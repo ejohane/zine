@@ -1,0 +1,21 @@
+{
+  "name": "@zine/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./components": "./src/components/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "*",
+    "@repo/typescript-config": "*",
+    "@types/node": "22.12.0",
+    "@types/react": "18.3.12",
+    "typescript": "5.3.3"
+  },
+  "dependencies": {}
+}
