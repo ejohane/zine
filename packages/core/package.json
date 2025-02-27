@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./components": "./src/components/index.ts"
+    "./bookmarks": "./src/bookmarks/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -17,5 +17,7 @@
     "@types/react": "18.3.12",
     "typescript": "5.3.3"
   },
-  "dependencies": {}
+  "dependencies": {
+    "open-graph-scraper-lite": "^2.1.0"
+  }
 }
