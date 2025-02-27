@@ -9,6 +9,7 @@ export default function Home() {
 
   return (
     <SafeAreaView className="w-full h-full">
+      <AddLinkActionSheet />
       {/* <Box> */}
       {/*   <Button */}
       {/*     size="md" */}
