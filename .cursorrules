@@ -25,8 +25,25 @@ This is a monorepo built using Turborepo, managed with Bun package manager.
 4. TypeScript configurations should extend from the shared `typescript-config` package
 5. ESLint configurations should extend from the shared `eslint-config` package
 
+## Styling Guidelines
+1. Always use design tokens for colors instead of hardcoded values
+   - Use `bg-background-0` for primary background (white in light mode)
+   - Use `bg-error-{shade}` for error states
+   - Use `text-background-0` for text on colored backgrounds
+   - Use `bg-background-error` for error backgrounds
+2. Theme-aware styling
+   - Never use hardcoded colors like `bg-white` or `text-black`
+   - Use semantic color tokens that automatically adapt to light/dark modes
+3. Component styling
+   - Use Tailwind classes through the `className` prop
+   - For animated styles, use design token variables: `rgb(var(--color-{token}))`
+4. Typography
+   - Use `text-typography-{shade}` for text colors
+   - Use predefined font sizes and weights from the theme
+
 ## Best Practices
 1. Keep shared code in packages to promote reusability
 2. Maintain clear separation between application and package code
 3. Use the monorepo's shared configurations for consistency
-4. Follow the established project structure for new features and components 
+4. Follow the established project structure for new features and components
+5. Use design tokens consistently across components for maintainable theming 

@@ -32,7 +32,7 @@ export const ContentListCard = ({
 }: ContentListCardProps) => {
   return (
     <Pressable onPress={() => Linking.openURL(url)}>
-      <Box className="flex flex-row p-4 gap-3 items-center">
+      <Box className="flex flex-row p-4 gap-3 items-center bg-background-0">
         <Image
           alt="image"
           source={{ uri: image ?? "" }}
@@ -77,11 +77,11 @@ export const SwipeableContentCard = ({
           alignItems: "center",
           justifyContent: "flex-end",
           width: 100,
-          backgroundColor: "#red-600",
+          backgroundColor: "rgb(var(--color-background-error))",
         }}
       >
-        <Box className="p-2 rounded-full bg-red-600 mr-4">
-          <Icon as={Trash2Icon} color="white" />
+        <Box className="p-2 rounded-full bg-error-600 mr-4">
+          <Icon as={Trash2Icon} className="text-background-0" />
         </Box>
       </Animated.View>
     );

@@ -14,7 +14,7 @@ export default function Queue() {
   if (isLoading) return <Text>Loading...</Text>;
 
   return (
-    <SafeAreaView className="h-full">
+    <SafeAreaView className="h-full bg-background-0">
       <FlatList
       className="h-full" 
          data={result ?? []} 
