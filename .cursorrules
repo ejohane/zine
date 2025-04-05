@@ -1,0 +1,32 @@
+# Zine Project Rules and Structure
+
+## Project Overview
+This is a monorepo built using Turborepo, managed with Bun package manager.
+
+## Directory Structure
+- `/apps` - Contains the main applications
+  - `/api` - Cloudflare Workers API with D1 database
+  - `/zine` - React Native app using Expo and Expo Router
+- `/packages` - Contains shared packages
+  - `/core` - Core shared functionality
+  - `/eslint-config` - Shared ESLint configuration
+  - `/typescript-config` - Shared TypeScript configuration
+
+## Technology Stack
+- Package Manager: Bun
+- Monorepo Tool: Turborepo
+- API: Cloudflare Workers with D1 database
+- Mobile App: React Native with Expo and Expo Router
+
+## Development Rules
+1. All shared code should be placed in the appropriate package under `/packages`
+2. Application-specific code should be contained within their respective directories under `/apps`
+3. Dependencies should be managed using Bun
+4. TypeScript configurations should extend from the shared `typescript-config` package
+5. ESLint configurations should extend from the shared `eslint-config` package
+
+## Best Practices
+1. Keep shared code in packages to promote reusability
+2. Maintain clear separation between application and package code
+3. Use the monorepo's shared configurations for consistency
+4. Follow the established project structure for new features and components 

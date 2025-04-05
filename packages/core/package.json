@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./bookmarks": "./src/bookmarks/index.ts"
+    ".": "./src/index.ts",
+    "./bookmarks": "./src/bookmarks/index.ts",
+    "./content": "./src/content/index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

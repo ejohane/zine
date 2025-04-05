@@ -1,9 +1,84 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7a563fbe-3684-4eb7-96fb-3312c144d28a",
+  "id": "1f919cf7-ee56-4df2-b49a-267cb01c74b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "bookmark_tags": {
+      "name": "bookmark_tags",
+      "columns": {
+        "bookmark_id": {
+          "name": "bookmark_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.446Z\"'"
+        }
+      },
+      "indexes": {
+        "bookmark_tags_tag_idx": {
+          "name": "bookmark_tags_tag_idx",
+          "columns": [
+            "tag_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "bookmark_tags_bookmark_id_bookmarks_id_fk": {
+          "name": "bookmark_tags_bookmark_id_bookmarks_id_fk",
+          "tableFrom": "bookmark_tags",
+          "tableTo": "bookmarks",
+          "columnsFrom": [
+            "bookmark_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "bookmark_tags_tag_id_tags_id_fk": {
+          "name": "bookmark_tags_tag_id_tags_id_fk",
+          "tableFrom": "bookmark_tags",
+          "tableTo": "tags",
+          "columnsFrom": [
+            "tag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "bookmark_tags_bookmark_id_tag_id_pk": {
+          "columns": [
+            "bookmark_id",
+            "tag_id"
+          ],
+          "name": "bookmark_tags_bookmark_id_tag_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "bookmarks": {
       "name": "bookmarks",
       "columns": {
@@ -34,7 +109,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-02-24T21:04:41.186Z\"'"
+          "default": "'\"2025-04-01T10:44:54.446Z\"'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -42,7 +117,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-02-24T21:04:41.186Z\"'"
+          "default": "'\"2025-04-01T10:44:54.446Z\"'"
         },
         "is_archived": {
           "name": "is_archived",
@@ -73,6 +148,142 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "author": {
+      "name": "author",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.443Z\"'"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.443Z\"'"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "author_services": {
+      "name": "author_services",
+      "columns": {
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "service_id": {
+          "name": "service_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "service_url": {
+          "name": "service_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.444Z\"'"
+        }
+      },
+      "indexes": {
+        "author_services_service_idx": {
+          "name": "author_services_service_idx",
+          "columns": [
+            "service_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "author_services_author_id_author_id_fk": {
+          "name": "author_services_author_id_author_id_fk",
+          "tableFrom": "author_services",
+          "tableTo": "author",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "author_services_service_id_services_id_fk": {
+          "name": "author_services_service_id_services_id_fk",
+          "tableFrom": "author_services",
+          "tableTo": "services",
+          "columnsFrom": [
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "author_services_author_id_service_id_pk": {
+          "columns": [
+            "author_id",
+            "service_id"
+          ],
+          "name": "author_services_author_id_service_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "content": {
       "name": "content",
       "columns": {
@@ -89,7 +300,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'\"2025-02-24T21:04:41.185Z\"'"
+          "default": "'\"2025-04-01T10:44:54.446Z\"'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -97,7 +308,7 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false,
-          "default": "'\"2025-02-24T21:04:41.185Z\"'"
+          "default": "'\"2025-04-01T10:44:54.446Z\"'"
         },
         "url": {
           "name": "url",
@@ -120,36 +331,16 @@
           "notNull": false,
           "autoincrement": false
         },
-        "site_name": {
-          "name": "site_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "type": {
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "website": {
-          "name": "website",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'link'"
         },
         "image": {
           "name": "image",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "author": {
-          "name": "author",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -162,22 +353,138 @@
           "notNull": false,
           "autoincrement": false
         },
-        "source": {
-          "name": "source",
-          "type": "text",
+        "author_id": {
+          "name": "author_id",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "metadata": {
-          "name": "metadata",
-          "type": "text",
+        "service_id": {
+          "name": "service_id",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "type_idx": {
+          "name": "type_idx",
+          "columns": [
+            "type"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "content_author_id_author_id_fk": {
+          "name": "content_author_id_author_id_fk",
+          "tableFrom": "content",
+          "tableTo": "author",
+          "columnsFrom": [
+            "author_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "content_service_id_services_id_fk": {
+          "name": "content_service_id_services_id_fk",
+          "tableFrom": "content",
+          "tableTo": "services",
+          "columnsFrom": [
+            "service_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "services": {
+      "name": "services",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'web'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.443Z\"'"
+        }
+      },
+      "indexes": {
+        "services_name_unique": {
+          "name": "services_name_unique",
+          "columns": [
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tags": {
+      "name": "tags",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'\"2025-04-01T10:44:54.438Z\"'"
+        }
+      },
+      "indexes": {
+        "tags_name_unique": {
+          "name": "tags_name_unique",
+          "columns": [
+            "name"
+          ],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

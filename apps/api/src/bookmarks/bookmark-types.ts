@@ -1,7 +1,7 @@
 import { InferSelectModel } from "drizzle-orm";
 import { bookmarks } from "./bookmarks.sql";
-import { ContentItem } from "../content/content-types";
+import { Content } from "../content/types/content-types";
 
 export type Bookmark = Omit<InferSelectModel<typeof bookmarks>, "contentId"> & {
-  content: ContentItem;
+  content: Content;
 };

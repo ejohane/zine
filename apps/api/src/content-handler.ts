@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import z from "zod";
 import { Env } from ".";
-import { parsePreview } from "./content/content";
+import { parseAndSave } from "./content/content";
 
 const app = new Hono<Env>().post(
   "/preview",
@@ -10,7 +10,7 @@ const app = new Hono<Env>().post(
   async (c) => {
     const { url } = c.req.valid("json");
 
-    const { result, error, errorMsg } = await parsePreview(url, c.env.DB);
+    const { result, error, errorMsg } = await parseAndSave(url, c.env.DB);
 
     if (error) {
       c.status(500);

@@ -3,6 +3,12 @@
 name = "zine-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-09"
+compatibility_flags = ["nodejs_compat_v2"]
+
+
+routes = [
+  { pattern = "api.erikjohansson.dev", custom_domain = true }
+]
 
 # Workers Logs
 # Docs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
@@ -10,9 +16,6 @@ compatibility_date = "2025-01-09"
 [observability]
 enabled = true
 
-routes = [
-  { pattern = "api.erikjohansson.dev", custom_domain = true }
-]
 
 # Automatically place your workloads in an optimal location to minimize latency.
 # If you are running back-end logic in a Worker, running it closer to your back-end infrastructure
@@ -49,7 +52,7 @@ routes = [
 [[d1_databases]]
 binding = "DB"
 database_name = "zine-db"
-database_id = "06dd0188-b014-405e-b9a5-19e3068c507f"
+database_id = "4746a303-2143-4573-8997-849d7b707607"
 migrations_dir = "drizzle"
 
 

@@ -18,28 +18,27 @@ function getLocalD1DB() {
   }
 }
 
-// export default defineConfig({
-//   dialect: "sqlite",
-//   schema: "./src/**/*.sql.ts",
-//   out: "./drizzle",
-//   driver: "d1-http",
-//   dbCredentials: {
-//     databaseId: "06dd0188-b014-405e-b9a5-19e3068c507f",
-//     accountId: process.env.CLOUDFLARE_ACCOUNT_ID as string,
-//     token: process.env.CLOUDFLARE_API_TOKEN as string,
-//   },
-// });
+const isProduction = process.env.ENVIRONMENT === "production";
 
-export default defineConfig({
-  dialect: "sqlite",
-  schema: "./src/**/*.sql.ts",
-  out: "./drizzle",
-  // dbCredentials: {
-  // 	databaseId: "06dd0188-b014-405e-b9a5-19e3068c507f",
-  // 	accountId: process.env.CLOUDFLARE_ACCOUNT_ID as string,
-  // 	token: process.env.CLOUDFLARE_API_TOKEN as string,
-  // },
-  dbCredentials: {
-    url: getLocalD1DB(),
-  } as any,
-});
+const config = isProduction
+  ? defineConfig({
+      dialect: "sqlite",
+      schema: "./src/**/*.sql.ts",
+      out: "./drizzle",
+      driver: "d1-http",
+      dbCredentials: {
+        databaseId: "4746a303-2143-4573-8997-849d7b707607",
+        accountId: process.env.CLOUDFLARE_ACCOUNT_ID as string,
+        token: process.env.CLOUDFLARE_API_TOKEN as string,
+      },
+    })
+  : defineConfig({
+      dialect: "sqlite",
+      schema: "./src/**/*.sql.ts",
+      out: "./drizzle",
+      dbCredentials: {
+        url: getLocalD1DB(),
+      } as any,
+    });
+
+export default config;

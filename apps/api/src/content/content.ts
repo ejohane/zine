@@ -1,69 +1,126 @@
-import { eq } from "drizzle-orm";
-import { ContentItem, ContentPreview } from "./content-types";
-import { content } from "./content.sql";
-import { parseOpenGraph } from "./open-graph/open-graph-parser";
 import { drizzle } from "drizzle-orm/d1";
 import { ErrorResult, SuccessResult } from "../common/common-types";
+import { Content } from "./types/content-types";
+import { author, content, services } from "./schema";
+import { processUrl } from "./processor";
+import { getOrCreateService } from "./service";
+import { getOrCreateAuthorForService } from "./author";
+import { eq } from "drizzle-orm";
 
-async function getContentByUrl(url: string, db: any) {
-  return await drizzle(db)
-    .select()
-    .from(content)
-    .where(eq(content.url, url))
-    .get();
-}
-
-export async function getContentItemByUrl(
-  url: string,
-  db: any,
-): Promise<ContentItem | undefined> {
-  const content = await getContentByUrl(url, db);
-  if (!content) return;
-  const { metadata, ...contentWithoutMetadata } = content;
-  return contentWithoutMetadata;
-}
-
-export async function parsePreview(
+export async function getContentByUrl(
   url: string,
   db: D1Database,
-): Promise<SuccessResult<ContentPreview> | ErrorResult<ContentPreview>> {
-  const existingContent = await getContentByUrl(url, db);
-  if (existingContent) {
-    const { title } = existingContent;
-    return SuccessResult({ title, url });
-  }
+): Promise<Content | undefined> {
+  const result = await drizzle(db)
+    .select({
+      id: content.id,
+      createdAt: content.createdAt,
+      updatedAt: content.updatedAt,
+      publishedDate: content.publishedDate,
+      url: content.url,
+      title: content.title,
+      description: content.description,
+      type: content.type,
+      image: content.image,
+      duration: content.duration,
+      author: {
+        id: author.id,
+        name: author.name,
+        image: author.image,
+        description: author.description,
+        createdAt: author.createdAt,
+        updatedAt: author.updatedAt,
+      },
+      service: {
+        id: services.id,
+        name: services.name,
+        createdAt: services.createdAt,
+      },
+    })
+    .from(content)
+    .leftJoin(author, eq(content.authorId, author.id)) // LEFT JOIN because authorId is nullable
+    .innerJoin(services, eq(content.serviceId, services.id)) // INNER JOIN because serviceId is not null
+    .where(eq(content.url, url))
+    .limit(1)
+    .then((rows) => rows[0] || null);
 
-  const item = await parseOpenGraph(url);
-  if (!item) {
-    return ErrorResult("Failed to parse Open Graph data");
-  }
-
-  const { title } = item;
-
-  return SuccessResult({ title, url });
+  return result;
 }
 
 export async function parseAndSave(
   url: string,
   db: D1Database,
-): Promise<SuccessResult<ContentItem> | ErrorResult<ContentItem>> {
+): Promise<SuccessResult<Content> | ErrorResult<Content>> {
+  console.log("parseAndSave", url);
   const existingContent = await getContentByUrl(url, db);
   if (existingContent) {
-    const { metadata, ...itemWithoutMetadata } = existingContent;
-    return SuccessResult(itemWithoutMetadata);
+    return SuccessResult(existingContent);
+  }
+  console.log("existingContent", existingContent);
+
+  const partialContent = await processUrl(url);
+  if (!partialContent) {
+    return ErrorResult("Failed to parse url");
   }
 
-  const item = await parseOpenGraph(url);
-  if (!item) {
-    return ErrorResult("Failed to parse Open Graph data");
-  }
+  const serviceRecord = await getOrCreateService(
+    partialContent.service?.name as any,
+    db,
+  );
 
-  const [newContentItem] = await drizzle(db)
+  const authorRecord = await getOrCreateAuthorForService(
+    {
+      name: partialContent?.author?.name ?? "",
+      description: partialContent?.author?.description,
+      image: partialContent?.author?.image,
+    },
+    serviceRecord.id,
+    db,
+  );
+
+  const { authorId, serviceId, ...newContent } = await drizzle(db)
     .insert(content)
-    .values({ ...item, createdAt: new Date(), updatedAt: new Date() })
-    .returning();
+    .values({
+      authorId: authorRecord.id,
+      serviceId: serviceRecord.id,
+      url: url,
+      title: partialContent.title,
+      description: partialContent.description,
+      type: partialContent.type,
+      image: partialContent.image,
+      duration: partialContent.duration,
+      publishedDate: partialContent.publishedDate || new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning()
+    .then((rows) => rows[0]);
 
-  const { metadata, ...itemWithoutMetadata } = newContentItem;
+  const c: Content = {
+    id: newContent.id,
+    url: newContent.url,
+    createdAt: newContent.createdAt,
+    updatedAt: newContent.updatedAt,
+    description: newContent.description,
+    type: newContent.type,
+    duration: newContent.duration,
+    title: newContent.title,
+    image: newContent.image,
+    publishedDate: newContent.publishedDate,
+    author: {
+      id: authorRecord.id,
+      createdAt: authorRecord.createdAt,
+      description: authorRecord.description,
+      name: authorRecord.name,
+      image: authorRecord.image,
+      updatedAt: authorRecord.updatedAt,
+    },
+    service: {
+      id: serviceRecord.id,
+      name: serviceRecord.name,
+      createdAt: serviceRecord.createdAt,
+    },
+  };
 
-  return SuccessResult(itemWithoutMetadata);
+  return SuccessResult(c);
 }

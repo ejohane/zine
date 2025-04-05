@@ -15,7 +15,11 @@
     /* Specify how TypeScript looks up a file from a given module specifier. */
     "moduleResolution": "Bundler",
     /* Specify type package names to be included without being referenced in a source file. */
-    "types": ["@cloudflare/workers-types/2023-07-01", "@types/node"],
+    "types": [
+      "@cloudflare/workers-types/2023-07-01",
+      "@types/node",
+      "vitest/globals"
+    ],
     /* Enable importing .json files */
     "resolveJsonModule": true,
 

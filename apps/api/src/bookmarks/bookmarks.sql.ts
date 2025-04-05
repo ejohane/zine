@@ -1,5 +1,12 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { content } from "../content/content.sql";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
+import { tags } from "../tags/tags.sql";
+import { content } from "../content/schema";
 
 export const bookmarks = sqliteTable("bookmarks", {
   id: integer("id", { mode: "number" }).primaryKey(),
@@ -17,3 +24,24 @@ export const bookmarks = sqliteTable("bookmarks", {
     .notNull()
     .default(false),
 });
+
+export const bookmarkTags = sqliteTable(
+  "bookmark_tags",
+  {
+    bookmarkId: integer("bookmark_id")
+      .notNull()
+      .references(() => bookmarks.id),
+    tagId: integer("tag_id")
+      .notNull()
+      .references(() => tags.id),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(new Date()),
+  },
+  (table) => ({
+    // Define composite primary key directly with primaryKey()
+    pk: primaryKey({ columns: [table.bookmarkId, table.tagId] }),
+    // Index for faster lookups by tag
+    tagIdx: index("bookmark_tags_tag_idx").on(table.tagId),
+  }),
+);
