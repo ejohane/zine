@@ -12,7 +12,7 @@ export function mapSpotifyEpisodeToContent(
     publishedDate: new Date(episode.release_date),
     type: "audio",
     image: episode.images[0]?.url,
-    duration: episode.duration_ms * 1000,
+    duration: episode.duration_ms / 1000,
     author: {
       name: episode.show.name,
       description: episode.show.description,

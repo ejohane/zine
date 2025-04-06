@@ -9,7 +9,11 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuZXJpa2pvaGFuc3Nvbi5kZXYk",
+        "EXPO_PUBLIC_API_URL": "https://api.erikjohansson.dev"
+      }
     },
     "production": {
       "autoIncrement": true

@@ -51,6 +51,8 @@ export async function getBookmarksForUser(req: {
     };
   });
 
+  console.log(response)
+
   return SuccessResult(response);
 }
 

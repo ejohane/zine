@@ -10,8 +10,6 @@ const spotify = SpotifyApi.withClientCredentials(clientID, clientSecret);
 export async function resolveSpotifyEpisode(
   episodeId: string,
 ): Promise<Episode | null> {
-  console.log("resolveSpotifyEpisode", episodeId);
   const episode = await spotify.episodes.get(episodeId, "US");
-  console.log("episode", episode);
   return episode;
 }

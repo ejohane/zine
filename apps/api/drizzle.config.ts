@@ -18,7 +18,8 @@ function getLocalD1DB() {
   }
 }
 
-const isProduction = process.env.ENVIRONMENT === "production";
+// const isProduction = process.env.ENVIRONMENT === "production";
+const isProduction = true
 
 const config = isProduction
   ? defineConfig({

@@ -33,7 +33,6 @@ app.use(
 app.use("*", clerkMiddleware());
 
 app.use("*", async (c, next) => {
-  console.log("here");
   const auth = getAuth(c);
   if (!auth?.userId) {
     return c.json({ error: "Unauthorized" }, 401);

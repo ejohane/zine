@@ -1,6 +1,5 @@
 import { YoutubeVideoDetails } from "../resolvers/youtube-resolver";
-import { Content, PartialContent } from "../../types/content-types";
-import { NestedPartial } from "../../../utils/type-utils";
+import { PartialContent } from "../../types/content-types";
 
 export function mapYoutubeEpisodeToContent(
   url: string,
@@ -12,12 +11,12 @@ export function mapYoutubeEpisodeToContent(
     description: youtube.description,
     publishedDate: new Date(youtube.publishedAt),
     type: "video",
-    image: youtube.thumbnails?.default?.url ?? undefined,
+    image: youtube.thumbnails?.high?.url ?? undefined,
     duration: youtube.duration ?? undefined,
     author: {
       name: youtube.channel.title,
       description: youtube.channel.description,
-      image: youtube.channel.thumbnails.default?.url ?? undefined,
+      image: youtube.channel.thumbnails.high?.url ?? undefined,
     },
     service: {
       name: "youtube",
