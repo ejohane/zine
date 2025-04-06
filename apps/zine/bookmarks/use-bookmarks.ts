@@ -146,6 +146,82 @@ export const useBookmarks = () => {
     },
   });
 
+  const { mutate: addTagToBookmarkMutate } = useMutation({
+    mutationKey: ["add-tag-to-bookmark"],
+    mutationFn: async ({ bookmarkId, tagName }: { bookmarkId: number; tagName: string }) => {
+      const token = await auth.getToken();
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/bookmarks/${bookmarkId}/tags`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ tagName }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to add tag to bookmark");
+      }
+
+      return response.json();
+    },
+    // Optimistic update
+    onMutate: async ({ bookmarkId, tagName }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["get-bookmarks"] });
+
+      // Save the previous bookmarks
+      const previousBookmarks = queryClient.getQueryData(["get-bookmarks"]);
+
+      // Optimistically update the cache
+      queryClient.setQueryData<GetBookmarksResponse>(
+        ["get-bookmarks"],
+        (old) => {
+          if (!old?.result) return old;
+          
+          return {
+            result: old.result.map((bookmark) => {
+              if (bookmark.id === bookmarkId) {
+                // Check if the tag already exists
+                const tagExists = bookmark.tags?.some(tag => tag.name === tagName) ?? false;
+                
+                if (!tagExists) {
+                  // Add the new tag to the bookmark
+                  return {
+                    ...bookmark,
+                    tags: [
+                      ...(bookmark.tags ?? []),
+                      {
+                        id: 0, // Temporary ID
+                        name: tagName,
+                        createdAt: new Date(),
+                      },
+                    ],
+                  };
+                }
+              }
+              return bookmark;
+            }),
+          };
+        },
+      );
+
+      // Return context with previous bookmarks for rollback
+      return { previousBookmarks };
+    },
+    // If the mutation fails, rollback using the previous value
+    onError: (_err, _variables, context) => {
+      queryClient.setQueryData(["get-bookmarks"], context?.previousBookmarks);
+    },
+    // After success or error, refetch to ensure data is correct
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["get-bookmarks"] });
+    },
+  });
+
   return {
     bookmarks: {
       result: query.data?.result,
@@ -154,5 +230,6 @@ export const useBookmarks = () => {
     },
     saveBookmark: mutate,
     deleteBookmark: deleteBookmarkMutate,
+    addTagToBookmark: addTagToBookmarkMutate,
   };
 };

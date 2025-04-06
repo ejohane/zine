@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import bookmarksHandler from "./bookmarks-handler";
 import contentHandler from "./content-handler";
+import tagsHandler from "./tags/tags-handler";
 import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
 
 export type Env = {
@@ -11,6 +12,7 @@ export type Env = {
   };
   Variables: {
     userId: string;
+    auth: ReturnType<typeof getAuth>;
   };
 };
 
@@ -45,7 +47,8 @@ app.use("*", async (c, next) => {
 
 const routes = app
   .route("/bookmarks", bookmarksHandler)
-  .route("/content", contentHandler);
+  .route("/content", contentHandler)
+  .route("/tags", tagsHandler);
 
 export default app;
 

@@ -1,4 +1,5 @@
 import { Content } from "../content/content-types";
+import { Tag } from "../tags/tag-types";
 
 export interface Bookmark {
   id: number;
@@ -7,4 +8,5 @@ export interface Bookmark {
   updatedAt: Date;
   isArchived: boolean;
   content: Content;
+  tags?: Tag[];
 }

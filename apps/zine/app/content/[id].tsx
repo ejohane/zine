@@ -24,10 +24,11 @@ import { Linking } from "react-native";
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import { formatDate, formatDuration } from "@/utils/format";
+import { TagList } from "@/components/tags";
 
 export default function ContentPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { bookmarks } = useBookmarks();
+  const { bookmarks, addTagToBookmark } = useBookmarks();
   const router = useRouter();
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
@@ -101,6 +102,19 @@ export default function ContentPage() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       Linking.openURL(contentUrl);
     }
+  };
+
+  // Handle adding a new tag
+  const handleAddTag = (tagName: string) => {
+    if(!bookmark?.id) return;
+    addTagToBookmark({bookmarkId: bookmark?.id, tagName});
+  };
+
+  // Handle removing a tag
+  const handleRemoveTag = (tagId: number) => {
+    // Here you would call your API to remove the tag
+    console.log("Removing tag:", tagId);
+    // For now, we'll just log the action
   };
 
   return (
@@ -204,6 +218,13 @@ export default function ContentPage() {
               </Text>
             </Pressable>
           </Box>
+
+          {/* Tags Section */}
+          <TagList 
+            tags={bookmark?.tags} 
+            onAddTag={handleAddTag} 
+            onRemoveTag={handleRemoveTag} 
+          />
 
           <Pressable
             onPress={isDescriptionLong ? toggleDescription : undefined}

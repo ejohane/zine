@@ -1,9 +1,23 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
-export const tags = sqliteTable("tags", {
-  id: integer("id", { mode: "number" }).primaryKey(),
-  name: text("name").notNull().unique(), // Unique tag names
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(new Date()),
-});
+export const tags = sqliteTable(
+  "tags",
+  {
+    id: integer("id", { mode: "number" }).primaryKey(),
+    name: text("name").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(new Date()),
+  },
+  (table) => ({
+    // Create a unique index on the name to prevent duplicate tags
+    nameIdx: uniqueIndex("tags_name_unique").on(table.name),
+  })
+);

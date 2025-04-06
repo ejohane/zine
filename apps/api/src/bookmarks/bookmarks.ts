@@ -1,11 +1,12 @@
 import { drizzle } from "drizzle-orm/d1";
 import { getContentByUrl, parseAndSave } from "../content/content";
-import { bookmarks } from "./bookmarks.sql";
-import { and, eq, desc } from "drizzle-orm";
+import { bookmarks, bookmarkTags } from "./bookmarks.sql";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import { Bookmark } from "@zine/core";
 import { ErrorResult, SuccessResult } from "../common/common-types";
 import { content } from "../content/schema";
 import { author, services } from "../content/schema";
+import { tags } from "../tags/tags.sql";
 
 export async function getBookmarksForUser(req: {
   userId: string;
@@ -26,6 +27,26 @@ export async function getBookmarksForUser(req: {
     .innerJoin(content, eq(bookmarks.contentId, content.id))
     .leftJoin(author, eq(content.authorId, author.id))
     .innerJoin(services, eq(content.serviceId, services.id));
+
+  // Get tags for all bookmarks
+  const bookmarkIds = result.map(r => r.bookmarks.id);
+  const bookmarkTagsResult = await drizzle(req.db)
+    .select({
+      bookmarkId: bookmarkTags.bookmarkId,
+      tag: tags,
+    })
+    .from(bookmarkTags)
+    .innerJoin(tags, eq(bookmarkTags.tagId, tags.id))
+    .where(inArray(bookmarkTags.bookmarkId, bookmarkIds));
+
+  // Create a map of bookmark IDs to their tags
+  const tagsByBookmarkId = bookmarkTagsResult.reduce((acc, { bookmarkId, tag }) => {
+    if (!acc[bookmarkId]) {
+      acc[bookmarkId] = [];
+    }
+    acc[bookmarkId].push(tag);
+    return acc;
+  }, {} as Record<number, typeof tags.$inferSelect[]>);
 
   const response = result.map<Bookmark>((obj) => {
     const { contentId, ...bookmark } = obj.bookmarks;
@@ -48,10 +69,9 @@ export async function getBookmarksForUser(req: {
           createdAt: obj.service.createdAt,
         },
       },
+      tags: tagsByBookmarkId[bookmark.id] || [],
     };
   });
-
-  console.log(response)
 
   return SuccessResult(response);
 }
@@ -82,6 +102,16 @@ export async function createBookmark(req: {
   if (existingBookmarkResult && existingContent) {
     const { contentId, ...bookmarkFields } = existingBookmarkResult.bookmarks;
     const { authorId, serviceId, ...contentFields } = existingBookmarkResult.content;
+
+    // Get tags for the bookmark
+    const bookmarkTagsResult = await drizzle(req.db)
+      .select({
+        tag: tags,
+      })
+      .from(bookmarkTags)
+      .innerJoin(tags, eq(bookmarkTags.tagId, tags.id))
+      .where(eq(bookmarkTags.bookmarkId, bookmarkFields.id));
+
     return SuccessResult({
       ...bookmarkFields,
       content: {
@@ -100,6 +130,7 @@ export async function createBookmark(req: {
           createdAt: existingBookmarkResult.service.createdAt,
         },
       },
+      tags: bookmarkTagsResult.map(r => r.tag),
     });
   }
 
@@ -129,6 +160,7 @@ export async function createBookmark(req: {
   return SuccessResult({
     ...bookmarkFields,
     content: existingContent,
+    tags: [],
   });
 }
 
@@ -142,6 +174,74 @@ export async function archiveBookmark(req: {
       .update(bookmarks)
       .set({ isArchived: true })
       .where(and(eq(bookmarks.id, req.id), eq(bookmarks.userId, req.userId)));
+
+    return SuccessResult(undefined);
+  } catch (error: any) {
+    return ErrorResult(error);
+  }
+}
+
+export async function addTagToBookmark(req: {
+  bookmarkId: number;
+  tagName: string;
+  userId: string;
+  db: D1Database;
+}): Promise<SuccessResult<void> | ErrorResult<void>> {
+  try {
+    // First, verify the bookmark exists and belongs to the user
+    const bookmark = await drizzle(req.db)
+      .select()
+      .from(bookmarks)
+      .where(and(eq(bookmarks.id, req.bookmarkId), eq(bookmarks.userId, req.userId)))
+      .get();
+
+    if (!bookmark) {
+      return ErrorResult("Bookmark not found or does not belong to user");
+    }
+
+    // Check if the tag already exists
+    let tag = await drizzle(req.db)
+      .select()
+      .from(tags)
+      .where(eq(tags.name, req.tagName))
+      .get();
+
+    // If tag doesn't exist, create it
+    if (!tag) {
+      const [newTag] = await drizzle(req.db)
+        .insert(tags)
+        .values({
+          name: req.tagName,
+          createdAt: new Date(),
+        })
+        .returning();
+
+      if (!newTag) {
+        return ErrorResult("Failed to create tag");
+      }
+      tag = newTag;
+    }
+
+    // Check if the bookmark-tag relationship already exists
+    const existingRelationship = await drizzle(req.db)
+      .select()
+      .from(bookmarkTags)
+      .where(and(
+        eq(bookmarkTags.bookmarkId, req.bookmarkId),
+        eq(bookmarkTags.tagId, tag.id)
+      ))
+      .get();
+
+    // If the relationship doesn't exist, create it
+    if (!existingRelationship) {
+      await drizzle(req.db)
+        .insert(bookmarkTags)
+        .values({
+          bookmarkId: req.bookmarkId,
+          tagId: tag.id,
+          createdAt: new Date(),
+        });
+    }
 
     return SuccessResult(undefined);
   } catch (error: any) {
