@@ -93,8 +93,10 @@ export const SwipeableContentCard = ({
         friction={2} // Controls swipe resistance
         rightThreshold={DELETE_THRESHOLD} // Distance to swipe before triggering delete
         renderRightActions={renderRightActions}
-        onSwipeableOpen={(direction) => {
+        onSwipeableWillOpen={(direction) => {
           if (direction === "right" && onDelete) {
+            // Call onDelete immediately when the swipeable is about to open
+            // This happens when the user releases the swipeable item and it's within the threshold
             onDelete();
           }
         }}
