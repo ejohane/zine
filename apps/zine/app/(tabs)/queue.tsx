@@ -16,20 +16,22 @@ export default function Queue() {
   return (
     <SafeAreaView className="h-full bg-background-0">
       <FlatList
-      className="h-full" 
-         data={result ?? []} 
-         renderItem={({ item }) => { 
-           return ( 
-             <SwipeableContentCard 
-               url={item.content.url} 
-               title={item.content.title ?? "" } 
-               image={item.content.image ?? ""} 
-               author={item.content.author?.name ?? ""} 
-               onDelete={() => deleteBookmark(item.id)} 
-             /> 
-           ); 
-         }} 
-       /> 
+        className="h-full" 
+        data={result ?? []} 
+        renderItem={({ item }) => { 
+          return ( 
+            <SwipeableContentCard 
+              id={item.id}
+              url={item.content.url} 
+              title={item.content.title ?? "" } 
+              image={item.content.image ?? ""} 
+              author={item.content.author?.name ?? ""} 
+              type={item.content.type}
+              onDelete={() => deleteBookmark(item.id)} 
+            /> 
+          ); 
+        }} 
+      /> 
       <AddLinkFab />
     </SafeAreaView>
   );

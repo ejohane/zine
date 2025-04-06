@@ -7,9 +7,16 @@ export interface Author {
   description: string | null;
 }
 
+export type ServiceName = "youtube" |
+  "spotify" |
+  "x" |
+  "substack" |
+  "rss" |
+  "web"
+
 export interface Service {
   id: number;
-  name: string;
+  name: ServiceName;
   createdAt: Date;
 }
 
@@ -22,6 +29,7 @@ export const contentTypes = [
   "link",
 ] as const;
 export type ContentType = (typeof contentTypes)[number];
+
 
 export interface Content {
   id: number;
@@ -41,14 +49,14 @@ export interface Content {
 // Partial types using DeepPartial
 export type DeepPartial<T> = T extends object
   ? {
-      [P in keyof T]?: DeepPartial<T[P]>;
-    }
+    [P in keyof T]?: DeepPartial<T[P]>;
+  }
   : T;
 
 export type PartialAuthor = DeepPartial<Author>;
 export type PartialService = DeepPartial<Service>;
 export type PartialContent = {
   [K in keyof Content]?: Content[K] extends infer U | null
-    ? DeepPartial<U> | null
-    : DeepPartial<Content[K]>;
+  ? DeepPartial<U> | null
+  : DeepPartial<Content[K]>;
 }; 

@@ -4,7 +4,7 @@ import { Box } from "../ui/box";
 import { Image } from "../ui/image";
 import { Text } from "../ui/text";
 import { Icon } from "../ui/icon";
-import { BookIcon, Trash2Icon } from "lucide-react-native";
+import { BookIcon, Trash2Icon, HeadphonesIcon, TvIcon, NewspaperIcon, XIcon, GlobeIcon } from "lucide-react-native";
 import {
   GestureHandlerRootView,
   PanGestureHandler,
@@ -12,26 +12,59 @@ import {
   Swipeable,
 } from "react-native-gesture-handler";
 import { useCallback, useRef } from "react";
+import { router } from "expo-router";
+import { ContentType } from "@zine/core";
 
 type ContentListCardProps = {
+  id?: number;
   url: string;
   title?: string;
   image?: string;
   author?: string;
+  type?: ContentType
   onDelete?: () => void;
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const DELETE_THRESHOLD = SCREEN_WIDTH * 0.3;
 
+const getContentTypeIcon = (type?: ContentType) => {
+  switch (type) {
+    case "audio":
+      return HeadphonesIcon;
+    case "video":
+      return TvIcon;
+    case "article":
+      return NewspaperIcon;
+    case "post":
+      return XIcon;
+    case "link":
+      return GlobeIcon;
+    default:
+      return BookIcon;
+  }
+};
+
 export const ContentListCard = ({
+  id,
   url,
   title,
   image,
   author,
+  type,
 }: ContentListCardProps) => {
+  const handlePress = () => {
+    if (id) {
+      router.push(`/content/${id.toString()}`);
+    } else {
+      Linking.openURL(url);
+    }
+  };
+
+  const ContentIcon = getContentTypeIcon(type);
+
   return (
-    <Pressable onPress={() => Linking.openURL(url)}>
+    <Pressable onPress={handlePress}>
       <Box className="flex flex-row p-4 gap-3 items-center bg-background-0">
         <Image
           alt="image"
@@ -42,7 +75,7 @@ export const ContentListCard = ({
           <Text className="font-semibold text-xl line-clamp-2">{title}</Text>
           {author && (
             <Box className="flex flex-row items-center gap-2 pt-1">
-              <Icon as={BookIcon} size="sm" />
+              <Icon as={ContentIcon} size="sm" />
               <Text className="text-sm">•</Text>
               <Text className="text-sm">{author}</Text>
             </Box>
@@ -54,10 +87,12 @@ export const ContentListCard = ({
 };
 
 export const SwipeableContentCard = ({
+  id,
   url,
   title,
   image,
   author,
+  type,
   onDelete,
 }: ContentListCardProps) => {
   // Render the right swipe action (delete button)
@@ -102,10 +137,12 @@ export const SwipeableContentCard = ({
         }}
       >
         <ContentListCard
+          id={id}
           url={url}
           title={title}
           image={image}
           author={author}
+          type={type}
         />
       </Swipeable>
     </GestureHandlerRootView>
