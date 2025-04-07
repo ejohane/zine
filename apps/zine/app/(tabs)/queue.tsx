@@ -21,12 +21,7 @@ export default function Queue() {
         renderItem={({ item }) => { 
           return ( 
             <SwipeableContentCard 
-              id={item.id}
-              url={item.content.url} 
-              title={item.content.title ?? "" } 
-              image={item.content.image ?? ""} 
-              author={item.content.author?.name ?? ""} 
-              type={item.content.type}
+              bookmark={item}
               onDelete={() => deleteBookmark(item.id)} 
             /> 
           ); 
