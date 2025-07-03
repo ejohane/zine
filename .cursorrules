@@ -1,0 +1,223 @@
+# Zine Bookmark Manager - Cursor Rules
+
+You are an expert full-stack developer working on Zine, a modern bookmark manager built with TypeScript. This is a monorepo project using Turborepo and Bun.
+
+## Project Structure
+
+This is a monorepo with the following structure:
+- `apps/web/` - React frontend (Vite + TypeScript)
+- `packages/api/` - Hono API backend (Cloudflare Workers)
+- `packages/shared/` - Shared types and utilities
+- Root-level configuration files for the monorepo
+
+## Technology Stack
+
+### Frontend (`apps/web/`)
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Routing**: Tanstack Router (v1.45+)
+- **UI Components**: shadcn/ui with Radix UI primitives
+- **Styling**: Tailwind CSS with tailwindcss-animate
+- **Icons**: Lucide React
+- **Utilities**: clsx, tailwind-merge, class-variance-authority
+- **Deployment**: Cloudflare Pages via Wrangler
+
+### Backend (`packages/api/`)
+- **Framework**: Hono (v4.4+)
+- **Runtime**: Cloudflare Workers
+- **Database**: Cloudflare D1 with Drizzle ORM
+- **Validation**: Zod schemas with drizzle-zod integration
+- **Deployment**: Cloudflare Workers via Wrangler
+
+### Shared (`packages/shared/`)
+- **Types**: Shared TypeScript interfaces and types
+- **Utilities**: Common utility functions
+- **Validation**: Shared Zod schemas
+
+### Monorepo Tools
+- **Package Manager**: Bun (v1.0+)
+- **Monorepo**: Turborepo with workspace management
+- **Linting**: ESLint with TypeScript rules
+- **Type Checking**: TypeScript (v5.0+)
+
+## Development Guidelines
+
+### Code Style & Patterns
+1. **Use TypeScript strictly** - Enable all strict options, prefer explicit types
+2. **Follow React best practices** - Use hooks, functional components, proper dependency arrays
+3. **Implement proper error handling** - Use Result patterns, proper error boundaries
+4. **Use Zod for validation** - All API inputs/outputs should have Zod schemas
+5. **Prefer composition over inheritance** - Use React patterns like render props, hooks
+6. **Use proper async/await patterns** - Handle promises correctly, avoid callback hell
+
+### File Naming Conventions
+- **React Components**: PascalCase (e.g., `BookmarkCard.tsx`)
+- **Hooks**: camelCase with "use" prefix (e.g., `useBookmarks.ts`)
+- **Utilities**: camelCase (e.g., `formatDate.ts`)
+- **Types**: PascalCase (e.g., `BookmarkTypes.ts`)
+- **API Routes**: kebab-case (e.g., `bookmark-routes.ts`)
+
+### Import Organization
+```typescript
+// 1. Node modules
+import React from 'react'
+import { Hono } from 'hono'
+
+// 2. Internal packages (monorepo)
+import { BookmarkSchema } from '@zine/shared'
+
+// 3. Relative imports
+import { Button } from '../components/ui/button'
+import './styles.css'
+```
+
+### Component Patterns
+- Use shadcn/ui components as base, extend with custom variants
+- Implement proper loading and error states
+- Use Tanstack Router for navigation and route management
+- Prefer controlled components with proper form handling
+
+### API Development
+- Use Hono's context properly for request/response handling
+- Implement proper CORS and security headers
+- Use Drizzle ORM for type-safe database operations
+- Validate all inputs with Zod schemas
+- Return consistent API response formats
+
+### Database Patterns
+- Use Drizzle ORM schema definitions in `packages/api/src/db/`
+- Implement proper migrations with `drizzle-kit`
+- Use proper indexing for query performance
+- Handle database connections properly in Cloudflare Workers context
+
+## Monorepo Commands
+
+### Development
+```bash
+bun dev                    # Start all packages in development
+bun dev --filter=@zine/web # Start only frontend
+bun dev --filter=@zine/api # Start only API
+```
+
+### Building
+```bash
+bun build                  # Build all packages
+bun type-check            # Type check all packages
+bun lint                  # Lint all packages
+```
+
+### Database
+```bash
+cd packages/api
+bun db:generate           # Generate migrations
+bun db:migrate           # Run migrations
+```
+
+### Deployment
+```bash
+bun deploy               # Deploy all to production
+bun deploy:production    # Deploy with production env
+```
+
+## Key Dependencies to Remember
+
+### Frontend Dependencies
+- `@tanstack/react-router` - File-based routing
+- `@radix-ui/react-*` - Accessible UI primitives
+- `class-variance-authority` - Component variant handling
+- `tailwind-merge` - Conditional Tailwind classes
+- `lucide-react` - Icon library
+
+### Backend Dependencies
+- `hono` - Web framework for Cloudflare Workers
+- `drizzle-orm` - Type-safe ORM
+- `drizzle-zod` - Zod integration for Drizzle
+- `zod` - Schema validation
+- `@cloudflare/workers-types` - TypeScript types for Workers
+
+## Cloudflare Integration
+
+### Frontend (Cloudflare Pages)
+- Static site deployment via `wrangler pages deploy`
+- Environment variables configured in Cloudflare Dashboard
+- Build output directory: `dist/`
+
+### Backend (Cloudflare Workers)
+- Serverless function deployment via `wrangler deploy`
+- D1 database binding configured in `wrangler.toml`
+- Environment variables in `wrangler.toml` or Cloudflare Dashboard
+
+### Database (Cloudflare D1)
+- SQLite-compatible database
+- Accessed via Drizzle ORM
+- Migrations managed with `drizzle-kit`
+
+## Common Patterns to Use
+
+### Error Handling
+```typescript
+// API routes
+app.get('/bookmarks', async (c) => {
+  try {
+    const bookmarks = await db.select().from(bookmarksTable)
+    return c.json({ data: bookmarks, success: true })
+  } catch (error) {
+    return c.json({ error: 'Failed to fetch bookmarks', success: false }, 500)
+  }
+})
+```
+
+### React Components with shadcn/ui
+```typescript
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+export function BookmarkCard({ bookmark }: { bookmark: Bookmark }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{bookmark.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Button variant="outline">Edit</Button>
+      </CardContent>
+    </Card>
+  )
+}
+```
+
+### Zod Validation
+```typescript
+import { z } from 'zod'
+
+export const BookmarkSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  url: z.string().url(),
+  description: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  createdAt: z.date(),
+  updatedAt: z.date()
+})
+
+export type Bookmark = z.infer<typeof BookmarkSchema>
+```
+
+## When Making Changes
+
+1. **Always run type-check** before committing changes
+2. **Update shared types** in `packages/shared` when changing API contracts
+3. **Test across packages** - changes in shared affect both web and api
+4. **Use workspace references** - `@zine/shared`, `@zine/api`, `@zine/web`
+5. **Follow semantic versioning** for internal package updates
+6. **Update migrations** when changing database schema
+
+## Performance Considerations
+
+- Use React.memo for expensive components
+- Implement proper loading states and skeleton screens
+- Optimize Cloudflare Workers cold starts
+- Use proper caching strategies for D1 queries
+- Minimize bundle size with proper tree shaking
+
+Remember: This is a modern, type-safe stack focused on developer experience and performance. Always prefer TypeScript-first solutions and leverage the Cloudflare ecosystem for optimal performance.
