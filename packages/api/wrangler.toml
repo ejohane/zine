@@ -1,0 +1,20 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "zine-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-05"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "development"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-db"
+database_id = "your-database-id"
+
+[env.production]
+name = "zine-api-production"
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "zine-db-production"
+database_id = "your-production-database-id"
