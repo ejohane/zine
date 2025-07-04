@@ -44,7 +44,7 @@ jobs:
         run: bun lint --filter=@zine/web
 
       - name: Build web app
-        run: bun build --filter=@zine/web
+        run: bun run build --filter=@zine/web
 
       - name: Deploy to Cloudflare Pages (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
