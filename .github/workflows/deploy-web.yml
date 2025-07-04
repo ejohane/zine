@@ -52,7 +52,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name=zine-web --env=production
+          command: pages deploy apps/web/dist --project-name=zine-web --branch=main
 
       - name: Deploy to Cloudflare Pages (Preview)
         if: github.event_name == 'pull_request'
@@ -60,7 +60,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/web/dist --project-name=zine-web
+          command: pages deploy apps/web/dist --project-name=zine-web --branch=preview
 
       - name: Comment PR with Preview URL
         if: github.event_name == 'pull_request'

@@ -23,3 +23,5 @@ export const UpdateBookmarkSchema = CreateBookmarkSchema.partial()
 export type Bookmark = z.infer<typeof BookmarkSchema>
 export type CreateBookmark = z.infer<typeof CreateBookmarkSchema>
 export type UpdateBookmark = z.infer<typeof UpdateBookmarkSchema>
+
+// Type definitions for the Zine bookmark management system
