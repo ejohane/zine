@@ -4,23 +4,21 @@ on:
   push:
     branches:
       - main
-    # Temporarily removed paths filter for testing
-    # paths:
-    #   - 'apps/web/**'
-    #   - 'packages/shared/**'
-    #   - 'package.json'
-    #   - 'bun.lockb'
-    #   - 'turbo.json'
+    paths:
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'turbo.json'
   pull_request:
     branches:
       - main
-    # Temporarily removed paths filter for testing
-    # paths:
-    #   - 'apps/web/**'
-    #   - 'packages/shared/**'
-    #   - 'package.json'
-    #   - 'bun.lockb'
-    #   - 'turbo.json'
+    paths:
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'bun.lockb'
+      - 'turbo.json'
 
 jobs:
   deploy:
