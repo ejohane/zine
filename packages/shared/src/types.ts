@@ -20,6 +20,8 @@ export const CreateBookmarkSchema = z.object({
 
 export const UpdateBookmarkSchema = CreateBookmarkSchema.partial()
 
+// Schema for partial bookmark updates
+
 export type Bookmark = z.infer<typeof BookmarkSchema>
 export type CreateBookmark = z.infer<typeof CreateBookmarkSchema>
 export type UpdateBookmark = z.infer<typeof UpdateBookmarkSchema>
