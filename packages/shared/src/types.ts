@@ -1,3 +1,4 @@
+// Shared types and schemas for Zine bookmark manager
 import { z } from 'zod'
 
 export const BookmarkSchema = z.object({
