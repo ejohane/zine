@@ -9,6 +9,7 @@ on:
       - 'apps/web/**'
       - 'package.json'
       - 'bun.lockb'
+      - '.github/workflows/deploy.yml'
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'apps/web/**'
       - 'package.json'
       - 'bun.lockb'
+      - '.github/workflows/deploy.yml'
 
 jobs:
   deploy-api:
