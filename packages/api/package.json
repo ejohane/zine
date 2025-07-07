@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev src/index.ts",
+    "dev": "wrangler dev src/index.ts --host 0.0.0.0",
     "deploy": "wrangler deploy --minify src/index.ts",
     "type-check": "tsc --noEmit",
     "build": "tsc",
@@ -11,6 +11,7 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@zine/shared": "workspace:*",
     "hono": "^4.4.0",
     "drizzle-orm": "^0.31.0",
     "drizzle-zod": "^0.5.1",

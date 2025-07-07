@@ -2,17 +2,17 @@
 import { z } from 'zod'
 
 export const BookmarkSchema = z.object({
-  id: z.number(),
-  url: z.string().url(),
+  id: z.string(),
+  url: z.string().url().optional(),
   title: z.string(),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 })
 
 export const CreateBookmarkSchema = z.object({
-  url: z.string().url(),
+  url: z.string().url().optional(),
   title: z.string(),
   description: z.string().optional(),
   tags: z.array(z.string()).optional(),
@@ -20,10 +20,16 @@ export const CreateBookmarkSchema = z.object({
 
 export const UpdateBookmarkSchema = CreateBookmarkSchema.partial()
 
-// Schema for partial bookmark updates
-
 export type Bookmark = z.infer<typeof BookmarkSchema>
 export type CreateBookmark = z.infer<typeof CreateBookmarkSchema>
 export type UpdateBookmark = z.infer<typeof UpdateBookmarkSchema>
 
-// Type definitions for the Zine bookmark management system
+// API Response types
+export interface ApiResponse<T = any> {
+  data?: T
+  error?: string
+  message?: string
+}
+
+export interface BookmarksResponse extends ApiResponse<Bookmark[]> {}
+export interface BookmarkResponse extends ApiResponse<Bookmark> {}

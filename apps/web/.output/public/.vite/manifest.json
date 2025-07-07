@@ -1,0 +1,47 @@
+{
+  "../../../../../../../~start/default-client-entry.tsx": {
+    "file": "assets/main-BHyfKfzB.js",
+    "name": "main",
+    "src": "../../../../../../../~start/default-client-entry.tsx",
+    "isEntry": true,
+    "dynamicImports": [
+      "../../node_modules/@tanstack/router-devtools-core/dist/esm/FloatingTanStackRouterDevtools.js",
+      "src/routes/bookmarks.tsx?tsr-split=component",
+      "src/routes/index.tsx?tsr-split=component"
+    ],
+    "assets": [
+      "assets/App-C1hn0JOW.css"
+    ]
+  },
+  "../../node_modules/@tanstack/router-devtools-core/dist/esm/FloatingTanStackRouterDevtools.js": {
+    "file": "assets/FloatingTanStackRouterDevtools-Dm-ZgsRl.js",
+    "name": "FloatingTanStackRouterDevtools",
+    "src": "../../node_modules/@tanstack/router-devtools-core/dist/esm/FloatingTanStackRouterDevtools.js",
+    "isDynamicEntry": true,
+    "imports": [
+      "../../../../../../../~start/default-client-entry.tsx"
+    ]
+  },
+  "/Users/erikjohansson/dev/2025/zine/apps/web/src/App.css": {
+    "file": "assets/App-C1hn0JOW.css",
+    "src": "/Users/erikjohansson/dev/2025/zine/apps/web/src/App.css"
+  },
+  "src/routes/bookmarks.tsx?tsr-split=component": {
+    "file": "assets/bookmarks-C4BlhZGs.js",
+    "name": "bookmarks",
+    "src": "src/routes/bookmarks.tsx?tsr-split=component",
+    "isDynamicEntry": true,
+    "imports": [
+      "../../../../../../../~start/default-client-entry.tsx"
+    ]
+  },
+  "src/routes/index.tsx?tsr-split=component": {
+    "file": "assets/index-CmOiJaI_.js",
+    "name": "index",
+    "src": "src/routes/index.tsx?tsr-split=component",
+    "isDynamicEntry": true,
+    "imports": [
+      "../../../../../../../~start/default-client-entry.tsx"
+    ]
+  }
+}

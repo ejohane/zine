@@ -1,17 +1,10 @@
-// Zine Bookmark Manager - Entry point
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { RouterProvider, createRouter } from '@tanstack/react-router'
-import { routeTree } from './routeTree.gen'
+import { RouterProvider } from '@tanstack/react-router'
+import { createRouter } from './router'
 import './App.css'
 
-const router = createRouter({ routeTree })
-
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router
-  }
-}
+const router = createRouter()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
