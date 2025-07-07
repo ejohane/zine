@@ -2,11 +2,82 @@ import { Bookmark, CreateBookmark, UpdateBookmark, BookmarksResponse, BookmarkRe
 
 // Mock data - in a real app, this would come from a database
 const mockBookmarks: Bookmark[] = [
-  { id: '1', title: 'GitHub - React', url: 'https://github.com/facebook/react' },
-  { id: '2', title: 'TanStack Query Documentation', url: 'https://tanstack.com/query' },
-  { id: '3', title: 'Vite Documentation', url: 'https://vitejs.dev' },
-  { id: '4', title: 'Cloudflare Workers', url: 'https://workers.cloudflare.com' },
-  { id: '5', title: 'TypeScript Handbook', url: 'https://www.typescriptlang.org/docs' },
+  { 
+    id: '1', 
+    userId: '1',
+    title: 'GitHub - React', 
+    url: 'https://github.com/facebook/react',
+    originalUrl: 'https://github.com/facebook/react',
+    status: 'active' as const,
+    description: 'A declarative, efficient, and flexible JavaScript library for building user interfaces.',
+    source: 'web' as const,
+    contentType: 'link' as const,
+    thumbnailUrl: 'https://opengraph.githubassets.com/1/facebook/react',
+    faviconUrl: 'https://github.com/favicon.ico',
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01')
+  },
+  { 
+    id: '2', 
+    userId: '1',
+    title: 'TanStack Query Documentation', 
+    url: 'https://tanstack.com/query',
+    originalUrl: 'https://tanstack.com/query',
+    status: 'active' as const,
+    description: 'Powerful data synchronization for React, Vue, Solid & Svelte.',
+    source: 'web' as const,
+    contentType: 'article' as const,
+    thumbnailUrl: 'https://tanstack.com/images/query-og.png',
+    faviconUrl: 'https://tanstack.com/favicon.ico',
+    createdAt: new Date('2024-01-02'),
+    updatedAt: new Date('2024-01-02')
+  },
+  { 
+    id: '3', 
+    userId: '1',
+    title: 'Vite Documentation', 
+    url: 'https://vitejs.dev',
+    originalUrl: 'https://vitejs.dev',
+    status: 'active' as const,
+    description: 'Next Generation Frontend Tooling. Get ready for a development environment that can finally catch up with you.',
+    source: 'web' as const,
+    contentType: 'article' as const,
+    thumbnailUrl: 'https://vitejs.dev/og-image.png',
+    faviconUrl: 'https://vitejs.dev/favicon.ico',
+    createdAt: new Date('2024-01-03'),
+    updatedAt: new Date('2024-01-03')
+  },
+  { 
+    id: '4', 
+    userId: '1',
+    title: 'Cloudflare Workers', 
+    url: 'https://workers.cloudflare.com',
+    originalUrl: 'https://workers.cloudflare.com',
+    status: 'active' as const,
+    description: 'Deploy serverless code instantly across the globe to give it exceptional performance, reliability, and scale.',
+    source: 'web' as const,
+    contentType: 'link' as const,
+    thumbnailUrl: 'https://workers.cloudflare.com/resources/logo/logo.svg',
+    faviconUrl: 'https://workers.cloudflare.com/favicon.ico',
+    createdAt: new Date('2024-01-04'),
+    updatedAt: new Date('2024-01-04')
+  },
+  { 
+    id: '5', 
+    userId: '1',
+    title: 'TypeScript Handbook', 
+    url: 'https://www.typescriptlang.org/docs',
+    originalUrl: 'https://www.typescriptlang.org/docs',
+    status: 'active' as const,
+    description: 'The TypeScript Handbook is a comprehensive guide to the TypeScript language.',
+    source: 'web' as const,
+    contentType: 'article' as const,
+    thumbnailUrl: 'https://www.typescriptlang.org/images/branding/ts-logo-512.png',
+    faviconUrl: 'https://www.typescriptlang.org/favicon-32x32.png',
+    language: 'en',
+    createdAt: new Date('2024-01-05'),
+    updatedAt: new Date('2024-01-05')
+  },
 ]
 
 // Database interface that can be implemented by different storage backends
@@ -34,7 +105,13 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
   async create(bookmark: CreateBookmark): Promise<Bookmark> {
     const newBookmark: Bookmark = {
       id: String(this.nextId++),
-      ...bookmark,
+      userId: '1',
+      status: 'active',
+      url: bookmark.url || '',
+      originalUrl: bookmark.url || '',
+      title: bookmark.title,
+      description: bookmark.description,
+      tags: bookmark.tags,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -66,6 +143,11 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
 // Service class that implements the business logic
 export class BookmarkService {
   constructor(private repository: BookmarkRepository) {}
+
+  // Expose repository for other services
+  getRepository(): BookmarkRepository {
+    return this.repository
+  }
 
   async getBookmarks(): Promise<BookmarksResponse> {
     try {
@@ -122,5 +204,4 @@ export class BookmarkService {
   }
 }
 
-// Default service instance for convenience
-export const bookmarkService = new BookmarkService(new InMemoryBookmarkRepository())
+// Note: Default service instance removed - services now initialized with D1 database in API layer

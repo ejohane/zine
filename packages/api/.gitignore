@@ -1,0 +1,12 @@
+# Local development database for Drizzle Studio
+local.db
+
+# Wrangler files
+.wrangler/
+.dev.vars
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/

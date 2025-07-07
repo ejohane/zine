@@ -1,15 +1,27 @@
-name: Deploy to Cloudflare
+name: Deploy to Cloudflare Workers
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'packages/api/**'
+      - 'packages/shared/**'
+      - 'apps/web/**'
+      - 'package.json'
+      - 'bun.lockb'
   pull_request:
     branches: [main]
+    paths:
+      - 'packages/api/**'
+      - 'packages/shared/**'
+      - 'apps/web/**'
+      - 'package.json'
+      - 'bun.lockb'
 
 jobs:
-  deploy:
+  deploy-api:
     runs-on: ubuntu-latest
-    name: Deploy
+    name: Deploy API
     steps:
       - uses: actions/checkout@v4
       
@@ -21,19 +33,122 @@ jobs:
       - name: Install dependencies
         run: bun install
         
-      - name: Build packages
-        run: bun run build
+      - name: Type check
+        run: bun run type-check
+        working-directory: packages/api
         
-      - name: Deploy API to Cloudflare Workers
+      - name: Build shared package
+        run: bun run build
+        working-directory: packages/shared
+        
+      - name: Build API
+        run: bun run build
+        working-directory: packages/api
+        
+      - name: Run database migrations (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/api
+          command: d1 migrations apply zine-db-production
+          
+      - name: Deploy to Production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
           command: deploy --env production
           
-      - name: Deploy Web to Cloudflare Workers
+      - name: Deploy Preview
+        if: github.event_name == 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/api
+          command: deploy --name zine-api-${{ github.head_ref }}
+        id: preview_deploy
+        
+      - name: Comment Preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deploymentUrl = `https://zine-api-${{ github.head_ref }}.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **API Preview Deployment Ready!**
+              
+              **Preview URL:** ${deploymentUrl}
+              **Branch:** \`${{ github.head_ref }}\`
+              **Commit:** \`${{ github.sha }}\`
+              
+              Test your API endpoints at: ${deploymentUrl}/api/v1/`
+            })
+            
+  deploy-web:
+    runs-on: ubuntu-latest
+    name: Deploy Web App
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Type check
+        run: bun run type-check
+        working-directory: apps/web
+        
+      - name: Build shared package
+        run: bun run build
+        working-directory: packages/shared
+        
+      - name: Build Web App
+        run: bun run build
+        working-directory: apps/web
+        
+      - name: Deploy to Production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/web
           command: deploy --env production
+          
+      - name: Deploy Preview
+        if: github.event_name == 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: apps/web
+          command: deploy --name zine-web-${{ github.head_ref }}
+        id: web_preview_deploy
+        
+      - name: Comment Preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deploymentUrl = `https://zine-web-${{ github.head_ref }}.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🌐 **Web App Preview Deployment Ready!**
+              
+              **Preview URL:** ${deploymentUrl}
+              **Branch:** \`${{ github.head_ref }}\`
+              **Commit:** \`${{ github.sha }}\`
+              
+              View your web app at: ${deploymentUrl}`
+            })

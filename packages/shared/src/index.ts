@@ -1,2 +1,5 @@
 export * from './types'
 export * from './api-service'
+export * from './url-normalizer'
+export * from './metadata-extractor'
+export * from './bookmark-save-service'
