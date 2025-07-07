@@ -2,7 +2,32 @@ import type { Bookmark, CreateBookmark, UpdateBookmark, SaveBookmark } from '@zi
 
 export type { Bookmark, CreateBookmark, UpdateBookmark, SaveBookmark }
 
-const API_BASE_URL = '/api/v1'
+// Environment-based API URL configuration
+const getApiBaseUrl = (): string => {
+  // Check if we're in development mode
+  if (import.meta.env.DEV) {
+    return '/api/v1' // Proxy to localhost:8787
+  }
+  
+  // For production and preview environments
+  const currentHost = window.location.hostname
+  
+  // Production environment
+  if (currentHost === 'myzine.app') {
+    return 'https://api.myzine.app/api/v1'
+  }
+  
+  // Preview environment - replace web with api in hostname
+  if (currentHost.includes('zine-web-')) {
+    const apiHost = currentHost.replace('zine-web-', 'zine-api-')
+    return `https://${apiHost}/api/v1`
+  }
+  
+  // Fallback to relative URL
+  return '/api/v1'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export interface BookmarksResponse {
   data: Bookmark[]
