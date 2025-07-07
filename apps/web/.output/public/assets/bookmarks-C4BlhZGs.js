@@ -1,0 +1,1 @@
+import{j as s}from"./main-BHyfKfzB.js";const e=()=>s.jsxs("div",{className:"p-2",children:[s.jsx("h1",{className:"text-2xl font-bold",children:"Bookmarks"}),s.jsx("p",{className:"mt-2",children:"Your saved bookmarks will appear here"})]});export{e as component};

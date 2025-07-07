@@ -1,7 +1,15 @@
 #:schema node_modules/wrangler/config-schema.json
 name = "zine-web"
+main = "src/worker.ts"
 compatibility_date = "2024-06-05"
-pages_build_output_dir = "dist"
+compatibility_flags = ["nodejs_compat"]
+
+[build]
+command = "bun run build"
+
+[assets]
+directory = "dist"
 
 [env.production]
 name = "zine-web-production"
+route = "myzine.app/*"
