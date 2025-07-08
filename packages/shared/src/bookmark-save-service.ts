@@ -3,7 +3,7 @@
  */
 
 import { normalizeUrl, areUrlsDuplicates } from './url-normalizer'
-import { metadataExtractor } from './metadata-extractor'
+import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
 import type { 
   Bookmark, 
   SaveBookmark, 
@@ -74,7 +74,7 @@ export class BookmarkSaveService {
       }
 
       // Step 3: Extract metadata
-      const metadataResult = await metadataExtractor.extractMetadata(input.url)
+      const metadataResult = await enhancedMetadataExtractor.extractMetadata(input.url)
       
       if (!metadataResult.success) {
         return {
@@ -169,7 +169,7 @@ export class BookmarkSaveService {
       const normalized = normalizeUrl(url)
       
       // Extract metadata
-      const metadataResult = await metadataExtractor.extractMetadata(url)
+      const metadataResult = await enhancedMetadataExtractor.extractMetadata(url)
       
       if (!metadataResult.success) {
         return {
@@ -266,7 +266,7 @@ export class BookmarkSaveService {
       }
 
       // Re-extract metadata using the original URL
-      const metadataResult = await metadataExtractor.extractMetadata(existingBookmark.originalUrl || existingBookmark.url)
+      const metadataResult = await enhancedMetadataExtractor.extractMetadata(existingBookmark.originalUrl || existingBookmark.url)
       
       if (!metadataResult.success) {
         return {
