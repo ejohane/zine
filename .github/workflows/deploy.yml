@@ -3,22 +3,22 @@ name: Deploy to Cloudflare Workers
 on:
   push:
     branches: [main]
-    paths:
-      - 'packages/api/**'
-      - 'packages/shared/**'
-      - 'apps/web/**'
-      - 'package.json'
-      - 'bun.lockb'
-      - '.github/workflows/deploy.yml'
+    # paths:
+    #   - 'packages/api/**'
+    #   - 'packages/shared/**'
+    #   - 'apps/web/**'
+    #   - 'package.json'
+    #   - 'bun.lockb'
+    #   - '.github/workflows/deploy.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'packages/api/**'
-      - 'packages/shared/**'
-      - 'apps/web/**'
-      - 'package.json'
-      - 'bun.lockb'
-      - '.github/workflows/deploy.yml'
+    # paths:
+    #   - 'packages/api/**'
+    #   - 'packages/shared/**'
+    #   - 'apps/web/**'
+    #   - 'package.json'
+    #   - 'bun.lockb'
+    #   - '.github/workflows/deploy.yml'
 
 jobs:
   deploy-api:

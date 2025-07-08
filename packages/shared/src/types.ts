@@ -10,6 +10,9 @@ export const BookmarkStatusEnum = z.enum(['active', 'archived', 'deleted'])
 export const VideoMetadataSchema = z.object({
   duration: z.number().optional(),
   viewCount: z.number().optional(),
+  likeCount: z.number().optional(),
+  channelId: z.string().optional(),
+  categoryId: z.string().optional(),
 })
 
 export const PodcastMetadataSchema = z.object({
