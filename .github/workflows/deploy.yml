@@ -56,7 +56,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
-          command: d1 migrations apply --env production DB
+          command: d1 migrations apply --env production --remote DB
           
       - name: Deploy to Production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
