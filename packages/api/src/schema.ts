@@ -1,6 +1,16 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),                    // Clerk user ID
+  email: text('email').notNull(),                 // Primary email from Clerk
+  firstName: text('first_name'),                  // First name from Clerk
+  lastName: text('last_name'),                    // Last name from Clerk
+  imageUrl: text('image_url'),                    // Profile image URL from Clerk
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const creators = sqliteTable('creators', {
   id: text('id').primaryKey(),              // Platform-specific ID (e.g. youtube:UCabc123)
   name: text('name').notNull(),             // Display name
@@ -16,7 +26,7 @@ export const creators = sqliteTable('creators', {
 
 export const bookmarks = sqliteTable('bookmarks', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  userId: text('user_id').notNull().default('1'),    // Hardcoded for now
+  userId: text('user_id').notNull().references(() => users.id),
   url: text('url').notNull(),                        // Normalized canonical URL
   originalUrl: text('original_url').notNull(),       // Original URL as submitted
   title: text('title').notNull(),
@@ -43,11 +53,15 @@ export const bookmarks = sqliteTable('bookmarks', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
 
+export const insertUserSchema = createInsertSchema(users)
+export const selectUserSchema = createSelectSchema(users)
 export const insertCreatorSchema = createInsertSchema(creators)
 export const selectCreatorSchema = createSelectSchema(creators)
 export const insertBookmarkSchema = createInsertSchema(bookmarks)
 export const selectBookmarkSchema = createSelectSchema(bookmarks)
 
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
 export type Creator = typeof creators.$inferSelect
 export type NewCreator = typeof creators.$inferInsert
 export type Bookmark = typeof bookmarks.$inferSelect

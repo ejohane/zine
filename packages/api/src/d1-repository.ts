@@ -67,7 +67,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
     }
   }
 
-  async create(bookmark: CreateBookmark): Promise<Bookmark> {
+  async create(bookmark: CreateBookmark & { userId: string }): Promise<Bookmark> {
     try {
       const now = Date.now()
       
@@ -81,7 +81,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING *
       `).bind(
-        '1', // user_id (hardcoded for now)
+        bookmark.userId,
         bookmark.url || '',
         bookmark.url || '', // original_url same as url for basic create
         bookmark.title,
@@ -177,6 +177,132 @@ export class D1BookmarkRepository implements BookmarkRepository {
     } catch (error) {
       console.error('Error deleting bookmark:', error)
       throw new Error('Failed to delete bookmark from database')
+    }
+  }
+
+  // User-scoped methods for better security and performance
+  async getByUserId(userId: string): Promise<Bookmark[]> {
+    try {
+      const result = await this.db.prepare(`
+        SELECT 
+          b.*,
+          c.id as creator_id,
+          c.name as creator_name,
+          c.handle as creator_handle,
+          c.avatar_url as creator_avatar_url,
+          c.bio as creator_bio,
+          c.url as creator_url,
+          c.platforms as creator_platforms,
+          c.external_links as creator_external_links,
+          c.created_at as creator_created_at,
+          c.updated_at as creator_updated_at
+        FROM bookmarks b
+        LEFT JOIN creators c ON b.creator_id = c.id
+        WHERE b.user_id = ?
+        ORDER BY b.created_at DESC
+      `).bind(userId).all()
+
+      return result.results.map(row => this.mapRowToBookmark(row))
+    } catch (error) {
+      console.error('Error fetching bookmarks for user:', error)
+      throw new Error('Failed to fetch user bookmarks from database')
+    }
+  }
+
+  async getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null> {
+    try {
+      const result = await this.db.prepare(`
+        SELECT 
+          b.*,
+          c.id as creator_id,
+          c.name as creator_name,
+          c.handle as creator_handle,
+          c.avatar_url as creator_avatar_url,
+          c.bio as creator_bio,
+          c.url as creator_url,
+          c.platforms as creator_platforms,
+          c.external_links as creator_external_links,
+          c.created_at as creator_created_at,
+          c.updated_at as creator_updated_at
+        FROM bookmarks b
+        LEFT JOIN creators c ON b.creator_id = c.id
+        WHERE b.id = ? AND b.user_id = ?
+      `).bind(id, userId).first()
+
+      if (!result) {
+        return null
+      }
+
+      return this.mapRowToBookmark(result)
+    } catch (error) {
+      console.error('Error fetching bookmark by id and user:', error)
+      throw new Error('Failed to fetch user bookmark from database')
+    }
+  }
+
+  async updateByIdAndUserId(id: string, bookmark: UpdateBookmark, userId: string): Promise<Bookmark | null> {
+    try {
+      const now = Date.now()
+      
+      // Build dynamic update query based on provided fields
+      const updates: string[] = []
+      const values: any[] = []
+      
+      if (bookmark.title !== undefined) {
+        updates.push('title = ?')
+        values.push(bookmark.title)
+      }
+      if (bookmark.description !== undefined) {
+        updates.push('description = ?')
+        values.push(bookmark.description)
+      }
+      if (bookmark.url !== undefined) {
+        updates.push('url = ?')
+        values.push(bookmark.url)
+      }
+      if (bookmark.tags !== undefined) {
+        updates.push('tags = ?')
+        values.push(JSON.stringify(bookmark.tags))
+      }
+      
+      updates.push('updated_at = ?')
+      values.push(now)
+      values.push(id) // for WHERE clause
+      values.push(userId) // for WHERE clause
+      
+      if (updates.length === 1) {
+        // Only updated_at, nothing to update
+        return this.getByIdAndUserId(id, userId)
+      }
+      
+      const result = await this.db.prepare(`
+        UPDATE bookmarks 
+        SET ${updates.join(', ')}
+        WHERE id = ? AND user_id = ?
+        RETURNING *
+      `).bind(...values).first()
+
+      if (!result) {
+        return null
+      }
+
+      return this.mapRowToBookmark(result)
+    } catch (error) {
+      console.error('Error updating user bookmark:', error)
+      throw new Error('Failed to update user bookmark in database')
+    }
+  }
+
+  async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
+    try {
+      const result = await this.db.prepare(`
+        DELETE FROM bookmarks WHERE id = ? AND user_id = ?
+      `).bind(id, userId).run()
+
+      return result.meta.changes > 0
+    } catch (error) {
+      console.error('Error deleting user bookmark:', error)
+      throw new Error('Failed to delete user bookmark from database')
     }
   }
 

@@ -18,6 +18,12 @@ database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
 [env.production]
 name = "zine-api-production"
 route = "api.myzine.app/*"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+# Add your Clerk production secret key here
+# CLERK_SECRET_KEY = "sk_live_your_production_secret_key_here"
+
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "zine-db-production"
