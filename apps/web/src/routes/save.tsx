@@ -42,7 +42,7 @@ function SavePage() {
     navigate({ to: '/' })
   }
 
-  const handleUrlFromExtension = (newUrl: string, title?: string) => {
+  const handleUrlFromExtension = (newUrl: string, _title?: string) => {
     setCurrentUrl(newUrl)
   }
 

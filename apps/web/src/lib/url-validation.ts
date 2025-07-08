@@ -115,7 +115,7 @@ export const validateAndNormalizeUrl = (input: string): UrlValidationResult => {
   }
 }
 
-const detectPlatform = (hostname: string, pathname: string): string => {
+const detectPlatform = (hostname: string, _pathname: string): string => {
   const domain = hostname.toLowerCase()
   
   if (domain.includes('youtube.com') || domain.includes('youtu.be')) {

@@ -14,6 +14,23 @@ export interface ExtensionMessage {
   data?: any
 }
 
+// Browser extension API type definitions
+declare global {
+  interface Window {
+    chrome?: {
+      runtime?: {
+        sendMessage: (extensionId: string, message: any, callback: (response: any) => void) => void
+        lastError?: { message: string }
+      }
+    }
+    browser?: {
+      runtime?: {
+        sendMessage: (message: any) => Promise<any>
+      }
+    }
+  }
+}
+
 export const detectBrowserExtension = async (): Promise<ExtensionInfo> => {
   const defaultInfo: ExtensionInfo = {
     isInstalled: false,
@@ -30,13 +47,13 @@ export const detectBrowserExtension = async (): Promise<ExtensionInfo> => {
           resolve(defaultInfo)
         }, 1000) // 1 second timeout
 
-        window.chrome.runtime.sendMessage(
+        window.chrome!.runtime!.sendMessage(
           'zine-extension-id', // This would be the actual extension ID
           { type: 'PING' },
-          (response) => {
+          (response: any) => {
             clearTimeout(timeout)
             
-            if (chrome.runtime.lastError) {
+            if (window.chrome?.runtime?.lastError) {
               resolve(defaultInfo)
               return
             }
@@ -63,8 +80,8 @@ export const detectBrowserExtension = async (): Promise<ExtensionInfo> => {
           resolve(defaultInfo)
         }, 1000)
 
-        window.browser.runtime.sendMessage({ type: 'PING' })
-          .then((response) => {
+        window.browser!.runtime!.sendMessage({ type: 'PING' })
+          .then((response: any) => {
             clearTimeout(timeout)
             if (response?.success) {
               resolve({
@@ -94,11 +111,11 @@ export const saveCurrentTab = async (): Promise<{ success: boolean; url?: string
   try {
     if (typeof window !== 'undefined' && window.chrome?.runtime?.sendMessage) {
       return new Promise((resolve) => {
-        window.chrome.runtime.sendMessage(
+        window.chrome!.runtime!.sendMessage(
           'zine-extension-id',
           { type: 'GET_CURRENT_TAB' },
-          (response) => {
-            if (chrome.runtime.lastError) {
+          (response: any) => {
+            if (window.chrome?.runtime?.lastError) {
               resolve({ success: false, error: 'Extension communication failed' })
               return
             }
