@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useSearch, redirect } from '@tanstack/react-router'
+import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import { useAuth } from '@clerk/clerk-react'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { Button } from '../components/ui/button'
@@ -287,7 +287,7 @@ function Home() {
 
 export const Route = createFileRoute('/')({
   component: Home,
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async () => {
     // Note: This is a placeholder. In a real app, we'd need to check auth status
     // For now, we'll rely on the Clerk components to handle the redirect
     return {}
