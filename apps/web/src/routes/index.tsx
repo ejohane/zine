@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
+import { useAuth } from '@clerk/clerk-react'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
@@ -10,8 +11,36 @@ interface HomeSearchParams {
 }
 
 function Home() {
+  const { isSignedIn, isLoaded } = useAuth()
   const { data: bookmarks, isLoading, error } = useBookmarks()
   const { saved, message } = useSearch({ from: '/' }) as HomeSearchParams
+
+  // Show loading while Clerk loads
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Redirect to sign-in if not authenticated
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Welcome to Zine</h2>
+          <p className="text-gray-600 mb-6">Please sign in to access your bookmarks</p>
+          <Link to="/sign-in">
+            <Button size="lg">Sign In</Button>
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (isLoading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -258,6 +287,11 @@ function Home() {
 
 export const Route = createFileRoute('/')({
   component: Home,
+  beforeLoad: async () => {
+    // Note: This is a placeholder. In a real app, we'd need to check auth status
+    // For now, we'll rely on the Clerk components to handle the redirect
+    return {}
+  },
   validateSearch: (search: Record<string, unknown>): HomeSearchParams => {
     return {
       saved: typeof search.saved === 'string' ? search.saved : undefined,

@@ -2,6 +2,19 @@ import type { Bookmark, CreateBookmark, UpdateBookmark, SaveBookmark } from '@zi
 
 export type { Bookmark, CreateBookmark, UpdateBookmark, SaveBookmark }
 
+// Helper function to create authenticated headers
+const createAuthHeaders = (token?: string | null): HeadersInit => {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+  
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  
+  return headers
+}
+
 // Environment-based API URL configuration
 const getApiBaseUrl = (): string => {
   // Check if we're in development mode
@@ -40,20 +53,23 @@ export interface BookmarksResponse {
   }
 }
 
-export const fetchBookmarks = async (params?: {
-  userId?: string
-  status?: string
-  source?: string
-  contentType?: string
-}): Promise<Bookmark[]> => {
+export const fetchBookmarks = async (
+  token: string | null,
+  params?: {
+    status?: string
+    source?: string
+    contentType?: string
+  }
+): Promise<Bookmark[]> => {
   const searchParams = new URLSearchParams()
-  if (params?.userId) searchParams.set('userId', params.userId)
   if (params?.status) searchParams.set('status', params.status)
   if (params?.source) searchParams.set('source', params.source)
   if (params?.contentType) searchParams.set('contentType', params.contentType)
   
   const url = `${API_BASE_URL}/bookmarks${searchParams.toString() ? '?' + searchParams.toString() : ''}`
-  const response = await fetch(url)
+  const response = await fetch(url, {
+    headers: createAuthHeaders(token),
+  })
   if (!response.ok) {
     throw new Error('Failed to fetch bookmarks')
   }
@@ -61,8 +77,10 @@ export const fetchBookmarks = async (params?: {
   return result.data
 }
 
-export const fetchBookmark = async (id: string): Promise<Bookmark | undefined> => {
-  const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`)
+export const fetchBookmark = async (id: string, token: string | null): Promise<Bookmark | undefined> => {
+  const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`, {
+    headers: createAuthHeaders(token),
+  })
   if (!response.ok) {
     if (response.status === 404) {
       return undefined
@@ -72,12 +90,10 @@ export const fetchBookmark = async (id: string): Promise<Bookmark | undefined> =
   return response.json()
 }
 
-export const createNewBookmark = async (bookmark: CreateBookmark): Promise<Bookmark | undefined> => {
+export const createNewBookmark = async (bookmark: CreateBookmark, token: string | null): Promise<Bookmark | undefined> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createAuthHeaders(token),
     body: JSON.stringify(bookmark),
   })
   if (!response.ok) {
@@ -86,12 +102,10 @@ export const createNewBookmark = async (bookmark: CreateBookmark): Promise<Bookm
   return response.json()
 }
 
-export const saveBookmark = async (bookmark: SaveBookmark): Promise<Bookmark> => {
+export const saveBookmark = async (bookmark: SaveBookmark, token: string | null): Promise<Bookmark> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks/save`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createAuthHeaders(token),
     body: JSON.stringify(bookmark),
   })
   
@@ -107,12 +121,10 @@ export const saveBookmark = async (bookmark: SaveBookmark): Promise<Bookmark> =>
   return result.data
 }
 
-export const previewBookmark = async (url: string): Promise<Bookmark> => {
+export const previewBookmark = async (url: string, token: string | null): Promise<Bookmark> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks/preview`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createAuthHeaders(token),
     body: JSON.stringify({ url }),
   })
   
@@ -125,12 +137,10 @@ export const previewBookmark = async (url: string): Promise<Bookmark> => {
   return result.data
 }
 
-export const refreshBookmarkMetadata = async (id: string): Promise<Bookmark> => {
+export const refreshBookmarkMetadata = async (id: string, token: string | null): Promise<Bookmark> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks/${id}/refresh`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createAuthHeaders(token),
   })
   
   const result = await response.json()
@@ -145,12 +155,10 @@ export const refreshBookmarkMetadata = async (id: string): Promise<Bookmark> => 
   return result.data
 }
 
-export const updateExistingBookmark = async (id: string, bookmark: UpdateBookmark): Promise<Bookmark | undefined> => {
+export const updateExistingBookmark = async (id: string, bookmark: UpdateBookmark, token: string | null): Promise<Bookmark | undefined> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: createAuthHeaders(token),
     body: JSON.stringify(bookmark),
   })
   if (!response.ok) {
@@ -162,9 +170,10 @@ export const updateExistingBookmark = async (id: string, bookmark: UpdateBookmar
   return response.json()
 }
 
-export const removeBookmark = async (id: string): Promise<{ success: boolean; message?: string }> => {
+export const removeBookmark = async (id: string, token: string | null): Promise<{ success: boolean; message?: string }> => {
   const response = await fetch(`${API_BASE_URL}/bookmarks/${id}`, {
     method: 'DELETE',
+    headers: createAuthHeaders(token),
   })
   if (!response.ok) {
     if (response.status === 404) {

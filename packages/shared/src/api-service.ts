@@ -84,9 +84,14 @@ const mockBookmarks: Bookmark[] = [
 export interface BookmarkRepository {
   getAll(): Promise<Bookmark[]>
   getById(id: string): Promise<Bookmark | null>
-  create(bookmark: CreateBookmark): Promise<Bookmark>
+  create(bookmark: CreateBookmark & { userId: string }): Promise<Bookmark>
   update(id: string, bookmark: UpdateBookmark): Promise<Bookmark | null>
   delete(id: string): Promise<boolean>
+  // User-scoped methods for better security and performance
+  getByUserId(userId: string): Promise<Bookmark[]>
+  getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null>
+  updateByIdAndUserId(id: string, bookmark: UpdateBookmark, userId: string): Promise<Bookmark | null>
+  deleteByIdAndUserId(id: string, userId: string): Promise<boolean>
 }
 
 // In-memory implementation for development/testing
@@ -102,10 +107,10 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
     return this.bookmarks.find(b => b.id === id) || null
   }
 
-  async create(bookmark: CreateBookmark): Promise<Bookmark> {
+  async create(bookmark: CreateBookmark & { userId: string }): Promise<Bookmark> {
     const newBookmark: Bookmark = {
       id: String(this.nextId++),
-      userId: '1',
+      userId: bookmark.userId,
       status: 'active',
       url: bookmark.url || '',
       originalUrl: bookmark.url || '',
@@ -133,6 +138,35 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
 
   async delete(id: string): Promise<boolean> {
     const index = this.bookmarks.findIndex(b => b.id === id)
+    if (index === -1) return false
+    
+    this.bookmarks.splice(index, 1)
+    return true
+  }
+
+  // User-scoped methods
+  async getByUserId(userId: string): Promise<Bookmark[]> {
+    return this.bookmarks.filter(b => b.userId === userId)
+  }
+
+  async getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null> {
+    return this.bookmarks.find(b => b.id === id && b.userId === userId) || null
+  }
+
+  async updateByIdAndUserId(id: string, bookmark: UpdateBookmark, userId: string): Promise<Bookmark | null> {
+    const index = this.bookmarks.findIndex(b => b.id === id && b.userId === userId)
+    if (index === -1) return null
+    
+    this.bookmarks[index] = {
+      ...this.bookmarks[index],
+      ...bookmark,
+      updatedAt: new Date(),
+    }
+    return this.bookmarks[index]
+  }
+
+  async deleteByIdAndUserId(id: string, userId: string): Promise<boolean> {
+    const index = this.bookmarks.findIndex(b => b.id === id && b.userId === userId)
     if (index === -1) return false
     
     this.bookmarks.splice(index, 1)
@@ -170,9 +204,9 @@ export class BookmarkService {
     }
   }
 
-  async createBookmark(bookmark: CreateBookmark): Promise<BookmarkResponse> {
+  async createBookmark(bookmark: CreateBookmark, userId: string): Promise<BookmarkResponse> {
     try {
-      const newBookmark = await this.repository.create(bookmark)
+      const newBookmark = await this.repository.create({ ...bookmark, userId })
       return { data: newBookmark, message: 'Bookmark created successfully' }
     } catch (error) {
       return { error: 'Failed to create bookmark' }

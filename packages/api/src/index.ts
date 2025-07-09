@@ -9,9 +9,11 @@ import {
   BookmarkSaveService
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
+import { authMiddleware, getAuthContext } from './middleware/auth'
 
 type Bindings = {
   DB: D1Database
+  CLERK_SECRET_KEY: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -41,13 +43,16 @@ app.get('/health', (c) => {
   return c.json({ status: 'healthy', timestamp: new Date().toISOString() })
 })
 
+// Apply authentication middleware to all /api/v1/bookmarks routes
+app.use('/api/v1/bookmarks/*', authMiddleware)
+
 // Bookmarks endpoints
 app.get('/api/v1/bookmarks', async (c) => {
   const { bookmarkService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
   
   try {
     // Get query parameters for filtering
-    const userId = c.req.query('userId') || '1' // Default to user 1 for now
     const status = c.req.query('status') || 'active'
     const source = c.req.query('source')
     const contentType = c.req.query('contentType')
@@ -61,8 +66,8 @@ app.get('/api/v1/bookmarks', async (c) => {
     
     // Apply filters
     bookmarks = bookmarks.filter(bookmark => {
-      // Filter by user ID
-      if (bookmark.userId !== userId) return false
+      // Filter by authenticated user ID
+      if (bookmark.userId !== auth.userId) return false
       
       // Filter by status
       if (bookmark.status !== status) return false
@@ -87,7 +92,7 @@ app.get('/api/v1/bookmarks', async (c) => {
       data: bookmarks,
       meta: {
         total: bookmarks.length,
-        userId,
+        userId: auth.userId,
         status,
         ...(source && { source }),
         ...(contentType && { contentType })
@@ -100,20 +105,31 @@ app.get('/api/v1/bookmarks', async (c) => {
 
 app.get('/api/v1/bookmarks/:id', async (c) => {
   const { bookmarkService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
   const id = c.req.param('id')
+  
   const result = await bookmarkService.getBookmark(id)
   if (result.error) {
     return c.json({ error: result.error }, result.error === 'Bookmark not found' ? 404 : 500)
   }
+  
+  // Ensure user can only access their own bookmarks
+  if (result.data?.userId !== auth.userId) {
+    return c.json({ error: 'Bookmark not found' }, 404)
+  }
+  
   return c.json(result.data)
 })
 
 app.post('/api/v1/bookmarks', async (c) => {
   const { bookmarkService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
+  
   try {
     const body = await c.req.json()
     const validatedData = CreateBookmarkSchema.parse(body)
-    const result = await bookmarkService.createBookmark(validatedData)
+    
+    const result = await bookmarkService.createBookmark(validatedData, auth.userId)
     if (result.error) {
       return c.json({ error: result.error }, 500)
     }
@@ -125,8 +141,21 @@ app.post('/api/v1/bookmarks', async (c) => {
 
 app.put('/api/v1/bookmarks/:id', async (c) => {
   const { bookmarkService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
+  
   try {
     const id = c.req.param('id')
+    
+    // First check if bookmark exists and belongs to user
+    const existingResult = await bookmarkService.getBookmark(id)
+    if (existingResult.error) {
+      return c.json({ error: existingResult.error }, existingResult.error === 'Bookmark not found' ? 404 : 500)
+    }
+    
+    if (existingResult.data?.userId !== auth.userId) {
+      return c.json({ error: 'Bookmark not found' }, 404)
+    }
+    
     const body = await c.req.json()
     const validatedData = UpdateBookmarkSchema.parse(body)
     const result = await bookmarkService.updateBookmark(id, validatedData)
@@ -141,7 +170,19 @@ app.put('/api/v1/bookmarks/:id', async (c) => {
 
 app.delete('/api/v1/bookmarks/:id', async (c) => {
   const { bookmarkService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
   const id = c.req.param('id')
+  
+  // First check if bookmark exists and belongs to user
+  const existingResult = await bookmarkService.getBookmark(id)
+  if (existingResult.error) {
+    return c.json({ error: existingResult.error }, existingResult.error === 'Bookmark not found' ? 404 : 500)
+  }
+  
+  if (existingResult.data?.userId !== auth.userId) {
+    return c.json({ error: 'Bookmark not found' }, 404)
+  }
+  
   const result = await bookmarkService.deleteBookmark(id)
   if (result.error) {
     return c.json({ error: result.error }, result.error === 'Bookmark not found' ? 404 : 500)
@@ -152,10 +193,19 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
 // New save endpoint
 app.post('/api/v1/bookmarks/save', async (c) => {
   const { bookmarkSaveService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
+  
   try {
     const body = await c.req.json()
     const validatedData = SaveBookmarkSchema.parse(body)
-    const result = await bookmarkSaveService.saveBookmark(validatedData)
+    
+    // Ensure userId is set to authenticated user
+    const saveData = {
+      ...validatedData,
+      userId: auth.userId
+    }
+    
+    const result = await bookmarkSaveService.saveBookmark(saveData)
     
     if (!result.success) {
       if (result.duplicate) {
@@ -205,8 +255,22 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
 // Refresh metadata endpoint
 app.put('/api/v1/bookmarks/:id/refresh', async (c) => {
   const { bookmarkSaveService } = initializeServices(c.env.DB)
+  const auth = getAuthContext(c)
+  
   try {
     const id = c.req.param('id')
+    
+    // First check if bookmark exists and belongs to user
+    const { bookmarkService } = initializeServices(c.env.DB)
+    const existingResult = await bookmarkService.getBookmark(id)
+    if (existingResult.error) {
+      return c.json({ error: existingResult.error }, existingResult.error === 'Bookmark not found' ? 404 : 500)
+    }
+    
+    if (existingResult.data?.userId !== auth.userId) {
+      return c.json({ error: 'Bookmark not found' }, 404)
+    }
+    
     const result = await bookmarkSaveService.refreshMetadata(id)
     
     if (!result.success) {

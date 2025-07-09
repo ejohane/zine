@@ -6,6 +6,17 @@ export const SourceEnum = z.enum(['youtube', 'spotify', 'twitter', 'x', 'substac
 export const ContentTypeEnum = z.enum(['video', 'podcast', 'article', 'post', 'link'])
 export const BookmarkStatusEnum = z.enum(['active', 'archived', 'deleted'])
 
+// User schema
+export const UserSchema = z.object({
+  id: z.string(), // Clerk user ID
+  email: z.string().email(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  imageUrl: z.string().optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+})
+
 // Extended metadata schemas
 export const VideoMetadataSchema = z.object({
   duration: z.number().optional(),
@@ -114,6 +125,7 @@ export const CreateCreatorSchema = z.object({
 })
 
 // Type exports
+export type User = z.infer<typeof UserSchema>
 export type Creator = z.infer<typeof CreatorSchema>
 export type Bookmark = z.infer<typeof BookmarkSchema>
 export type CreateBookmark = z.infer<typeof CreateBookmarkSchema>

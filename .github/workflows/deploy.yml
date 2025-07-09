@@ -65,6 +65,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
           command: deploy --env production
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}
           
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
@@ -73,6 +75,8 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
           command: deploy --name zine-api-${{ github.head_ref }}
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_DEV }}
         id: preview_deploy
         
       - name: Comment Preview URL
@@ -120,9 +124,19 @@ jobs:
         run: bun run build
         working-directory: packages/shared
         
-      - name: Build Web App
+      - name: Build Web App (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: bun run build
         working-directory: apps/web
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
+          
+      - name: Build Web App (Preview)
+        if: github.event_name == 'pull_request'
+        run: bun run build
+        working-directory: apps/web
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
         
       - name: Deploy to Production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
