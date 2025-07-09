@@ -129,13 +129,7 @@ app.post('/api/v1/bookmarks', async (c) => {
     const body = await c.req.json()
     const validatedData = CreateBookmarkSchema.parse(body)
     
-    // Ensure userId is set to authenticated user
-    const bookmarkData = {
-      ...validatedData,
-      userId: auth.userId
-    }
-    
-    const result = await bookmarkService.createBookmark(bookmarkData)
+    const result = await bookmarkService.createBookmark(validatedData, auth.userId)
     if (result.error) {
       return c.json({ error: result.error }, 500)
     }

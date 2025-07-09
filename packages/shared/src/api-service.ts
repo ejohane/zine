@@ -204,9 +204,9 @@ export class BookmarkService {
     }
   }
 
-  async createBookmark(bookmark: CreateBookmark): Promise<BookmarkResponse> {
+  async createBookmark(bookmark: CreateBookmark, userId: string): Promise<BookmarkResponse> {
     try {
-      const newBookmark = await this.repository.create(bookmark)
+      const newBookmark = await this.repository.create({ ...bookmark, userId })
       return { data: newBookmark, message: 'Bookmark created successfully' }
     } catch (error) {
       return { error: 'Failed to create bookmark' }

@@ -113,11 +113,12 @@ export class BookmarkSaveService {
         })
       } else {
         // Fallback to basic repository method
-        const createData: CreateBookmark = {
+        const createData: CreateBookmark & { userId: string } = {
           title: metadata.title,
           description: metadata.description,
           url: normalized.normalized,
-          tags: []
+          tags: [],
+          userId
         }
 
         const basicBookmark = await this.repository.create(createData)
