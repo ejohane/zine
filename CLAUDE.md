@@ -92,6 +92,55 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 - **Type Checking**: `turbo type-check` for all packages
 - **Building**: `turbo build` for production builds
 
+## CRITICAL: Quality Checks After Every Change
+
+**MANDATORY**: After implementing ANY code change, you MUST run these commands to ensure CI won't fail:
+
+### 1. Type Check All Packages
+```bash
+turbo type-check
+```
+- Run this after ANY TypeScript/JavaScript changes
+- Fix ALL type errors before proceeding
+- Never commit code that doesn't pass type checking
+
+### 2. Build All Packages  
+```bash
+turbo build
+```
+- Run this after ANY significant changes
+- Ensure all packages build successfully
+- Fix ALL build errors before proceeding
+
+### 3. Run Tests (if available)
+```bash
+turbo test
+```
+- Run this after ANY logic changes
+- Ensure all tests pass
+- Fix ALL test failures before proceeding
+
+### 4. Check Individual Package Health
+For specific packages that were modified:
+```bash
+# Frontend checks
+cd apps/web && bun run type-check && bun run build
+
+# API checks  
+cd packages/api && bun run type-check && bun run build
+
+# Shared package checks
+cd packages/shared && bun run build
+```
+
+### 5. Before Committing
+Always run the full suite:
+```bash
+turbo type-check && turbo build
+```
+
+**NEVER commit code that fails these checks - it will break CI!**
+
 ## Deployment
 
 - **Frontend**: Cloudflare Pages (SPA)
@@ -104,5 +153,8 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 - ✅ Frontend SPA with TanStack Router
 - ✅ API with full CRUD endpoints
 - ✅ Shared types and business logic
-- ⚠️ Using mock data (InMemoryBookmarkRepository)
-- 🔄 Ready to connect D1 database
+- ✅ Clerk authentication integrated (JWT verification)
+- ✅ User-scoped data isolation
+- ✅ Protected routes with authentication
+- ✅ D1 database with user relationships
+- ✅ Production-ready authentication system
