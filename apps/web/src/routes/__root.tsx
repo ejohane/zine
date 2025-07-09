@@ -30,7 +30,7 @@ function RootComponent() {
     },
   }))
 
-  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+  const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION || import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_DEV
 
   if (!publishableKey) {
     throw new Error('Missing Clerk publishable key')
