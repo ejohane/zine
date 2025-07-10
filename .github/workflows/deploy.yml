@@ -126,7 +126,10 @@ jobs:
         
       - name: Build Web App (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: bun run build
+        run: |
+          echo "Building with env vars:"
+          echo "VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION is set: $([[ -n "$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" ]] && echo "YES" || echo "NO")"
+          bun run build
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
