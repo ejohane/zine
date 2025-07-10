@@ -14,7 +14,6 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
@@ -41,27 +40,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignUpSplatRoute = SignUpSplatRouteImport.update({
-  id: '/$',
-  path: '/$',
-  getParentRoute: () => SignUpRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRouteWithChildren
-  '/sign-up/$': typeof SignUpSplatRoute
+  '/sign-up': typeof SignUpRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRouteWithChildren
-  '/sign-up/$': typeof SignUpSplatRoute
+  '/sign-up': typeof SignUpRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,28 +61,14 @@ export interface FileRoutesById {
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRouteWithChildren
-  '/sign-up/$': typeof SignUpSplatRoute
+  '/sign-up': typeof SignUpRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/bookmarks'
-    | '/save'
-    | '/sign-in'
-    | '/sign-up'
-    | '/sign-up/$'
+  fullPaths: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up' | '/sign-up/$'
-  id:
-    | '__root__'
-    | '/'
-    | '/bookmarks'
-    | '/save'
-    | '/sign-in'
-    | '/sign-up'
-    | '/sign-up/$'
+  to: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
+  id: '__root__' | '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -98,7 +76,7 @@ export interface RootRouteChildren {
   BookmarksRoute: typeof BookmarksRoute
   SaveRoute: typeof SaveRoute
   SignInRoute: typeof SignInRoute
-  SignUpRoute: typeof SignUpRouteWithChildren
+  SignUpRoute: typeof SignUpRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -138,33 +116,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sign-up/$': {
-      id: '/sign-up/$'
-      path: '/$'
-      fullPath: '/sign-up/$'
-      preLoaderRoute: typeof SignUpSplatRouteImport
-      parentRoute: typeof SignUpRoute
-    }
   }
 }
-
-interface SignUpRouteChildren {
-  SignUpSplatRoute: typeof SignUpSplatRoute
-}
-
-const SignUpRouteChildren: SignUpRouteChildren = {
-  SignUpSplatRoute: SignUpSplatRoute,
-}
-
-const SignUpRouteWithChildren =
-  SignUpRoute._addFileChildren(SignUpRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BookmarksRoute: BookmarksRoute,
   SaveRoute: SaveRoute,
   SignInRoute: SignInRoute,
-  SignUpRoute: SignUpRouteWithChildren,
+  SignUpRoute: SignUpRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
