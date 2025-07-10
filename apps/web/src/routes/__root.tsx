@@ -70,7 +70,7 @@ function RootComponent() {
         </div>
         <hr />
         <Outlet />
-        <TanStackRouterDevtools position="bottom-right" />
+        {import.meta.env.DEV && <TanStackRouterDevtools position="bottom-right" />}
       </QueryClientProvider>
     </ClerkProvider>
   )
