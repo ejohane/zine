@@ -38,10 +38,10 @@ export default {
       
       if (indexAsset.status !== 404) {
         return new Response(indexAsset.body, {
-          ...indexAsset,
+          status: 200,
           headers: {
-            ...indexAsset.headers,
             'Content-Type': 'text/html',
+            'Cache-Control': 'no-cache',
           },
         });
       }
