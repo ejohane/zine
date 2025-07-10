@@ -103,11 +103,49 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 - **Database**: Cloudflare D1
 - **Commands**: `turbo deploy` (staging) or `turbo deploy:production`
 
+## Environment Variables
+
+### Frontend Environment Variables (apps/web)
+
+- **Naming Convention**: All frontend environment variables must be prefixed with `VITE_`
+- **Local Development**: Use `.env.local` for local development environment variables
+- **Production**: Environment variables are handled through GitHub Actions during deployment
+
+### GitHub Actions Environment Variable Setup
+
+Due to limitations with how Vite handles environment variables in GitHub Actions, the following process is required:
+
+1. **Add secrets to GitHub repository** under Settings → Secrets and variables → Actions
+2. **Install dotenv-cli** as a dev dependency: `bun add -D dotenv-cli`
+3. **Create .env file during build process** in GitHub Actions workflow:
+   ```yaml
+   - name: Build Web App (Production)
+     run: |
+       echo "VITE_YOUR_VAR=$VITE_YOUR_VAR" > .env.production
+       bunx dotenv-cli -e .env.production -- bun run build
+     working-directory: apps/web
+     env:
+       VITE_YOUR_VAR: ${{ secrets.VITE_YOUR_VAR }}
+   ```
+
+### Backend Environment Variables (packages/api)
+
+- **Local Development**: Use `.dev.vars` file (not committed to git)
+- **Production**: Environment variables are set through Cloudflare Workers dashboard or wrangler.toml
+- **GitHub Actions**: Use `env` section in workflow for deployment secrets
+
+### Important Notes
+
+- **Security**: Never commit actual environment variable values to git
+- **Prefixes**: Frontend variables must use `VITE_` prefix, backend variables don't need prefixes
+- **GitHub Actions**: Standard `env` section in GitHub Actions doesn't work directly with Vite builds - must use dotenv-cli workaround
+
 ## Current Status
 
 - ✅ Frontend SPA with TanStack Router
 - ✅ API with full CRUD endpoints
 - ✅ Shared types and business logic
+- ✅ Authentication with Clerk
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
 

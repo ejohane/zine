@@ -32,22 +32,6 @@ function RootComponent() {
 
   const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION || import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_DEV
 
-  // Debug logging
-  console.log('Environment variables:', {
-    VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION,
-    VITE_CLERK_PUBLISHABLE_KEY_DEV: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_DEV,
-    MODE: import.meta.env.MODE,
-    PROD: import.meta.env.PROD,
-    DEV: import.meta.env.DEV,
-    allEnvVars: import.meta.env
-  })
-  
-  // Test hardcoded value to see if the issue is with env var detection
-  console.log('Process env during build:', {
-    VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION || 'not set',
-    testVar: import.meta.env.VITE_TEST_VAR || 'not set'
-  })
-
   if (!publishableKey) {
     throw new Error('Missing Clerk publishable key')
   }
