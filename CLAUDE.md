@@ -16,6 +16,7 @@ zine/ (Monorepo Root)
 ## Technology Stack
 
 ### Frontend (apps/web)
+
 - **Framework**: Vite SPA with React 18
 - **Routing**: TanStack Router (client-side routing)
 - **State Management**: TanStack Query for server state
@@ -23,6 +24,7 @@ zine/ (Monorepo Root)
 - **Type Safety**: TypeScript + Zod validation
 
 ### Backend (packages/api)
+
 - **Runtime**: Cloudflare Workers
 - **Framework**: Hono
 - **Database**: D1 (Cloudflare's SQLite)
@@ -30,6 +32,7 @@ zine/ (Monorepo Root)
 - **Deployment**: Wrangler
 
 ### Shared Package (packages/shared)
+
 - **Architecture**: Repository pattern with service layer
 - **Validation**: Zod schemas for type safety
 - **Business Logic**: BookmarkService with repository abstraction
@@ -54,6 +57,7 @@ zine/ (Monorepo Root)
 ## Repository Pattern
 
 The shared package uses a repository pattern:
+
 - `BookmarkRepository` interface defines the contract
 - `InMemoryBookmarkRepository` (current) for mock data
 - `BookmarkService` provides business logic
@@ -94,7 +98,7 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 
 ## Deployment
 
-- **Frontend**: Cloudflare Pages (SPA)
+- **Frontend**: Cloudflare Workers (SPA)
 - **API**: Cloudflare Workers
 - **Database**: Cloudflare D1
 - **Commands**: `turbo deploy` (staging) or `turbo deploy:production`
@@ -106,3 +110,4 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 - ✅ Shared types and business logic
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
+

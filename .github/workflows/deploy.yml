@@ -129,14 +129,14 @@ jobs:
         run: bun run build
         working-directory: apps/web
         env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
+          VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'
         run: bun run build
         working-directory: apps/web
         env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
+          VITE_CLERK_PUBLISHABLE_KEY_DEV: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
         
       - name: Deploy to Production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
