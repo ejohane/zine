@@ -133,6 +133,7 @@ jobs:
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
+          VITE_TEST_VAR: "test-value-production"
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'

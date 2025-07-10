@@ -41,6 +41,12 @@ function RootComponent() {
     DEV: import.meta.env.DEV,
     allEnvVars: import.meta.env
   })
+  
+  // Test hardcoded value to see if the issue is with env var detection
+  console.log('Process env during build:', {
+    VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: 'VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION',
+    testVar: import.meta.env.VITE_TEST_VAR || 'not set'
+  })
 
   if (!publishableKey) {
     throw new Error('Missing Clerk publishable key')
