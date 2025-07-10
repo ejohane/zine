@@ -44,7 +44,7 @@ function RootComponent() {
   
   // Test hardcoded value to see if the issue is with env var detection
   console.log('Process env during build:', {
-    VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: 'VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION',
+    VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION || 'not set',
     testVar: import.meta.env.VITE_TEST_VAR || 'not set'
   })
 

@@ -129,7 +129,9 @@ jobs:
         run: |
           echo "Building with env vars:"
           echo "VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION is set: $([[ -n "$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" ]] && echo "YES" || echo "NO")"
-          bun run build
+          echo "VITE_TEST_VAR is set: $([[ -n "$VITE_TEST_VAR" ]] && echo "YES" || echo "NO")"
+          echo "Building with explicit env vars..."
+          VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION="$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" VITE_TEST_VAR="$VITE_TEST_VAR" bun run build
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
