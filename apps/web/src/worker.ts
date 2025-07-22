@@ -11,8 +11,8 @@ export default {
     const url = new URL(request.url);
     
     // API routes
-    if (url.pathname === '/api/v1/bookmarks') {
-      if (request.method === 'GET') {
+    if (url.pathname.startsWith('/api/')) {
+      if (url.pathname === '/api/v1/bookmarks' && request.method === 'GET') {
         return new Response(JSON.stringify(testBookmarks), {
           headers: {
             'Content-Type': 'application/json',
@@ -31,19 +31,32 @@ export default {
       return asset;
     }
     
-    // For SPA routing, serve index.html for any non-asset requests
-    if (!url.pathname.includes('.')) {
-      const indexRequest = new Request(`${url.origin}/index.html`);
-      const indexAsset = await env.ASSETS.fetch(indexRequest);
-      
-      if (indexAsset.status !== 404) {
-        return new Response(indexAsset.body, {
-          status: 200,
-          headers: {
-            'Content-Type': 'text/html',
-            'Cache-Control': 'no-cache',
-          },
+    // For SPA routing, serve index.html for client-side routes
+    // This handles all routes that don't have file extensions (like /sign-up, /bookmarks, etc.)
+    const isClientSideRoute = !url.pathname.includes('.');
+    
+    if (isClientSideRoute) {
+      try {
+        const indexRequest = new Request(`${url.origin}/index.html`, {
+          method: 'GET',
         });
+        const indexAsset = await env.ASSETS.fetch(indexRequest);
+        
+        if (indexAsset.ok) {
+          // Clone the response to avoid stream consumption issues
+          const indexContent = await indexAsset.text();
+          return new Response(indexContent, {
+            status: 200,
+            headers: {
+              'Content-Type': 'text/html; charset=utf-8',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0',
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Error serving index.html:', error);
       }
     }
     
