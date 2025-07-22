@@ -26,9 +26,16 @@ export default {
     // Try to serve static assets first
     const asset = await env.ASSETS.fetch(request);
     
-    // If asset found, return it
+    // If asset found, add appropriate cache headers
     if (asset.status !== 404) {
-      return asset;
+      const response = new Response(asset.body, asset);
+      
+      // Cache static assets (JS, CSS, images) for 1 hour
+      if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/)) {
+        response.headers.set('Cache-Control', 'public, max-age=3600');
+      }
+      
+      return response;
     }
     
     // For SPA routing, serve index.html for client-side routes
@@ -52,6 +59,8 @@ export default {
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache',
               'Expires': '0',
+              'X-Deployment-Time': new Date().toISOString(),
+              'X-Build-Version': env.BUILD_TIME || 'dev',
             },
           });
         }
@@ -68,4 +77,5 @@ interface Env {
   ASSETS: {
     fetch: (request: Request) => Promise<Response>;
   };
+  BUILD_TIME?: string;
 }

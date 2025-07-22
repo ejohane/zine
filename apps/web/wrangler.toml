@@ -12,7 +12,17 @@ command = "bun run build"
 
 [assets]
 directory = "dist"
+browser_TTL = 3600
+edge_TTL = 7200
 
 [env.production]
 name = "zine-web-production"
 route = "myzine.app/*"
+
+[env.production.vars]
+BUILD_TIME = "{{BUILD_TIME}}"
+
+[env.production.assets]
+directory = "dist"
+browser_TTL = 3600
+edge_TTL = 7200

@@ -19,6 +19,10 @@ database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
 name = "zine-api-production"
 route = "api.myzine.app/*"
 
+# Cache configuration for API responses
+[env.production.placement]
+mode = "smart"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 # Add your Clerk production secret key here
