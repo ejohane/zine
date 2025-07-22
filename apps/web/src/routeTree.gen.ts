@@ -9,20 +9,20 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignUpRouteImport } from './routes/sign-up'
-import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as Test2RouteImport } from './routes/test2'
+import { Route as Test1RouteImport } from './routes/test1'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as IndexRouteImport } from './routes/index'
 
-const SignUpRoute = SignUpRouteImport.update({
-  id: '/sign-up',
-  path: '/sign-up',
+const Test2Route = Test2RouteImport.update({
+  id: '/test2',
+  path: '/test2',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignInRoute = SignInRouteImport.update({
-  id: '/sign-in',
-  path: '/sign-in',
+const Test1Route = Test1RouteImport.update({
+  id: '/test1',
+  path: '/test1',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaveRoute = SaveRouteImport.update({
@@ -45,54 +45,54 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/test1': typeof Test1Route
+  '/test2': typeof Test2Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/test1': typeof Test1Route
+  '/test2': typeof Test2Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/test1': typeof Test1Route
+  '/test2': typeof Test2Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
+  fullPaths: '/' | '/bookmarks' | '/save' | '/test1' | '/test2'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
-  id: '__root__' | '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
+  to: '/' | '/bookmarks' | '/save' | '/test1' | '/test2'
+  id: '__root__' | '/' | '/bookmarks' | '/save' | '/test1' | '/test2'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BookmarksRoute: typeof BookmarksRoute
   SaveRoute: typeof SaveRoute
-  SignInRoute: typeof SignInRoute
-  SignUpRoute: typeof SignUpRoute
+  Test1Route: typeof Test1Route
+  Test2Route: typeof Test2Route
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sign-up': {
-      id: '/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof SignUpRouteImport
+    '/test2': {
+      id: '/test2'
+      path: '/test2'
+      fullPath: '/test2'
+      preLoaderRoute: typeof Test2RouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sign-in': {
-      id: '/sign-in'
-      path: '/sign-in'
-      fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInRouteImport
+    '/test1': {
+      id: '/test1'
+      path: '/test1'
+      fullPath: '/test1'
+      preLoaderRoute: typeof Test1RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/save': {
@@ -123,8 +123,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BookmarksRoute: BookmarksRoute,
   SaveRoute: SaveRoute,
-  SignInRoute: SignInRoute,
-  SignUpRoute: SignUpRoute,
+  Test1Route: Test1Route,
+  Test2Route: Test2Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
