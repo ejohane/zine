@@ -10,6 +10,9 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     
+    // Log request for debugging in production
+    console.log(`[${new Date().toISOString()}] ${request.method} ${url.pathname}`);
+    
     // API routes
     if (url.pathname.startsWith('/api/')) {
       if (url.pathname === '/api/v1/bookmarks' && request.method === 'GET') {
@@ -24,18 +27,44 @@ export default {
     }
     
     // Try to serve static assets first
-    const asset = await env.ASSETS.fetch(request);
-    
-    // If asset found, add appropriate cache headers
-    if (asset.status !== 404) {
-      const response = new Response(asset.body, asset);
-      
-      // Cache static assets (JS, CSS, images) for 1 hour
-      if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/)) {
-        response.headers.set('Cache-Control', 'public, max-age=3600');
+    if (!env.ASSETS) {
+      console.error('ASSETS binding is not available - this indicates a deployment configuration issue');
+      // For SPA routes, try to serve a basic HTML fallback instead of erroring
+      if (!url.pathname.includes('.')) {
+        return new Response(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>Loading...</title></head>
+            <body>
+              <div>The application is loading. If this message persists, there may be a deployment issue.</div>
+              <script>setTimeout(() => location.reload(), 3000);</script>
+            </body>
+          </html>
+        `, {
+          status: 200,
+          headers: { 'Content-Type': 'text/html' }
+        });
       }
+      return new Response('Server configuration error - ASSETS binding missing', { status: 500 });
+    }
+    
+    try {
+      const asset = await env.ASSETS.fetch(request);
       
-      return response;
+      // If asset found, add appropriate cache headers
+      if (asset.status !== 404) {
+        const response = new Response(asset.body, asset);
+        
+        // Cache static assets (JS, CSS, images) for 1 hour
+        if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/)) {
+          response.headers.set('Cache-Control', 'public, max-age=3600');
+        }
+        
+        return response;
+      }
+    } catch (error) {
+      console.error('Error fetching asset:', error);
+      // Continue to SPA routing logic
     }
     
     // For SPA routing, serve index.html for client-side routes
@@ -47,6 +76,12 @@ export default {
         const indexRequest = new Request(`${url.origin}/index.html`, {
           method: 'GET',
         });
+        
+        if (!env.ASSETS) {
+          console.error('ASSETS binding is not available for SPA routing');
+          return new Response('Server configuration error', { status: 500 });
+        }
+        
         const indexAsset = await env.ASSETS.fetch(indexRequest);
         
         if (indexAsset.ok) {
