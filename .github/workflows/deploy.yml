@@ -68,6 +68,14 @@ jobs:
         env:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}
           
+      - name: Purge Cache (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
+          
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
         uses: cloudflare/wrangler-action@v3
@@ -129,6 +137,9 @@ jobs:
         run: |
           echo "VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION=$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" > .env.production
           bunx dotenv-cli -e .env.production -- bun run build
+          # Replace BUILD_TIME placeholder in wrangler.toml
+          BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
+          sed -i "s/{{BUILD_TIME}}/$BUILD_TIME/g" wrangler.toml
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
@@ -147,6 +158,14 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/web
           command: deploy --env production
+          
+      - name: Purge Cache (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}'
           
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
