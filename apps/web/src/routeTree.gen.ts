@@ -9,17 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 
-const SignUpRoute = SignUpRouteImport.update({
-  id: '/sign-up',
-  path: '/sign-up',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
@@ -40,20 +35,25 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SignUpSplatRoute = SignUpSplatRouteImport.update({
+  id: '/sign-up/$',
+  path: '/sign-up/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/sign-up/$': typeof SignUpSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/sign-up/$': typeof SignUpSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -61,14 +61,14 @@ export interface FileRoutesById {
   '/bookmarks': typeof BookmarksRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/sign-up/$': typeof SignUpSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
+  fullPaths: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
-  id: '__root__' | '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up'
+  to: '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up/$'
+  id: '__root__' | '/' | '/bookmarks' | '/save' | '/sign-in' | '/sign-up/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,18 +76,11 @@ export interface RootRouteChildren {
   BookmarksRoute: typeof BookmarksRoute
   SaveRoute: typeof SaveRoute
   SignInRoute: typeof SignInRoute
-  SignUpRoute: typeof SignUpRoute
+  SignUpSplatRoute: typeof SignUpSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sign-up': {
-      id: '/sign-up'
-      path: '/sign-up'
-      fullPath: '/sign-up'
-      preLoaderRoute: typeof SignUpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sign-in': {
       id: '/sign-in'
       path: '/sign-in'
@@ -116,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sign-up/$': {
+      id: '/sign-up/$'
+      path: '/sign-up/$'
+      fullPath: '/sign-up/$'
+      preLoaderRoute: typeof SignUpSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -124,7 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   BookmarksRoute: BookmarksRoute,
   SaveRoute: SaveRoute,
   SignInRoute: SignInRoute,
-  SignUpRoute: SignUpRoute,
+  SignUpSplatRoute: SignUpSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
