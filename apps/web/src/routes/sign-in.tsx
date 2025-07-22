@@ -15,8 +15,7 @@ function SignInPage() {
           </h2>
         </div>
         <SignIn 
-          routing="path" 
-          path="/sign-in" 
+          routing="virtual" 
           redirectUrl="/"
           signUpUrl="/sign-up"
         />
