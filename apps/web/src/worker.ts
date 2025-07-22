@@ -68,8 +68,9 @@ export default {
     }
     
     // For SPA routing, serve index.html for client-side routes
-    // This handles all routes that don't have file extensions (like /sign-up, /bookmarks, etc.)
-    const isClientSideRoute = !url.pathname.includes('.');
+    // This handles all routes that don't have file extensions (like /test1, /test2, etc.)
+    const isStaticAsset = url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|json|txt|xml|pdf)$/);
+    const isClientSideRoute = !isStaticAsset;
     
     if (isClientSideRoute) {
       try {
