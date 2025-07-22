@@ -140,6 +140,10 @@ Due to limitations with how Vite handles environment variables in GitHub Actions
 - **Prefixes**: Frontend variables must use `VITE_` prefix, backend variables don't need prefixes
 - **GitHub Actions**: Standard `env` section in GitHub Actions doesn't work directly with Vite builds - must use dotenv-cli workaround
 
+## Deployment Guidelines
+
+- **Do not run deploy scripts locally, always go through github ci/cd**
+
 ## Current Status
 
 - ✅ Frontend SPA with TanStack Router
@@ -148,4 +152,3 @@ Due to limitations with how Vite handles environment variables in GitHub Actions
 - ✅ Authentication with Clerk
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
-
