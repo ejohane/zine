@@ -15,6 +15,13 @@ export default defineConfig({
     },
     historyApiFallback: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
   plugins: [
     react(),
     TanStackRouterVite(),
