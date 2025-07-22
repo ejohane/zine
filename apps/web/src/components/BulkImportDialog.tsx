@@ -3,7 +3,6 @@
  */
 
 import { useState } from 'react'
-import { useAuth } from '@clerk/clerk-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { saveBookmark } from '../lib/api'
@@ -26,7 +25,6 @@ interface ImportItem {
 }
 
 export function BulkImportDialog({ isOpen, onClose, onSuccess, className = '' }: BulkImportDialogProps) {
-  const { getToken } = useAuth()
   const [urlsText, setUrlsText] = useState('')
   const [importItems, setImportItems] = useState<ImportItem[]>([])
   const [isImporting, setIsImporting] = useState(false)
@@ -87,8 +85,7 @@ export function BulkImportDialog({ isOpen, onClose, onSuccess, className = '' }:
           notes: item.notes
         }
 
-        const token = await getToken()
-        const bookmark = await saveBookmark(saveData, token)
+        const bookmark = await saveBookmark(saveData, null)
         
         // Update to success
         setImportItems(current => 
