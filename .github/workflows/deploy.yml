@@ -58,6 +58,16 @@ jobs:
           workingDirectory: packages/api
           command: d1 migrations apply --env production --remote DB
           
+      - name: Set Clerk Secret (Production)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/api
+          command: secret put CLERK_SECRET_KEY --env production
+        env:
+          WRANGLER_SECRET_VALUE: ${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}
+          
       - name: Deploy to Production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
@@ -65,8 +75,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
           command: deploy --env production
-        env:
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}
           
       - name: Purge Cache (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -76,6 +84,16 @@ jobs:
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}'
           
+      - name: Set Clerk Secret (Preview)
+        if: github.event_name == 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: packages/api
+          command: secret put CLERK_SECRET_KEY --name zine-api-${{ github.head_ref }}
+        env:
+          WRANGLER_SECRET_VALUE: ${{ secrets.CLERK_SECRET_KEY_DEV }}
+          
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
         uses: cloudflare/wrangler-action@v3
@@ -83,8 +101,6 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
           command: deploy --name zine-api-${{ github.head_ref }}
-        env:
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_DEV }}
         id: preview_deploy
         
       - name: Comment Preview URL
@@ -135,14 +151,16 @@ jobs:
       - name: Build Web App (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          echo "VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION=$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" > .env.production
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY" > .env.production
+          echo "Building with environment variables..."
+          cat .env.production
           bunx dotenv-cli -e .env.production -- bun run build
           # Replace BUILD_TIME placeholder in wrangler.toml
           BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
           sed -i "s/{{BUILD_TIME}}/$BUILD_TIME/g" wrangler.toml
         working-directory: apps/web
         env:
-          VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'
