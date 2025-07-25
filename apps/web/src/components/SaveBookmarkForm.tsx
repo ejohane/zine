@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { saveBookmark, previewBookmark } from '../lib/api'
 import { validateAndNormalizeUrl, getUrlSuggestions } from '../lib/url-validation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
+import { useAuth } from '../lib/auth'
 import type { Bookmark, SaveBookmark } from '../lib/api'
 import type { UrlValidationResult } from '../lib/url-validation'
 
@@ -31,6 +32,7 @@ export function SaveBookmarkForm({
   onCancel,
   className = ''
 }: SaveBookmarkFormProps) {
+  const { getToken } = useAuth()
   const [url, setUrl] = useState(initialUrl)
   const [notes, setNotes] = useState('')
   const [preview, setPreview] = useState<PreviewState>({
@@ -93,7 +95,8 @@ export function SaveBookmarkForm({
     setPreview({ bookmark: null, isLoading: true, error: null })
 
     try {
-      const bookmarkPreview = await previewBookmark(urlValidation.normalized, null)
+      const token = await getToken()
+      const bookmarkPreview = await previewBookmark(urlValidation.normalized, token)
       setPreview({ bookmark: bookmarkPreview, isLoading: false, error: null })
     } catch (error) {
       setPreview({ 
@@ -120,7 +123,8 @@ export function SaveBookmarkForm({
         notes: notes.trim() || undefined
       }
 
-      const savedBookmark = await saveBookmark(saveData, null)
+      const token = await getToken()
+      const savedBookmark = await saveBookmark(saveData, token)
       onSuccess?.(savedBookmark)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'Failed to save bookmark')

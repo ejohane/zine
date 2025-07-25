@@ -71,6 +71,9 @@ export const fetchBookmarks = async (
     headers: createAuthHeaders(token),
   })
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
     throw new Error('Failed to fetch bookmarks')
   }
   const result: BookmarksResponse = await response.json()
