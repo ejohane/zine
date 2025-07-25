@@ -60,13 +60,10 @@ jobs:
           
       - name: Set Clerk Secret (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: packages/api
-          command: secret put CLERK_SECRET_KEY --env production
+        run: echo "${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}" | bunx wrangler secret put CLERK_SECRET_KEY --env production
+        working-directory: packages/api
         env:
-          WRANGLER_SECRET_VALUE: ${{ secrets.CLERK_SECRET_KEY_PRODUCTION }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           
       - name: Deploy to Production
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -86,13 +83,10 @@ jobs:
           
       - name: Set Clerk Secret (Preview)
         if: github.event_name == 'pull_request'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: packages/api
-          command: secret put CLERK_SECRET_KEY --name zine-api-${{ github.head_ref }}
+        run: echo "${{ secrets.CLERK_SECRET_KEY_DEV }}" | bunx wrangler secret put CLERK_SECRET_KEY --name zine-api-${{ github.head_ref }}
+        working-directory: packages/api
         env:
-          WRANGLER_SECRET_VALUE: ${{ secrets.CLERK_SECRET_KEY_DEV }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
