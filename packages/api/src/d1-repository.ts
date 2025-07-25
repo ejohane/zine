@@ -423,4 +423,36 @@ export class D1BookmarkRepository implements BookmarkRepository {
 
     return bookmark
   }
+
+  /**
+   * Ensure user exists in the database - creates user if not exists
+   */
+  async ensureUser(userData: {
+    id: string
+    email?: string
+    firstName?: string
+    lastName?: string
+    imageUrl?: string
+  }): Promise<void> {
+    try {
+      const now = Date.now()
+      
+      await this.db.prepare(`
+        INSERT OR IGNORE INTO users (
+          id, email, first_name, last_name, image_url, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        userData.id,
+        userData.email || '',
+        userData.firstName || null,
+        userData.lastName || null,
+        userData.imageUrl || null,
+        now,
+        now
+      ).run()
+    } catch (error) {
+      console.error('Error ensuring user exists:', error)
+      throw new Error('Failed to ensure user exists in database')
+    }
+  }
 }
