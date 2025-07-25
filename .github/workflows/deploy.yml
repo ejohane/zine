@@ -135,14 +135,16 @@ jobs:
       - name: Build Web App (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          echo "VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION=$VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION" > .env.production
+          echo "VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY" > .env.production
+          echo "Building with environment variables..."
+          cat .env.production
           bunx dotenv-cli -e .env.production -- bun run build
           # Replace BUILD_TIME placeholder in wrangler.toml
           BUILD_TIME=$(date -u +%Y%m%d%H%M%S)
           sed -i "s/{{BUILD_TIME}}/$BUILD_TIME/g" wrangler.toml
         working-directory: apps/web
         env:
-          VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_PRODUCTION }}
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'
