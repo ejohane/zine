@@ -333,6 +333,14 @@ export class D1BookmarkRepository implements BookmarkRepository {
     try {
       const now = Date.now()
       
+      console.log('Creating bookmark with metadata for userId:', bookmarkData.userId)
+      console.log('Bookmark data:', {
+        userId: bookmarkData.userId,
+        title: bookmarkData.title,
+        url: bookmarkData.url,
+        creatorId: bookmarkData.creatorId
+      })
+      
       const result = await this.db.prepare(`
         INSERT INTO bookmarks (
           user_id, url, original_url, title, description, source, content_type,
@@ -425,6 +433,47 @@ export class D1BookmarkRepository implements BookmarkRepository {
   }
 
   /**
+   * Ensure creator exists in the database - creates creator if not exists
+   */
+  async ensureCreator(creatorData: {
+    id: string
+    name: string
+    handle?: string
+    avatarUrl?: string
+    bio?: string
+    url?: string
+    platforms?: string[]
+    externalLinks?: Array<{title: string, url: string}>
+  }): Promise<void> {
+    try {
+      const now = Date.now()
+      
+      console.log('Running ensureCreator for:', creatorData.id)
+      const result = await this.db.prepare(`
+        INSERT OR IGNORE INTO creators (
+          id, name, handle, avatar_url, bio, url, platforms, external_links, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        creatorData.id,
+        creatorData.name,
+        creatorData.handle || null,
+        creatorData.avatarUrl || null,
+        creatorData.bio || null,
+        creatorData.url || null,
+        creatorData.platforms ? JSON.stringify(creatorData.platforms) : null,
+        creatorData.externalLinks ? JSON.stringify(creatorData.externalLinks) : null,
+        now,
+        now
+      ).run()
+      
+      console.log('ensureCreator result:', result.meta)
+    } catch (error) {
+      console.error('Error ensuring creator exists:', error)
+      throw new Error('Failed to ensure creator exists in database')
+    }
+  }
+
+  /**
    * Ensure user exists in the database - creates user if not exists
    */
   async ensureUser(userData: {
@@ -437,7 +486,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
     try {
       const now = Date.now()
       
-      await this.db.prepare(`
+      console.log('Running ensureUser for:', userData.id)
+      const result = await this.db.prepare(`
         INSERT OR IGNORE INTO users (
           id, email, first_name, last_name, image_url, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -450,6 +500,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
         now,
         now
       ).run()
+      
+      console.log('ensureUser result:', result.meta)
     } catch (error) {
       console.error('Error ensuring user exists:', error)
       throw new Error('Failed to ensure user exists in database')

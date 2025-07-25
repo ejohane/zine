@@ -130,10 +130,12 @@ app.post('/api/v1/bookmarks', async (c) => {
     const validatedData = CreateBookmarkSchema.parse(body)
     
     // Ensure user exists in database before creating bookmark
+    console.log('Ensuring user exists for userId:', auth.userId)
     const d1Repository = new D1BookmarkRepository(c.env.DB)
     await d1Repository.ensureUser({
       id: auth.userId
     })
+    console.log('User ensured successfully for userId:', auth.userId)
     
     const result = await bookmarkService.createBookmark(validatedData, auth.userId)
     if (result.error) {
@@ -206,10 +208,12 @@ app.post('/api/v1/bookmarks/save', async (c) => {
     const validatedData = SaveBookmarkSchema.parse(body)
     
     // Ensure user exists in database before creating bookmark
+    console.log('Ensuring user exists for userId:', auth.userId)
     const d1Repository = new D1BookmarkRepository(c.env.DB)
     await d1Repository.ensureUser({
       id: auth.userId
     })
+    console.log('User ensured successfully for userId:', auth.userId)
     
     // Ensure userId is set to authenticated user
     const saveData = {
@@ -217,7 +221,7 @@ app.post('/api/v1/bookmarks/save', async (c) => {
       userId: auth.userId
     }
     
-    const result = await bookmarkSaveService.saveBookmark(saveData)
+    const result = await bookmarkSaveService.saveBookmark(saveData, auth.userId)
     
     if (!result.success) {
       if (result.duplicate) {
