@@ -34,6 +34,16 @@ export interface EnhancedBookmarkRepository extends BookmarkRepository {
     tags?: string[]
     notes?: string
   }) => Promise<Bookmark>
+  ensureCreator?: (creatorData: {
+    id: string
+    name: string
+    handle?: string
+    avatarUrl?: string
+    bio?: string
+    url?: string
+    platforms?: string[]
+    externalLinks?: Array<{title: string, url: string}>
+  }) => Promise<void>
 }
 
 export interface SaveBookmarkResult {
@@ -85,7 +95,28 @@ export class BookmarkSaveService {
 
       const metadata = metadataResult.metadata!
 
-      // Step 4: Create the bookmark with full metadata
+      // Step 4: Ensure creator exists if we have creator metadata
+      let creatorId: string | undefined = undefined
+      if (metadata.creator && this.repository.ensureCreator) {
+        try {
+          await this.repository.ensureCreator({
+            id: metadata.creator.id,
+            name: metadata.creator.name,
+            handle: metadata.creator.handle,
+            avatarUrl: metadata.creator.avatarUrl,
+            bio: metadata.creator.bio,
+            url: metadata.creator.url,
+            platforms: metadata.creator.platforms,
+            externalLinks: metadata.creator.externalLinks
+          })
+          creatorId = metadata.creator.id
+        } catch (error) {
+          console.warn('Failed to ensure creator exists, setting creatorId to null:', error)
+          creatorId = undefined
+        }
+      }
+
+      // Step 5: Create the bookmark with full metadata
       let newBookmark: Bookmark
 
       if (this.repository.createWithMetadata) {
@@ -103,7 +134,7 @@ export class BookmarkSaveService {
           publishedAt: metadata.publishedAt,
           language: metadata.language,
           status: 'active',
-          creatorId: metadata.creator?.id,
+          creatorId: creatorId,
           videoMetadata: metadata.videoMetadata,
           podcastMetadata: metadata.podcastMetadata,
           articleMetadata: metadata.articleMetadata,
