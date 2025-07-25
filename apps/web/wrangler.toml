@@ -13,8 +13,6 @@ command = "bun run build"
 [assets]
 directory = "dist"
 not_found_handling = "single-page-application"
-browser_TTL = 3600
-edge_TTL = 7200
 
 [env.production]
 name = "zine-web-production"
@@ -26,5 +24,3 @@ BUILD_TIME = "{{BUILD_TIME}}"
 [env.production.assets]
 directory = "dist"
 not_found_handling = "single-page-application"
-browser_TTL = 3600
-edge_TTL = 7200
