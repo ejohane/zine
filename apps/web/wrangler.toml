@@ -12,6 +12,7 @@ command = "bun run build"
 
 [assets]
 directory = "dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 [env.production]
@@ -23,4 +24,5 @@ BUILD_TIME = "{{BUILD_TIME}}"
 
 [env.production.assets]
 directory = "dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
