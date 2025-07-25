@@ -129,6 +129,12 @@ app.post('/api/v1/bookmarks', async (c) => {
     const body = await c.req.json()
     const validatedData = CreateBookmarkSchema.parse(body)
     
+    // Ensure user exists in database before creating bookmark
+    const d1Repository = new D1BookmarkRepository(c.env.DB)
+    await d1Repository.ensureUser({
+      id: auth.userId
+    })
+    
     const result = await bookmarkService.createBookmark(validatedData, auth.userId)
     if (result.error) {
       return c.json({ error: result.error }, 500)
@@ -199,6 +205,12 @@ app.post('/api/v1/bookmarks/save', async (c) => {
     const body = await c.req.json()
     const validatedData = SaveBookmarkSchema.parse(body)
     
+    // Ensure user exists in database before creating bookmark
+    const d1Repository = new D1BookmarkRepository(c.env.DB)
+    await d1Repository.ensureUser({
+      id: auth.userId
+    })
+    
     // Ensure userId is set to authenticated user
     const saveData = {
       ...validatedData,
@@ -214,6 +226,7 @@ app.post('/api/v1/bookmarks/save', async (c) => {
           duplicate: result.duplicate 
         }, 409) // Conflict
       }
+      console.error('Error creating bookmark with metadata:', result.error)
       return c.json({ error: result.error }, 500)
     }
     
@@ -222,6 +235,7 @@ app.post('/api/v1/bookmarks/save', async (c) => {
       message: result.message 
     }, 201)
   } catch (error) {
+    console.error('Error creating bookmark with metadata:', error)
     return c.json({ error: 'Invalid request data' }, 400)
   }
 })
