@@ -3,7 +3,7 @@
  * Features: URL input, metadata preview, validation, enhanced save experience
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
 import { saveBookmark, previewBookmark } from '../lib/api'
@@ -74,19 +74,8 @@ export function SaveBookmarkForm({
     }
   }, [url])
 
-  // Auto-preview when URL changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (urlValidation?.isValid && urlValidation.normalized !== preview.bookmark?.originalUrl) {
-        handlePreview()
-      }
-    }, 1000) // Debounce for 1 second
-
-    return () => clearTimeout(timer)
-  }, [urlValidation])
-
   // Handle metadata preview
-  const handlePreview = async () => {
+  const handlePreview = useCallback(async () => {
     if (!urlValidation?.isValid || !urlValidation.normalized) {
       setPreview({ bookmark: null, isLoading: false, error: 'Invalid URL' })
       return
@@ -105,7 +94,18 @@ export function SaveBookmarkForm({
         error: error instanceof Error ? error.message : 'Failed to preview bookmark' 
       })
     }
-  }
+  }, [urlValidation, getToken])
+
+  // Auto-preview when URL changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (urlValidation?.isValid && urlValidation.normalized !== preview.bookmark?.originalUrl) {
+        handlePreview()
+      }
+    }, 1000) // Debounce for 1 second
+
+    return () => clearTimeout(timer)
+  }, [urlValidation, handlePreview, preview.bookmark?.originalUrl])
 
   // Handle save bookmark
   const handleSave = async () => {

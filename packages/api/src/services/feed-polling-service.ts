@@ -1,6 +1,6 @@
 import { SubscriptionRepository, FeedItemRepository, UserAccount, Subscription, FeedItem } from '@zine/shared'
-import { SpotifyAPI, SpotifyEpisode } from '../external/spotify-api'
-import { YouTubeAPI, YouTubeVideoDetails } from '../external/youtube-api'
+import { SpotifyAPI } from '../external/spotify-api'
+import { YouTubeAPI } from '../external/youtube-api'
 
 export interface PollResult {
   provider: 'spotify' | 'youtube'
@@ -253,35 +253,5 @@ export class FeedPollingService {
     }
   }
 
-  // Rate limiting helper
-  private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
-  }
 
-  // Error handling with exponential backoff
-  private async withRetry<T>(
-    operation: () => Promise<T>, 
-    maxRetries: number = 3, 
-    baseDelay: number = 1000
-  ): Promise<T> {
-    let lastError: Error | undefined
-
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        return await operation()
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error))
-        
-        if (attempt === maxRetries) {
-          throw lastError
-        }
-
-        const delay = baseDelay * Math.pow(2, attempt)
-        console.log(`[FeedPolling] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, lastError.message)
-        await this.delay(delay)
-      }
-    }
-
-    throw lastError || new Error('Unknown error in retry operation')
-  }
 }

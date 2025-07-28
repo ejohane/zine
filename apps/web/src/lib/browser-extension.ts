@@ -11,7 +11,16 @@ export interface ExtensionInfo {
 
 export interface ExtensionMessage {
   type: 'SAVE_BOOKMARK' | 'GET_CURRENT_TAB' | 'PING'
-  data?: any
+  data?: unknown
+}
+
+interface ExtensionResponse {
+  success?: boolean
+  version?: string
+  features?: string[]
+  url?: string
+  title?: string
+  error?: string
 }
 
 // Browser extension API type definitions
@@ -19,13 +28,13 @@ declare global {
   interface Window {
     chrome?: {
       runtime?: {
-        sendMessage: (extensionId: string, message: any, callback: (response: any) => void) => void
+        sendMessage: (extensionId: string, message: unknown, callback: (response: ExtensionResponse) => void) => void
         lastError?: { message: string }
       }
     }
     browser?: {
       runtime?: {
-        sendMessage: (message: any) => Promise<any>
+        sendMessage: (message: unknown) => Promise<ExtensionResponse>
       }
     }
   }
@@ -50,7 +59,7 @@ export const detectBrowserExtension = async (): Promise<ExtensionInfo> => {
         window.chrome!.runtime!.sendMessage(
           'zine-extension-id', // This would be the actual extension ID
           { type: 'PING' },
-          (response: any) => {
+          (response: ExtensionResponse) => {
             clearTimeout(timeout)
             
             if (window.chrome?.runtime?.lastError) {
@@ -81,7 +90,7 @@ export const detectBrowserExtension = async (): Promise<ExtensionInfo> => {
         }, 1000)
 
         window.browser!.runtime!.sendMessage({ type: 'PING' })
-          .then((response: any) => {
+          .then((response) => {
             clearTimeout(timeout)
             if (response?.success) {
               resolve({
@@ -114,7 +123,7 @@ export const saveCurrentTab = async (): Promise<{ success: boolean; url?: string
         window.chrome!.runtime!.sendMessage(
           'zine-extension-id',
           { type: 'GET_CURRENT_TAB' },
-          (response: any) => {
+          (response: ExtensionResponse) => {
             if (window.chrome?.runtime?.lastError) {
               resolve({ success: false, error: 'Extension communication failed' })
               return

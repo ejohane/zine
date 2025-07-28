@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, desc, asc, inArray } from 'drizzle-orm'
+import { eq, and, desc, inArray } from 'drizzle-orm'
 import * as schema from './schema'
 import { 
   FeedItemRepository,
@@ -135,6 +135,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           eq(schema.userFeedItems.userId, userId)
         )
       )
+      .$dynamic()
 
     const conditions = []
     

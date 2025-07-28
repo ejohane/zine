@@ -697,7 +697,7 @@ export default {
   fetch: app.fetch,
   
   // Scheduled events (cron triggers)
-  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+  async scheduled(_event: ScheduledEvent, env: Bindings, _ctx: ExecutionContext): Promise<void> {
     console.log(`[Scheduled] Feed polling triggered by cron at ${new Date().toISOString()}`)
     
     try {
