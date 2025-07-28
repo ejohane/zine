@@ -49,6 +49,14 @@ function RootComponent() {
                 Bookmarks
               </Link>
               <Link
+                to="/feed"
+                activeProps={{
+                  className: 'font-bold',
+                }}
+              >
+                Feed
+              </Link>
+              <Link
                 to="/test1"
                 activeProps={{
                   className: 'font-bold',

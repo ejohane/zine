@@ -367,3 +367,145 @@ export const updateSubscriptions = async (
   
   return response.json()
 }
+
+// Feed Types
+export interface FeedItem {
+  id: string
+  title: string
+  description?: string
+  thumbnailUrl?: string
+  publishedAt: Date
+  durationSeconds?: number
+  externalUrl: string
+  subscription: {
+    id: string
+    title: string
+    creatorName: string
+    thumbnailUrl?: string
+    providerId: string
+  }
+}
+
+export interface FeedItemWithState {
+  id: string
+  feedItem: FeedItem
+  isRead: boolean
+  readAt?: Date
+  bookmarkId?: number
+  createdAt: Date
+}
+
+export interface FeedResponse {
+  feedItems: FeedItemWithState[]
+  pagination: {
+    limit: number
+    offset: number
+    hasMore: boolean
+  }
+}
+
+export interface SubscriptionWithUnreadCount {
+  id: string
+  title: string
+  creatorName: string
+  thumbnailUrl?: string
+  providerId: string
+  unreadCount: number
+  lastUpdated: Date
+}
+
+export interface SubscriptionsWithCountsResponse {
+  subscriptions: SubscriptionWithUnreadCount[]
+}
+
+// Feed APIs
+export const fetchFeed = async (
+  token: string | null,
+  params?: {
+    unread?: boolean
+    subscription?: string
+    limit?: number
+    offset?: number
+  }
+): Promise<FeedResponse> => {
+  const searchParams = new URLSearchParams()
+  if (params?.unread) searchParams.set('unread', 'true')
+  if (params?.subscription) searchParams.set('subscription', params.subscription)
+  if (params?.limit) searchParams.set('limit', params.limit.toString())
+  if (params?.offset) searchParams.set('offset', params.offset.toString())
+  
+  const url = `${API_BASE_URL}/feed${searchParams.toString() ? '?' + searchParams.toString() : ''}`
+  const response = await fetch(url, {
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
+    throw new Error('Failed to fetch feed')
+  }
+  
+  const result = await response.json()
+  return {
+    ...result,
+    feedItems: result.feedItems.map((item: any) => ({
+      ...item,
+      feedItem: {
+        ...item.feedItem,
+        publishedAt: new Date(item.feedItem.publishedAt)
+      },
+      readAt: item.readAt ? new Date(item.readAt) : undefined,
+      createdAt: new Date(item.createdAt)
+    }))
+  }
+}
+
+export const fetchSubscriptionsWithCounts = async (
+  token: string | null
+): Promise<SubscriptionWithUnreadCount[]> => {
+  const response = await fetch(`${API_BASE_URL}/feed/subscriptions`, {
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
+    throw new Error('Failed to fetch subscriptions with counts')
+  }
+  
+  const result: SubscriptionsWithCountsResponse = await response.json()
+  return result.subscriptions.map(sub => ({
+    ...sub,
+    lastUpdated: new Date(sub.lastUpdated)
+  }))
+}
+
+export const markFeedItemAsRead = async (
+  itemId: string,
+  token: string | null
+): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/feed/${itemId}/read`, {
+    method: 'PUT',
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to mark item as read')
+  }
+}
+
+export const markFeedItemAsUnread = async (
+  itemId: string,
+  token: string | null
+): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/feed/${itemId}/unread`, {
+    method: 'PUT',
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    throw new Error('Failed to mark item as unread')
+  }
+}
