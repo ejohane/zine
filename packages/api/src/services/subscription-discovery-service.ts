@@ -27,16 +27,11 @@ export class SubscriptionDiscoveryService {
     userId: string, 
     provider: 'spotify' | 'youtube'
   ): Promise<DiscoveryResult> {
-    // Get user's OAuth account for this provider
-    const userAccount = await this.subscriptionRepository.getUserAccount(userId, provider)
+    // Get user's OAuth account for this provider (with automatic token refresh if needed)
+    const userAccount = await this.subscriptionRepository.getValidUserAccount(userId, provider)
     
     if (!userAccount) {
-      throw new Error(`No ${provider} account connected for user`)
-    }
-
-    // Check if token is expired and needs refresh
-    if (this.isTokenExpired(userAccount)) {
-      throw new Error(`${provider} token expired - please reconnect your account`)
+      throw new Error(`No valid ${provider} account found - please reconnect your account`)
     }
 
     try {
@@ -191,13 +186,4 @@ export class SubscriptionDiscoveryService {
     return { added, removed }
   }
 
-  private isTokenExpired(userAccount: UserAccount): boolean {
-    if (!userAccount.expiresAt) {
-      return false // No expiration date means token doesn't expire
-    }
-    
-    // Add 5 minute buffer before expiration
-    const bufferMs = 5 * 60 * 1000
-    return new Date().getTime() > (userAccount.expiresAt.getTime() - bufferMs)
-  }
 }

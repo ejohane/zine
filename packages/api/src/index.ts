@@ -17,6 +17,7 @@ import { OAuthService, encodeState, decodeState, getUserInfo } from './oauth/oau
 import { setupDatabase } from './setup-database'
 import { SubscriptionDiscoveryService } from './services/subscription-discovery-service'
 import { FeedPollingService } from './services/feed-polling-service'
+import { TokenRefreshService } from './services/token-refresh-service'
 
 type Bindings = {
   DB: D1Database
@@ -52,17 +53,19 @@ let subscriptionRepository: D1SubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
 let feedPollingService: FeedPollingService
+let tokenRefreshService: TokenRefreshService
 
 // Initialize services on first request
-async function initializeServices(db: D1Database) {
+async function initializeServices(db: D1Database, env: Bindings) {
   if (!bookmarkService) {
     const d1Repository = new D1BookmarkRepository(db)
     bookmarkService = new BookmarkService(d1Repository)
     bookmarkSaveService = new BookmarkSaveService(d1Repository)
-    subscriptionRepository = new D1SubscriptionRepository(db)
+    subscriptionRepository = new D1SubscriptionRepository(db, env)
     feedItemRepository = new D1FeedItemRepository(db)
     subscriptionDiscoveryService = new SubscriptionDiscoveryService(subscriptionRepository)
     feedPollingService = new FeedPollingService(subscriptionRepository, feedItemRepository)
+    tokenRefreshService = new TokenRefreshService(subscriptionRepository)
     
     // Setup database tables and providers
     await setupDatabase(db)
@@ -73,7 +76,8 @@ async function initializeServices(db: D1Database) {
     subscriptionRepository, 
     feedItemRepository,
     subscriptionDiscoveryService,
-    feedPollingService
+    feedPollingService,
+    tokenRefreshService
   }
 }
 
@@ -163,7 +167,7 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       return c.json({ error: 'Unsupported provider' }, 400)
     }
     
-    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     const oauthService = new OAuthService(oauthProvider.config)
     
     console.log('Debug info:', {
@@ -248,7 +252,7 @@ app.delete('/api/v1/auth/:provider/disconnect', async (c) => {
     const provider = c.req.param('provider')
     const auth = getAuthContext(c)
     
-    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     const account = await subscriptionRepository.getUserAccount(auth.userId, provider)
     if (!account) {
@@ -264,11 +268,189 @@ app.delete('/api/v1/auth/:provider/disconnect', async (c) => {
   }
 })
 
+// Manual token refresh endpoint
+app.post('/api/v1/auth/:provider/refresh', authMiddleware, async (c) => {
+  try {
+    const provider = c.req.param('provider')
+    const auth = getAuthContext(c)
+    
+    if (!['spotify', 'youtube'].includes(provider)) {
+      return c.json({ error: 'Invalid provider' }, 400)
+    }
+    
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    // Get the user's account for this provider
+    const existingAccount = await subscriptionRepository.getUserAccount(auth.userId, provider)
+    if (!existingAccount) {
+      return c.json({ error: `No ${provider} account connected` }, 404)
+    }
+    
+    if (!existingAccount.refreshToken) {
+      return c.json({ error: 'No refresh token available - please reconnect your account' }, 400)
+    }
+    
+    console.log(`[ManualRefresh] User ${auth.userId} requesting manual refresh for ${provider} account ${existingAccount.id}`)
+    
+    // Attempt to refresh the token
+    const refreshedAccount = await subscriptionRepository.getValidUserAccount(auth.userId, provider)
+    
+    if (!refreshedAccount) {
+      console.error(`[ManualRefresh] Failed to refresh token for user ${auth.userId} provider ${provider}`)
+      return c.json({ 
+        error: 'Failed to refresh token - please try reconnecting your account',
+        requiresReconnection: true
+      }, 400)
+    }
+    
+    // Check if the token was actually refreshed (expiration time changed)
+    const wasRefreshed = !existingAccount.expiresAt || !refreshedAccount.expiresAt || 
+                        refreshedAccount.expiresAt.getTime() !== existingAccount.expiresAt.getTime()
+    
+    console.log(`[ManualRefresh] Token refresh ${wasRefreshed ? 'successful' : 'not needed'} for user ${auth.userId} provider ${provider}`)
+    
+    return c.json({
+      success: true,
+      message: wasRefreshed ? 'Token refreshed successfully' : 'Token was already valid',
+      account: {
+        id: refreshedAccount.id,
+        provider: refreshedAccount.providerId,
+        externalAccountId: refreshedAccount.externalAccountId,
+        expiresAt: refreshedAccount.expiresAt?.toISOString(),
+        hasRefreshToken: !!refreshedAccount.refreshToken
+      },
+      wasRefreshed
+    })
+    
+  } catch (error) {
+    console.error('Manual token refresh error:', error)
+    return c.json({ 
+      error: 'Failed to refresh token',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500)
+  }
+})
+
+// OAuth health check endpoint
+app.get('/api/v1/auth/health', authMiddleware, async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    const oauthProviders = getOAuthProviders(c.env)
+    const healthStatus = {
+      userId: auth.userId,
+      timestamp: new Date().toISOString(),
+      providers: [] as Array<{
+        provider: string
+        connected: boolean
+        accountId?: string
+        externalAccountId?: string
+        tokenStatus: 'valid' | 'expired' | 'expiring_soon' | 'no_token'
+        expiresAt?: string
+        hasRefreshToken: boolean
+        canRefresh: boolean
+        timeUntilExpiry?: string
+        requiresAttention: boolean
+        lastRefreshAttempt?: string
+        nextAllowedRefresh?: string
+      }>
+    }
+    
+    for (const [providerId] of Object.entries(oauthProviders)) {
+      const account = await subscriptionRepository.getUserAccount(auth.userId, providerId)
+      
+      if (!account) {
+        healthStatus.providers.push({
+          provider: providerId,
+          connected: false,
+          tokenStatus: 'no_token',
+          hasRefreshToken: false,
+          canRefresh: false,
+          requiresAttention: false
+        })
+        continue
+      }
+      
+      // Determine token status
+      const now = new Date()
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
+      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000)
+      
+      let tokenStatus: 'valid' | 'expired' | 'expiring_soon' | 'no_token' = 'valid'
+      let timeUntilExpiry: string | undefined
+      let requiresAttention = false
+      
+      if (!account.expiresAt) {
+        tokenStatus = 'valid'
+        timeUntilExpiry = 'never expires'
+      } else if (account.expiresAt <= now) {
+        tokenStatus = 'expired'
+        requiresAttention = true
+        timeUntilExpiry = 'expired'
+      } else if (account.expiresAt <= fifteenMinutesFromNow) {
+        tokenStatus = 'expiring_soon'
+        requiresAttention = true
+        const minutesLeft = Math.floor((account.expiresAt.getTime() - now.getTime()) / 60000)
+        timeUntilExpiry = `${minutesLeft} minutes`
+      } else if (account.expiresAt <= oneHourFromNow) {
+        tokenStatus = 'expiring_soon'
+        const minutesLeft = Math.floor((account.expiresAt.getTime() - now.getTime()) / 60000)
+        timeUntilExpiry = `${minutesLeft} minutes`
+      } else {
+        const hoursLeft = Math.floor((account.expiresAt.getTime() - now.getTime()) / 3600000)
+        timeUntilExpiry = hoursLeft < 24 ? `${hoursLeft} hours` : `${Math.floor(hoursLeft / 24)} days`
+      }
+      
+      // Check if refresh is possible
+      const canRefresh = !!account.refreshToken && (tokenStatus === 'expired' || tokenStatus === 'expiring_soon')
+      
+      healthStatus.providers.push({
+        provider: providerId,
+        connected: true,
+        accountId: account.id,
+        externalAccountId: account.externalAccountId,
+        tokenStatus,
+        expiresAt: account.expiresAt?.toISOString(),
+        hasRefreshToken: !!account.refreshToken,
+        canRefresh,
+        timeUntilExpiry,
+        requiresAttention
+      })
+    }
+    
+    // Overall health summary
+    const connectedCount = healthStatus.providers.filter(p => p.connected).length
+    const expiredCount = healthStatus.providers.filter(p => p.tokenStatus === 'expired').length
+    const expiringSoonCount = healthStatus.providers.filter(p => p.tokenStatus === 'expiring_soon').length
+    const requiresAttentionCount = healthStatus.providers.filter(p => p.requiresAttention).length
+    
+    return c.json({
+      ...healthStatus,
+      summary: {
+        totalProviders: healthStatus.providers.length,
+        connectedProviders: connectedCount,
+        expiredTokens: expiredCount,
+        expiringSoonTokens: expiringSoonCount,
+        requiresAttention: requiresAttentionCount,
+        overallHealth: requiresAttentionCount === 0 ? 'healthy' : expiredCount > 0 ? 'critical' : 'warning'
+      }
+    })
+    
+  } catch (error) {
+    console.error('OAuth health check error:', error)
+    return c.json({ 
+      error: 'Failed to check OAuth health',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, 500)
+  }
+})
+
 // Account status endpoint
 app.get('/api/v1/accounts', async (c) => {
   try {
     const auth = getAuthContext(c)
-    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     const oauthProviders = getOAuthProviders(c.env)
     const accounts = []
@@ -303,7 +485,7 @@ app.get('/api/v1/subscriptions/discover/:provider', async (c) => {
       return c.json({ error: 'Unsupported provider' }, 400)
     }
     
-    const { subscriptionDiscoveryService } = await initializeServices(c.env.DB)
+    const { subscriptionDiscoveryService } = await initializeServices(c.env.DB, c.env)
     
     const result = await subscriptionDiscoveryService.discoverUserSubscriptions(auth.userId, provider)
     
@@ -322,7 +504,7 @@ app.get('/api/v1/subscriptions', async (c) => {
     const auth = getAuthContext(c)
     const provider = c.req.query('provider') // Optional filter by provider
     
-    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     let userSubscriptions
     if (provider) {
@@ -372,7 +554,7 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
       return c.json({ error: 'subscriptions must be an array' }, 400)
     }
     
-    const { subscriptionDiscoveryService } = await initializeServices(c.env.DB)
+    const { subscriptionDiscoveryService } = await initializeServices(c.env.DB, c.env)
     
     const result = await subscriptionDiscoveryService.updateUserSubscriptions(
       auth.userId,
@@ -400,7 +582,7 @@ app.get('/api/v1/feed', async (c) => {
     const limit = parseInt(c.req.query('limit') || '50')
     const offset = parseInt(c.req.query('offset') || '0')
     
-    const { feedItemRepository } = await initializeServices(c.env.DB)
+    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
     
     let feedItems
     if (subscriptionId) {
@@ -463,7 +645,7 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
-    const { feedItemRepository } = await initializeServices(c.env.DB)
+    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
     
     await feedItemRepository.markAsRead(auth.userId, itemId)
     
@@ -479,7 +661,7 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
-    const { feedItemRepository } = await initializeServices(c.env.DB)
+    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
     
     await feedItemRepository.markAsUnread(auth.userId, itemId)
     
@@ -494,7 +676,7 @@ app.get('/api/v1/feed/subscriptions', async (c) => {
   try {
     const auth = getAuthContext(c)
     
-    const { feedItemRepository } = await initializeServices(c.env.DB)
+    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
     
     const subscriptionsWithCounts = await feedItemRepository.getSubscriptionsWithUnreadCounts(auth.userId)
     
@@ -518,7 +700,7 @@ app.get('/api/v1/feed/subscriptions', async (c) => {
 // Feed Polling endpoints
 app.get('/api/v1/jobs/poll-feeds', async (c) => {
   try {
-    const { feedPollingService } = await initializeServices(c.env.DB)
+    const { feedPollingService } = await initializeServices(c.env.DB, c.env)
     
     console.log('Manual feed polling triggered')
     const results = await feedPollingService.pollAllActiveSubscriptions()
@@ -560,7 +742,7 @@ app.post('/api/v1/jobs/schedule-polls', async (c) => {
 // Monitoring and health check endpoints
 app.get('/api/v1/health/feeds', async (c) => {
   try {
-    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    const { subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Get basic stats
     const spotifySubscriptions = await subscriptionRepository.getSubscriptionsByProvider('spotify')
@@ -629,7 +811,7 @@ app.get('/api/v1/jobs/status', async (c) => {
 
 // Bookmarks endpoints
 app.get('/api/v1/bookmarks', async (c) => {
-  const { bookmarkService } = await initializeServices(c.env.DB)
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   
   try {
@@ -685,7 +867,7 @@ app.get('/api/v1/bookmarks', async (c) => {
 })
 
 app.get('/api/v1/bookmarks/:id', async (c) => {
-  const { bookmarkService } = await initializeServices(c.env.DB)
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   const id = c.req.param('id')
   
@@ -703,7 +885,7 @@ app.get('/api/v1/bookmarks/:id', async (c) => {
 })
 
 app.post('/api/v1/bookmarks', async (c) => {
-  const { bookmarkService } = await initializeServices(c.env.DB)
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   
   try {
@@ -729,7 +911,7 @@ app.post('/api/v1/bookmarks', async (c) => {
 })
 
 app.put('/api/v1/bookmarks/:id', async (c) => {
-  const { bookmarkService } = await initializeServices(c.env.DB)
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   
   try {
@@ -758,7 +940,7 @@ app.put('/api/v1/bookmarks/:id', async (c) => {
 })
 
 app.delete('/api/v1/bookmarks/:id', async (c) => {
-  const { bookmarkService } = await initializeServices(c.env.DB)
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   const id = c.req.param('id')
   
@@ -781,7 +963,7 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
 
 // New save endpoint
 app.post('/api/v1/bookmarks/save', async (c) => {
-  const { bookmarkSaveService } = await initializeServices(c.env.DB)
+  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   
   try {
@@ -827,7 +1009,7 @@ app.post('/api/v1/bookmarks/save', async (c) => {
 
 // Metadata preview endpoint
 app.post('/api/v1/bookmarks/preview', async (c) => {
-  const { bookmarkSaveService } = await initializeServices(c.env.DB)
+  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
   try {
     const body = await c.req.json()
     const { url } = body
@@ -853,14 +1035,14 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
 
 // Refresh metadata endpoint
 app.put('/api/v1/bookmarks/:id/refresh', async (c) => {
-  const { bookmarkSaveService } = await initializeServices(c.env.DB)
+  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
   
   try {
     const id = c.req.param('id')
     
     // First check if bookmark exists and belongs to user
-    const { bookmarkService } = await initializeServices(c.env.DB)
+    const { bookmarkService } = await initializeServices(c.env.DB, c.env)
     const existingResult = await bookmarkService.getBookmark(id)
     if (existingResult.error) {
       return c.json({ error: existingResult.error }, existingResult.error === 'Bookmark not found' ? 404 : 500)
@@ -892,30 +1074,80 @@ export default {
   
   // Scheduled events (cron triggers)
   async scheduled(_event: ScheduledEvent, env: Bindings, _ctx: ExecutionContext): Promise<void> {
-    console.log(`[Scheduled] Feed polling triggered by cron at ${new Date().toISOString()}`)
+    const now = new Date()
+    const currentMinute = now.getMinutes()
+    
+    // Determine which scheduled job to run based on the current minute
+    // Every hour at minute 0: Feed polling (cron: "0 * * * *")
+    // Every 30 minutes (at minutes 0 and 30): Token refresh (cron: "*/30 * * * *")
     
     try {
-      // Initialize services
-      const { feedPollingService } = await initializeServices(env.DB)
-      
-      // Run the polling
-      const results = await feedPollingService.pollAllActiveSubscriptions()
-      
-      console.log(`[Scheduled] Feed polling completed:`, {
-        subscriptionsPolled: results.totalSubscriptionsPolled,
-        newItemsFound: results.totalNewItems,
-        usersNotified: results.totalUsersNotified,
-        errors: results.errors.length
-      })
-      
-      // If there are critical errors, we could log them or send alerts
-      if (results.errors.length > 0) {
-        console.error('[Scheduled] Feed polling errors:', results.errors)
+      if (currentMinute === 0) {
+        // Run both jobs at the top of each hour
+        console.log(`[Scheduled] Running both feed polling and token refresh at ${now.toISOString()}`)
+        
+        const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
+        
+        // Run both jobs concurrently
+        const [feedResults, tokenResults] = await Promise.allSettled([
+          feedPollingService.pollAllActiveSubscriptions(),
+          tokenRefreshService.refreshExpiringTokens()
+        ])
+        
+        // Handle feed polling results
+        if (feedResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Feed polling completed:`, {
+            subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
+            newItemsFound: feedResults.value.totalNewItems,
+            usersNotified: feedResults.value.totalUsersNotified,
+            errors: feedResults.value.errors.length
+          })
+          
+          if (feedResults.value.errors.length > 0) {
+            console.error('[Scheduled] Feed polling errors:', feedResults.value.errors)
+          }
+        } else {
+          console.error('[Scheduled] Feed polling failed:', feedResults.reason)
+        }
+        
+        // Handle token refresh results
+        if (tokenResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Token refresh completed:`, {
+            accountsChecked: tokenResults.value.totalAccountsChecked,
+            tokensRefreshed: tokenResults.value.tokensRefreshed,
+            errors: tokenResults.value.errors.length
+          })
+          
+          if (tokenResults.value.errors.length > 0) {
+            console.error('[Scheduled] Token refresh errors:', tokenResults.value.errors)
+          }
+        } else {
+          console.error('[Scheduled] Token refresh failed:', tokenResults.reason)
+        }
+        
+      } else if (currentMinute === 30) {
+        // Run only token refresh at half-hour mark
+        console.log(`[Scheduled] Running token refresh at ${now.toISOString()}`)
+        
+        const { tokenRefreshService } = await initializeServices(env.DB, env)
+        
+        const tokenResults = await tokenRefreshService.refreshExpiringTokens()
+        
+        console.log(`[Scheduled] Token refresh completed:`, {
+          accountsChecked: tokenResults.totalAccountsChecked,
+          tokensRefreshed: tokenResults.tokensRefreshed,
+          errors: tokenResults.errors.length
+        })
+        
+        if (tokenResults.errors.length > 0) {
+          console.error('[Scheduled] Token refresh errors:', tokenResults.errors)
+        }
+      } else {
+        console.warn(`[Scheduled] Unexpected cron trigger at minute ${currentMinute} - ignoring`)
       }
       
     } catch (error) {
-      console.error('[Scheduled] Fatal error during scheduled feed polling:', error)
-      // In production, you might want to send this to an error tracking service
+      console.error('[Scheduled] Fatal error during scheduled task:', error)
     }
   }
 }

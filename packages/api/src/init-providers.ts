@@ -1,7 +1,16 @@
 import { D1SubscriptionRepository } from './d1-subscription-repository'
 
 export async function initializeProviders(db: D1Database) {
-  const repository = new D1SubscriptionRepository(db)
+  // Note: This function is not currently used in the codebase
+  // Using dummy environment for provider initialization only
+  const dummyEnv = {
+    SPOTIFY_CLIENT_ID: 'dummy',
+    SPOTIFY_CLIENT_SECRET: 'dummy',
+    YOUTUBE_CLIENT_ID: 'dummy',
+    YOUTUBE_CLIENT_SECRET: 'dummy',
+    API_BASE_URL: 'dummy'
+  }
+  const repository = new D1SubscriptionRepository(db, dummyEnv)
   
   try {
     // Check if providers already exist

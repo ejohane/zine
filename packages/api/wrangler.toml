@@ -10,9 +10,12 @@ enabled = true
 [vars]
 ENVIRONMENT = "development"
 
-# Cron triggers for feed polling
+# Cron triggers for scheduled tasks
 [triggers]
-crons = ["0 * * * *"]  # Every hour
+crons = [
+  "0 * * * *",       # Every hour - feed polling
+  "*/30 * * * *"     # Every 30 minutes - token refresh
+]
 
 [[d1_databases]]
 binding = "DB"

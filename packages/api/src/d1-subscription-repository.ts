@@ -8,12 +8,25 @@ import {
   Subscription,
   UserSubscription
 } from '@zine/shared'
+import { getOAuthProviders } from './oauth/oauth-config'
+import { OAuthService } from './oauth/oauth-service'
+
+// Define the environment bindings interface
+interface EnvironmentBindings {
+  SPOTIFY_CLIENT_ID: string
+  SPOTIFY_CLIENT_SECRET: string
+  YOUTUBE_CLIENT_ID: string
+  YOUTUBE_CLIENT_SECRET: string
+  API_BASE_URL: string
+}
 
 export class D1SubscriptionRepository implements SubscriptionRepository {
   private db: ReturnType<typeof drizzle>
+  private env: EnvironmentBindings
 
-  constructor(d1Database: D1Database) {
+  constructor(d1Database: D1Database, env: EnvironmentBindings) {
     this.db = drizzle(d1Database, { schema })
+    this.env = env
   }
 
   async getProviders(): Promise<SubscriptionProvider[]> {
@@ -187,11 +200,126 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
     // If no valid tokens found, try to refresh one
     for (const account of accounts) {
       if (account.refreshToken) {
-        // TODO: Implement token refresh logic
-        console.log(`Could refresh token for account ${account.id}, but refresh logic not implemented yet`)
+        try {
+          console.log(`Attempting to refresh token for account ${account.id}`)
+          
+          // Get OAuth configuration for the provider
+          const oauthProviders = getOAuthProviders(this.env)
+          const oauthProvider = oauthProviders[providerId]
+          
+          if (!oauthProvider) {
+            console.error(`OAuth provider configuration not found for ${providerId}`)
+            continue
+          }
+          
+          // Create OAuth service instance
+          const oauthService = new OAuthService(oauthProvider.config)
+          
+          // Refresh the token
+          const newTokens = await oauthService.refreshToken(account.refreshToken)
+          
+          // Calculate new expiration date
+          const newExpiresAt = newTokens.expires_in 
+            ? new Date(Date.now() + newTokens.expires_in * 1000) 
+            : undefined
+          
+          // Update the account with new tokens
+          await this.db
+            .update(schema.userAccounts)
+            .set({
+              accessToken: newTokens.access_token,
+              refreshToken: newTokens.refresh_token || account.refreshToken, // Keep old refresh token if new one not provided
+              expiresAt: newExpiresAt,
+              updatedAt: new Date()
+            })
+            .where(eq(schema.userAccounts.id, account.id))
+          
+          console.log(`Successfully refreshed token for account ${account.id}`)
+          
+          // Return the updated account
+          return {
+            ...account,
+            accessToken: newTokens.access_token,
+            refreshToken: newTokens.refresh_token || account.refreshToken,
+            expiresAt: newExpiresAt
+          }
+        } catch (error) {
+          console.error(`Failed to refresh token for account ${account.id}:`, error)
+          // Continue to next account - don't return null immediately
+          continue
+        }
       }
     }
     
+    return null
+  }
+
+  async getValidUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
+    // Get the specific user's account for this provider
+    const userAccount = await this.getUserAccount(userId, providerId)
+    
+    if (!userAccount) {
+      return null
+    }
+
+    // Check if token is not expired (or if expiresAt is null, assume it's valid)
+    const now = new Date()
+    if (!userAccount.expiresAt || userAccount.expiresAt > now) {
+      return userAccount
+    }
+
+    // Token is expired, try to refresh if refresh token exists
+    if (userAccount.refreshToken) {
+      try {
+        console.log(`Attempting to refresh token for user account ${userAccount.id}`)
+        
+        // Get OAuth configuration for the provider
+        const oauthProviders = getOAuthProviders(this.env)
+        const oauthProvider = oauthProviders[providerId]
+        
+        if (!oauthProvider) {
+          console.error(`OAuth provider configuration not found for ${providerId}`)
+          return null
+        }
+        
+        // Create OAuth service instance
+        const oauthService = new OAuthService(oauthProvider.config)
+        
+        // Refresh the token
+        const newTokens = await oauthService.refreshToken(userAccount.refreshToken)
+        
+        // Calculate new expiration date
+        const newExpiresAt = newTokens.expires_in 
+          ? new Date(Date.now() + newTokens.expires_in * 1000) 
+          : undefined
+        
+        // Update the account with new tokens
+        await this.db
+          .update(schema.userAccounts)
+          .set({
+            accessToken: newTokens.access_token,
+            refreshToken: newTokens.refresh_token || userAccount.refreshToken, // Keep old refresh token if new one not provided
+            expiresAt: newExpiresAt,
+            updatedAt: new Date()
+          })
+          .where(eq(schema.userAccounts.id, userAccount.id))
+        
+        console.log(`Successfully refreshed token for user account ${userAccount.id}`)
+        
+        // Return the updated account
+        return {
+          ...userAccount,
+          accessToken: newTokens.access_token,
+          refreshToken: newTokens.refresh_token || userAccount.refreshToken,
+          expiresAt: newExpiresAt
+        }
+      } catch (error) {
+        console.error(`Failed to refresh token for user account ${userAccount.id}:`, error)
+        return null
+      }
+    }
+
+    // No refresh token available or refresh failed
     return null
   }
 

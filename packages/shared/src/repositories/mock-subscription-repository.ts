@@ -102,6 +102,24 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     return null
   }
 
+  async getValidUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
+    const account = await this.getUserAccount(userId, providerId)
+    if (!account) {
+      return null
+    }
+    
+    const now = new Date()
+    
+    // Check if token is valid (non-expired)
+    if (!account.expiresAt || account.expiresAt > now) {
+      return account
+    }
+    
+    // Note: Mock repository doesn't implement token refresh
+    // In a real implementation, this would attempt to refresh the token
+    return null
+  }
+
   async getSubscription(id: string): Promise<Subscription | null> {
     return this.subscriptions.find(s => s.id === id) || null
   }
