@@ -5,3 +5,9 @@ export * from './metadata-extractor'
 export * from './enhanced-metadata-extractor'
 export * from './bookmark-save-service'
 export * from './creator-service'
+
+// Subscription system exports
+export * from './repositories/subscription-repository'
+export * from './repositories/feed-item-repository'
+export * from './repositories/mock-subscription-repository'
+export * from './repositories/mock-feed-item-repository'

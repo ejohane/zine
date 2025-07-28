@@ -10,6 +10,10 @@ enabled = true
 [vars]
 ENVIRONMENT = "development"
 
+# Cron triggers for feed polling
+[[triggers]]
+crons = ["0 * * * *"]  # Every hour
+
 [[d1_databases]]
 binding = "DB"
 database_name = "zine-db2"

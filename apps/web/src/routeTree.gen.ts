@@ -16,7 +16,10 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
+import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SubscriptionsIndexRouteImport } from './routes/subscriptions/index'
+import { Route as SubscriptionsDiscoverProviderRouteImport } from './routes/subscriptions/discover/$provider'
 
 const Test2Route = Test2RouteImport.update({
   id: '/test2',
@@ -53,14 +56,31 @@ const BookmarksRoute = BookmarksRouteImport.update({
   path: '/bookmarks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountsRoute = AccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SubscriptionsIndexRoute = SubscriptionsIndexRouteImport.update({
+  id: '/subscriptions/',
+  path: '/subscriptions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SubscriptionsDiscoverProviderRoute =
+  SubscriptionsDiscoverProviderRouteImport.update({
+    id: '/subscriptions/discover/$provider',
+    path: '/subscriptions/discover/$provider',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -68,9 +88,12 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/subscriptions': typeof SubscriptionsIndexRoute
+  '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -78,10 +101,13 @@ export interface FileRoutesByTo {
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/subscriptions': typeof SubscriptionsIndexRoute
+  '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -89,11 +115,14 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/subscriptions/': typeof SubscriptionsIndexRoute
+  '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accounts'
     | '/bookmarks'
     | '/profile'
     | '/save'
@@ -101,9 +130,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/subscriptions'
+    | '/subscriptions/discover/$provider'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accounts'
     | '/bookmarks'
     | '/profile'
     | '/save'
@@ -111,9 +143,12 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/subscriptions'
+    | '/subscriptions/discover/$provider'
   id:
     | '__root__'
     | '/'
+    | '/accounts'
     | '/bookmarks'
     | '/profile'
     | '/save'
@@ -121,10 +156,13 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/subscriptions/'
+    | '/subscriptions/discover/$provider'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountsRoute: typeof AccountsRoute
   BookmarksRoute: typeof BookmarksRoute
   ProfileRoute: typeof ProfileRoute
   SaveRoute: typeof SaveRoute
@@ -132,6 +170,8 @@ export interface RootRouteChildren {
   SignUpRoute: typeof SignUpRoute
   Test1Route: typeof Test1Route
   Test2Route: typeof Test2Route
+  SubscriptionsIndexRoute: typeof SubscriptionsIndexRoute
+  SubscriptionsDiscoverProviderRoute: typeof SubscriptionsDiscoverProviderRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -185,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookmarksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/accounts': {
+      id: '/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -192,11 +239,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/subscriptions/': {
+      id: '/subscriptions/'
+      path: '/subscriptions'
+      fullPath: '/subscriptions'
+      preLoaderRoute: typeof SubscriptionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/subscriptions/discover/$provider': {
+      id: '/subscriptions/discover/$provider'
+      path: '/subscriptions/discover/$provider'
+      fullPath: '/subscriptions/discover/$provider'
+      preLoaderRoute: typeof SubscriptionsDiscoverProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountsRoute: AccountsRoute,
   BookmarksRoute: BookmarksRoute,
   ProfileRoute: ProfileRoute,
   SaveRoute: SaveRoute,
@@ -204,6 +266,8 @@ const rootRouteChildren: RootRouteChildren = {
   SignUpRoute: SignUpRoute,
   Test1Route: Test1Route,
   Test2Route: Test2Route,
+  SubscriptionsIndexRoute: SubscriptionsIndexRoute,
+  SubscriptionsDiscoverProviderRoute: SubscriptionsDiscoverProviderRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

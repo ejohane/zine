@@ -134,6 +134,38 @@ Due to limitations with how Vite handles environment variables in GitHub Actions
 - **Production**: Environment variables are set through Cloudflare Workers dashboard or wrangler.toml
 - **GitHub Actions**: Use `env` section in workflow for deployment secrets
 
+#### OAuth Setup (Required for Subscription Features)
+
+To enable Spotify and YouTube account connections:
+
+1. **Create OAuth Applications**:
+   - **Spotify**: Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create a new app
+   - **YouTube**: Go to [Google Cloud Console](https://console.developers.google.com) and create a new project with YouTube Data API v3 enabled
+
+2. **Configure Redirect URIs**:
+   - **Development**: `http://localhost:8787/api/v1/auth/{provider}/callback`
+   - **Production**: `https://api.myzine.app/api/v1/auth/{provider}/callback`
+
+3. **Set Required Scopes**:
+   - **Spotify**: `user-read-playback-position`, `user-library-read`
+   - **YouTube**: `https://www.googleapis.com/auth/youtube.readonly`
+
+4. **Local Development Setup**:
+   ```bash
+   cd packages/api
+   cp .dev.vars.example .dev.vars
+   # Edit .dev.vars with your OAuth credentials
+   ```
+
+5. **Required Environment Variables**:
+   ```
+   API_BASE_URL=http://localhost:8787
+   SPOTIFY_CLIENT_ID=your_spotify_client_id
+   SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+   YOUTUBE_CLIENT_ID=your_youtube_client_id
+   YOUTUBE_CLIENT_SECRET=your_youtube_client_secret
+   ```
+
 ### Important Notes
 
 - **Security**: Never commit actual environment variable values to git
@@ -150,5 +182,7 @@ Due to limitations with how Vite handles environment variables in GitHub Actions
 - ✅ API with full CRUD endpoints
 - ✅ Shared types and business logic
 - ✅ Authentication with Clerk
+- ✅ OAuth Integration (Spotify & YouTube)
+- ✅ Subscription Discovery & Management
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
