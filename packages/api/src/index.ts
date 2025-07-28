@@ -10,7 +10,7 @@ import {
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
 import { D1SubscriptionRepository } from './d1-subscription-repository'
-import { D1FeedItemRepository, UserFeedItemWithDetails, SubscriptionWithUnreadCount } from './d1-feed-item-repository'
+import { D1FeedItemRepository } from './d1-feed-item-repository'
 import { authMiddleware, getAuthContext } from './middleware/auth'
 import { getOAuthProviders } from './oauth/oauth-config'
 import { OAuthService, encodeState, decodeState, getUserInfo } from './oauth/oauth-service'
@@ -414,7 +414,7 @@ app.get('/api/v1/feed', async (c) => {
       )
     } else {
       // Get all feed items for user
-      feedItems = await feedItemRepository.getUserFeedItems(
+      feedItems = await feedItemRepository.getUserFeedItemsWithDetails(
         auth.userId, 
         unreadOnly, 
         limit, 

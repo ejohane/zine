@@ -116,43 +116,60 @@ export class D1FeedItemRepository implements FeedItemRepository {
     return userFeedItems.length > 0 ? this.mapUserFeedItem(userFeedItems[0]) : null
   }
 
-  async getUserFeedItems(userId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
+  async getUserFeedItems(userId: string, options?: {
+    isRead?: boolean
+    subscriptionIds?: string[]
+    limit?: number
+    offset?: number
+  }): Promise<FeedItemWithReadState[]> {
     let query = this.db
       .select({
-        userFeedItem: schema.userFeedItems,
         feedItem: schema.feedItems,
-        subscription: schema.subscriptions
+        userFeedItem: schema.userFeedItems
       })
-      .from(schema.userFeedItems)
-      .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
-      .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
-      .where(eq(schema.userFeedItems.userId, userId))
+      .from(schema.feedItems)
+      .leftJoin(
+        schema.userFeedItems,
+        and(
+          eq(schema.userFeedItems.feedItemId, schema.feedItems.id),
+          eq(schema.userFeedItems.userId, userId)
+        )
+      )
       .$dynamic()
 
-    if (unreadOnly) {
-      query = query.where(and(
-        eq(schema.userFeedItems.userId, userId),
-        eq(schema.userFeedItems.isRead, false)
-      ))
+    const conditions = []
+    
+    if (options?.isRead !== undefined) {
+      if (options.isRead) {
+        conditions.push(eq(schema.userFeedItems.isRead, true))
+      } else {
+        conditions.push(eq(schema.userFeedItems.isRead, false))
+      }
     }
 
-    query = query
-      .orderBy(desc(schema.feedItems.publishedAt))
-      .limit(limit)
-      .offset(offset)
+    if (options?.subscriptionIds && options.subscriptionIds.length > 0) {
+      conditions.push(inArray(schema.feedItems.subscriptionId, options.subscriptionIds))
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions))
+    }
+
+    query = query.orderBy(desc(schema.feedItems.publishedAt))
+
+    if (options?.limit) {
+      query = query.limit(options.limit)
+    }
+
+    if (options?.offset) {
+      query = query.offset(options.offset)
+    }
 
     const results = await query
 
     return results.map(row => ({
-      id: row.userFeedItem.id,
-      feedItem: {
-        ...this.mapFeedItem(row.feedItem),
-        subscription: this.mapSubscription(row.subscription)
-      },
-      isRead: Boolean(row.userFeedItem.isRead),
-      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
-      bookmarkId: row.userFeedItem.bookmarkId || undefined,
-      createdAt: new Date(row.userFeedItem.createdAt)
+      ...this.mapFeedItem(row.feedItem),
+      userFeedItem: row.userFeedItem ? this.mapUserFeedItem(row.userFeedItem) : undefined
     }))
   }
 
@@ -247,60 +264,43 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())
   }
 
-  async getUserFeedItemsOld(userId: string, options?: {
-    isRead?: boolean
-    subscriptionIds?: string[]
-    limit?: number
-    offset?: number
-  }): Promise<FeedItemWithReadState[]> {
+  async getUserFeedItemsWithDetails(userId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
     let query = this.db
       .select({
+        userFeedItem: schema.userFeedItems,
         feedItem: schema.feedItems,
-        userFeedItem: schema.userFeedItems
+        subscription: schema.subscriptions
       })
-      .from(schema.feedItems)
-      .leftJoin(
-        schema.userFeedItems,
-        and(
-          eq(schema.userFeedItems.feedItemId, schema.feedItems.id),
-          eq(schema.userFeedItems.userId, userId)
-        )
-      )
+      .from(schema.userFeedItems)
+      .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
+      .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
+      .where(eq(schema.userFeedItems.userId, userId))
       .$dynamic()
 
-    const conditions = []
-    
-    if (options?.isRead !== undefined) {
-      if (options.isRead) {
-        conditions.push(eq(schema.userFeedItems.isRead, true))
-      } else {
-        conditions.push(eq(schema.userFeedItems.isRead, false))
-      }
+    if (unreadOnly) {
+      query = query.where(and(
+        eq(schema.userFeedItems.userId, userId),
+        eq(schema.userFeedItems.isRead, false)
+      ))
     }
 
-    if (options?.subscriptionIds && options.subscriptionIds.length > 0) {
-      conditions.push(inArray(schema.feedItems.subscriptionId, options.subscriptionIds))
-    }
-
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions))
-    }
-
-    query = query.orderBy(desc(schema.feedItems.publishedAt))
-
-    if (options?.limit) {
-      query = query.limit(options.limit)
-    }
-
-    if (options?.offset) {
-      query = query.offset(options.offset)
-    }
+    query = query
+      .orderBy(desc(schema.feedItems.publishedAt))
+      .limit(limit)
+      .offset(offset)
 
     const results = await query
 
     return results.map(row => ({
-      ...this.mapFeedItem(row.feedItem),
-      userFeedItem: row.userFeedItem ? this.mapUserFeedItem(row.userFeedItem) : undefined
+      id: row.userFeedItem.id,
+      feedItem: {
+        ...this.mapFeedItem(row.feedItem),
+        subscription: this.mapSubscription(row.subscription)
+      },
+      isRead: Boolean(row.userFeedItem.isRead),
+      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
+      bookmarkId: row.userFeedItem.bookmarkId || undefined,
+      createdAt: new Date(row.userFeedItem.createdAt)
     }))
   }
 
