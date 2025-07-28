@@ -1,4 +1,4 @@
-CREATE TABLE `feed_items` (
+CREATE TABLE IF NOT EXISTS `feed_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`subscription_id` text NOT NULL,
 	`external_id` text NOT NULL,
@@ -12,14 +12,14 @@ CREATE TABLE `feed_items` (
 	FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE TABLE `subscription_providers` (
+CREATE TABLE IF NOT EXISTS `subscription_providers` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
 	`oauth_config` text NOT NULL,
 	`created_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE `subscriptions` (
+CREATE TABLE IF NOT EXISTS `subscriptions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`provider_id` text NOT NULL,
 	`external_id` text NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE `subscriptions` (
 	FOREIGN KEY (`provider_id`) REFERENCES `subscription_providers`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE TABLE `user_accounts` (
+CREATE TABLE IF NOT EXISTS `user_accounts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`provider_id` text NOT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE `user_accounts` (
 	FOREIGN KEY (`provider_id`) REFERENCES `subscription_providers`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE TABLE `user_feed_items` (
+CREATE TABLE IF NOT EXISTS `user_feed_items` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`feed_item_id` text NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE `user_feed_items` (
 	FOREIGN KEY (`bookmark_id`) REFERENCES `bookmarks`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE TABLE `user_subscriptions` (
+CREATE TABLE IF NOT EXISTS `user_subscriptions` (
 	`id` text PRIMARY KEY NOT NULL,
 	`user_id` text NOT NULL,
 	`subscription_id` text NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE `user_subscriptions` (
 	FOREIGN KEY (`subscription_id`) REFERENCES `subscriptions`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
 	`first_name` text,
