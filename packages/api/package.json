@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev src/index.ts --host 0.0.0.0",
+    "dev": "wrangler dev src/index.ts --host 0.0.0.0 --port 8787",
     "deploy": "wrangler deploy --minify src/index.ts",
     "type-check": "tsc --noEmit",
     "build": "tsc",

@@ -187,3 +187,183 @@ export const removeBookmark = async (id: string, token: string | null): Promise<
   const result = await response.json()
   return { success: true, message: result.message }
 }
+
+// OAuth and Account Types
+export interface Account {
+  provider: {
+    id: string
+    name: string
+  }
+  connected: boolean
+  connectedAt?: string
+  externalAccountId?: string
+}
+
+export interface AccountsResponse {
+  accounts: Account[]
+}
+
+export interface OAuthConnectResponse {
+  authUrl: string
+}
+
+// OAuth and Account Management APIs
+export const fetchAccounts = async (token: string | null): Promise<Account[]> => {
+  const response = await fetch(`${API_BASE_URL}/accounts`, {
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
+    throw new Error('Failed to fetch accounts')
+  }
+  
+  const result: AccountsResponse = await response.json()
+  return result.accounts
+}
+
+export const connectAccount = async (provider: string, token: string | null, redirectUrl?: string): Promise<string> => {
+  const response = await fetch(`${API_BASE_URL}/auth/${provider}/connect`, {
+    method: 'POST',
+    headers: createAuthHeaders(token),
+    body: JSON.stringify({ redirectUrl }),
+  })
+  
+  if (!response.ok) {
+    const result = await response.json()
+    throw new Error(result.error || 'Failed to initiate OAuth flow')
+  }
+  
+  const result: OAuthConnectResponse = await response.json()
+  return result.authUrl
+}
+
+export const disconnectAccount = async (provider: string, token: string | null): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/auth/${provider}/disconnect`, {
+    method: 'DELETE',
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    const result = await response.json()
+    throw new Error(result.error || 'Failed to disconnect account')
+  }
+}
+
+// Subscription Discovery & Management Types
+export interface DiscoveredSubscription {
+  externalId: string
+  title: string
+  creatorName: string
+  description?: string
+  thumbnailUrl?: string
+  subscriptionUrl?: string
+  provider: 'spotify' | 'youtube'
+  isUserSubscribed: boolean
+}
+
+export interface DiscoveryResult {
+  provider: 'spotify' | 'youtube'
+  subscriptions: DiscoveredSubscription[]
+  totalFound: number
+  errors?: string[]
+}
+
+export interface UserSubscription {
+  id: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  subscription: {
+    id: string
+    providerId: string
+    externalId: string
+    title: string
+    creatorName: string
+    description?: string
+    thumbnailUrl?: string
+    subscriptionUrl?: string
+  }
+}
+
+export interface SubscriptionsResponse {
+  subscriptions: UserSubscription[]
+  total: number
+}
+
+export interface SubscriptionUpdateRequest {
+  externalId: string
+  title: string
+  creatorName: string
+  description?: string
+  thumbnailUrl?: string
+  subscriptionUrl?: string
+  selected: boolean
+}
+
+export interface SubscriptionUpdateResponse {
+  message: string
+  added: number
+  removed: number
+}
+
+// Subscription Discovery & Management APIs
+export const discoverSubscriptions = async (
+  provider: 'spotify' | 'youtube', 
+  token: string | null
+): Promise<DiscoveryResult> => {
+  const response = await fetch(`${API_BASE_URL}/subscriptions/discover/${provider}`, {
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    const result = await response.json()
+    throw new Error(result.error || 'Failed to discover subscriptions')
+  }
+  
+  return response.json()
+}
+
+export const fetchUserSubscriptions = async (
+  token: string | null,
+  provider?: string
+): Promise<UserSubscription[]> => {
+  const params = new URLSearchParams()
+  if (provider) params.set('provider', provider)
+  
+  const url = `${API_BASE_URL}/subscriptions${params.toString() ? '?' + params.toString() : ''}`
+  const response = await fetch(url, {
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
+    throw new Error('Failed to fetch subscriptions')
+  }
+  
+  const result: SubscriptionsResponse = await response.json()
+  return result.subscriptions
+}
+
+export const updateSubscriptions = async (
+  provider: 'spotify' | 'youtube',
+  subscriptions: SubscriptionUpdateRequest[],
+  token: string | null
+): Promise<SubscriptionUpdateResponse> => {
+  const response = await fetch(`${API_BASE_URL}/subscriptions/${provider}/update`, {
+    method: 'POST',
+    headers: createAuthHeaders(token),
+    body: JSON.stringify({ subscriptions }),
+  })
+  
+  if (!response.ok) {
+    const result = await response.json()
+    throw new Error(result.error || 'Failed to update subscriptions')
+  }
+  
+  return response.json()
+}

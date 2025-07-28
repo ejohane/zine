@@ -1,0 +1,49 @@
+export interface FeedItem {
+  id: string
+  subscriptionId: string
+  externalId: string
+  title: string
+  description?: string
+  thumbnailUrl?: string
+  publishedAt: Date
+  durationSeconds?: number
+  externalUrl: string
+  createdAt: Date
+}
+
+export interface UserFeedItem {
+  id: string
+  userId: string
+  feedItemId: string
+  isRead: boolean
+  bookmarkId?: number
+  readAt?: Date
+  createdAt: Date
+}
+
+export interface FeedItemWithReadState extends FeedItem {
+  userFeedItem?: UserFeedItem
+}
+
+export interface FeedItemRepository {
+  // Feed item operations
+  getFeedItem(id: string): Promise<FeedItem | null>
+  getFeedItemsBySubscription(subscriptionId: string): Promise<FeedItem[]>
+  createFeedItem(feedItem: Omit<FeedItem, 'createdAt'>): Promise<FeedItem>
+  createFeedItems(feedItems: Omit<FeedItem, 'createdAt'>[]): Promise<FeedItem[]>
+  findOrCreateFeedItem(feedItem: Omit<FeedItem, 'id' | 'createdAt'>): Promise<FeedItem>
+
+  // User feed item operations
+  getUserFeedItem(userId: string, feedItemId: string): Promise<UserFeedItem | null>
+  getUserFeedItems(userId: string, options?: {
+    isRead?: boolean
+    subscriptionIds?: string[]
+    limit?: number
+    offset?: number
+  }): Promise<FeedItemWithReadState[]>
+  createUserFeedItem(userFeedItem: Omit<UserFeedItem, 'createdAt'>): Promise<UserFeedItem>
+  createUserFeedItems(userFeedItems: Omit<UserFeedItem, 'createdAt'>[]): Promise<UserFeedItem[]>
+  markAsRead(userId: string, feedItemId: string): Promise<UserFeedItem>
+  markAsUnread(userId: string, feedItemId: string): Promise<UserFeedItem>
+  addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number): Promise<UserFeedItem>
+}
