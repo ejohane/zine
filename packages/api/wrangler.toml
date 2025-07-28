@@ -11,7 +11,7 @@ enabled = true
 ENVIRONMENT = "development"
 
 # Cron triggers for feed polling
-[[triggers]]
+[triggers]
 crons = ["0 * * * *"]  # Every hour
 
 [[d1_databases]]

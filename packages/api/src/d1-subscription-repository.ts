@@ -163,6 +163,52 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       .where(eq(schema.userAccounts.id, id))
   }
 
+  async getUserAccountsByProvider(providerId: string): Promise<UserAccount[]> {
+    const accounts = await this.db
+      .select()
+      .from(schema.userAccounts)
+      .where(eq(schema.userAccounts.providerId, providerId))
+    
+    return accounts.map(this.mapUserAccount)
+  }
+
+  async getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null> {
+    // Get all accounts for this provider and find one with a valid (non-expired) token
+    const accounts = await this.getUserAccountsByProvider(providerId)
+    
+    const now = new Date()
+    for (const account of accounts) {
+      // Check if token is not expired (or if expiresAt is null, assume it's valid)
+      if (!account.expiresAt || account.expiresAt > now) {
+        return account
+      }
+    }
+    
+    // If no valid tokens found, try to refresh one
+    for (const account of accounts) {
+      if (account.refreshToken) {
+        // TODO: Implement token refresh logic
+        console.log(`Could refresh token for account ${account.id}, but refresh logic not implemented yet`)
+      }
+    }
+    
+    return null
+  }
+
+  async getUsersForSubscription(subscriptionId: string): Promise<string[]> {
+    const userSubscriptions = await this.db
+      .select({
+        userId: schema.userSubscriptions.userId
+      })
+      .from(schema.userSubscriptions)
+      .where(and(
+        eq(schema.userSubscriptions.subscriptionId, subscriptionId),
+        eq(schema.userSubscriptions.isActive, true)
+      ))
+    
+    return userSubscriptions.map(us => us.userId)
+  }
+
   async getSubscription(id: string): Promise<Subscription | null> {
     const subscriptions = await this.db
       .select()

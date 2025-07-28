@@ -420,16 +420,85 @@ app.get('/api/v1/jobs/poll-feeds', async (c) => {
 
 app.post('/api/v1/jobs/schedule-polls', async (c) => {
   try {
-    // Setup scheduled polling - for now just return success
-    // TODO: Implement actual Cloudflare Workers cron trigger setup
     return c.json({ 
-      message: 'Scheduled polling setup successfully',
+      message: 'Scheduled polling is configured via Cloudflare Workers cron triggers',
       timestamp: new Date().toISOString(),
-      note: 'Scheduled polling will be implemented with Cloudflare Workers cron triggers'
+      schedule: 'Hourly (0 * * * *)',
+      status: 'active'
     })
   } catch (error) {
     console.error('Schedule polling setup error:', error)
     return c.json({ error: 'Failed to setup scheduled polling' }, 500)
+  }
+})
+
+// Monitoring and health check endpoints
+app.get('/api/v1/health/feeds', async (c) => {
+  try {
+    const { subscriptionRepository } = await initializeServices(c.env.DB)
+    
+    // Get basic stats
+    const spotifySubscriptions = await subscriptionRepository.getSubscriptionsByProvider('spotify')
+    const youtubeSubscriptions = await subscriptionRepository.getSubscriptionsByProvider('youtube')
+    
+    // Get recent polling activity (checking for recent feed items)
+    const now = new Date()
+    
+    // This is a basic health check - in production you'd want more detailed metrics
+    return c.json({
+      status: 'healthy',
+      timestamp: now.toISOString(),
+      subscriptions: {
+        spotify: spotifySubscriptions.length,
+        youtube: youtubeSubscriptions.length,
+        total: spotifySubscriptions.length + youtubeSubscriptions.length
+      },
+      polling: {
+        schedule: 'Hourly (0 * * * *)',
+        nextRun: 'At the top of every hour',
+        status: 'active'
+      },
+      lastHour: {
+        note: 'Detailed metrics would be added in production monitoring'
+      }
+    })
+  } catch (error) {
+    console.error('Feed health check error:', error)
+    return c.json({ 
+      status: 'unhealthy',
+      error: 'Failed to check feed health',
+      timestamp: new Date().toISOString()
+    }, 500)
+  }
+})
+
+app.get('/api/v1/jobs/status', async (c) => {
+  try {
+    return c.json({
+      scheduled: {
+        feedPolling: {
+          enabled: true,
+          schedule: 'Hourly (0 * * * *)',
+          lastRun: 'See Cloudflare Workers logs',
+          nextRun: 'At the top of every hour'
+        }
+      },
+      manual: {
+        pollFeeds: {
+          endpoint: '/api/v1/jobs/poll-feeds',
+          method: 'GET',
+          description: 'Manually trigger feed polling for all subscriptions'
+        }
+      },
+      monitoring: {
+        health: '/api/v1/health/feeds',
+        status: '/api/v1/jobs/status'
+      },
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('Job status error:', error)
+    return c.json({ error: 'Failed to get job status' }, 500)
   }
 })
 

@@ -84,6 +84,24 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     }
   }
 
+  async getUserAccountsByProvider(providerId: string): Promise<UserAccount[]> {
+    return this.userAccounts.filter(a => a.providerId === providerId)
+  }
+
+  async getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null> {
+    const accounts = await this.getUserAccountsByProvider(providerId)
+    const now = new Date()
+    
+    // Find first account with valid (non-expired) token
+    for (const account of accounts) {
+      if (!account.expiresAt || account.expiresAt > now) {
+        return account
+      }
+    }
+    
+    return null
+  }
+
   async getSubscription(id: string): Promise<Subscription | null> {
     return this.subscriptions.find(s => s.id === id) || null
   }
@@ -164,5 +182,11 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     if (userSubIndex !== -1) {
       this.userSubscriptions.splice(userSubIndex, 1)
     }
+  }
+
+  async getUsersForSubscription(subscriptionId: string): Promise<string[]> {
+    return this.userSubscriptions
+      .filter(us => us.subscriptionId === subscriptionId && us.isActive)
+      .map(us => us.userId)
   }
 }

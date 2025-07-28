@@ -46,6 +46,8 @@ export interface SubscriptionRepository {
 
   // User account operations
   getUserAccount(userId: string, providerId: string): Promise<UserAccount | null>
+  getUserAccountsByProvider(providerId: string): Promise<UserAccount[]>
+  getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null>
   createUserAccount(account: Omit<UserAccount, 'createdAt' | 'updatedAt'>): Promise<UserAccount>
   updateUserAccount(id: string, updates: Partial<Pick<UserAccount, 'accessToken' | 'refreshToken' | 'expiresAt'>>): Promise<UserAccount>
   deleteUserAccount(id: string): Promise<void>
@@ -59,6 +61,7 @@ export interface SubscriptionRepository {
   // User subscription operations
   getUserSubscriptions(userId: string): Promise<(UserSubscription & { subscription: Subscription })[]>
   getUserSubscriptionsByProvider(userId: string, providerId: string): Promise<(UserSubscription & { subscription: Subscription })[]>
+  getUsersForSubscription(subscriptionId: string): Promise<string[]>
   createUserSubscription(userSubscription: Omit<UserSubscription, 'createdAt' | 'updatedAt'>): Promise<UserSubscription>
   updateUserSubscription(id: string, updates: Partial<Pick<UserSubscription, 'isActive'>>): Promise<UserSubscription>
   deleteUserSubscription(id: string): Promise<void>
