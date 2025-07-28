@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { FeedItemCard } from './FeedItemCard'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
@@ -66,22 +65,8 @@ export function FeedItemList({
   showUnreadOnly = false,
   onToggleUnreadOnly
 }: FeedItemListProps) {
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
-  
   const handleItemOpen = (url: string) => {
     window.open(url, '_blank', 'noopener,noreferrer')
-  }
-  
-  const toggleItemExpanded = (itemId: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId)
-      } else {
-        newSet.add(itemId)
-      }
-      return newSet
-    })
   }
 
   // Loading state

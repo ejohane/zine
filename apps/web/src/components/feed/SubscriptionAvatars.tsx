@@ -6,7 +6,7 @@ interface Subscription {
   id: string
   title: string
   creatorName: string
-  thumbnailUrl: string
+  thumbnailUrl?: string
   providerId: string
   unreadCount: number
   lastUpdated: Date

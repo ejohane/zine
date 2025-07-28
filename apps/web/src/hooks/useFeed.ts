@@ -8,7 +8,8 @@ import {
   saveBookmark,
   type FeedItemWithState,
   type SubscriptionWithUnreadCount,
-  type FeedItem
+  type FeedItem,
+  type FeedResponse
 } from '../lib/api'
 
 interface UseFeedOptions {
@@ -24,15 +25,16 @@ export function useFeed(options: UseFeedOptions = {}) {
 
   return useInfiniteQuery({
     queryKey: ['feed', { unreadOnly, subscriptionId, limit }],
-    queryFn: async ({ pageParam = 0 }) => {
+    queryFn: async ({ pageParam }) => {
       const token = await getToken()
       return fetchFeed(token, {
         unread: unreadOnly,
         subscription: subscriptionId,
         limit,
-        offset: pageParam
+        offset: pageParam as number
       })
     },
+    initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.pagination.hasMore) {
         return allPages.length * limit
@@ -99,7 +101,7 @@ export function useMarkFeedItemRead() {
         }))
       })
     },
-    onError: (error, itemId) => {
+    onError: (error) => {
       // Revert optimistic update
       queryClient.invalidateQueries({ queryKey: ['feed'] })
       queryClient.invalidateQueries({ queryKey: ['subscriptions-with-counts'] })
@@ -152,7 +154,7 @@ export function useMarkFeedItemUnread() {
         }))
       })
     },
-    onError: (error, itemId) => {
+    onError: (error) => {
       // Revert optimistic update
       queryClient.invalidateQueries({ queryKey: ['feed'] })
       queryClient.invalidateQueries({ queryKey: ['subscriptions-with-counts'] })
@@ -249,7 +251,7 @@ export function useFeedManager(options: UseFeedOptions = {}) {
   const saveToBookmarks = useSaveFeedItemToBookmarks()
 
   // Flatten all pages into a single array
-  const feedItems = feed.data?.pages.flatMap(page => page.feedItems) || []
+  const feedItems = feed.data?.pages.flatMap((page: FeedResponse) => page.feedItems) || []
   
   return {
     // Data
