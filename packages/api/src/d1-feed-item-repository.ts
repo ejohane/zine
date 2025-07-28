@@ -116,7 +116,138 @@ export class D1FeedItemRepository implements FeedItemRepository {
     return userFeedItems.length > 0 ? this.mapUserFeedItem(userFeedItems[0]) : null
   }
 
-  async getUserFeedItems(userId: string, options?: {
+  async getUserFeedItems(userId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
+    let query = this.db
+      .select({
+        userFeedItem: schema.userFeedItems,
+        feedItem: schema.feedItems,
+        subscription: schema.subscriptions
+      })
+      .from(schema.userFeedItems)
+      .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
+      .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
+      .where(eq(schema.userFeedItems.userId, userId))
+      .$dynamic()
+
+    if (unreadOnly) {
+      query = query.where(and(
+        eq(schema.userFeedItems.userId, userId),
+        eq(schema.userFeedItems.isRead, false)
+      ))
+    }
+
+    query = query
+      .orderBy(desc(schema.feedItems.publishedAt))
+      .limit(limit)
+      .offset(offset)
+
+    const results = await query
+
+    return results.map(row => ({
+      id: row.userFeedItem.id,
+      feedItem: {
+        ...this.mapFeedItem(row.feedItem),
+        subscription: this.mapSubscription(row.subscription)
+      },
+      isRead: Boolean(row.userFeedItem.isRead),
+      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
+      bookmarkId: row.userFeedItem.bookmarkId || undefined,
+      createdAt: new Date(row.userFeedItem.createdAt)
+    }))
+  }
+
+  async getUserFeedItemsBySubscription(userId: string, subscriptionId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
+    let query = this.db
+      .select({
+        userFeedItem: schema.userFeedItems,
+        feedItem: schema.feedItems,
+        subscription: schema.subscriptions
+      })
+      .from(schema.userFeedItems)
+      .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
+      .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
+      .where(and(
+        eq(schema.userFeedItems.userId, userId),
+        eq(schema.feedItems.subscriptionId, subscriptionId)
+      ))
+      .$dynamic()
+
+    if (unreadOnly) {
+      query = query.where(and(
+        eq(schema.userFeedItems.userId, userId),
+        eq(schema.feedItems.subscriptionId, subscriptionId),
+        eq(schema.userFeedItems.isRead, false)
+      ))
+    }
+
+    query = query
+      .orderBy(desc(schema.feedItems.publishedAt))
+      .limit(limit)
+      .offset(offset)
+
+    const results = await query
+
+    return results.map(row => ({
+      id: row.userFeedItem.id,
+      feedItem: {
+        ...this.mapFeedItem(row.feedItem),
+        subscription: this.mapSubscription(row.subscription)
+      },
+      isRead: Boolean(row.userFeedItem.isRead),
+      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
+      bookmarkId: row.userFeedItem.bookmarkId || undefined,
+      createdAt: new Date(row.userFeedItem.createdAt)
+    }))
+  }
+
+  async getSubscriptionsWithUnreadCounts(userId: string): Promise<SubscriptionWithUnreadCount[]> {
+    const results = await this.db
+      .select({
+        subscription: schema.subscriptions,
+        unreadCount: schema.userFeedItems.isRead,
+        lastUpdated: schema.feedItems.publishedAt
+      })
+      .from(schema.subscriptions)
+      .innerJoin(schema.feedItems, eq(schema.subscriptions.id, schema.feedItems.subscriptionId))
+      .leftJoin(schema.userFeedItems, and(
+        eq(schema.feedItems.id, schema.userFeedItems.feedItemId),
+        eq(schema.userFeedItems.userId, userId)
+      ))
+      .orderBy(desc(schema.feedItems.publishedAt))
+
+    // Group by subscription and calculate unread counts
+    const subscriptionMap = new Map<string, SubscriptionWithUnreadCount>()
+    
+    for (const row of results) {
+      const subId = row.subscription.id
+      
+      if (!subscriptionMap.has(subId)) {
+        subscriptionMap.set(subId, {
+          subscription: this.mapSubscription(row.subscription),
+          unreadCount: 0,
+          lastUpdated: new Date(row.lastUpdated)
+        })
+      }
+      
+      const subscription = subscriptionMap.get(subId)!
+      
+      // Count unread items (userFeedItem.isRead is false or null means unread)
+      if (row.unreadCount === false || row.unreadCount === null) {
+        subscription.unreadCount++
+      }
+      
+      // Update last updated time if this item is newer
+      const itemDate = new Date(row.lastUpdated)
+      if (itemDate > subscription.lastUpdated) {
+        subscription.lastUpdated = itemDate
+      }
+    }
+
+    return Array.from(subscriptionMap.values())
+      .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())
+  }
+
+  async getUserFeedItemsOld(userId: string, options?: {
     isRead?: boolean
     subscriptionIds?: string[]
     limit?: number
@@ -340,4 +471,36 @@ export class D1FeedItemRepository implements FeedItemRepository {
       createdAt: new Date(row.createdAt)
     }
   }
+
+  private mapSubscription(row: any): any {
+    return {
+      id: row.id,
+      providerId: row.providerId,
+      externalId: row.externalId,
+      title: row.title,
+      creatorName: row.creatorName,
+      description: row.description || undefined,
+      thumbnailUrl: row.thumbnailUrl || undefined,
+      subscriptionUrl: row.subscriptionUrl || undefined,
+      createdAt: new Date(row.createdAt)
+    }
+  }
+}
+
+// Additional types for feed UI
+export interface UserFeedItemWithDetails {
+  id: string
+  feedItem: FeedItem & {
+    subscription: any
+  }
+  isRead: boolean
+  readAt?: Date
+  bookmarkId?: number
+  createdAt: Date
+}
+
+export interface SubscriptionWithUnreadCount {
+  subscription: any
+  unreadCount: number
+  lastUpdated: Date
 }

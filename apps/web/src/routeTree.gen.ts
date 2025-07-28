@@ -15,10 +15,12 @@ import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as FeedRouteImport } from './routes/feed'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscriptionsIndexRouteImport } from './routes/subscriptions/index'
+import { Route as FeedSubscriptionIdRouteImport } from './routes/feed/$subscriptionId'
 import { Route as SubscriptionsDiscoverProviderRouteImport } from './routes/subscriptions/discover/$provider'
 
 const Test2Route = Test2RouteImport.update({
@@ -51,6 +53,11 @@ const ProfileRoute = ProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedRoute = FeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookmarksRoute = BookmarksRouteImport.update({
   id: '/bookmarks',
   path: '/bookmarks',
@@ -71,6 +78,11 @@ const SubscriptionsIndexRoute = SubscriptionsIndexRouteImport.update({
   path: '/subscriptions/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedSubscriptionIdRoute = FeedSubscriptionIdRouteImport.update({
+  id: '/$subscriptionId',
+  path: '/$subscriptionId',
+  getParentRoute: () => FeedRoute,
+} as any)
 const SubscriptionsDiscoverProviderRoute =
   SubscriptionsDiscoverProviderRouteImport.update({
     id: '/subscriptions/discover/$provider',
@@ -82,12 +94,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
+  '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
@@ -95,12 +109,14 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
+  '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
@@ -109,12 +125,14 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
+  '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
+  '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions/': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
 }
@@ -124,12 +142,14 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
+    | '/feed'
     | '/profile'
     | '/save'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/feed/$subscriptionId'
     | '/subscriptions'
     | '/subscriptions/discover/$provider'
   fileRoutesByTo: FileRoutesByTo
@@ -137,12 +157,14 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
+    | '/feed'
     | '/profile'
     | '/save'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/feed/$subscriptionId'
     | '/subscriptions'
     | '/subscriptions/discover/$provider'
   id:
@@ -150,12 +172,14 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
+    | '/feed'
     | '/profile'
     | '/save'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
     | '/test2'
+    | '/feed/$subscriptionId'
     | '/subscriptions/'
     | '/subscriptions/discover/$provider'
   fileRoutesById: FileRoutesById
@@ -164,6 +188,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountsRoute: typeof AccountsRoute
   BookmarksRoute: typeof BookmarksRoute
+  FeedRoute: typeof FeedRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SaveRoute: typeof SaveRoute
   SignInRoute: typeof SignInRoute
@@ -218,6 +243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feed': {
+      id: '/feed'
+      path: '/feed'
+      fullPath: '/feed'
+      preLoaderRoute: typeof FeedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/bookmarks': {
       id: '/bookmarks'
       path: '/bookmarks'
@@ -246,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SubscriptionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feed/$subscriptionId': {
+      id: '/feed/$subscriptionId'
+      path: '/$subscriptionId'
+      fullPath: '/feed/$subscriptionId'
+      preLoaderRoute: typeof FeedSubscriptionIdRouteImport
+      parentRoute: typeof FeedRoute
+    }
     '/subscriptions/discover/$provider': {
       id: '/subscriptions/discover/$provider'
       path: '/subscriptions/discover/$provider'
@@ -256,10 +295,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface FeedRouteChildren {
+  FeedSubscriptionIdRoute: typeof FeedSubscriptionIdRoute
+}
+
+const FeedRouteChildren: FeedRouteChildren = {
+  FeedSubscriptionIdRoute: FeedSubscriptionIdRoute,
+}
+
+const FeedRouteWithChildren = FeedRoute._addFileChildren(FeedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsRoute: AccountsRoute,
   BookmarksRoute: BookmarksRoute,
+  FeedRoute: FeedRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SaveRoute: SaveRoute,
   SignInRoute: SignInRoute,

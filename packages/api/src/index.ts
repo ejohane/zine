@@ -10,7 +10,7 @@ import {
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
 import { D1SubscriptionRepository } from './d1-subscription-repository'
-import { D1FeedItemRepository } from './d1-feed-item-repository'
+import { D1FeedItemRepository, UserFeedItemWithDetails, SubscriptionWithUnreadCount } from './d1-feed-item-repository'
 import { authMiddleware, getAuthContext } from './middleware/auth'
 import { getOAuthProviders } from './oauth/oauth-config'
 import { OAuthService, encodeState, decodeState, getUserInfo } from './oauth/oauth-service'
@@ -92,6 +92,7 @@ app.get('/health', (c) => {
 app.use('/api/v1/bookmarks/*', authMiddleware)
 app.use('/api/v1/accounts/*', authMiddleware)
 app.use('/api/v1/subscriptions/*', authMiddleware)
+app.use('/api/v1/feed/*', authMiddleware)
 
 // Apply auth middleware only to specific auth endpoints (not callbacks)
 app.use('/api/v1/auth/*/connect', authMiddleware)
@@ -387,6 +388,130 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
   } catch (error) {
     console.error('Update subscriptions error:', error)
     return c.json({ error: 'Failed to update subscriptions' }, 500)
+  }
+})
+
+// Feed endpoints
+app.get('/api/v1/feed', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const unreadOnly = c.req.query('unread') === 'true'
+    const subscriptionId = c.req.query('subscription')
+    const limit = parseInt(c.req.query('limit') || '50')
+    const offset = parseInt(c.req.query('offset') || '0')
+    
+    const { feedItemRepository } = await initializeServices(c.env.DB)
+    
+    let feedItems
+    if (subscriptionId) {
+      // Get feed items for specific subscription
+      feedItems = await feedItemRepository.getUserFeedItemsBySubscription(
+        auth.userId, 
+        subscriptionId, 
+        unreadOnly, 
+        limit, 
+        offset
+      )
+    } else {
+      // Get all feed items for user
+      feedItems = await feedItemRepository.getUserFeedItems(
+        auth.userId, 
+        unreadOnly, 
+        limit, 
+        offset
+      )
+    }
+    
+    return c.json({
+      feedItems: feedItems.map(item => ({
+        id: item.id,
+        feedItem: {
+          id: item.feedItem.id,
+          title: item.feedItem.title,
+          description: item.feedItem.description,
+          thumbnailUrl: item.feedItem.thumbnailUrl,
+          publishedAt: item.feedItem.publishedAt,
+          durationSeconds: item.feedItem.durationSeconds,
+          externalUrl: item.feedItem.externalUrl,
+          subscription: {
+            id: item.feedItem.subscription.id,
+            title: item.feedItem.subscription.title,
+            creatorName: item.feedItem.subscription.creatorName,
+            thumbnailUrl: item.feedItem.subscription.thumbnailUrl,
+            providerId: item.feedItem.subscription.providerId
+          }
+        },
+        isRead: item.isRead,
+        readAt: item.readAt,
+        bookmarkId: item.bookmarkId,
+        createdAt: item.createdAt
+      })),
+      pagination: {
+        limit,
+        offset,
+        hasMore: feedItems.length === limit
+      }
+    })
+  } catch (error) {
+    console.error('Get feed items error:', error)
+    return c.json({ error: 'Failed to get feed items' }, 500)
+  }
+})
+
+app.put('/api/v1/feed/:itemId/read', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const itemId = c.req.param('itemId')
+    
+    const { feedItemRepository } = await initializeServices(c.env.DB)
+    
+    await feedItemRepository.markAsRead(auth.userId, itemId)
+    
+    return c.json({ message: 'Item marked as read' })
+  } catch (error) {
+    console.error('Mark as read error:', error)
+    return c.json({ error: 'Failed to mark item as read' }, 500)
+  }
+})
+
+app.put('/api/v1/feed/:itemId/unread', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const itemId = c.req.param('itemId')
+    
+    const { feedItemRepository } = await initializeServices(c.env.DB)
+    
+    await feedItemRepository.markAsUnread(auth.userId, itemId)
+    
+    return c.json({ message: 'Item marked as unread' })
+  } catch (error) {
+    console.error('Mark as unread error:', error)
+    return c.json({ error: 'Failed to mark item as unread' }, 500)
+  }
+})
+
+app.get('/api/v1/feed/subscriptions', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    
+    const { feedItemRepository } = await initializeServices(c.env.DB)
+    
+    const subscriptionsWithCounts = await feedItemRepository.getSubscriptionsWithUnreadCounts(auth.userId)
+    
+    return c.json({
+      subscriptions: subscriptionsWithCounts.map(sub => ({
+        id: sub.subscription.id,
+        title: sub.subscription.title,
+        creatorName: sub.subscription.creatorName,
+        thumbnailUrl: sub.subscription.thumbnailUrl,
+        providerId: sub.subscription.providerId,
+        unreadCount: sub.unreadCount,
+        lastUpdated: sub.lastUpdated
+      }))
+    })
+  } catch (error) {
+    console.error('Get subscriptions with counts error:', error)
+    return c.json({ error: 'Failed to get subscriptions with unread counts' }, 500)
   }
 })
 
