@@ -81,9 +81,16 @@ jobs:
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}'
           
+      - name: Set Preview Variables
+        if: github.event_name == 'pull_request'
+        run: |
+          SANITIZED_BRANCH=$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+          echo "SANITIZED_BRANCH=$SANITIZED_BRANCH" >> $GITHUB_ENV
+          echo "API_PREVIEW_NAME=zine-api-$SANITIZED_BRANCH" >> $GITHUB_ENV
+          
       - name: Set Clerk Secret (Preview)
         if: github.event_name == 'pull_request'
-        run: echo "${{ secrets.CLERK_SECRET_KEY_DEV }}" | bunx wrangler secret put CLERK_SECRET_KEY --name zine-api-$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+        run: echo "${{ secrets.CLERK_SECRET_KEY_DEV }}" | bunx wrangler secret put CLERK_SECRET_KEY --name ${{ env.API_PREVIEW_NAME }}
         working-directory: packages/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -94,7 +101,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
-          command: deploy --name zine-api-$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+          command: deploy --name ${{ env.API_PREVIEW_NAME }}
         id: preview_deploy
         
       - name: Comment Preview URL
@@ -180,13 +187,20 @@ jobs:
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}'
           
+      - name: Set Web Preview Variables
+        if: github.event_name == 'pull_request'
+        run: |
+          SANITIZED_BRANCH=$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+          echo "SANITIZED_BRANCH=$SANITIZED_BRANCH" >> $GITHUB_ENV
+          echo "WEB_PREVIEW_NAME=zine-web-$SANITIZED_BRANCH" >> $GITHUB_ENV
+          
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/web
-          command: deploy --name zine-web-$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+          command: deploy --name ${{ env.WEB_PREVIEW_NAME }}
         id: web_preview_deploy
         
       - name: Comment Preview URL
