@@ -1077,73 +1077,48 @@ export default {
     const now = new Date()
     const currentMinute = now.getMinutes()
     
-    // Determine which scheduled job to run based on the current minute
-    // Every hour at minute 0: Feed polling (cron: "0 * * * *")
-    // Every 30 minutes (at minutes 0 and 30): Token refresh (cron: "*/30 * * * *")
+    // Run both feed polling and token refresh every 30 minutes (cron: "*/30 * * * *")
     
     try {
-      if (currentMinute === 0) {
-        // Run both jobs at the top of each hour
-        console.log(`[Scheduled] Running both feed polling and token refresh at ${now.toISOString()}`)
-        
-        const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
-        
-        // Run both jobs concurrently
-        const [feedResults, tokenResults] = await Promise.allSettled([
-          feedPollingService.pollAllActiveSubscriptions(),
-          tokenRefreshService.refreshExpiringTokens()
-        ])
-        
-        // Handle feed polling results
-        if (feedResults.status === 'fulfilled') {
-          console.log(`[Scheduled] Feed polling completed:`, {
-            subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
-            newItemsFound: feedResults.value.totalNewItems,
-            usersNotified: feedResults.value.totalUsersNotified,
-            errors: feedResults.value.errors.length
-          })
-          
-          if (feedResults.value.errors.length > 0) {
-            console.error('[Scheduled] Feed polling errors:', feedResults.value.errors)
-          }
-        } else {
-          console.error('[Scheduled] Feed polling failed:', feedResults.reason)
-        }
-        
-        // Handle token refresh results
-        if (tokenResults.status === 'fulfilled') {
-          console.log(`[Scheduled] Token refresh completed:`, {
-            accountsChecked: tokenResults.value.totalAccountsChecked,
-            tokensRefreshed: tokenResults.value.tokensRefreshed,
-            errors: tokenResults.value.errors.length
-          })
-          
-          if (tokenResults.value.errors.length > 0) {
-            console.error('[Scheduled] Token refresh errors:', tokenResults.value.errors)
-          }
-        } else {
-          console.error('[Scheduled] Token refresh failed:', tokenResults.reason)
-        }
-        
-      } else if (currentMinute === 30) {
-        // Run only token refresh at half-hour mark
-        console.log(`[Scheduled] Running token refresh at ${now.toISOString()}`)
-        
-        const { tokenRefreshService } = await initializeServices(env.DB, env)
-        
-        const tokenResults = await tokenRefreshService.refreshExpiringTokens()
-        
-        console.log(`[Scheduled] Token refresh completed:`, {
-          accountsChecked: tokenResults.totalAccountsChecked,
-          tokensRefreshed: tokenResults.tokensRefreshed,
-          errors: tokenResults.errors.length
+      console.log(`[Scheduled] Running feed polling and token refresh at ${now.toISOString()} (minute ${currentMinute})`)
+      
+      const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
+      
+      // Run both jobs concurrently
+      const [feedResults, tokenResults] = await Promise.allSettled([
+        feedPollingService.pollAllActiveSubscriptions(),
+        tokenRefreshService.refreshExpiringTokens()
+      ])
+      
+      // Handle feed polling results
+      if (feedResults.status === 'fulfilled') {
+        console.log(`[Scheduled] Feed polling completed:`, {
+          subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
+          newItemsFound: feedResults.value.totalNewItems,
+          usersNotified: feedResults.value.totalUsersNotified,
+          errors: feedResults.value.errors.length
         })
         
-        if (tokenResults.errors.length > 0) {
-          console.error('[Scheduled] Token refresh errors:', tokenResults.errors)
+        if (feedResults.value.errors.length > 0) {
+          console.error('[Scheduled] Feed polling errors:', feedResults.value.errors)
         }
       } else {
-        console.warn(`[Scheduled] Unexpected cron trigger at minute ${currentMinute} - ignoring`)
+        console.error('[Scheduled] Feed polling failed:', feedResults.reason)
+      }
+      
+      // Handle token refresh results
+      if (tokenResults.status === 'fulfilled') {
+        console.log(`[Scheduled] Token refresh completed:`, {
+          accountsChecked: tokenResults.value.totalAccountsChecked,
+          tokensRefreshed: tokenResults.value.tokensRefreshed,
+          errors: tokenResults.value.errors.length
+        })
+        
+        if (tokenResults.value.errors.length > 0) {
+          console.error('[Scheduled] Token refresh errors:', tokenResults.value.errors)
+        }
+      } else {
+        console.error('[Scheduled] Token refresh failed:', tokenResults.reason)
       }
       
     } catch (error) {
