@@ -645,7 +645,12 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
-    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
+    const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    // Ensure user exists in database before marking as read
+    await subscriptionRepository.ensureUser({
+      id: auth.userId
+    })
     
     await feedItemRepository.markAsRead(auth.userId, itemId)
     
@@ -661,7 +666,12 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
-    const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
+    const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    // Ensure user exists in database before marking as unread
+    await subscriptionRepository.ensureUser({
+      id: auth.userId
+    })
     
     await feedItemRepository.markAsUnread(auth.userId, itemId)
     
