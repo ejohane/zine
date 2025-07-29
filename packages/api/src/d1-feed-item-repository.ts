@@ -370,6 +370,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
         readAt: now
       }
     } else {
+      // Verify that the feed item exists before creating user feed item
+      const feedItem = await this.getFeedItem(feedItemId)
+      if (!feedItem) {
+        throw new Error(`Feed item ${feedItemId} not found`)
+      }
+      
       // Create new user feed item as read
       const userFeedItemId = `${userId}-${feedItemId}-${Date.now()}`
       return this.createUserFeedItem({
@@ -403,6 +409,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
         readAt: undefined
       }
     } else {
+      // Verify that the feed item exists before creating user feed item
+      const feedItem = await this.getFeedItem(feedItemId)
+      if (!feedItem) {
+        throw new Error(`Feed item ${feedItemId} not found`)
+      }
+      
       // Create new user feed item as unread
       const userFeedItemId = `${userId}-${feedItemId}-${Date.now()}`
       return this.createUserFeedItem({
