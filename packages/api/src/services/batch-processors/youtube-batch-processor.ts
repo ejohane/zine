@@ -1,6 +1,8 @@
 import { Subscription, FeedItem } from '@zine/shared'
 import { YouTubeAPI, YouTubeChannel, YouTubeVideoDetails } from '../../external/youtube-api'
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
+import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
+import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
 
 interface ChannelWithVideos {
   channel: YouTubeChannel
@@ -14,13 +16,49 @@ interface MultipleChannelsResponse {
 export class YouTubeBatchProcessor extends BaseBatchProcessor {
   protected providerId = 'youtube'
 
+  constructor() {
+    super()
+    // Initialize rate limiter and circuit breaker with YouTube-specific settings
+    this.initializeProcessingUtilities(
+      RATE_LIMITER_CONFIGS.youtube,
+      {
+        failureThreshold: 3, // YouTube has stricter limits
+        failureWindow: 60000,
+        recoveryTimeout: 60000, // Longer recovery for YouTube
+        successThreshold: 2,
+        name: 'youtube',
+        isFailure: (error: any) => {
+          // Consider quota exceeded and server errors as failures
+          return error.status === 429 || error.status === 403 || (error.status >= 500 && error.status < 600)
+        }
+      }
+    )
+  }
+
   async processBatch(
     subscriptions: Subscription[],
     accessToken: string,
     options?: Partial<BatchProcessorOptions>
   ): Promise<BatchProcessorResult[]> {
     const opts = { ...this.getDefaultOptions(), ...options }
+    // YouTube has lower rate limits, reduce concurrency
+    opts.maxConcurrency = Math.min(opts.maxConcurrency, 3)
+    
     const youtubeAPI = new YouTubeAPI(accessToken)
+
+    // Initialize progress tracking
+    const progressTracker = new ProgressTracker(subscriptions.length)
+    this.progressTracker = progressTracker
+    
+    if (opts.onProgress) {
+      progressTracker.onProgress((_update, metrics) => {
+        opts.onProgress!(metrics.completedTasks + metrics.failedTasks, metrics.totalTasks)
+      })
+    }
+    
+    // Create console reporter for detailed progress
+    const reporter = new ConsoleProgressReporter(progressTracker)
+    progressTracker.start()
 
     // Test connection first
     const connectionValid = await youtubeAPI.testConnection()
@@ -39,9 +77,13 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     const channelIds = Array.from(subscriptionsByChannelId.keys())
     const channelChunks = this.chunk(channelIds, opts.maxBatchSize)
 
-    // Fetch all channels in batches
+    // Fetch all channels in batches with rate limiting
     const allChannels: YouTubeChannel[] = []
     for (const chunk of channelChunks) {
+      if (this.rateLimiter && opts.useRateLimiter) {
+        await this.rateLimiter.consume(1)
+      }
+      
       const channels = await this.retryOperation(
         () => this.getMultipleChannels(youtubeAPI, chunk),
         opts.retryAttempts,
@@ -56,29 +98,50 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     const channelsWithVideos = await this.processWithConcurrency(
       allChannels,
       async (channel) => {
-        // First get video IDs from search
-        const searchResponse = await this.retryOperation(
-          () => youtubeAPI.getChannelVideos(channel.id, 20),
-          opts.retryAttempts,
-          opts.retryDelay
-        )
+        progressTracker.taskStarted(channel.id, { channelName: channel.snippet.title })
+        
+        try {
+          // First get video IDs from search
+          const searchResponse = await this.retryOperation(
+            () => youtubeAPI.getChannelVideos(channel.id, 20),
+            opts.retryAttempts,
+            opts.retryDelay
+          )
 
-        if (searchResponse.items.length === 0) {
-          return { channel, videos: [] }
+          if (searchResponse.items.length === 0) {
+            progressTracker.taskCompleted(channel.id, { videoCount: 0 })
+            return { channel, videos: [] }
+          }
+
+          // Then batch fetch video details with rate limiting
+          const videoIds = searchResponse.items.map(item => item.id.videoId)
+          if (this.rateLimiter && opts.useRateLimiter) {
+            await this.rateLimiter.consume(1)
+          }
+          
+          const videos = await this.retryOperation(
+            () => this.getMultipleVideos(youtubeAPI, videoIds),
+            opts.retryAttempts,
+            opts.retryDelay
+          )
+
+          progressTracker.taskCompleted(channel.id, { videoCount: videos.length })
+          return { channel, videos }
+        } catch (error) {
+          progressTracker.taskFailed(channel.id, error as Error)
+          throw error
         }
-
-        // Then batch fetch video details
-        const videoIds = searchResponse.items.map(item => item.id.videoId)
-        const videos = await this.retryOperation(
-          () => this.getMultipleVideos(youtubeAPI, videoIds),
-          opts.retryAttempts,
-          opts.retryDelay
-        )
-
-        return { channel, videos }
       },
-      opts.maxConcurrency
+      opts.maxConcurrency,
+      {
+        onProgress: opts.onProgress,
+        useRateLimiter: opts.useRateLimiter,
+        useCircuitBreaker: opts.useCircuitBreaker
+      }
     )
+
+    // Print summary
+    reporter.printSummary()
 
     // Convert to results
     return this.convertToResults(channelsWithVideos, subscriptionsByChannelId)

@@ -1,6 +1,8 @@
 import { Subscription, FeedItem } from '@zine/shared'
 import { SpotifyAPI, SpotifyShow, SpotifyEpisode } from '../../external/spotify-api'
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
+import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
+import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
 
 interface ShowWithEpisodes {
   show: SpotifyShow
@@ -14,6 +16,25 @@ interface MultipleShowsResponse {
 export class SpotifyBatchProcessor extends BaseBatchProcessor {
   protected providerId = 'spotify'
 
+  constructor() {
+    super()
+    // Initialize rate limiter and circuit breaker with Spotify-specific settings
+    this.initializeProcessingUtilities(
+      RATE_LIMITER_CONFIGS.spotify,
+      {
+        failureThreshold: 5,
+        failureWindow: 60000,
+        recoveryTimeout: 30000,
+        successThreshold: 3,
+        name: 'spotify',
+        isFailure: (error: any) => {
+          // Consider rate limit errors and server errors as failures
+          return error.status === 429 || (error.status >= 500 && error.status < 600)
+        }
+      }
+    )
+  }
+
   async processBatch(
     subscriptions: Subscription[],
     accessToken: string,
@@ -21,6 +42,20 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
   ): Promise<BatchProcessorResult[]> {
     const opts = { ...this.getDefaultOptions(), ...options }
     const spotifyAPI = new SpotifyAPI(accessToken)
+
+    // Initialize progress tracking
+    const progressTracker = new ProgressTracker(subscriptions.length)
+    this.progressTracker = progressTracker
+    
+    if (opts.onProgress) {
+      progressTracker.onProgress((_update, metrics) => {
+        opts.onProgress!(metrics.completedTasks + metrics.failedTasks, metrics.totalTasks)
+      })
+    }
+    
+    // Create console reporter for detailed progress
+    const reporter = new ConsoleProgressReporter(progressTracker)
+    progressTracker.start()
 
     // Test connection first
     const connectionValid = await spotifyAPI.testConnection()
@@ -39,9 +74,13 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     const showIds = Array.from(subscriptionsByExternalId.keys())
     const showChunks = this.chunk(showIds, opts.maxBatchSize)
 
-    // Fetch all shows in batches
+    // Fetch all shows in batches with rate limiting
     const allShows: SpotifyShow[] = []
     for (const chunk of showChunks) {
+      if (this.rateLimiter && opts.useRateLimiter) {
+        await this.rateLimiter.consume(1)
+      }
+      
       const shows = await this.retryOperation(
         () => this.getMultipleShows(spotifyAPI, chunk),
         opts.retryAttempts,
@@ -56,15 +95,32 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     const showsWithEpisodes = await this.processWithConcurrency(
       allShows,
       async (show) => {
-        const episodes = await this.retryOperation(
-          () => spotifyAPI.getLatestEpisodes(show.id, 20),
-          opts.retryAttempts,
-          opts.retryDelay
-        )
-        return { show, episodes }
+        progressTracker.taskStarted(show.id, { showName: show.name })
+        
+        try {
+          const episodes = await this.retryOperation(
+            () => spotifyAPI.getLatestEpisodes(show.id, 20),
+            opts.retryAttempts,
+            opts.retryDelay
+          )
+          
+          progressTracker.taskCompleted(show.id, { episodeCount: episodes.length })
+          return { show, episodes }
+        } catch (error) {
+          progressTracker.taskFailed(show.id, error as Error)
+          throw error
+        }
       },
-      opts.maxConcurrency
+      opts.maxConcurrency,
+      {
+        onProgress: opts.onProgress,
+        useRateLimiter: opts.useRateLimiter,
+        useCircuitBreaker: opts.useCircuitBreaker
+      }
     )
+
+    // Print summary
+    reporter.printSummary()
 
     // Convert to results
     return this.convertToResults(showsWithEpisodes, subscriptionsByExternalId)

@@ -1,4 +1,8 @@
 import { Subscription, FeedItem } from '@zine/shared'
+import { RateLimiter, RateLimiterConfig } from '../../utils/rate-limiter'
+import { CircuitBreaker, CircuitBreakerOptions } from '../../utils/circuit-breaker'
+import { ProgressTracker } from '../../utils/progress-tracker'
+import { ConcurrentQueue, createTask } from '../../utils/concurrent-queue'
 
 export interface BatchProcessorResult {
   subscriptionId: string
@@ -12,6 +16,9 @@ export interface BatchProcessorOptions {
   maxConcurrency: number
   retryAttempts: number
   retryDelay: number
+  useRateLimiter?: boolean
+  useCircuitBreaker?: boolean
+  onProgress?: (completed: number, total: number) => void
 }
 
 export interface BatchProcessor {
@@ -41,6 +48,9 @@ export interface BatchProcessor {
 
 export abstract class BaseBatchProcessor implements BatchProcessor {
   protected abstract providerId: string
+  protected rateLimiter?: RateLimiter
+  protected circuitBreaker?: CircuitBreaker
+  protected progressTracker?: ProgressTracker
 
   abstract processBatch(
     subscriptions: Subscription[],
@@ -57,7 +67,40 @@ export abstract class BaseBatchProcessor implements BatchProcessor {
       maxBatchSize: 50,
       maxConcurrency: 5,
       retryAttempts: 3,
-      retryDelay: 1000
+      retryDelay: 1000,
+      useRateLimiter: true,
+      useCircuitBreaker: true
+    }
+  }
+
+  /**
+   * Initialize rate limiter and circuit breaker if configured
+   */
+  protected initializeProcessingUtilities(
+    rateLimiterConfig?: Partial<RateLimiterConfig>,
+    circuitBreakerConfig?: Partial<CircuitBreakerOptions>
+  ): void {
+    // Initialize rate limiter if not already created
+    if (!this.rateLimiter && rateLimiterConfig) {
+      this.rateLimiter = new RateLimiter({
+        capacity: 150,
+        refillRate: 150,
+        refillInterval: 60 * 1000,
+        name: this.providerId,
+        ...rateLimiterConfig,
+      })
+    }
+    
+    // Initialize circuit breaker if not already created
+    if (!this.circuitBreaker && circuitBreakerConfig) {
+      this.circuitBreaker = new CircuitBreaker({
+        failureThreshold: 5,
+        failureWindow: 60000,
+        recoveryTimeout: 30000,
+        successThreshold: 3,
+        name: this.providerId,
+        ...circuitBreakerConfig,
+      })
     }
   }
 
@@ -73,34 +116,71 @@ export abstract class BaseBatchProcessor implements BatchProcessor {
   }
 
   /**
-   * Process multiple promises with concurrency limit
+   * Process multiple items with concurrent queue, rate limiting, and circuit breaker
    */
   protected async processWithConcurrency<T, R>(
     items: T[],
     processor: (item: T) => Promise<R>,
-    maxConcurrency: number
+    maxConcurrency: number,
+    options?: {
+      onProgress?: (completed: number, total: number) => void
+      useRateLimiter?: boolean
+      useCircuitBreaker?: boolean
+    }
   ): Promise<R[]> {
-    const results: R[] = []
-    const executing: Promise<void>[] = []
-
-    for (const item of items) {
-      const promise = processor(item).then(result => {
-        results.push(result)
-      })
-
-      executing.push(promise)
-
-      if (executing.length >= maxConcurrency) {
-        await Promise.race(executing)
-        executing.splice(
-          executing.findIndex(p => p === promise),
-          1
-        )
+    const { onProgress, useRateLimiter = true, useCircuitBreaker = true } = options || {}
+    
+    // Create concurrent queue
+    const queue = new ConcurrentQueue<R>({
+      concurrency: maxConcurrency,
+      onProgress,
+      priorityQueue: true,
+    })
+    
+    const results: Map<number, R> = new Map()
+    
+    // Create tasks for each item
+    const tasks = items.map((item, index) => {
+      return createTask(
+        index.toString(),
+        async () => {
+          let processItem = () => processor(item)
+          
+          // Wrap with circuit breaker if enabled
+          if (useCircuitBreaker && this.circuitBreaker) {
+            const originalProcess = processItem
+            processItem = () => this.circuitBreaker!.execute(originalProcess)
+          }
+          
+          // Wrap with rate limiter if enabled
+          if (useRateLimiter && this.rateLimiter) {
+            await this.rateLimiter.consume(1)
+          }
+          
+          const result = await processItem()
+          results.set(index, result)
+          return result
+        },
+        0 // Default priority
+      )
+    })
+    
+    // Add all tasks to queue
+    queue.addBatch(tasks)
+    
+    // Wait for completion
+    await queue.waitForCompletion()
+    
+    // Return results in original order
+    const orderedResults: R[] = []
+    for (let i = 0; i < items.length; i++) {
+      const result = results.get(i)
+      if (result !== undefined) {
+        orderedResults.push(result)
       }
     }
-
-    await Promise.all(executing)
-    return results
+    
+    return orderedResults
   }
 
   /**

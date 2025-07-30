@@ -74,7 +74,11 @@ export class FeedPollingService {
 
         try {
           console.log(`[FeedPolling] Starting batch processing for ${providerId}`)
-          const batchResults = await processor.processBatch(subscriptions, userAccount.accessToken)
+          const batchResults = await processor.processBatch(subscriptions, userAccount.accessToken, {
+            onProgress: (completed, total) => {
+              console.log(`[FeedPolling] ${providerId} progress: ${completed}/${total} (${Math.round(completed/total * 100)}%)`)
+            }
+          })
           
           // Process batch results
           for (const batchResult of batchResults) {
