@@ -16,8 +16,9 @@ import { getOAuthProviders } from './oauth/oauth-config'
 import { OAuthService, encodeState, decodeState, getUserInfo } from './oauth/oauth-service'
 import { setupDatabase } from './setup-database'
 import { SubscriptionDiscoveryService } from './services/subscription-discovery-service'
-import { FeedPollingService } from './services/feed-polling-service'
+import { OptimizedFeedPollingService } from './services/optimized-feed-polling-service'
 import { TokenRefreshService } from './services/token-refresh-service'
+import { QueryOptimizer } from './repositories/query-optimizer'
 
 type Bindings = {
   DB: D1Database
@@ -52,8 +53,9 @@ let bookmarkSaveService: BookmarkSaveService
 let subscriptionRepository: D1SubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
-let feedPollingService: FeedPollingService
+let feedPollingService: OptimizedFeedPollingService
 let tokenRefreshService: TokenRefreshService
+let queryOptimizer: QueryOptimizer
 
 // Initialize services on first request
 async function initializeServices(db: D1Database, env: Bindings) {
@@ -64,11 +66,15 @@ async function initializeServices(db: D1Database, env: Bindings) {
     subscriptionRepository = new D1SubscriptionRepository(db, env)
     feedItemRepository = new D1FeedItemRepository(db)
     subscriptionDiscoveryService = new SubscriptionDiscoveryService(subscriptionRepository)
-    feedPollingService = new FeedPollingService(subscriptionRepository, feedItemRepository)
+    feedPollingService = new OptimizedFeedPollingService(subscriptionRepository, feedItemRepository, db)
     tokenRefreshService = new TokenRefreshService(subscriptionRepository)
+    queryOptimizer = new QueryOptimizer(db)
     
     // Setup database tables and providers
     await setupDatabase(db)
+    
+    // Create optimized indexes for feed operations
+    await queryOptimizer.createOptimizedIndexes()
   }
   return { 
     bookmarkService, 
@@ -1102,15 +1108,25 @@ export default {
       
       // Handle feed polling results
       if (feedResults.status === 'fulfilled') {
+        const result = feedResults.value
         console.log(`[Scheduled] Feed polling completed:`, {
-          subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
-          newItemsFound: feedResults.value.totalNewItems,
-          usersNotified: feedResults.value.totalUsersNotified,
-          errors: feedResults.value.errors.length
+          subscriptionsPolled: result.totalSubscriptionsPolled,
+          newItemsFound: result.totalNewItems,
+          usersNotified: result.totalUsersNotified,
+          errors: result.errors.length,
+          performanceMetrics: result.performanceMetrics
         })
         
-        if (feedResults.value.errors.length > 0) {
-          console.error('[Scheduled] Feed polling errors:', feedResults.value.errors)
+        if (result.performanceMetrics) {
+          console.log(`[Scheduled] Performance:`, {
+            duration: `${result.performanceMetrics.durationMs}ms`,
+            cacheHitRate: `${result.performanceMetrics.cacheHitRate}%`,
+            dbQueriesReduced: result.performanceMetrics.dbQueriesReduced
+          })
+        }
+        
+        if (result.errors.length > 0) {
+          console.error('[Scheduled] Feed polling errors:', result.errors)
         }
       } else {
         console.error('[Scheduled] Feed polling failed:', feedResults.reason)
