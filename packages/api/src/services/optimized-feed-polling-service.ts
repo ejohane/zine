@@ -1,0 +1,298 @@
+import { SubscriptionRepository, FeedItemRepository, UserAccount, Subscription, FeedItem } from '@zine/shared'
+import { BatchProcessor } from './batch-processors/batch-processor.interface'
+import { SpotifyBatchProcessor } from './batch-processors/spotify-batch-processor'
+import { YouTubeBatchProcessor } from './batch-processors/youtube-batch-processor'
+import { BatchDatabaseOperations } from '../repositories/batch-operations'
+import { DeduplicationCache } from '../repositories/deduplication-cache'
+
+export interface PollResult {
+  provider: 'spotify' | 'youtube'
+  subscriptionId: string
+  subscriptionTitle: string
+  newItemsFound: number
+  totalUsersNotified: number
+  errors?: string[]
+}
+
+export interface PollingResults {
+  timestamp: Date
+  totalSubscriptionsPolled: number
+  totalNewItems: number
+  totalUsersNotified: number
+  results: PollResult[]
+  errors: string[]
+  performanceMetrics?: {
+    durationMs: number
+    cacheHitRate: number
+    dbQueriesReduced: number
+  }
+}
+
+export class OptimizedFeedPollingService {
+  private batchProcessors: Map<string, BatchProcessor>
+  private deduplicationCache: DeduplicationCache
+  private batchOps: BatchDatabaseOperations
+  private dbQueryCount = 0
+  
+  constructor(
+    private subscriptionRepository: SubscriptionRepository,
+    _feedItemRepository: FeedItemRepository,
+    d1Database: D1Database
+  ) {
+    // Initialize batch processors
+    this.batchProcessors = new Map<string, BatchProcessor>([
+      ['spotify', new SpotifyBatchProcessor()],
+      ['youtube', new YouTubeBatchProcessor()]
+    ])
+
+    // Initialize optimization components
+    this.batchOps = new BatchDatabaseOperations(d1Database)
+    this.deduplicationCache = new DeduplicationCache({
+      maxSize: 20000,  // Larger cache for better hit rate
+      ttlMinutes: 120  // 2 hours TTL
+    })
+  }
+
+  async pollAllActiveSubscriptions(): Promise<PollingResults> {
+    const startTime = new Date()
+    console.log(`[OptimizedFeedPolling] Starting polling at ${startTime.toISOString()}`)
+
+    // Reset metrics
+    this.dbQueryCount = 0
+    this.deduplicationCache.resetStats()
+
+    const results: PollResult[] = []
+    const globalErrors: string[] = []
+    let totalNewItems = 0
+    let totalUsersNotified = 0
+
+    try {
+      // Get all active subscriptions grouped by provider
+      const subscriptionsByProvider = new Map<string, Subscription[]>()
+      
+      for (const [providerId] of this.batchProcessors) {
+        const subs = await this.subscriptionRepository.getSubscriptionsByProvider(providerId)
+        this.dbQueryCount++
+        
+        if (subs.length > 0) {
+          subscriptionsByProvider.set(providerId, subs)
+          console.log(`[OptimizedFeedPolling] Found ${subs.length} ${providerId} subscriptions`)
+        }
+      }
+
+      // Warm cache with recent items for all subscriptions
+      await this.warmCacheForSubscriptions(subscriptionsByProvider)
+
+      // Process each provider's subscriptions using batch processors
+      for (const [providerId, subscriptions] of subscriptionsByProvider) {
+        const processor = this.batchProcessors.get(providerId)
+        if (!processor) {
+          globalErrors.push(`No batch processor found for provider: ${providerId}`)
+          continue
+        }
+
+        // Get a valid access token for this provider
+        const userAccount = await this.getValidUserAccountForProvider(providerId)
+        if (!userAccount) {
+          globalErrors.push(`No valid tokens available for ${providerId}`)
+          console.log(`[OptimizedFeedPolling] No valid tokens available for ${providerId}`)
+          continue
+        }
+
+        try {
+          console.log(`[OptimizedFeedPolling] Starting batch processing for ${providerId}`)
+          const batchResults = await processor.processBatch(subscriptions, userAccount.accessToken, {
+            onProgress: (completed, total) => {
+              console.log(`[OptimizedFeedPolling] ${providerId} progress: ${completed}/${total} (${Math.round(completed/total * 100)}%)`)
+            }
+          })
+          
+          // Process all results for this provider in batches
+          const providerNewItems: Array<Omit<FeedItem, 'id' | 'createdAt'>> = []
+          const resultsBySubscription = new Map<string, typeof batchResults[0]>()
+
+          for (const batchResult of batchResults) {
+            if (batchResult.error) {
+              globalErrors.push(`${batchResult.subscriptionTitle}: ${batchResult.error}`)
+              continue
+            }
+
+            resultsBySubscription.set(batchResult.subscriptionId, batchResult)
+
+            // Filter items using cache first
+            for (const item of batchResult.newItems) {
+              // Check cache first for ultra-fast deduplication
+              if (!this.deduplicationCache.has(item.subscriptionId, item.externalId)) {
+                providerNewItems.push({
+                  subscriptionId: item.subscriptionId,
+                  externalId: item.externalId,
+                  title: item.title,
+                  description: item.description,
+                  thumbnailUrl: item.thumbnailUrl,
+                  publishedAt: item.publishedAt,
+                  durationSeconds: item.durationSeconds,
+                  externalUrl: item.externalUrl
+                })
+              }
+            }
+          }
+
+          // Batch process all new items for this provider
+          if (providerNewItems.length > 0) {
+            console.log(`[OptimizedFeedPolling] Processing ${providerNewItems.length} potential new items for ${providerId}`)
+            
+            // Check existing items in a single query
+            const existingItemsMap = await this.batchOps.checkExistingFeedItems(
+              providerNewItems.map(item => ({ 
+                subscriptionId: item.subscriptionId, 
+                externalId: item.externalId 
+              }))
+            )
+            this.dbQueryCount++
+
+            // Batch insert truly new items
+            const createdItems = await this.batchOps.batchInsertFeedItems(
+              providerNewItems,
+              existingItemsMap
+            )
+            this.dbQueryCount++
+
+            // Add new items to cache
+            this.deduplicationCache.addBatch(createdItems)
+
+            // Group created items by subscription
+            const itemsBySubscription = new Map<string, FeedItem[]>()
+            for (const item of createdItems) {
+              if (!itemsBySubscription.has(item.subscriptionId)) {
+                itemsBySubscription.set(item.subscriptionId, [])
+              }
+              itemsBySubscription.get(item.subscriptionId)!.push(item)
+            }
+
+            // Create user feed items for each subscription with new items
+            for (const [subscriptionId, items] of itemsBySubscription) {
+              const batchResult = resultsBySubscription.get(subscriptionId)!
+              const usersNotified = await this.createUserFeedItemsBatch(subscriptionId, items)
+
+              results.push({
+                provider: providerId as 'spotify' | 'youtube',
+                subscriptionId: batchResult.subscriptionId,
+                subscriptionTitle: batchResult.subscriptionTitle,
+                newItemsFound: items.length,
+                totalUsersNotified: usersNotified
+              })
+
+              totalNewItems += items.length
+              totalUsersNotified += usersNotified
+            }
+          }
+        } catch (error) {
+          const errorMsg = `${providerId} batch processing failed: ${error instanceof Error ? error.message : String(error)}`
+          console.error(`[OptimizedFeedPolling] ${errorMsg}`)
+          globalErrors.push(errorMsg)
+        }
+      }
+
+      const endTime = new Date()
+      const duration = endTime.getTime() - startTime.getTime()
+      const cacheStats = this.deduplicationCache.getStats()
+
+      console.log(`[OptimizedFeedPolling] Completed in ${duration}ms`)
+      console.log(`[OptimizedFeedPolling] Found ${totalNewItems} new items for ${totalUsersNotified} users`)
+      console.log(`[OptimizedFeedPolling] Cache hit rate: ${cacheStats.hitRate}%`)
+      console.log(`[OptimizedFeedPolling] Total DB queries: ${this.dbQueryCount}`)
+
+      const totalSubscriptions = Array.from(subscriptionsByProvider.values())
+        .reduce((sum, subs) => sum + subs.length, 0)
+
+      return {
+        timestamp: startTime,
+        totalSubscriptionsPolled: totalSubscriptions,
+        totalNewItems,
+        totalUsersNotified,
+        results,
+        errors: globalErrors,
+        performanceMetrics: {
+          durationMs: duration,
+          cacheHitRate: cacheStats.hitRate,
+          dbQueriesReduced: Math.max(0, totalSubscriptions * 3 - this.dbQueryCount) // Estimate of queries saved
+        }
+      }
+    } catch (error) {
+      console.error('[OptimizedFeedPolling] Fatal error during polling:', error)
+      globalErrors.push(`Fatal error: ${error instanceof Error ? error.message : String(error)}`)
+      
+      return {
+        timestamp: startTime,
+        totalSubscriptionsPolled: 0,
+        totalNewItems: 0,
+        totalUsersNotified: 0,
+        results,
+        errors: globalErrors
+      }
+    }
+  }
+
+  private async warmCacheForSubscriptions(subscriptionsByProvider: Map<string, Subscription[]>): Promise<void> {
+    const allSubscriptionIds: string[] = []
+    
+    for (const subscriptions of subscriptionsByProvider.values()) {
+      allSubscriptionIds.push(...subscriptions.map(s => s.id))
+    }
+
+    if (allSubscriptionIds.length > 0) {
+      console.log(`[OptimizedFeedPolling] Warming cache for ${allSubscriptionIds.length} subscriptions`)
+      const recentItems = await this.batchOps.getRecentFeedItemIds(allSubscriptionIds, 24)
+      this.dbQueryCount++
+      
+      this.deduplicationCache.warmCache(recentItems)
+      console.log(`[OptimizedFeedPolling] Cache warmed with recent items`)
+    }
+  }
+
+  private async createUserFeedItemsBatch(subscriptionId: string, newFeedItems: FeedItem[]): Promise<number> {
+    if (newFeedItems.length === 0) return 0
+
+    // Get all users subscribed to this subscription
+    const subscribedUserIds = await this.subscriptionRepository.getUsersForSubscription(subscriptionId)
+    this.dbQueryCount++
+    
+    console.log(`[OptimizedFeedPolling] Found ${subscribedUserIds.length} users subscribed to ${subscriptionId}`)
+    
+    if (subscribedUserIds.length === 0) return 0
+
+    // Use batch operations to create user feed items
+    await this.batchOps.batchCreateUserFeedItems(
+      subscribedUserIds,
+      newFeedItems
+    )
+    this.dbQueryCount++
+    
+    return subscribedUserIds.length
+  }
+
+  private async getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null> {
+    try {
+      const account = await this.subscriptionRepository.getValidUserAccountForProvider(providerId)
+      this.dbQueryCount++
+      return account
+    } catch (error) {
+      console.error(`Error getting user account for provider ${providerId}:`, error)
+      return null
+    }
+  }
+
+  /**
+   * Get cache statistics for monitoring
+   */
+  getCacheStats(): ReturnType<DeduplicationCache['getStats']> {
+    return this.deduplicationCache.getStats()
+  }
+
+  /**
+   * Clear cache (useful for testing or maintenance)
+   */
+  clearCache(): void {
+    this.deduplicationCache.clear()
+  }
+}
