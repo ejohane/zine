@@ -54,6 +54,10 @@ export class SpotifyAPI {
 
   constructor(private accessToken: string) {}
 
+  getAccessToken(): string {
+    return this.accessToken
+  }
+
   async getUserPodcasts(limit: number = 50, offset: number = 0): Promise<SpotifyShowsResponse> {
     const response = await fetch(
       `${this.baseUrl}/me/shows?limit=${limit}&offset=${offset}`,

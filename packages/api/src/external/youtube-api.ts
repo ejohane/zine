@@ -103,6 +103,10 @@ export class YouTubeAPI {
 
   constructor(private accessToken: string) {}
 
+  getAccessToken(): string {
+    return this.accessToken
+  }
+
   async getUserSubscriptions(
     maxResults: number = 50, 
     pageToken?: string
