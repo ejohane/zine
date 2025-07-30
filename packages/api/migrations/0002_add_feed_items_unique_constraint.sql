@@ -1,4 +1,18 @@
--- Add unique constraint on subscription_id and external_id to prevent duplicate feed items
+-- First, remove duplicate feed items keeping only the most recent one
+DELETE FROM feed_items 
+WHERE id NOT IN (
+    SELECT MAX(id) 
+    FROM feed_items 
+    GROUP BY subscription_id, external_id
+);
+
+-- Also clean up any orphaned user_feed_items references
+DELETE FROM user_feed_items 
+WHERE feed_item_id NOT IN (
+    SELECT id FROM feed_items
+);
+
+-- Now add unique constraint on subscription_id and external_id to prevent duplicate feed items
 CREATE UNIQUE INDEX idx_feed_items_subscription_external ON feed_items(subscription_id, external_id);
 
 -- Add index for performance on subscription_id and published_at
