@@ -152,6 +152,19 @@ export class MockSubscriptionRepository implements SubscriptionRepository {
     })
   }
 
+  async updateSubscription(id: string, updates: Partial<Pick<Subscription, 'totalEpisodes'>>): Promise<Subscription> {
+    const subscriptionIndex = this.subscriptions.findIndex(s => s.id === id)
+    if (subscriptionIndex === -1) {
+      throw new Error('Subscription not found')
+    }
+    
+    this.subscriptions[subscriptionIndex] = {
+      ...this.subscriptions[subscriptionIndex],
+      ...updates
+    }
+    return this.subscriptions[subscriptionIndex]
+  }
+
   async getUserSubscriptions(userId: string): Promise<(UserSubscription & { subscription: Subscription })[]> {
     return this.userSubscriptions
       .filter(us => us.userId === userId)

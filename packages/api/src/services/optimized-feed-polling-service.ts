@@ -1,5 +1,5 @@
 import { SubscriptionRepository, FeedItemRepository, UserAccount, Subscription, FeedItem } from '@zine/shared'
-import { BatchProcessor } from './batch-processors/batch-processor.interface'
+import { BatchProcessor, BatchProcessorOptions } from './batch-processors/batch-processor.interface'
 import { SpotifyBatchProcessor } from './batch-processors/spotify-batch-processor'
 import { YouTubeBatchProcessor } from './batch-processors/youtube-batch-processor'
 import { BatchDatabaseOperations } from '../repositories/batch-operations'
@@ -37,12 +37,29 @@ export class OptimizedFeedPollingService {
   constructor(
     private subscriptionRepository: SubscriptionRepository,
     _feedItemRepository: FeedItemRepository,
-    d1Database: D1Database
+    d1Database: D1Database,
+    processorOptions?: {
+      spotify?: Partial<BatchProcessorOptions>
+      youtube?: Partial<BatchProcessorOptions>
+    }
   ) {
-    // Initialize batch processors
+    // Initialize batch processors with optional overrides
+    const spotifyProcessor = new SpotifyBatchProcessor()
+    const youtubeProcessor = new YouTubeBatchProcessor()
+    
+    // Apply any option overrides
+    if (processorOptions?.spotify) {
+      const defaultOpts = spotifyProcessor.getDefaultOptions()
+      spotifyProcessor.getDefaultOptions = () => ({ ...defaultOpts, ...processorOptions.spotify })
+    }
+    if (processorOptions?.youtube) {
+      const defaultOpts = youtubeProcessor.getDefaultOptions()
+      youtubeProcessor.getDefaultOptions = () => ({ ...defaultOpts, ...processorOptions.youtube })
+    }
+    
     this.batchProcessors = new Map<string, BatchProcessor>([
-      ['spotify', new SpotifyBatchProcessor()],
-      ['youtube', new YouTubeBatchProcessor()]
+      ['spotify', spotifyProcessor],
+      ['youtube', youtubeProcessor]
     ])
 
     // Initialize optimization components
@@ -118,6 +135,18 @@ export class OptimizedFeedPollingService {
             }
 
             resultsBySubscription.set(batchResult.subscriptionId, batchResult)
+
+            // Update totalEpisodes if provided (for Spotify optimization)
+            if (batchResult.totalEpisodes !== undefined) {
+              try {
+                await this.subscriptionRepository.updateSubscription(batchResult.subscriptionId, {
+                  totalEpisodes: batchResult.totalEpisodes
+                })
+                this.dbQueryCount++
+              } catch (error) {
+                console.error(`Failed to update totalEpisodes for subscription ${batchResult.subscriptionId}:`, error)
+              }
+            }
 
             // Filter items using cache first
             for (const item of batchResult.newItems) {

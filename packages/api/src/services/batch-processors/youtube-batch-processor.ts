@@ -227,7 +227,7 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
   getDefaultOptions(): BatchProcessorOptions {
     return {
       maxBatchSize: 50, // YouTube's limit for batch channel/video fetching
-      maxConcurrency: 5, // Lower concurrency to respect rate limits
+      maxConcurrency: 1, // Reduced from 5 to stay under Cloudflare's 50 subrequest limit (2 API calls per channel)
       retryAttempts: 3,
       retryDelay: 1000
     }

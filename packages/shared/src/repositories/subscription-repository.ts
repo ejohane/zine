@@ -26,6 +26,7 @@ export interface Subscription {
   description?: string
   thumbnailUrl?: string
   subscriptionUrl?: string
+  totalEpisodes?: number
   createdAt: Date
 }
 
@@ -58,6 +59,7 @@ export interface SubscriptionRepository {
   getSubscriptionsByProvider(providerId: string): Promise<Subscription[]>
   createSubscription(subscription: Omit<Subscription, 'createdAt'>): Promise<Subscription>
   findOrCreateSubscription(subscription: Omit<Subscription, 'id' | 'createdAt'>): Promise<Subscription>
+  updateSubscription(id: string, updates: Partial<Pick<Subscription, 'totalEpisodes'>>): Promise<Subscription>
 
   // User subscription operations
   getUserSubscriptions(userId: string): Promise<(UserSubscription & { subscription: Subscription })[]>
