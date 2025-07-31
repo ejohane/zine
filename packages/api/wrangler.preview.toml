@@ -1,0 +1,34 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "zine-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-05"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+ENVIRONMENT = "development"
+
+# Cron triggers are disabled for preview deployments to avoid exceeding account limits
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-db2"
+database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
+
+[env.production]
+name = "zine-api-production"
+route = "api.myzine.app/*"
+
+# Cache configuration for API responses
+[env.production.placement]
+mode = "smart"
+
+[env.production.vars]
+ENVIRONMENT = "production"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "zine-db-production"
+database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
