@@ -1,6 +1,6 @@
 import { SubscriptionRepository, UserAccount } from '@zine/shared'
 import { SpotifyAPI } from '../external/spotify-api'
-import { YouTubeAPI } from '../external/youtube-api'
+import { YouTubeAPI, YouTubeChannel } from '../external/youtube-api'
 
 export interface DiscoveredSubscription {
   externalId: string
@@ -11,6 +11,7 @@ export interface DiscoveredSubscription {
   subscriptionUrl?: string
   provider: 'spotify' | 'youtube'
   isUserSubscribed: boolean // Whether user has selected this subscription in Zine
+  totalEpisodes?: number // Total episodes/videos count for optimization
 }
 
 export interface DiscoveryResult {
@@ -75,7 +76,8 @@ export class SubscriptionDiscoveryService {
       thumbnailUrl: show.images?.[0]?.url,
       subscriptionUrl: show.external_urls?.spotify,
       provider: 'spotify' as const,
-      isUserSubscribed: userSubscriptionIds.has(show.id)
+      isUserSubscribed: userSubscriptionIds.has(show.id),
+      totalEpisodes: show.total_episodes
     }))
 
     return {
@@ -104,7 +106,22 @@ export class SubscriptionDiscoveryService {
     const userSubscriptions = await this.subscriptionRepository.getUserSubscriptionsByProvider(userId, 'youtube')
     const userSubscriptionIds = new Set(userSubscriptions.map(us => us.subscription.externalId))
 
-    // Convert YouTube subscriptions to our format
+    // Extract channel IDs and fetch channel details in batches to get video counts
+    const channelIds = youtubeSubscriptions.map(sub => sub.snippet.resourceId.channelId)
+    const channelDetails = new Map<string, number>()
+    
+    // Fetch channel details in batches of 50 (YouTube's limit)
+    for (let i = 0; i < channelIds.length; i += 50) {
+      const batch = channelIds.slice(i, i + 50)
+      const channels = await this.getMultipleChannels(youtubeAPI, batch)
+      
+      for (const channel of channels) {
+        const videoCount = parseInt(channel.statistics?.videoCount || '0', 10)
+        channelDetails.set(channel.id, videoCount)
+      }
+    }
+
+    // Convert YouTube subscriptions to our format with video counts
     const discoveredSubscriptions: DiscoveredSubscription[] = youtubeSubscriptions.map(sub => ({
       externalId: sub.snippet.resourceId.channelId,
       title: sub.snippet.title,
@@ -113,7 +130,8 @@ export class SubscriptionDiscoveryService {
       thumbnailUrl: sub.snippet.thumbnails?.medium?.url || sub.snippet.thumbnails?.default?.url,
       subscriptionUrl: `https://youtube.com/channel/${sub.snippet.resourceId.channelId}`,
       provider: 'youtube' as const,
-      isUserSubscribed: userSubscriptionIds.has(sub.snippet.resourceId.channelId)
+      isUserSubscribed: userSubscriptionIds.has(sub.snippet.resourceId.channelId),
+      totalEpisodes: channelDetails.get(sub.snippet.resourceId.channelId) || 0
     }))
 
     return {
@@ -121,6 +139,33 @@ export class SubscriptionDiscoveryService {
       subscriptions: discoveredSubscriptions,
       totalFound: youtubeSubscriptions.length
     }
+  }
+
+  private async getMultipleChannels(api: YouTubeAPI, channelIds: string[]): Promise<YouTubeChannel[]> {
+    // YouTube's channels endpoint supports batch fetching
+    const baseUrl = 'https://www.googleapis.com/youtube/v3'
+    const params = new URLSearchParams({
+      part: 'snippet,statistics',
+      id: channelIds.join(',')
+    })
+
+    const response = await fetch(
+      `${baseUrl}/channels?${params.toString()}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${api.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`YouTube API error: ${response.status} ${error}`)
+    }
+
+    const data = await response.json() as { items: YouTubeChannel[] }
+    return data.items
   }
 
   async updateUserSubscriptions(
@@ -134,6 +179,7 @@ export class SubscriptionDiscoveryService {
       thumbnailUrl?: string
       subscriptionUrl?: string
       selected: boolean
+      totalEpisodes?: number
     }>
   ): Promise<{ added: number; removed: number }> {
     let added = 0
@@ -148,7 +194,8 @@ export class SubscriptionDiscoveryService {
         creatorName: choice.creatorName,
         description: choice.description,
         thumbnailUrl: choice.thumbnailUrl,
-        subscriptionUrl: choice.subscriptionUrl
+        subscriptionUrl: choice.subscriptionUrl,
+        totalEpisodes: choice.totalEpisodes
       })
 
       // Check if user already has this subscription
