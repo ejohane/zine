@@ -105,7 +105,7 @@ jobs:
             echo "::error::Deployment failed"
             exit 1
           fi
-          URL=$(echo "$OUTPUT" | grep -o 'https://[^ ]*' | tail -1)
+          URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
           if [ -z "$URL" ]; then
             echo "::error::Could not extract deployment URL from wrangler output"
             echo "::debug::Wrangler output: $OUTPUT"
@@ -215,7 +215,7 @@ jobs:
             echo "::error::Deployment failed"
             exit 1
           fi
-          URL=$(echo "$OUTPUT" | grep -o 'https://[^ ]*' | tail -1)
+          URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
           if [ -z "$URL" ]; then
             echo "::error::Could not extract deployment URL from wrangler output"
             echo "::debug::Wrangler output: $OUTPUT"
