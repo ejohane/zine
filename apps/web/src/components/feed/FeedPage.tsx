@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '../auth/ProtectedRoute'
 import { SubscriptionAvatars } from './SubscriptionAvatars'
 import { FeedItemList } from './FeedItemList'
@@ -13,6 +13,7 @@ interface FeedPageProps {
 
 export function FeedPage({ subscriptionId }: FeedPageProps) {
   const [showUnreadOnly, setShowUnreadOnly] = useState(true)
+  const navigate = useNavigate()
   
   const {
     feedItems,
@@ -36,15 +37,12 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
   })
 
   const handleSubscriptionSelect = (selectedId: string | null) => {
-    // This would typically navigate to the new route
-    // For now, we'll just update the URL if needed
+    // Navigate to the appropriate route
     if (selectedId) {
-      window.history.pushState({}, '', `/feed/${selectedId}`)
+      navigate({ to: '/feed/$subscriptionId', params: { subscriptionId: selectedId } })
     } else {
-      window.history.pushState({}, '', '/feed')
+      navigate({ to: '/feed' })
     }
-    // Force a page reload to update the route
-    window.location.reload()
   }
 
   // Error state
@@ -188,7 +186,7 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
               : "Your subscriptions haven't posted any new content yet."
           }
           emptyActionText="Manage Subscriptions"
-          onEmptyAction={() => window.location.href = '/subscriptions'}
+          onEmptyAction={() => navigate({ to: '/subscriptions' })}
         />
 
         {/* Loading overlay for subscription avatars */}
