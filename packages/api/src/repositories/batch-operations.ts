@@ -83,10 +83,10 @@ export class BatchDatabaseOperations {
           title: feedItem.title,
           description: feedItem.description || null,
           thumbnailUrl: feedItem.thumbnailUrl || null,
-          publishedAt: feedItem.publishedAt,
+          publishedAt: feedItem.publishedAt.getTime(),
           durationSeconds: feedItem.durationSeconds || null,
           externalUrl: feedItem.externalUrl,
-          createdAt: now
+          createdAt: now.getTime()
         })
       }
     }
@@ -108,7 +108,7 @@ export class BatchDatabaseOperations {
             }))
           )
           return Array.from(recheckMap.values()).filter(item => 
-            item.createdAt.getTime() > now.getTime() - 1000
+            new Date(item.createdAt).getTime() > now.getTime() - 1000
           )
         }
         throw error
@@ -176,7 +176,7 @@ export class BatchDatabaseOperations {
             isRead: false,
             bookmarkId: null,
             readAt: null,
-            createdAt: now
+            createdAt: now.getTime()
           })
         }
       }
@@ -222,7 +222,7 @@ export class BatchDatabaseOperations {
       .from(schema.feedItems)
       .where(and(
         inArray(schema.feedItems.subscriptionId, subscriptionIds),
-        sql`${schema.feedItems.publishedAt} > ${cutoffTime}`
+        sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
       ))
 
     // Group by subscription ID
