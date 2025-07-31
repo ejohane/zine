@@ -9,6 +9,7 @@ export interface BatchProcessorResult {
   subscriptionTitle: string
   newItems: FeedItem[]
   error?: string
+  totalEpisodes?: number // Updated total episodes count from provider
 }
 
 export interface BatchProcessorOptions {

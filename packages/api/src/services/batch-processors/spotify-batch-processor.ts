@@ -91,9 +91,22 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
 
     console.log(`[SpotifyBatchProcessor] Fetched metadata for ${allShows.length} shows`)
 
-    // Now fetch episodes for each show with concurrency control
+    // Filter shows that have new episodes by comparing total_episodes
+    const showsWithChanges = allShows.filter(show => {
+      const subscription = subscriptionsByExternalId.get(show.id)
+      if (!subscription || subscription.totalEpisodes === undefined) {
+        // If we don't have a previous count, we need to check
+        return true
+      }
+      // Only check shows where total_episodes has increased
+      return show.total_episodes > subscription.totalEpisodes
+    })
+
+    console.log(`[SpotifyBatchProcessor] ${showsWithChanges.length} shows have new episodes (out of ${allShows.length})`)
+
+    // Now fetch episodes only for shows with changes
     const showsWithEpisodes = await this.processWithConcurrency(
-      allShows,
+      showsWithChanges,
       async (show) => {
         progressTracker.taskStarted(show.id, { showName: show.name })
         
@@ -123,7 +136,7 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     reporter.printSummary()
 
     // Convert to results
-    return this.convertToResults(showsWithEpisodes, subscriptionsByExternalId)
+    return this.convertToResults(showsWithEpisodes, allShows, subscriptionsByExternalId)
   }
 
   private async getMultipleShows(api: SpotifyAPI, showIds: string[]): Promise<SpotifyShow[]> {
@@ -157,10 +170,13 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
 
   private convertToResults(
     showsWithEpisodes: ShowWithEpisodes[],
+    allShows: SpotifyShow[],
     subscriptionsByExternalId: Map<string, Subscription>
   ): BatchProcessorResult[] {
     const results: BatchProcessorResult[] = []
+    const processedSubscriptionIds = new Set<string>()
 
+    // First, add results for shows where we fetched episodes
     for (const { show, episodes } of showsWithEpisodes) {
       const subscription = subscriptionsByExternalId.get(show.id)
       if (!subscription) continue
@@ -181,13 +197,29 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
       results.push({
         subscriptionId: subscription.id,
         subscriptionTitle: subscription.title,
-        newItems
+        newItems,
+        totalEpisodes: show.total_episodes
       })
+      processedSubscriptionIds.add(subscription.id)
+    }
+
+    // Add results for shows that haven't changed (still need to update totalEpisodes)
+    for (const show of allShows) {
+      const subscription = subscriptionsByExternalId.get(show.id)
+      if (!subscription || processedSubscriptionIds.has(subscription.id)) continue
+
+      results.push({
+        subscriptionId: subscription.id,
+        subscriptionTitle: subscription.title,
+        newItems: [],
+        totalEpisodes: show.total_episodes
+      })
+      processedSubscriptionIds.add(subscription.id)
     }
 
     // Add results for subscriptions that had errors or no shows found
     for (const subscription of subscriptionsByExternalId.values()) {
-      if (!results.find(r => r.subscriptionId === subscription.id)) {
+      if (!processedSubscriptionIds.has(subscription.id)) {
         results.push({
           subscriptionId: subscription.id,
           subscriptionTitle: subscription.title,
@@ -203,7 +235,7 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
   getDefaultOptions(): BatchProcessorOptions {
     return {
       maxBatchSize: 50, // Spotify's limit for batch show fetching
-      maxConcurrency: 10, // Higher concurrency for episode fetching
+      maxConcurrency: 5, // Optimized: fewer shows need episode fetching with total_episodes check
       retryAttempts: 3,
       retryDelay: 1000
     }

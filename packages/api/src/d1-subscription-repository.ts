@@ -398,6 +398,20 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
     return this.createSubscription({ ...subscription, id })
   }
 
+  async updateSubscription(id: string, updates: Partial<Pick<Subscription, 'totalEpisodes'>>): Promise<Subscription> {
+    await this.db
+      .update(schema.subscriptions)
+      .set(updates)
+      .where(eq(schema.subscriptions.id, id))
+    
+    const updated = await this.getSubscription(id)
+    if (!updated) {
+      throw new Error(`Subscription ${id} not found after update`)
+    }
+    
+    return updated
+  }
+
   async getUserSubscriptions(userId: string): Promise<(UserSubscription & { subscription: Subscription })[]> {
     const userSubs = await this.db
       .select({
