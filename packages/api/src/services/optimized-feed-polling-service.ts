@@ -251,7 +251,7 @@ export class OptimizedFeedPollingService {
         this.dbQueryCount++
         
         let totalCachedItems = 0
-        for (const [subId, itemIds] of recentItems) {
+        for (const [_subId, itemIds] of recentItems) {
           totalCachedItems += itemIds.size
         }
         
