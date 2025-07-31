@@ -651,6 +651,8 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
+    console.log(`Mark as read request for itemId: ${itemId} by userId: ${auth.userId}`)
+    
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as read
@@ -658,7 +660,23 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
       id: auth.userId
     })
     
-    await feedItemRepository.markAsRead(auth.userId, itemId)
+    // Extract the actual feedItemId from the userFeedItemId if needed
+    // The itemId might be in format: userId-feedItemId-timestamp
+    let feedItemId = itemId
+    
+    // Check if this looks like a userFeedItemId (contains userId prefix)
+    if (itemId.startsWith(auth.userId + '-')) {
+      // Extract the feedItemId part (everything after userId- and before the last timestamp)
+      const parts = itemId.substring(auth.userId.length + 1).split('-')
+      if (parts.length >= 3) {
+        // Remove the last part (timestamp) and rejoin
+        parts.pop() // Remove timestamp
+        feedItemId = parts.join('-')
+        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+      }
+    }
+    
+    await feedItemRepository.markAsRead(auth.userId, feedItemId)
     
     return c.json({ message: 'Item marked as read' })
   } catch (error) {
@@ -672,6 +690,8 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
     
+    console.log(`Mark as unread request for itemId: ${itemId} by userId: ${auth.userId}`)
+    
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as unread
@@ -679,7 +699,23 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
       id: auth.userId
     })
     
-    await feedItemRepository.markAsUnread(auth.userId, itemId)
+    // Extract the actual feedItemId from the userFeedItemId if needed
+    // The itemId might be in format: userId-feedItemId-timestamp
+    let feedItemId = itemId
+    
+    // Check if this looks like a userFeedItemId (contains userId prefix)
+    if (itemId.startsWith(auth.userId + '-')) {
+      // Extract the feedItemId part (everything after userId- and before the last timestamp)
+      const parts = itemId.substring(auth.userId.length + 1).split('-')
+      if (parts.length >= 3) {
+        // Remove the last part (timestamp) and rejoin
+        parts.pop() // Remove timestamp
+        feedItemId = parts.join('-')
+        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+      }
+    }
+    
+    await feedItemRepository.markAsUnread(auth.userId, feedItemId)
     
     return c.json({ message: 'Item marked as unread' })
   } catch (error) {
