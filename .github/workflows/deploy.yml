@@ -100,7 +100,7 @@ jobs:
         id: api_preview_deploy
         run: |
           set -e
-          OUTPUT=$(bunx wrangler deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1 | tee /dev/tty)
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
           if [ $? -ne 0 ]; then
             echo "::error::Deployment failed"
             exit 1
@@ -210,7 +210,7 @@ jobs:
         id: web_preview_deploy
         run: |
           set -e
-          OUTPUT=$(bunx wrangler deploy --name ${{ env.WEB_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1 | tee /dev/tty)
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.WEB_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
           if [ $? -ne 0 ]; then
             echo "::error::Deployment failed"
             exit 1
