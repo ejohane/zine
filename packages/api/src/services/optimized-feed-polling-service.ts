@@ -220,6 +220,7 @@ export class OptimizedFeedPollingService {
       }
     } catch (error) {
       console.error('[OptimizedFeedPolling] Fatal error during polling:', error)
+      console.error('[OptimizedFeedPolling] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       globalErrors.push(`Fatal error: ${error instanceof Error ? error.message : String(error)}`)
       
       return {
@@ -236,17 +237,36 @@ export class OptimizedFeedPollingService {
   private async warmCacheForSubscriptions(subscriptionsByProvider: Map<string, Subscription[]>): Promise<void> {
     const allSubscriptionIds: string[] = []
     
-    for (const subscriptions of subscriptionsByProvider.values()) {
-      allSubscriptionIds.push(...subscriptions.map(s => s.id))
+    for (const [provider, subscriptions] of subscriptionsByProvider.entries()) {
+      const ids = subscriptions.map(s => s.id)
+      allSubscriptionIds.push(...ids)
+      console.log(`[OptimizedFeedPolling] Provider ${provider}: ${ids.length} subscription IDs`)
     }
 
     if (allSubscriptionIds.length > 0) {
-      console.log(`[OptimizedFeedPolling] Warming cache for ${allSubscriptionIds.length} subscriptions`)
-      const recentItems = await this.batchOps.getRecentFeedItemIds(allSubscriptionIds, 24)
-      this.dbQueryCount++
+      console.log(`[OptimizedFeedPolling] Warming cache for ${allSubscriptionIds.length} total subscriptions`)
       
-      this.deduplicationCache.warmCache(recentItems)
-      console.log(`[OptimizedFeedPolling] Cache warmed with recent items`)
+      try {
+        const recentItems = await this.batchOps.getRecentFeedItemIds(allSubscriptionIds, 24)
+        this.dbQueryCount++
+        
+        let totalCachedItems = 0
+        for (const [subId, itemIds] of recentItems) {
+          totalCachedItems += itemIds.size
+        }
+        
+        this.deduplicationCache.warmCache(recentItems)
+        console.log(`[OptimizedFeedPolling] Cache warmed with ${totalCachedItems} recent items from ${recentItems.size} subscriptions`)
+      } catch (error) {
+        console.error(`[OptimizedFeedPolling] Cache warming failed:`, error)
+        console.error(`[OptimizedFeedPolling] Error details:`, {
+          totalSubscriptions: allSubscriptionIds.length,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined
+        })
+        // Don't fail the entire polling operation if cache warming fails
+        console.warn(`[OptimizedFeedPolling] Continuing without cache warming due to error`)
+      }
     }
   }
 

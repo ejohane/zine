@@ -14,8 +14,9 @@ export class BatchDatabaseOperations {
   // We need to account for the number of variables per item
   private static readonly SQLITE_MAX_VARIABLES = 999
   private static readonly VARIABLES_PER_FEED_ITEM = 9 // Number of columns in feed_items insert
-  private static readonly VARIABLES_PER_USER_FEED_ITEM = 6 // Number of columns in user_feed_items insert
+  private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
   private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
+  private static readonly SAFETY_BUFFER = 10 // Safety buffer to ensure we never exceed the limit
 
   constructor(d1Database: D1Database) {
     this.db = drizzle(d1Database, { schema })
@@ -30,39 +31,60 @@ export class BatchDatabaseOperations {
   ): Promise<Map<string, FeedItem>> {
     if (items.length === 0) return new Map()
 
+    console.log(`[BatchOps:checkExistingFeedItems] Checking ${items.length} items for existence`)
     const existingMap = new Map<string, FeedItem>()
     
     // Calculate max items per chunk based on variables per condition
     const maxItemsPerChunk = Math.floor(
-      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
       BatchDatabaseOperations.VARIABLES_PER_CONDITION
     )
+    
+    console.log(`[BatchOps:checkExistingFeedItems] Max items per chunk: ${maxItemsPerChunk} (${BatchDatabaseOperations.VARIABLES_PER_CONDITION} variables per item)`)
     
     // Process in chunks to avoid SQLite variable limit
     for (let i = 0; i < items.length; i += maxItemsPerChunk) {
       const chunk = items.slice(i, i + maxItemsPerChunk)
+      const chunkNum = Math.floor(i / maxItemsPerChunk) + 1
+      const totalChunks = Math.ceil(items.length / maxItemsPerChunk)
       
-      // Create conditions for this chunk
-      const conditions = chunk.map(item => 
-        and(
-          eq(schema.feedItems.subscriptionId, item.subscriptionId),
-          eq(schema.feedItems.externalId, item.externalId)
+      console.log(`[BatchOps:checkExistingFeedItems] Processing chunk ${chunkNum}/${totalChunks} with ${chunk.length} items`)
+      
+      try {
+        // Create conditions for this chunk
+        const conditions = chunk.map(item => 
+          and(
+            eq(schema.feedItems.subscriptionId, item.subscriptionId),
+            eq(schema.feedItems.externalId, item.externalId)
+          )
         )
-      )
-      
-      // Query this chunk
-      const existingItems = await this.db
-        .select()
-        .from(schema.feedItems)
-        .where(or(...conditions))
-      
-      // Add to map
-      for (const item of existingItems) {
-        const key = `${item.subscriptionId}-${item.externalId}`
-        existingMap.set(key, this.mapFeedItem(item))
+        
+        // Query this chunk
+        const existingItems = await this.db
+          .select()
+          .from(schema.feedItems)
+          .where(or(...conditions))
+        
+        console.log(`[BatchOps:checkExistingFeedItems] Chunk ${chunkNum} found ${existingItems.length} existing items`)
+        
+        // Add to map
+        for (const item of existingItems) {
+          const key = `${item.subscriptionId}-${item.externalId}`
+          existingMap.set(key, this.mapFeedItem(item))
+        }
+      } catch (error) {
+        console.error(`[BatchOps:checkExistingFeedItems] Error processing chunk ${chunkNum}:`, error)
+        console.error(`[BatchOps:checkExistingFeedItems] Chunk details:`, {
+          chunkSize: chunk.length,
+          variablesUsed: chunk.length * BatchDatabaseOperations.VARIABLES_PER_CONDITION,
+          maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES,
+          errorMessage: error instanceof Error ? error.message : String(error)
+        })
+        throw error
       }
     }
 
+    console.log(`[BatchOps:checkExistingFeedItems] Completed. Found ${existingMap.size} existing items`)
     return existingMap
   }
 
@@ -112,7 +134,7 @@ export class BatchDatabaseOperations {
 
     // Calculate max items per insert based on variables per item
     const maxItemsPerInsert = Math.floor(
-      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
       BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM
     )
 
@@ -124,8 +146,23 @@ export class BatchDatabaseOperations {
         // Insert in chunks to avoid SQLite variable limit
         for (let i = 0; i < itemsToInsert.length; i += maxItemsPerInsert) {
           const chunk = itemsToInsert.slice(i, i + maxItemsPerInsert)
-          await this.db.insert(schema.feedItems).values(chunk)
-          totalInserted += chunk.length
+          const chunkNum = Math.floor(i / maxItemsPerInsert) + 1
+          const totalChunks = Math.ceil(itemsToInsert.length / maxItemsPerInsert)
+          
+          console.log(`[BatchOps:batchInsertFeedItems] Inserting chunk ${chunkNum}/${totalChunks} with ${chunk.length} items (max per chunk: ${maxItemsPerInsert})`)
+          
+          try {
+            await this.db.insert(schema.feedItems).values(chunk)
+            totalInserted += chunk.length
+          } catch (error) {
+            console.error(`[BatchOps:batchInsertFeedItems] Error inserting chunk ${chunkNum}:`, error)
+            console.error(`[BatchOps:batchInsertFeedItems] Chunk details:`, {
+              chunkSize: chunk.length,
+              variablesUsed: chunk.length * BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM,
+              maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES
+            })
+            throw error
+          }
         }
         
         console.log(`[BatchOps] Inserted ${totalInserted} new feed items in ${Math.ceil(itemsToInsert.length / maxItemsPerInsert)} chunks`)
@@ -232,7 +269,7 @@ export class BatchDatabaseOperations {
 
     // Calculate max items per insert based on variables per item
     const maxItemsPerInsert = Math.floor(
-      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
       BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM
     )
 
@@ -244,8 +281,23 @@ export class BatchDatabaseOperations {
         // Insert in chunks to avoid SQLite variable limit
         for (let i = 0; i < userFeedItemsToInsert.length; i += maxItemsPerInsert) {
           const chunk = userFeedItemsToInsert.slice(i, i + maxItemsPerInsert)
-          await this.db.insert(schema.userFeedItems).values(chunk)
-          totalInserted += chunk.length
+          const chunkNum = Math.floor(i / maxItemsPerInsert) + 1
+          const totalChunks = Math.ceil(userFeedItemsToInsert.length / maxItemsPerInsert)
+          
+          console.log(`[BatchOps:batchCreateUserFeedItems] Inserting chunk ${chunkNum}/${totalChunks} with ${chunk.length} items (max per chunk: ${maxItemsPerInsert})`)
+          
+          try {
+            await this.db.insert(schema.userFeedItems).values(chunk)
+            totalInserted += chunk.length
+          } catch (error) {
+            console.error(`[BatchOps:batchCreateUserFeedItems] Error inserting chunk ${chunkNum}:`, error)
+            console.error(`[BatchOps:batchCreateUserFeedItems] Chunk details:`, {
+              chunkSize: chunk.length,
+              variablesUsed: chunk.length * BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM,
+              maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES
+            })
+            throw error
+          }
         }
         
         console.log(`[BatchOps] Created ${totalInserted} user feed items in ${Math.ceil(userFeedItemsToInsert.length / maxItemsPerInsert)} chunks`)
@@ -274,35 +326,59 @@ export class BatchDatabaseOperations {
   ): Promise<Map<string, Set<string>>> {
     if (subscriptionIds.length === 0) return new Map()
 
+    console.log(`[BatchOps:getRecentFeedItemIds] Starting with ${subscriptionIds.length} subscription IDs`)
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000)
     const resultMap = new Map<string, Set<string>>()
     
     // Process subscription IDs in chunks to avoid SQLite variable limit
-    const maxIdsPerChunk = Math.floor(BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 2) // Account for cutoffTime variable
+    // Each subscription ID is 1 variable, plus 1 for the cutoff time
+    // SQLite limit is 999, but we use a conservative approach
+    const maxIdsPerChunk = 900 // Conservative limit to avoid edge cases
+    
+    console.log(`[BatchOps:getRecentFeedItemIds] Max IDs per chunk: ${maxIdsPerChunk}`)
+    console.log(`[BatchOps:getRecentFeedItemIds] Total chunks needed: ${Math.ceil(subscriptionIds.length / maxIdsPerChunk)}`)
     
     for (let i = 0; i < subscriptionIds.length; i += maxIdsPerChunk) {
       const chunk = subscriptionIds.slice(i, i + maxIdsPerChunk)
+      const chunkNum = Math.floor(i / maxIdsPerChunk) + 1
+      const totalChunks = Math.ceil(subscriptionIds.length / maxIdsPerChunk)
       
-      const recentItems = await this.db
-        .select({
-          subscriptionId: schema.feedItems.subscriptionId,
-          externalId: schema.feedItems.externalId
-        })
-        .from(schema.feedItems)
-        .where(and(
-          inArray(schema.feedItems.subscriptionId, chunk),
-          sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
-        ))
+      console.log(`[BatchOps:getRecentFeedItemIds] Processing chunk ${chunkNum}/${totalChunks} with ${chunk.length} subscription IDs`)
       
-      // Group by subscription ID
-      for (const item of recentItems) {
-        if (!resultMap.has(item.subscriptionId)) {
-          resultMap.set(item.subscriptionId, new Set())
+      try {
+        const recentItems = await this.db
+          .select({
+            subscriptionId: schema.feedItems.subscriptionId,
+            externalId: schema.feedItems.externalId
+          })
+          .from(schema.feedItems)
+          .where(and(
+            inArray(schema.feedItems.subscriptionId, chunk),
+            sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
+          ))
+        
+        console.log(`[BatchOps:getRecentFeedItemIds] Chunk ${chunkNum} returned ${recentItems.length} items`)
+        
+        // Group by subscription ID
+        for (const item of recentItems) {
+          if (!resultMap.has(item.subscriptionId)) {
+            resultMap.set(item.subscriptionId, new Set())
+          }
+          resultMap.get(item.subscriptionId)!.add(item.externalId)
         }
-        resultMap.get(item.subscriptionId)!.add(item.externalId)
+      } catch (error) {
+        console.error(`[BatchOps:getRecentFeedItemIds] Error processing chunk ${chunkNum}:`, error)
+        console.error(`[BatchOps:getRecentFeedItemIds] Chunk details:`, {
+          chunkSize: chunk.length,
+          firstId: chunk[0],
+          lastId: chunk[chunk.length - 1],
+          errorMessage: error instanceof Error ? error.message : String(error)
+        })
+        throw error
       }
     }
 
+    console.log(`[BatchOps:getRecentFeedItemIds] Completed. Found items for ${resultMap.size} subscriptions`)
     return resultMap
   }
 
