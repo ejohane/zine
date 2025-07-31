@@ -177,7 +177,10 @@ jobs:
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'
-        run: bun run build
+        run: |
+          echo "VITE_CLERK_PUBLISHABLE_KEY_DEV=$VITE_CLERK_PUBLISHABLE_KEY_DEV" > .env
+          echo "VITE_API_URL=https://zine-api-${{ steps.branch-name.outputs.current-branch }}.zine-dev.workers.dev" >> .env
+          bunx dotenv-cli -e .env -- bun run build
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_DEV: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
