@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, inArray, sql } from 'drizzle-orm'
+import { eq, and, inArray, sql, or } from 'drizzle-orm'
 import * as schema from '../schema'
 import { FeedItem } from '@zine/shared'
 
@@ -9,6 +9,13 @@ import { FeedItem } from '@zine/shared'
  */
 export class BatchDatabaseOperations {
   private db: ReturnType<typeof drizzle>
+  
+  // SQLite has a limit of 999 variables per query
+  // We need to account for the number of variables per item
+  private static readonly SQLITE_MAX_VARIABLES = 999
+  private static readonly VARIABLES_PER_FEED_ITEM = 9 // Number of columns in feed_items insert
+  private static readonly VARIABLES_PER_USER_FEED_ITEM = 6 // Number of columns in user_feed_items insert
+  private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
 
   constructor(d1Database: D1Database) {
     this.db = drizzle(d1Database, { schema })
@@ -23,25 +30,37 @@ export class BatchDatabaseOperations {
   ): Promise<Map<string, FeedItem>> {
     if (items.length === 0) return new Map()
 
-    // Create unique key combinations for the query
-    const conditions = items.map(item => 
-      and(
-        eq(schema.feedItems.subscriptionId, item.subscriptionId),
-        eq(schema.feedItems.externalId, item.externalId)
-      )
-    )
-
-    // Query all existing items in a single operation
-    const existingItems = await this.db
-      .select()
-      .from(schema.feedItems)
-      .where(sql`${conditions.map((c, i) => i === 0 ? c : sql` OR ${c}`).reduce((acc, curr) => sql`${acc}${curr}`)}`)
-
-    // Create map for O(1) lookups
     const existingMap = new Map<string, FeedItem>()
-    for (const item of existingItems) {
-      const key = `${item.subscriptionId}-${item.externalId}`
-      existingMap.set(key, this.mapFeedItem(item))
+    
+    // Calculate max items per chunk based on variables per condition
+    const maxItemsPerChunk = Math.floor(
+      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      BatchDatabaseOperations.VARIABLES_PER_CONDITION
+    )
+    
+    // Process in chunks to avoid SQLite variable limit
+    for (let i = 0; i < items.length; i += maxItemsPerChunk) {
+      const chunk = items.slice(i, i + maxItemsPerChunk)
+      
+      // Create conditions for this chunk
+      const conditions = chunk.map(item => 
+        and(
+          eq(schema.feedItems.subscriptionId, item.subscriptionId),
+          eq(schema.feedItems.externalId, item.externalId)
+        )
+      )
+      
+      // Query this chunk
+      const existingItems = await this.db
+        .select()
+        .from(schema.feedItems)
+        .where(or(...conditions))
+      
+      // Add to map
+      for (const item of existingItems) {
+        const key = `${item.subscriptionId}-${item.externalId}`
+        existingMap.set(key, this.mapFeedItem(item))
+      }
     }
 
     return existingMap
@@ -91,11 +110,25 @@ export class BatchDatabaseOperations {
       }
     }
 
-    // Batch insert all new items
+    // Calculate max items per insert based on variables per item
+    const maxItemsPerInsert = Math.floor(
+      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM
+    )
+
+    // Batch insert all new items in chunks
     if (itemsToInsert.length > 0) {
       try {
-        await this.db.insert(schema.feedItems).values(itemsToInsert)
-        console.log(`[BatchOps] Inserted ${itemsToInsert.length} new feed items`)
+        let totalInserted = 0
+        
+        // Insert in chunks to avoid SQLite variable limit
+        for (let i = 0; i < itemsToInsert.length; i += maxItemsPerInsert) {
+          const chunk = itemsToInsert.slice(i, i + maxItemsPerInsert)
+          await this.db.insert(schema.feedItems).values(chunk)
+          totalInserted += chunk.length
+        }
+        
+        console.log(`[BatchOps] Inserted ${totalInserted} new feed items in ${Math.ceil(itemsToInsert.length / maxItemsPerInsert)} chunks`)
       } catch (error) {
         // Handle potential unique constraint violations gracefully
         if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
@@ -128,18 +161,33 @@ export class BatchDatabaseOperations {
   ): Promise<Set<string>> {
     if (userIds.length === 0 || feedItemIds.length === 0) return new Set()
 
-    const existingUserFeedItems = await this.db
-      .select()
-      .from(schema.userFeedItems)
-      .where(and(
-        inArray(schema.userFeedItems.userId, userIds),
-        inArray(schema.userFeedItems.feedItemId, feedItemIds)
-      ))
-
-    // Create set of existing IDs for O(1) lookups
     const existingIds = new Set<string>()
-    for (const item of existingUserFeedItems) {
-      existingIds.add(item.id)
+    
+    // SQLite inArray has limits, so we need to chunk
+    // Each item in the query uses 2 variables (userId, feedItemId)
+    const maxIdsPerChunk = Math.floor(BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 2)
+    
+    // Process user IDs in chunks
+    for (let i = 0; i < userIds.length; i += maxIdsPerChunk) {
+      const userChunk = userIds.slice(i, i + maxIdsPerChunk)
+      
+      // Process feed item IDs in chunks for each user chunk
+      for (let j = 0; j < feedItemIds.length; j += maxIdsPerChunk) {
+        const feedItemChunk = feedItemIds.slice(j, j + maxIdsPerChunk)
+        
+        const existingUserFeedItems = await this.db
+          .select()
+          .from(schema.userFeedItems)
+          .where(and(
+            inArray(schema.userFeedItems.userId, userChunk),
+            inArray(schema.userFeedItems.feedItemId, feedItemChunk)
+          ))
+        
+        // Add to set
+        for (const item of existingUserFeedItems) {
+          existingIds.add(item.id)
+        }
+      }
     }
 
     return existingIds
@@ -182,11 +230,25 @@ export class BatchDatabaseOperations {
       }
     }
 
-    // Batch insert all new user feed items
+    // Calculate max items per insert based on variables per item
+    const maxItemsPerInsert = Math.floor(
+      BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 
+      BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM
+    )
+
+    // Batch insert all new user feed items in chunks
     if (userFeedItemsToInsert.length > 0) {
       try {
-        await this.db.insert(schema.userFeedItems).values(userFeedItemsToInsert)
-        console.log(`[BatchOps] Created ${userFeedItemsToInsert.length} user feed items`)
+        let totalInserted = 0
+        
+        // Insert in chunks to avoid SQLite variable limit
+        for (let i = 0; i < userFeedItemsToInsert.length; i += maxItemsPerInsert) {
+          const chunk = userFeedItemsToInsert.slice(i, i + maxItemsPerInsert)
+          await this.db.insert(schema.userFeedItems).values(chunk)
+          totalInserted += chunk.length
+        }
+        
+        console.log(`[BatchOps] Created ${totalInserted} user feed items in ${Math.ceil(userFeedItemsToInsert.length / maxItemsPerInsert)} chunks`)
       } catch (error) {
         // Handle potential unique constraint violations
         if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
@@ -213,25 +275,32 @@ export class BatchDatabaseOperations {
     if (subscriptionIds.length === 0) return new Map()
 
     const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000)
-
-    const recentItems = await this.db
-      .select({
-        subscriptionId: schema.feedItems.subscriptionId,
-        externalId: schema.feedItems.externalId
-      })
-      .from(schema.feedItems)
-      .where(and(
-        inArray(schema.feedItems.subscriptionId, subscriptionIds),
-        sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
-      ))
-
-    // Group by subscription ID
     const resultMap = new Map<string, Set<string>>()
-    for (const item of recentItems) {
-      if (!resultMap.has(item.subscriptionId)) {
-        resultMap.set(item.subscriptionId, new Set())
+    
+    // Process subscription IDs in chunks to avoid SQLite variable limit
+    const maxIdsPerChunk = Math.floor(BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 2) // Account for cutoffTime variable
+    
+    for (let i = 0; i < subscriptionIds.length; i += maxIdsPerChunk) {
+      const chunk = subscriptionIds.slice(i, i + maxIdsPerChunk)
+      
+      const recentItems = await this.db
+        .select({
+          subscriptionId: schema.feedItems.subscriptionId,
+          externalId: schema.feedItems.externalId
+        })
+        .from(schema.feedItems)
+        .where(and(
+          inArray(schema.feedItems.subscriptionId, chunk),
+          sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
+        ))
+      
+      // Group by subscription ID
+      for (const item of recentItems) {
+        if (!resultMap.has(item.subscriptionId)) {
+          resultMap.set(item.subscriptionId, new Set())
+        }
+        resultMap.get(item.subscriptionId)!.add(item.externalId)
       }
-      resultMap.get(item.subscriptionId)!.add(item.externalId)
     }
 
     return resultMap
