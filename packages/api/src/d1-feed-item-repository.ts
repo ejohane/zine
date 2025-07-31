@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, desc, inArray } from 'drizzle-orm'
+import { eq, and, desc, inArray, or } from 'drizzle-orm'
 import * as schema from './schema'
 import { 
   FeedItemRepository,
@@ -7,6 +7,10 @@ import {
   UserFeedItem,
   FeedItemWithReadState
 } from '@zine/shared'
+
+// SQLite has a limit of 999 variables per query
+const SQLITE_MAX_VARIABLES = 999
+const VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert
 
 export class D1FeedItemRepository implements FeedItemRepository {
   private db: ReturnType<typeof drizzle>
@@ -84,8 +88,8 @@ export class D1FeedItemRepository implements FeedItemRepository {
   }
 
   async findOrCreateFeedItem(feedItem: Omit<FeedItem, 'id' | 'createdAt'>): Promise<FeedItem> {
-    // Try to find existing feed item
-    const existing = await this.db
+    // Check if feed item already exists
+    const existingItems = await this.db
       .select()
       .from(schema.feedItems)
       .where(and(
@@ -93,18 +97,18 @@ export class D1FeedItemRepository implements FeedItemRepository {
         eq(schema.feedItems.externalId, feedItem.externalId)
       ))
       .limit(1)
-
-    if (existing.length > 0) {
-      return this.mapFeedItem(existing[0])
+    
+    if (existingItems.length > 0) {
+      return this.mapFeedItem(existingItems[0])
     }
-
-    // Create new feed item
-    const id = `${feedItem.subscriptionId}-${feedItem.externalId}-${Date.now()}`
+    
+    // Create new feed item with deterministic ID
+    const id = `${feedItem.subscriptionId}-${feedItem.externalId}`
     return this.createFeedItem({ ...feedItem, id })
   }
 
   async getUserFeedItem(userId: string, feedItemId: string): Promise<UserFeedItem | null> {
-    const userFeedItems = await this.db
+    const results = await this.db
       .select()
       .from(schema.userFeedItems)
       .where(and(
@@ -113,15 +117,18 @@ export class D1FeedItemRepository implements FeedItemRepository {
       ))
       .limit(1)
     
-    return userFeedItems.length > 0 ? this.mapUserFeedItem(userFeedItems[0]) : null
+    return results.length > 0 ? this.mapUserFeedItem(results[0]) : null
   }
 
-  async getUserFeedItems(userId: string, options?: {
-    isRead?: boolean
-    subscriptionIds?: string[]
-    limit?: number
-    offset?: number
-  }): Promise<FeedItemWithReadState[]> {
+  async getUserFeedItems(
+    userId: string,
+    options?: {
+      isRead?: boolean
+      subscriptionIds?: string[]
+      limit?: number
+      offset?: number
+    }
+  ): Promise<FeedItemWithReadState[]> {
     let query = this.db
       .select({
         feedItem: schema.feedItems,
@@ -131,7 +138,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .leftJoin(
         schema.userFeedItems,
         and(
-          eq(schema.userFeedItems.feedItemId, schema.feedItems.id),
+          eq(schema.feedItems.id, schema.userFeedItems.feedItemId),
           eq(schema.userFeedItems.userId, userId)
         )
       )
@@ -147,8 +154,23 @@ export class D1FeedItemRepository implements FeedItemRepository {
       }
     }
 
+    // Handle subscription IDs with chunking to avoid SQLite variable limit
     if (options?.subscriptionIds && options.subscriptionIds.length > 0) {
-      conditions.push(inArray(schema.feedItems.subscriptionId, options.subscriptionIds))
+      const subscriptionConditions = []
+      const maxIdsPerChunk = Math.floor(SQLITE_MAX_VARIABLES / 2) // Conservative estimate
+      
+      // Process subscription IDs in chunks
+      for (let i = 0; i < options.subscriptionIds.length; i += maxIdsPerChunk) {
+        const chunk = options.subscriptionIds.slice(i, i + maxIdsPerChunk)
+        subscriptionConditions.push(inArray(schema.feedItems.subscriptionId, chunk))
+      }
+      
+      // Combine chunks with OR
+      if (subscriptionConditions.length === 1) {
+        conditions.push(subscriptionConditions[0])
+      } else {
+        conditions.push(or(...subscriptionConditions))
+      }
     }
 
     if (conditions.length > 0) {
@@ -338,7 +360,14 @@ export class D1FeedItemRepository implements FeedItemRepository {
       createdAt: now
     }))
 
-    await this.db.insert(schema.userFeedItems).values(newUserFeedItems)
+    // Calculate max items per insert based on variables per item
+    const maxItemsPerInsert = Math.floor(SQLITE_MAX_VARIABLES / VARIABLES_PER_USER_FEED_ITEM)
+    
+    // Insert in chunks to avoid SQLite variable limit
+    for (let i = 0; i < newUserFeedItems.length; i += maxItemsPerInsert) {
+      const chunk = newUserFeedItems.slice(i, i + maxItemsPerInsert)
+      await this.db.insert(schema.userFeedItems).values(chunk)
+    }
     
     return userFeedItems.map(userFeedItem => ({
       ...userFeedItem,
@@ -389,6 +418,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
   }
 
   async markAsUnread(userId: string, feedItemId: string): Promise<UserFeedItem> {
+    // First check if user feed item exists
     const existing = await this.getUserFeedItem(userId, feedItemId)
     
     if (existing) {
@@ -427,13 +457,14 @@ export class D1FeedItemRepository implements FeedItemRepository {
   }
 
   async addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number): Promise<UserFeedItem> {
+    // First check if user feed item exists
     const existing = await this.getUserFeedItem(userId, feedItemId)
     
     if (existing) {
       await this.db
         .update(schema.userFeedItems)
         .set({
-          bookmarkId
+          bookmarkId: bookmarkId
         })
         .where(and(
           eq(schema.userFeedItems.userId, userId),
@@ -445,6 +476,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
         bookmarkId
       }
     } else {
+      // Verify that the feed item exists before creating user feed item
+      const feedItem = await this.getFeedItem(feedItemId)
+      if (!feedItem) {
+        throw new Error(`Feed item ${feedItemId} not found`)
+      }
+      
       // Create new user feed item with bookmark
       const userFeedItemId = `${userId}-${feedItemId}-${Date.now()}`
       return this.createUserFeedItem({
@@ -493,25 +530,22 @@ export class D1FeedItemRepository implements FeedItemRepository {
       creatorName: row.creatorName,
       description: row.description || undefined,
       thumbnailUrl: row.thumbnailUrl || undefined,
-      subscriptionUrl: row.subscriptionUrl || undefined,
-      createdAt: new Date(row.createdAt)
+      subscriptionUrl: row.subscriptionUrl || undefined
     }
   }
 }
 
-// Additional types for feed UI
-export interface UserFeedItemWithDetails {
+// Type definitions for internal use
+interface UserFeedItemWithDetails {
   id: string
-  feedItem: FeedItem & {
-    subscription: any
-  }
+  feedItem: FeedItem & { subscription: any }
   isRead: boolean
   readAt?: Date
   bookmarkId?: number
   createdAt: Date
 }
 
-export interface SubscriptionWithUnreadCount {
+interface SubscriptionWithUnreadCount {
   subscription: any
   unreadCount: number
   lastUpdated: Date
