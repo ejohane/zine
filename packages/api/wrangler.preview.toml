@@ -1,0 +1,19 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "zine-api"
+main = "src/index.ts"
+compatibility_date = "2024-06-05"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+ENVIRONMENT = "development"
+
+# NO CRON TRIGGERS FOR PREVIEW DEPLOYMENTS
+# This prevents hitting the 5 cron trigger limit on Cloudflare Free plan
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-db2"
+database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
