@@ -101,7 +101,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
-          command: deploy --name ${{ env.API_PREVIEW_NAME }}
+          command: deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml
         id: preview_deploy
         
       - name: Comment Preview URL
