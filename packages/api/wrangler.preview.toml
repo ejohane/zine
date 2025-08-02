@@ -10,8 +10,7 @@ enabled = true
 [vars]
 ENVIRONMENT = "development"
 
-# NO CRON TRIGGERS FOR PREVIEW DEPLOYMENTS
-# This prevents hitting the 5 cron trigger limit on Cloudflare Free plan
+# Cron triggers are disabled for preview deployments to avoid exceeding account limits
 
 [[d1_databases]]
 binding = "DB"

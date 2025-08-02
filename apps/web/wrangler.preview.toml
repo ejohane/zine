@@ -1,0 +1,19 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "zine-web"
+main = "src/worker.ts"
+compatibility_date = "2024-06-05"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[build]
+command = "bun run build"
+
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+ENVIRONMENT = "preview"

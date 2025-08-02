@@ -97,20 +97,31 @@ jobs:
           
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: packages/api
-          command: deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml
-        id: preview_deploy
+        id: api_preview_deploy
+        run: |
+          set -e
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Deployment failed"
+            exit 1
+          fi
+          URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract deployment URL from wrangler output"
+            echo "::debug::Wrangler output: $OUTPUT"
+            exit 1
+          fi
+          echo "deployment-url=$URL" >> $GITHUB_OUTPUT
+        working-directory: packages/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         
       - name: Comment Preview URL
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.api_preview_deploy.outputs.deployment-url
         uses: actions/github-script@v7
         with:
           script: |
-            const sanitizedBranch = "${{ github.head_ref }}".replace(/[^a-zA-Z0-9-]/g, '-');
-            const deploymentUrl = `https://zine-api-${sanitizedBranch}.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev`;
+            const deploymentUrl = "${{ steps.api_preview_deploy.outputs.deployment-url }}";
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -166,7 +177,10 @@ jobs:
           
       - name: Build Web App (Preview)
         if: github.event_name == 'pull_request'
-        run: bun run build
+        run: |
+          echo "VITE_CLERK_PUBLISHABLE_KEY_DEV=$VITE_CLERK_PUBLISHABLE_KEY_DEV" > .env
+          echo "VITE_API_URL=https://zine-api-${{ steps.branch-name.outputs.current-branch }}.zine-dev.workers.dev" >> .env
+          bunx dotenv-cli -e .env -- bun run build
         working-directory: apps/web
         env:
           VITE_CLERK_PUBLISHABLE_KEY_DEV: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY_DEV }}
@@ -196,20 +210,31 @@ jobs:
           
       - name: Deploy Preview
         if: github.event_name == 'pull_request'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/web
-          command: deploy --name ${{ env.WEB_PREVIEW_NAME }}
         id: web_preview_deploy
+        run: |
+          set -e
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.WEB_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "::error::Deployment failed"
+            exit 1
+          fi
+          URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
+          if [ -z "$URL" ]; then
+            echo "::error::Could not extract deployment URL from wrangler output"
+            echo "::debug::Wrangler output: $OUTPUT"
+            exit 1
+          fi
+          echo "deployment-url=$URL" >> $GITHUB_OUTPUT
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         
       - name: Comment Preview URL
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.web_preview_deploy.outputs.deployment-url
         uses: actions/github-script@v7
         with:
           script: |
-            const sanitizedBranch = "${{ github.head_ref }}".replace(/[^a-zA-Z0-9-]/g, '-');
-            const deploymentUrl = `https://zine-web-${sanitizedBranch}.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev`;
+            const deploymentUrl = "${{ steps.web_preview_deploy.outputs.deployment-url }}";
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
