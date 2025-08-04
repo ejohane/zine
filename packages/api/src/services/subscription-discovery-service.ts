@@ -181,9 +181,10 @@ export class SubscriptionDiscoveryService {
       selected: boolean
       totalEpisodes?: number
     }>
-  ): Promise<{ added: number; removed: number }> {
+  ): Promise<{ added: number; removed: number; newSubscriptionIds: string[] }> {
     let added = 0
     let removed = 0
+    const newSubscriptionIds: string[] = []
 
     for (const choice of subscriptionChoices) {
       // Find or create the subscription in our database
@@ -212,12 +213,14 @@ export class SubscriptionDiscoveryService {
             isActive: true
           })
           added++
+          newSubscriptionIds.push(subscription.id)
         } else if (!existingUserSub.isActive) {
           // Reactivate existing subscription
           await this.subscriptionRepository.updateUserSubscription(existingUserSub.id, {
             isActive: true
           })
           added++
+          newSubscriptionIds.push(subscription.id)
         }
       } else {
         if (existingUserSub && existingUserSub.isActive) {
@@ -230,7 +233,7 @@ export class SubscriptionDiscoveryService {
       }
     }
 
-    return { added, removed }
+    return { added, removed, newSubscriptionIds }
   }
 
 }

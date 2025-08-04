@@ -1,0 +1,1 @@
+ALTER TABLE `subscriptions` ADD `total_episodes` integer;
