@@ -1,1 +1,1 @@
-ALTER TABLE `subscriptions` ADD `total_episodes` integer;
+-- Migration already applied manually. Column total_episodes already exists.
