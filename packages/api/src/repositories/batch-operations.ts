@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, inArray, sql, or } from 'drizzle-orm'
+import { eq, and, inArray, sql, or, gt } from 'drizzle-orm'
 import * as schema from '../schema'
 import { FeedItem } from '@zine/shared'
 
@@ -10,9 +10,10 @@ import { FeedItem } from '@zine/shared'
 export class BatchDatabaseOperations {
   private db: ReturnType<typeof drizzle>
   
-  // SQLite has a limit of 999 variables per query
-  // We need to account for the number of variables per item
-  private static readonly SQLITE_MAX_VARIABLES = 999
+  // Cloudflare D1 appears to have a lower limit than standard SQLite
+  // Based on errors, the limit seems to be around 296-297 parameters
+  // Setting to 250 to be extra safe
+  private static readonly SQLITE_MAX_VARIABLES = 250
   private static readonly VARIABLES_PER_FEED_ITEM = 9 // Number of columns in feed_items insert
   private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
   private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
@@ -332,8 +333,8 @@ export class BatchDatabaseOperations {
     
     // Process subscription IDs in chunks to avoid SQLite variable limit
     // Each subscription ID is 1 variable, plus 1 for the cutoff time
-    // SQLite limit is 999, but we use a conservative approach
-    const maxIdsPerChunk = 900 // Conservative limit to avoid edge cases
+    // Leave room for the timestamp parameter and a safety buffer
+    const maxIdsPerChunk = BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER - 1
     
     console.log(`[BatchOps:getRecentFeedItemIds] Max IDs per chunk: ${maxIdsPerChunk}`)
     console.log(`[BatchOps:getRecentFeedItemIds] Total chunks needed: ${Math.ceil(subscriptionIds.length / maxIdsPerChunk)}`)
@@ -354,7 +355,7 @@ export class BatchDatabaseOperations {
           .from(schema.feedItems)
           .where(and(
             inArray(schema.feedItems.subscriptionId, chunk),
-            sql`${schema.feedItems.publishedAt} > ${cutoffTime.getTime()}`
+            gt(schema.feedItems.publishedAt, cutoffTime.getTime())
           ))
         
         console.log(`[BatchOps:getRecentFeedItemIds] Chunk ${chunkNum} returned ${recentItems.length} items`)
