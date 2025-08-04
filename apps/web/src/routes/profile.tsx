@@ -4,7 +4,7 @@ import { PageWrapper } from '../components/layout/PageWrapper'
 import { useAuth } from '../lib/auth'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { useTheme } from '../hooks/useTheme'
-import { User, Settings, Palette, BookOpen, Clock, Tag, LogOut } from 'lucide-react'
+import { User, Settings, Palette, BookOpen, LogOut } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export const Route = createFileRoute('/profile')({
@@ -23,6 +23,7 @@ function ProfilePage() {
     articleCount: bookmarks?.filter(b => b.contentType === 'article').length || 0,
     podcastCount: bookmarks?.filter(b => b.contentType === 'podcast').length || 0,
     savedToday: bookmarks?.filter(b => {
+      if (!b.createdAt) return false
       const createdDate = new Date(b.createdAt)
       const today = new Date()
       return createdDate.toDateString() === today.toDateString()
