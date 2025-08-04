@@ -13,7 +13,7 @@ ENVIRONMENT = "development"
 # Cron triggers for scheduled tasks
 [triggers]
 crons = [
-  "*/5 * * * *"   # Every 30 minutes - both feed polling and token refresh
+  "*/30 * * * *"   # Every 30 minutes - both feed polling and token refresh
 ]
 
 [[d1_databases]]
