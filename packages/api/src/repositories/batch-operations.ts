@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, inArray, sql, or, gt } from 'drizzle-orm'
+import { eq, and, inArray, or, gt } from 'drizzle-orm'
 import * as schema from '../schema'
 import { FeedItem } from '@zine/shared'
 
@@ -355,7 +355,7 @@ export class BatchDatabaseOperations {
           .from(schema.feedItems)
           .where(and(
             inArray(schema.feedItems.subscriptionId, chunk),
-            gt(schema.feedItems.publishedAt, cutoffTime.getTime())
+            gt(schema.feedItems.publishedAt, cutoffTime)
           ))
         
         console.log(`[BatchOps:getRecentFeedItemIds] Chunk ${chunkNum} returned ${recentItems.length} items`)
