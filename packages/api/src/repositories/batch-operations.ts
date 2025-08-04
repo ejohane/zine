@@ -37,13 +37,14 @@ export class BatchDatabaseOperations {
     console.log(`[BatchOps:checkExistingFeedItems] Checking ${items.length} items for existence`)
     const existingMap = new Map<string, FeedItem>()
     
-    // Calculate max items per chunk based on variables per condition
-    const maxItemsPerChunk = Math.floor(
-      (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
-      BatchDatabaseOperations.VARIABLES_PER_CONDITION
-    )
+    // The Drizzle ORM's or() with multiple and() conditions generates more complex SQL than expected
+    // Each condition uses more than 2 variables when expanded by the ORM
+    // Based on the error with 60 items (120 expected variables) still failing,
+    // we need to be much more conservative
+    // Setting to 30 items per chunk to ensure we stay well below the limit
+    const maxItemsPerChunk = 30
     
-    console.log(`[BatchOps:checkExistingFeedItems] Max items per chunk: ${maxItemsPerChunk} (${BatchDatabaseOperations.VARIABLES_PER_CONDITION} variables per item)`)
+    console.log(`[BatchOps:checkExistingFeedItems] Max items per chunk: ${maxItemsPerChunk} (conservative limit due to complex OR query generation)`)
     
     // Process in chunks to avoid SQLite variable limit
     for (let i = 0; i < items.length; i += maxItemsPerChunk) {
