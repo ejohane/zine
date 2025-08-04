@@ -13,6 +13,7 @@ import { Route as Test2RouteImport } from './routes/test2'
 import { Route as Test1RouteImport } from './routes/test1'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SearchRouteImport } from './routes/search'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as FeedRouteImport } from './routes/feed'
@@ -41,6 +42,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SaveRoute = SaveRouteImport.update({
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
+  '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
+  '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
+  '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/test1': typeof Test1Route
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/profile'
     | '/save'
+    | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/profile'
     | '/save'
+    | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/feed'
     | '/profile'
     | '/save'
+    | '/search'
     | '/sign-in'
     | '/sign-up'
     | '/test1'
@@ -191,6 +203,7 @@ export interface RootRouteChildren {
   FeedRoute: typeof FeedRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SaveRoute: typeof SaveRoute
+  SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   Test1Route: typeof Test1Route
@@ -227,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/save': {
@@ -312,6 +332,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeedRoute: FeedRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SaveRoute: SaveRoute,
+  SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   Test1Route: Test1Route,

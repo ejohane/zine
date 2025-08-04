@@ -1,0 +1,95 @@
+:root {
+  /* Light Theme Colors */
+  --spotify-green: #1db954;
+  --spotify-green-hover: #1ed760;
+  --spotify-black: #121212;
+  --spotify-white: #ffffff;
+  
+  /* Light Mode Palette */
+  --background: #ffffff;
+  --foreground: #121212;
+  --card: #f5f5f5;
+  --card-foreground: #121212;
+  --popover: #ffffff;
+  --popover-foreground: #121212;
+  --primary: #1db954;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #121212;
+  --muted: #f3f4f6;
+  --muted-foreground: #6a6a6a;
+  --accent: #f3f4f6;
+  --accent-foreground: #121212;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #1db954;
+  
+  /* Surface colors for layering */
+  --surface: #f5f5f5;
+  --surface-hover: #ebebeb;
+  --surface-active: #e0e0e0;
+  
+  /* Text colors */
+  --text-primary: #121212;
+  --text-secondary: #6a6a6a;
+  --text-tertiary: #9ca3af;
+  
+  /* Navigation specific */
+  --nav-background: #ffffff;
+  --nav-text: #121212;
+  --nav-hover: #f3f4f6;
+  --nav-active: #1db954;
+}
+
+.dark {
+  /* Dark Mode Palette - Spotify inspired */
+  --background: #121212;
+  --foreground: #ffffff;
+  --card: #181818;
+  --card-foreground: #ffffff;
+  --popover: #282828;
+  --popover-foreground: #ffffff;
+  --primary: #1db954;
+  --primary-foreground: #000000;
+  --secondary: #282828;
+  --secondary-foreground: #ffffff;
+  --muted: #181818;
+  --muted-foreground: #b3b3b3;
+  --accent: #282828;
+  --accent-foreground: #ffffff;
+  --destructive: #f44336;
+  --destructive-foreground: #000000;
+  --border: #282828;
+  --input: #282828;
+  --ring: #1db954;
+  
+  /* Surface colors for layering */
+  --surface: #181818;
+  --surface-hover: #282828;
+  --surface-active: #383838;
+  
+  /* Text colors */
+  --text-primary: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-tertiary: #6a6a6a;
+  
+  /* Navigation specific */
+  --nav-background: #121212;
+  --nav-text: #b3b3b3;
+  --nav-hover: #282828;
+  --nav-active: #1db954;
+}
+
+/* Transition for smooth theme switching */
+* {
+  transition: background-color 200ms ease-in-out, 
+              border-color 200ms ease-in-out,
+              color 200ms ease-in-out;
+}
+
+/* Prevent transition on page load */
+.no-transition * {
+  transition: none !important;
+}

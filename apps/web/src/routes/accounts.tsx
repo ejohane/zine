@@ -5,6 +5,7 @@ import { Badge } from '../components/ui/badge'
 import { Alert, AlertDescription } from '../components/ui/alert'
 import { Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react'
 import { useAccounts } from '../hooks/useAccounts'
+import { PageWrapper } from '../components/layout/PageWrapper'
 
 export const Route = createFileRoute('/accounts')({
   component: AccountsPage,
@@ -25,30 +26,30 @@ function AccountsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8">
+      <PageWrapper>
         <div className="flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
           <span className="ml-2">Loading accounts...</span>
         </div>
-      </div>
+      </PageWrapper>
     )
   }
 
   if (error) {
     return (
-      <div className="container mx-auto py-8">
+      <PageWrapper>
         <Alert variant="destructive">
           <AlertDescription>
             Failed to load accounts: {error.message}
           </AlertDescription>
         </Alert>
-      </div>
+      </PageWrapper>
     )
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
-      <div className="space-y-6">
+    <PageWrapper>
+      <div className="max-w-4xl mx-auto space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Connected Accounts</h1>
           <p className="text-muted-foreground">
@@ -173,6 +174,6 @@ function AccountsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageWrapper>
   )
 }

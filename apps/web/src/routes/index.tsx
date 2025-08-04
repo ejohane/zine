@@ -1,39 +1,39 @@
-import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { useAuth } from '../lib/auth'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
-import type { Bookmark } from '../lib/api'
+import { BookmarkSectionSkeleton } from '../components/home/BookmarkSkeleton'
+import { FilterTabs } from '../components/home/FilterTabs'
+import { ContentGrid } from '../components/home/ContentGrid'
+import { SectionHeader } from '../components/home/SectionHeader'
+import { Plus, User } from 'lucide-react'
+import { useState } from 'react'
 
-interface HomeSearchParams {
-  saved?: string
-  message?: string
-}
 
 function Home() {
   const { isAuthenticated } = useAuth()
   const { data: bookmarks, isLoading, error } = useBookmarks()
-  const { saved, message } = useSearch({ from: '/' }) as HomeSearchParams
+  const [activeFilter, setActiveFilter] = useState('All')
 
   // Show welcome screen for unauthenticated users
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Welcome to Zine</h1>
-          <p className="mb-8">Please sign in to access your bookmarks</p>
-          <div className="space-x-4">
-            <Link 
-              to="/sign-in"
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Sign In
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="mb-8">
+            <h1 className="text-5xl font-bold mb-4 text-foreground">Welcome to Zine</h1>
+            <p className="text-xl text-muted-foreground">Your intelligent bookmark manager with a modern twist</p>
+          </div>
+          <div className="space-y-4">
+            <Link to="/sign-in" className="block">
+              <Button size="lg" className="w-full bg-spotify-green hover:bg-spotify-green-hover text-white">
+                Sign In
+              </Button>
             </Link>
-            <Link 
-              to="/sign-up"
-              className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-            >
-              Sign Up
+            <Link to="/sign-up" className="block">
+              <Button size="lg" variant="outline" className="w-full">
+                Create Account
+              </Button>
             </Link>
           </div>
         </div>
@@ -42,243 +42,122 @@ function Home() {
   }
 
   if (isLoading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading your bookmarks...</p>
+    <div className="min-h-screen bg-background p-4">
+      <div className="animate-pulse">
+        <div className="h-10 bg-secondary rounded w-64 mb-2" />
+        <div className="h-6 bg-secondary rounded w-96 mb-8" />
       </div>
+      <BookmarkSectionSkeleton />
+      <BookmarkSectionSkeleton />
     </div>
   )
   
   if (error) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-red-600 mb-4">Error loading bookmarks: {error.message}</p>
+    <div className="min-h-screen bg-background p-4">
+      <div className="text-center py-12">
+        <p className="text-destructive mb-4">Error loading bookmarks: {error.message}</p>
         <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     </div>
   )
 
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
-  }
-
-  const renderBookmarkCard = (bookmark: Bookmark) => (
-    <Card key={bookmark.id} className="hover:shadow-md transition-shadow">
-      <CardContent className="p-6">
-        <div className="flex gap-4">
-          {/* Thumbnail */}
-          {bookmark.thumbnailUrl && (
-            <div className="flex-shrink-0">
-              <img
-                src={bookmark.thumbnailUrl}
-                alt="Thumbnail"
-                className="w-16 h-16 object-cover rounded-md border"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.display = 'none'
-                }}
-              />
-            </div>
-          )}
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-lg line-clamp-2 mb-2">
-              <a 
-                href={bookmark.url} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="hover:text-blue-600 transition-colors"
-              >
-                {bookmark.title}
-              </a>
-            </h3>
-            
-            {bookmark.description && (
-              <p className="text-gray-600 text-sm line-clamp-2 mb-3">
-                {bookmark.description}
-              </p>
-            )}
-
-            {/* Badges */}
-            <div className="flex flex-wrap gap-2 mb-3">
-              {bookmark.source && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  {bookmark.source}
-                </span>
-              )}
-              {bookmark.contentType && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  {bookmark.contentType}
-                </span>
-              )}
-            </div>
-
-            {/* Creator and metadata */}
-            <div className="space-y-1 text-sm text-gray-600">
-              {bookmark.creator && (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4">👤</span>
-                  <span>{bookmark.creator.name}</span>
-                  {bookmark.creator.handle && (
-                    <span className="text-gray-500">{bookmark.creator.handle}</span>
-                  )}
-                </div>
-              )}
-
-              {bookmark.videoMetadata?.duration && (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4">📹</span>
-                  <span>Duration: {formatDuration(bookmark.videoMetadata.duration)}</span>
-                </div>
-              )}
-
-              {bookmark.podcastMetadata?.episodeTitle && (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4">🎧</span>
-                  <span>{bookmark.podcastMetadata.episodeTitle}</span>
-                </div>
-              )}
-
-              {bookmark.articleMetadata?.wordCount && (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4">📰</span>
-                  <span>{bookmark.articleMetadata.wordCount} words</span>
-                  {bookmark.articleMetadata.readingTime && (
-                    <span className="text-gray-500">({bookmark.articleMetadata.readingTime} min read)</span>
-                  )}
-                </div>
-              )}
-
-              {bookmark.publishedAt && (
-                <div className="flex items-center gap-2 text-gray-500">
-                  <span className="w-4 h-4">📅</span>
-                  <span>{new Date(bookmark.publishedAt).toLocaleDateString()}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Notes */}
-            {bookmark.notes && (
-              <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-sm">
-                <strong>Notes:</strong> {bookmark.notes}
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
+  // Organize bookmarks by categories
+  const recentBookmarks = bookmarks?.slice(0, 8) || []
+  const podcastBookmarks = bookmarks?.filter(b => b.contentType === 'podcast') || []
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Success Message */}
-      {saved && message && (
-        <div className="bg-green-50 border border-green-200 px-4 py-3 mb-4">
-          <div className="flex items-center gap-2 text-green-700">
-            <span className="w-5 h-5">✅</span>
-            <span>{message}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="bg-white border-b shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900">Zine</h1>
-              <p className="text-lg text-gray-600 mt-1">Your intelligent bookmark manager</p>
-            </div>
-            <Link to="/save">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
-                <span className="w-5 h-5 mr-2">🔖</span>
-                Save Bookmark
-              </Button>
-            </Link>
-          </div>
+    <div className="min-h-screen bg-background text-foreground">
+      {/* User Profile Header */}
+      <div className="flex items-center justify-between p-4 pt-12">
+        <div className="w-10 h-10 rounded-full bg-spotify-green flex items-center justify-center">
+          <User className="w-6 h-6 text-white" />
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Stats */}
-        <div className="mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl">{bookmarks?.length || 0}</CardTitle>
-                <CardDescription>Total Bookmarks</CardDescription>
-              </CardHeader>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl">
-                  {bookmarks?.filter(b => b.source && b.source !== 'web').length || 0}
-                </CardTitle>
-                <CardDescription>Platform-Specific</CardDescription>
-              </CardHeader>
-            </Card>
+      {/* Filter Tabs */}
+      <div className="px-4 mb-6">
+        <FilterTabs activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+      </div>
 
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl">
-                  {new Set(bookmarks?.map(b => b.creator?.name).filter(Boolean)).size || 0}
-                </CardTitle>
-                <CardDescription>Unique Creators</CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        </div>
+      {/* Content Grid */}
+      <div className="px-4 space-y-6 pb-28">
+        {bookmarks && bookmarks.length > 0 ? (
+          <>
+            {/* Your Episodes Section */}
+            <ContentGrid
+              title="Your Episodes"
+              items={recentBookmarks.slice(0, 2)}
+              type="episodes"
+            />
 
-        {/* Bookmarks */}
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold text-gray-900">Recent Bookmarks</h2>
-            {bookmarks && bookmarks.length > 0 && (
-              <Link to="/save">
-                <Button variant="outline">
-                  <span className="w-4 h-4 mr-2">➕</span>
-                  Add Another
-                </Button>
-              </Link>
-            )}
-          </div>
-
-          {bookmarks && bookmarks.length > 0 ? (
-            <div className="space-y-4">
-              {bookmarks.map(renderBookmarkCard)}
-            </div>
-          ) : (
-            <Card className="text-center py-12">
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">🔖</span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      No bookmarks yet
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                      Start building your collection by saving your first bookmark
-                    </p>
-                    <Link to="/save">
-                      <Button size="lg">
-                        <span className="w-5 h-5 mr-2">🚀</span>
-                        Save Your First Bookmark
+            {/* Picked for you Section */}
+            <div>
+              <SectionHeader title="Picked for you" />
+              <div className="space-y-4">
+                {recentBookmarks.slice(0, 1).map((bookmark) => (
+                  <div key={bookmark.id} className="bg-surface rounded-lg p-4 flex items-center space-x-4">
+                    <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                      <span className="text-xs font-medium">IMG</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs text-spotify-green mb-1">Included in Premium</div>
+                      <h3 className="font-semibold text-foreground line-clamp-2">{bookmark.title}</h3>
+                      <p className="text-sm text-muted-foreground">{bookmark.url}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button size="sm" variant="ghost" className="w-8 h-8 p-0">
+                        <Plus className="w-4 h-4" />
                       </Button>
-                    </Link>
+                      <Button size="sm" className="w-8 h-8 p-0 rounded-full bg-white text-black hover:bg-gray-200">
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Your shows Section */}
+            <div>
+              <SectionHeader title="Your shows" />
+              <div className="grid grid-cols-1 gap-4">
+                {podcastBookmarks.slice(0, 3).map((bookmark) => (
+                  <div key={bookmark.id} className="relative">
+                    <div className="w-full aspect-video bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
+                      <span className="text-xs font-medium text-muted-foreground">PODCAST</span>
+                      <div className="absolute top-2 left-2">
+                        <div className="bg-black/80 text-white px-2 py-1 rounded text-xs font-medium">
+                          A SPOTIFY VIDEO PODCAST
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <h3 className="font-semibold text-foreground">{bookmark.title}</h3>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-24 h-24 mb-6 rounded-full bg-card flex items-center justify-center">
+              <Plus className="w-12 h-12 text-muted-foreground" />
+            </div>
+            <h3 className="text-2xl font-semibold mb-2 text-foreground">No content yet</h3>
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Start building your collection by saving your first bookmark. We'll organize everything for you.
+            </p>
+            <Link to="/save">
+              <Button size="lg" className="bg-spotify-green hover:bg-spotify-green-hover text-white">
+                <Plus className="w-5 h-5 mr-2" />
+                Save Your First Bookmark
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -290,11 +169,5 @@ export const Route = createFileRoute('/')({
     // Note: This is a placeholder. In a real app, we'd need to check auth status
     // For now, we'll rely on the Clerk components to handle the redirect
     return {}
-  },
-  validateSearch: (search: Record<string, unknown>): HomeSearchParams => {
-    return {
-      saved: typeof search.saved === 'string' ? search.saved : undefined,
-      message: typeof search.message === 'string' ? search.message : undefined,
-    }
   },
 })

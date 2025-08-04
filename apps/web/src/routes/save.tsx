@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button'
 import { SaveBookmarkForm } from '../components/SaveBookmarkForm'
 import { BrowserExtensionBanner } from '../components/BrowserExtensionBanner'
 import { BulkImportDialog } from '../components/BulkImportDialog'
+import { PageWrapper } from '../components/layout/PageWrapper'
 import type { Bookmark } from '../lib/api'
 
 interface SaveSearchParams {
@@ -47,7 +48,7 @@ function SavePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-4 sm:py-8 px-4">
+    <PageWrapper className="bg-gray-50">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
@@ -119,7 +120,7 @@ function SavePage() {
           onSuccess={handleBulkImportSuccess}
         />
       </div>
-    </div>
+    </PageWrapper>
   )
 }
 
