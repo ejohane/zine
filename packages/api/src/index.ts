@@ -19,6 +19,7 @@ import { SubscriptionDiscoveryService } from './services/subscription-discovery-
 import { OptimizedFeedPollingService } from './services/optimized-feed-polling-service'
 import { TokenRefreshService } from './services/token-refresh-service'
 import { QueryOptimizer } from './repositories/query-optimizer'
+import { InitialFeedPopulationService } from './services/initial-feed-population-service'
 
 type Bindings = {
   DB: D1Database
@@ -56,6 +57,7 @@ let subscriptionDiscoveryService: SubscriptionDiscoveryService
 let feedPollingService: OptimizedFeedPollingService
 let tokenRefreshService: TokenRefreshService
 let queryOptimizer: QueryOptimizer
+let initialFeedPopulationService: InitialFeedPopulationService
 
 // Initialize services on first request
 async function initializeServices(db: D1Database, env: Bindings) {
@@ -69,6 +71,7 @@ async function initializeServices(db: D1Database, env: Bindings) {
     feedPollingService = new OptimizedFeedPollingService(subscriptionRepository, feedItemRepository, db)
     tokenRefreshService = new TokenRefreshService(subscriptionRepository)
     queryOptimizer = new QueryOptimizer(db)
+    initialFeedPopulationService = new InitialFeedPopulationService(subscriptionRepository, feedItemRepository)
     
     // Setup database tables and providers
     await setupDatabase(db)
@@ -83,7 +86,8 @@ async function initializeServices(db: D1Database, env: Bindings) {
     feedItemRepository,
     subscriptionDiscoveryService,
     feedPollingService,
-    tokenRefreshService
+    tokenRefreshService,
+    initialFeedPopulationService
   }
 }
 
@@ -560,13 +564,31 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
       return c.json({ error: 'subscriptions must be an array' }, 400)
     }
     
-    const { subscriptionDiscoveryService } = await initializeServices(c.env.DB, c.env)
+    const { subscriptionDiscoveryService, initialFeedPopulationService } = await initializeServices(c.env.DB, c.env)
     
     const result = await subscriptionDiscoveryService.updateUserSubscriptions(
       auth.userId,
       provider,
       subscriptions
     )
+    
+    // If new subscriptions were added, populate initial feed with content from last 24 hours
+    if (result.newSubscriptionIds.length > 0) {
+      console.log(`[SubscriptionUpdate] Populating initial feed for ${result.newSubscriptionIds.length} new subscriptions`)
+      
+      try {
+        const populationResults = await initialFeedPopulationService.populateInitialFeedForUser(
+          auth.userId,
+          result.newSubscriptionIds
+        )
+        
+        const totalItemsAdded = populationResults.reduce((sum, r) => sum + r.itemsAdded, 0)
+        console.log(`[SubscriptionUpdate] Added ${totalItemsAdded} items to user's feed from last 24 hours`)
+      } catch (error) {
+        // Log error but don't fail the subscription update
+        console.error('[SubscriptionUpdate] Error populating initial feed:', error)
+      }
+    }
     
     return c.json({
       message: 'Subscriptions updated successfully',
