@@ -15,6 +15,8 @@ interface MultipleShowsResponse {
 
 export class SpotifyBatchProcessor extends BaseBatchProcessor {
   protected providerId = 'spotify'
+  private subrequestCount = 0
+  private readonly MAX_SUBREQUESTS = 45 // Conservative limit (Cloudflare allows 50)
 
   constructor() {
     super()
@@ -58,12 +60,16 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     progressTracker.start()
 
     // Test connection first
+    this.subrequestCount++ // Track the API call
     const connectionValid = await spotifyAPI.testConnection()
     if (!connectionValid) {
       throw new Error('Spotify API connection failed - token may be invalid')
     }
 
     console.log(`[SpotifyBatchProcessor] Processing ${subscriptions.length} subscriptions in batches of ${opts.maxBatchSize}`)
+    
+    // Reset subrequest counter
+    this.subrequestCount = 0
 
     // Group subscriptions by external ID for batch fetching
     const subscriptionsByExternalId = new Map<string, Subscription>()
@@ -77,10 +83,17 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     // Fetch all shows in batches with rate limiting
     const allShows: SpotifyShow[] = []
     for (const chunk of showChunks) {
+      // Check if we're approaching the subrequest limit
+      if (this.subrequestCount >= this.MAX_SUBREQUESTS) {
+        console.warn(`[SpotifyBatchProcessor] Approaching subrequest limit (${this.subrequestCount}/${this.MAX_SUBREQUESTS}), stopping early`)
+        break
+      }
+      
       if (this.rateLimiter && opts.useRateLimiter) {
         await this.rateLimiter.consume(1)
       }
       
+      this.subrequestCount++ // Track the API call
       const shows = await this.retryOperation(
         () => this.getMultipleShows(spotifyAPI, chunk),
         opts.retryAttempts,
@@ -104,36 +117,63 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
 
     console.log(`[SpotifyBatchProcessor] ${showsWithChanges.length} shows have new episodes (out of ${allShows.length})`)
 
-    // Now fetch episodes only for shows with changes
-    const showsWithEpisodes = await this.processWithConcurrency(
-      showsWithChanges,
-      async (show) => {
-        progressTracker.taskStarted(show.id, { showName: show.name })
-        
-        try {
-          const episodes = await this.retryOperation(
-            () => spotifyAPI.getLatestEpisodes(show.id, 20),
-            opts.retryAttempts,
-            opts.retryDelay
-          )
-          
-          progressTracker.taskCompleted(show.id, { episodeCount: episodes.length })
-          return { show, episodes }
-        } catch (error) {
-          progressTracker.taskFailed(show.id, error as Error)
-          throw error
-        }
-      },
-      opts.maxConcurrency,
-      {
-        onProgress: opts.onProgress,
-        useRateLimiter: opts.useRateLimiter,
-        useCircuitBreaker: opts.useCircuitBreaker
+    // Batch shows to avoid too many concurrent requests
+    const showBatches = this.chunk(showsWithChanges, Math.ceil(showsWithChanges.length / opts.maxConcurrency))
+    const showsWithEpisodes: ShowWithEpisodes[] = []
+
+    // Process each batch sequentially to control subrequests
+    for (const batch of showBatches) {
+      // Check if we're approaching the subrequest limit before processing batch
+      const estimatedSubrequests = this.subrequestCount + batch.length
+      if (estimatedSubrequests >= this.MAX_SUBREQUESTS) {
+        console.warn(`[SpotifyBatchProcessor] Would exceed subrequest limit (${estimatedSubrequests}/${this.MAX_SUBREQUESTS}), processing partial batch`)
+        // Process only what we can handle
+        const remainingCapacity = Math.max(0, this.MAX_SUBREQUESTS - this.subrequestCount)
+        if (remainingCapacity === 0) break
+        batch.splice(remainingCapacity)
       }
-    )
+      
+      console.log(`[SpotifyBatchProcessor] Processing batch of ${batch.length} shows (subrequests: ${this.subrequestCount}/${this.MAX_SUBREQUESTS})`)
+      
+      const batchResults = await this.processWithConcurrency(
+        batch,
+        async (show) => {
+          progressTracker.taskStarted(show.id, { showName: show.name })
+          
+          try {
+            this.subrequestCount++ // Track the API call
+            const episodes = await this.retryOperation(
+              () => spotifyAPI.getLatestEpisodes(show.id, 20),
+              opts.retryAttempts,
+              opts.retryDelay
+            )
+            
+            progressTracker.taskCompleted(show.id, { episodeCount: episodes.length })
+            return { show, episodes }
+          } catch (error) {
+            progressTracker.taskFailed(show.id, error as Error)
+            throw error
+          }
+        },
+        opts.maxConcurrency,
+        {
+          onProgress: opts.onProgress,
+          useRateLimiter: opts.useRateLimiter,
+          useCircuitBreaker: opts.useCircuitBreaker
+        }
+      )
+      
+      showsWithEpisodes.push(...batchResults)
+      
+      // Add a small delay between batches to ensure we don't exceed limits
+      if (showBatches.length > 1 && showBatches.indexOf(batch) < showBatches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    }
 
     // Print summary
     reporter.printSummary()
+    console.log(`[SpotifyBatchProcessor] Total subrequests used: ${this.subrequestCount}/${this.MAX_SUBREQUESTS}`)
 
     // Convert to results
     return this.convertToResults(showsWithEpisodes, allShows, subscriptionsByExternalId)
@@ -235,7 +275,7 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
   getDefaultOptions(): BatchProcessorOptions {
     return {
       maxBatchSize: 50, // Spotify's limit for batch show fetching
-      maxConcurrency: 5, // Optimized: fewer shows need episode fetching with total_episodes check
+      maxConcurrency: 2, // Reduced from 5 to avoid hitting Cloudflare's 50 subrequest limit
       retryAttempts: 3,
       retryDelay: 1000
     }
