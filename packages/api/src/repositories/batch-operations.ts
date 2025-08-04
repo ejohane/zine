@@ -13,6 +13,8 @@ export class BatchDatabaseOperations {
   // Cloudflare D1 appears to have a lower limit than standard SQLite
   // Based on errors, the limit seems to be around 296-297 parameters
   // Setting to 250 to be extra safe
+  // NOTE: Some queries (like getRecentFeedItemIds) may need even lower limits
+  // due to complex WHERE clauses with multiple parameters
   private static readonly SQLITE_MAX_VARIABLES = 250
   private static readonly VARIABLES_PER_FEED_ITEM = 9 // Number of columns in feed_items insert
   private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
@@ -332,9 +334,9 @@ export class BatchDatabaseOperations {
     const resultMap = new Map<string, Set<string>>()
     
     // Process subscription IDs in chunks to avoid SQLite variable limit
-    // Each subscription ID is 1 variable, plus 1 for the cutoff time
-    // Leave room for the timestamp parameter and a safety buffer
-    const maxIdsPerChunk = BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER - 1
+    // Be extra conservative - Cloudflare D1 seems to have issues with too many parameters
+    // Use a much smaller chunk size to ensure we stay well below the limit
+    const maxIdsPerChunk = 50 // Conservative limit to avoid "too many SQL variables" error
     
     console.log(`[BatchOps:getRecentFeedItemIds] Max IDs per chunk: ${maxIdsPerChunk}`)
     console.log(`[BatchOps:getRecentFeedItemIds] Total chunks needed: ${Math.ceil(subscriptionIds.length / maxIdsPerChunk)}`)
