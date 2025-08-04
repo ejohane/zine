@@ -367,6 +367,7 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       description: subscription.description || null,
       thumbnailUrl: subscription.thumbnailUrl || null,
       subscriptionUrl: subscription.subscriptionUrl || null,
+      totalEpisodes: subscription.totalEpisodes || null,
       createdAt: now
     }
 
