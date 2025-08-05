@@ -13,13 +13,20 @@ ENVIRONMENT = "development"
 # Cron triggers for scheduled tasks
 [triggers]
 crons = [
-  "*/30 * * * *"   # Every 30 minutes - both feed polling and token refresh
+  "*/5 * * * *"   # Every 5 minutes - both feed polling and token refresh
 ]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "zine-db2"
 database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
+
+[[durable_objects.bindings]]
+name = "USER_SUBSCRIPTION_MANAGER"
+class_name = "UserSubscriptionManager"
+
+[migrations]
+tag = "v1"
 
 [env.production]
 name = "zine-api-production"
@@ -36,3 +43,7 @@ ENVIRONMENT = "production"
 binding = "DB"
 database_name = "zine-db-production"
 database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
+
+[[env.production.durable_objects.bindings]]
+name = "USER_SUBSCRIPTION_MANAGER"
+class_name = "UserSubscriptionManager"
