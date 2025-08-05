@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
-import { userAccounts, users } from '../schema';
+import { eq } from 'drizzle-orm';
+import { users } from '../schema';
 import type { Env } from '../types';
 import { getFeatureFlagService } from './feature-flags';
 
@@ -111,7 +111,6 @@ export class DualModeTokenService {
     const shouldUseDO = featureFlags.shouldUseDurableObjects(userId);
     
     let source: 'do' | 'd1' | 'both' = 'd1';
-    let error: string | undefined;
 
     try {
       const user = await this.getUser(userId);
@@ -237,23 +236,13 @@ export class DualModeTokenService {
   /**
    * Get tokens from D1 database
    */
-  private async getTokensFromD1(userId: string): Promise<Map<string, TokenData>> {
-    const accounts = await this.db.select()
-      .from(userAccounts)
-      .where(eq(userAccounts.userId, userId))
-      .execute();
+  private async getTokensFromD1(_userId: string): Promise<Map<string, TokenData>> {
+    // NOTE: Token columns have been removed from schema
+    // D1 tokens are only available during migration period
+    // This function will return empty map after migration
+    console.warn('[DualModeTokenService] Token columns removed from D1 - returning empty map');
     
     const tokens = new Map<string, TokenData>();
-    
-    for (const account of accounts) {
-      tokens.set(account.providerId, {
-        provider: account.providerId as 'spotify' | 'youtube',
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken || undefined,
-        expiresAt: account.expiresAt || undefined
-      });
-    }
-    
     return tokens;
   }
 
@@ -280,19 +269,10 @@ export class DualModeTokenService {
   /**
    * Update token in D1 database
    */
-  private async updateTokenInD1(userId: string, tokenData: TokenData): Promise<void> {
-    await this.db.update(userAccounts)
-      .set({
-        accessToken: tokenData.accessToken,
-        refreshToken: tokenData.refreshToken,
-        expiresAt: tokenData.expiresAt,
-        updatedAt: new Date()
-      })
-      .where(and(
-        eq(userAccounts.userId, userId),
-        eq(userAccounts.providerId, tokenData.provider)
-      ))
-      .execute();
+  private async updateTokenInD1(_userId: string, _tokenData: TokenData): Promise<void> {
+    // NOTE: Token columns have been removed from schema
+    // D1 token updates are only available during migration period
+    console.warn('[DualModeTokenService] Cannot update tokens in D1 - columns removed');
   }
 
   /**

@@ -183,10 +183,14 @@ export class SingleUserPollingService {
     for (const subscription of subscriptions) {
       try {
         // Fetch channel details and recent videos
-        const videos = await youtubeAPI.getChannelVideos(subscription.externalId, 10)
+        const searchResponse = await youtubeAPI.getChannelVideos(subscription.externalId, 10)
+        
+        // Get video details for duration information
+        const videoIds = searchResponse.items.map(v => v.id.videoId)
+        const videoDetails = videoIds.length > 0 ? await youtubeAPI.getVideoDetails(videoIds) : []
 
         // Check for new videos
-        const newItems = await this.checkForNewItems(subscription.id, videos.map(video => ({
+        const newItems = await this.checkForNewItems(subscription.id, videoDetails.map(video => ({
           externalId: video.id,
           title: video.snippet.title,
           description: video.snippet.description,

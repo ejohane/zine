@@ -37,7 +37,7 @@ export interface RefreshAttempt {
 export class UserSubscriptionManager {
   private state: DurableObjectState;
   private env: Env;
-  private pollInterval: number = 5 * 60 * 1000; // 5 minutes
+  private userId: string | null = null;
   private tokenRefreshBuffer: number = 60 * 60 * 1000; // 1 hour
 
   constructor(state: DurableObjectState, env: Env) {
@@ -167,8 +167,8 @@ export class UserSubscriptionManager {
     
     for (const [provider, token] of tokens) {
       tokenData[provider] = {
-        expiresAt: new Date(token.expiresAt),
-        lastRefresh: new Date(token.lastRefresh),
+        expiresAt: token.expiresAt,
+        lastRefresh: token.lastRefresh,
         provider: token.provider
       };
     }
@@ -247,7 +247,7 @@ export class UserSubscriptionManager {
   }
 
   private async initializeFromDatabase(): Promise<void> {
-    const userId = await this.state.storage.get<string>('userId');
+    const userId = this.userId || await this.state.storage.get<string>('userId');
     if (!userId) return;
     
     try {
@@ -441,8 +441,8 @@ export class UserSubscriptionManager {
     );
   }
 
-  private async scheduleNextAlarm(): Promise<void> {
-    // Not used - polling is triggered by cron job
-    // Keeping method for backward compatibility
-  }
+  // Not used - polling is triggered by cron job
+  // private async scheduleNextAlarm(): Promise<void> {
+  //   // Keeping method for backward compatibility
+  // }
 }

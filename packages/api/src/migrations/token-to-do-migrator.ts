@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, isNull, not, or } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql } from 'drizzle-orm';
 import { userAccounts, users, tokenMigrationStatus } from '../schema';
 import type { Env } from '../types';
 import { nanoid } from 'nanoid';
@@ -10,6 +10,7 @@ export interface MigrationStatus {
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   error?: string;
   attemptCount: number;
+  startedAt?: Date;
   lastAttemptAt?: Date;
   completedAt?: Date;
 }
@@ -168,7 +169,7 @@ export class TokenToDOMigrator {
       await this.db.update(users)
         .set({ durableObjectId: doId.toString() } as any)
         .where(eq(users.id, userId))
-        .execute();
+        .all();
 
       report.inProgress--;
       report.migrated++;
@@ -259,14 +260,14 @@ export class TokenToDOMigrator {
       errors: []
     };
 
-    const whereClause = userIds 
-      ? and(users.durableObjectId !== null, users.id in userIds)
-      : users.durableObjectId !== null;
+    const whereClause = userIds && userIds.length > 0
+      ? and(sql`${users.durableObjectId} IS NOT NULL`, inArray(users.id, userIds))
+      : sql`${users.durableObjectId} IS NOT NULL`;
 
     const usersToRollback = await this.db.select()
       .from(users)
       .where(whereClause as any)
-      .execute();
+      .all();
 
     report.totalUsers = usersToRollback.length;
 
@@ -283,28 +284,19 @@ export class TokenToDOMigrator {
         if (tokensResponse.ok) {
           const tokens = await tokensResponse.json() as any;
           
-          // Update tokens in database
-          for (const [provider, tokenData] of Object.entries(tokens)) {
-            await this.db.update(userAccounts)
-              .set({
-                accessToken: (tokenData as any).accessToken,
-                refreshToken: (tokenData as any).refreshToken,
-                expiresAt: (tokenData as any).expiresAt ? new Date((tokenData as any).expiresAt) : null,
-                updatedAt: new Date()
-              })
-              .where(and(
-                eq(userAccounts.userId, user.id),
-                eq(userAccounts.providerId, provider)
-              ))
-              .execute();
-          }
+          // NOTE: Token columns have been removed from schema
+          // This rollback function requires the old schema with token columns
+          // Only use this during the migration period when dual-mode is active
+          console.warn(`[Rollback] Cannot restore tokens to database - token columns removed`);
+          console.warn(`[Rollback] Tokens for user ${user.id} remain in DO but not in DB`);
+          report.totalTokens += Object.keys(tokens).length;
         }
 
         // Clear DO ID from user record
         await this.db.update(users)
           .set({ durableObjectId: null } as any)
           .where(eq(users.id, user.id))
-          .execute();
+          .all();
 
         report.migrated++;
       } catch (error) {
@@ -328,16 +320,16 @@ export class TokenToDOMigrator {
       return this.db.select({ id: users.id })
         .from(users)
         .where(and(
-          users.id in userIds,
-          isNull(users.durableObjectId as any)
+          inArray(users.id, userIds),
+          isNull(users.durableObjectId)
         ))
-        .execute();
+        .all();
     }
 
     return this.db.select({ id: users.id })
       .from(users)
-      .where(isNull(users.durableObjectId as any))
-      .execute();
+      .where(isNull(users.durableObjectId))
+      .all();
   }
 
   /**
@@ -347,7 +339,7 @@ export class TokenToDOMigrator {
     return this.db.select()
       .from(userAccounts)
       .where(eq(userAccounts.userId, userId))
-      .execute();
+      .all();
   }
 
   /**
@@ -361,7 +353,7 @@ export class TokenToDOMigrator {
         eq(tokenMigrationStatus.userId, userId),
         eq(tokenMigrationStatus.provider, provider)
       ))
-      .execute();
+      .all();
 
     if (existing.length > 0) {
       const record = existing[0];
@@ -388,7 +380,7 @@ export class TokenToDOMigrator {
         createdAt: new Date(),
         updatedAt: new Date()
       })
-      .execute();
+      .all();
 
     return {
       userId,
@@ -415,7 +407,7 @@ export class TokenToDOMigrator {
         eq(tokenMigrationStatus.userId, userId),
         eq(tokenMigrationStatus.provider, provider)
       ))
-      .execute();
+      .all();
   }
 
   /**
@@ -424,7 +416,7 @@ export class TokenToDOMigrator {
   async getMigrationStatus(): Promise<Map<string, MigrationStatus>> {
     const statuses = await this.db.select()
       .from(tokenMigrationStatus)
-      .execute();
+      .all();
     
     const statusMap = new Map<string, MigrationStatus>();
     for (const record of statuses) {
@@ -449,7 +441,7 @@ export class TokenToDOMigrator {
   async exportStatus(): Promise<string> {
     const statuses = await this.db.select()
       .from(tokenMigrationStatus)
-      .execute();
+      .all();
     
     return JSON.stringify(statuses, null, 2);
   }
@@ -464,7 +456,7 @@ export class TokenToDOMigrator {
   }> {
     const statuses = await this.db.select()
       .from(tokenMigrationStatus)
-      .execute();
+      .all();
     
     const summary = {
       total: statuses.length,

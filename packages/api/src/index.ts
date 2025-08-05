@@ -6,7 +6,8 @@ import {
   UpdateBookmarkSchema,
   SaveBookmarkSchema,
   BookmarkService,
-  BookmarkSaveService
+  BookmarkSaveService,
+  SubscriptionRepository
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
 import { D1SubscriptionRepository } from './d1-subscription-repository'
@@ -60,7 +61,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Initialize services with D1 database
 let bookmarkService: BookmarkService
 let bookmarkSaveService: BookmarkSaveService
-let subscriptionRepository: D1SubscriptionRepository
+let subscriptionRepository: SubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
 let feedPollingService: OptimizedFeedPollingService
@@ -235,13 +236,13 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       
       // First ensure the user exists
       console.log('Ensuring user exists in database...')
-      await subscriptionRepository.ensureUser({
+      await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
         id: decodedState.userId
       })
       
       // Then ensure the provider exists
       console.log('Ensuring provider exists in database...')
-      await subscriptionRepository.ensureProvider({
+      await (subscriptionRepository as D1SubscriptionRepository).ensureProvider({
         id: provider,
         name: provider === 'spotify' ? 'Spotify' : 'YouTube',
         oauthConfig: JSON.stringify(oauthProvider.config)
@@ -698,7 +699,7 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as read
-    await subscriptionRepository.ensureUser({
+    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
       id: auth.userId
     })
     
@@ -737,7 +738,7 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as unread
-    await subscriptionRepository.ensureUser({
+    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
       id: auth.userId
     })
     
@@ -912,7 +913,7 @@ app.post('/api/v1/migration/tokens-to-do', async (c) => {
     return c.text(text)
   } catch (error) {
     console.error('Migration error:', error)
-    return c.json({ error: 'Migration failed', details: error.message }, 500)
+    return c.json({ error: 'Migration failed', details: error instanceof Error ? error.message : String(error) }, 500)
   }
 })
 
@@ -925,7 +926,7 @@ app.get('/api/v1/migration/status', async (c) => {
     return c.text(text)
   } catch (error) {
     console.error('Migration status error:', error)
-    return c.json({ error: 'Failed to get migration status', details: error.message }, 500)
+    return c.json({ error: 'Failed to get migration status', details: error instanceof Error ? error.message : String(error) }, 500)
   }
 })
 
@@ -944,7 +945,7 @@ app.get('/api/v1/migration/metrics', async (c) => {
     })
   } catch (error) {
     console.error('Migration metrics error:', error)
-    return c.json({ error: 'Failed to get migration metrics', details: error.message }, 500)
+    return c.json({ error: 'Failed to get migration metrics', details: error instanceof Error ? error.message : String(error) }, 500)
   }
 })
 
@@ -1279,7 +1280,7 @@ export default {
             }
           }
           
-          const result = await response.json()
+          const result = await response.json() as any
           return { 
             userId: user.id, 
             durableObjectId: user.durableObjectId,
@@ -1293,7 +1294,7 @@ export default {
             userId: user.id, 
             durableObjectId: user.durableObjectId,
             success: false, 
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             duration: Date.now() - startTime
           }
         }
