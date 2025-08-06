@@ -526,9 +526,7 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       userId: row.userId,
       providerId: row.providerId,
       externalAccountId: row.externalAccountId,
-      accessToken: row.accessToken,
-      refreshToken: row.refreshToken || undefined,
-      expiresAt: row.expiresAt ? new Date(row.expiresAt) : undefined,
+      isActive: row.isActive,
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt)
     }
