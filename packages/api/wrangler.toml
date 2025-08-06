@@ -27,7 +27,7 @@ class_name = "UserSubscriptionManager"
 
 [[migrations]]
 tag = "v1"
-new_classes = [ "UserSubscriptionManager" ]
+new_sqlite_classes = [ "UserSubscriptionManager" ]
 
 # Migrations are handled via GitHub Actions workflow
 
@@ -53,4 +53,4 @@ class_name = "UserSubscriptionManager"
 
 [[env.production.migrations]]
 tag = "v1"
-new_classes = [ "UserSubscriptionManager" ]
+new_sqlite_classes = [ "UserSubscriptionManager" ]
