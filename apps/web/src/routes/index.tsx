@@ -3,17 +3,21 @@ import { useAuth } from '../lib/auth'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
 import { useFeedManager } from '../hooks/useFeed'
-import { Filter, TrendingUp, Clock, BookOpen, Play, MoreHorizontal, BookmarkIcon } from 'lucide-react'
+import { useBookmarks } from '../hooks/useBookmarks'
+import { Filter, TrendingUp, Clock, BookOpen, Play, MoreHorizontal, BookmarkIcon, Plus, User } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '../lib/utils'
 import type { FeedItemWithState } from '../lib/api'
-
-interface HomeSearchParams {
-  saved?: string
-  message?: string
-}
+import { BookmarkSectionSkeleton } from '../components/home/BookmarkSkeleton'
+import { ContentGrid } from '../components/home/ContentGrid'
+import { SectionHeader } from '../components/home/SectionHeader'
 
 type FilterType = 'trending' | 'recent' | 'unread'
+
+interface HomeSearchParams {
+  saved?: boolean
+  message?: string
+}
 
 function Home() {
   const { isAuthenticated } = useAuth()
@@ -23,8 +27,8 @@ function Home() {
   const { 
     feedItems, 
     subscriptions,
-    isLoading, 
-    error,
+    isLoading: isFeedLoading, 
+    error: feedError,
     markAsRead,
     markAsUnread,
     saveToBookmarks,
@@ -34,25 +38,27 @@ function Home() {
     unreadOnly: activeFilter === 'unread' 
   })
 
+  const { data: bookmarks, isLoading: isBookmarksLoading, error: bookmarksError } = useBookmarks()
+
   // Show welcome screen for unauthenticated users
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Welcome to Zine</h1>
-          <p className="mb-8">Please sign in to access your feed</p>
-          <div className="space-x-4">
-            <Link 
-              to="/sign-in"
-              className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full"
-            >
-              Sign In
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="mb-8">
+            <h1 className="text-5xl font-bold mb-4 text-foreground">Welcome to Zine</h1>
+            <p className="text-xl text-muted-foreground">Your intelligent bookmark manager with a modern twist</p>
+          </div>
+          <div className="space-y-4">
+            <Link to="/sign-in" className="block">
+              <Button size="lg" className="w-full bg-spotify-green hover:bg-spotify-green-hover text-white">
+                Sign In
+              </Button>
             </Link>
-            <Link 
-              to="/sign-up"
-              className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-full"
-            >
-              Sign Up
+            <Link to="/sign-up" className="block">
+              <Button size="lg" variant="outline" className="w-full">
+                Create Account
+              </Button>
             </Link>
           </div>
         </div>
@@ -60,19 +66,24 @@ function Home() {
     )
   }
 
+  const isLoading = isFeedLoading || isBookmarksLoading
+  const error = feedError || bookmarksError
+
   if (isLoading) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading your feed...</p>
+    <div className="min-h-screen bg-background p-4">
+      <div className="animate-pulse">
+        <div className="h-10 bg-secondary rounded w-64 mb-2" />
+        <div className="h-6 bg-secondary rounded w-96 mb-8" />
       </div>
+      <BookmarkSectionSkeleton />
+      <BookmarkSectionSkeleton />
     </div>
   )
   
   if (error) return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-red-600 mb-4">Error loading feed: {error.message}</p>
+    <div className="min-h-screen bg-background p-4">
+      <div className="text-center py-12">
+        <p className="text-destructive mb-4">Error loading content: {error.message}</p>
         <Button onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     </div>
@@ -136,6 +147,10 @@ function Home() {
     return 'Good evening'
   }
 
+  // Organize bookmarks by categories
+  const recentBookmarks = bookmarks?.slice(0, 8) || []
+  const podcastBookmarks = bookmarks?.filter(b => b.contentType === 'podcast') || []
+
   return (
     <div className="min-h-screen bg-white">
       {/* Success Message */}
@@ -150,6 +165,13 @@ function Home() {
 
       {/* Main Content */}
       <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* User Profile Header (Mobile) */}
+        <div className="flex items-center justify-between mb-4 md:hidden">
+          <div className="w-10 h-10 rounded-full bg-spotify-green flex items-center justify-center">
+            <User className="w-6 h-6 text-white" />
+          </div>
+        </div>
+
         {/* Greeting Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-green-500 mb-2">{greeting()}</h1>
@@ -359,29 +381,94 @@ function Home() {
               ))}
             </div>
           ) : (
-            <Card className="text-center py-12">
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">📺</span>
-                  </div>
+            <div>
+              {/* Bookmarks Content Grid */}
+              {bookmarks && bookmarks.length > 0 ? (
+                <div className="space-y-6 pb-28">
+                  {/* Your Episodes Section */}
+                  <ContentGrid
+                    title="Your Episodes"
+                    items={recentBookmarks.slice(0, 2)}
+                    type="episodes"
+                  />
+
+                  {/* Picked for you Section */}
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      No content yet
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                      Subscribe to your favorite creators to see their content here
-                    </p>
-                    <Link to="/subscriptions">
-                      <Button size="lg" className="bg-green-500 hover:bg-green-600">
-                        <span className="w-5 h-5 mr-2">🔍</span>
-                        Discover Subscriptions
-                      </Button>
-                    </Link>
+                    <SectionHeader title="Picked for you" />
+                    <div className="space-y-4">
+                      {recentBookmarks.slice(0, 1).map((bookmark) => (
+                        <div key={bookmark.id} className="bg-surface rounded-lg p-4 flex items-center space-x-4">
+                          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                            <span className="text-xs font-medium">IMG</span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="text-xs text-spotify-green mb-1">Included in Premium</div>
+                            <h3 className="font-semibold text-foreground line-clamp-2">{bookmark.title}</h3>
+                            <p className="text-sm text-muted-foreground">{bookmark.url}</p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button size="sm" variant="ghost" className="w-8 h-8 p-0">
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                            <Button size="sm" className="w-8 h-8 p-0 rounded-full bg-white text-black hover:bg-gray-200">
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                              </svg>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Your shows Section */}
+                  <div>
+                    <SectionHeader title="Your shows" />
+                    <div className="grid grid-cols-1 gap-4">
+                      {podcastBookmarks.slice(0, 3).map((bookmark) => (
+                        <div key={bookmark.id} className="relative">
+                          <div className="w-full aspect-video bg-surface rounded-lg flex items-center justify-center relative overflow-hidden">
+                            <span className="text-xs font-medium text-muted-foreground">PODCAST</span>
+                            <div className="absolute top-2 left-2">
+                              <div className="bg-black/80 text-white px-2 py-1 rounded text-xs font-medium">
+                                A SPOTIFY VIDEO PODCAST
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <h3 className="font-semibold text-foreground">{bookmark.title}</h3>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              ) : (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">📺</span>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          No content yet
+                        </h3>
+                        <p className="text-gray-600 mb-6">
+                          Subscribe to your favorite creators to see their content here
+                        </p>
+                        <Link to="/subscriptions">
+                          <Button size="lg" className="bg-green-500 hover:bg-green-600">
+                            <span className="w-5 h-5 mr-2">🔍</span>
+                            Discover Subscriptions
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -395,11 +482,5 @@ export const Route = createFileRoute('/')({
     // Note: This is a placeholder. In a real app, we'd need to check auth status
     // For now, we'll rely on the Clerk components to handle the redirect
     return {}
-  },
-  validateSearch: (search: Record<string, unknown>): HomeSearchParams => {
-    return {
-      saved: typeof search.saved === 'string' ? search.saved : undefined,
-      message: typeof search.message === 'string' ? search.message : undefined,
-    }
   },
 })

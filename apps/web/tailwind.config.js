@@ -51,6 +51,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        'spotify-green': 'var(--spotify-green)',
+        'spotify-green-hover': 'var(--spotify-green-hover)',
+        'surface': 'var(--surface)',
+        'surface-hover': 'var(--surface-hover)',
+        'surface-active': 'var(--surface-active)',
       },
       borderRadius: {
         lg: "var(--radius)",

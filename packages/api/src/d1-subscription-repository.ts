@@ -8,8 +8,6 @@ import {
   Subscription,
   UserSubscription
 } from '@zine/shared'
-import { getOAuthProviders } from './oauth/oauth-config'
-import { OAuthService } from './oauth/oauth-service'
 
 // Define the environment bindings interface
 interface EnvironmentBindings {
@@ -22,11 +20,9 @@ interface EnvironmentBindings {
 
 export class D1SubscriptionRepository implements SubscriptionRepository {
   private db: ReturnType<typeof drizzle>
-  private env: EnvironmentBindings
 
-  constructor(d1Database: D1Database, env: EnvironmentBindings) {
+  constructor(d1Database: D1Database, _env: EnvironmentBindings) {
     this.db = drizzle(d1Database, { schema })
-    this.env = env
   }
 
   async getProviders(): Promise<SubscriptionProvider[]> {
@@ -123,9 +119,7 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       userId: account.userId,
       providerId: account.providerId,
       externalAccountId: account.externalAccountId,
-      accessToken: account.accessToken,
-      refreshToken: account.refreshToken || null,
-      expiresAt: account.expiresAt || null,
+      isActive: true,
       createdAt: now,
       updatedAt: now
     }
@@ -139,16 +133,11 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
     }
   }
 
-  async updateUserAccount(id: string, updates: Partial<Pick<UserAccount, 'accessToken' | 'refreshToken' | 'expiresAt'>>): Promise<UserAccount> {
+  async updateUserAccount(id: string, _updates: Partial<Pick<UserAccount, 'accessToken' | 'refreshToken' | 'expiresAt'>>): Promise<UserAccount> {
     const now = new Date()
-    const updateData: any = {
+    // Since tokens are stored in Durable Objects, we only update the timestamp
+    const updateData = {
       updatedAt: now
-    }
-
-    if (updates.accessToken) updateData.accessToken = updates.accessToken
-    if (updates.refreshToken !== undefined) updateData.refreshToken = updates.refreshToken
-    if (updates.expiresAt !== undefined) {
-      updateData.expiresAt = updates.expiresAt || null
     }
 
     await this.db
@@ -186,147 +175,46 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
   }
 
   async getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null> {
-    // Get all accounts for this provider and find one with a valid (non-expired) token
+    // Since tokens are stored in Durable Objects, we can't check validity here
+    // Just return the first active account for the provider
     const accounts = await this.getUserAccountsByProvider(providerId)
     
-    const now = new Date()
-    for (const account of accounts) {
-      // Check if token is not expired (or if expiresAt is null, assume it's valid)
-      if (!account.expiresAt || account.expiresAt > now) {
-        return account
-      }
+    // Return the first active account if any exist
+    const activeAccount = accounts.find(account => {
+      // Check if account has isActive property (from DB) 
+      const dbAccount = account as any
+      return dbAccount.isActive !== false
+    })
+    
+    if (activeAccount) {
+      return activeAccount
     }
     
-    // If no valid tokens found, try to refresh one
-    for (const account of accounts) {
-      if (account.refreshToken) {
-        try {
-          console.log(`Attempting to refresh token for account ${account.id}`)
-          
-          // Get OAuth configuration for the provider
-          const oauthProviders = getOAuthProviders(this.env)
-          const oauthProvider = oauthProviders[providerId]
-          
-          if (!oauthProvider) {
-            console.error(`OAuth provider configuration not found for ${providerId}`)
-            continue
-          }
-          
-          // Create OAuth service instance
-          const oauthService = new OAuthService(oauthProvider.config)
-          
-          // Refresh the token
-          const newTokens = await oauthService.refreshToken(account.refreshToken)
-          
-          // Calculate new expiration date
-          const newExpiresAt = newTokens.expires_in 
-            ? new Date(Date.now() + newTokens.expires_in * 1000) 
-            : undefined
-          
-          // NOTE: Token columns removed from schema
-          // This method should not be used after migration to DOs
-          console.warn('[D1SubscriptionRepository] Token refresh attempted but columns removed');
-          
-          // await this.db
-          //   .update(schema.userAccounts)
-          //   .set({
-          //     accessToken: newTokens.access_token,
-          //     refreshToken: newTokens.refresh_token || account.refreshToken,
-          //     expiresAt: newExpiresAt,
-          //     updatedAt: new Date()
-          //   })
-          //   .where(eq(schema.userAccounts.id, account.id))
-          
-          console.log(`Successfully refreshed token for account ${account.id}`)
-          
-          // Return the updated account
-          return {
-            ...account,
-            accessToken: newTokens.access_token,
-            refreshToken: newTokens.refresh_token || account.refreshToken,
-            expiresAt: newExpiresAt
-          }
-        } catch (error) {
-          console.error(`Failed to refresh token for account ${account.id}:`, error)
-          // Continue to next account - don't return null immediately
-          continue
-        }
-      }
-    }
+    // Log warning if this method is called
+    console.warn('[D1SubscriptionRepository] getValidUserAccountForProvider called but tokens are in DOs');
     
     return null
   }
 
   async getValidUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
-    // Get the specific user's account for this provider
+    // Since tokens are stored in Durable Objects, we can't check validity here
+    // Just return the account if it exists and is active
     const userAccount = await this.getUserAccount(userId, providerId)
     
     if (!userAccount) {
       return null
     }
 
-    // Check if token is not expired (or if expiresAt is null, assume it's valid)
-    const now = new Date()
-    if (!userAccount.expiresAt || userAccount.expiresAt > now) {
-      return userAccount
+    // Check if account is active
+    const dbAccount = userAccount as any
+    if (dbAccount.isActive === false) {
+      return null
     }
 
-    // Token is expired, try to refresh if refresh token exists
-    if (userAccount.refreshToken) {
-      try {
-        console.log(`Attempting to refresh token for user account ${userAccount.id}`)
-        
-        // Get OAuth configuration for the provider
-        const oauthProviders = getOAuthProviders(this.env)
-        const oauthProvider = oauthProviders[providerId]
-        
-        if (!oauthProvider) {
-          console.error(`OAuth provider configuration not found for ${providerId}`)
-          return null
-        }
-        
-        // Create OAuth service instance
-        const oauthService = new OAuthService(oauthProvider.config)
-        
-        // Refresh the token
-        const newTokens = await oauthService.refreshToken(userAccount.refreshToken)
-        
-        // Calculate new expiration date
-        const newExpiresAt = newTokens.expires_in 
-          ? new Date(Date.now() + newTokens.expires_in * 1000) 
-          : undefined
-        
-        // NOTE: Token columns removed from schema
-        // This method should not be used after migration to DOs
-        console.warn('[D1SubscriptionRepository] Token refresh attempted but columns removed');
-        
-        // await this.db
-        //   .update(schema.userAccounts)
-        //   .set({
-        //     accessToken: newTokens.access_token,
-        //     refreshToken: newTokens.refresh_token || userAccount.refreshToken,
-        //     expiresAt: newExpiresAt,
-        //     updatedAt: new Date()
-        //   })
-        //   .where(eq(schema.userAccounts.id, userAccount.id))
-        
-        console.log(`Successfully refreshed token for user account ${userAccount.id}`)
-        
-        // Return the updated account
-        return {
-          ...userAccount,
-          accessToken: newTokens.access_token,
-          refreshToken: newTokens.refresh_token || userAccount.refreshToken,
-          expiresAt: newExpiresAt
-        }
-      } catch (error) {
-        console.error(`Failed to refresh token for user account ${userAccount.id}:`, error)
-        return null
-      }
-    }
-
-    // No refresh token available or refresh failed
-    return null
+    // Log warning if this method is called
+    console.warn('[D1SubscriptionRepository] getValidUserAccount called but tokens are in DOs');
+    
+    return userAccount
   }
 
   async getUsersForSubscription(subscriptionId: string): Promise<string[]> {
@@ -526,7 +414,11 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       userId: row.userId,
       providerId: row.providerId,
       externalAccountId: row.externalAccountId,
-      isActive: row.isActive,
+      // Tokens are stored in Durable Objects, not in D1
+      // Return empty values to satisfy the interface
+      accessToken: '',
+      refreshToken: undefined,
+      expiresAt: undefined,
       createdAt: new Date(row.createdAt),
       updatedAt: new Date(row.updatedAt)
     }

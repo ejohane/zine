@@ -186,3 +186,30 @@ To enable Spotify and YouTube account connections:
 - ✅ Subscription Discovery & Management
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
+
+## Git Worktree Database Sync
+
+When working with git worktrees, you need to sync the database from the main project to avoid "no such table" errors.
+
+### Syncing Database for Worktrees
+
+The main project is located at `/Users/erikjohansson/dev/2025/zine`. When creating or switching to a worktree branch:
+
+1. **Run the sync script**:
+   ```bash
+   bun run sync-db
+   # or
+   ./scripts/sync-db-from-main.sh
+   ```
+
+2. **What it does**:
+   - Copies the `.wrangler/state` directory (contains D1 database)
+   - Copies `local.db` and related WAL/SHM files
+   - Preserves all database tables and data from the main project
+
+3. **When to use**:
+   - After creating a new worktree
+   - When encountering "no such table" errors
+   - After database schema changes in the main project
+
+The sync script is idempotent and safe to run multiple times.

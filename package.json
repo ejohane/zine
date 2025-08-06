@@ -13,13 +13,19 @@
     "clean": "turbo clean",
     "deploy": "turbo deploy",
     "deploy:production": "turbo deploy:production",
-    "prepare": "husky"
+    "prepare": "husky",
+    "sync-db": "./scripts/sync-db-from-main.sh"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",
     "husky": "^9.1.7",
+    "playwright": "^1.54.2",
     "turbo": "^2.0.0",
     "typescript": "^5.0.0"
   },
-  "packageManager": "bun@1.0.0"
+  "packageManager": "bun@1.0.0",
+  "dependencies": {
+    "framer-motion": "^12.23.12",
+    "lucide-react": "^0.536.0"
+  }
 }
