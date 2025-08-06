@@ -31,7 +31,7 @@ export function PageWrapper({ children, className }: PageWrapperProps) {
   return (
     <motion.div
       className={cn(
-        'min-h-screen bg-background',
+        'min-h-screen bg-background safe-top',
         'pb-20 md:pt-16 md:pb-0', // Account for fixed nav (top on desktop, bottom on mobile)
         className
       )}
