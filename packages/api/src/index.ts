@@ -6,7 +6,8 @@ import {
   UpdateBookmarkSchema,
   SaveBookmarkSchema,
   BookmarkService,
-  BookmarkSaveService
+  BookmarkSaveService,
+  SubscriptionRepository
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
 import { D1SubscriptionRepository } from './d1-subscription-repository'
@@ -21,7 +22,7 @@ import { TokenRefreshService } from './services/token-refresh-service'
 import { QueryOptimizer } from './repositories/query-optimizer'
 import { InitialFeedPopulationService } from './services/initial-feed-population-service'
 
-type Bindings = {
+export type Bindings = {
   DB: D1Database
   CLERK_SECRET_KEY: string
   // OAuth environment variables
@@ -32,7 +33,16 @@ type Bindings = {
   YOUTUBE_CLIENT_SECRET: string
   YOUTUBE_REDIRECT_URI?: string
   API_BASE_URL: string
+  // Durable Objects
+  USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
+  // Feature flags
+  FEATURE_USE_DO_TOKENS?: string
+  FEATURE_DO_ROLLOUT_PERCENTAGE?: string
+  FEATURE_DUAL_MODE_TOKENS?: string
+  FEATURE_MIGRATION_METRICS?: string
 }
+
+export type Env = Bindings
 
 // Cloudflare Workers types for scheduled events
 interface ScheduledEvent {
@@ -51,7 +61,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Initialize services with D1 database
 let bookmarkService: BookmarkService
 let bookmarkSaveService: BookmarkSaveService
-let subscriptionRepository: D1SubscriptionRepository
+let subscriptionRepository: SubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
 let feedPollingService: OptimizedFeedPollingService
@@ -65,7 +75,18 @@ async function initializeServices(db: D1Database, env: Bindings) {
     const d1Repository = new D1BookmarkRepository(db)
     bookmarkService = new BookmarkService(d1Repository)
     bookmarkSaveService = new BookmarkSaveService(d1Repository)
-    subscriptionRepository = new D1SubscriptionRepository(db, env)
+    
+    // Check if dual-mode tokens are enabled
+    const { getFeatureFlagService } = await import('./services/feature-flags')
+    const featureFlags = getFeatureFlagService(env)
+    
+    if (featureFlags.getFlag('useDurableObjectsForTokens')) {
+      const { DualModeSubscriptionRepository } = await import('./repositories/dual-mode-subscription-repository')
+      subscriptionRepository = new DualModeSubscriptionRepository(env)
+    } else {
+      subscriptionRepository = new D1SubscriptionRepository(db, env)
+    }
+    
     feedItemRepository = new D1FeedItemRepository(db)
     subscriptionDiscoveryService = new SubscriptionDiscoveryService(subscriptionRepository)
     feedPollingService = new OptimizedFeedPollingService(subscriptionRepository, feedItemRepository, db)
@@ -215,13 +236,13 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       
       // First ensure the user exists
       console.log('Ensuring user exists in database...')
-      await subscriptionRepository.ensureUser({
+      await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
         id: decodedState.userId
       })
       
       // Then ensure the provider exists
       console.log('Ensuring provider exists in database...')
-      await subscriptionRepository.ensureProvider({
+      await (subscriptionRepository as D1SubscriptionRepository).ensureProvider({
         id: provider,
         name: provider === 'spotify' ? 'Spotify' : 'YouTube',
         oauthConfig: JSON.stringify(oauthProvider.config)
@@ -678,7 +699,7 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as read
-    await subscriptionRepository.ensureUser({
+    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
       id: auth.userId
     })
     
@@ -717,7 +738,7 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as unread
-    await subscriptionRepository.ensureUser({
+    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
       id: auth.userId
     })
     
@@ -880,6 +901,51 @@ app.get('/api/v1/jobs/status', async (c) => {
   } catch (error) {
     console.error('Job status error:', error)
     return c.json({ error: 'Failed to get job status' }, 500)
+  }
+})
+
+// Migration endpoints
+app.post('/api/v1/migration/tokens-to-do', async (c) => {
+  try {
+    const { runMigration } = await import('./migrations/migration-cli')
+    const response = await runMigration(c.env, c.req.raw)
+    const text = await response.text()
+    return c.text(text)
+  } catch (error) {
+    console.error('Migration error:', error)
+    return c.json({ error: 'Migration failed', details: error instanceof Error ? error.message : String(error) }, 500)
+  }
+})
+
+app.get('/api/v1/migration/status', async (c) => {
+  try {
+    const { runMigration } = await import('./migrations/migration-cli')
+    const request = new Request(`${c.req.url}?action=status`)
+    const response = await runMigration(c.env, request)
+    const text = await response.text()
+    return c.text(text)
+  } catch (error) {
+    console.error('Migration status error:', error)
+    return c.json({ error: 'Failed to get migration status', details: error instanceof Error ? error.message : String(error) }, 500)
+  }
+})
+
+app.get('/api/v1/migration/metrics', async (c) => {
+  try {
+    const { DualModeSubscriptionRepository } = await import('./repositories/dual-mode-subscription-repository')
+    const { getFeatureFlagService } = await import('./services/feature-flags')
+    
+    const featureFlags = getFeatureFlagService(c.env)
+    const dualModeRepo = new DualModeSubscriptionRepository(c.env)
+    
+    return c.json({
+      featureFlags: featureFlags.getFlags(),
+      tokenServiceMetrics: dualModeRepo.getTokenServiceMetrics(),
+      timestamp: new Date().toISOString()
+    })
+  } catch (error) {
+    console.error('Migration metrics error:', error)
+    return c.json({ error: 'Failed to get migration metrics', details: error instanceof Error ? error.message : String(error) }, 500)
   }
 })
 
@@ -1149,64 +1215,204 @@ export default {
   // Scheduled events (cron triggers)
   async scheduled(_event: ScheduledEvent, env: Bindings, _ctx: ExecutionContext): Promise<void> {
     const now = new Date()
-    const currentMinute = now.getMinutes()
-    
-    // Run both feed polling and token refresh every 30 minutes (cron: "*/30 * * * *")
+    console.log(`[Scheduled] Starting Durable Object polling at ${now.toISOString()}`)
     
     try {
-      console.log(`[Scheduled] Running feed polling and token refresh at ${now.toISOString()} (minute ${currentMinute})`)
+      // Check if Durable Objects are enabled
+      const { getFeatureFlagService } = await import('./services/feature-flags')
+      const featureFlags = getFeatureFlagService(env)
       
-      const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
-      
-      // Run both jobs concurrently
-      const [feedResults, tokenResults] = await Promise.allSettled([
-        feedPollingService.pollAllActiveSubscriptions(),
-        tokenRefreshService.refreshExpiringTokens()
-      ])
-      
-      // Handle feed polling results
-      if (feedResults.status === 'fulfilled') {
-        const result = feedResults.value
-        console.log(`[Scheduled] Feed polling completed:`, {
-          subscriptionsPolled: result.totalSubscriptionsPolled,
-          newItemsFound: result.totalNewItems,
-          usersNotified: result.totalUsersNotified,
-          errors: result.errors.length,
-          performanceMetrics: result.performanceMetrics
-        })
+      if (!featureFlags.getFlag('useDurableObjectsForTokens')) {
+        // Fall back to old polling method
+        console.log('[Scheduled] Durable Objects not enabled, using legacy polling')
+        const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
         
-        if (result.performanceMetrics) {
-          console.log(`[Scheduled] Performance:`, {
-            duration: `${result.performanceMetrics.durationMs}ms`,
-            cacheHitRate: `${result.performanceMetrics.cacheHitRate}%`,
-            dbQueriesReduced: result.performanceMetrics.dbQueriesReduced
+        const [feedResults, tokenResults] = await Promise.allSettled([
+          feedPollingService.pollAllActiveSubscriptions(),
+          tokenRefreshService.refreshExpiringTokens()
+        ])
+        
+        if (feedResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Legacy feed polling completed:`, {
+            subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
+            newItemsFound: feedResults.value.totalNewItems,
+            usersNotified: feedResults.value.totalUsersNotified
           })
         }
         
-        if (result.errors.length > 0) {
-          console.error('[Scheduled] Feed polling errors:', result.errors)
+        if (tokenResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Legacy token refresh completed:`, {
+            accountsChecked: tokenResults.value.totalAccountsChecked,
+            tokensRefreshed: tokenResults.value.tokensRefreshed
+          })
         }
-      } else {
-        console.error('[Scheduled] Feed polling failed:', feedResults.reason)
+        
+        return
       }
       
-      // Handle token refresh results
-      if (tokenResults.status === 'fulfilled') {
-        console.log(`[Scheduled] Token refresh completed:`, {
-          accountsChecked: tokenResults.value.totalAccountsChecked,
-          tokensRefreshed: tokenResults.value.tokensRefreshed,
-          errors: tokenResults.value.errors.length
-        })
-        
-        if (tokenResults.value.errors.length > 0) {
-          console.error('[Scheduled] Token refresh errors:', tokenResults.value.errors)
+      // Durable Objects mode: fetch active users and send poll messages
+      const activeUsers = await env.DB.prepare(`
+        SELECT DISTINCT u.id, u.durableObjectId
+        FROM users u
+        INNER JOIN userAccounts ua ON u.id = ua.userId
+        WHERE ua.isActive = 1
+        AND u.durableObjectId IS NOT NULL
+      `).all()
+      
+      console.log(`[Scheduled] Found ${activeUsers.results.length} active users with Durable Objects`)
+      
+      // Send poll messages to each user's Durable Object
+      const pollPromises = activeUsers.results.map(async (user) => {
+        const startTime = Date.now()
+        try {
+          const doId = env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId as string)
+          const stub = env.USER_SUBSCRIPTION_MANAGER.get(doId)
+          
+          const response = await stub.fetch(new Request('https://do.internal/poll'))
+          if (!response.ok) {
+            console.error(`[Scheduled] Poll failed for user ${user.id}: ${response.status}`)
+            return { 
+              userId: user.id, 
+              durableObjectId: user.durableObjectId,
+              success: false, 
+              error: `HTTP ${response.status}`,
+              duration: Date.now() - startTime
+            }
+          }
+          
+          const result = await response.json() as any
+          return { 
+            userId: user.id, 
+            durableObjectId: user.durableObjectId,
+            success: true, 
+            duration: Date.now() - startTime,
+            ...result 
+          }
+        } catch (error) {
+          console.error(`[Scheduled] Error polling user ${user.id}:`, error)
+          return { 
+            userId: user.id, 
+            durableObjectId: user.durableObjectId,
+            success: false, 
+            error: error instanceof Error ? error.message : String(error),
+            duration: Date.now() - startTime
+          }
         }
-      } else {
-        console.error('[Scheduled] Token refresh failed:', tokenResults.reason)
+      })
+      
+      // Execute all polls with concurrency limit
+      const BATCH_SIZE = 10
+      const results = []
+      
+      for (let i = 0; i < pollPromises.length; i += BATCH_SIZE) {
+        const batch = pollPromises.slice(i, i + BATCH_SIZE)
+        const batchResults = await Promise.allSettled(batch)
+        results.push(...batchResults)
       }
+      
+      // Aggregate results and update DO status tracking
+      let totalNewItems = 0
+      let successfulPolls = 0
+      let failedPolls = 0
+      const doStatusUpdates = []
+      
+      for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.success) {
+          successfulPolls++
+          totalNewItems += result.value.newItemsCount || 0
+          
+          // Prepare status update for successful poll
+          doStatusUpdates.push({
+            userId: result.value.userId,
+            durableObjectId: result.value.durableObjectId,
+            status: 'healthy',
+            lastPollTime: now,
+            lastPollSuccess: true,
+            lastPollError: null,
+            newItems: result.value.newItemsCount || 0,
+            duration: result.value.duration
+          })
+        } else {
+          failedPolls++
+          
+          // Prepare status update for failed poll
+          if (result.status === 'rejected') {
+            // For rejected promises, we might not have userId/durableObjectId
+            console.error('[Scheduled] Poll promise rejected:', result.reason)
+          } else if (result.value) {
+            doStatusUpdates.push({
+              userId: result.value.userId,
+              durableObjectId: result.value.durableObjectId,
+              status: 'unhealthy',
+              lastPollTime: now,
+              lastPollSuccess: false,
+              lastPollError: result.value.error || 'Unknown error',
+              newItems: 0,
+              duration: result.value.duration || 0
+            })
+          }
+        }
+      }
+      
+      // Update DO status tracking in database
+      try {
+        for (const update of doStatusUpdates) {
+          await env.DB.prepare(`
+            INSERT INTO durable_object_status (
+              id, userId, durableObjectId, status, lastPollTime, 
+              lastPollSuccess, lastPollError, totalPollCount, 
+              successfulPollCount, failedPollCount, totalNewItems,
+              createdAt, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              status = excluded.status,
+              lastPollTime = excluded.lastPollTime,
+              lastPollSuccess = excluded.lastPollSuccess,
+              lastPollError = excluded.lastPollError,
+              totalPollCount = durable_object_status.totalPollCount + 1,
+              successfulPollCount = CASE 
+                WHEN excluded.lastPollSuccess = 1 
+                THEN durable_object_status.successfulPollCount + 1 
+                ELSE durable_object_status.successfulPollCount 
+              END,
+              failedPollCount = CASE 
+                WHEN excluded.lastPollSuccess = 0 
+                THEN durable_object_status.failedPollCount + 1 
+                ELSE durable_object_status.failedPollCount 
+              END,
+              totalNewItems = durable_object_status.totalNewItems + excluded.totalNewItems,
+              updatedAt = excluded.updatedAt
+          `).bind(
+            `${update.userId}-do-status`,
+            update.userId,
+            update.durableObjectId,
+            update.status,
+            update.lastPollTime.getTime(),
+            update.lastPollSuccess ? 1 : 0,
+            update.lastPollError,
+            update.lastPollSuccess ? 1 : 0,
+            update.lastPollSuccess ? 0 : 1,
+            update.newItems,
+            now.getTime(),
+            now.getTime()
+          ).run()
+        }
+      } catch (error) {
+        console.error('[Scheduled] Error updating DO status tracking:', error)
+      }
+      
+      console.log(`[Scheduled] Durable Object polling completed:`, {
+        totalUsers: activeUsers.results.length,
+        successfulPolls,
+        failedPolls,
+        totalNewItems
+      })
       
     } catch (error) {
       console.error('[Scheduled] Fatal error during scheduled task:', error)
     }
   }
 }
+
+// Export Durable Objects
+export { UserSubscriptionManager } from './durable-objects/user-subscription-manager'

@@ -7,6 +7,7 @@ export const users = sqliteTable('users', {
   firstName: text('first_name'),                  // First name from Clerk
   lastName: text('last_name'),                    // Last name from Clerk
   imageUrl: text('image_url'),                    // Profile image URL from Clerk
+  durableObjectId: text('durable_object_id'),     // DO ID for user's subscription manager
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
@@ -67,9 +68,11 @@ export const userAccounts = sqliteTable('user_accounts', {
   userId: text('user_id').notNull().references(() => users.id),
   providerId: text('provider_id').notNull().references(() => subscriptionProviders.id),
   externalAccountId: text('external_account_id').notNull(),
-  accessToken: text('access_token').notNull(),
-  refreshToken: text('refresh_token'),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  // Tokens are now stored in Durable Objects, not in the database
+  // accessToken: text('access_token').notNull(), // REMOVED - stored in DO
+  // refreshToken: text('refresh_token'), // REMOVED - stored in DO
+  // expiresAt: integer('expires_at', { mode: 'timestamp' }), // REMOVED - stored in DO
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
@@ -123,6 +126,52 @@ export const userFeedItems = sqliteTable('user_feed_items', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+// Token migration tracking
+export const tokenMigrationStatus = sqliteTable('token_migration_status', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  provider: text('provider').notNull(),
+  status: text('status').notNull(), // pending, in_progress, completed, failed
+  attemptCount: integer('attempt_count').notNull().default(0),
+  error: text('error'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  lastAttemptAt: integer('last_attempt_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+// Durable Object status tracking
+export const durableObjectStatus = sqliteTable('durable_object_status', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  durableObjectId: text('durable_object_id').notNull(),
+  status: text('status').notNull(), // healthy, unhealthy, inactive
+  lastPollTime: integer('last_poll_time', { mode: 'timestamp' }),
+  lastPollSuccess: integer('last_poll_success', { mode: 'boolean' }).notNull().default(true),
+  lastPollError: text('last_poll_error'),
+  totalPollCount: integer('total_poll_count').notNull().default(0),
+  successfulPollCount: integer('successful_poll_count').notNull().default(0),
+  failedPollCount: integer('failed_poll_count').notNull().default(0),
+  totalNewItems: integer('total_new_items').notNull().default(0),
+  lastHealthCheckTime: integer('last_health_check_time', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+// Durable Object polling metrics
+export const durableObjectMetrics = sqliteTable('durable_object_metrics', {
+  id: text('id').primaryKey(),
+  durableObjectId: text('durable_object_id').notNull(),
+  pollTimestamp: integer('poll_timestamp', { mode: 'timestamp' }).notNull(),
+  provider: text('provider').notNull(), // spotify, youtube
+  subscriptionCount: integer('subscription_count').notNull(),
+  newItemsFound: integer('new_items_found').notNull(),
+  pollDurationMs: integer('poll_duration_ms').notNull(),
+  errors: text('errors'), // JSON array of errors
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
 export const insertCreatorSchema = createInsertSchema(creators)
@@ -143,6 +192,12 @@ export const insertFeedItemSchema = createInsertSchema(feedItems)
 export const selectFeedItemSchema = createSelectSchema(feedItems)
 export const insertUserFeedItemSchema = createInsertSchema(userFeedItems)
 export const selectUserFeedItemSchema = createSelectSchema(userFeedItems)
+export const insertTokenMigrationStatusSchema = createInsertSchema(tokenMigrationStatus)
+export const selectTokenMigrationStatusSchema = createSelectSchema(tokenMigrationStatus)
+export const insertDurableObjectStatusSchema = createInsertSchema(durableObjectStatus)
+export const selectDurableObjectStatusSchema = createSelectSchema(durableObjectStatus)
+export const insertDurableObjectMetricsSchema = createInsertSchema(durableObjectMetrics)
+export const selectDurableObjectMetricsSchema = createSelectSchema(durableObjectMetrics)
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -164,3 +219,9 @@ export type FeedItem = typeof feedItems.$inferSelect
 export type NewFeedItem = typeof feedItems.$inferInsert
 export type UserFeedItem = typeof userFeedItems.$inferSelect
 export type NewUserFeedItem = typeof userFeedItems.$inferInsert
+export type TokenMigrationStatus = typeof tokenMigrationStatus.$inferSelect
+export type NewTokenMigrationStatus = typeof tokenMigrationStatus.$inferInsert
+export type DurableObjectStatus = typeof durableObjectStatus.$inferSelect
+export type NewDurableObjectStatus = typeof durableObjectStatus.$inferInsert
+export type DurableObjectMetrics = typeof durableObjectMetrics.$inferSelect
+export type NewDurableObjectMetrics = typeof durableObjectMetrics.$inferInsert

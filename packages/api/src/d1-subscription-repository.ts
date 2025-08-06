@@ -223,16 +223,19 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
             ? new Date(Date.now() + newTokens.expires_in * 1000) 
             : undefined
           
-          // Update the account with new tokens
-          await this.db
-            .update(schema.userAccounts)
-            .set({
-              accessToken: newTokens.access_token,
-              refreshToken: newTokens.refresh_token || account.refreshToken, // Keep old refresh token if new one not provided
-              expiresAt: newExpiresAt,
-              updatedAt: new Date()
-            })
-            .where(eq(schema.userAccounts.id, account.id))
+          // NOTE: Token columns removed from schema
+          // This method should not be used after migration to DOs
+          console.warn('[D1SubscriptionRepository] Token refresh attempted but columns removed');
+          
+          // await this.db
+          //   .update(schema.userAccounts)
+          //   .set({
+          //     accessToken: newTokens.access_token,
+          //     refreshToken: newTokens.refresh_token || account.refreshToken,
+          //     expiresAt: newExpiresAt,
+          //     updatedAt: new Date()
+          //   })
+          //   .where(eq(schema.userAccounts.id, account.id))
           
           console.log(`Successfully refreshed token for account ${account.id}`)
           
@@ -293,16 +296,19 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
           ? new Date(Date.now() + newTokens.expires_in * 1000) 
           : undefined
         
-        // Update the account with new tokens
-        await this.db
-          .update(schema.userAccounts)
-          .set({
-            accessToken: newTokens.access_token,
-            refreshToken: newTokens.refresh_token || userAccount.refreshToken, // Keep old refresh token if new one not provided
-            expiresAt: newExpiresAt,
-            updatedAt: new Date()
-          })
-          .where(eq(schema.userAccounts.id, userAccount.id))
+        // NOTE: Token columns removed from schema
+        // This method should not be used after migration to DOs
+        console.warn('[D1SubscriptionRepository] Token refresh attempted but columns removed');
+        
+        // await this.db
+        //   .update(schema.userAccounts)
+        //   .set({
+        //     accessToken: newTokens.access_token,
+        //     refreshToken: newTokens.refresh_token || userAccount.refreshToken,
+        //     expiresAt: newExpiresAt,
+        //     updatedAt: new Date()
+        //   })
+        //   .where(eq(schema.userAccounts.id, userAccount.id))
         
         console.log(`Successfully refreshed token for user account ${userAccount.id}`)
         
