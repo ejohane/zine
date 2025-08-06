@@ -59,4 +59,4 @@ const Fab = React.forwardRef<HTMLButtonElement, FabProps>(
 )
 Fab.displayName = "Fab"
 
-export { Fab, fabVariants }
+export { Fab }

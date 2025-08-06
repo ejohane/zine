@@ -449,7 +449,14 @@ export const fetchFeed = async (
   const result = await response.json()
   return {
     ...result,
-    feedItems: result.feedItems.map((item: any) => ({
+    feedItems: result.feedItems.map((item: {
+      id: string
+      feedItem: FeedItem & { publishedAt: string }
+      isRead: boolean
+      readAt?: string
+      bookmarkId?: number
+      createdAt: string
+    }) => ({
       ...item,
       feedItem: {
         ...item.feedItem,

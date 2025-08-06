@@ -75,12 +75,20 @@ export function useMarkFeedItemRead() {
       await queryClient.cancelQueries({ queryKey: ['feed'] })
       
       // Update all feed queries
-      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: any) => {
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: unknown) => {
         if (!oldData) return oldData
         
+        const typedData = oldData as {
+          pages: Array<{
+            feedItems: FeedItemWithState[]
+            pagination: FeedResponse['pagination']
+          }>
+          pageParams: unknown[]
+        }
+        
         return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
+          ...typedData,
+          pages: typedData.pages.map((page) => ({
             ...page,
             feedItems: page.feedItems.map((item: FeedItemWithState) => 
               item.id === itemId 
@@ -128,12 +136,20 @@ export function useMarkFeedItemUnread() {
       await queryClient.cancelQueries({ queryKey: ['feed'] })
       
       // Update all feed queries
-      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: any) => {
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: unknown) => {
         if (!oldData) return oldData
         
+        const typedData = oldData as {
+          pages: Array<{
+            feedItems: FeedItemWithState[]
+            pagination: FeedResponse['pagination']
+          }>
+          pageParams: unknown[]
+        }
+        
         return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
+          ...typedData,
+          pages: typedData.pages.map((page) => ({
             ...page,
             feedItems: page.feedItems.map((item: FeedItemWithState) => 
               item.id === itemId 
@@ -183,12 +199,20 @@ export function useSaveFeedItemToBookmarks() {
       // Optimistic update - mark as bookmarked in feed
       await queryClient.cancelQueries({ queryKey: ['feed'] })
       
-      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: any) => {
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: unknown) => {
         if (!oldData) return oldData
         
+        const typedData = oldData as {
+          pages: Array<{
+            feedItems: FeedItemWithState[]
+            pagination: FeedResponse['pagination']
+          }>
+          pageParams: unknown[]
+        }
+        
         return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
+          ...typedData,
+          pages: typedData.pages.map((page) => ({
             ...page,
             feedItems: page.feedItems.map((item: FeedItemWithState) => 
               item.feedItem.id === feedItem.id 
@@ -201,12 +225,20 @@ export function useSaveFeedItemToBookmarks() {
     },
     onSuccess: (bookmark, feedItem) => {
       // Update with real bookmark ID
-      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: any) => {
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: unknown) => {
         if (!oldData) return oldData
         
+        const typedData = oldData as {
+          pages: Array<{
+            feedItems: FeedItemWithState[]
+            pagination: FeedResponse['pagination']
+          }>
+          pageParams: unknown[]
+        }
+        
         return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
+          ...typedData,
+          pages: typedData.pages.map((page) => ({
             ...page,
             feedItems: page.feedItems.map((item: FeedItemWithState) => 
               item.feedItem.id === feedItem.id 
@@ -222,12 +254,20 @@ export function useSaveFeedItemToBookmarks() {
     },
     onError: (error, feedItem) => {
       // Revert optimistic update
-      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: any) => {
+      queryClient.setQueriesData({ queryKey: ['feed'] }, (oldData: unknown) => {
         if (!oldData) return oldData
         
+        const typedData = oldData as {
+          pages: Array<{
+            feedItems: FeedItemWithState[]
+            pagination: FeedResponse['pagination']
+          }>
+          pageParams: unknown[]
+        }
+        
         return {
-          ...oldData,
-          pages: oldData.pages.map((page: any) => ({
+          ...typedData,
+          pages: typedData.pages.map((page) => ({
             ...page,
             feedItems: page.feedItems.map((item: FeedItemWithState) => 
               item.feedItem.id === feedItem.id 
