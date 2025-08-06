@@ -1251,13 +1251,42 @@ export default {
       }
       
       // Durable Objects mode: fetch active users and send poll messages
-      const activeUsers = await env.DB.prepare(`
-        SELECT DISTINCT u.id, u.durableObjectId
-        FROM users u
-        INNER JOIN userAccounts ua ON u.id = ua.userId
-        WHERE ua.isActive = 1
-        AND u.durableObjectId IS NOT NULL
-      `).all()
+      // Check if the durable_object_id column exists
+      let activeUsers: D1Result<any>
+      try {
+        activeUsers = await env.DB.prepare(`
+          SELECT DISTINCT u.id, u.durable_object_id as durableObjectId
+          FROM users u
+          INNER JOIN user_accounts ua ON u.id = ua.user_id
+          WHERE u.durable_object_id IS NOT NULL
+        `).all()
+      } catch (error) {
+        console.log('[Scheduled] Database schema not ready for Durable Objects, falling back to legacy polling')
+        // Fall back to legacy polling if the schema isn't ready
+        const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
+        
+        const [feedResults, tokenResults] = await Promise.allSettled([
+          feedPollingService.pollAllActiveSubscriptions(),
+          tokenRefreshService.refreshExpiringTokens()
+        ])
+        
+        if (feedResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Legacy feed polling completed:`, {
+            subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
+            newItemsFound: feedResults.value.totalNewItems,
+            usersNotified: feedResults.value.totalUsersNotified
+          })
+        }
+        
+        if (tokenResults.status === 'fulfilled') {
+          console.log(`[Scheduled] Legacy token refresh completed:`, {
+            accountsChecked: tokenResults.value.totalAccountsChecked,
+            tokensRefreshed: tokenResults.value.tokensRefreshed
+          })
+        }
+        
+        return
+      }
       
       console.log(`[Scheduled] Found ${activeUsers.results.length} active users with Durable Objects`)
       
@@ -1356,6 +1385,16 @@ export default {
       
       // Update DO status tracking in database
       try {
+        // Check if the durable_object_status table exists
+        const tableCheck = await env.DB.prepare(`
+          SELECT name FROM sqlite_master WHERE type='table' AND name='durable_object_status'
+        `).first()
+        
+        if (!tableCheck) {
+          console.log('[Scheduled] durable_object_status table not found, skipping status updates')
+          return
+        }
+        
         for (const update of doStatusUpdates) {
           await env.DB.prepare(`
             INSERT INTO durable_object_status (

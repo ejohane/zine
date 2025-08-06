@@ -119,7 +119,6 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       userId: account.userId,
       providerId: account.providerId,
       externalAccountId: account.externalAccountId,
-      isActive: true,
       createdAt: now,
       updatedAt: now
     }
@@ -179,15 +178,10 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
     // Just return the first active account for the provider
     const accounts = await this.getUserAccountsByProvider(providerId)
     
-    // Return the first active account if any exist
-    const activeAccount = accounts.find(account => {
-      // Check if account has isActive property (from DB) 
-      const dbAccount = account as any
-      return dbAccount.isActive !== false
-    })
-    
-    if (activeAccount) {
-      return activeAccount
+    // Return the first account if any exist
+    // Note: isActive column doesn't exist in user_accounts table
+    if (accounts.length > 0) {
+      return accounts[0]
     }
     
     // Log warning if this method is called
@@ -205,11 +199,8 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       return null
     }
 
-    // Check if account is active
-    const dbAccount = userAccount as any
-    if (dbAccount.isActive === false) {
-      return null
-    }
+    // Account exists, return it
+    // Note: isActive column doesn't exist in user_accounts table
 
     // Log warning if this method is called
     console.warn('[D1SubscriptionRepository] getValidUserAccount called but tokens are in DOs');
@@ -411,16 +402,16 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
   private mapUserAccount(row: any): UserAccount {
     return {
       id: row.id,
-      userId: row.userId,
-      providerId: row.providerId,
-      externalAccountId: row.externalAccountId,
+      userId: row.user_id || row.userId,
+      providerId: row.provider_id || row.providerId,
+      externalAccountId: row.external_account_id || row.externalAccountId,
       // Tokens are stored in Durable Objects, not in D1
       // Return empty values to satisfy the interface
       accessToken: '',
       refreshToken: undefined,
       expiresAt: undefined,
-      createdAt: new Date(row.createdAt),
-      updatedAt: new Date(row.updatedAt)
+      createdAt: new Date(row.created_at || row.createdAt),
+      updatedAt: new Date(row.updated_at || row.updatedAt)
     }
   }
 
