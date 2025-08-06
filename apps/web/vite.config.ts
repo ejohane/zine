@@ -16,11 +16,20 @@ export default defineConfig({
     historyApiFallback: true,
   },
   build: {
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'router': ['@tanstack/react-router'],
+          'ui-vendor': ['framer-motion', 'lucide-react'],
+          'clerk': ['@clerk/clerk-react'],
+        },
       },
     },
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', '@tanstack/react-router', 'framer-motion'],
   },
   plugins: [
     react(),
