@@ -1,12 +1,15 @@
 import {
-  Link,
   createRootRoute,
   Outlet,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { SignedIn, SignedOut, UserButton } from '@clerk/clerk-react'
+import { SignedIn, SignedOut } from '@clerk/clerk-react'
 import * as React from 'react'
+import { Header } from '@/components/navigation/Header'
+import { TabBar } from '@/components/navigation/TabBar'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+import { cn } from '@/lib/utils'
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -20,73 +23,27 @@ function RootComponent() {
       },
     },
   }))
+  
+  const isMobile = useIsMobile()
 
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen">
+      <div className="min-h-screen flex flex-col">
         <SignedOut>
           <Outlet />
         </SignedOut>
 
         <SignedIn>
-          <div className="p-2 flex gap-2 justify-between">
-            <div className="flex gap-2">
-              <Link
-                to="/"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-                activeOptions={{ exact: true }}
-              >
-                Home
-              </Link>
-              <Link
-                to="/bookmarks"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-              >
-                Bookmarks
-              </Link>
-              <Link
-                to="/feed"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-              >
-                Feed
-              </Link>
-              <Link
-                to="/test1"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-              >
-                Test 1
-              </Link>
-              <Link
-                to="/test2"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-              >
-                Test 2
-              </Link>
-              <Link
-                to="/profile"
-                activeProps={{
-                  className: 'font-bold',
-                }}
-              >
-                Profile
-              </Link>
-            </div>
-            <div className="flex items-center gap-2">
-              <UserButton afterSignOutUrl="/" />
-            </div>
-          </div>
-          <hr />
-          <Outlet />
+          {!isMobile && <Header />}
+          
+          <main className={cn(
+            "flex-1",
+            isMobile && "pb-16" // Add padding for mobile tab bar
+          )}>
+            <Outlet />
+          </main>
+          
+          {isMobile && <TabBar />}
         </SignedIn>
       </div>
       

@@ -74,6 +74,10 @@ export class FeedPollingService {
 
         try {
           console.log(`[FeedPolling] Starting batch processing for ${providerId}`)
+          if (!userAccount.accessToken) {
+            console.log(`[FeedPolling] No access token found for ${providerId}, skipping`)
+            continue
+          }
           const batchResults = await processor.processBatch(subscriptions, userAccount.accessToken, {
             onProgress: (completed, total) => {
               console.log(`[FeedPolling] ${providerId} progress: ${completed}/${total} (${Math.round(completed/total * 100)}%)`)

@@ -66,6 +66,10 @@ export class InitialFeedPopulationService {
     userId: string
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
+    if (!userAccount.accessToken) {
+      console.log('[InitialFeedPopulation] No access token for Spotify')
+      return results
+    }
     const spotifyAPI = new SpotifyAPI(userAccount.accessToken)
 
     for (const subscriptionId of subscriptionIds) {
@@ -143,6 +147,10 @@ export class InitialFeedPopulationService {
     userId: string
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
+    if (!userAccount.accessToken) {
+      console.log('[InitialFeedPopulation] No access token for YouTube')
+      return results
+    }
     const youtubeAPI = new YouTubeAPI(userAccount.accessToken)
 
     for (const subscriptionId of subscriptionIds) {

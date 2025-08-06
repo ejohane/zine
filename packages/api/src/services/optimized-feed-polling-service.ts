@@ -118,6 +118,10 @@ export class OptimizedFeedPollingService {
 
         try {
           console.log(`[OptimizedFeedPolling] Starting batch processing for ${providerId}`)
+          if (!userAccount.accessToken) {
+            console.log(`[OptimizedFeedPolling] No access token found for ${providerId}, skipping`)
+            continue
+          }
           const batchResults = await processor.processBatch(subscriptions, userAccount.accessToken, {
             onProgress: (completed, total) => {
               console.log(`[OptimizedFeedPolling] ${providerId} progress: ${completed}/${total} (${Math.round(completed/total * 100)}%)`)

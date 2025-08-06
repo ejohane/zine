@@ -54,12 +54,14 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
     
     // Also update DO if user has been migrated
     try {
-      await this.tokenService.updateToken(account.userId, {
-        provider: account.providerId as 'spotify' | 'youtube',
-        accessToken: account.accessToken,
-        refreshToken: account.refreshToken || undefined,
-        expiresAt: account.expiresAt || undefined
-      });
+      if (account.accessToken) {
+        await this.tokenService.updateToken(account.userId, {
+          provider: account.providerId as 'spotify' | 'youtube',
+          accessToken: account.accessToken,
+          refreshToken: account.refreshToken || undefined,
+          expiresAt: account.expiresAt || undefined
+        });
+      }
     } catch (error) {
       console.error('Failed to update token in DO after account creation:', error);
       // Don't fail the operation if DO update fails

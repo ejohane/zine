@@ -530,7 +530,8 @@ export class D1FeedItemRepository implements FeedItemRepository {
       creatorName: row.creatorName,
       description: row.description || undefined,
       thumbnailUrl: row.thumbnailUrl || undefined,
-      subscriptionUrl: row.subscriptionUrl || undefined
+      subscriptionUrl: row.subscriptionUrl || undefined,
+      totalEpisodes: row.totalEpisodes || undefined
     }
   }
 }
