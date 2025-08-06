@@ -209,8 +209,8 @@ export class EnhancedMetadataExtractor {
    */
   private parseEnhancedHtmlMetadata(html: string, url: string): EnhancedExtractedMetadata {
     // Parse HTML using linkedom for proper DOM manipulation
-    const parsed = parseHTML(html) as any
-    const document = parsed.document as LinkedOMDocument
+    const parsed = parseHTML(html)
+    const document = parsed as unknown as LinkedOMDocument
     
     // Extract JSON-LD structured data
     const jsonLdData = this.extractJsonLd(document)
