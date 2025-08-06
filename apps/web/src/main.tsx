@@ -5,7 +5,20 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import { createRouter } from './router'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { SetupPage } from './components/SetupPage'
+import { registerSW } from 'virtual:pwa-register'
 import './App.css'
+
+// Register service worker
+const updateSW = registerSW({
+  onNeedRefresh() {
+    if (confirm('New content available. Reload?')) {
+      updateSW(true)
+    }
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline')
+  },
+})
 
 // Environment-based Clerk key selection
 const getClerkPublishableKey = (): string | null => {
