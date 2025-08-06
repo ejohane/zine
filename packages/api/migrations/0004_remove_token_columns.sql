@@ -21,18 +21,18 @@ CREATE TABLE user_accounts_new (
 
 -- Copy data from old table (excluding token columns)
 INSERT INTO user_accounts_new (id, userId, providerId, externalAccountId, isActive, createdAt, updatedAt)
-SELECT id, userId, providerId, externalAccountId, 
+SELECT id, user_id, provider_id, external_account_id, 
        1 as isActive,  -- Default all existing accounts to active
-       createdAt, updatedAt
-FROM userAccounts;
+       created_at, updated_at
+FROM user_accounts;
 
 -- Drop the old table
-DROP TABLE userAccounts;
+DROP TABLE user_accounts;
 
 -- Rename the new table
-ALTER TABLE user_accounts_new RENAME TO userAccounts;
+ALTER TABLE user_accounts_new RENAME TO user_accounts;
 
 -- Recreate any indexes if needed
-CREATE INDEX idx_userAccounts_userId ON userAccounts(userId);
-CREATE INDEX idx_userAccounts_providerId ON userAccounts(providerId);
-CREATE UNIQUE INDEX idx_userAccounts_user_provider ON userAccounts(userId, providerId);
+CREATE INDEX idx_user_accounts_userId ON user_accounts(userId);
+CREATE INDEX idx_user_accounts_providerId ON user_accounts(providerId);
+CREATE UNIQUE INDEX idx_user_accounts_user_provider ON user_accounts(userId, providerId);
