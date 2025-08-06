@@ -10,9 +10,10 @@ export interface UserAccount {
   userId: string
   providerId: string
   externalAccountId: string
-  accessToken: string
-  refreshToken?: string
-  expiresAt?: Date
+  accessToken?: string  // Now stored in Durable Objects
+  refreshToken?: string  // Now stored in Durable Objects
+  expiresAt?: Date  // Now stored in Durable Objects
+  isActive: boolean
   createdAt: Date
   updatedAt: Date
 }

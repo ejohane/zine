@@ -1,1 +1,2 @@
--- Migration already applied manually. Column total_episodes already exists.
+-- Add total_episodes column to subscriptions table
+ALTER TABLE subscriptions ADD COLUMN total_episodes INTEGER;

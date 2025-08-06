@@ -7,7 +7,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SignedIn, SignedOut } from '@clerk/clerk-react'
 import { AnimatePresence } from 'framer-motion'
 import * as React from 'react'
-import { Navigation } from '../components/layout/Navigation'
+import { Header } from '@/components/navigation/Header'
+import { TabBar } from '@/components/navigation/TabBar'
+import { useIsMobile } from '@/hooks/useMediaQuery'
+import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { SkipLink } from '../components/layout/SkipLink'
 
@@ -23,21 +26,31 @@ function RootComponent() {
       },
     },
   }))
+  
+  const isMobile = useIsMobile()
 
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         <SkipLink />
-        <div className="min-h-screen">
+        <div className="min-h-screen flex flex-col">
           <SignedOut>
             <Outlet />
           </SignedOut>
 
           <SignedIn>
-            <Navigation />
-            <AnimatePresence mode="wait">
-              <Outlet />
-            </AnimatePresence>
+            {!isMobile && <Header />}
+            
+            <main className={cn(
+              "flex-1",
+              isMobile && "pb-16" // Add padding for mobile tab bar
+            )}>
+              <AnimatePresence mode="wait">
+                <Outlet />
+              </AnimatePresence>
+            </main>
+            
+            {isMobile && <TabBar />}
           </SignedIn>
         </div>
         

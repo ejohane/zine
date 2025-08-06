@@ -17,6 +17,44 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* PWA Safe Area Support */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+  
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  /* Ensure the app fills the viewport in standalone mode */
+  html, body, #root {
+    height: 100%;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Allow text selection in content areas */
+  .content-area {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  /* Improve touch responsiveness */
+  button, a, .touchable {
+    touch-action: manipulation;
+  }
 }
 
 /* Hide scrollbar for webkit browsers */

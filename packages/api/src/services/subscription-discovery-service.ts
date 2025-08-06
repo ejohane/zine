@@ -52,6 +52,9 @@ export class SubscriptionDiscoveryService {
     userId: string, 
     userAccount: UserAccount
   ): Promise<DiscoveryResult> {
+    if (!userAccount.accessToken) {
+      throw new Error('No access token available for Spotify')
+    }
     const spotifyAPI = new SpotifyAPI(userAccount.accessToken)
     
     // Test connection first
@@ -91,6 +94,9 @@ export class SubscriptionDiscoveryService {
     userId: string, 
     userAccount: UserAccount
   ): Promise<DiscoveryResult> {
+    if (!userAccount.accessToken) {
+      throw new Error('No access token available for YouTube')
+    }
     const youtubeAPI = new YouTubeAPI(userAccount.accessToken)
     
     // Test connection first

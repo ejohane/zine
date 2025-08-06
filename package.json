@@ -1,7 +1,10 @@
 {
   "name": "zine",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
@@ -10,10 +13,12 @@
     "clean": "turbo clean",
     "deploy": "turbo deploy",
     "deploy:production": "turbo deploy:production",
+    "prepare": "husky",
     "sync-db": "./scripts/sync-db-from-main.sh"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",
+    "husky": "^9.1.7",
     "playwright": "^1.54.2",
     "turbo": "^2.0.0",
     "typescript": "^5.0.0"

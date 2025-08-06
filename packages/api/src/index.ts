@@ -255,7 +255,8 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
         externalAccountId: userInfo.id,
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
-        expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined
+        expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
+        isActive: true
       })
     }
     

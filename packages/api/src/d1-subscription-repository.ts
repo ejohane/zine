@@ -410,6 +410,7 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       accessToken: '',
       refreshToken: undefined,
       expiresAt: undefined,
+      isActive: row.isActive === 1,
       createdAt: new Date(row.created_at || row.createdAt),
       updatedAt: new Date(row.updated_at || row.updatedAt)
     }

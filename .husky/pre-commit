@@ -1,0 +1,24 @@
+#!/bin/sh
+
+echo "🔍 Running linter..."
+bun run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Linting failed! Please fix the errors before committing."
+  exit 1
+fi
+
+echo "🧪 Running type checks..."
+bun run type-check
+if [ $? -ne 0 ]; then
+  echo "❌ Type checking failed! Please fix the errors before committing."
+  exit 1
+fi
+
+echo "🏗️  Running build..."
+bun run build
+if [ $? -ne 0 ]; then
+  echo "❌ Build failed! Please fix the errors before committing."
+  exit 1
+fi
+
+echo "✅ All checks passed! Proceeding with commit..."
