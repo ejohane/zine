@@ -175,7 +175,7 @@ export class DualModeTokenService {
 
       if (shouldUseDO && hasDurableObject) {
         // Use DO for refresh
-        const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(userId);
+        const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
         const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
         
         const response = await doStub.fetch(
@@ -212,7 +212,14 @@ export class DualModeTokenService {
    * Get tokens from Durable Object
    */
   private async getTokensFromDO(userId: string): Promise<Map<string, TokenData>> {
-    const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(userId);
+    // Get the user's durableObjectId from the database
+    const user = await this.getUser(userId);
+    if (!user?.durableObjectId) {
+      throw new Error(`No Durable Object ID found for user ${userId}`);
+    }
+    
+    // Use idFromString with the stored DO ID (already a hex string)
+    const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
     const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
     
     const response = await doStub.fetch(
@@ -255,7 +262,14 @@ export class DualModeTokenService {
    * Update token in Durable Object
    */
   private async updateTokenInDO(userId: string, tokenData: TokenData): Promise<void> {
-    const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(userId);
+    // Get the user's durableObjectId from the database
+    const user = await this.getUser(userId);
+    if (!user?.durableObjectId) {
+      throw new Error(`No Durable Object ID found for user ${userId}`);
+    }
+    
+    // Use idFromString with the stored DO ID (already a hex string)
+    const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
     const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
     
     const response = await doStub.fetch(
