@@ -1,5 +1,4 @@
 export interface FeatureFlags {
-  useDurableObjectsForTokens: boolean;
   durableObjectsRolloutPercentage: number;
   enableDualModeTokenStorage: boolean;
   enableMigrationMetrics: boolean;
@@ -10,7 +9,6 @@ export class FeatureFlagService {
 
   constructor(initialFlags?: Partial<FeatureFlags>) {
     this.flags = {
-      useDurableObjectsForTokens: false,
       durableObjectsRolloutPercentage: 0,
       enableDualModeTokenStorage: false,
       enableMigrationMetrics: false,
@@ -20,21 +18,11 @@ export class FeatureFlagService {
 
   /**
    * Check if a user should use Durable Objects based on rollout percentage
+   * Note: This is now always true as we've migrated to Durable Objects for all users
    */
-  shouldUseDurableObjects(userId: string): boolean {
-    if (!this.flags.useDurableObjectsForTokens) {
-      return false;
-    }
-
-    // If 100% rollout, all users use DOs
-    if (this.flags.durableObjectsRolloutPercentage >= 100) {
-      return true;
-    }
-
-    // Use consistent hashing to determine if user is in rollout
-    const hash = this.hashUserId(userId);
-    const threshold = this.flags.durableObjectsRolloutPercentage / 100;
-    return hash < threshold;
+  shouldUseDurableObjects(_userId: string): boolean {
+    // Always use Durable Objects - keeping method for backward compatibility
+    return true;
   }
 
   /**
@@ -65,26 +53,12 @@ export class FeatureFlagService {
     this.flags[flag] = value;
   }
 
-  /**
-   * Simple hash function to consistently assign users to rollout groups
-   */
-  private hashUserId(userId: string): number {
-    let hash = 0;
-    for (let i = 0; i < userId.length; i++) {
-      const char = userId.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    // Convert to 0-1 range
-    return Math.abs(hash) / 2147483647;
-  }
 
   /**
    * Create from environment variables
    */
   static fromEnv(env: any): FeatureFlagService {
     return new FeatureFlagService({
-      useDurableObjectsForTokens: env.FEATURE_USE_DO_TOKENS === 'true',
       durableObjectsRolloutPercentage: parseInt(env.FEATURE_DO_ROLLOUT_PERCENTAGE || '0'),
       enableDualModeTokenStorage: env.FEATURE_DUAL_MODE_TOKENS === 'true',
       enableMigrationMetrics: env.FEATURE_MIGRATION_METRICS === 'true'

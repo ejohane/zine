@@ -36,7 +36,6 @@ export type Bindings = {
   // Durable Objects
   USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
   // Feature flags
-  FEATURE_USE_DO_TOKENS?: string
   FEATURE_DO_ROLLOUT_PERCENTAGE?: string
   FEATURE_DUAL_MODE_TOKENS?: string
   FEATURE_MIGRATION_METRICS?: string
@@ -76,16 +75,9 @@ async function initializeServices(db: D1Database, env: Bindings) {
     bookmarkService = new BookmarkService(d1Repository)
     bookmarkSaveService = new BookmarkSaveService(d1Repository)
     
-    // Check if dual-mode tokens are enabled
-    const { getFeatureFlagService } = await import('./services/feature-flags')
-    const featureFlags = getFeatureFlagService(env)
-    
-    if (featureFlags.getFlag('useDurableObjectsForTokens')) {
-      const { DualModeSubscriptionRepository } = await import('./repositories/dual-mode-subscription-repository')
-      subscriptionRepository = new DualModeSubscriptionRepository(env)
-    } else {
-      subscriptionRepository = new D1SubscriptionRepository(db, env)
-    }
+    // Always use DualModeSubscriptionRepository for token storage in Durable Objects
+    const { DualModeSubscriptionRepository } = await import('./repositories/dual-mode-subscription-repository')
+    subscriptionRepository = new DualModeSubscriptionRepository(env)
     
     feedItemRepository = new D1FeedItemRepository(db)
     subscriptionDiscoveryService = new SubscriptionDiscoveryService(subscriptionRepository)
@@ -1233,39 +1225,7 @@ export default {
     console.log(`[Scheduled] Starting Durable Object polling at ${now.toISOString()}`)
     
     try {
-      // Check if Durable Objects are enabled
-      const { getFeatureFlagService } = await import('./services/feature-flags')
-      const featureFlags = getFeatureFlagService(env)
-      
-      if (!featureFlags.getFlag('useDurableObjectsForTokens')) {
-        // Fall back to old polling method
-        console.log('[Scheduled] Durable Objects not enabled, using legacy polling')
-        const { feedPollingService, tokenRefreshService } = await initializeServices(env.DB, env)
-        
-        const [feedResults, tokenResults] = await Promise.allSettled([
-          feedPollingService.pollAllActiveSubscriptions(),
-          tokenRefreshService.refreshExpiringTokens()
-        ])
-        
-        if (feedResults.status === 'fulfilled') {
-          console.log(`[Scheduled] Legacy feed polling completed:`, {
-            subscriptionsPolled: feedResults.value.totalSubscriptionsPolled,
-            newItemsFound: feedResults.value.totalNewItems,
-            usersNotified: feedResults.value.totalUsersNotified
-          })
-        }
-        
-        if (tokenResults.status === 'fulfilled') {
-          console.log(`[Scheduled] Legacy token refresh completed:`, {
-            accountsChecked: tokenResults.value.totalAccountsChecked,
-            tokensRefreshed: tokenResults.value.tokensRefreshed
-          })
-        }
-        
-        return
-      }
-      
-      // Durable Objects mode: fetch active users and send poll messages
+      // Always use Durable Objects mode: fetch active users and send poll messages
       // Check if the durable_object_id column exists
       let activeUsers: D1Result<any>
       try {

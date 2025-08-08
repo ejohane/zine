@@ -12,7 +12,6 @@ export interface Env {
   // Durable Objects
   USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
   // Feature flags
-  FEATURE_USE_DO_TOKENS?: string
   FEATURE_DO_ROLLOUT_PERCENTAGE?: string
   FEATURE_DUAL_MODE_TOKENS?: string
   FEATURE_MIGRATION_METRICS?: string
