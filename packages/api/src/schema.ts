@@ -65,16 +65,16 @@ export const subscriptionProviders = sqliteTable('subscription_providers', {
 // User's connected accounts
 export const userAccounts = sqliteTable('user_accounts', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id),
-  providerId: text('provider_id').notNull().references(() => subscriptionProviders.id),
-  externalAccountId: text('external_account_id').notNull(),
+  userId: text('userId').notNull().references(() => users.id),
+  providerId: text('providerId').notNull().references(() => subscriptionProviders.id),
+  externalAccountId: text('externalAccountId').notNull(),
   // Tokens are now stored in Durable Objects, not in the database
   // accessToken: text('access_token').notNull(), // REMOVED - stored in DO
   // refreshToken: text('refresh_token'), // REMOVED - stored in DO
   // expiresAt: integer('expires_at', { mode: 'timestamp' }), // REMOVED - stored in DO
-  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  isActive: integer('isActive', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 })
 
 // Available subscriptions (podcasts, channels)
