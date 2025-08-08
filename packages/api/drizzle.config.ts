@@ -1,9 +1,4 @@
 import { defineConfig } from "drizzle-kit";
-import * as dotenv from "dotenv";
-import * as path from "path";
-
-// Load environment variables from .drizzle.env if present
-dotenv.config({ path: path.resolve(__dirname, ".drizzle.env") });
 
 // Check if we're trying to connect to production
 const isProduction = process.env.DRIZZLE_ENV === "production";
