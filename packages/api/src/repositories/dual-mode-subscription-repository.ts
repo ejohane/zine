@@ -12,6 +12,8 @@ import type { Env } from '../types';
 /**
  * Wrapper for SubscriptionRepository that intercepts token operations
  * and routes them through the DualModeTokenService
+ * 
+ * Also exposes D1-specific helper methods for data initialization
  */
 export class DualModeSubscriptionRepository implements SubscriptionRepository {
   private baseRepository: D1SubscriptionRepository;
@@ -45,7 +47,64 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
   }
 
   async getValidUserAccountForProvider(providerId: string): Promise<UserAccount | null> {
-    return this.baseRepository.getValidUserAccountForProvider(providerId);
+    // Get all accounts for this provider from D1
+    const accounts = await this.baseRepository.getUserAccountsByProvider(providerId);
+    
+    if (accounts.length === 0) {
+      return null;
+    }
+    
+    // Try to find an account with valid tokens from DO
+    for (const account of accounts) {
+      try {
+        // Get tokens from dual-mode service
+        const tokens = await this.tokenService.getTokens(account.userId);
+        const tokenData = tokens.get(providerId);
+        
+        if (tokenData && tokenData.accessToken) {
+          // Check if token needs refresh
+          const needsRefresh = tokenData.expiresAt && 
+            tokenData.expiresAt <= new Date(Date.now() + this.tokenService.getTokenRefreshBuffer());
+          
+          if (needsRefresh) {
+            try {
+              // Try to refresh the token
+              const refreshedTokens = await this.tokenService.refreshTokens(account.userId);
+              const refreshedToken = refreshedTokens.get(providerId);
+              
+              if (refreshedToken && refreshedToken.accessToken) {
+                return {
+                  ...account,
+                  accessToken: refreshedToken.accessToken,
+                  refreshToken: refreshedToken.refreshToken,
+                  expiresAt: refreshedToken.expiresAt
+                };
+              }
+            } catch (refreshError) {
+              console.error(`Failed to refresh token for user ${account.userId}:`, refreshError);
+              // Continue to next account if refresh fails
+              continue;
+            }
+          }
+          
+          // Return account with valid token
+          return {
+            ...account,
+            accessToken: tokenData.accessToken,
+            refreshToken: tokenData.refreshToken,
+            expiresAt: tokenData.expiresAt
+          };
+        }
+      } catch (error) {
+        console.error(`Error getting tokens for user ${account.userId}:`, error);
+        // Continue to next account if there's an error
+        continue;
+      }
+    }
+    
+    // No valid account found
+    console.warn(`No valid account with tokens found for provider ${providerId}`);
+    return null;
   }
 
   async createUserAccount(account: Omit<UserAccount, 'createdAt' | 'updatedAt'>): Promise<UserAccount> {
@@ -171,6 +230,21 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
 
   async deleteUserSubscription(id: string): Promise<void> {
     return this.baseRepository.deleteUserSubscription(id);
+  }
+
+  // Helper methods for ensuring data exists
+  async ensureUser(userData: {
+    id: string
+    email?: string
+    firstName?: string
+    lastName?: string
+    imageUrl?: string
+  }): Promise<void> {
+    return this.baseRepository.ensureUser(userData);
+  }
+
+  async ensureProvider(provider: { id: string; name: string; oauthConfig: string }): Promise<void> {
+    return this.baseRepository.ensureProvider(provider);
   }
 
   /**

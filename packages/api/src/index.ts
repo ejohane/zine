@@ -6,11 +6,9 @@ import {
   UpdateBookmarkSchema,
   SaveBookmarkSchema,
   BookmarkService,
-  BookmarkSaveService,
-  SubscriptionRepository
+  BookmarkSaveService
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
-import { D1SubscriptionRepository } from './d1-subscription-repository'
 import { D1FeedItemRepository } from './d1-feed-item-repository'
 import { authMiddleware, getAuthContext } from './middleware/auth'
 import { getOAuthProviders } from './oauth/oauth-config'
@@ -21,6 +19,7 @@ import { OptimizedFeedPollingService } from './services/optimized-feed-polling-s
 import { TokenRefreshService } from './services/token-refresh-service'
 import { QueryOptimizer } from './repositories/query-optimizer'
 import { InitialFeedPopulationService } from './services/initial-feed-population-service'
+import { DualModeSubscriptionRepository } from './repositories/dual-mode-subscription-repository'
 
 export type Bindings = {
   DB: D1Database
@@ -60,7 +59,7 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Initialize services with D1 database
 let bookmarkService: BookmarkService
 let bookmarkSaveService: BookmarkSaveService
-let subscriptionRepository: SubscriptionRepository
+let subscriptionRepository: DualModeSubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
 let feedPollingService: OptimizedFeedPollingService
@@ -228,13 +227,13 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       
       // First ensure the user exists
       console.log('Ensuring user exists in database...')
-      await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
+      await subscriptionRepository.ensureUser({
         id: decodedState.userId
       })
       
       // Then ensure the provider exists
       console.log('Ensuring provider exists in database...')
-      await (subscriptionRepository as D1SubscriptionRepository).ensureProvider({
+      await subscriptionRepository.ensureProvider({
         id: provider,
         name: provider === 'spotify' ? 'Spotify' : 'YouTube',
         oauthConfig: JSON.stringify(oauthProvider.config)
@@ -706,7 +705,7 @@ app.put('/api/v1/feed/:itemId/read', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as read
-    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
+    await subscriptionRepository.ensureUser({
       id: auth.userId
     })
     
@@ -745,7 +744,7 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
     const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
     
     // Ensure user exists in database before marking as unread
-    await (subscriptionRepository as D1SubscriptionRepository).ensureUser({
+    await subscriptionRepository.ensureUser({
       id: auth.userId
     })
     

@@ -16,13 +16,16 @@ interface EnvironmentBindings {
   YOUTUBE_CLIENT_ID: string
   YOUTUBE_CLIENT_SECRET: string
   API_BASE_URL: string
+  USER_SUBSCRIPTION_MANAGER?: DurableObjectNamespace
 }
 
 export class D1SubscriptionRepository implements SubscriptionRepository {
   private db: ReturnType<typeof drizzle>
+  private env: EnvironmentBindings
 
-  constructor(d1Database: D1Database, _env: EnvironmentBindings) {
+  constructor(d1Database: D1Database, env: EnvironmentBindings) {
     this.db = drizzle(d1Database, { schema })
+    this.env = env
   }
 
   async getProviders(): Promise<SubscriptionProvider[]> {
@@ -82,15 +85,56 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       const now = new Date()
       
       console.log('Running ensureUser for:', userData.id)
+      
+      // Generate the Durable Object ID for this user
+      const durableObjectId = userData.id; // Use userId as the DO ID
+      
       await this.db.insert(schema.users).values({
         id: userData.id,
         email: userData.email || '',
         firstName: userData.firstName || null,
         lastName: userData.lastName || null,
         imageUrl: userData.imageUrl || null,
+        durableObjectId: durableObjectId,
         createdAt: now,
         updatedAt: now
-      }).onConflictDoNothing()
+      }).onConflictDoUpdate({
+        target: schema.users.id,
+        set: {
+          email: userData.email || '',
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          imageUrl: userData.imageUrl || null,
+          durableObjectId: durableObjectId,
+          updatedAt: now
+        }
+      })
+      
+      // Initialize the Durable Object if we have access to the namespace
+      if (this.env?.USER_SUBSCRIPTION_MANAGER) {
+        try {
+          const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(durableObjectId);
+          const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
+          
+          // Initialize the DO with the user ID
+          const response = await doStub.fetch(
+            new Request('https://do.internal/init', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: userData.id })
+            })
+          );
+          
+          if (!response.ok) {
+            console.error(`Failed to initialize DO for user ${userData.id}: ${await response.text()}`);
+          } else {
+            console.log(`Successfully initialized DO for user ${userData.id}`);
+          }
+        } catch (doError) {
+          console.error(`Error initializing DO for user ${userData.id}:`, doError);
+          // Don't fail the user creation if DO initialization fails
+        }
+      }
       
       console.log('ensureUser completed for:', userData.id)
     } catch (error) {

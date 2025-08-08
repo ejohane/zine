@@ -23,10 +23,15 @@ export class DualModeTokenService {
   private db: ReturnType<typeof drizzle>;
   private env: Env;
   private metrics: TokenOperationMetrics[] = [];
+  private tokenRefreshBuffer = 60 * 60 * 1000; // 1 hour buffer before expiry
 
   constructor(env: Env) {
     this.env = env;
     this.db = drizzle(env.DB);
+  }
+
+  getTokenRefreshBuffer(): number {
+    return this.tokenRefreshBuffer;
   }
 
   /**
