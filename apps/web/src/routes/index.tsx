@@ -2,6 +2,7 @@ import { createFileRoute, Link, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
 import { Button } from '../components/ui/button'
 import { Card, CardContent } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { useFeedManager } from '../hooks/useFeed'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { Filter, TrendingUp, Clock, BookOpen, Play, MoreHorizontal, BookmarkIcon, Plus, User } from 'lucide-react'
@@ -398,13 +399,34 @@ function Home() {
                     <div className="space-y-4">
                       {recentBookmarks.slice(0, 1).map((bookmark) => (
                         <div key={bookmark.id} className="bg-surface rounded-lg p-4 flex items-center space-x-4">
-                          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-                            <span className="text-xs font-medium">IMG</span>
-                          </div>
+                          {bookmark.thumbnailUrl ? (
+                            <img
+                              src={bookmark.thumbnailUrl}
+                              alt={bookmark.title}
+                              className="w-16 h-16 rounded-lg object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.parentElement?.classList.add('bg-muted', 'flex', 'items-center', 'justify-center');
+                                target.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-xs font-medium">IMG</span>');
+                              }}
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                              <span className="text-xs font-medium">IMG</span>
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="text-xs text-spotify-green mb-1">Included in Premium</div>
                             <h3 className="font-semibold text-foreground line-clamp-2">{bookmark.title}</h3>
-                            <p className="text-sm text-muted-foreground">{bookmark.url}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="secondary" className="text-xs">
+                                {bookmark.source === 'spotify' ? '🎧 Spotify' : 
+                                 bookmark.source === 'youtube' ? '📺 YouTube' : 
+                                 '🌐 Web'}
+                              </Badge>
+                            </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Button size="sm" variant="ghost" className="w-8 h-8 p-0">

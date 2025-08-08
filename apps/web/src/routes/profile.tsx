@@ -4,8 +4,11 @@ import { PageWrapper } from '../components/layout/PageWrapper'
 import { useAuth } from '../lib/auth'
 import { useBookmarks } from '../hooks/useBookmarks'
 import { useTheme } from '../hooks/useTheme'
-import { User, Settings, Palette, BookOpen, LogOut } from 'lucide-react'
+import { useAccounts } from '../hooks/useAccounts'
+import { User, Settings, Palette, BookOpen, LogOut, Link as LinkIcon, CheckCircle, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 
 export const Route = createFileRoute('/profile')({
   component: ProfilePage,
@@ -15,6 +18,14 @@ function ProfilePage() {
   const { user, signOut } = useAuth()
   const { data: bookmarks, isLoading: bookmarksLoading } = useBookmarks()
   const { theme, setTheme } = useTheme()
+  const { 
+    accounts, 
+    isLoading: accountsLoading, 
+    connect, 
+    disconnect, 
+    isConnecting, 
+    isDisconnecting 
+  } = useAccounts()
 
   // Calculate user statistics
   const stats = {
@@ -205,11 +216,97 @@ function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* Account Settings */}
+        {/* Connected Accounts */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <LinkIcon className="w-5 h-5" />
+            Connected Accounts
+          </h2>
+          <div className="bg-surface rounded-lg p-6">
+            <p className="text-sm text-muted-foreground mb-6">
+              Connect your accounts to sync subscriptions and discover new content
+            </p>
+            {accountsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading accounts...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {accounts.map((account) => (
+                  <div key={account.provider.id} className="flex items-center justify-between p-4 bg-background rounded-lg border border-border">
+                    <div className="flex items-center gap-4">
+                      <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted">
+                        {account.provider.id === 'spotify' && (
+                          <div className="h-5 w-5 bg-green-500 rounded-full" />
+                        )}
+                        {account.provider.id === 'youtube' && (
+                          <div className="h-5 w-5 bg-red-500 rounded-full" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium">{account.provider.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {account.provider.id === 'spotify' && 'Podcast subscriptions'}
+                          {account.provider.id === 'youtube' && 'Channel subscriptions'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {account.connected ? (
+                        <>
+                          <Badge variant="default" className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            <span>Connected</span>
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => disconnect(account.provider.id)}
+                            disabled={isDisconnecting}
+                          >
+                            {isDisconnecting ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              'Disconnect'
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => connect({ 
+                            provider: account.provider.id,
+                            redirectUrl: window.location.origin + '/profile'
+                          })}
+                          disabled={isConnecting}
+                          className="bg-spotify-green hover:bg-spotify-green/90 text-black"
+                        >
+                          {isConnecting ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            'Connect'
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Account Settings */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
           className="mb-8"
         >
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -238,7 +335,7 @@ function ProfilePage() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.5 }}
           className="mb-8"
         >
           <motion.button
