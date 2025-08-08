@@ -26,9 +26,6 @@ export default isProduction
         accountId: process.env.CLOUDFLARE_ACCOUNT_ID!,
         databaseId: process.env.CLOUDFLARE_DATABASE_ID!,
         token: process.env.CLOUDFLARE_D1_TOKEN!,
-        // accountId: "887513bb1f71a8ef2029e2f9bd3086b2",
-        // databaseId: "9020d4fb-d780-4feb-bb6f-7c5a424f2835",
-        // token: "6FyhhT-Vm5PTUfKRNZyKN7sV14F3NAj119Gf2i5f",
       },
     })
   : defineConfig({
@@ -39,4 +36,3 @@ export default isProduction
         url: "./local.db",
       },
     });
-

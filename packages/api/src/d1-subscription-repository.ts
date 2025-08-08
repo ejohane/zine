@@ -100,16 +100,25 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
   }
 
   async getUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
-    const accounts = await this.db
-      .select()
-      .from(schema.userAccounts)
-      .where(and(
-        eq(schema.userAccounts.userId, userId),
-        eq(schema.userAccounts.providerId, providerId)
-      ))
-      .limit(1)
-    
-    return accounts.length > 0 ? this.mapUserAccount(accounts[0]) : null
+    try {
+      const accounts = await this.db
+        .select()
+        .from(schema.userAccounts)
+        .where(and(
+          eq(schema.userAccounts.userId, userId),
+          eq(schema.userAccounts.providerId, providerId)
+        ))
+        .limit(1)
+      
+      return accounts.length > 0 ? this.mapUserAccount(accounts[0]) : null
+    } catch (error) {
+      // If table doesn't exist, return null instead of throwing
+      if (error instanceof Error && error.message.includes('no such table')) {
+        console.warn(`Table user_accounts does not exist. Returning null for getUserAccount(${userId}, ${providerId})`)
+        return null
+      }
+      throw error
+    }
   }
 
   async createUserAccount(account: Omit<UserAccount, 'createdAt' | 'updatedAt'>): Promise<UserAccount> {

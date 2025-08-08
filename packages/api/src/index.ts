@@ -488,16 +488,30 @@ app.get('/api/v1/accounts', async (c) => {
     const accounts = []
     
     for (const [providerId, provider] of Object.entries(oauthProviders)) {
-      const account = await subscriptionRepository.getUserAccount(auth.userId, providerId)
-      accounts.push({
-        provider: {
-          id: provider.id,
-          name: provider.name
-        },
-        connected: !!account,
-        connectedAt: account?.createdAt,
-        externalAccountId: account?.externalAccountId
-      })
+      try {
+        const account = await subscriptionRepository.getUserAccount(auth.userId, providerId)
+        accounts.push({
+          provider: {
+            id: provider.id,
+            name: provider.name
+          },
+          connected: !!account,
+          connectedAt: account?.createdAt,
+          externalAccountId: account?.externalAccountId
+        })
+      } catch (error) {
+        // If we can't get account info for a provider, still include it as disconnected
+        console.warn(`Failed to get account for provider ${providerId}:`, error)
+        accounts.push({
+          provider: {
+            id: provider.id,
+            name: provider.name
+          },
+          connected: false,
+          connectedAt: null,
+          externalAccountId: null
+        })
+      }
     }
     
     return c.json({ accounts })
