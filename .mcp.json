@@ -1,0 +1,17 @@
+{
+  "model": "opus",
+  "mcpServers": {
+    "cloudflare": {
+      "command": "/Users/erikjohansson/.nvm/versions/node/v22.13.0/bin/mcp-server-cloudflare",
+      "args": ["run"],
+      "env": {
+        "CLOUDFLARE_ACCOUNT_ID": "887513bb1f71a8ef2029e2f9bd3086b2",
+        "CLOUDFLARE_API_TOKEN": "Tg23M3SYy-Skf7dCN8lGmogzyX_rX06Z04rsQfbR"
+      }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@dimitrilahaye/mcp-playwright"]
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { Checkbox } from '../../../components/ui/checkbox'
 import { Loader2, Search, CheckCircle, ExternalLink } from 'lucide-react'
 import { useProviderSubscriptions } from '../../../hooks/useSubscriptions'
 import { useAccounts } from '../../../hooks/useAccounts'
+import { useQueryClient } from '@tanstack/react-query'
 import type { DiscoveredSubscription, SubscriptionUpdateRequest } from '../../../lib/api'
 
 export const Route = createFileRoute('/subscriptions/discover/$provider')({
@@ -18,8 +19,9 @@ function SubscriptionDiscoveryPage() {
   const { provider } = Route.useParams()
   const [selectedSubscriptions, setSelectedSubscriptions] = useState<Set<string>>(new Set())
   const [hasChanges, setHasChanges] = useState(false)
+  const queryClient = useQueryClient()
 
-  const { accounts } = useAccounts()
+  const { accounts, refetch: refetchAccounts } = useAccounts()
   const {
     discoveredSubscriptions,
     totalFound,
@@ -33,6 +35,13 @@ function SubscriptionDiscoveryPage() {
 
   // Check if provider is connected
   const connectedAccount = accounts.find(acc => acc.provider.id === provider && acc.connected)
+  
+  // Refresh accounts data when mounting and after potential reconnection
+  useEffect(() => {
+    // Invalidate and refetch accounts to ensure we have fresh data
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    refetchAccounts()
+  }, [provider, queryClient, refetchAccounts])
 
   // Initialize selected subscriptions from user's existing choices
   useEffect(() => {

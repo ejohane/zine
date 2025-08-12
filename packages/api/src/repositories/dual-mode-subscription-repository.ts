@@ -130,23 +130,48 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
   }
 
   async updateUserAccount(id: string, updates: Partial<Pick<UserAccount, 'accessToken' | 'refreshToken' | 'expiresAt'>>): Promise<UserAccount> {
-    // NOTE: Since getUserAccountById doesn't exist, we need to find the account another way
-    // This is a temporary workaround - ideally we should add getUserAccountById to D1SubscriptionRepository
-    return this.baseRepository.updateUserAccount(id, updates);
+    // Update the account in D1
+    const updatedAccount = await this.baseRepository.updateUserAccount(id, updates);
+    
+    // Also update tokens in Durable Object if tokens are being updated
+    if (updates.accessToken || updates.refreshToken) {
+      try {
+        await this.tokenService.updateToken(updatedAccount.userId, {
+          provider: updatedAccount.providerId as 'spotify' | 'youtube',
+          accessToken: updates.accessToken || updatedAccount.accessToken || '',
+          refreshToken: updates.refreshToken || updatedAccount.refreshToken,
+          expiresAt: updates.expiresAt || updatedAccount.expiresAt
+        });
+      } catch (error) {
+        console.error(`Failed to update tokens in DO for user ${updatedAccount.userId}:`, error);
+        // Don't fail the whole operation if DO update fails
+      }
+    }
+    
+    return updatedAccount;
   }
 
   async getValidUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
-    // Use dual-mode token service to get tokens
-    const tokens = await this.tokenService.getTokens(userId);
-    const tokenData = tokens.get(providerId);
-    
-    if (!tokenData) {
+    // Get the base account info from D1 first to check if account exists
+    const account = await this.baseRepository.getUserAccount(userId, providerId);
+    if (!account) {
       return null;
     }
 
-    // Get the base account info from D1
-    const account = await this.baseRepository.getUserAccount(userId, providerId);
-    if (!account) {
+    // Try to get tokens from dual-mode token service
+    let tokens: Map<string, any>;
+    try {
+      tokens = await this.tokenService.getTokens(userId);
+    } catch (error) {
+      console.error(`Failed to get tokens for user ${userId}:`, error);
+      return null;
+    }
+    
+    const tokenData = tokens.get(providerId);
+    
+    // If no token data found, account exists but has no valid tokens
+    if (!tokenData || !tokenData.accessToken) {
+      console.warn(`Account exists for ${userId}/${providerId} but no valid tokens found`);
       return null;
     }
 
