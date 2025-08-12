@@ -138,11 +138,21 @@ export class UserSubscriptionManager {
   }
 
   private async handleTokenUpdate(request: Request): Promise<Response> {
-    const tokenData: OAuthTokenData = await request.json();
+    const tokenData = await request.json() as any;
+    console.log(`[DO] Received token update for provider ${tokenData.provider}`)
+    
     const tokens = await this.state.storage.get<Map<string, OAuthTokenData>>('tokens') || new Map();
+    console.log(`[DO] Current tokens count: ${tokens.size}`)
     
     // Validate token data
     if (!this.isValidTokenData(tokenData)) {
+      console.error(`[DO] Invalid token data received:`, {
+        hasAccessToken: !!tokenData?.accessToken,
+        hasRefreshToken: !!tokenData?.refreshToken,
+        hasExpiresAt: !!tokenData?.expiresAt,
+        hasLastRefresh: !!tokenData?.lastRefresh,
+        provider: tokenData?.provider
+      })
       return new Response(
         JSON.stringify({ error: 'Invalid token data' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -151,6 +161,7 @@ export class UserSubscriptionManager {
     
     tokens.set(tokenData.provider, tokenData);
     await this.state.storage.put('tokens', tokens);
+    console.log(`[DO] Successfully stored token for ${tokenData.provider}, total tokens: ${tokens.size}`)
     
     // Clear any refresh attempt tracking for this provider
     const refreshAttempts = await this.state.storage.get<Map<string, RefreshAttempt>>('refreshAttempts') || new Map();
@@ -234,11 +245,16 @@ export class UserSubscriptionManager {
   }
 
   private async handleExportTokens(): Promise<Response> {
+    const userId = await this.state.storage.get<string>('userId');
     const tokens = await this.state.storage.get<Map<string, OAuthTokenData>>('tokens') || new Map();
+    
+    console.log(`[DO] Exporting tokens for user ${userId}, count: ${tokens.size}`)
+    
     const exportData: Record<string, OAuthTokenData> = {};
     
     // Convert Map to object for export
     for (const [provider, token] of tokens) {
+      console.log(`[DO] Exporting token for provider ${provider}, has accessToken: ${!!token.accessToken}`)
       exportData[provider] = token;
     }
     

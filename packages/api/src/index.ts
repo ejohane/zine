@@ -217,6 +217,13 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       // Update existing account
       console.log('Updating existing account...')
       
+      // CRITICAL: Ensure user exists with Durable Object ID before updating tokens
+      // This is essential for reconnection to work properly
+      console.log('Ensuring user has Durable Object ID...')
+      await subscriptionRepository.ensureUser({
+        id: decodedState.userId
+      })
+      
       // First update the account in the database
       await subscriptionRepository.updateUserAccount(existingAccount.id, {
         accessToken: tokens.access_token,

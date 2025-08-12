@@ -330,11 +330,22 @@ export class DualModeTokenService {
     const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
     const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
     
+    // Prepare token data with all required fields for DO
+    const doTokenData = {
+      provider: tokenData.provider,
+      accessToken: tokenData.accessToken,
+      refreshToken: tokenData.refreshToken,
+      expiresAt: tokenData.expiresAt ? new Date(tokenData.expiresAt).getTime() : Date.now() + 3600000, // Default 1 hour
+      lastRefresh: Date.now() // Required by DO validation
+    };
+    
+    console.log(`[DualModeTokenService] Sending token to DO with all required fields`)
+    
     const response = await doStub.fetch(
       new Request('https://do.internal/update-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tokenData)
+        body: JSON.stringify(doTokenData)
       })
     );
     
