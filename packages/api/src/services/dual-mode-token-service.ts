@@ -259,6 +259,41 @@ export class DualModeTokenService {
   }
 
   /**
+   * Delete a token for a specific provider
+   */
+  async deleteToken(userId: string, provider: 'spotify' | 'youtube'): Promise<void> {
+    try {
+      // Get the user's durableObjectId from the database
+      const user = await this.getUser(userId);
+      if (!user?.durableObjectId) {
+        console.warn(`No Durable Object ID found for user ${userId}, cannot delete token`);
+        return;
+      }
+      
+      // Use idFromString with the stored DO ID (already a hex string)
+      const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
+      const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
+      
+      const response = await doStub.fetch(
+        new Request('https://do.internal/delete-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider })
+        })
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to delete token from DO: ${await response.text()}`);
+      }
+      
+      console.log(`Successfully deleted ${provider} token for user ${userId}`);
+    } catch (error) {
+      console.error(`Failed to delete token for ${userId}/${provider}:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Update token in Durable Object
    */
   private async updateTokenInDO(userId: string, tokenData: TokenData): Promise<void> {

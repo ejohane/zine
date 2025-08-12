@@ -68,6 +68,8 @@ export class UserSubscriptionManager {
           return await this.handleValidateTokens();
         case '/export-tokens':
           return await this.handleExportTokens();
+        case '/delete-token':
+          return await this.handleDeleteToken(request);
         default:
           return new Response('Not found', { status: 404 });
       }
@@ -242,6 +244,41 @@ export class UserSubscriptionManager {
     
     return new Response(
       JSON.stringify(exportData),
+      { headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  private async handleDeleteToken(request: Request): Promise<Response> {
+    const { provider } = await request.json() as { provider: string };
+    
+    if (!provider) {
+      return new Response(
+        JSON.stringify({ error: 'Provider is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const tokens = await this.state.storage.get<Map<string, OAuthTokenData>>('tokens') || new Map();
+    
+    if (!tokens.has(provider)) {
+      return new Response(
+        JSON.stringify({ error: `No token found for provider: ${provider}` }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    tokens.delete(provider);
+    await this.state.storage.put('tokens', tokens);
+    
+    // Also clear any refresh attempts for this provider
+    const refreshAttempts = await this.state.storage.get<Map<string, RefreshAttempt>>('refreshAttempts') || new Map();
+    refreshAttempts.delete(provider);
+    await this.state.storage.put('refreshAttempts', refreshAttempts);
+    
+    console.log(`Deleted token for provider: ${provider}`);
+    
+    return new Response(
+      JSON.stringify({ success: true, message: `Token for ${provider} deleted` }),
       { headers: { 'Content-Type': 'application/json' } }
     );
   }

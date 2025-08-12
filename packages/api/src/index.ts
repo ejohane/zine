@@ -216,11 +216,30 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
     if (existingAccount) {
       // Update existing account
       console.log('Updating existing account...')
+      
+      // First update the account in the database
       await subscriptionRepository.updateUserAccount(existingAccount.id, {
         accessToken: tokens.access_token,
         refreshToken: tokens.refresh_token,
         expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined
       })
+      
+      // Also ensure tokens are updated in Durable Object
+      // This is critical for reconnection to work properly
+      try {
+        const { DualModeTokenService } = await import('./services/dual-mode-token-service')
+        const tokenService = new DualModeTokenService(c.env)
+        await tokenService.updateToken(decodedState.userId, {
+          provider: provider as 'spotify' | 'youtube',
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined
+        })
+        console.log('Successfully updated tokens in Durable Object')
+      } catch (doError) {
+        console.error('Failed to update tokens in Durable Object:', doError)
+        // Log but don't fail the OAuth flow
+      }
     } else {
       // Create new account
       console.log('Creating new account...')
@@ -249,6 +268,22 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
         expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined,
         isActive: true
       })
+      
+      // Also store tokens in Durable Object for new accounts
+      try {
+        const { DualModeTokenService } = await import('./services/dual-mode-token-service')
+        const tokenService = new DualModeTokenService(c.env)
+        await tokenService.updateToken(decodedState.userId, {
+          provider: provider as 'spotify' | 'youtube',
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined
+        })
+        console.log('Successfully stored tokens in Durable Object for new account')
+      } catch (doError) {
+        console.error('Failed to store tokens in Durable Object:', doError)
+        // Log but don't fail the OAuth flow
+      }
     }
     
     console.log('OAuth callback completed successfully')
@@ -282,7 +317,19 @@ app.delete('/api/v1/auth/:provider/disconnect', async (c) => {
       return c.json({ error: 'Account not found' }, 404)
     }
     
+    // Delete the account from database
     await subscriptionRepository.deleteUserAccount(account.id)
+    
+    // Also remove tokens from Durable Object
+    try {
+      const { DualModeTokenService } = await import('./services/dual-mode-token-service')
+      const tokenService = new DualModeTokenService(c.env)
+      await tokenService.deleteToken(auth.userId, provider as 'spotify' | 'youtube')
+      console.log(`Successfully removed ${provider} tokens from Durable Object`)
+    } catch (doError) {
+      console.error(`Failed to remove ${provider} tokens from Durable Object:`, doError)
+      // Log but don't fail the disconnect
+    }
     
     return c.json({ message: 'Account disconnected successfully' })
   } catch (error) {
