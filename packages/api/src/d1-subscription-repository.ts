@@ -86,40 +86,57 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       
       console.log('Running ensureUser for:', userData.id)
       
-      // Generate the Durable Object ID for this user using idFromName
-      // This creates a consistent DO ID based on the user ID
+      // Check if user exists and has a valid DO ID
+      const existingUser = await this.db.select()
+        .from(schema.users)
+        .where(eq(schema.users.id, userData.id))
+        .get();
+      
       let durableObjectIdString: string | null = null;
+      let doId: DurableObjectId | null = null;
       
       if (this.env?.USER_SUBSCRIPTION_MANAGER) {
-        const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromName(userData.id);
-        durableObjectIdString = doId.toString(); // Convert to 64-hex string for storage
+        // Check if existing user has a valid 64-char hex DO ID
+        if (existingUser?.durableObjectId && existingUser.durableObjectId.length === 64) {
+          // Use existing valid DO ID
+          durableObjectIdString = existingUser.durableObjectId;
+          doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(durableObjectIdString);
+        } else {
+          // Generate new DO ID using idFromName
+          doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromName(userData.id);
+          durableObjectIdString = doId.toString(); // Convert to 64-hex string for storage
+        }
       }
       
-      await this.db.insert(schema.users).values({
-        id: userData.id,
-        email: userData.email || '',
-        firstName: userData.firstName || null,
-        lastName: userData.lastName || null,
-        imageUrl: userData.imageUrl || null,
-        durableObjectId: durableObjectIdString,
-        createdAt: now,
-        updatedAt: now
-      }).onConflictDoUpdate({
-        target: schema.users.id,
-        set: {
+      if (existingUser) {
+        // Update existing user
+        await this.db.update(schema.users)
+          .set({
+            email: userData.email || '',
+            firstName: userData.firstName || null,
+            lastName: userData.lastName || null,
+            imageUrl: userData.imageUrl || null,
+            durableObjectId: durableObjectIdString,
+            updatedAt: now
+          })
+          .where(eq(schema.users.id, userData.id));
+      } else {
+        // Insert new user
+        await this.db.insert(schema.users).values({
+          id: userData.id,
           email: userData.email || '',
           firstName: userData.firstName || null,
           lastName: userData.lastName || null,
           imageUrl: userData.imageUrl || null,
           durableObjectId: durableObjectIdString,
+          createdAt: now,
           updatedAt: now
-        }
-      })
+        });
+      }
       
       // Initialize the Durable Object if we have access to the namespace
-      if (this.env?.USER_SUBSCRIPTION_MANAGER && durableObjectIdString) {
+      if (this.env?.USER_SUBSCRIPTION_MANAGER && doId) {
         try {
-          const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(durableObjectIdString);
           const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
           
           // Initialize the DO with the user ID
