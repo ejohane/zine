@@ -227,6 +227,7 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
       // Also ensure tokens are updated in Durable Object
       // This is critical for reconnection to work properly
       try {
+        console.log(`[OAuth] Updating tokens in DO for existing account: userId=${decodedState.userId}, provider=${provider}`)
         const { DualModeTokenService } = await import('./services/dual-mode-token-service')
         const tokenService = new DualModeTokenService(c.env)
         await tokenService.updateToken(decodedState.userId, {
@@ -235,9 +236,9 @@ app.get('/api/v1/auth/:provider/callback', async (c) => {
           refreshToken: tokens.refresh_token,
           expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : undefined
         })
-        console.log('Successfully updated tokens in Durable Object')
+        console.log(`[OAuth] Successfully updated tokens in Durable Object for ${decodedState.userId}/${provider}`)
       } catch (doError) {
-        console.error('Failed to update tokens in Durable Object:', doError)
+        console.error(`[OAuth] Failed to update tokens in Durable Object for ${decodedState.userId}/${provider}:`, doError)
         // Log but don't fail the OAuth flow
       }
     } else {

@@ -42,6 +42,8 @@ export class DualModeTokenService {
     const featureFlags = getFeatureFlagService(this.env);
     const shouldUseDO = featureFlags.shouldUseDurableObjects(userId);
     
+    console.log(`[DualModeTokenService] Getting tokens for user ${userId}, shouldUseDO: ${shouldUseDO}`)
+    
     let doTokens: Map<string, TokenData> | null = null;
     let d1Tokens: Map<string, TokenData> | null = null;
     let source: 'do' | 'd1' | 'both' = 'd1';
@@ -51,12 +53,15 @@ export class DualModeTokenService {
       // Check if user has been migrated to DO
       const user = await this.getUser(userId);
       const hasDurableObject = !!user?.durableObjectId;
+      
+      console.log(`[DualModeTokenService] User ${userId} has DO ID: ${hasDurableObject}, DO ID: ${user?.durableObjectId?.substring(0, 8)}...`)
 
       if (shouldUseDO && hasDurableObject) {
         // Try DO first
         try {
           doTokens = await this.getTokensFromDO(userId);
           source = 'do';
+          console.log(`[DualModeTokenService] Got ${doTokens.size} tokens from DO for user ${userId}`)
           
           // If dual mode is enabled, also fetch from D1 for comparison
           if (featureFlags.getFlag('enableDualModeTokenStorage')) {
@@ -115,11 +120,15 @@ export class DualModeTokenService {
     const featureFlags = getFeatureFlagService(this.env);
     const shouldUseDO = featureFlags.shouldUseDurableObjects(userId);
     
+    console.log(`[DualModeTokenService] Updating token for user ${userId}, provider ${tokenData.provider}, shouldUseDO: ${shouldUseDO}`)
+    
     let source: 'do' | 'd1' | 'both' = 'd1';
 
     try {
       const user = await this.getUser(userId);
       const hasDurableObject = !!user?.durableObjectId;
+      
+      console.log(`[DualModeTokenService] User ${userId} has DO: ${hasDurableObject}, DO ID: ${user?.durableObjectId?.substring(0, 8)}...`)
 
       if (shouldUseDO && hasDurableObject) {
         // Update DO
@@ -212,11 +221,15 @@ export class DualModeTokenService {
    * Get tokens from Durable Object
    */
   private async getTokensFromDO(userId: string): Promise<Map<string, TokenData>> {
+    console.log(`[DualModeTokenService] Getting tokens from DO for user ${userId}`)
+    
     // Get the user's durableObjectId from the database
     const user = await this.getUser(userId);
     if (!user?.durableObjectId) {
       throw new Error(`No Durable Object ID found for user ${userId}`);
     }
+    
+    console.log(`[DualModeTokenService] Using DO ID: ${user.durableObjectId.substring(0, 8)}...`)
     
     // Use idFromString with the stored DO ID (already a hex string)
     const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
@@ -227,13 +240,18 @@ export class DualModeTokenService {
     );
     
     if (!response.ok) {
-      throw new Error(`Failed to get tokens from DO: ${await response.text()}`);
+      const errorText = await response.text();
+      console.error(`[DualModeTokenService] DO export-tokens failed: ${errorText}`)
+      throw new Error(`Failed to get tokens from DO: ${errorText}`);
     }
 
     const tokenData = await response.json() as Record<string, any>;
+    console.log(`[DualModeTokenService] DO returned token data: ${JSON.stringify(Object.keys(tokenData))}`)
+    
     const tokens = new Map<string, TokenData>();
     
     for (const [provider, data] of Object.entries(tokenData)) {
+      console.log(`[DualModeTokenService] Processing token for provider ${provider}, has accessToken: ${!!data.accessToken}`)
       tokens.set(provider, {
         provider: provider as 'spotify' | 'youtube',
         accessToken: data.accessToken,
@@ -242,6 +260,7 @@ export class DualModeTokenService {
       });
     }
     
+    console.log(`[DualModeTokenService] Returning ${tokens.size} tokens from DO`)
     return tokens;
   }
 
@@ -297,11 +316,15 @@ export class DualModeTokenService {
    * Update token in Durable Object
    */
   private async updateTokenInDO(userId: string, tokenData: TokenData): Promise<void> {
+    console.log(`[DualModeTokenService] Updating token in DO for user ${userId}, provider ${tokenData.provider}`)
+    
     // Get the user's durableObjectId from the database
     const user = await this.getUser(userId);
     if (!user?.durableObjectId) {
       throw new Error(`No Durable Object ID found for user ${userId}`);
     }
+    
+    console.log(`[DualModeTokenService] Using DO ID ${user.durableObjectId.substring(0, 8)}... to update token`)
     
     // Use idFromString with the stored DO ID (already a hex string)
     const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
@@ -316,8 +339,12 @@ export class DualModeTokenService {
     );
     
     if (!response.ok) {
-      throw new Error(`Failed to update token in DO: ${await response.text()}`);
+      const errorText = await response.text();
+      console.error(`[DualModeTokenService] Failed to update token in DO: ${errorText}`)
+      throw new Error(`Failed to update token in DO: ${errorText}`);
     }
+    
+    console.log(`[DualModeTokenService] Successfully updated token in DO for ${userId}/${tokenData.provider}`)
   }
 
   /**

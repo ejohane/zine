@@ -152,18 +152,24 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
   }
 
   async getValidUserAccount(userId: string, providerId: string): Promise<UserAccount | null> {
+    console.log(`[DualModeRepo] Getting valid account for user ${userId}, provider ${providerId}`)
+    
     // Get the base account info from D1 first to check if account exists
     const account = await this.baseRepository.getUserAccount(userId, providerId);
     if (!account) {
+      console.log(`[DualModeRepo] No account found in D1 for user ${userId}, provider ${providerId}`)
       return null;
     }
+    
+    console.log(`[DualModeRepo] Found account in D1: ${account.id}, provider: ${account.providerId}`)
 
     // Try to get tokens from dual-mode token service
     let tokens: Map<string, any>;
     try {
       tokens = await this.tokenService.getTokens(userId);
+      console.log(`[DualModeRepo] Retrieved tokens map, size: ${tokens.size}, providers: ${Array.from(tokens.keys()).join(', ')}`)
     } catch (error) {
-      console.error(`Failed to get tokens for user ${userId}:`, error);
+      console.error(`[DualModeRepo] Failed to get tokens for user ${userId}:`, error);
       return null;
     }
     
@@ -171,9 +177,11 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
     
     // If no token data found, account exists but has no valid tokens
     if (!tokenData || !tokenData.accessToken) {
-      console.warn(`Account exists for ${userId}/${providerId} but no valid tokens found`);
+      console.warn(`[DualModeRepo] Account exists for ${userId}/${providerId} but no valid tokens found. TokenData: ${JSON.stringify(tokenData)}`)
       return null;
     }
+    
+    console.log(`[DualModeRepo] Found valid token for ${userId}/${providerId}`)
 
     // Check if token needs refresh
     const needsRefresh = tokenData.expiresAt && tokenData.expiresAt <= new Date(Date.now() + 60 * 60 * 1000);

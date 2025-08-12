@@ -28,12 +28,17 @@ export class SubscriptionDiscoveryService {
     userId: string, 
     provider: 'spotify' | 'youtube'
   ): Promise<DiscoveryResult> {
+    console.log(`[SubscriptionDiscoveryService] Starting discovery for user ${userId}, provider ${provider}`)
+    
     // Get user's OAuth account for this provider (with automatic token refresh if needed)
     const userAccount = await this.subscriptionRepository.getValidUserAccount(userId, provider)
     
     if (!userAccount) {
+      console.error(`[SubscriptionDiscoveryService] No valid account found for user ${userId}, provider ${provider}`)
       throw new Error(`No valid ${provider} account found - please reconnect your account`)
     }
+    
+    console.log(`[SubscriptionDiscoveryService] Found valid account for user ${userId}, has token: ${!!userAccount.accessToken}`)
 
     try {
       if (provider === 'spotify') {
