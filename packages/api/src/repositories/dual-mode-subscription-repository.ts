@@ -265,6 +265,27 @@ export class DualModeSubscriptionRepository implements SubscriptionRepository {
     return this.baseRepository.deleteUserSubscription(id);
   }
 
+  // Batch operations for performance
+  async batchUpdateUserSubscriptions(updates: Array<{ id: string; isActive: boolean }>): Promise<void> {
+    if (this.baseRepository.batchUpdateUserSubscriptions) {
+      return this.baseRepository.batchUpdateUserSubscriptions(updates);
+    }
+    // Fallback to individual updates if batch method not available
+    for (const update of updates) {
+      await this.baseRepository.updateUserSubscription(update.id, { isActive: update.isActive });
+    }
+  }
+
+  async batchCreateUserSubscriptions(userSubscriptions: Array<Omit<UserSubscription, 'createdAt' | 'updatedAt'>>): Promise<void> {
+    if (this.baseRepository.batchCreateUserSubscriptions) {
+      return this.baseRepository.batchCreateUserSubscriptions(userSubscriptions);
+    }
+    // Fallback to individual creates if batch method not available
+    for (const sub of userSubscriptions) {
+      await this.baseRepository.createUserSubscription(sub);
+    }
+  }
+
   // Helper methods for ensuring data exists
   async ensureUser(userData: {
     id: string

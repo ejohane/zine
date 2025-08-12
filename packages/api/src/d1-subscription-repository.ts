@@ -516,4 +516,56 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       updatedAt: new Date(row.updatedAt)
     }
   }
+
+  // Batch update methods for better performance
+  async batchUpdateUserSubscriptions(
+    updates: Array<{ id: string; isActive: boolean }>
+  ): Promise<void> {
+    if (updates.length === 0) return
+
+    const now = new Date()
+    const BATCH_SIZE = 50 // Process in smaller batches to avoid SQL limits
+
+    for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+      const batch = updates.slice(i, i + BATCH_SIZE)
+      
+      // Build batch update SQL
+      const promises = batch.map(update => 
+        this.db
+          .update(schema.userSubscriptions)
+          .set({ 
+            isActive: update.isActive,
+            updatedAt: now 
+          })
+          .where(eq(schema.userSubscriptions.id, update.id))
+      )
+      
+      // Execute batch in parallel
+      await Promise.all(promises)
+    }
+  }
+
+  async batchCreateUserSubscriptions(
+    userSubscriptions: Array<Omit<UserSubscription, 'createdAt' | 'updatedAt'>>
+  ): Promise<void> {
+    if (userSubscriptions.length === 0) return
+
+    const now = new Date()
+    const BATCH_SIZE = 50
+
+    for (let i = 0; i < userSubscriptions.length; i += BATCH_SIZE) {
+      const batch = userSubscriptions.slice(i, i + BATCH_SIZE)
+      
+      const values = batch.map(sub => ({
+        id: sub.id,
+        userId: sub.userId,
+        subscriptionId: sub.subscriptionId,
+        isActive: sub.isActive,
+        createdAt: now,
+        updatedAt: now
+      }))
+      
+      await this.db.insert(schema.userSubscriptions).values(values)
+    }
+  }
 }

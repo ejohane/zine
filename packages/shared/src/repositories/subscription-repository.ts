@@ -69,4 +69,8 @@ export interface SubscriptionRepository {
   createUserSubscription(userSubscription: Omit<UserSubscription, 'createdAt' | 'updatedAt'>): Promise<UserSubscription>
   updateUserSubscription(id: string, updates: Partial<Pick<UserSubscription, 'isActive'>>): Promise<UserSubscription>
   deleteUserSubscription(id: string): Promise<void>
+  
+  // Batch operations for performance
+  batchUpdateUserSubscriptions?(updates: Array<{ id: string; isActive: boolean }>): Promise<void>
+  batchCreateUserSubscriptions?(userSubscriptions: Array<Omit<UserSubscription, 'createdAt' | 'updatedAt'>>): Promise<void>
 }

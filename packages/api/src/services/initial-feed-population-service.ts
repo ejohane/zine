@@ -20,10 +20,10 @@ export class InitialFeedPopulationService {
     subscriptionIds: string[]
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
-    const twentyFourHoursAgo = new Date()
-    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24)
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    console.log(`[InitialFeedPopulation] Populating initial feed for user ${userId} with ${subscriptionIds.length} subscriptions`)
+    console.log(`[InitialFeedPopulation] Populating initial feed for user ${userId} with ${subscriptionIds.length} subscriptions (last 7 days)`)
 
     // Group subscriptions by provider
     const subscriptionsByProvider = new Map<string, string[]>()
@@ -46,10 +46,10 @@ export class InitialFeedPopulationService {
       }
 
       if (providerId === 'spotify') {
-        const spotifyResults = await this.populateSpotifyFeeds(subIds, userAccount, twentyFourHoursAgo, userId)
+        const spotifyResults = await this.populateSpotifyFeeds(subIds, userAccount, sevenDaysAgo, userId)
         results.push(...spotifyResults)
       } else if (providerId === 'youtube') {
-        const youtubeResults = await this.populateYouTubeFeeds(subIds, userAccount, twentyFourHoursAgo, userId)
+        const youtubeResults = await this.populateYouTubeFeeds(subIds, userAccount, sevenDaysAgo, userId)
         results.push(...youtubeResults)
       }
     }
@@ -80,7 +80,7 @@ export class InitialFeedPopulationService {
         // Fetch latest episodes (limited to 20)
         const episodes = await spotifyAPI.getLatestEpisodes(subscription.externalId, 20)
         
-        // Filter to only episodes from the last 24 hours
+        // Filter to only episodes from the last 7 days
         const recentEpisodes = episodes.filter(episode => {
           const publishedAt = new Date(episode.release_date)
           return publishedAt >= cutoffDate
@@ -161,7 +161,7 @@ export class InitialFeedPopulationService {
         // Fetch latest videos (limited to 20)
         const videos = await youtubeAPI.getLatestVideos(subscription.externalId, 20)
         
-        // Filter to only videos from the last 24 hours
+        // Filter to only videos from the last 7 days
         const recentVideos = videos.filter(video => {
           const publishedAt = new Date(video.snippet.publishedAt)
           return publishedAt >= cutoffDate

@@ -55,6 +55,9 @@ export function useUpdateSubscriptions() {
       queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] })
       queryClient.invalidateQueries({ queryKey: ['user-subscriptions', variables.provider] })
       queryClient.invalidateQueries({ queryKey: ['subscription-discovery', variables.provider] })
+      // Invalidate feed queries to show new episodes
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions-with-counts'] })
     },
     onError: (error) => {
       console.error('Failed to update subscriptions:', error)
@@ -71,7 +74,7 @@ export function useProviderSubscriptions(provider: 'spotify' | 'youtube') {
   const discover = () => discovery.refetch()
   
   const updateSelections = (subscriptions: SubscriptionUpdateRequest[]) => {
-    return updateMutation.mutate({ provider, subscriptions })
+    return updateMutation.mutateAsync({ provider, subscriptions })
   }
 
   return {
