@@ -204,7 +204,14 @@ export class OptimizedFeedPollingService {
 
             // Create user feed items for each subscription with new items
             for (const [subscriptionId, items] of itemsBySubscription) {
-              const batchResult = resultsBySubscription.get(subscriptionId)!
+              const batchResult = resultsBySubscription.get(subscriptionId)
+              
+              // Skip if we don't have the batch result (e.g., due to an error)
+              if (!batchResult) {
+                console.warn(`[OptimizedFeedPolling] No batch result found for subscription ${subscriptionId}, skipping user feed item creation`)
+                continue
+              }
+              
               const usersNotified = await this.createUserFeedItemsBatch(subscriptionId, items)
 
               results.push({
