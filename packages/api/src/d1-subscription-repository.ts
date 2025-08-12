@@ -86,8 +86,14 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
       
       console.log('Running ensureUser for:', userData.id)
       
-      // Generate the Durable Object ID for this user
-      const durableObjectId = userData.id; // Use userId as the DO ID
+      // Generate the Durable Object ID for this user using idFromName
+      // This creates a consistent DO ID based on the user ID
+      let durableObjectIdString: string | null = null;
+      
+      if (this.env?.USER_SUBSCRIPTION_MANAGER) {
+        const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromName(userData.id);
+        durableObjectIdString = doId.toString(); // Convert to 64-hex string for storage
+      }
       
       await this.db.insert(schema.users).values({
         id: userData.id,
@@ -95,7 +101,7 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
         firstName: userData.firstName || null,
         lastName: userData.lastName || null,
         imageUrl: userData.imageUrl || null,
-        durableObjectId: durableObjectId,
+        durableObjectId: durableObjectIdString,
         createdAt: now,
         updatedAt: now
       }).onConflictDoUpdate({
@@ -105,15 +111,15 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
           firstName: userData.firstName || null,
           lastName: userData.lastName || null,
           imageUrl: userData.imageUrl || null,
-          durableObjectId: durableObjectId,
+          durableObjectId: durableObjectIdString,
           updatedAt: now
         }
       })
       
       // Initialize the Durable Object if we have access to the namespace
-      if (this.env?.USER_SUBSCRIPTION_MANAGER) {
+      if (this.env?.USER_SUBSCRIPTION_MANAGER && durableObjectIdString) {
         try {
-          const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(durableObjectId);
+          const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(durableObjectIdString);
           const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
           
           // Initialize the DO with the user ID

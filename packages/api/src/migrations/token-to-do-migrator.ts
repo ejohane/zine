@@ -104,8 +104,8 @@ export class TokenToDOMigrator {
         return;
       }
 
-      // Get or create user's DO
-      const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(userId);
+      // Get or create user's DO using idFromName (consistent ID based on userId)
+      const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromName(userId);
       const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
 
       // Initialize DO with user ID
