@@ -74,7 +74,9 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
     // Group subscriptions by external ID for batch fetching
     const subscriptionsByExternalId = new Map<string, Subscription>()
     subscriptions.forEach(sub => {
-      subscriptionsByExternalId.set(sub.externalId, sub)
+      if (sub && sub.externalId) {
+        subscriptionsByExternalId.set(sub.externalId, sub)
+      }
     })
 
     const showIds = Array.from(subscriptionsByExternalId.keys())

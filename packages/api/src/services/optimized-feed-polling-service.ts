@@ -91,9 +91,16 @@ export class OptimizedFeedPollingService {
         const subs = await this.subscriptionRepository.getSubscriptionsByProvider(providerId)
         this.dbQueryCount++
         
-        if (subs.length > 0) {
-          subscriptionsByProvider.set(providerId, subs)
-          console.log(`[OptimizedFeedPolling] Found ${subs.length} ${providerId} subscriptions`)
+        // Filter out any null/undefined subscriptions
+        const validSubs = subs.filter(s => s && s.id)
+        
+        if (validSubs.length > 0) {
+          subscriptionsByProvider.set(providerId, validSubs)
+          console.log(`[OptimizedFeedPolling] Found ${validSubs.length} ${providerId} subscriptions`)
+        }
+        
+        if (subs.length !== validSubs.length) {
+          console.warn(`[OptimizedFeedPolling] Filtered out ${subs.length - validSubs.length} invalid subscriptions for ${providerId}`)
         }
       }
 
@@ -278,7 +285,9 @@ export class OptimizedFeedPollingService {
     const allSubscriptionIds: string[] = []
     
     for (const [provider, subscriptions] of subscriptionsByProvider.entries()) {
-      const ids = subscriptions.map(s => s.id)
+      // Filter out any null/undefined subscriptions and safely map to IDs
+      const validSubscriptions = subscriptions.filter(s => s && s.id)
+      const ids = validSubscriptions.map(s => s.id)
       allSubscriptionIds.push(...ids)
       console.log(`[OptimizedFeedPolling] Provider ${provider}: ${ids.length} subscription IDs`)
     }
