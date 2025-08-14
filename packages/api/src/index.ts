@@ -1295,7 +1295,7 @@ export default {
       const activeUsers = await env.DB.prepare(`
         SELECT DISTINCT u.id, u.durable_object_id as durableObjectId
         FROM users u
-        INNER JOIN user_accounts ua ON u.id = ua.user_id
+        INNER JOIN user_accounts ua ON u.id = ua.userId
         WHERE u.durable_object_id IS NOT NULL
         LIMIT 100
       `).all()
