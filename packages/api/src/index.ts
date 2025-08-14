@@ -1291,22 +1291,17 @@ export default {
     const now = new Date()
     
     try {
-      // Check if we should use Durable Objects or legacy polling
-      let activeUsers: D1Result<any>
-      try {
-        activeUsers = await env.DB.prepare(`
-          SELECT DISTINCT u.id, u.durable_object_id as durableObjectId
-          FROM users u
-          INNER JOIN user_accounts ua ON u.id = ua.user_id
-          WHERE u.durable_object_id IS NOT NULL
-          LIMIT 100
-        `).all()
-      } catch (error) {
-        console.log('[Scheduled] Database schema not ready for Durable Objects, falling back to legacy polling', {
-          error: error instanceof Error ? error.message : String(error)
-        })
-        // Fall back to optimized legacy polling
-        await this.performOptimizedLegacyPolling(env)
+      // Get all active users with Durable Objects
+      const activeUsers = await env.DB.prepare(`
+        SELECT DISTINCT u.id, u.durable_object_id as durableObjectId
+        FROM users u
+        INNER JOIN user_accounts ua ON u.id = ua.user_id
+        WHERE u.durable_object_id IS NOT NULL
+        LIMIT 100
+      `).all()
+      
+      if (!activeUsers || activeUsers.results.length === 0) {
+        console.log('[Scheduled] No active users with Durable Objects found')
         return
       }
       
@@ -1507,88 +1502,6 @@ export default {
       
     } catch (error) {
       console.error('[Scheduled] Fatal error during scheduled task:', error)
-    }
-  },
-
-  // Optimized legacy polling with better CPU management
-  async performOptimizedLegacyPolling(env: Bindings): Promise<void> {
-    try {
-      const { tokenRefreshService } = await initializeServices(env.DB, env)
-      
-      // First, handle token refresh (this is usually quick)
-      console.log('[OptimizedFeedPolling] Starting token refresh')
-      const tokenResults = await tokenRefreshService.refreshExpiringTokens()
-      console.log(`[OptimizedFeedPolling] Token refresh completed:`, {
-        accountsChecked: tokenResults.totalAccountsChecked,
-        tokensRefreshed: tokenResults.tokensRefreshed
-      })
-      
-      // For feed polling, we'll use a more targeted approach
-      // Only poll subscriptions that haven't been checked recently
-      const POLLING_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
-      const cutoffTime = Date.now() - POLLING_INTERVAL_MS
-      
-      // Get subscriptions that need polling
-      const subscriptionsToCheck = await env.DB.prepare(`
-        SELECT DISTINCT s.id, s.provider_id as providerId, s.external_id as externalId, s.title, s.total_episodes as totalEpisodes
-        FROM subscriptions s
-        INNER JOIN user_subscriptions us ON s.id = us.subscription_id
-        WHERE us.is_active = 1
-        AND (s.last_polled_at IS NULL OR s.last_polled_at < ?)
-        LIMIT 50
-      `).bind(cutoffTime).all()
-      
-      console.log(`[OptimizedFeedPolling] Found ${subscriptionsToCheck.results.length} subscriptions to poll`)
-      
-      if (subscriptionsToCheck.results.length > 0) {
-        // Process in small batches to avoid CPU timeout
-        const { feedPollingService } = await initializeServices(env.DB, env)
-        
-        // Group by provider
-        const byProvider = new Map<string, any[]>()
-        for (const sub of subscriptionsToCheck.results) {
-          if (!byProvider.has(sub.providerId as string)) {
-            byProvider.set(sub.providerId as string, [])
-          }
-          byProvider.get(sub.providerId as string)!.push(sub)
-        }
-        
-        // Process each provider's subscriptions
-        for (const [providerId, subs] of byProvider) {
-          console.log(`[OptimizedFeedPolling] Processing ${subs.length} ${providerId} subscriptions`)
-          
-          // Convert to Subscription objects for the polling service
-          const subscriptions = subs.map(s => ({
-            id: s.id as string,
-            externalId: s.externalId as string,
-            title: s.title as string,
-            creatorName: s.title as string,
-            description: '',
-            thumbnailUrl: '',
-            feedUrl: '',
-            subscriptionUrl: '',
-            totalEpisodes: s.totalEpisodes as number || 0,
-            createdAt: new Date(),
-            providerId: s.providerId as string
-          }))
-          
-          // Poll this provider's subscriptions
-          try {
-            await feedPollingService.pollProviderSubscriptions(providerId, subscriptions)
-            
-            // Update last polled timestamp
-            for (const sub of subs) {
-              await env.DB.prepare(`
-                UPDATE subscriptions SET last_polled_at = ? WHERE id = ?
-              `).bind(Date.now(), sub.id).run()
-            }
-          } catch (error) {
-            console.error(`[OptimizedFeedPolling] Error polling ${providerId}:`, error)
-          }
-        }
-      }
-    } catch (error) {
-      console.error('[OptimizedFeedPolling] Error in legacy polling:', error)
     }
   }
 }
