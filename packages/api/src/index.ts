@@ -1302,7 +1302,9 @@ export default {
           LIMIT 100
         `).all()
       } catch (error) {
-        console.log('[Scheduled] Database schema not ready for Durable Objects, falling back to legacy polling')
+        console.log('[Scheduled] Database schema not ready for Durable Objects, falling back to legacy polling', {
+          error: error instanceof Error ? error.message : String(error)
+        })
         // Fall back to optimized legacy polling
         await this.performOptimizedLegacyPolling(env)
         return
@@ -1528,11 +1530,11 @@ export default {
       
       // Get subscriptions that need polling
       const subscriptionsToCheck = await env.DB.prepare(`
-        SELECT DISTINCT s.id, s.providerId, s.externalId, s.title, s.totalEpisodes
+        SELECT DISTINCT s.id, s.provider_id as providerId, s.external_id as externalId, s.title, s.total_episodes as totalEpisodes
         FROM subscriptions s
-        INNER JOIN userSubscriptions us ON s.id = us.subscriptionId
-        WHERE us.isActive = 1
-        AND (s.lastPolledAt IS NULL OR s.lastPolledAt < ?)
+        INNER JOIN user_subscriptions us ON s.id = us.subscription_id
+        WHERE us.is_active = 1
+        AND (s.last_polled_at IS NULL OR s.last_polled_at < ?)
         LIMIT 50
       `).bind(cutoffTime).all()
       
@@ -1577,7 +1579,7 @@ export default {
             // Update last polled timestamp
             for (const sub of subs) {
               await env.DB.prepare(`
-                UPDATE subscriptions SET lastPolledAt = ? WHERE id = ?
+                UPDATE subscriptions SET last_polled_at = ? WHERE id = ?
               `).bind(Date.now(), sub.id).run()
             }
           } catch (error) {
