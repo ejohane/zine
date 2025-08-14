@@ -88,6 +88,7 @@ export const subscriptions = sqliteTable('subscriptions', {
   thumbnailUrl: text('thumbnail_url'),
   subscriptionUrl: text('subscription_url'),
   totalEpisodes: integer('total_episodes'),
+  lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 

@@ -28,6 +28,6 @@
     "dotenv": "^17.2.1",
     "drizzle-kit": "^0.31.4",
     "typescript": "^5.4.5",
-    "wrangler": "^3.60.0"
+    "wrangler": "^4.29.0"
   }
 }
