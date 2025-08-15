@@ -81,9 +81,9 @@ export class SingleUserPollingService {
         s.creator_name,
         s.description,
         s.thumbnail_url,
-        s.feed_url,
         s.subscription_url,
         s.total_episodes,
+        s.last_polled_at,
         s.created_at,
         s.provider_id
       FROM subscriptions s
@@ -98,9 +98,9 @@ export class SingleUserPollingService {
       creatorName: row.creator_name as string || row.title as string, // Use title as fallback
       description: row.description as string,
       thumbnailUrl: row.thumbnail_url as string,
-      feedUrl: row.feed_url as string,
+      feedUrl: '', // feed_url not in database, using empty string
       subscriptionUrl: row.subscription_url as string || '',
-      totalEpisodes: row.total_episodes as number,
+      totalEpisodes: row.total_episodes as number || 0,
       createdAt: new Date(row.created_at as string),
       providerId: row.provider_id as string
     }))
