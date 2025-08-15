@@ -187,6 +187,113 @@ To enable Spotify and YouTube account connections:
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
 
+## Design System (@zine/design-system)
+
+### Architecture
+
+The design system uses a **hybrid approach**: shadcn/ui for primitive components with custom Zine-specific patterns.
+
+- **Location**: `packages/design-system/`
+- **Build Tool**: tsup for bundling
+- **Documentation**: Storybook on port 6006
+- **Styling**: Tailwind CSS with CSS variables for theming
+- **Components**: Radix UI primitives wrapped with shadcn/ui patterns
+
+### Package Structure
+
+```
+packages/design-system/
+├── src/
+│   ├── tokens/              # Design tokens (colors, typography, spacing, breakpoints)
+│   ├── components/
+│   │   ├── ui/             # shadcn/ui components (Button, Card, Badge, etc.)
+│   │   └── patterns/       # Zine-specific patterns (BookmarkCard, SubscriptionItem)
+│   ├── lib/                # Utilities (cn function for className merging)
+│   └── styles/             # Global CSS with Tailwind directives
+├── .storybook/             # Storybook configuration
+├── components.json         # shadcn/ui configuration
+├── tailwind.config.ts      # Tailwind configuration with custom tokens
+└── tsup.config.ts         # Build configuration
+```
+
+### Design Tokens
+
+- **Colors**: Brand colors (primary), neutral scale, semantic colors (success/warning/error), platform colors (Spotify/YouTube/Apple/Google)
+- **Typography**: Font families (sans/mono/display), size scale (xs to 6xl), weights, letter spacing
+- **Spacing**: Consistent spacing scale from 0 to 32 (0px to 128px)
+- **Breakpoints**: Mobile-first responsive breakpoints (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px)
+
+### Component Categories
+
+1. **UI Components** (from shadcn/ui):
+   - Primitives: Button, Input, Label
+   - Layout: Card, Separator
+   - Feedback: Badge, Skeleton
+   - Overlay: Dialog, Dropdown Menu
+   - Navigation: Tabs
+   - Display: Avatar
+
+2. **Zine-Specific Patterns**:
+   - `BookmarkCard`: Display bookmarks with platform-specific styling
+   - `SubscriptionItem`: Display subscription content (podcasts, videos)
+
+### Usage in Web App
+
+```typescript
+// Import components and utilities
+import { Button, Card, BookmarkCard, cn, tokens } from '@zine/design-system';
+
+// Use components in your app
+<Button variant="primary" size="md">Click me</Button>
+<BookmarkCard {...bookmarkProps} />
+
+// Access design tokens
+const primaryColor = tokens.colors.primary[500];
+const spacing = tokens.spacing[4];
+```
+
+### Development Commands
+
+```bash
+# Development with watch mode
+cd packages/design-system
+bun run dev
+
+# Run Storybook for component development
+bun run storybook
+
+# Build the package
+bun run build
+
+# Add new shadcn component
+bun run add-component
+# or
+npx shadcn@latest add [component-name]
+
+# Type checking
+bun run type-check
+```
+
+### Adding New Components
+
+1. **For shadcn/ui components**: Use `npx shadcn@latest add [component]`
+2. **For custom patterns**: Create in `src/components/patterns/`
+3. **Always export from `src/index.ts`**
+4. **Create Storybook stories for documentation**
+
+### Styling Approach
+
+- **Tailwind CSS**: Primary styling method
+- **CSS Variables**: For theming support (defined in globals.css)
+- **class-variance-authority (CVA)**: For component variants
+- **tailwind-merge + clsx**: For conditional className handling via `cn()` utility
+
+### Platform Support Strategy
+
+- **Web**: Primary target, full component library
+- **Mobile (Future)**: React Native variants in `components/mobile/`
+- **Desktop (Future)**: Electron/Tauri enhancements
+
 ## Git Worktree Database Sync
 
 When working with git worktrees, you need to sync the database from the main project to avoid "no such table" errors.

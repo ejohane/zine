@@ -17,7 +17,6 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as SaveRouteImport } from './routes/save'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as FeedRouteImport } from './routes/feed'
-import { Route as DesignSystemRouteImport } from './routes/design-system'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
@@ -65,11 +64,6 @@ const FeedRoute = FeedRouteImport.update({
   path: '/feed',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DesignSystemRoute = DesignSystemRouteImport.update({
-  id: '/design-system',
-  path: '/design-system',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const BookmarksRoute = BookmarksRouteImport.update({
   id: '/bookmarks',
   path: '/bookmarks',
@@ -106,7 +100,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
-  '/design-system': typeof DesignSystemRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -123,7 +116,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
-  '/design-system': typeof DesignSystemRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -141,7 +133,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/bookmarks': typeof BookmarksRoute
-  '/design-system': typeof DesignSystemRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
   '/save': typeof SaveRoute
@@ -160,7 +151,6 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
-    | '/design-system'
     | '/feed'
     | '/profile'
     | '/save'
@@ -177,7 +167,6 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
-    | '/design-system'
     | '/feed'
     | '/profile'
     | '/save'
@@ -194,7 +183,6 @@ export interface FileRouteTypes {
     | '/'
     | '/accounts'
     | '/bookmarks'
-    | '/design-system'
     | '/feed'
     | '/profile'
     | '/save'
@@ -212,7 +200,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountsRoute: typeof AccountsRoute
   BookmarksRoute: typeof BookmarksRoute
-  DesignSystemRoute: typeof DesignSystemRoute
   FeedRoute: typeof FeedRouteWithChildren
   ProfileRoute: typeof ProfileRoute
   SaveRoute: typeof SaveRoute
@@ -283,13 +270,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FeedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/design-system': {
-      id: '/design-system'
-      path: '/design-system'
-      fullPath: '/design-system'
-      preLoaderRoute: typeof DesignSystemRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/bookmarks': {
       id: '/bookmarks'
       path: '/bookmarks'
@@ -349,7 +329,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsRoute: AccountsRoute,
   BookmarksRoute: BookmarksRoute,
-  DesignSystemRoute: DesignSystemRoute,
   FeedRoute: FeedRouteWithChildren,
   ProfileRoute: ProfileRoute,
   SaveRoute: SaveRoute,
