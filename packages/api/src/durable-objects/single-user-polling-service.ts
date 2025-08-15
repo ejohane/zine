@@ -12,6 +12,13 @@ export interface UserPollResult {
   errors?: string[]
 }
 
+interface LastSeenEpisode {
+  subscriptionId: string
+  lastEpisodeId: string
+  lastEpisodeDate: string
+  lastCheckTime: string
+}
+
 export class SingleUserPollingService {
   private userId: string
   private db: D1Database
@@ -125,14 +132,83 @@ export class SingleUserPollingService {
     const results: UserPollResult[] = []
     const spotifyAPI = new SpotifyAPI(token.accessToken)
 
-    for (const subscription of subscriptions) {
-      try {
-        // Fetch show details and recent episodes
-        const show = await spotifyAPI.getShow(subscription.externalId)
-        const episodes = await spotifyAPI.getShowEpisodes(subscription.externalId, 10)
+    if (subscriptions.length === 0) {
+      return results
+    }
 
-        // Check for new episodes
-        const newItems = await this.checkForNewItems(subscription.id, episodes.items.map(ep => ({
+    console.log(`[SingleUserPolling] Batch fetching ${subscriptions.length} Spotify shows`)
+
+    // Step 1: Get last seen episodes for all subscriptions
+    const subscriptionIds = subscriptions.map(s => s.id)
+    const lastSeenEpisodes = await this.getLastSeenEpisodes(subscriptionIds)
+
+    // Step 2: Batch fetch all shows
+    const showIds = subscriptions.map(s => s.externalId)
+    const subscriptionMap = new Map(subscriptions.map(s => [s.externalId, s]))
+    
+    let shows: Array<{ id: string; name: string; total_episodes: number }> = []
+    try {
+      shows = await spotifyAPI.getMultipleShows(showIds)
+    } catch (error) {
+      console.error(`[SingleUserPolling] Error batch fetching Spotify shows:`, error)
+      // Fall back to individual fetching if batch fails
+      for (const subscription of subscriptions) {
+        results.push({
+          provider: 'spotify',
+          subscriptionId: subscription.id,
+          subscriptionTitle: subscription.title,
+          newItemsFound: 0,
+          errors: [error instanceof Error ? error.message : String(error)]
+        })
+      }
+      return results
+    }
+
+    // Step 2: Identify shows with new episodes
+    const showsWithNewEpisodes: Array<{ show: any; subscription: Subscription }> = []
+    const showsToUpdate: Array<{ subscriptionId: string; totalEpisodes: number }> = []
+
+    for (const show of shows) {
+      const subscription = subscriptionMap.get(show.id)
+      if (!subscription) continue
+
+      // Check if total episodes has changed
+      if (subscription.totalEpisodes === undefined || show.total_episodes > subscription.totalEpisodes) {
+        showsWithNewEpisodes.push({ show, subscription })
+      }
+      
+      // Track total episodes update
+      if (show.total_episodes !== subscription.totalEpisodes) {
+        showsToUpdate.push({
+          subscriptionId: subscription.id,
+          totalEpisodes: show.total_episodes
+        })
+      }
+    }
+
+    console.log(`[SingleUserPolling] ${showsWithNewEpisodes.length} shows have new episodes (out of ${shows.length})`)
+
+    // Step 3: Fetch episodes only for shows with changes (with parallel processing)
+    const episodeFetchPromises = showsWithNewEpisodes.map(async ({ show, subscription }) => {
+      try {
+        // Determine how many episodes to fetch based on last seen
+        const lastSeen = lastSeenEpisodes.get(subscription.id)
+        const episodesToFetch = lastSeen ? Math.min(20, show.total_episodes - (subscription.totalEpisodes || 0) + 5) : 10
+        
+        const episodes = await spotifyAPI.getShowEpisodes(subscription.externalId, episodesToFetch)
+        
+        // If we have a last seen episode, filter out episodes we've already processed
+        let episodesToProcess = episodes.items
+        if (lastSeen && lastSeen.lastEpisodeId) {
+          const lastSeenIndex = episodesToProcess.findIndex(ep => ep.id === lastSeen.lastEpisodeId)
+          if (lastSeenIndex >= 0) {
+            // Only process episodes newer than the last seen one
+            episodesToProcess = episodesToProcess.slice(0, lastSeenIndex)
+          }
+        }
+        
+        // Check for new episodes (this also handles deduplication at the database level)
+        const newItems = await this.checkForNewItems(subscription.id, episodesToProcess.map(ep => ({
           externalId: ep.id,
           title: ep.name,
           description: ep.description,
@@ -147,28 +223,50 @@ export class SingleUserPollingService {
           await this.createFeedItems(subscription.id, newItems)
         }
 
-        results.push({
-          provider: 'spotify',
+        return {
+          provider: 'spotify' as const,
           subscriptionId: subscription.id,
           subscriptionTitle: subscription.title,
           newItemsFound: newItems.length
-        })
-
-        // Update total episodes if changed
-        if (show.total_episodes !== subscription.totalEpisodes) {
-          await this.updateSubscriptionTotalEpisodes(subscription.id, show.total_episodes)
         }
       } catch (error) {
-        console.error(`[SingleUserPolling] Error polling Spotify subscription ${subscription.id}:`, error)
-        results.push({
-          provider: 'spotify',
+        console.error(`[SingleUserPolling] Error fetching episodes for ${subscription.id}:`, error)
+        return {
+          provider: 'spotify' as const,
           subscriptionId: subscription.id,
           subscriptionTitle: subscription.title,
           newItemsFound: 0,
           errors: [error instanceof Error ? error.message : String(error)]
+        }
+      }
+    })
+
+    // Process episodes in batches to avoid overwhelming the API
+    const batchSize = 5
+    for (let i = 0; i < episodeFetchPromises.length; i += batchSize) {
+      const batch = episodeFetchPromises.slice(i, i + batchSize)
+      const batchResults = await Promise.all(batch)
+      results.push(...batchResults)
+    }
+
+    // Add results for shows without new episodes
+    for (const subscription of subscriptions) {
+      if (!results.find(r => r.subscriptionId === subscription.id)) {
+        results.push({
+          provider: 'spotify',
+          subscriptionId: subscription.id,
+          subscriptionTitle: subscription.title,
+          newItemsFound: 0
         })
       }
     }
+
+    // Step 4: Batch update total episodes
+    for (const update of showsToUpdate) {
+      await this.updateSubscriptionTotalEpisodes(update.subscriptionId, update.totalEpisodes)
+    }
+
+    console.log(`[SingleUserPolling] Spotify polling complete. Processed ${results.length} subscriptions, found ${results.reduce((sum, r) => sum + r.newItemsFound, 0)} new items`)
 
     return results
   }
@@ -332,4 +430,32 @@ export class SingleUserPollingService {
 
     return hours * 3600 + minutes * 60 + seconds
   }
+
+  private async getLastSeenEpisodes(subscriptionIds: string[]): Promise<Map<string, LastSeenEpisode>> {
+    if (subscriptionIds.length === 0) return new Map()
+
+    const placeholders = subscriptionIds.map(() => '?').join(',')
+    const result = await this.db.prepare(`
+      SELECT 
+        subscription_id,
+        MAX(external_id) as last_episode_id,
+        MAX(published_at) as last_episode_date
+      FROM feed_items
+      WHERE subscription_id IN (${placeholders})
+      GROUP BY subscription_id
+    `).bind(...subscriptionIds).all()
+
+    const lastSeenMap = new Map<string, LastSeenEpisode>()
+    for (const row of result.results) {
+      lastSeenMap.set(row.subscription_id as string, {
+        subscriptionId: row.subscription_id as string,
+        lastEpisodeId: row.last_episode_id as string,
+        lastEpisodeDate: row.last_episode_date as string,
+        lastCheckTime: new Date().toISOString()
+      })
+    }
+
+    return lastSeenMap
+  }
+
 }

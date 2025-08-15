@@ -119,6 +119,48 @@ export class SpotifyAPI {
     return response.json()
   }
 
+  async getMultipleShows(showIds: string[]): Promise<SpotifyShow[]> {
+    if (showIds.length === 0) {
+      return []
+    }
+
+    // Spotify limits to 50 shows per request
+    const maxBatchSize = 50
+    const results: SpotifyShow[] = []
+
+    // Process in batches if necessary
+    for (let i = 0; i < showIds.length; i += maxBatchSize) {
+      const batch = showIds.slice(i, i + maxBatchSize)
+      const params = new URLSearchParams({
+        ids: batch.join(','),
+        market: 'US' // Required for episode availability
+      })
+
+      const response = await fetch(
+        `${this.baseUrl}/shows?${params.toString()}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.text()
+        throw new Error(`Spotify API error: ${response.status} ${error}`)
+      }
+
+      const data = await response.json() as { shows: (SpotifyShow | null)[] }
+      
+      // Filter out null shows (deleted or unavailable)
+      const validShows = data.shows.filter((show): show is SpotifyShow => show !== null)
+      results.push(...validShows)
+    }
+
+    return results
+  }
+
   async getShowEpisodes(showId: string, limit: number = 50, offset: number = 0): Promise<SpotifyEpisodesResponse> {
     const response = await fetch(
       `${this.baseUrl}/shows/${showId}/episodes?limit=${limit}&offset=${offset}`,
