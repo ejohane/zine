@@ -11,9 +11,24 @@ export * from './components/ui/dropdown-menu';
 export * from './components/ui/skeleton';
 export * from './components/ui/separator';
 
+// Export layout components
+export * from './components/layout/AppShell';
+export * from './components/layout/Container';
+export * from './components/layout/Section';
+export * from './components/layout/Grid';
+
+// Export navigation components
+export * from './components/navigation/NavItem';
+export * from './components/navigation/BottomNav';
+export * from './components/navigation/QuickActionButton';
+export * from './components/navigation/QuickActionGrid';
+
 // Export patterns
 export * from './components/patterns/BookmarkCard';
 export * from './components/patterns/SubscriptionItem';
+
+// Export theme provider
+export { ThemeProvider, useTheme } from './components/theme-provider';
 
 // Export utilities
 export { cn } from './lib/utils';
