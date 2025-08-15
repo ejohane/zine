@@ -76,33 +76,33 @@ export class SingleUserPollingService {
     const result = await this.db.prepare(`
       SELECT 
         s.id,
-        s.externalId,
+        s.external_id,
         s.title,
-        s.creatorName,
+        s.creator_name,
         s.description,
-        s.thumbnailUrl,
-        s.feedUrl,
-        s.subscriptionUrl,
-        s.totalEpisodes,
-        s.createdAt,
-        s.providerId
+        s.thumbnail_url,
+        s.feed_url,
+        s.subscription_url,
+        s.total_episodes,
+        s.created_at,
+        s.provider_id
       FROM subscriptions s
-      INNER JOIN userSubscriptions us ON s.id = us.subscriptionId
-      WHERE us.userId = ? AND us.isActive = 1
+      INNER JOIN user_subscriptions us ON s.id = us.subscription_id
+      WHERE us.user_id = ? AND us.is_active = 1
     `).bind(this.userId).all()
 
     return result.results.map(row => ({
       id: row.id as string,
-      externalId: row.externalId as string,
+      externalId: row.external_id as string,
       title: row.title as string,
-      creatorName: row.creatorName as string || row.title as string, // Use title as fallback
+      creatorName: row.creator_name as string || row.title as string, // Use title as fallback
       description: row.description as string,
-      thumbnailUrl: row.thumbnailUrl as string,
-      feedUrl: row.feedUrl as string,
-      subscriptionUrl: row.subscriptionUrl as string || '',
-      totalEpisodes: row.totalEpisodes as number,
-      createdAt: new Date(row.createdAt as string),
-      providerId: row.providerId as string
+      thumbnailUrl: row.thumbnail_url as string,
+      feedUrl: row.feed_url as string,
+      subscriptionUrl: row.subscription_url as string || '',
+      totalEpisodes: row.total_episodes as number,
+      createdAt: new Date(row.created_at as string),
+      providerId: row.provider_id as string
     }))
   }
 
@@ -245,13 +245,13 @@ export class SingleUserPollingService {
     const placeholders = externalIds.map(() => '?').join(',')
     
     const existing = await this.db.prepare(`
-      SELECT externalId 
-      FROM feedItems 
-      WHERE subscriptionId = ? 
-      AND externalId IN (${placeholders})
+      SELECT external_id 
+      FROM feed_items 
+      WHERE subscription_id = ? 
+      AND external_id IN (${placeholders})
     `).bind(subscriptionId, ...externalIds).all()
 
-    const existingIds = new Set(existing.results.map(row => row.externalId as string))
+    const existingIds = new Set(existing.results.map(row => row.external_id as string))
     
     return items.filter(item => !existingIds.has(item.externalId))
   }
@@ -274,9 +274,9 @@ export class SingleUserPollingService {
     for (const item of items) {
       const id = crypto.randomUUID()
       await this.db.prepare(`
-        INSERT INTO feedItems (
-          id, subscriptionId, externalId, title, description, 
-          thumbnailUrl, publishedAt, durationSeconds, externalUrl, createdAt
+        INSERT INTO feed_items (
+          id, subscription_id, external_id, title, description, 
+          thumbnail_url, published_at, duration_seconds, external_url, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         id,
@@ -298,8 +298,8 @@ export class SingleUserPollingService {
     for (const feedItemId of createdFeedItems) {
       const userFeedItemId = `${this.userId}-${feedItemId}`
       await this.db.prepare(`
-        INSERT OR IGNORE INTO userFeedItems (
-          id, userId, feedItemId, isRead, createdAt
+        INSERT OR IGNORE INTO user_feed_items (
+          id, user_id, feed_item_id, is_read, created_at
         ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         userFeedItemId,
@@ -316,7 +316,7 @@ export class SingleUserPollingService {
   private async updateSubscriptionTotalEpisodes(subscriptionId: string, totalEpisodes: number): Promise<void> {
     await this.db.prepare(`
       UPDATE subscriptions 
-      SET totalEpisodes = ? 
+      SET total_episodes = ? 
       WHERE id = ?
     `).bind(totalEpisodes, subscriptionId).run()
   }
