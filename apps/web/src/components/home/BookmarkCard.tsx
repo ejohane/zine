@@ -10,6 +10,12 @@ interface BookmarkCardProps {
 }
 
 export function BookmarkCard({ bookmark, variant = 'default', onClick }: BookmarkCardProps) {
+  // Debug logging
+  console.log('BookmarkCard received:', bookmark)
+  
+  // Check if title looks like an ID (only alphanumeric, no spaces)
+  const titleLooksLikeId = bookmark.title && /^[a-zA-Z0-9]+$/.test(bookmark.title) && bookmark.title.length > 15
+  const displayTitle = titleLooksLikeId ? (bookmark.description || bookmark.url || 'Untitled Bookmark') : (bookmark.title || 'Untitled Bookmark')
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
@@ -91,7 +97,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
             <>
               <img
                 src={bookmark.thumbnailUrl}
-                alt={bookmark.title}
+                alt={displayTitle}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
@@ -130,7 +136,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
         {/* Content */}
         <div className="p-4">
           <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-foreground">
-            {bookmark.title}
+            {displayTitle}
           </h3>
           {bookmark.creator?.name && (
             <p className="text-xs text-muted-foreground">
@@ -171,7 +177,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
         {/* Content */}
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm line-clamp-1 mb-1">
-            {bookmark.title}
+            {displayTitle}
           </h3>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {bookmark.creator?.name && <span>{bookmark.creator.name}</span>}
@@ -238,7 +244,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
           {/* Content */}
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base md:text-lg line-clamp-2 mb-1 text-card-foreground group-hover:text-spotify-green transition-colors">
-              {bookmark.title}
+              {displayTitle}
             </h3>
             
             {bookmark.description && (

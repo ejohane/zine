@@ -27,14 +27,14 @@ export function MobileNav() {
               to={path}
               className={cn(
                 'flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg transition-all duration-200 min-w-0 flex-1',
-                'hover:text-primary focus:outline-none focus:ring-2 focus:ring-spotify-green focus:ring-offset-2 focus:ring-offset-background',
-                isActive ? 'text-foreground' : 'text-muted-foreground'
+                'hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background',
+                isActive ? 'text-primary' : 'text-muted-foreground'
               )}
               aria-label={label}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon className={cn('w-6 h-6', isActive && 'text-foreground')} aria-hidden="true" />
-              <span className={cn('text-xs font-medium', isActive && 'text-foreground')}>{label}</span>
+              <Icon className="w-6 h-6" aria-hidden="true" />
+              <span className="text-xs font-medium">{label}</span>
             </Link>
           )
         })}
