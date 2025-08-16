@@ -4,7 +4,9 @@ import {
   discoverSubscriptions, 
   fetchUserSubscriptions, 
   updateSubscriptions,
-  type SubscriptionUpdateRequest
+  refreshSubscriptions,
+  type SubscriptionUpdateRequest,
+  type RefreshSubscriptionsResult
 } from '../lib/api'
 
 export function useSubscriptionDiscovery(provider: 'spotify' | 'youtube') {
@@ -103,4 +105,36 @@ export function useProviderSubscriptions(provider: 'spotify' | 'youtube') {
     refetchUserSubscriptions: userSubscriptions.refetch,
     refetchDiscovery: discovery.refetch
   }
+}
+
+// Hook for manually refreshing subscriptions
+export function useRefreshSubscriptions() {
+  const { getToken } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation<RefreshSubscriptionsResult, Error>({
+    mutationFn: async () => {
+      const token = await getToken()
+      return refreshSubscriptions(token)
+    },
+    onSuccess: (data) => {
+      // Invalidate feed and subscription queries to show new items
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      queryClient.invalidateQueries({ queryKey: ['user-subscriptions'] })
+      queryClient.invalidateQueries({ queryKey: ['subscriptions-with-counts'] })
+      
+      // Store the next allowed time for rate limiting UI
+      if (data.nextAllowedTime) {
+        localStorage.setItem('lastRefreshTime', new Date().toISOString())
+        localStorage.setItem('nextAllowedRefreshTime', data.nextAllowedTime)
+      }
+    },
+    onError: (error: any) => {
+      // Handle rate limiting error
+      if (error.isRateLimited && error.nextAllowedTime) {
+        localStorage.setItem('nextAllowedRefreshTime', error.nextAllowedTime)
+      }
+      console.error('Failed to refresh subscriptions:', error)
+    }
+  })
 }

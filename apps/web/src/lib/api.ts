@@ -516,3 +516,55 @@ export const markFeedItemAsUnread = async (
     throw new Error('Failed to mark item as unread')
   }
 }
+
+// Manual subscription refresh
+export interface RefreshSubscriptionsResult {
+  success: boolean
+  message: string
+  newItemsCount: number
+  details?: Array<{
+    provider: string
+    subscriptionsPolled: number
+    newItemsFound: number
+  }>
+  nextAllowedTime: string
+  rateLimitSeconds: number
+}
+
+export interface RefreshSubscriptionsError {
+  error: string
+  message: string
+  retryAfter?: number
+  nextAllowedTime?: string
+  details?: string[]
+}
+
+export const refreshSubscriptions = async (
+  token: string | null
+): Promise<RefreshSubscriptionsResult> => {
+  const response = await fetch(`${API_BASE_URL}/subscriptions/refresh`, {
+    method: 'POST',
+    headers: createAuthHeaders(token),
+  })
+  
+  if (!response.ok) {
+    const errorData: RefreshSubscriptionsError = await response.json()
+    
+    if (response.status === 429) {
+      // Rate limited - throw a specific error
+      const error = new Error(errorData.message || 'Rate limited')
+      ;(error as any).isRateLimited = true
+      ;(error as any).retryAfter = errorData.retryAfter
+      ;(error as any).nextAllowedTime = errorData.nextAllowedTime
+      throw error
+    }
+    
+    if (response.status === 401) {
+      throw new Error('UNAUTHORIZED')
+    }
+    
+    throw new Error(errorData.message || 'Failed to refresh subscriptions')
+  }
+  
+  return response.json()
+}

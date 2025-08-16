@@ -1,11 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { ProtectedRoute } from '../auth/ProtectedRoute'
 import { SubscriptionAvatars } from './SubscriptionAvatars'
 import { FeedItemList } from './FeedItemList'
 import { useFeedManager } from '../../hooks/useFeed'
+import { useRefreshSubscriptions } from '../../hooks/useSubscriptions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
 import { Button } from '../ui/button'
+import { RefreshButton } from '../subscriptions/RefreshButton'
+import { Alert, AlertDescription } from '../ui/alert'
 
 interface FeedPageProps {
   subscriptionId?: string
@@ -13,7 +16,9 @@ interface FeedPageProps {
 
 export function FeedPage({ subscriptionId }: FeedPageProps) {
   const [showUnreadOnly, setShowUnreadOnly] = useState(true)
+  const [refreshMessage, setRefreshMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null)
   const navigate = useNavigate()
+  const refreshMutation = useRefreshSubscriptions()
   
   const {
     feedItems,
@@ -35,6 +40,49 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
     subscriptionId,
     limit: 20
   })
+
+  // Get stored refresh times for rate limiting UI
+  const lastRefreshTime = localStorage.getItem('lastRefreshTime')
+  const nextAllowedTime = localStorage.getItem('nextAllowedRefreshTime')
+
+  const handleRefresh = async () => {
+    setRefreshMessage(null)
+    try {
+      const result = await refreshMutation.mutateAsync()
+      
+      setRefreshMessage({
+        type: 'success',
+        message: result.message
+      })
+      
+      // Refetch feed data to show new items
+      if (result.newItemsCount > 0) {
+        refetch()
+        refetchSubscriptions()
+      }
+      
+      // Clear message after 5 seconds
+      setTimeout(() => setRefreshMessage(null), 5000)
+    } catch (error: any) {
+      setRefreshMessage({
+        type: 'error',
+        message: error.message || "Failed to refresh subscriptions"
+      })
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => setRefreshMessage(null), 5000)
+    }
+  }
+
+  // Clear old localStorage values when they expire
+  useEffect(() => {
+    if (nextAllowedTime) {
+      const nextTime = new Date(nextAllowedTime)
+      if (nextTime <= new Date()) {
+        localStorage.removeItem('nextAllowedRefreshTime')
+      }
+    }
+  }, [nextAllowedTime])
 
   const handleSubscriptionSelect = (selectedId: string | null) => {
     // Navigate to the appropriate route
@@ -140,6 +188,15 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
           </div>
           
           <div className="flex items-center gap-2">
+            {subscriptions.length > 0 && (
+              <RefreshButton
+                onRefresh={handleRefresh}
+                isRefreshing={refreshMutation.isPending}
+                lastRefreshTime={lastRefreshTime ? new Date(lastRefreshTime) : null}
+                nextAllowedTime={nextAllowedTime ? new Date(nextAllowedTime) : null}
+                showLabel={false}
+              />
+            )}
             <Link to="/subscriptions">
               <Button variant="outline" size="sm">
                 Manage Subscriptions
@@ -152,6 +209,13 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
             </Link>
           </div>
         </div>
+
+        {/* Refresh Status Alert */}
+        {refreshMessage && (
+          <Alert variant={refreshMessage.type === 'error' ? 'destructive' : 'default'}>
+            <AlertDescription>{refreshMessage.message}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Subscription Avatars */}
         {!isLoadingSubscriptions && subscriptions.length > 0 && (
