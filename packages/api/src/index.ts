@@ -118,6 +118,32 @@ app.get('/health', (c) => {
   return c.json({ status: 'healthy', timestamp: new Date().toISOString() })
 })
 
+// Metadata preview endpoint (public - no auth required)
+app.post('/api/v1/bookmarks/preview', async (c) => {
+  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
+  try {
+    const body = await c.req.json()
+    const { url } = body
+    
+    if (!url || typeof url !== 'string') {
+      return c.json({ error: 'URL is required' }, 400)
+    }
+    
+    const result = await bookmarkSaveService.previewMetadata(url)
+    
+    if (!result.success) {
+      return c.json({ error: result.error }, 500)
+    }
+    
+    return c.json({ 
+      data: result.bookmark,
+      message: result.message 
+    })
+  } catch (error) {
+    return c.json({ error: 'Invalid request data' }, 400)
+  }
+})
+
 // Apply authentication middleware to protected routes
 app.use('/api/v1/bookmarks/*', authMiddleware)
 app.use('/api/v1/accounts/*', authMiddleware)
@@ -1295,32 +1321,6 @@ app.post('/api/v1/bookmarks/save', async (c) => {
     }, 201)
   } catch (error) {
     console.error('Error creating bookmark with metadata:', error)
-    return c.json({ error: 'Invalid request data' }, 400)
-  }
-})
-
-// Metadata preview endpoint
-app.post('/api/v1/bookmarks/preview', async (c) => {
-  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
-  try {
-    const body = await c.req.json()
-    const { url } = body
-    
-    if (!url || typeof url !== 'string') {
-      return c.json({ error: 'URL is required' }, 400)
-    }
-    
-    const result = await bookmarkSaveService.previewMetadata(url)
-    
-    if (!result.success) {
-      return c.json({ error: result.error }, 500)
-    }
-    
-    return c.json({ 
-      data: result.bookmark,
-      message: result.message 
-    })
-  } catch (error) {
     return c.json({ error: 'Invalid request data' }, 400)
   }
 })
