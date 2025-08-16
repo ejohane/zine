@@ -9,8 +9,26 @@ interface ChannelWithVideos {
   videos: YouTubeVideoDetails[]
 }
 
-interface MultipleChannelsResponse {
-  items: YouTubeChannel[]
+interface PlaylistItemsResponse {
+  items: Array<{
+    contentDetails: {
+      videoId: string
+    }
+  }>
+}
+
+interface ChannelWithStats extends YouTubeChannel {
+  statistics: {
+    viewCount: string
+    subscriberCount: string
+    hiddenSubscriberCount: boolean
+    videoCount: string
+  }
+  contentDetails?: {
+    relatedPlaylists?: {
+      uploads?: string
+    }
+  }
 }
 
 export class YouTubeBatchProcessor extends BaseBatchProcessor {
@@ -44,6 +62,10 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     // YouTube has lower rate limits, reduce concurrency
     opts.maxConcurrency = Math.min(opts.maxConcurrency, 3)
     
+    // Track subrequests for Cloudflare limit
+    let subrequestCount = 0
+    const MAX_SUBREQUESTS = 45 // Leave buffer for other operations
+    
     const youtubeAPI = new YouTubeAPI(accessToken)
 
     // Initialize progress tracking
@@ -66,7 +88,7 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
       throw new Error('YouTube API connection failed - token may be invalid')
     }
 
-    console.log(`[YouTubeBatchProcessor] Processing ${subscriptions.length} subscriptions in batches of ${opts.maxBatchSize}`)
+    console.log(`[YouTubeBatchProcessor] Processing ${subscriptions.length} subscriptions with optimized batching`)
 
     // Group subscriptions by channel ID
     const subscriptionsByChannelId = new Map<string, Subscription>()
@@ -77,81 +99,132 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     const channelIds = Array.from(subscriptionsByChannelId.keys())
     const channelChunks = this.chunk(channelIds, opts.maxBatchSize)
 
-    // Fetch all channels in batches with rate limiting
-    const allChannels: YouTubeChannel[] = []
+    // Step 1: Batch fetch channels with statistics & contentDetails
+    const allChannels: ChannelWithStats[] = []
     for (const chunk of channelChunks) {
+      if (subrequestCount >= MAX_SUBREQUESTS) {
+        console.log(`[YouTubeBatchProcessor] Reached subrequest limit, stopping at ${allChannels.length} channels`)
+        break
+      }
+      
       if (this.rateLimiter && opts.useRateLimiter) {
         await this.rateLimiter.consume(1)
       }
       
       const channels = await this.retryOperation(
-        () => this.getMultipleChannels(youtubeAPI, chunk),
+        () => this.getMultipleChannelsWithStats(youtubeAPI, chunk),
         opts.retryAttempts,
         opts.retryDelay
       )
       allChannels.push(...channels)
+      subrequestCount++
     }
 
-    console.log(`[YouTubeBatchProcessor] Fetched metadata for ${allChannels.length} channels`)
+    console.log(`[YouTubeBatchProcessor] Fetched metadata for ${allChannels.length} channels with statistics`)
 
-    // Fetch latest videos for each channel with concurrency control
-    const channelsWithVideos = await this.processWithConcurrency(
-      allChannels,
-      async (channel) => {
+    // Step 2: Filter channels with new videos (change detection)
+    const channelsWithChanges = this.detectChanges(allChannels, subscriptionsByChannelId)
+    console.log(`[YouTubeBatchProcessor] ${channelsWithChanges.length} channels have new content`)
+
+    // Step 3: Batch fetch video IDs from uploads playlists (only for channels with changes)
+    const allVideoIds: string[] = []
+    const videoIdsByChannel = new Map<string, string[]>()
+    
+    // Process channels with changes in small batches to stay under subrequest limit
+    const BATCH_SIZE = 5 // Process 5 channels at a time
+    const changeBatches = this.chunk(channelsWithChanges, BATCH_SIZE)
+    
+    for (const batch of changeBatches) {
+      if (subrequestCount >= MAX_SUBREQUESTS) {
+        console.log(`[YouTubeBatchProcessor] Reached subrequest limit`)
+        break
+      }
+      
+      // Parallel fetch within batch
+      const batchPromises = batch.map(async (channel) => {
         progressTracker.taskStarted(channel.id, { channelName: channel.snippet.title })
         
         try {
-          // First get video IDs from search
-          const searchResponse = await this.retryOperation(
-            () => youtubeAPI.getChannelVideos(channel.id, 20),
-            opts.retryAttempts,
-            opts.retryDelay
-          )
-
-          if (searchResponse.items.length === 0) {
+          const uploadsPlaylistId = channel.contentDetails?.relatedPlaylists?.uploads
+          if (!uploadsPlaylistId) {
             progressTracker.taskCompleted(channel.id, { videoCount: 0 })
-            return { channel, videos: [] }
-          }
-
-          // Then batch fetch video details with rate limiting
-          const videoIds = searchResponse.items.map(item => item.id.videoId)
-          if (this.rateLimiter && opts.useRateLimiter) {
-            await this.rateLimiter.consume(1)
+            return { channelId: channel.id, videoIds: [] }
           }
           
-          const videos = await this.retryOperation(
-            () => this.getMultipleVideos(youtubeAPI, videoIds),
+          // Use playlistItems.list instead of search (1 quota unit vs 100)
+          const videoIds = await this.retryOperation(
+            () => this.getPlaylistVideoIds(youtubeAPI, uploadsPlaylistId, 20),
             opts.retryAttempts,
             opts.retryDelay
           )
-
-          progressTracker.taskCompleted(channel.id, { videoCount: videos.length })
-          return { channel, videos }
+          
+          progressTracker.taskCompleted(channel.id, { videoCount: videoIds.length })
+          return { channelId: channel.id, videoIds }
         } catch (error) {
           progressTracker.taskFailed(channel.id, error as Error)
-          throw error
+          return { channelId: channel.id, videoIds: [] }
         }
-      },
-      opts.maxConcurrency,
-      {
-        onProgress: opts.onProgress,
-        useRateLimiter: opts.useRateLimiter,
-        useCircuitBreaker: opts.useCircuitBreaker
+      })
+      
+      const results = await Promise.all(batchPromises)
+      subrequestCount += batch.length
+      
+      for (const result of results) {
+        videoIdsByChannel.set(result.channelId, result.videoIds)
+        allVideoIds.push(...result.videoIds)
       }
-    )
+    }
+    
+    console.log(`[YouTubeBatchProcessor] Collected ${allVideoIds.length} video IDs from ${channelsWithChanges.length} channels`)
+    
+    // Step 4: Batch fetch all video details at once
+    const allVideos: YouTubeVideoDetails[] = []
+    const videoChunks = this.chunk(allVideoIds, 50) // YouTube allows 50 video IDs per request
+    
+    for (const chunk of videoChunks) {
+      if (subrequestCount >= MAX_SUBREQUESTS) {
+        console.log(`[YouTubeBatchProcessor] Reached subrequest limit`)
+        break
+      }
+      
+      if (this.rateLimiter && opts.useRateLimiter) {
+        await this.rateLimiter.consume(1)
+      }
+      
+      const videos = await this.retryOperation(
+        () => this.getMultipleVideos(youtubeAPI, chunk),
+        opts.retryAttempts,
+        opts.retryDelay
+      )
+      allVideos.push(...videos)
+      subrequestCount++
+    }
+    
+    console.log(`[YouTubeBatchProcessor] Fetched details for ${allVideos.length} videos`)
+    
+    // Group videos back by channel
+    const channelsWithVideos: ChannelWithVideos[] = allChannels.map(channel => {
+      const channelVideoIds = videoIdsByChannel.get(channel.id) || []
+      const channelVideos = allVideos.filter(video => channelVideoIds.includes(video.id))
+      return { channel, videos: channelVideos }
+    })
 
     // Print summary
     reporter.printSummary()
+    console.log(`[YouTubeBatchProcessor] Total subrequests used: ${subrequestCount}/${MAX_SUBREQUESTS}`)
+
+    // Step 5: Update stored metadata for change detection
+    await this.updateChannelMetadata(allChannels, subscriptionsByChannelId)
 
     // Convert to results
     return this.convertToResults(channelsWithVideos, subscriptionsByChannelId)
   }
 
-  private async getMultipleChannels(api: YouTubeAPI, channelIds: string[]): Promise<YouTubeChannel[]> {
+  private async getMultipleChannelsWithStats(api: YouTubeAPI, channelIds: string[]): Promise<ChannelWithStats[]> {
     // YouTube's channels endpoint supports batch fetching
     const baseUrl = 'https://www.googleapis.com/youtube/v3'
     const params = new URLSearchParams({
-      part: 'snippet,statistics',
+      part: 'snippet,statistics,contentDetails', // Added contentDetails for uploads playlist
       id: channelIds.join(',')
     })
 
@@ -170,8 +243,63 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
       throw new Error(`YouTube API error: ${response.status} ${error}`)
     }
 
-    const data = await response.json() as MultipleChannelsResponse
+    const data = await response.json() as { items: ChannelWithStats[] }
     return data.items
+  }
+  
+  private detectChanges(channels: ChannelWithStats[], subscriptionsByChannelId: Map<string, Subscription>): ChannelWithStats[] {
+    return channels.filter(channel => {
+      const subscription = subscriptionsByChannelId.get(channel.id)
+      if (!subscription) return true // New channel, fetch videos
+      
+      const currentVideoCount = parseInt(channel.statistics.videoCount)
+      const storedVideoCount = (subscription as any).videoCount || 0
+      
+      // Only fetch if video count increased or we don't have stored count
+      return currentVideoCount > storedVideoCount || storedVideoCount === 0
+    })
+  }
+  
+  private async getPlaylistVideoIds(api: YouTubeAPI, playlistId: string, maxResults: number = 20): Promise<string[]> {
+    const baseUrl = 'https://www.googleapis.com/youtube/v3'
+    const params = new URLSearchParams({
+      part: 'contentDetails',
+      playlistId,
+      maxResults: maxResults.toString()
+    })
+    
+    const response = await fetch(
+      `${baseUrl}/playlistItems?${params.toString()}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${api.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    )
+    
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`YouTube API error: ${response.status} ${error}`)
+    }
+    
+    const data = await response.json() as PlaylistItemsResponse
+    return data.items.map(item => item.contentDetails.videoId)
+  }
+  
+  private async updateChannelMetadata(channels: ChannelWithStats[], subscriptionsByChannelId: Map<string, Subscription>): Promise<void> {
+    // This would normally update the database with new video counts and playlist IDs
+    // For now, we'll just log the updates that would be made
+    for (const channel of channels) {
+      const subscription = subscriptionsByChannelId.get(channel.id)
+      if (subscription) {
+        const updates = {
+          videoCount: parseInt(channel.statistics.videoCount),
+          uploadsPlaylistId: channel.contentDetails?.relatedPlaylists?.uploads
+        }
+        console.log(`[YouTubeBatchProcessor] Would update ${subscription.title}: videoCount=${updates.videoCount}`)
+      }
+    }
   }
 
   private async getMultipleVideos(api: YouTubeAPI, videoIds: string[]): Promise<YouTubeVideoDetails[]> {
@@ -227,7 +355,7 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
   getDefaultOptions(): BatchProcessorOptions {
     return {
       maxBatchSize: 50, // YouTube's limit for batch channel/video fetching
-      maxConcurrency: 1, // Reduced from 5 to stay under Cloudflare's 50 subrequest limit (2 API calls per channel)
+      maxConcurrency: 5, // Can increase this now with optimized batching
       retryAttempts: 3,
       retryDelay: 1000
     }
