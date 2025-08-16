@@ -46,13 +46,26 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
   const getContentTypeColor = () => {
     switch (bookmark.contentType) {
       case 'video':
-        return 'bg-orange-500 text-white'
+        return 'bg-video-orange text-white'
       case 'podcast':
-        return 'bg-pink-500 text-white'
+        return 'bg-podcast-pink text-white'
       case 'article':
-        return 'bg-blue-500 text-white'
+        return 'bg-article-blue text-white'
       default:
-        return 'bg-gray-500 text-white'
+        return 'bg-gray-600 text-white'
+    }
+  }
+
+  const getContentTypeGradient = () => {
+    switch (bookmark.contentType) {
+      case 'video':
+        return 'from-orange-500 to-orange-400'
+      case 'podcast':
+        return 'from-pink-500 to-pink-400'
+      case 'article':
+        return 'from-blue-500 to-blue-400'
+      default:
+        return 'from-gray-600 to-gray-500'
     }
   }
 
@@ -69,7 +82,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
   if (variant === 'carousel') {
     return (
       <div 
-        className="group relative bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden"
+        className="group relative bg-white dark:bg-zinc-900 rounded-2xl shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden"
         onClick={handleClick}
       >
         {/* Thumbnail with gradient overlay */}
@@ -87,8 +100,13 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
               )} />
             </>
           ) : (
-            <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-              {getContentTypeIcon()}
+            <div className={cn(
+              "w-full h-full bg-gradient-to-br flex items-center justify-center",
+              getContentTypeGradient()
+            )}>
+              <div className="text-white opacity-80">
+                {getContentTypeIcon()}
+              </div>
             </div>
           )}
           
@@ -111,11 +129,11 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
 
         {/* Content */}
         <div className="p-4">
-          <h3 className="font-semibold text-sm line-clamp-2 mb-1">
+          <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-foreground">
             {bookmark.title}
           </h3>
           {bookmark.creator?.name && (
-            <p className="text-xs text-gray-600 dark:text-gray-400">
+            <p className="text-xs text-muted-foreground">
               {bookmark.creator.name}
             </p>
           )}
@@ -128,7 +146,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
   if (variant === 'compact') {
     return (
       <div 
-        className="group flex items-center gap-3 p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+        className="group flex items-center gap-3 p-3 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 rounded-xl transition-colors cursor-pointer"
         onClick={handleClick}
       >
         {/* Small thumbnail */}
@@ -140,8 +158,13 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
             loading="lazy"
           />
         ) : (
-          <div className="w-16 h-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
-            {getContentTypeIcon()}
+          <div className={cn(
+            "w-16 h-16 rounded bg-gradient-to-br flex items-center justify-center flex-shrink-0",
+            getContentTypeGradient()
+          )}>
+            <div className="text-white opacity-80">
+              {getContentTypeIcon()}
+            </div>
           </div>
         )}
 
@@ -150,7 +173,7 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
           <h3 className="font-medium text-sm line-clamp-1 mb-1">
             {bookmark.title}
           </h3>
-          <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {bookmark.creator?.name && <span>{bookmark.creator.name}</span>}
             {bookmark.source && (
               <>

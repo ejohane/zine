@@ -58,7 +58,7 @@ export function RecentCarousel() {
         <div className="flex gap-4 overflow-hidden">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="flex-shrink-0 w-[280px]">
-              <div className="w-full h-[200px] rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+              <div className="w-full h-[200px] rounded-lg bg-gray-200 dark:bg-zinc-800 animate-pulse" />
             </div>
           ))}
         </div>
@@ -77,14 +77,14 @@ export function RecentCarousel() {
         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={scrollLeft}
-            className="p-1 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow"
+            className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:shadow-lg transition-shadow"
             aria-label="Scroll left"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <button
             onClick={scrollRight}
-            className="p-1 rounded-full bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-shadow"
+            className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:shadow-lg transition-shadow"
             aria-label="Scroll right"
           >
             <ChevronRight className="w-5 h-5" />

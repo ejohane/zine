@@ -23,9 +23,9 @@ function QuickActionButton({ icon, label, onClick, to, className }: QuickActionB
 
   const buttonClass = cn(
     "flex flex-col items-center justify-center p-6 rounded-2xl",
-    "bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700",
+    "bg-white hover:bg-gray-50 dark:bg-zinc-900 dark:hover:bg-zinc-800",
     "transition-all hover:scale-105 active:scale-95",
-    "shadow-sm hover:shadow-lg border border-gray-200 dark:border-gray-700",
+    "shadow-sm hover:shadow-lg border border-gray-200 dark:border-zinc-800",
     "min-h-[120px] w-full",
     className
   )
@@ -69,18 +69,18 @@ export function QuickActions() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <QuickActionButton
-        icon={<Play className="w-8 h-8 text-blue-500" />}
+        icon={<Play className="w-8 h-8 text-white" />}
         label="Continue"
         onClick={handleContinue}
         className={!continueItem ? 'opacity-50 cursor-not-allowed' : ''}
       />
       <QuickActionButton
-        icon={<Star className="w-8 h-8 text-yellow-500" />}
+        icon={<Star className="w-8 h-8 text-white" />}
         label="Favorites"
         onClick={handleFavorites}
       />
       <QuickActionButton
-        icon={<Plus className="w-8 h-8 text-green-500" />}
+        icon={<Plus className="w-8 h-8 text-white" />}
         label="Add New"
         to="/save"
       />

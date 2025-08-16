@@ -15,7 +15,7 @@ export function QueueList() {
         <h2 className="text-xl font-semibold mb-4">Queue</h2>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="w-full h-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse" />
+            <div key={i} className="w-full h-24 rounded-lg bg-gray-200 dark:bg-zinc-800 animate-pulse" />
           ))}
         </div>
       </div>

@@ -129,10 +129,11 @@ export function useRefreshSubscriptions() {
         localStorage.setItem('nextAllowedRefreshTime', data.nextAllowedTime)
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       // Handle rate limiting error
-      if (error.isRateLimited && error.nextAllowedTime) {
-        localStorage.setItem('nextAllowedRefreshTime', error.nextAllowedTime)
+      const err = error as { isRateLimited?: boolean; nextAllowedTime?: string }
+      if (err.isRateLimited && err.nextAllowedTime) {
+        localStorage.setItem('nextAllowedRefreshTime', err.nextAllowedTime)
       }
       console.error('Failed to refresh subscriptions:', error)
     }

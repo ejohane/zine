@@ -63,10 +63,10 @@ export function FeedPage({ subscriptionId }: FeedPageProps) {
       
       // Clear message after 5 seconds
       setTimeout(() => setRefreshMessage(null), 5000)
-    } catch (error: any) {
+    } catch (error) {
       setRefreshMessage({
         type: 'error',
-        message: error.message || "Failed to refresh subscriptions"
+        message: error instanceof Error ? error.message : "Failed to refresh subscriptions"
       })
       
       // Clear error message after 5 seconds
