@@ -69,18 +69,18 @@ export function QuickActions() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <QuickActionButton
-        icon={<Play className="w-8 h-8 text-white" />}
+        icon={<Play className="w-8 h-8 text-foreground" />}
         label="Continue"
         onClick={handleContinue}
         className={!continueItem ? 'opacity-50 cursor-not-allowed' : ''}
       />
       <QuickActionButton
-        icon={<Star className="w-8 h-8 text-white" />}
+        icon={<Star className="w-8 h-8 text-foreground" />}
         label="Favorites"
         onClick={handleFavorites}
       />
       <QuickActionButton
-        icon={<Plus className="w-8 h-8 text-white" />}
+        icon={<Plus className="w-8 h-8 text-foreground" />}
         label="Add New"
         to="/save"
       />
