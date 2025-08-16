@@ -1,11 +1,15 @@
-import { ExternalLink, Clock, User, Calendar } from 'lucide-react'
+import { ExternalLink, Clock, User, Calendar, Play, Headphones, FileText } from 'lucide-react'
 import type { Bookmark } from '../../lib/api'
+import { cn } from '@/lib/utils'
+import { Badge } from '../ui/badge'
 
 interface BookmarkCardProps {
   bookmark: Bookmark
+  variant?: 'default' | 'carousel' | 'compact'
+  onClick?: (bookmark: Bookmark) => void
 }
 
-export function BookmarkCard({ bookmark }: BookmarkCardProps) {
+export function BookmarkCard({ bookmark, variant = 'default', onClick }: BookmarkCardProps) {
   const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
@@ -26,6 +30,148 @@ export function BookmarkCard({ bookmark }: BookmarkCardProps) {
     return d.toLocaleDateString('en-US')
   }
 
+  const getContentTypeIcon = () => {
+    switch (bookmark.contentType) {
+      case 'video':
+        return <Play className="w-4 h-4" />
+      case 'podcast':
+        return <Headphones className="w-4 h-4" />
+      case 'article':
+        return <FileText className="w-4 h-4" />
+      default:
+        return <ExternalLink className="w-4 h-4" />
+    }
+  }
+
+  const getContentTypeColor = () => {
+    switch (bookmark.contentType) {
+      case 'video':
+        return 'bg-orange-500 text-white'
+      case 'podcast':
+        return 'bg-pink-500 text-white'
+      case 'article':
+        return 'bg-blue-500 text-white'
+      default:
+        return 'bg-gray-500 text-white'
+    }
+  }
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (onClick) {
+      onClick(bookmark)
+    } else {
+      window.open(bookmark.url, '_blank')
+    }
+  }
+
+  // Carousel variant - rich media card
+  if (variant === 'carousel') {
+    return (
+      <div 
+        className="group relative bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition-all duration-200 cursor-pointer overflow-hidden"
+        onClick={handleClick}
+      >
+        {/* Thumbnail with gradient overlay */}
+        <div className="relative aspect-video">
+          {bookmark.thumbnailUrl ? (
+            <>
+              <img
+                src={bookmark.thumbnailUrl}
+                alt={bookmark.title}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"
+              )} />
+            </>
+          ) : (
+            <div className="w-full h-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+              {getContentTypeIcon()}
+            </div>
+          )}
+          
+          {/* Content type badge */}
+          <div className="absolute top-2 right-2">
+            <Badge className={cn("text-xs", getContentTypeColor())}>
+              {bookmark.contentType?.toUpperCase() || 'WEB'}
+            </Badge>
+          </div>
+
+          {/* Duration/Reading time */}
+          {(bookmark.videoMetadata?.duration || bookmark.articleMetadata?.readingTime) && (
+            <div className="absolute bottom-2 right-2 bg-black/80 text-white px-2 py-1 rounded text-xs">
+              {bookmark.videoMetadata?.duration 
+                ? formatDuration(bookmark.videoMetadata.duration)
+                : `${bookmark.articleMetadata?.readingTime} min`}
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="p-4">
+          <h3 className="font-semibold text-sm line-clamp-2 mb-1">
+            {bookmark.title}
+          </h3>
+          {bookmark.creator?.name && (
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              {bookmark.creator.name}
+            </p>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Compact variant - minimal list item
+  if (variant === 'compact') {
+    return (
+      <div 
+        className="group flex items-center gap-3 p-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+        onClick={handleClick}
+      >
+        {/* Small thumbnail */}
+        {bookmark.thumbnailUrl ? (
+          <img
+            src={bookmark.thumbnailUrl}
+            alt=""
+            className="w-16 h-16 rounded object-cover flex-shrink-0"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-16 h-16 rounded bg-gray-200 dark:bg-gray-700 flex items-center justify-center flex-shrink-0">
+            {getContentTypeIcon()}
+          </div>
+        )}
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-sm line-clamp-1 mb-1">
+            {bookmark.title}
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            {bookmark.creator?.name && <span>{bookmark.creator.name}</span>}
+            {bookmark.source && (
+              <>
+                <span>•</span>
+                <span>{bookmark.source}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            {bookmark.contentType || 'web'}
+          </Badge>
+        </div>
+      </div>
+    )
+  }
+
+  // Default variant - existing full card
   return (
     <div className="group relative bg-card hover:bg-surface-hover rounded-lg transition-all duration-200 cursor-pointer overflow-hidden">
       <a 
@@ -33,6 +179,7 @@ export function BookmarkCard({ bookmark }: BookmarkCardProps) {
         target="_blank" 
         rel="noopener noreferrer"
         className="block p-4"
+        onClick={onClick ? (e) => { e.preventDefault(); onClick(bookmark) } : undefined}
       >
         <div className="flex gap-4">
           {/* Thumbnail */}
