@@ -88,6 +88,9 @@ export const subscriptions = sqliteTable('subscriptions', {
   thumbnailUrl: text('thumbnail_url'),
   subscriptionUrl: text('subscription_url'),
   totalEpisodes: integer('total_episodes'),
+  videoCount: integer('video_count'),                     // NEW: For YouTube change detection
+  uploadsPlaylistId: text('uploads_playlist_id'),          // NEW: Cache playlist ID
+  etag: text('etag'),                                      // NEW: For ETag caching
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
