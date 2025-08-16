@@ -20,6 +20,7 @@ import { TokenRefreshService } from './services/token-refresh-service'
 import { QueryOptimizer } from './repositories/query-optimizer'
 import { InitialFeedPopulationService } from './services/initial-feed-population-service'
 import { DualModeSubscriptionRepository } from './repositories/dual-mode-subscription-repository'
+import { userStateRoutes } from './routes/user-state'
 
 export type Bindings = {
   DB: D1Database
@@ -34,6 +35,7 @@ export type Bindings = {
   API_BASE_URL: string
   // Durable Objects
   USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
+  USER_RECENT_BOOKMARKS: DurableObjectNamespace
   // KV for rate limiting
   KV?: KVNamespace
   // Feature flags
@@ -1357,6 +1359,12 @@ app.put('/api/v1/bookmarks/:id/refresh', async (c) => {
   }
 })
 
+// User state endpoints (Recent items, Continue bookmark, etc.)
+app.use('/api/v1/user-state/*', authMiddleware)
+
+// Mount user state routes (imported at top of file)
+app.route('/api/v1/user-state', userStateRoutes)
+
 // Scheduled event handler for cron triggers
 export default {
   // HTTP requests
@@ -1597,3 +1605,4 @@ export default {
 
 // Export Durable Objects
 export { UserSubscriptionManager } from './durable-objects/user-subscription-manager'
+export { UserRecentBookmarksDO } from './durableObjects/UserRecentBookmarksDO'

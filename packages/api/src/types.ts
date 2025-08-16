@@ -11,6 +11,7 @@ export interface Env {
   API_BASE_URL: string
   // Durable Objects
   USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
+  USER_RECENT_BOOKMARKS: DurableObjectNamespace
   // Feature flags
   FEATURE_DO_ROLLOUT_PERCENTAGE?: string
   FEATURE_DUAL_MODE_TOKENS?: string

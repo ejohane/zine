@@ -25,9 +25,17 @@ database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
 name = "USER_SUBSCRIPTION_MANAGER"
 class_name = "UserSubscriptionManager"
 
+[[durable_objects.bindings]]
+name = "USER_RECENT_BOOKMARKS"
+class_name = "UserRecentBookmarksDO"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = [ "UserSubscriptionManager" ]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = [ "UserRecentBookmarksDO" ]
 
 # Migrations are handled via GitHub Actions workflow
 
@@ -51,6 +59,14 @@ database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
 name = "USER_SUBSCRIPTION_MANAGER"
 class_name = "UserSubscriptionManager"
 
+[[env.production.durable_objects.bindings]]
+name = "USER_RECENT_BOOKMARKS"
+class_name = "UserRecentBookmarksDO"
+
 [[env.production.migrations]]
 tag = "v1"
 new_sqlite_classes = [ "UserSubscriptionManager" ]
+
+[[env.production.migrations]]
+tag = "v2"
+new_sqlite_classes = [ "UserRecentBookmarksDO" ]

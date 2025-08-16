@@ -552,10 +552,15 @@ export const refreshSubscriptions = async (
     
     if (response.status === 429) {
       // Rate limited - throw a specific error
-      const error = new Error(errorData.message || 'Rate limited')
-      ;(error as any).isRateLimited = true
-      ;(error as any).retryAfter = errorData.retryAfter
-      ;(error as any).nextAllowedTime = errorData.nextAllowedTime
+      interface RateLimitError extends Error {
+        isRateLimited: boolean
+        retryAfter?: number
+        nextAllowedTime?: string
+      }
+      const error = new Error(errorData.message || 'Rate limited') as RateLimitError
+      error.isRateLimited = true
+      error.retryAfter = errorData.retryAfter
+      error.nextAllowedTime = errorData.nextAllowedTime
       throw error
     }
     
