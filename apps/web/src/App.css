@@ -35,14 +35,42 @@
     padding-right: env(safe-area-inset-right);
   }
   
+  /* Safe area utilities */
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom);
+  }
+  
+  /* Tab bar height with safe area */
+  .pb-tab-bar {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  
   /* Ensure the app fills the viewport in standalone mode */
-  html, body, #root {
+  html {
     height: 100%;
-    overflow-x: hidden;
+    /* Prevent rubber band scrolling on iOS */
+    position: fixed;
+    width: 100%;
+  }
+  
+  body {
+    height: 100%;
+    overflow: hidden;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+  
+  #root {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   /* Allow text selection in content areas */
