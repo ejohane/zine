@@ -87,3 +87,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  @keyframes progress-indeterminate {
+    0% {
+      transform: translateX(-100%);
+      width: 40%;
+    }
+    50% {
+      transform: translateX(100%);
+      width: 30%;
+    }
+    100% {
+      transform: translateX(250%);
+      width: 40%;
+    }
+  }
+
+  .animate-progress-indeterminate {
+    animation: progress-indeterminate 1.5s ease-in-out infinite;
+  }
+}

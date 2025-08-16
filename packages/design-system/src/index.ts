@@ -16,12 +16,22 @@ export * from './components/layout/AppShell';
 export * from './components/layout/Container';
 export * from './components/layout/Section';
 export * from './components/layout/Grid';
+export * from './components/layout/Stack';
+export * from './components/layout/Flex';
 
 // Export navigation components
 export * from './components/navigation/NavItem';
 export * from './components/navigation/BottomNav';
 export * from './components/navigation/QuickActionButton';
 export * from './components/navigation/QuickActionGrid';
+export * from './components/navigation/Navbar';
+export * from './components/navigation/Sidebar';
+export * from './components/navigation/Breadcrumb';
+
+// Export feedback components
+export * from './components/feedback/Spinner';
+export * from './components/feedback/Progress';
+export * from './components/feedback/Toast';
 
 // Export patterns
 export * from './components/patterns/BookmarkCard';
