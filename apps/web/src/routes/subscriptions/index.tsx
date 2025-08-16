@@ -4,8 +4,10 @@ import { Button } from '../../components/ui/button'
 import { Badge } from '../../components/ui/badge'
 import { Alert, AlertDescription } from '../../components/ui/alert'
 import { Loader2, Plus, Settings, ExternalLink } from 'lucide-react'
-import { useUserSubscriptions } from '../../hooks/useSubscriptions'
+import { useUserSubscriptions, useRefreshSubscriptions } from '../../hooks/useSubscriptions'
 import { useAccounts } from '../../hooks/useAccounts'
+import { RefreshButton } from '../../components/subscriptions/RefreshButton'
+import { useEffect, useState } from 'react'
 
 export const Route = createFileRoute('/subscriptions/')({
   component: SubscriptionsPage,
@@ -14,10 +16,49 @@ export const Route = createFileRoute('/subscriptions/')({
 function SubscriptionsPage() {
   const { accounts, isLoading: accountsLoading } = useAccounts()
   const { data: subscriptions, isLoading, error } = useUserSubscriptions()
+  const refreshMutation = useRefreshSubscriptions()
+  const [refreshMessage, setRefreshMessage] = useState<{ type: 'success' | 'error', message: string } | null>(null)
 
   const connectedProviders = accounts.filter(acc => acc.connected)
   const hasSpotify = connectedProviders.some(acc => acc.provider.id === 'spotify')
   const hasYouTube = connectedProviders.some(acc => acc.provider.id === 'youtube')
+
+  // Get stored refresh times for rate limiting UI
+  const lastRefreshTime = localStorage.getItem('lastRefreshTime')
+  const nextAllowedTime = localStorage.getItem('nextAllowedRefreshTime')
+
+  const handleRefresh = async () => {
+    setRefreshMessage(null)
+    try {
+      const result = await refreshMutation.mutateAsync()
+      
+      setRefreshMessage({
+        type: 'success',
+        message: result.message
+      })
+      
+      // Clear message after 5 seconds
+      setTimeout(() => setRefreshMessage(null), 5000)
+    } catch (error: any) {
+      setRefreshMessage({
+        type: 'error',
+        message: error.message || "Failed to refresh subscriptions"
+      })
+      
+      // Clear error message after 5 seconds
+      setTimeout(() => setRefreshMessage(null), 5000)
+    }
+  }
+
+  // Clear old localStorage values on unmount or when they expire
+  useEffect(() => {
+    if (nextAllowedTime) {
+      const nextTime = new Date(nextAllowedTime)
+      if (nextTime <= new Date()) {
+        localStorage.removeItem('nextAllowedRefreshTime')
+      }
+    }
+  }, [nextAllowedTime])
 
   if (accountsLoading || isLoading) {
     return (
@@ -45,12 +86,28 @@ function SubscriptionsPage() {
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Your Subscriptions</h1>
-          <p className="text-muted-foreground">
-            Manage your podcast and channel subscriptions from connected accounts.
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Your Subscriptions</h1>
+            <p className="text-muted-foreground">
+              Manage your podcast and channel subscriptions from connected accounts.
+            </p>
+          </div>
+          {subscriptions && subscriptions.length > 0 && (
+            <RefreshButton
+              onRefresh={handleRefresh}
+              isRefreshing={refreshMutation.isPending}
+              lastRefreshTime={lastRefreshTime ? new Date(lastRefreshTime) : null}
+              nextAllowedTime={nextAllowedTime ? new Date(nextAllowedTime) : null}
+            />
+          )}
         </div>
+
+        {refreshMessage && (
+          <Alert variant={refreshMessage.type === 'error' ? 'destructive' : 'default'}>
+            <AlertDescription>{refreshMessage.message}</AlertDescription>
+          </Alert>
+        )}
 
         {connectedProviders.length === 0 && (
           <Alert>
