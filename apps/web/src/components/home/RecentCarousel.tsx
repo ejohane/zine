@@ -14,6 +14,9 @@ export function RecentCarousel() {
   // TODO: Replace with DO endpoint /api/v1/user-state/recent
   const { data: bookmarks, isLoading } = useBookmarks({ status: 'active' })
   const recentBookmarks = bookmarks?.slice(0, 10) || []
+  
+  // Debug logging
+  console.log('Recent bookmarks data:', recentBookmarks)
 
   // Mark bookmark as opened
   const markAsOpened = useMutation({
