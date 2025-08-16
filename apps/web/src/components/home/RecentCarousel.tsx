@@ -54,7 +54,7 @@ export function RecentCarousel() {
   if (isLoading) {
     return (
       <div className="relative">
-        <h2 className="text-xl font-semibold mb-4">Recent</h2>
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Recent</h2>
         <div className="flex gap-4 overflow-hidden">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="flex-shrink-0 w-[280px]">
@@ -73,21 +73,21 @@ export function RecentCarousel() {
   return (
     <div className="relative group">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Recent</h2>
+        <h2 className="text-xl font-semibold text-foreground">Recent</h2>
         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             onClick={scrollLeft}
             className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:shadow-lg transition-shadow"
             aria-label="Scroll left"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-5 h-5 text-foreground" />
           </button>
           <button
             onClick={scrollRight}
             className="p-1 rounded-full bg-white dark:bg-zinc-800 shadow-md hover:shadow-lg transition-shadow"
             aria-label="Scroll right"
           >
-            <ChevronRight className="w-5 h-5" />
+            <ChevronRight className="w-5 h-5 text-foreground" />
           </button>
         </div>
       </div>

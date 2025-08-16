@@ -17,7 +17,7 @@ function QuickActionButton({ icon, label, onClick, to, className }: QuickActionB
       <div className="w-14 h-14 mx-auto mb-2 flex items-center justify-center">
         {icon}
       </div>
-      <span className="text-sm font-medium">{label}</span>
+      <span className="text-sm font-medium text-foreground">{label}</span>
     </>
   )
 

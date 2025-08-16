@@ -12,7 +12,7 @@ export function QueueList() {
   if (isLoading) {
     return (
       <div>
-        <h2 className="text-xl font-semibold mb-4">Queue</h2>
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Queue</h2>
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div key={i} className="w-full h-24 rounded-lg bg-gray-200 dark:bg-zinc-800 animate-pulse" />
@@ -29,7 +29,7 @@ export function QueueList() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Queue</h2>
+        <h2 className="text-xl font-semibold text-foreground">Queue</h2>
         <Link to="/bookmarks">
           <Button variant="ghost" size="sm" className="text-sm">
             See all
