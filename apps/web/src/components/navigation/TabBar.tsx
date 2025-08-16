@@ -12,8 +12,8 @@ export function TabBar() {
   const location = useLocation()
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background safe-bottom">
-      <nav className="flex h-16 items-center justify-around">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-t border-border">
+      <nav className="flex h-16 items-center justify-around px-safe">
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
@@ -38,6 +38,8 @@ export function TabBar() {
           )
         })}
       </nav>
+      {/* Safe area padding for iOS home indicator */}
+      <div className="h-safe-bottom bg-background/95" />
     </div>
   )
 }

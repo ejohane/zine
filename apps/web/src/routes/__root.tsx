@@ -43,7 +43,7 @@ function RootComponent() {
             
             <main className={cn(
               "flex-1",
-              isMobile && "pb-16" // Add padding for mobile tab bar
+              isMobile && "pb-tab-bar" // Add padding for mobile tab bar with safe area
             )}>
               <AnimatePresence mode="wait">
                 <Outlet />
