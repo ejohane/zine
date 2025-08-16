@@ -126,9 +126,13 @@ export class EnhancedMetadataExtractor {
    * Extract metadata from a URL with enhanced parsing
    */
   async extractMetadata(url: string): Promise<EnhancedMetadataExtractionResult> {
+    console.log('[EnhancedMetadataExtractor] Starting extraction for URL:', url)
     try {
       const normalized = normalizeUrl(url)
       const platform = detectPlatform(url)
+      
+      console.log('[EnhancedMetadataExtractor] Detected platform:', platform)
+      console.log('[EnhancedMetadataExtractor] Normalized URL:', normalized.normalized)
       
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), this.timeout)
@@ -139,9 +143,11 @@ export class EnhancedMetadataExtractor {
         // Route to platform-specific extractors first
         switch (platform) {
           case 'youtube':
+            console.log('[EnhancedMetadataExtractor] Using YouTube extractor')
             metadata = await this.extractYouTubeMetadata(normalized.normalized, controller.signal)
             break
           case 'spotify':
+            console.log('[EnhancedMetadataExtractor] Using Spotify extractor')
             metadata = await this.extractSpotifyMetadata(normalized.normalized, controller.signal)
             break
           case 'x':
@@ -161,12 +167,16 @@ export class EnhancedMetadataExtractor {
       } catch (error) {
         clearTimeout(timeoutId)
         
+        console.error(`Platform-specific extraction failed for ${platform}:`, error)
+        
         // If platform-specific extraction fails, try enhanced web extraction
         if (platform !== 'web') {
           try {
+            console.log(`Attempting fallback to enhanced web extraction for ${platform}`)
             const fallbackMetadata = await this.extractEnhancedWebMetadata(normalized.normalized, controller.signal)
             return { success: true, metadata: fallbackMetadata }
           } catch (fallbackError) {
+            console.error(`Enhanced web extraction also failed for ${platform}:`, fallbackError)
             return this.createMinimalMetadata(url, normalized.normalized, platform as Source)
           }
         }
@@ -867,21 +877,44 @@ export class EnhancedMetadataExtractor {
       // Extract Spotify ID and type from URL
       const spotifyData = this.extractSpotifyInfo(url)
       if (!spotifyData) {
+        console.warn('Could not extract Spotify information from URL:', url)
         throw new Error('Could not extract Spotify information from URL')
       }
+
+      console.log('Extracting Spotify metadata for:', spotifyData)
 
       // Use Spotify oEmbed API (doesn't require authentication)
       const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`
       
-      const response = await fetch(oembedUrl, { signal })
+      console.log('Fetching Spotify oEmbed from:', oembedUrl)
+      
+      let response: Response
+      try {
+        response = await fetch(oembedUrl, { 
+          signal,
+          headers: {
+            'Accept': 'application/json'
+          }
+        })
+      } catch (fetchError) {
+        console.error('Fetch error for Spotify oEmbed:', fetchError)
+        console.error('Fetch error details:', {
+          message: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          stack: fetchError instanceof Error ? fetchError.stack : undefined,
+          url: oembedUrl
+        })
+        throw new Error(`Failed to fetch Spotify oEmbed: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`)
+      }
+      
       if (!response.ok) {
+        console.error(`Spotify oEmbed API failed with status ${response.status}`)
+        const responseText = await response.text()
+        console.error('Response body:', responseText)
         throw new Error(`Spotify oEmbed API failed: ${response.status}`)
       }
 
       const oembedData = await response.json() as SpotifyOEmbedResponse
-
-      // Also fetch the page for additional metadata
-      const pageMetadata = await this.extractEnhancedWebMetadata(url, signal)
+      console.log('Spotify oEmbed data received:', oembedData)
 
       // Determine content type based on Spotify URL
       const contentType: ContentType = spotifyData.type === 'episode' ? 'podcast' : 
@@ -906,11 +939,6 @@ export class EnhancedMetadataExtractor {
           }
         }
       }
-      
-      // Fallback to page metadata creator if no artist found
-      if (!creator && pageMetadata.creator) {
-        creator = pageMetadata.creator
-      }
 
       // Extract content-specific metadata
       let podcastMetadata: PodcastMetadata | undefined
@@ -918,19 +946,19 @@ export class EnhancedMetadataExtractor {
         // Extract episode information from title or description
         const episodeTitleMatch = oembedData.title?.match(/^([^|·•]+)/)
         podcastMetadata = {
-          episodeTitle: episodeTitleMatch?.[1]?.trim(),
+          episodeTitle: episodeTitleMatch?.[1]?.trim() || oembedData.title,
           seriesName: creator?.name,
           duration: undefined // Would need Spotify Web API for duration
         }
       }
 
       return {
-        title: oembedData.title || pageMetadata.title,
-        description: pageMetadata.description,
-        thumbnailUrl: oembedData.thumbnail_url || pageMetadata.thumbnailUrl,
-        faviconUrl: pageMetadata.faviconUrl,
-        publishedAt: pageMetadata.publishedAt,
-        language: pageMetadata.language,
+        title: oembedData.title || 'Untitled',
+        description: undefined, // oEmbed doesn't provide description
+        thumbnailUrl: oembedData.thumbnail_url,
+        faviconUrl: 'https://www.scdn.co/i/_global/favicon.png',
+        publishedAt: undefined, // oEmbed doesn't provide publish date
+        language: undefined, // oEmbed doesn't provide language
         source: 'spotify',
         contentType,
         creator: this.resolveCreator(creator),
@@ -938,7 +966,15 @@ export class EnhancedMetadataExtractor {
       }
 
     } catch (error) {
+      console.error('Spotify metadata extraction failed:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        url,
+        stack: error instanceof Error ? error.stack : undefined
+      })
+      
       // Fallback to enhanced web extraction if Spotify-specific extraction fails
+      console.log('Falling back to enhanced web extraction for Spotify URL')
       const fallback = await this.extractEnhancedWebMetadata(url, signal)
       return {
         ...fallback,
