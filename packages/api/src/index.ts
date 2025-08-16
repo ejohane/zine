@@ -34,6 +34,8 @@ export type Bindings = {
   API_BASE_URL: string
   // Durable Objects
   USER_SUBSCRIPTION_MANAGER: DurableObjectNamespace
+  // KV for rate limiting
+  KV?: KVNamespace
   // Feature flags
   FEATURE_DO_ROLLOUT_PERCENTAGE?: string
   FEATURE_DUAL_MODE_TOKENS?: string
@@ -680,6 +682,93 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
   } catch (error) {
     console.error('Update subscriptions error:', error)
     return c.json({ error: 'Failed to update subscriptions' }, 500)
+  }
+})
+
+// Manual refresh endpoint - allows users to trigger feed refresh for their subscriptions
+app.post('/api/v1/subscriptions/refresh', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const { RateLimiter } = await import('./services/rate-limiter')
+    
+    // Check rate limiting
+    const rateLimitResult = await RateLimiter.checkRateLimit(c, auth.userId)
+    
+    if (!rateLimitResult.allowed) {
+      const message = RateLimiter.getRateLimitMessage(rateLimitResult.remainingTime!)
+      return c.json({ 
+        error: 'Rate limited',
+        message,
+        retryAfter: Math.ceil(rateLimitResult.remainingTime! / 1000),
+        nextAllowedTime: new Date(Date.now() + rateLimitResult.remainingTime!).toISOString()
+      }, 429)
+    }
+    
+    // Get user's Durable Object ID
+    const userResult = await c.env.DB.prepare(`
+      SELECT durable_object_id as durableObjectId
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `).bind(auth.userId).first()
+    
+    if (!userResult || !userResult.durableObjectId) {
+      console.log(`[ManualRefresh] No Durable Object found for user ${auth.userId}`)
+      return c.json({ 
+        error: 'User configuration not found',
+        message: 'Unable to refresh subscriptions. Please try reconnecting your accounts.'
+      }, 404)
+    }
+    
+    // Record the refresh attempt for rate limiting
+    await RateLimiter.recordRefresh(c, auth.userId)
+    
+    // Get the Durable Object stub and trigger polling
+    const doId = c.env.USER_SUBSCRIPTION_MANAGER.idFromString(userResult.durableObjectId as string)
+    const stub = c.env.USER_SUBSCRIPTION_MANAGER.get(doId)
+    
+    // Send poll request to the Durable Object
+    const pollResponse = await stub.fetch(new Request('https://do/poll'))
+    const pollResult = await pollResponse.json() as {
+      success: boolean
+      newItemsCount: number
+      errors: string[]
+      results: Array<{
+        provider: string
+        subscriptionsPolled: number
+        newItemsFound: number
+      }>
+    }
+    
+    if (!pollResult.success) {
+      console.error(`[ManualRefresh] Polling failed for user ${auth.userId}:`, pollResult.errors)
+      return c.json({ 
+        error: 'Failed to refresh subscriptions',
+        message: 'An error occurred while refreshing your subscriptions. Please try again later.',
+        details: pollResult.errors
+      }, 500)
+    }
+    
+    // Calculate next allowed refresh time
+    const nextAllowedTime = new Date(Date.now() + 5 * 60 * 1000)
+    
+    return c.json({
+      success: true,
+      message: pollResult.newItemsCount > 0 
+        ? `Found ${pollResult.newItemsCount} new ${pollResult.newItemsCount === 1 ? 'item' : 'items'}!`
+        : 'No new items found',
+      newItemsCount: pollResult.newItemsCount,
+      details: pollResult.results,
+      nextAllowedTime: nextAllowedTime.toISOString(),
+      rateLimitSeconds: 300 // 5 minutes
+    })
+    
+  } catch (error) {
+    console.error('[ManualRefresh] Error:', error)
+    return c.json({ 
+      error: 'Internal server error',
+      message: 'An unexpected error occurred. Please try again later.'
+    }, 500)
   }
 })
 
