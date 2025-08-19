@@ -6,6 +6,7 @@ import { createRouter } from './router'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { SetupPage } from './components/SetupPage'
 import { registerSW } from 'virtual:pwa-register'
+import { Toaster } from 'sonner'
 import './App.css'
 
 // Register service worker
@@ -62,6 +63,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       {PUBLISHABLE_KEY ? (
         <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
           <RouterProvider router={router} />
+          <Toaster 
+            position="bottom-right"
+            toastOptions={{
+              className: 'font-sans',
+              style: {
+                background: 'hsl(var(--background))',
+                color: 'hsl(var(--foreground))',
+                border: '1px solid hsl(var(--border))',
+              },
+            }}
+          />
         </ClerkProvider>
       ) : (
         <SetupPage />

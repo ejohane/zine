@@ -2,6 +2,8 @@ import { Play, Star, Plus } from 'lucide-react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
 import { useBookmarks } from '@/hooks/useBookmarks'
+import { AddBookmarkSheet } from '@/components/bookmarks/AddBookmarkSheet'
+import { useState } from 'react'
 
 interface QuickActionButtonProps {
   icon: React.ReactNode
@@ -47,6 +49,7 @@ function QuickActionButton({ icon, label, onClick, to, className }: QuickActionB
 
 export function QuickActions() {
   const navigate = useNavigate()
+  const [addBookmarkOpen, setAddBookmarkOpen] = useState(false)
 
   // Fetch continue item from API (will be connected to DO later)
   // TODO: Replace with DO endpoint for last opened bookmark
@@ -66,24 +69,31 @@ export function QuickActions() {
     navigate({ to: '/bookmarks', search: { filter: 'favorites' } })
   }
 
+  const handleAddNew = () => {
+    setAddBookmarkOpen(true)
+  }
+
   return (
-    <div className="grid grid-cols-3 gap-4">
-      <QuickActionButton
-        icon={<Play className="w-8 h-8 text-foreground" />}
-        label="Continue"
-        onClick={handleContinue}
-        className={!continueItem ? 'opacity-50 cursor-not-allowed' : ''}
-      />
-      <QuickActionButton
-        icon={<Star className="w-8 h-8 text-foreground" />}
-        label="Favorites"
-        onClick={handleFavorites}
-      />
-      <QuickActionButton
-        icon={<Plus className="w-8 h-8 text-foreground" />}
-        label="Add New"
-        to="/save"
-      />
-    </div>
+    <>
+      <div className="grid grid-cols-3 gap-4">
+        <QuickActionButton
+          icon={<Play className="w-8 h-8 text-foreground" />}
+          label="Continue"
+          onClick={handleContinue}
+          className={!continueItem ? 'opacity-50 cursor-not-allowed' : ''}
+        />
+        <QuickActionButton
+          icon={<Star className="w-8 h-8 text-foreground" />}
+          label="Favorites"
+          onClick={handleFavorites}
+        />
+        <QuickActionButton
+          icon={<Plus className="w-8 h-8 text-foreground" />}
+          label="Add New"
+          onClick={handleAddNew}
+        />
+      </div>
+      <AddBookmarkSheet open={addBookmarkOpen} onOpenChange={setAddBookmarkOpen} />
+    </>
   )
 }
