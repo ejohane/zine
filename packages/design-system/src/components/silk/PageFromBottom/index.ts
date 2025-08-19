@@ -1,0 +1,1 @@
+export { PageFromBottom, type PageFromBottomProps } from './PageFromBottom';

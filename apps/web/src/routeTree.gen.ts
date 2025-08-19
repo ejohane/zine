@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as Test2RouteImport } from './routes/test2'
 import { Route as Test1RouteImport } from './routes/test1'
+import { Route as SilkDemoRouteImport } from './routes/silk-demo'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SearchRouteImport } from './routes/search'
@@ -32,6 +33,11 @@ const Test2Route = Test2RouteImport.update({
 const Test1Route = Test1RouteImport.update({
   id: '/test1',
   path: '/test1',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SilkDemoRoute = SilkDemoRouteImport.update({
+  id: '/silk-demo',
+  path: '/silk-demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SignUpRoute = SignUpRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/silk-demo': typeof SilkDemoRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/silk-demo': typeof SilkDemoRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/silk-demo': typeof SilkDemoRoute
   '/test1': typeof Test1Route
   '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
@@ -157,6 +166,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
+    | '/silk-demo'
     | '/test1'
     | '/test2'
     | '/feed/$subscriptionId'
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
+    | '/silk-demo'
     | '/test1'
     | '/test2'
     | '/feed/$subscriptionId'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
+    | '/silk-demo'
     | '/test1'
     | '/test2'
     | '/feed/$subscriptionId'
@@ -206,6 +218,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
+  SilkDemoRoute: typeof SilkDemoRoute
   Test1Route: typeof Test1Route
   Test2Route: typeof Test2Route
   SubscriptionsIndexRoute: typeof SubscriptionsIndexRoute
@@ -226,6 +239,13 @@ declare module '@tanstack/react-router' {
       path: '/test1'
       fullPath: '/test1'
       preLoaderRoute: typeof Test1RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/silk-demo': {
+      id: '/silk-demo'
+      path: '/silk-demo'
+      fullPath: '/silk-demo'
+      preLoaderRoute: typeof SilkDemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-up': {
@@ -335,6 +355,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
+  SilkDemoRoute: SilkDemoRoute,
   Test1Route: Test1Route,
   Test2Route: Test2Route,
   SubscriptionsIndexRoute: SubscriptionsIndexRoute,
