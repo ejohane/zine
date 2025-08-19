@@ -37,6 +37,10 @@ export * from './components/feedback/Toast';
 export * from './components/patterns/BookmarkCard';
 export * from './components/patterns/SubscriptionItem';
 
+// Export Silk components
+export * from './components/silk/Sheet';
+export * from './components/silk/BottomSheet';
+
 // Export theme provider
 export { ThemeProvider, useTheme } from './components/theme-provider';
 

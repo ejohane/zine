@@ -14,7 +14,8 @@
     "deploy": "turbo deploy",
     "deploy:production": "turbo deploy:production",
     "prepare": "husky",
-    "sync-db": "./scripts/sync-db-from-main.sh"
+    "sync-db": "./scripts/sync-db-from-main.sh",
+    "storybook": "cd packages/design-system && bun run storybook"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",

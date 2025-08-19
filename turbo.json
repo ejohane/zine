@@ -17,6 +17,10 @@
     },
     "deploy:production": {
       "dependsOn": ["build"]
+    },
+    "storybook": {
+      "cache": false,
+      "persistent": true
     }
   }
 }
