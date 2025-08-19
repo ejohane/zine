@@ -551,7 +551,9 @@ export class D1SubscriptionRepository implements SubscriptionRepository {
     if (userSubscriptions.length === 0) return
 
     const now = new Date()
-    const BATCH_SIZE = 50
+    // Reduced batch size to avoid D1/SQLite parameter limits
+    // Each record has 6 parameters, so 10 records = 60 parameters (well under limits)
+    const BATCH_SIZE = 10
 
     for (let i = 0; i < userSubscriptions.length; i += BATCH_SIZE) {
       const batch = userSubscriptions.slice(i, i + BATCH_SIZE)
