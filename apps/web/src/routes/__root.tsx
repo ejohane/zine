@@ -33,7 +33,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         <SkipLink />
-        <div className="min-h-screen flex flex-col">
+        <div className="flex flex-col h-full">
           <SignedOut>
             <Outlet />
           </SignedOut>
@@ -41,16 +41,36 @@ function RootComponent() {
           <SignedIn>
             {!isMobile && <Header />}
             
-            <main className={cn(
-              "flex-1",
-              isMobile && "pb-16" // Add padding for mobile tab bar
-            )}>
-              <AnimatePresence mode="wait">
-                <Outlet />
-              </AnimatePresence>
-            </main>
-            
-            {isMobile && <TabBar />}
+            {isMobile ? (
+              <>
+                {/* Mobile layout with fixed positioning for iOS PWA */}
+                <div className="flex flex-col h-full">
+                  {/* Header area with safe area padding */}
+                  <div className="flex-shrink-0 safe-top" />
+                  
+                  {/* Main content area */}
+                  <main 
+                    className="flex-1 overflow-y-auto overflow-x-hidden"
+                    style={{ 
+                      paddingBottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))',
+                      WebkitOverflowScrolling: 'touch' 
+                    }}
+                  >
+                    <AnimatePresence mode="wait">
+                      <Outlet />
+                    </AnimatePresence>
+                  </main>
+                </div>
+                
+                <TabBar />
+              </>
+            ) : (
+              <main className="flex-1">
+                <AnimatePresence mode="wait">
+                  <Outlet />
+                </AnimatePresence>
+              </main>
+            )}
           </SignedIn>
         </div>
         

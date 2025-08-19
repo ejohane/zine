@@ -1,5 +1,5 @@
 @import './styles/themes.css';
-@import '../../node_modules/@silk-hq/components/dist/main-unlayered.css';
+/* @import '../../node_modules/@silk-hq/components/dist/main-unlayered.css'; */
 
 @tailwind base;
 @tailwind components;
@@ -44,6 +44,38 @@
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+  
+  /* iOS PWA specific fixes */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS specific styles */
+    html {
+      height: 100vh;
+      height: -webkit-fill-available;
+    }
+    
+    body {
+      height: 100vh;
+      height: -webkit-fill-available;
+      position: fixed;
+      width: 100%;
+      overflow: hidden;
+    }
+    
+    #root {
+      height: 100vh;
+      height: -webkit-fill-available;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    /* Ensure the main container fills available space */
+    #root > div {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
   }
   
   /* Allow text selection in content areas */
