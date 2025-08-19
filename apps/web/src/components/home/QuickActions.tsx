@@ -29,6 +29,7 @@ function QuickActionButton({ icon, label, onClick, to, className }: QuickActionB
     "transition-all hover:scale-105 active:scale-95",
     "shadow-sm hover:shadow-lg border border-gray-200 dark:border-zinc-800",
     "min-h-[120px] w-full",
+    "touch-manipulation", // Prevent double-tap zoom on mobile
     className
   )
 
@@ -41,7 +42,11 @@ function QuickActionButton({ icon, label, onClick, to, className }: QuickActionB
   }
 
   return (
-    <button onClick={onClick} className={buttonClass}>
+    <button 
+      onClick={onClick} 
+      className={buttonClass}
+      type="button"
+    >
       {buttonContent}
     </button>
   )
@@ -69,7 +74,9 @@ export function QuickActions() {
     navigate({ to: '/bookmarks', search: { filter: 'favorites' } })
   }
 
-  const handleAddNew = () => {
+  const handleAddNew = (e?: React.MouseEvent | React.PointerEvent) => {
+    e?.preventDefault()
+    e?.stopPropagation()
     setAddBookmarkOpen(true)
   }
 

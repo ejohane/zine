@@ -45,18 +45,20 @@ export function AddBookmarkSheet({ open, onOpenChange }: AddBookmarkSheetProps) 
 
   // Debounce URL input for preview API calls
   React.useEffect(() => {
-    if (!url) {
+    const trimmedUrl = url.trim()
+    
+    if (!trimmedUrl) {
       setDebouncedUrl('')
       return
     }
 
-    const validation = validateUrl(url)
+    const validation = validateUrl(trimmedUrl)
     if (!validation.valid) {
       return
     }
 
     const timer = setTimeout(() => {
-      setDebouncedUrl(normalizeUrl(url))
+      setDebouncedUrl(normalizeUrl(trimmedUrl))
     }, 500)
 
     return () => clearTimeout(timer)
@@ -77,20 +79,31 @@ export function AddBookmarkSheet({ open, onOpenChange }: AddBookmarkSheetProps) 
   // Auto-focus and auto-paste from clipboard when sheet opens
   React.useEffect(() => {
     if (open) {
-      // Focus the input
-      setTimeout(() => {
-        inputRef.current?.focus()
-      }, 100)
+      // Focus the input after sheet animation completes
+      // Increased timeout for better mobile support
+      const focusTimer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus()
+          // On mobile, we may need to click first to trigger keyboard
+          if ('ontouchstart' in window) {
+            inputRef.current.click()
+          }
+        }
+      }, 500) // Increased from 100ms to allow for sheet animation
 
       // Try to paste from clipboard
-      getClipboardUrlIfValid().then((clipboardUrl) => {
-        if (clipboardUrl && !url) {
-          setUrl(clipboardUrl)
-          setError(null)
-        }
-      })
+      if (!url) { // Only paste if URL is empty
+        getClipboardUrlIfValid().then((clipboardUrl) => {
+          if (clipboardUrl) {
+            setUrl(clipboardUrl)
+            setError(null)
+          }
+        })
+      }
+
+      return () => clearTimeout(focusTimer)
     }
-  }, [open, url])
+  }, [open, url]) // url dependency needed for exhaustive deps
 
   // Reset state when sheet closes
   React.useEffect(() => {
@@ -111,9 +124,10 @@ export function AddBookmarkSheet({ open, onOpenChange }: AddBookmarkSheetProps) 
       setError(null)
     }
 
-    // Basic validation as user types
-    if (newUrl && newUrl.length > 5) {
-      const validation = validateUrl(newUrl)
+    // Basic validation as user types (with trimmed URL)
+    const trimmedUrl = newUrl.trim()
+    if (trimmedUrl && trimmedUrl.length > 5) {
+      const validation = validateUrl(trimmedUrl)
       if (!validation.valid) {
         setError(validation.error || null)
       }
@@ -186,6 +200,11 @@ export function AddBookmarkSheet({ open, onOpenChange }: AddBookmarkSheetProps) 
                 aria-label="URL input"
                 aria-invalid={!!error}
                 aria-describedby={error ? "url-error" : undefined}
+                autoComplete="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="url"
               />
               {url && (
                 <button
