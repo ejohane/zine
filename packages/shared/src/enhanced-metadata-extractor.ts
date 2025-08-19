@@ -219,8 +219,8 @@ export class EnhancedMetadataExtractor {
    */
   private parseEnhancedHtmlMetadata(html: string, url: string): EnhancedExtractedMetadata {
     // Parse HTML using linkedom for proper DOM manipulation
-    const parsed = parseHTML(html)
-    const document = parsed as unknown as LinkedOMDocument
+    const parsed = parseHTML(html) as any
+    const document = parsed.document as LinkedOMDocument
     
     // Extract JSON-LD structured data
     const jsonLdData = this.extractJsonLd(document)
@@ -819,13 +819,19 @@ export class EnhancedMetadataExtractor {
 
       const oembedData = await response.json() as YouTubeOEmbedResponse
 
-      // Also fetch the video page for additional metadata
-      const pageMetadata = await this.extractEnhancedWebMetadata(url, signal)
-
-      // Extract duration from page metadata if available
+      // Try to fetch the video page for additional metadata, but don't fail if it doesn't work
+      let pageMetadata: EnhancedExtractedMetadata | undefined
       let duration: number | undefined
-      if (pageMetadata.videoMetadata?.duration) {
-        duration = pageMetadata.videoMetadata.duration
+      
+      try {
+        pageMetadata = await this.extractEnhancedWebMetadata(url, signal)
+        // Extract duration from page metadata if available
+        if (pageMetadata?.videoMetadata?.duration) {
+          duration = pageMetadata.videoMetadata.duration
+        }
+      } catch (pageError) {
+        console.warn('Failed to extract additional YouTube page metadata:', pageError)
+        // Continue with oEmbed data only
       }
 
       // Parse creator information from oEmbed
@@ -846,12 +852,12 @@ export class EnhancedMetadataExtractor {
       }
 
       return {
-        title: oembedData.title || pageMetadata.title,
-        description: pageMetadata.description,
-        thumbnailUrl: oembedData.thumbnail_url || pageMetadata.thumbnailUrl,
-        faviconUrl: pageMetadata.faviconUrl,
-        publishedAt: pageMetadata.publishedAt,
-        language: pageMetadata.language,
+        title: oembedData.title || pageMetadata?.title || 'Untitled Video',
+        description: pageMetadata?.description,
+        thumbnailUrl: oembedData.thumbnail_url || pageMetadata?.thumbnailUrl,
+        faviconUrl: pageMetadata?.faviconUrl || 'https://www.youtube.com/favicon.ico',
+        publishedAt: pageMetadata?.publishedAt,
+        language: pageMetadata?.language,
         source: 'youtube',
         contentType: 'video',
         creator: this.resolveCreator(creator),
