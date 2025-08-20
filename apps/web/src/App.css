@@ -1,5 +1,4 @@
 @import './styles/themes.css';
-@import '../../node_modules/@silk-hq/components/dist/main-unlayered.css';
 
 @tailwind base;
 @tailwind components;
