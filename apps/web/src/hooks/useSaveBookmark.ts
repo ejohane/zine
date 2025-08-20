@@ -59,7 +59,7 @@ export function useSaveBookmark() {
     }, 1000) // Debounce for 1 second
 
     return () => clearTimeout(timer)
-  }, [lastUrl, previewedUrl, getToken])
+  }, [lastUrl, getToken])
 
   const updateUrl = useCallback((url: string) => {
     // If URL is cleared, reset the previewed URL as well
