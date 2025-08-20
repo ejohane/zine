@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { X } from 'lucide-react'
 import { saveBookmark, previewBookmark } from '../lib/api'
 import { validateAndNormalizeUrl, getUrlSuggestions } from '../lib/url-validation'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
@@ -47,10 +48,31 @@ export function SaveBookmarkForm({
   const [urlSuggestions, setUrlSuggestions] = useState<string[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
+  const [previewRetryCount, setPreviewRetryCount] = useState(0)
   
   // Refs for focusing inputs
   const urlInputRef = useRef<HTMLInputElement>(null)
   const notesInputRef = useRef<HTMLTextAreaElement>(null)
+  
+  // Clipboard auto-paste on mount
+  useEffect(() => {
+    const checkClipboard = async () => {
+      if (!initialUrl && navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          const clipboardText = await navigator.clipboard.readText()
+          // Check if clipboard contains a URL-like string
+          if (clipboardText && (clipboardText.startsWith('http://') || clipboardText.startsWith('https://') || clipboardText.includes('.'))) {
+            setUrl(clipboardText)
+          }
+        } catch (err) {
+          // Clipboard access denied or not available
+          console.log('Clipboard access denied or not available')
+        }
+      }
+    }
+    
+    checkClipboard()
+  }, [initialUrl])
 
   // URL validation with enhanced features
   useEffect(() => {
@@ -74,25 +96,45 @@ export function SaveBookmarkForm({
     }
   }, [url])
 
-  // Handle metadata preview
-  const handlePreview = useCallback(async () => {
+  // Handle metadata preview with timeout and retry
+  const handlePreview = useCallback(async (retryAttempt = 0) => {
     if (!urlValidation?.isValid || !urlValidation.normalized) {
       setPreview({ bookmark: null, isLoading: false, error: 'Invalid URL' })
       return
     }
 
     setPreview({ bookmark: null, isLoading: true, error: null })
+    setPreviewRetryCount(retryAttempt)
+
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Preview request timed out after 10 seconds')), 10000)
+    })
 
     try {
       const token = await getToken()
-      const bookmarkPreview = await previewBookmark(urlValidation.normalized, token)
+      // Race between the preview request and timeout
+      const bookmarkPreview = await Promise.race([
+        previewBookmark(urlValidation.normalized, token),
+        timeoutPromise
+      ]) as Bookmark
+      
       setPreview({ bookmark: bookmarkPreview, isLoading: false, error: null })
+      setPreviewRetryCount(0)
     } catch (error) {
-      setPreview({ 
-        bookmark: null, 
-        isLoading: false, 
-        error: error instanceof Error ? error.message : 'Failed to preview bookmark' 
-      })
+      const errorMessage = error instanceof Error ? error.message : 'Failed to preview bookmark'
+      
+      // If it's the first attempt and not a timeout, try again once
+      if (retryAttempt === 0 && !errorMessage.includes('timed out')) {
+        setTimeout(() => handlePreview(1), 1000)
+      } else {
+        setPreview({ 
+          bookmark: null, 
+          isLoading: false, 
+          error: errorMessage 
+        })
+        setPreviewRetryCount(0)
+      }
     }
   }, [urlValidation, getToken])
 
@@ -252,19 +294,33 @@ export function SaveBookmarkForm({
                   'border-gray-300 focus:ring-blue-500'
                 }`}
                 autoFocus
+                aria-label="URL to bookmark"
+                aria-invalid={urlValidation?.isValid === false}
+                aria-describedby={urlValidation ? "url-validation-message" : undefined}
               />
-              {urlValidation?.isValid && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePreview}
-                  disabled={preview.isLoading}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2"
-                >
-                  {preview.isLoading ? 'Loading...' : 'Preview'}
-                </Button>
-              )}
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                {url && (
+                  <button
+                    type="button"
+                    onClick={() => setUrl('')}
+                    className="p-1 rounded-md hover:bg-gray-100 transition-colors"
+                    aria-label="Clear URL"
+                  >
+                    <X className="w-4 h-4 text-gray-500" />
+                  </button>
+                )}
+                {urlValidation?.isValid && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePreview(0)}
+                    disabled={preview.isLoading}
+                  >
+                    {preview.isLoading ? 'Loading...' : 'Preview'}
+                  </Button>
+                )}
+              </div>
 
               {/* URL Suggestions Dropdown */}
               {showSuggestions && urlSuggestions.length > 0 && (
@@ -285,7 +341,7 @@ export function SaveBookmarkForm({
 
             {/* Validation Messages */}
             {urlValidation && (
-              <div className="space-y-1">
+              <div className="space-y-1" id="url-validation-message" role="status" aria-live="polite">
                 {/* Errors */}
                 {urlValidation.errors.map((error, index) => (
                   <p key={index} className="text-sm text-red-600">❌ {error}</p>
@@ -300,6 +356,18 @@ export function SaveBookmarkForm({
                 {urlValidation.suggestions && urlValidation.suggestions.map((suggestion, index) => (
                   <p key={index} className="text-sm text-blue-600">💡 {suggestion}</p>
                 ))}
+                
+                {/* Special content type warnings */}
+                {urlValidation.normalized && (
+                  urlValidation.normalized.endsWith('.pdf') ||
+                  urlValidation.normalized.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
+                ) && (
+                  <p className="text-sm text-yellow-600">
+                    ⚠️ {urlValidation.normalized.endsWith('.pdf') 
+                      ? 'PDF files may have limited metadata extraction' 
+                      : 'Image files will only show basic metadata'}
+                  </p>
+                )}
 
                 {/* Success message with normalized URL */}
                 {urlValidation.isValid && urlValidation.normalized !== url && (
@@ -342,7 +410,10 @@ export function SaveBookmarkForm({
             {preview.isLoading && (
               <div className="flex items-center justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                <span className="ml-2">Extracting metadata...</span>
+                <span className="ml-2">
+                  Extracting metadata...
+                  {previewRetryCount > 0 && ` (Retry ${previewRetryCount})`}
+                </span>
               </div>
             )}
 
@@ -350,6 +421,15 @@ export function SaveBookmarkForm({
               <div className="text-red-600 py-4">
                 <p className="font-medium">Preview failed</p>
                 <p className="text-sm">{preview.error}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePreview(0)}
+                  className="mt-3"
+                >
+                  Retry
+                </Button>
               </div>
             )}
 
@@ -380,7 +460,9 @@ export function SaveBookmarkForm({
                     
                     {preview.bookmark.description && (
                       <p className="text-gray-600 text-sm line-clamp-2 sm:line-clamp-3 mb-3">
-                        {preview.bookmark.description}
+                        {preview.bookmark.description.length > 500 
+                          ? preview.bookmark.description.substring(0, 500) + '...'
+                          : preview.bookmark.description}
                       </p>
                     )}
 
