@@ -11,13 +11,20 @@ export function useSaveBookmark() {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastUrl, setLastUrl] = useState<string>('')
+  const [previewedUrl, setPreviewedUrl] = useState<string>('')
 
   // Handle preview with debounce
   useEffect(() => {
+    // Skip if we already have a preview for this URL
+    if (lastUrl && lastUrl === previewedUrl) {
+      return
+    }
+
     const timer = setTimeout(async () => {
       if (!lastUrl) {
         setPreview(null)
         setError(null)
+        setPreviewedUrl('')
         return
       }
 
@@ -25,6 +32,12 @@ export function useSaveBookmark() {
       if (!validation.isValid || !validation.normalized) {
         setError('Invalid URL')
         setPreview(null)
+        setPreviewedUrl('')
+        return
+      }
+
+      // Skip if we already previewed this normalized URL
+      if (validation.normalized === previewedUrl) {
         return
       }
 
@@ -35,22 +48,29 @@ export function useSaveBookmark() {
         const token = await getToken()
         const bookmarkPreview = await previewBookmark(validation.normalized, token)
         setPreview(bookmarkPreview)
+        setPreviewedUrl(validation.normalized)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to preview bookmark')
         setPreview(null)
+        setPreviewedUrl('')
       } finally {
         setIsLoading(false)
       }
     }, 1000) // Debounce for 1 second
 
     return () => clearTimeout(timer)
-  }, [lastUrl, getToken])
+  }, [lastUrl, previewedUrl, getToken])
 
   const updateUrl = useCallback((url: string) => {
+    // If URL is cleared, reset the previewed URL as well
+    if (!url) {
+      setPreviewedUrl('')
+    }
     setLastUrl(url)
   }, [])
 
   const retry = useCallback(async (url: string) => {
+    setPreviewedUrl('') // Reset the previewed URL to force a new preview
     setLastUrl('')
     setTimeout(() => setLastUrl(url), 100)
   }, [])
