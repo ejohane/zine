@@ -5,7 +5,8 @@
 - ✅ **Phase 2**: Database Query Layer (Complete)
 - ✅ **Phase 3**: Date Format Standardization (Complete)
 - ✅ **Phase 4**: Preview Service Refactor (Complete)
-- 🔄 **Phase 5-10**: Pending in future PRs
+- ✅ **Phase 5**: OAuth Token Management (Complete)
+- 🔄 **Phase 6-10**: Pending in future PRs
 
 **Current PR**: https://github.com/ejohane/zine/pull/59
 
