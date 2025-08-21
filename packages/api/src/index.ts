@@ -120,7 +120,6 @@ app.get('/health', (c) => {
 
 // Metadata preview endpoint (public - no auth required)
 app.post('/api/v1/bookmarks/preview', async (c) => {
-  const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
   try {
     const body = await c.req.json()
     const { url } = body
@@ -129,17 +128,28 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
       return c.json({ error: 'URL is required' }, 400)
     }
     
-    const result = await bookmarkSaveService.previewMetadata(url)
+    // Use the new optimized PreviewService
+    const { PreviewService } = await import('./services/preview-service')
+    const previewService = new PreviewService(c)
+    const result = await previewService.getPreview(url)
     
     if (!result.success) {
-      return c.json({ error: result.error }, 500)
+      return c.json({ 
+        error: result.error || 'Failed to extract metadata',
+        source: result.source,
+        cached: result.cached
+      }, 500)
     }
     
     return c.json({ 
-      data: result.bookmark,
-      message: result.message 
+      data: result.metadata,
+      source: result.source,
+      cached: result.cached,
+      provider: result.provider,
+      performanceMetrics: result.performanceMetrics
     })
   } catch (error) {
+    console.error('[Preview] Error:', error)
     return c.json({ error: 'Invalid request data' }, 400)
   }
 })
