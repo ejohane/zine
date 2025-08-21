@@ -1,5 +1,14 @@
 # Preview Endpoint Optimization Plan
 
+## Implementation Status
+- ✅ **Phase 1**: URL Normalization Infrastructure (Complete)
+- ✅ **Phase 2**: Database Query Layer (Complete)
+- ⏸️ **Phase 3**: Date Format Standardization (Not started)
+- ✅ **Phase 4**: Preview Service Refactor (Complete)
+- 🔄 **Phase 5-10**: Pending in future PRs
+
+**Current PR**: https://github.com/ejohane/zine/pull/59
+
 ## Executive Summary
 Transform the preview endpoint into a highly optimized service that checks existing database records before external API calls, uses native platform APIs with user auth tokens for richer metadata, and implements intelligent caching strategies.
 
@@ -42,11 +51,11 @@ Create a robust URL normalization system to ensure consistent database lookups.
    - Test edge cases (trailing slashes, fragments)
 
 ### Verification
-- [ ] URL normalizer handles all known YouTube URL formats
-- [ ] URL normalizer handles all known Spotify URL formats
-- [ ] Tracking parameters are correctly stripped
-- [ ] Essential parameters are preserved
-- [ ] All tests pass
+- [x] URL normalizer handles all known YouTube URL formats
+- [x] URL normalizer handles all known Spotify URL formats
+- [x] Tracking parameters are correctly stripped
+- [x] Essential parameters are preserved
+- [x] All tests pass
 
 ## Phase 2: Database Query Layer
 
@@ -75,11 +84,11 @@ Implement efficient database lookups for existing metadata.
    ```
 
 ### Verification
-- [ ] Repository methods return correct data
-- [ ] Queries execute in < 50ms
-- [ ] Indexes are properly created
-- [ ] Source table is correctly identified
-- [ ] Integration tests pass
+- [x] Repository methods return correct data
+- [x] Queries execute in < 50ms
+- [x] Indexes are properly created
+- [x] Source table is correctly identified
+- [x] Integration tests pass
 
 ## Phase 3: Date Format Standardization
 
@@ -139,11 +148,11 @@ Refactor the preview service to use the database-first approach.
    - Normalize response
 
 ### Verification
-- [ ] Database lookups work correctly
-- [ ] Source is accurately reported
-- [ ] Fallback chain works (DB → Native → oEmbed)
-- [ ] Response times < 200ms for cached
-- [ ] Response times < 2s for uncached
+- [x] Database lookups work correctly
+- [x] Source is accurately reported
+- [x] Fallback chain works (DB → Native → oEmbed)
+- [x] Response times < 200ms for cached
+- [ ] Response times < 2s for uncached (pending native API integration)
 
 ## Phase 5: OAuth Token Management
 
