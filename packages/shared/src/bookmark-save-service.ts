@@ -4,6 +4,7 @@
 
 import { normalizeUrl, areUrlsDuplicates } from './url-normalizer'
 import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
+import { DateNormalizer } from './date-normalizer'
 import type { 
   Bookmark, 
   SaveBookmark, 
@@ -164,7 +165,7 @@ export class BookmarkSaveService {
           contentType: metadata.contentType,
           thumbnailUrl: metadata.thumbnailUrl,
           faviconUrl: metadata.faviconUrl,
-          publishedAt: metadata.publishedAt,
+          publishedAt: metadata.publishedAt ? DateNormalizer.toUnixTimestamp(metadata.publishedAt) : null,
           language: metadata.language,
           status: 'active',
           videoMetadata: metadata.videoMetadata,
@@ -173,8 +174,8 @@ export class BookmarkSaveService {
           postMetadata: metadata.postMetadata,
           notes: input.notes,
           creator: metadata.creator,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          createdAt: DateNormalizer.now(),
+          updatedAt: DateNormalizer.now()
         }
       }
 
@@ -224,7 +225,7 @@ export class BookmarkSaveService {
         contentType: metadata.contentType,
         thumbnailUrl: metadata.thumbnailUrl,
         faviconUrl: metadata.faviconUrl,
-        publishedAt: metadata.publishedAt,
+        publishedAt: metadata.publishedAt ? DateNormalizer.toUnixTimestamp(metadata.publishedAt) : null,
         language: metadata.language,
         status: 'active',
         videoMetadata: metadata.videoMetadata,
@@ -232,8 +233,8 @@ export class BookmarkSaveService {
         articleMetadata: metadata.articleMetadata,
         postMetadata: metadata.postMetadata,
         creator: metadata.creator,
-        createdAt: new Date(),
-        updatedAt: new Date()
+        createdAt: DateNormalizer.now(),
+        updatedAt: DateNormalizer.now()
       }
 
       return {

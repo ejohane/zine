@@ -1,5 +1,6 @@
 // Shared types and schemas for Zine bookmark manager
 import { z } from 'zod'
+import { optionalUnixTimestamp } from './validators'
 
 // Source and content type enums
 export const SourceEnum = z.enum(['youtube', 'spotify', 'twitter', 'x', 'substack', 'web'])
@@ -13,8 +14,8 @@ export const UserSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   imageUrl: z.string().optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
+  createdAt: optionalUnixTimestamp(),
+  updatedAt: optionalUnixTimestamp(),
 })
 
 // Extended metadata schemas
@@ -58,8 +59,8 @@ export const CreatorSchema = z.object({
     title: z.string(),
     url: z.string(),
   })).optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
+  createdAt: optionalUnixTimestamp(),
+  updatedAt: optionalUnixTimestamp(),
 })
 
 // Extended bookmark schema
@@ -74,7 +75,7 @@ export const BookmarkSchema = z.object({
   contentType: ContentTypeEnum.optional(),
   thumbnailUrl: z.string().optional(),
   faviconUrl: z.string().optional(),
-  publishedAt: z.date().optional(),
+  publishedAt: optionalUnixTimestamp(),
   language: z.string().optional(),
   status: BookmarkStatusEnum.default('active'),
   creatorId: z.string().optional(),
@@ -88,8 +89,8 @@ export const BookmarkSchema = z.object({
   // Standard fields
   tags: z.array(z.string()).optional(),
   notes: z.string().optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
+  createdAt: optionalUnixTimestamp(),
+  updatedAt: optionalUnixTimestamp(),
   
   // Creator relation
   creator: CreatorSchema.optional(),
