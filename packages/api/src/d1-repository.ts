@@ -399,7 +399,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
       contentType: row.content_type || undefined,
       thumbnailUrl: row.thumbnail_url || undefined,
       faviconUrl: row.favicon_url || undefined,
-      publishedAt: row.published_at ? new Date(row.published_at) : undefined,
+      publishedAt: row.published_at ? Number(row.published_at) : undefined,
       language: row.language || undefined,
       status: row.status || 'active',
       creatorId: row.creator_id || undefined,
@@ -409,8 +409,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
       postMetadata: row.post_metadata ? JSON.parse(row.post_metadata) : undefined,
       tags: row.tags ? JSON.parse(row.tags) : undefined,
       notes: row.notes || undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      createdAt: Number(row.created_at),
+      updatedAt: Number(row.updated_at)
     }
 
     // Add creator if present
@@ -424,8 +424,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
         url: row.creator_url || undefined,
         platforms: row.creator_platforms ? JSON.parse(row.creator_platforms) : undefined,
         externalLinks: row.creator_external_links ? JSON.parse(row.creator_external_links) : undefined,
-        createdAt: row.creator_created_at ? new Date(row.creator_created_at) : undefined,
-        updatedAt: row.creator_updated_at ? new Date(row.creator_updated_at) : undefined
+        createdAt: row.creator_created_at ? Number(row.creator_created_at) : undefined,
+        updatedAt: row.creator_updated_at ? Number(row.creator_updated_at) : undefined
       }
     }
 

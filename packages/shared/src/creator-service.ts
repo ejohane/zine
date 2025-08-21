@@ -3,6 +3,7 @@
  */
 
 import type { Creator } from './types'
+import { DateNormalizer } from './date-normalizer'
 
 export interface CreatorResolutionResult {
   resolved: Creator
@@ -157,7 +158,7 @@ export class CreatorService {
       platforms: this.mergePlatforms(existing.platforms, newCreator.platforms),
       externalLinks: this.mergeExternalLinks(existing.externalLinks, newCreator.externalLinks),
       createdAt: existing.createdAt || newCreator.createdAt,
-      updatedAt: new Date()
+      updatedAt: DateNormalizer.now()
     }
   }
 

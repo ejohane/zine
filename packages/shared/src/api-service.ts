@@ -1,4 +1,5 @@
 import { Bookmark, CreateBookmark, UpdateBookmark, BookmarksResponse, BookmarkResponse } from './types'
+import { DateNormalizer } from './date-normalizer'
 
 // Mock data - in a real app, this would come from a database
 const mockBookmarks: Bookmark[] = [
@@ -14,8 +15,8 @@ const mockBookmarks: Bookmark[] = [
     contentType: 'link' as const,
     thumbnailUrl: 'https://opengraph.githubassets.com/1/facebook/react',
     faviconUrl: 'https://github.com/favicon.ico',
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01')
+    createdAt: DateNormalizer.toUnixTimestamp('2024-01-01'),
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-01')
   },
   { 
     id: '2', 
@@ -29,8 +30,8 @@ const mockBookmarks: Bookmark[] = [
     contentType: 'article' as const,
     thumbnailUrl: 'https://tanstack.com/images/query-og.png',
     faviconUrl: 'https://tanstack.com/favicon.ico',
-    createdAt: new Date('2024-01-02'),
-    updatedAt: new Date('2024-01-02')
+    createdAt: DateNormalizer.toUnixTimestamp('2024-01-02'),
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-02')
   },
   { 
     id: '3', 
@@ -44,8 +45,8 @@ const mockBookmarks: Bookmark[] = [
     contentType: 'article' as const,
     thumbnailUrl: 'https://vitejs.dev/og-image.png',
     faviconUrl: 'https://vitejs.dev/favicon.ico',
-    createdAt: new Date('2024-01-03'),
-    updatedAt: new Date('2024-01-03')
+    createdAt: DateNormalizer.toUnixTimestamp('2024-01-03'),
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-03')
   },
   { 
     id: '4', 
@@ -59,8 +60,8 @@ const mockBookmarks: Bookmark[] = [
     contentType: 'link' as const,
     thumbnailUrl: 'https://workers.cloudflare.com/resources/logo/logo.svg',
     faviconUrl: 'https://workers.cloudflare.com/favicon.ico',
-    createdAt: new Date('2024-01-04'),
-    updatedAt: new Date('2024-01-04')
+    createdAt: DateNormalizer.toUnixTimestamp('2024-01-04'),
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-04')
   },
   { 
     id: '5', 
@@ -75,8 +76,8 @@ const mockBookmarks: Bookmark[] = [
     thumbnailUrl: 'https://www.typescriptlang.org/images/branding/ts-logo-512.png',
     faviconUrl: 'https://www.typescriptlang.org/favicon-32x32.png',
     language: 'en',
-    createdAt: new Date('2024-01-05'),
-    updatedAt: new Date('2024-01-05')
+    createdAt: DateNormalizer.toUnixTimestamp('2024-01-05'),
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-05')
   },
 ]
 
@@ -117,8 +118,8 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
       title: bookmark.title,
       description: bookmark.description,
       tags: bookmark.tags,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: DateNormalizer.now(),
+      updatedAt: DateNormalizer.now(),
     }
     this.bookmarks.push(newBookmark)
     return newBookmark
@@ -131,7 +132,7 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
     this.bookmarks[index] = {
       ...this.bookmarks[index],
       ...bookmark,
-      updatedAt: new Date(),
+      updatedAt: DateNormalizer.now(),
     }
     return this.bookmarks[index]
   }
@@ -160,7 +161,7 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
     this.bookmarks[index] = {
       ...this.bookmarks[index],
       ...bookmark,
-      updatedAt: new Date(),
+      updatedAt: DateNormalizer.now(),
     }
     return this.bookmarks[index]
   }
