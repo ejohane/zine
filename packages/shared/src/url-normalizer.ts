@@ -87,6 +87,11 @@ function applyPlatformNormalization(
   
   // YouTube normalization
   if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+    // Normalize m.youtube.com to youtube.com
+    if (domain === 'm.youtube.com') {
+      parsed.hostname = 'youtube.com'
+    }
+    
     if (domain.includes('youtu.be')) {
       // Convert youtu.be to youtube.com
       const videoId = parsed.pathname.slice(1)
@@ -95,11 +100,18 @@ function applyPlatformNormalization(
       searchParams.set('v', videoId)
     }
     
+    // Preserve playlist parameter
+    const playlistId = searchParams.get('list')
+    
     // Remove YouTube-specific tracking params
     const youtubeParams = ['t', 'start', 'end', 'list', 'index', 'ab_channel']
     youtubeParams.forEach(param => {
       if (param === 't' || param === 'start') {
         // Keep time parameters as they're meaningful
+        return
+      }
+      if (param === 'list' && playlistId) {
+        // Keep playlist parameter
         return
       }
       searchParams.delete(param)
@@ -125,7 +137,7 @@ function applyPlatformNormalization(
     parsed.hostname = 'x.com'
     
     // Remove Twitter-specific tracking
-    const twitterParams = ['s', 'ref_src', 'ref_url', 'twgr']
+    const twitterParams = ['s', 't', 'ref_src', 'ref_url', 'twgr']
     twitterParams.forEach(param => {
       searchParams.delete(param)
     })
