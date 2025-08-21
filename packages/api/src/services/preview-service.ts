@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { D1MetadataRepository, type ExistingMetadata } from '../repositories/metadata-repository'
 import { normalizeUrl } from '@zine/shared'
 import { enhancedMetadataExtractor } from '@zine/shared'
+import { OAuthTokenService } from './oauth-token-service'
 
 export interface PreviewResponse {
   success: boolean
@@ -40,16 +41,18 @@ export interface PreviewResponse {
 
 export class PreviewService {
   private metadataRepo: D1MetadataRepository
+  private oauthTokenService: OAuthTokenService
   
   constructor(ctx: Context) {
     const db = ctx.env.DB
     this.metadataRepo = new D1MetadataRepository(db)
+    this.oauthTokenService = new OAuthTokenService(ctx.env)
   }
   
   /**
    * Get preview metadata using database-first approach
    */
-  async getPreview(url: string, _userId?: string): Promise<PreviewResponse> {
+  async getPreview(url: string, userId?: string): Promise<PreviewResponse> {
     const startTime = Date.now()
     let databaseLookupTime: number | undefined
     let externalApiTime: number | undefined
@@ -78,9 +81,35 @@ export class PreviewService {
         }
       }
       
-      // Step 3: Not in database - fetch from external source
-      // TODO: In Phase 5-7, check OAuth availability and use native APIs
-      // For now, use the existing metadata extractor
+      // Step 3: Not in database - check OAuth availability for native API access
+      let tokenAvailable = false
+      let provider: 'spotify' | 'youtube' | null = null
+      
+      if (userId && normalized.platform) {
+        // Check if URL is from a supported platform
+        if (normalized.platform === 'youtube' && this.isYouTubeUrl(normalized.normalized)) {
+          const availability = await this.oauthTokenService.checkTokenAvailability(userId, 'youtube')
+          if (availability.available) {
+            tokenAvailable = true
+            provider = 'youtube'
+            console.log(`[PreviewService] YouTube token available for user ${userId}, will use native API in future phases`)
+          }
+        } else if (normalized.platform === 'spotify' && this.isSpotifyUrl(normalized.normalized)) {
+          const availability = await this.oauthTokenService.checkTokenAvailability(userId, 'spotify')
+          if (availability.available) {
+            tokenAvailable = true
+            provider = 'spotify'
+            console.log(`[PreviewService] Spotify token available for user ${userId}, will use native API in future phases`)
+          }
+        }
+      }
+      
+      // Step 4: Fetch from external source (native API or fallback)
+      // TODO: In Phase 6-7, implement native API calls when tokenAvailable is true
+      // For now, use the existing metadata extractor but log the availability
+      if (tokenAvailable && provider) {
+        console.log(`[PreviewService] Token available for ${provider}, but native API not yet implemented (Phase 6-7)`)
+      }
       
       const apiStartTime = Date.now()
       const metadataResult = await enhancedMetadataExtractor.extractMetadata(url)
@@ -200,5 +229,19 @@ export class PreviewService {
     // TODO: Implement cache invalidation
     // This would mark the database entry as stale or delete it
     return true
+  }
+  
+  /**
+   * Check if URL is a YouTube URL
+   */
+  private isYouTubeUrl(url: string): boolean {
+    return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)/.test(url)
+  }
+  
+  /**
+   * Check if URL is a Spotify URL
+   */
+  private isSpotifyUrl(url: string): boolean {
+    return /^https?:\/\/(open|play)\.spotify\.com/.test(url)
   }
 }
