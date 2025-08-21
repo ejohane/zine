@@ -16,7 +16,7 @@ export class BatchDatabaseOperations {
   // NOTE: Some queries (like getRecentFeedItemIds) may need even lower limits
   // due to complex WHERE clauses with multiple parameters
   private static readonly SQLITE_MAX_VARIABLES = 250
-  private static readonly VARIABLES_PER_FEED_ITEM = 9 // Number of columns in feed_items insert
+  private static readonly VARIABLES_PER_FEED_ITEM = 18 // Number of columns in feed_items insert (including new Phase 1 fields)
   private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
   private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
   private static readonly SAFETY_BUFFER = 10 // Safety buffer to ensure we never exceed the limit
@@ -131,6 +131,20 @@ export class BatchDatabaseOperations {
           publishedAt: feedItem.publishedAt.getTime(),
           durationSeconds: feedItem.durationSeconds || null,
           externalUrl: feedItem.externalUrl,
+          
+          // Phase 1: New engagement metrics
+          viewCount: (feedItem as any).viewCount || null,
+          likeCount: (feedItem as any).likeCount || null,
+          commentCount: (feedItem as any).commentCount || null,
+          popularityScore: (feedItem as any).popularityScore || null,
+          
+          // Phase 1: New classification fields
+          language: (feedItem as any).language || null,
+          isExplicit: (feedItem as any).isExplicit ? 1 : 0,
+          contentType: (feedItem as any).contentType || null,
+          category: (feedItem as any).category || null,
+          tags: (feedItem as any).tags || null,
+          
           createdAt: now.getTime()
         })
       }

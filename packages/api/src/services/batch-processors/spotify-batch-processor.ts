@@ -229,10 +229,24 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
         externalId: episode.id,
         title: episode.name,
         description: episode.description,
-        thumbnailUrl: episode.images?.[0]?.url,
+        thumbnailUrl: episode.images?.[0]?.url || show.images?.[0]?.url,
         publishedAt: new Date(episode.release_date),
         durationSeconds: Math.round(episode.duration_ms / 1000),
         externalUrl: episode.external_urls.spotify,
+        
+        // Phase 1: New engagement metrics (Spotify doesn't provide these for episodes)
+        viewCount: undefined,
+        likeCount: undefined,
+        commentCount: undefined,
+        popularityScore: undefined,
+        
+        // Phase 1: New classification fields
+        language: episode.language || show.languages?.[0],
+        isExplicit: episode.explicit || show.explicit || false,
+        contentType: 'podcast',
+        category: show.category || 'podcast',
+        tags: undefined, // Spotify doesn't provide tags for episodes
+        
         createdAt: new Date()
       }))
 

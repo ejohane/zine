@@ -8,6 +8,20 @@ export interface FeedItem {
   publishedAt: Date
   durationSeconds?: number
   externalUrl: string
+  
+  // Phase 1: Engagement metrics
+  viewCount?: number
+  likeCount?: number
+  commentCount?: number
+  popularityScore?: number // 0-100 normalized
+  
+  // Phase 1: Classification fields
+  language?: string
+  isExplicit?: boolean
+  contentType?: string // 'video', 'podcast', 'short', 'live'
+  category?: string
+  tags?: string // JSON array
+  
   createdAt: Date
 }
 

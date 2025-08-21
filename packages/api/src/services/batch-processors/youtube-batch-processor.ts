@@ -317,18 +317,51 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
       const subscription = subscriptionsByChannelId.get(channel.id)
       if (!subscription) continue
 
-      const newItems: FeedItem[] = videos.map(video => ({
-        id: `youtube-${video.id}`,
-        subscriptionId: subscription.id,
-        externalId: video.id,
-        title: video.snippet.title,
-        description: video.snippet.description,
-        thumbnailUrl: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-        publishedAt: new Date(video.snippet.publishedAt),
-        durationSeconds: YouTubeAPI.parseDuration(video.contentDetails.duration),
-        externalUrl: `https://youtube.com/watch?v=${video.id}`,
-        createdAt: new Date()
-      }))
+      const newItems: FeedItem[] = videos.map(video => {
+        // Determine content type based on duration and live status
+        const durationSeconds = YouTubeAPI.parseDuration(video.contentDetails.duration)
+        let contentType: string = 'video'
+        if (video.snippet.liveBroadcastContent === 'live') {
+          contentType = 'live'
+        } else if (durationSeconds && durationSeconds <= 60) {
+          contentType = 'short'
+        }
+
+        // Calculate popularity score (0-100 normalized)
+        let popularityScore: number | undefined
+        if (video.statistics?.viewCount) {
+          const viewCount = parseInt(video.statistics.viewCount)
+          // Simple logarithmic scaling for popularity
+          popularityScore = Math.min(100, Math.floor(Math.log10(viewCount + 1) * 10))
+        }
+
+        return {
+          id: `youtube-${video.id}`,
+          subscriptionId: subscription.id,
+          externalId: video.id,
+          title: video.snippet.title,
+          description: video.snippet.description,
+          thumbnailUrl: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
+          publishedAt: new Date(video.snippet.publishedAt),
+          durationSeconds,
+          externalUrl: `https://youtube.com/watch?v=${video.id}`,
+          
+          // Phase 1: New engagement metrics
+          viewCount: video.statistics?.viewCount ? parseInt(video.statistics.viewCount) : undefined,
+          likeCount: video.statistics?.likeCount ? parseInt(video.statistics.likeCount) : undefined,
+          commentCount: video.statistics?.commentCount ? parseInt(video.statistics.commentCount) : undefined,
+          popularityScore,
+          
+          // Phase 1: New classification fields
+          language: video.snippet.defaultLanguage || video.snippet.defaultAudioLanguage,
+          isExplicit: false, // YouTube doesn't have explicit flag in API
+          contentType,
+          category: video.snippet.categoryId,
+          tags: video.snippet.tags ? JSON.stringify(video.snippet.tags) : undefined,
+          
+          createdAt: new Date()
+        } as FeedItem
+      })
 
       results.push({
         subscriptionId: subscription.id,
