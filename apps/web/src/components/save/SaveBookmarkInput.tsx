@@ -24,9 +24,10 @@ export function SaveBookmarkInput({
     }
   }, [autoFocus])
 
-  // Clipboard auto-paste on mount
+  // Clipboard auto-paste on mount only
   useEffect(() => {
     const checkClipboard = async () => {
+      // Only check clipboard on initial mount when value is empty
       if (!value && navigator.clipboard && navigator.clipboard.readText) {
         try {
           const clipboardText = await navigator.clipboard.readText()
@@ -42,7 +43,8 @@ export function SaveBookmarkInput({
     }
     
     checkClipboard()
-  }, [value, onChange])
+    // Remove dependencies to only run once on mount
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="relative">
