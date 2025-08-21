@@ -104,6 +104,11 @@ export const subscriptions = sqliteTable('subscriptions', {
   totalContentCount: integer('total_content_count'),
   channelMetadata: text('channel_metadata'), // JSON for platform-specific data
   
+  // Phase 3: Calculated channel metrics
+  engagementRateAvg: integer('engagement_rate_avg'), // stored as integer (rate * 10000)
+  popularityAvg: integer('popularity_avg'), // Average popularity score
+  uploadSchedule: text('upload_schedule'), // JSON object with schedule analysis
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -158,6 +163,22 @@ export const feedItems = sqliteTable('feed_items', {
   seasonNumber: integer('season_number'),
   totalEpisodesInSeries: integer('total_episodes_in_series'),
   isLatestEpisode: integer('is_latest_episode', { mode: 'boolean' }).default(false),
+  
+  // Phase 3: Technical metadata
+  hasCaptions: integer('has_captions', { mode: 'boolean' }).default(false),
+  hasHd: integer('has_hd', { mode: 'boolean' }).default(false),
+  videoQuality: text('video_quality'), // '1080p', '4K', etc.
+  hasTranscript: integer('has_transcript', { mode: 'boolean' }).default(false),
+  audioLanguages: text('audio_languages'), // JSON array of ISO 639-1 codes
+  audioQuality: text('audio_quality'), // 'high', 'medium', 'low'
+  
+  // Phase 3: Aggregated metadata
+  statisticsMetadata: text('statistics_metadata'), // JSON object for engagement metrics
+  technicalMetadata: text('technical_metadata'), // JSON object for technical details
+  
+  // Phase 3: Calculated metrics
+  engagementRate: integer('engagement_rate'), // stored as integer (rate * 10000) for precision
+  trendingScore: integer('trending_score'), // 0-100 score
   
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })

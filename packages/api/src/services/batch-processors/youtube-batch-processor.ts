@@ -338,6 +338,47 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
           popularityScore = Math.min(100, Math.floor(Math.log10(viewCount + 1) * 10))
         }
 
+        // Phase 3: Calculate engagement rate
+        let engagementRate: number | undefined
+        if (video.statistics?.viewCount && parseInt(video.statistics.viewCount) > 0) {
+          const views = parseInt(video.statistics.viewCount)
+          const likes = parseInt(video.statistics.likeCount || '0')
+          const comments = parseInt(video.statistics.commentCount || '0')
+          engagementRate = Math.min(1, (likes + comments) / views)
+        }
+
+        // Phase 3: Calculate trending score based on recency and engagement
+        let trendingScore: number | undefined
+        if (video.statistics?.viewCount && video.snippet.publishedAt) {
+          const viewCount = parseInt(video.statistics.viewCount)
+          const ageInDays = Math.max(1, (Date.now() - new Date(video.snippet.publishedAt).getTime()) / (1000 * 60 * 60 * 24))
+          const viewsPerDay = viewCount / ageInDays
+          const engagementBoost = engagementRate ? engagementRate * 20 : 0
+          trendingScore = Math.min(100, Math.floor(Math.log10(viewsPerDay + 1) * 15 + engagementBoost))
+        }
+
+        // Phase 3: Detect technical metadata
+        const hasHd = video.contentDetails?.definition === 'hd'
+        const hasCaptions = video.contentDetails?.caption === 'true'
+        const videoQuality = video.contentDetails?.definition === 'hd' ? '1080p' : '480p'
+        
+        // Phase 3: Build aggregated metadata objects
+        const statisticsMetadata = video.statistics ? JSON.stringify({
+          viewCount: video.statistics.viewCount,
+          likeCount: video.statistics.likeCount,
+          commentCount: video.statistics.commentCount,
+          favoriteCount: video.statistics.favoriteCount,
+          engagementRate: engagementRate?.toFixed(4)
+        }) : undefined
+
+        const technicalMetadata = JSON.stringify({
+          definition: video.contentDetails?.definition,
+          caption: video.contentDetails?.caption,
+          duration: video.contentDetails?.duration,
+          publishedAt: video.snippet.publishedAt,
+          channelId: video.snippet.channelId
+        })
+
         return {
           id: `youtube-${video.id}`,
           subscriptionId: subscription.id,
@@ -369,6 +410,23 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
           creatorVerified: channelStats.status?.isLinked || false,
           creatorSubscriberCount: channelStats.statistics?.subscriberCount ? 
             parseInt(channelStats.statistics.subscriberCount) : undefined,
+          
+          // Phase 3: Technical metadata
+          hasCaptions,
+          hasHd,
+          videoQuality,
+          hasTranscript: false, // YouTube API doesn't provide transcript availability
+          audioLanguages: video.snippet.defaultAudioLanguage ? 
+            JSON.stringify([video.snippet.defaultAudioLanguage]) : undefined,
+          audioQuality: 'high', // YouTube generally provides high quality audio
+          
+          // Phase 3: Aggregated metadata
+          statisticsMetadata,
+          technicalMetadata,
+          
+          // Phase 3: Calculated metrics
+          engagementRate,
+          trendingScore,
           
           createdAt: new Date()
         } as FeedItem

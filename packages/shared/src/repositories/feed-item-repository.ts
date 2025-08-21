@@ -39,6 +39,22 @@ export interface FeedItem {
   totalEpisodesInSeries?: number
   isLatestEpisode?: boolean
   
+  // Phase 3: Technical metadata
+  hasCaptions?: boolean
+  hasHd?: boolean
+  videoQuality?: string // '1080p', '4K', etc.
+  hasTranscript?: boolean
+  audioLanguages?: string // JSON array of ISO 639-1 codes
+  audioQuality?: string // 'high', 'medium', 'low'
+  
+  // Phase 3: Aggregated metadata
+  statisticsMetadata?: string // JSON object for engagement metrics
+  technicalMetadata?: string // JSON object for technical details
+  
+  // Phase 3: Calculated metrics
+  engagementRate?: number // Engagement rate (0-1 as decimal)
+  trendingScore?: number // 0-100 score
+  
   createdAt: Date
 }
 
