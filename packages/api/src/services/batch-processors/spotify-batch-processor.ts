@@ -3,6 +3,7 @@ import { SpotifyAPI, SpotifyShow, SpotifyEpisode } from '../../external/spotify-
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
 import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
 import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
+import { ContentMatchingService } from '../content-matching-service'
 
 interface ShowWithEpisodes {
   show: SpotifyShow
@@ -300,6 +301,12 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
         // Phase 3: Calculated metrics
         engagementRate,
         trendingScore,
+        
+        // Phase 4: Cross-platform matching
+        normalizedTitle: ContentMatchingService.normalizeTitle(episode.name),
+        episodeIdentifier: ContentMatchingService.generateEpisodeIdentifier(episode.episode_number, undefined),
+        publisherCanonicalId: undefined, // Will be set by a separate publisher matching service
+        // Note: contentFingerprint will be generated asynchronously after creation
         
         createdAt: new Date()
       }})

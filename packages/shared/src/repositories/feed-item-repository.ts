@@ -55,6 +55,13 @@ export interface FeedItem {
   engagementRate?: number // Engagement rate (0-1 as decimal)
   trendingScore?: number // 0-100 score
   
+  // Phase 4: Cross-platform matching
+  contentFingerprint?: string // Unique content identifier
+  publisherCanonicalId?: string // Unified publisher ID
+  crossPlatformMetadata?: string // JSON object for matches
+  normalizedTitle?: string // For fuzzy matching
+  episodeIdentifier?: string // Standardized episode ID
+  
   createdAt: Date
 }
 

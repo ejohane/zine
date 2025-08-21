@@ -3,6 +3,7 @@ import { YouTubeAPI, YouTubeChannel, YouTubeVideoDetails } from '../../external/
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
 import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
 import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
+import { ContentMatchingService } from '../content-matching-service'
 
 interface ChannelWithVideos {
   channel: YouTubeChannel
@@ -427,6 +428,12 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
           // Phase 3: Calculated metrics
           engagementRate,
           trendingScore,
+          
+          // Phase 4: Cross-platform matching
+          normalizedTitle: ContentMatchingService.normalizeTitle(video.snippet.title),
+          episodeIdentifier: undefined, // YouTube videos typically don't have episode numbers
+          publisherCanonicalId: undefined, // Will be set by a separate publisher matching service
+          // Note: contentFingerprint will be generated asynchronously after creation
           
           createdAt: new Date()
         } as FeedItem

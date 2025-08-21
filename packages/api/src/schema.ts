@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
 export const users = sqliteTable('users', {
@@ -180,6 +180,13 @@ export const feedItems = sqliteTable('feed_items', {
   engagementRate: integer('engagement_rate'), // stored as integer (rate * 10000) for precision
   trendingScore: integer('trending_score'), // 0-100 score
   
+  // Phase 4: Cross-platform matching fields
+  contentFingerprint: text('content_fingerprint'), // Unique content identifier
+  publisherCanonicalId: text('publisher_canonical_id'), // Unified publisher ID
+  crossPlatformMetadata: text('cross_platform_metadata'), // JSON object for matches
+  normalizedTitle: text('normalized_title'), // For fuzzy matching
+  episodeIdentifier: text('episode_identifier'), // Standardized episode ID
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -240,6 +247,32 @@ export const durableObjectMetrics = sqliteTable('durable_object_metrics', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+// Phase 4: Cross-platform matching tables
+export const publishers = sqliteTable('publishers', {
+  id: text('id').primaryKey(),
+  canonicalName: text('canonical_name').notNull(), // Primary/official name
+  alternativeNames: text('alternative_names'), // JSON array of known aliases
+  verified: integer('verified', { mode: 'boolean' }).default(false),
+  primaryPlatform: text('primary_platform'), // Main platform (youtube/spotify)
+  platformIdentities: text('platform_identities').notNull(), // JSON object: {youtube: {id, name}, spotify: {id, name}}
+  metadata: text('metadata'), // JSON object for additional data
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const contentMatches = sqliteTable('content_matches', {
+  id: text('id').primaryKey(),
+  contentFingerprint: text('content_fingerprint').notNull(),
+  platformA: text('platform_a').notNull(),
+  contentIdA: text('content_id_a').notNull(),
+  platformB: text('platform_b').notNull(),
+  contentIdB: text('content_id_b').notNull(),
+  matchConfidence: real('match_confidence').notNull(), // 0.0 to 1.0
+  matchReasons: text('match_reasons').notNull(), // JSON array of match factors
+  verified: integer('verified', { mode: 'boolean' }).default(false), // Human-verified match
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
 export const insertCreatorSchema = createInsertSchema(creators)
@@ -266,6 +299,10 @@ export const insertDurableObjectStatusSchema = createInsertSchema(durableObjectS
 export const selectDurableObjectStatusSchema = createSelectSchema(durableObjectStatus)
 export const insertDurableObjectMetricsSchema = createInsertSchema(durableObjectMetrics)
 export const selectDurableObjectMetricsSchema = createSelectSchema(durableObjectMetrics)
+export const insertPublishersSchema = createInsertSchema(publishers)
+export const selectPublishersSchema = createSelectSchema(publishers)
+export const insertContentMatchesSchema = createInsertSchema(contentMatches)
+export const selectContentMatchesSchema = createSelectSchema(contentMatches)
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -293,3 +330,7 @@ export type DurableObjectStatus = typeof durableObjectStatus.$inferSelect
 export type NewDurableObjectStatus = typeof durableObjectStatus.$inferInsert
 export type DurableObjectMetrics = typeof durableObjectMetrics.$inferSelect
 export type NewDurableObjectMetrics = typeof durableObjectMetrics.$inferInsert
+export type Publisher = typeof publishers.$inferSelect
+export type NewPublisher = typeof publishers.$inferInsert
+export type ContentMatch = typeof contentMatches.$inferSelect
+export type NewContentMatch = typeof contentMatches.$inferInsert
