@@ -10,10 +10,22 @@ export interface YouTubeChannel {
     }
     publishedAt: string
     customUrl?: string
+    country?: string
+    defaultLanguage?: string
   }
   statistics?: {
     subscriberCount: string
     videoCount: string
+    viewCount?: string
+    hiddenSubscriberCount?: boolean
+  }
+  status?: {
+    isLinked?: boolean
+    longUploadsStatus?: string
+    madeForKids?: boolean
+  }
+  topicDetails?: {
+    topicCategories?: string[]
   }
 }
 
@@ -74,9 +86,22 @@ export interface YouTubeVideoDetails {
     }
     channelId: string
     channelTitle: string
+    tags?: string[]
+    categoryId?: string
+    defaultLanguage?: string
+    defaultAudioLanguage?: string
+    liveBroadcastContent?: string
   }
   contentDetails: {
     duration: string // ISO 8601 duration (e.g., "PT4M13S")
+    definition?: string // "hd" or "sd"
+    caption?: string // "true" or "false"
+  }
+  statistics?: {
+    viewCount?: string
+    likeCount?: string
+    commentCount?: string
+    favoriteCount?: string
   }
 }
 
@@ -228,7 +253,7 @@ export class YouTubeAPI {
     if (videoIds.length === 0) return []
 
     const params = new URLSearchParams({
-      part: 'snippet,contentDetails',
+      part: 'snippet,contentDetails,statistics',
       id: videoIds.join(',')
     })
 

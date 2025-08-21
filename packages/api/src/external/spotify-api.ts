@@ -12,6 +12,9 @@ export interface SpotifyShow {
   }
   publisher: string
   total_episodes: number
+  languages?: string[]
+  explicit?: boolean
+  category?: string
 }
 
 export interface SpotifyShowsResponse {
@@ -41,6 +44,10 @@ export interface SpotifyEpisode {
     id: string
     name: string
   }
+  language?: string
+  explicit?: boolean
+  episode_number?: number
+  is_externally_hosted?: boolean
 }
 
 export interface SpotifyEpisodesResponse {

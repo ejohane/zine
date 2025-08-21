@@ -3,6 +3,7 @@ import { YouTubeAPI, YouTubeChannel, YouTubeVideoDetails } from '../../external/
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
 import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
 import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
+import { ContentMatchingService } from '../content-matching-service'
 
 interface ChannelWithVideos {
   channel: YouTubeChannel
@@ -316,19 +317,127 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     for (const { channel, videos } of channelsWithVideos) {
       const subscription = subscriptionsByChannelId.get(channel.id)
       if (!subscription) continue
+      
+      // Extract channel information for creator metadata
+      const channelStats = channel as ChannelWithStats
 
-      const newItems: FeedItem[] = videos.map(video => ({
-        id: `youtube-${video.id}`,
-        subscriptionId: subscription.id,
-        externalId: video.id,
-        title: video.snippet.title,
-        description: video.snippet.description,
-        thumbnailUrl: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
-        publishedAt: new Date(video.snippet.publishedAt),
-        durationSeconds: YouTubeAPI.parseDuration(video.contentDetails.duration),
-        externalUrl: `https://youtube.com/watch?v=${video.id}`,
-        createdAt: new Date()
-      }))
+      const newItems: FeedItem[] = videos.map(video => {
+        // Determine content type based on duration and live status
+        const durationSeconds = YouTubeAPI.parseDuration(video.contentDetails.duration)
+        let contentType: string = 'video'
+        if (video.snippet.liveBroadcastContent === 'live') {
+          contentType = 'live'
+        } else if (durationSeconds && durationSeconds <= 60) {
+          contentType = 'short'
+        }
+
+        // Calculate popularity score (0-100 normalized)
+        let popularityScore: number | undefined
+        if (video.statistics?.viewCount) {
+          const viewCount = parseInt(video.statistics.viewCount)
+          // Simple logarithmic scaling for popularity
+          popularityScore = Math.min(100, Math.floor(Math.log10(viewCount + 1) * 10))
+        }
+
+        // Phase 3: Calculate engagement rate
+        let engagementRate: number | undefined
+        if (video.statistics?.viewCount && parseInt(video.statistics.viewCount) > 0) {
+          const views = parseInt(video.statistics.viewCount)
+          const likes = parseInt(video.statistics.likeCount || '0')
+          const comments = parseInt(video.statistics.commentCount || '0')
+          engagementRate = Math.min(1, (likes + comments) / views)
+        }
+
+        // Phase 3: Calculate trending score based on recency and engagement
+        let trendingScore: number | undefined
+        if (video.statistics?.viewCount && video.snippet.publishedAt) {
+          const viewCount = parseInt(video.statistics.viewCount)
+          const ageInDays = Math.max(1, (Date.now() - new Date(video.snippet.publishedAt).getTime()) / (1000 * 60 * 60 * 24))
+          const viewsPerDay = viewCount / ageInDays
+          const engagementBoost = engagementRate ? engagementRate * 20 : 0
+          trendingScore = Math.min(100, Math.floor(Math.log10(viewsPerDay + 1) * 15 + engagementBoost))
+        }
+
+        // Phase 3: Detect technical metadata
+        const hasHd = video.contentDetails?.definition === 'hd'
+        const hasCaptions = video.contentDetails?.caption === 'true'
+        const videoQuality = video.contentDetails?.definition === 'hd' ? '1080p' : '480p'
+        
+        // Phase 3: Build aggregated metadata objects
+        const statisticsMetadata = video.statistics ? JSON.stringify({
+          viewCount: video.statistics.viewCount,
+          likeCount: video.statistics.likeCount,
+          commentCount: video.statistics.commentCount,
+          favoriteCount: video.statistics.favoriteCount,
+          engagementRate: engagementRate?.toFixed(4)
+        }) : undefined
+
+        const technicalMetadata = JSON.stringify({
+          definition: video.contentDetails?.definition,
+          caption: video.contentDetails?.caption,
+          duration: video.contentDetails?.duration,
+          publishedAt: video.snippet.publishedAt,
+          channelId: video.snippet.channelId
+        })
+
+        return {
+          id: `youtube-${video.id}`,
+          subscriptionId: subscription.id,
+          externalId: video.id,
+          title: video.snippet.title,
+          description: video.snippet.description,
+          thumbnailUrl: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
+          publishedAt: new Date(video.snippet.publishedAt),
+          durationSeconds,
+          externalUrl: `https://youtube.com/watch?v=${video.id}`,
+          
+          // Phase 1: New engagement metrics
+          viewCount: video.statistics?.viewCount ? parseInt(video.statistics.viewCount) : undefined,
+          likeCount: video.statistics?.likeCount ? parseInt(video.statistics.likeCount) : undefined,
+          commentCount: video.statistics?.commentCount ? parseInt(video.statistics.commentCount) : undefined,
+          popularityScore,
+          
+          // Phase 1: New classification fields
+          language: video.snippet.defaultLanguage || video.snippet.defaultAudioLanguage,
+          isExplicit: false, // YouTube doesn't have explicit flag in API
+          contentType,
+          category: video.snippet.categoryId,
+          tags: video.snippet.tags ? JSON.stringify(video.snippet.tags) : undefined,
+          
+          // Phase 2: Creator/Channel Information
+          creatorId: channelStats.id,
+          creatorName: channelStats.snippet.title,
+          creatorThumbnail: channelStats.snippet.thumbnails?.default?.url,
+          creatorVerified: channelStats.status?.isLinked || false,
+          creatorSubscriberCount: channelStats.statistics?.subscriberCount ? 
+            parseInt(channelStats.statistics.subscriberCount) : undefined,
+          
+          // Phase 3: Technical metadata
+          hasCaptions,
+          hasHd,
+          videoQuality,
+          hasTranscript: false, // YouTube API doesn't provide transcript availability
+          audioLanguages: video.snippet.defaultAudioLanguage ? 
+            JSON.stringify([video.snippet.defaultAudioLanguage]) : undefined,
+          audioQuality: 'high', // YouTube generally provides high quality audio
+          
+          // Phase 3: Aggregated metadata
+          statisticsMetadata,
+          technicalMetadata,
+          
+          // Phase 3: Calculated metrics
+          engagementRate,
+          trendingScore,
+          
+          // Phase 4: Cross-platform matching
+          normalizedTitle: ContentMatchingService.normalizeTitle(video.snippet.title),
+          episodeIdentifier: undefined, // YouTube videos typically don't have episode numbers
+          publisherCanonicalId: undefined, // Will be set by a separate publisher matching service
+          // Note: contentFingerprint will be generated asynchronously after creation
+          
+          createdAt: new Date()
+        } as FeedItem
+      })
 
       results.push({
         subscriptionId: subscription.id,

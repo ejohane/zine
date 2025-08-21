@@ -8,6 +8,60 @@ export interface FeedItem {
   publishedAt: Date
   durationSeconds?: number
   externalUrl: string
+  
+  // Phase 1: Engagement metrics
+  viewCount?: number
+  likeCount?: number
+  commentCount?: number
+  popularityScore?: number // 0-100 normalized
+  
+  // Phase 1: Classification fields
+  language?: string
+  isExplicit?: boolean
+  contentType?: string // 'video', 'podcast', 'short', 'live'
+  category?: string
+  tags?: string // JSON array
+  
+  // Phase 2: Creator/Channel Information
+  creatorId?: string
+  creatorName?: string
+  creatorThumbnail?: string
+  creatorVerified?: boolean
+  creatorSubscriberCount?: number // YouTube
+  creatorFollowerCount?: number // Spotify
+  
+  // Phase 2: Series/Show Context
+  seriesMetadata?: string // JSON object
+  seriesId?: string
+  seriesName?: string
+  episodeNumber?: number
+  seasonNumber?: number
+  totalEpisodesInSeries?: number
+  isLatestEpisode?: boolean
+  
+  // Phase 3: Technical metadata
+  hasCaptions?: boolean
+  hasHd?: boolean
+  videoQuality?: string // '1080p', '4K', etc.
+  hasTranscript?: boolean
+  audioLanguages?: string // JSON array of ISO 639-1 codes
+  audioQuality?: string // 'high', 'medium', 'low'
+  
+  // Phase 3: Aggregated metadata
+  statisticsMetadata?: string // JSON object for engagement metrics
+  technicalMetadata?: string // JSON object for technical details
+  
+  // Phase 3: Calculated metrics
+  engagementRate?: number // Engagement rate (0-1 as decimal)
+  trendingScore?: number // 0-100 score
+  
+  // Phase 4: Cross-platform matching
+  contentFingerprint?: string // Unique content identifier
+  publisherCanonicalId?: string // Unified publisher ID
+  crossPlatformMetadata?: string // JSON object for matches
+  normalizedTitle?: string // For fuzzy matching
+  episodeIdentifier?: string // Standardized episode ID
+  
   createdAt: Date
 }
 

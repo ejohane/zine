@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
 export const users = sqliteTable('users', {
@@ -65,16 +65,16 @@ export const subscriptionProviders = sqliteTable('subscription_providers', {
 // User's connected accounts
 export const userAccounts = sqliteTable('user_accounts', {
   id: text('id').primaryKey(),
-  userId: text('userId').notNull().references(() => users.id),
-  providerId: text('providerId').notNull().references(() => subscriptionProviders.id),
-  externalAccountId: text('externalAccountId').notNull(),
+  userId: text('user_id').notNull().references(() => users.id),
+  providerId: text('provider_id').notNull().references(() => subscriptionProviders.id),
+  externalAccountId: text('external_account_id').notNull(),
   // Tokens are now stored in Durable Objects, not in the database
   // accessToken: text('access_token').notNull(), // REMOVED - stored in DO
   // refreshToken: text('refresh_token'), // REMOVED - stored in DO
   // expiresAt: integer('expires_at', { mode: 'timestamp' }), // REMOVED - stored in DO
-  isActive: integer('isActive', { mode: 'boolean' }).notNull().default(true),
-  createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
 
 // Available subscriptions (podcasts, channels)
@@ -92,6 +92,23 @@ export const subscriptions = sqliteTable('subscriptions', {
   uploadsPlaylistId: text('uploads_playlist_id'),          // NEW: Cache playlist ID
   etag: text('etag'),                                      // NEW: For ETag caching
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
+  
+  // Phase 2: Richer channel/show data
+  subscriberCount: integer('subscriber_count'),
+  isVerified: integer('is_verified', { mode: 'boolean' }).default(false),
+  contentCategories: text('content_categories'), // JSON array
+  primaryLanguage: text('primary_language'),
+  averageDuration: integer('average_duration'), // seconds
+  uploadFrequency: text('upload_frequency'), // 'daily', 'weekly', 'monthly'
+  lastContentDate: integer('last_content_date', { mode: 'timestamp' }),
+  totalContentCount: integer('total_content_count'),
+  channelMetadata: text('channel_metadata'), // JSON for platform-specific data
+  
+  // Phase 3: Calculated channel metrics
+  engagementRateAvg: integer('engagement_rate_avg'), // stored as integer (rate * 10000)
+  popularityAvg: integer('popularity_avg'), // Average popularity score
+  uploadSchedule: text('upload_schedule'), // JSON object with schedule analysis
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -116,6 +133,60 @@ export const feedItems = sqliteTable('feed_items', {
   publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(),
   durationSeconds: integer('duration_seconds'),
   externalUrl: text('external_url').notNull(),
+  
+  // Phase 1: Engagement metrics
+  viewCount: integer('view_count'),
+  likeCount: integer('like_count'),
+  commentCount: integer('comment_count'),
+  popularityScore: integer('popularity_score'), // 0-100 normalized
+  
+  // Phase 1: Classification fields
+  language: text('language'),
+  isExplicit: integer('is_explicit', { mode: 'boolean' }).default(false),
+  contentType: text('content_type'), // 'video', 'podcast', 'short', 'live'
+  category: text('category'),
+  tags: text('tags'), // JSON array
+  
+  // Phase 2: Creator/Channel Information
+  creatorId: text('creator_id'),
+  creatorName: text('creator_name'),
+  creatorThumbnail: text('creator_thumbnail'),
+  creatorVerified: integer('creator_verified', { mode: 'boolean' }).default(false),
+  creatorSubscriberCount: integer('creator_subscriber_count'), // YouTube
+  creatorFollowerCount: integer('creator_follower_count'), // Spotify
+  
+  // Phase 2: Series/Show Context
+  seriesMetadata: text('series_metadata'), // JSON object
+  seriesId: text('series_id'),
+  seriesName: text('series_name'),
+  episodeNumber: integer('episode_number'),
+  seasonNumber: integer('season_number'),
+  totalEpisodesInSeries: integer('total_episodes_in_series'),
+  isLatestEpisode: integer('is_latest_episode', { mode: 'boolean' }).default(false),
+  
+  // Phase 3: Technical metadata
+  hasCaptions: integer('has_captions', { mode: 'boolean' }).default(false),
+  hasHd: integer('has_hd', { mode: 'boolean' }).default(false),
+  videoQuality: text('video_quality'), // '1080p', '4K', etc.
+  hasTranscript: integer('has_transcript', { mode: 'boolean' }).default(false),
+  audioLanguages: text('audio_languages'), // JSON array of ISO 639-1 codes
+  audioQuality: text('audio_quality'), // 'high', 'medium', 'low'
+  
+  // Phase 3: Aggregated metadata
+  statisticsMetadata: text('statistics_metadata'), // JSON object for engagement metrics
+  technicalMetadata: text('technical_metadata'), // JSON object for technical details
+  
+  // Phase 3: Calculated metrics
+  engagementRate: integer('engagement_rate'), // stored as integer (rate * 10000) for precision
+  trendingScore: integer('trending_score'), // 0-100 score
+  
+  // Phase 4: Cross-platform matching fields
+  contentFingerprint: text('content_fingerprint'), // Unique content identifier
+  publisherCanonicalId: text('publisher_canonical_id'), // Unified publisher ID
+  crossPlatformMetadata: text('cross_platform_metadata'), // JSON object for matches
+  normalizedTitle: text('normalized_title'), // For fuzzy matching
+  episodeIdentifier: text('episode_identifier'), // Standardized episode ID
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -176,6 +247,32 @@ export const durableObjectMetrics = sqliteTable('durable_object_metrics', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+// Phase 4: Cross-platform matching tables
+export const publishers = sqliteTable('publishers', {
+  id: text('id').primaryKey(),
+  canonicalName: text('canonical_name').notNull(), // Primary/official name
+  alternativeNames: text('alternative_names'), // JSON array of known aliases
+  verified: integer('verified', { mode: 'boolean' }).default(false),
+  primaryPlatform: text('primary_platform'), // Main platform (youtube/spotify)
+  platformIdentities: text('platform_identities').notNull(), // JSON object: {youtube: {id, name}, spotify: {id, name}}
+  metadata: text('metadata'), // JSON object for additional data
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+})
+
+export const contentMatches = sqliteTable('content_matches', {
+  id: text('id').primaryKey(),
+  contentFingerprint: text('content_fingerprint').notNull(),
+  platformA: text('platform_a').notNull(),
+  contentIdA: text('content_id_a').notNull(),
+  platformB: text('platform_b').notNull(),
+  contentIdB: text('content_id_b').notNull(),
+  matchConfidence: real('match_confidence').notNull(), // 0.0 to 1.0
+  matchReasons: text('match_reasons').notNull(), // JSON array of match factors
+  verified: integer('verified', { mode: 'boolean' }).default(false), // Human-verified match
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
 export const insertCreatorSchema = createInsertSchema(creators)
@@ -202,6 +299,10 @@ export const insertDurableObjectStatusSchema = createInsertSchema(durableObjectS
 export const selectDurableObjectStatusSchema = createSelectSchema(durableObjectStatus)
 export const insertDurableObjectMetricsSchema = createInsertSchema(durableObjectMetrics)
 export const selectDurableObjectMetricsSchema = createSelectSchema(durableObjectMetrics)
+export const insertPublishersSchema = createInsertSchema(publishers)
+export const selectPublishersSchema = createSelectSchema(publishers)
+export const insertContentMatchesSchema = createInsertSchema(contentMatches)
+export const selectContentMatchesSchema = createSelectSchema(contentMatches)
 
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
@@ -229,3 +330,7 @@ export type DurableObjectStatus = typeof durableObjectStatus.$inferSelect
 export type NewDurableObjectStatus = typeof durableObjectStatus.$inferInsert
 export type DurableObjectMetrics = typeof durableObjectMetrics.$inferSelect
 export type NewDurableObjectMetrics = typeof durableObjectMetrics.$inferInsert
+export type Publisher = typeof publishers.$inferSelect
+export type NewPublisher = typeof publishers.$inferInsert
+export type ContentMatch = typeof contentMatches.$inferSelect
+export type NewContentMatch = typeof contentMatches.$inferInsert

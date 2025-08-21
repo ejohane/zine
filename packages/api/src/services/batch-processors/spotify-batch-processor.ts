@@ -3,6 +3,7 @@ import { SpotifyAPI, SpotifyShow, SpotifyEpisode } from '../../external/spotify-
 import { BaseBatchProcessor, BatchProcessorResult, BatchProcessorOptions } from './batch-processor.interface'
 import { RATE_LIMITER_CONFIGS } from '../../utils/rate-limiter'
 import { ProgressTracker, ConsoleProgressReporter } from '../../utils/progress-tracker'
+import { ContentMatchingService } from '../content-matching-service'
 
 interface ShowWithEpisodes {
   show: SpotifyShow
@@ -223,18 +224,92 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
       const subscription = subscriptionsByExternalId.get(show.id)
       if (!subscription) continue
 
-      const newItems: FeedItem[] = episodes.map(episode => ({
+      const newItems: FeedItem[] = episodes.map((episode, index) => {
+        // Phase 3: Calculate engagement rate (not available for Spotify)
+        const engagementRate = undefined
+        
+        // Phase 3: Calculate trending score based on recency
+        let trendingScore: number | undefined
+        if (episode.release_date) {
+          const ageInDays = Math.max(1, (Date.now() - new Date(episode.release_date).getTime()) / (1000 * 60 * 60 * 24))
+          // For podcasts, newer is better since there's no view count
+          trendingScore = Math.min(100, Math.floor(100 / Math.sqrt(ageInDays)))
+        }
+
+        // Phase 3: Technical metadata
+        const hasTranscript = episode.is_externally_hosted === false // Spotify-hosted often have transcripts
+        const audioQuality = 'high' // Spotify provides high quality audio
+        
+        // Phase 3: Build aggregated metadata
+        const statisticsMetadata = undefined // Spotify doesn't provide episode statistics
+        const technicalMetadata = JSON.stringify({
+          isExternallyHosted: episode.is_externally_hosted,
+          durationMs: episode.duration_ms,
+          releaseDate: episode.release_date
+        })
+
+        return {
         id: `spotify-${episode.id}`,
         subscriptionId: subscription.id,
         externalId: episode.id,
         title: episode.name,
         description: episode.description,
-        thumbnailUrl: episode.images?.[0]?.url,
+        thumbnailUrl: episode.images?.[0]?.url || show.images?.[0]?.url,
         publishedAt: new Date(episode.release_date),
         durationSeconds: Math.round(episode.duration_ms / 1000),
         externalUrl: episode.external_urls.spotify,
+        
+        // Phase 1: New engagement metrics (Spotify doesn't provide these for episodes)
+        viewCount: undefined,
+        likeCount: undefined,
+        commentCount: undefined,
+        popularityScore: undefined,
+        
+        // Phase 1: New classification fields
+        language: episode.language || show.languages?.[0],
+        isExplicit: episode.explicit || show.explicit || false,
+        contentType: 'podcast',
+        category: show.category || 'podcast',
+        tags: undefined, // Spotify doesn't provide tags for episodes
+        
+        // Phase 2: Creator/Publisher Information
+        creatorId: show.id,
+        creatorName: show.publisher,
+        creatorThumbnail: show.images?.[0]?.url,
+        creatorVerified: false, // Spotify doesn't provide verification for podcasts
+        creatorFollowerCount: undefined, // Not available for podcasts
+        
+        // Phase 2: Series/Episode Context
+        seriesId: show.id,
+        seriesName: show.name,
+        episodeNumber: episode.episode_number,
+        totalEpisodesInSeries: show.total_episodes,
+        isLatestEpisode: index === 0, // First episode in list is usually latest
+        
+        // Phase 3: Technical metadata
+        hasCaptions: false, // Spotify doesn't provide caption info
+        hasHd: false, // Not applicable for audio
+        videoQuality: undefined, // Not applicable for audio
+        hasTranscript,
+        audioLanguages: episode.language ? JSON.stringify([episode.language]) : undefined,
+        audioQuality,
+        
+        // Phase 3: Aggregated metadata
+        statisticsMetadata,
+        technicalMetadata,
+        
+        // Phase 3: Calculated metrics
+        engagementRate,
+        trendingScore,
+        
+        // Phase 4: Cross-platform matching
+        normalizedTitle: ContentMatchingService.normalizeTitle(episode.name),
+        episodeIdentifier: ContentMatchingService.generateEpisodeIdentifier(episode.episode_number, undefined),
+        publisherCanonicalId: undefined, // Will be set by a separate publisher matching service
+        // Note: contentFingerprint will be generated asynchronously after creation
+        
         createdAt: new Date()
-      }))
+      }})
 
       results.push({
         subscriptionId: subscription.id,
