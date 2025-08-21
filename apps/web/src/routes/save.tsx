@@ -1,124 +1,84 @@
-import { createFileRoute, useNavigate, useSearch } from '@tanstack/react-router'
-import { useState } from 'react'
-import { Button } from '../components/ui/button'
-import { SaveBookmarkForm } from '../components/SaveBookmarkForm'
-import { BrowserExtensionBanner } from '../components/BrowserExtensionBanner'
-import { BulkImportDialog } from '../components/BulkImportDialog'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useState, useEffect } from 'react'
 import { PageWrapper } from '../components/layout/PageWrapper'
-import type { Bookmark } from '../lib/api'
-
-interface SaveSearchParams {
-  url?: string
-}
+import { SaveBookmarkInput } from '../components/save/SaveBookmarkInput'
+import { BookmarkPreview } from '../components/save/BookmarkPreview'
+import { useSaveBookmark } from '../hooks/useSaveBookmark'
 
 function SavePage() {
   const navigate = useNavigate()
-  const { url } = useSearch({ from: '/save' }) as SaveSearchParams
-  const [currentUrl, setCurrentUrl] = useState(url || '')
-  const [showBulkImport, setShowBulkImport] = useState(false)
+  const [url, setUrl] = useState('')
+  const { preview, saveBookmark, isLoading, isSaving, error, updateUrl, retry } = useSaveBookmark()
 
-  const handleSaveSuccess = (bookmark: Bookmark) => {
-    // Navigate back to home with success message
-    navigate({ 
-      to: '/', 
-      search: { 
-        saved: bookmark.id,
-        message: `Successfully saved: ${bookmark.title}` 
-      } 
-    })
-  }
+  // Update the hook when URL changes
+  useEffect(() => {
+    updateUrl(url)
+  }, [url, updateUrl])
 
-  const handleBulkImportSuccess = (bookmarks: Bookmark[]) => {
-    setShowBulkImport(false)
-    // Navigate back to home with success message
-    navigate({ 
-      to: '/', 
-      search: { 
-        message: `Successfully imported ${bookmarks.length} bookmarks` 
-      } 
-    })
+  const handleSave = async () => {
+    const result = await saveBookmark(url)
+    if (result) {
+      navigate({ 
+        to: '/', 
+        search: { 
+          saved: result.id,
+          message: `Successfully saved: ${result.title}` 
+        } 
+      })
+    }
   }
 
   const handleCancel = () => {
     navigate({ to: '/' })
   }
 
-  const handleUrlFromExtension = (newUrl: string) => {
-    setCurrentUrl(newUrl)
-  }
-
   return (
-    <PageWrapper className="bg-gray-50">
+    <PageWrapper>
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900">Save New Bookmark</h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowBulkImport(true)}
-              className="hidden sm:flex items-center gap-2"
-            >
-              <span className="w-4 h-4">📥</span>
-              Bulk Import
-            </Button>
-          </div>
-          <p className="text-base sm:text-lg text-gray-600 mb-4">
-            Add any URL to your bookmark collection with automatic metadata extraction
-          </p>
-          {/* Mobile bulk import button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowBulkImport(true)}
-            className="sm:hidden"
-          >
-            <span className="w-4 h-4 mr-2">📥</span>
-            Bulk Import
-          </Button>
+        {/* Page Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-6">Save Bookmark</h1>
+          
+          {/* URL Input */}
+          <SaveBookmarkInput
+            value={url}
+            onChange={setUrl}
+            onClear={() => setUrl('')}
+            placeholder="Enter URL to save..."
+          />
         </div>
 
-        {/* Browser Extension Banner */}
-        <BrowserExtensionBanner 
-          onUrlFromExtension={handleUrlFromExtension}
-          className="mb-6"
-        />
+        {/* Main Content */}
+        <main className="flex-1">
+          {/* Bookmark Preview */}
+          {(preview || isLoading || error) && (
+            <BookmarkPreview
+              preview={preview}
+              isLoading={isLoading}
+              error={error}
+              onRetry={() => retry(url)}
+            />
+          )}
 
-        {/* Save Form */}
-        <SaveBookmarkForm
-          initialUrl={currentUrl}
-          onSuccess={handleSaveSuccess}
-          onCancel={handleCancel}
-        />
-
-        {/* Help Text */}
-        <div className="mt-8 sm:mt-12 max-w-2xl mx-auto">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 sm:p-6">
-            <h3 className="font-semibold text-blue-900 mb-2">✨ Enhanced Metadata Extraction</h3>
-            <div className="text-sm text-blue-800 space-y-2">
-              <p>Zine automatically extracts rich metadata from your bookmarks:</p>
-              <ul className="list-disc list-inside space-y-1 ml-2 sm:ml-4">
-                <li><strong>YouTube</strong>: Video titles, creators, thumbnails, and duration</li>
-                <li><strong>Spotify</strong>: Podcast episodes, music tracks, and artist information</li>
-                <li><strong>Twitter/X</strong>: Tweet content, author details, and social context</li>
-                <li><strong>Substack</strong>: Article titles, authors, and reading time estimates</li>
-                <li><strong>Web Articles</strong>: Open Graph data, JSON-LD, and content analysis</li>
-              </ul>
-              <p className="mt-3">
-                <strong>Smart Features:</strong> Duplicate detection, creator normalization, 
-                and automatic content classification.
-              </p>
+          {/* Action Buttons */}
+          {preview && (
+            <div className="mt-6 flex gap-3 justify-end">
+              <button
+                onClick={handleCancel}
+                className="px-6 py-2 bg-surface hover:bg-surface-hover rounded-full text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2 bg-spotify-green text-black hover:bg-spotify-green-dark rounded-full text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {isSaving ? 'Saving...' : 'Save Bookmark'}
+              </button>
             </div>
-          </div>
-        </div>
-
-        {/* Bulk Import Dialog */}
-        <BulkImportDialog
-          isOpen={showBulkImport}
-          onClose={() => setShowBulkImport(false)}
-          onSuccess={handleBulkImportSuccess}
-        />
+          )}
+        </main>
       </div>
     </PageWrapper>
   )
@@ -126,9 +86,4 @@ function SavePage() {
 
 export const Route = createFileRoute('/save')({
   component: SavePage,
-  validateSearch: (search: Record<string, unknown>): SaveSearchParams => {
-    return {
-      url: typeof search.url === 'string' ? search.url : undefined,
-    }
-  },
 })
