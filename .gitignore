@@ -8,4 +8,4 @@ build/
 .next/
 .wrangler/
 .dev.vars
-.drizzle.env
+.drizzle.env.branches/

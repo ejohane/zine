@@ -32,7 +32,7 @@ WHERE
   );
 
 -- Feed items table  
--- Convert published_at and other date fields
+-- Convert published_at and created_at fields (Note: feed_items table doesn't have updated_at)
 UPDATE feed_items
 SET
   published_at = CASE
@@ -47,12 +47,6 @@ SET
     WHEN CAST(created_at AS INTEGER) > 10000000000 THEN CAST(created_at AS INTEGER) / 1000
     WHEN created_at LIKE '%-%-%T%' THEN CAST(strftime('%s', created_at) AS INTEGER)
     ELSE CAST(strftime('%s', 'now') AS INTEGER)
-  END,
-  updated_at = CASE
-    WHEN CAST(updated_at AS INTEGER) > 0 AND CAST(updated_at AS INTEGER) < 4102444800 THEN CAST(updated_at AS INTEGER)
-    WHEN CAST(updated_at AS INTEGER) > 10000000000 THEN CAST(updated_at AS INTEGER) / 1000
-    WHEN updated_at LIKE '%-%-%T%' THEN CAST(strftime('%s', updated_at) AS INTEGER)
-    ELSE CAST(strftime('%s', 'now') AS INTEGER)
   END
 WHERE
   -- Only update rows that need normalization
@@ -61,12 +55,10 @@ WHERE
     OR published_at LIKE '%-%-%T%'
     OR CAST(created_at AS INTEGER) > 10000000000
     OR created_at LIKE '%-%-%T%'
-    OR CAST(updated_at AS INTEGER) > 10000000000
-    OR updated_at LIKE '%-%-%T%'
   );
 
 -- Subscriptions table
--- Normalize last_polled_at and date fields
+-- Normalize last_polled_at and date fields (Note: subscriptions table doesn't have updated_at)
 UPDATE subscriptions
 SET
   last_polled_at = CASE
@@ -81,12 +73,6 @@ SET
     WHEN CAST(created_at AS INTEGER) > 10000000000 THEN CAST(created_at AS INTEGER) / 1000
     WHEN created_at LIKE '%-%-%T%' THEN CAST(strftime('%s', created_at) AS INTEGER)
     ELSE CAST(strftime('%s', 'now') AS INTEGER)
-  END,
-  updated_at = CASE
-    WHEN CAST(updated_at AS INTEGER) > 0 AND CAST(updated_at AS INTEGER) < 4102444800 THEN CAST(updated_at AS INTEGER)
-    WHEN CAST(updated_at AS INTEGER) > 10000000000 THEN CAST(updated_at AS INTEGER) / 1000
-    WHEN updated_at LIKE '%-%-%T%' THEN CAST(strftime('%s', updated_at) AS INTEGER)
-    ELSE CAST(strftime('%s', 'now') AS INTEGER)
   END
 WHERE
   -- Only update rows that need normalization
@@ -95,8 +81,6 @@ WHERE
     OR last_polled_at LIKE '%-%-%T%'
     OR CAST(created_at AS INTEGER) > 10000000000
     OR created_at LIKE '%-%-%T%'
-    OR CAST(updated_at AS INTEGER) > 10000000000
-    OR updated_at LIKE '%-%-%T%'
   );
 
 -- Users table
