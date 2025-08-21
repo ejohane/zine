@@ -128,10 +128,37 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
       return c.json({ error: 'URL is required' }, 400)
     }
     
+    // Check for conditional request headers
+    const ifNoneMatch = c.req.header('If-None-Match')
+    const userId = c.req.header('x-user-id') // Optional user ID for authenticated previews
+    
     // Use the new optimized PreviewService
     const { PreviewService } = await import('./services/preview-service')
     const previewService = new PreviewService(c)
-    const result = await previewService.getPreview(url)
+    const result = await previewService.getPreviewWithCache(url, userId, ifNoneMatch)
+    
+    // Handle 304 Not Modified
+    if (result.notModified) {
+      c.status(304)
+      if (result.cacheControl) {
+        c.header('Cache-Control', result.cacheControl)
+      }
+      if (result.etag) {
+        c.header('ETag', result.etag)
+      }
+      return c.body(null)
+    }
+    
+    // Set cache headers
+    if (result.cacheControl) {
+      c.header('Cache-Control', result.cacheControl)
+    }
+    if (result.etag) {
+      c.header('ETag', result.etag)
+    }
+    if (result.lastModified) {
+      c.header('Last-Modified', result.lastModified)
+    }
     
     if (!result.success) {
       return c.json({ 

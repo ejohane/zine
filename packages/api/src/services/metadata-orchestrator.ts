@@ -10,6 +10,9 @@ export interface OrchestrationResult {
   cached: boolean
   provider: string
   extractionTime: number
+  cacheControl?: string
+  etag?: string
+  lastModified?: string
 }
 
 interface RetryConfig {
@@ -26,6 +29,24 @@ export class MetadataOrchestrator {
     baseDelay: 1000,
     maxDelay: 10000
   }
+  
+  // In-memory cache for the current request lifecycle
+  private memoryCache = new Map<string, {
+    data: any
+    timestamp: number
+    etag: string
+  }>()
+  
+  // Cache configuration
+  private readonly CACHE_TTL = {
+    database: 86400000, // 24 hours
+    native_api: 3600000, // 1 hour
+    oembed: 3600000, // 1 hour
+    html_scrape: 1800000, // 30 minutes
+    minimal: 600000 // 10 minutes
+  }
+  
+  private readonly STALE_WHILE_REVALIDATE = 300000 // 5 minutes
 
   constructor(env: Env) {
     this.spotifyService = new SpotifyMetadataService(env)
@@ -39,6 +60,7 @@ export class MetadataOrchestrator {
     const startTime = Date.now()
     const normalized = normalizeUrl(url)
     const platform = detectPlatform(url)
+    const cacheKey = `${normalized.normalized}:${userId || 'anonymous'}`
 
     console.log('[MetadataOrchestrator] Starting extraction for:', {
       url,
@@ -48,16 +70,44 @@ export class MetadataOrchestrator {
       hasExisting: !!existingMetadata
     })
 
-    // 1. Return database metadata if available
-    if (existingMetadata) {
-      console.log('[MetadataOrchestrator] Using existing database metadata')
+    // Check memory cache first
+    const cachedData = this.memoryCache.get(cacheKey)
+    if (cachedData && (Date.now() - cachedData.timestamp) < this.CACHE_TTL.database) {
+      console.log('[MetadataOrchestrator] Using memory cache')
       return {
-        metadata: existingMetadata,
+        metadata: cachedData.data,
         source: 'database',
         cached: true,
         provider: platform,
-        extractionTime: Date.now() - startTime
+        extractionTime: 0,
+        cacheControl: this.getCacheControlHeader('database'),
+        etag: cachedData.etag
       }
+    }
+
+    // 1. Return database metadata if available
+    if (existingMetadata) {
+      console.log('[MetadataOrchestrator] Using existing database metadata')
+      const etag = this.generateEtag(existingMetadata)
+      const result = {
+        metadata: existingMetadata,
+        source: 'database' as const,
+        cached: true,
+        provider: platform,
+        extractionTime: Date.now() - startTime,
+        cacheControl: this.getCacheControlHeader('database'),
+        etag,
+        lastModified: new Date().toUTCString()
+      }
+      
+      // Store in memory cache
+      this.memoryCache.set(cacheKey, {
+        data: existingMetadata,
+        timestamp: Date.now(),
+        etag
+      })
+      
+      return result
     }
 
     // 2. Try native API with auth (if available)
@@ -65,12 +115,24 @@ export class MetadataOrchestrator {
       const nativeResult = await this.tryNativeApi(normalized.normalized, platform, userId)
       if (nativeResult) {
         console.log('[MetadataOrchestrator] Successfully extracted via native API')
+        const etag = this.generateEtag(nativeResult)
+        
+        // Cache the result
+        this.memoryCache.set(cacheKey, {
+          data: nativeResult,
+          timestamp: Date.now(),
+          etag
+        })
+        
         return {
           metadata: nativeResult,
           source: 'native_api',
           cached: false,
           provider: platform,
-          extractionTime: Date.now() - startTime
+          extractionTime: Date.now() - startTime,
+          cacheControl: this.getCacheControlHeader('native_api'),
+          etag,
+          lastModified: new Date().toUTCString()
         }
       }
     }
@@ -79,12 +141,24 @@ export class MetadataOrchestrator {
     const oembedResult = await this.tryOEmbed(normalized.normalized, platform)
     if (oembedResult) {
       console.log('[MetadataOrchestrator] Successfully extracted via oEmbed')
+      const etag = this.generateEtag(oembedResult)
+      
+      // Cache the result
+      this.memoryCache.set(cacheKey, {
+        data: oembedResult,
+        timestamp: Date.now(),
+        etag
+      })
+      
       return {
         metadata: oembedResult,
         source: 'oembed',
         cached: false,
         provider: platform,
-        extractionTime: Date.now() - startTime
+        extractionTime: Date.now() - startTime,
+        cacheControl: this.getCacheControlHeader('oembed'),
+        etag,
+        lastModified: new Date().toUTCString()
       }
     }
 
@@ -92,23 +166,41 @@ export class MetadataOrchestrator {
     const htmlResult = await this.tryHtmlScraping(normalized.normalized)
     if (htmlResult) {
       console.log('[MetadataOrchestrator] Successfully extracted via HTML scraping')
+      const etag = this.generateEtag(htmlResult)
+      
+      // Cache the result
+      this.memoryCache.set(cacheKey, {
+        data: htmlResult,
+        timestamp: Date.now(),
+        etag
+      })
+      
       return {
         metadata: htmlResult,
         source: 'html_scrape',
         cached: false,
         provider: platform,
-        extractionTime: Date.now() - startTime
+        extractionTime: Date.now() - startTime,
+        cacheControl: this.getCacheControlHeader('html_scrape'),
+        etag,
+        lastModified: new Date().toUTCString()
       }
     }
 
     // 5. Return minimal metadata as final fallback
     console.log('[MetadataOrchestrator] All extraction methods failed, returning minimal metadata')
+    const minimalMetadata = this.createMinimalMetadata(normalized.normalized, platform)
+    const etag = this.generateEtag(minimalMetadata)
+    
     return {
-      metadata: this.createMinimalMetadata(normalized.normalized, platform),
+      metadata: minimalMetadata,
       source: 'minimal',
       cached: false,
       provider: platform,
-      extractionTime: Date.now() - startTime
+      extractionTime: Date.now() - startTime,
+      cacheControl: this.getCacheControlHeader('minimal'),
+      etag,
+      lastModified: new Date().toUTCString()
     }
   }
 
@@ -358,6 +450,99 @@ export class MetadataOrchestrator {
       // Record failure if it was a native API failure
       this.recordFailure(service)
       throw error
+    }
+  }
+
+  /**
+   * Generate cache control header based on source
+   */
+  private getCacheControlHeader(source: keyof typeof this.CACHE_TTL): string {
+    const maxAge = Math.floor(this.CACHE_TTL[source] / 1000)
+    const staleWhileRevalidate = Math.floor(this.STALE_WHILE_REVALIDATE / 1000)
+    return `public, max-age=${maxAge}, stale-while-revalidate=${staleWhileRevalidate}`
+  }
+
+  /**
+   * Generate ETag for metadata
+   */
+  private generateEtag(metadata: any): string {
+    // Simple hash function for ETag generation
+    const str = JSON.stringify(metadata)
+    let hash = 0
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i)
+      hash = ((hash << 5) - hash) + char
+      hash = hash & hash // Convert to 32-bit integer
+    }
+    return `"${Math.abs(hash).toString(16)}"`
+  }
+
+  /**
+   * Implement stale-while-revalidate pattern
+   */
+  async extractWithStaleWhileRevalidate(
+    url: string,
+    userId?: string,
+    existingMetadata?: any,
+    ifNoneMatch?: string
+  ): Promise<OrchestrationResult & { notModified?: boolean }> {
+    const result = await this.extractWithCircuitBreaker(url, userId, existingMetadata)
+    
+    // Check if client has the same version (ETag match)
+    if (ifNoneMatch && result.etag === ifNoneMatch) {
+      return {
+        ...result,
+        notModified: true
+      }
+    }
+    
+    // If data is stale but within revalidation window, return stale data
+    // and trigger background refresh
+    if (result.cached && result.source === 'database') {
+      const cacheKey = `${url}:${userId || 'anonymous'}`
+      const cachedData = this.memoryCache.get(cacheKey)
+      
+      if (cachedData) {
+        const age = Date.now() - cachedData.timestamp
+        const maxAge = this.CACHE_TTL[result.source]
+        
+        if (age > maxAge && age < maxAge + this.STALE_WHILE_REVALIDATE) {
+          // Return stale data immediately
+          console.log('[MetadataOrchestrator] Serving stale data while revalidating')
+          
+          // Trigger background refresh (non-blocking)
+          this.backgroundRefresh(url, userId).catch(error => {
+            console.error('[MetadataOrchestrator] Background refresh failed:', error)
+          })
+          
+          return {
+            ...result,
+            cacheControl: `public, max-age=0, stale-while-revalidate=${Math.floor(this.STALE_WHILE_REVALIDATE / 1000)}`
+          }
+        }
+      }
+    }
+    
+    return result
+  }
+
+  /**
+   * Background refresh for stale-while-revalidate
+   */
+  private async backgroundRefresh(url: string, userId?: string): Promise<void> {
+    console.log('[MetadataOrchestrator] Starting background refresh for:', url)
+    
+    try {
+      // Clear from memory cache to force fresh fetch
+      const normalized = normalizeUrl(url)
+      const cacheKey = `${normalized.normalized}:${userId || 'anonymous'}`
+      this.memoryCache.delete(cacheKey)
+      
+      // Fetch fresh data
+      await this.extract(url, userId)
+      console.log('[MetadataOrchestrator] Background refresh completed for:', url)
+    } catch (error) {
+      console.error('[MetadataOrchestrator] Background refresh error:', error)
     }
   }
 }

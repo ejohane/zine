@@ -36,6 +36,10 @@ export interface PreviewResponse {
     databaseLookupTime?: number
     externalApiTime?: number
   }
+  cacheControl?: string
+  etag?: string
+  lastModified?: string
+  notModified?: boolean
 }
 
 export class PreviewService {
@@ -163,6 +167,106 @@ export class PreviewService {
     }
   }
   
+  /**
+   * Get preview with cache support (including ETags)
+   */
+  async getPreviewWithCache(url: string, userId?: string, ifNoneMatch?: string): Promise<PreviewResponse> {
+    const startTime = Date.now()
+    let databaseLookupTime: number | undefined
+    let externalApiTime: number | undefined
+    
+    try {
+      // Step 1: Normalize URL
+      const normalized = normalizeUrl(url)
+      
+      // Step 2: Check database first
+      const dbStartTime = Date.now()
+      const existingMetadata = await this.metadataRepo.findByUrl(url)
+      databaseLookupTime = Date.now() - dbStartTime
+      
+      // Step 3: Use orchestrator with stale-while-revalidate support
+      const apiStartTime = Date.now()
+      const orchestrationResult = await this.orchestrator.extractWithStaleWhileRevalidate(
+        url,
+        userId,
+        existingMetadata,
+        ifNoneMatch
+      )
+      externalApiTime = Date.now() - apiStartTime
+      
+      // Handle 304 Not Modified
+      if (orchestrationResult.notModified) {
+        return {
+          success: true,
+          source: orchestrationResult.source === 'database' ? 'database' : 
+                  orchestrationResult.source === 'native_api' ? 'native_api' :
+                  orchestrationResult.source === 'oembed' ? 'oembed' : 'scraper',
+          cached: true,
+          provider: orchestrationResult.provider,
+          notModified: true,
+          cacheControl: orchestrationResult.cacheControl,
+          etag: orchestrationResult.etag,
+          performanceMetrics: {
+            totalTime: Date.now() - startTime,
+            databaseLookupTime,
+            externalApiTime
+          }
+        }
+      }
+      
+      const metadata = orchestrationResult.metadata
+      
+      // Transform to preview response format
+      return {
+        success: true,
+        metadata: {
+          url: url,
+          normalizedUrl: normalized.normalized,
+          title: metadata.title,
+          description: metadata.description,
+          imageUrl: metadata.thumbnailUrl,
+          thumbnailUrl: metadata.thumbnailUrl,
+          faviconUrl: metadata.faviconUrl,
+          publishedAt: metadata.publishedAt,
+          author: metadata.articleMetadata?.authorName || metadata.creator?.name,
+          provider: metadata.source,
+          duration: metadata.videoMetadata?.duration || metadata.podcastMetadata?.duration,
+          viewCount: metadata.videoMetadata?.viewCount,
+          platform: normalized.platform,
+          language: metadata.language,
+          contentType: metadata.contentType,
+          creator: metadata.creator
+        },
+        source: orchestrationResult.source === 'database' ? 'database' : 
+                orchestrationResult.source === 'native_api' ? 'native_api' :
+                orchestrationResult.source === 'oembed' ? 'oembed' : 'scraper',
+        cached: orchestrationResult.cached,
+        provider: orchestrationResult.provider || normalized.platform || 'web',
+        cacheControl: orchestrationResult.cacheControl,
+        etag: orchestrationResult.etag,
+        lastModified: orchestrationResult.lastModified,
+        performanceMetrics: {
+          totalTime: Date.now() - startTime,
+          databaseLookupTime,
+          externalApiTime
+        }
+      }
+      
+    } catch (error) {
+      return {
+        success: false,
+        source: 'scraper',
+        cached: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        performanceMetrics: {
+          totalTime: Date.now() - startTime,
+          databaseLookupTime,
+          externalApiTime
+        }
+      }
+    }
+  }
+
   /**
    * Batch preview for multiple URLs (optimized for performance)
    */
