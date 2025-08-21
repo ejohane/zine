@@ -22,6 +22,23 @@ export interface FeedItem {
   category?: string
   tags?: string // JSON array
   
+  // Phase 2: Creator/Channel Information
+  creatorId?: string
+  creatorName?: string
+  creatorThumbnail?: string
+  creatorVerified?: boolean
+  creatorSubscriberCount?: number // YouTube
+  creatorFollowerCount?: number // Spotify
+  
+  // Phase 2: Series/Show Context
+  seriesMetadata?: string // JSON object
+  seriesId?: string
+  seriesName?: string
+  episodeNumber?: number
+  seasonNumber?: number
+  totalEpisodesInSeries?: number
+  isLatestEpisode?: boolean
+  
   createdAt: Date
 }
 

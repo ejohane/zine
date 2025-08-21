@@ -16,7 +16,7 @@ export class BatchDatabaseOperations {
   // NOTE: Some queries (like getRecentFeedItemIds) may need even lower limits
   // due to complex WHERE clauses with multiple parameters
   private static readonly SQLITE_MAX_VARIABLES = 250
-  private static readonly VARIABLES_PER_FEED_ITEM = 18 // Number of columns in feed_items insert (including new Phase 1 fields)
+  private static readonly VARIABLES_PER_FEED_ITEM = 31 // Number of columns in feed_items insert (including Phase 1 & 2 fields)
   private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
   private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
   private static readonly SAFETY_BUFFER = 10 // Safety buffer to ensure we never exceed the limit
@@ -144,6 +144,23 @@ export class BatchDatabaseOperations {
           contentType: (feedItem as any).contentType || null,
           category: (feedItem as any).category || null,
           tags: (feedItem as any).tags || null,
+          
+          // Phase 2: Creator/Channel Information
+          creatorId: (feedItem as any).creatorId || null,
+          creatorName: (feedItem as any).creatorName || null,
+          creatorThumbnail: (feedItem as any).creatorThumbnail || null,
+          creatorVerified: (feedItem as any).creatorVerified ? 1 : 0,
+          creatorSubscriberCount: (feedItem as any).creatorSubscriberCount || null,
+          creatorFollowerCount: (feedItem as any).creatorFollowerCount || null,
+          
+          // Phase 2: Series/Show Context
+          seriesMetadata: (feedItem as any).seriesMetadata || null,
+          seriesId: (feedItem as any).seriesId || null,
+          seriesName: (feedItem as any).seriesName || null,
+          episodeNumber: (feedItem as any).episodeNumber || null,
+          seasonNumber: (feedItem as any).seasonNumber || null,
+          totalEpisodesInSeries: (feedItem as any).totalEpisodesInSeries || null,
+          isLatestEpisode: (feedItem as any).isLatestEpisode ? 1 : 0,
           
           createdAt: now.getTime()
         })

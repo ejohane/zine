@@ -316,6 +316,9 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
     for (const { channel, videos } of channelsWithVideos) {
       const subscription = subscriptionsByChannelId.get(channel.id)
       if (!subscription) continue
+      
+      // Extract channel information for creator metadata
+      const channelStats = channel as ChannelWithStats
 
       const newItems: FeedItem[] = videos.map(video => {
         // Determine content type based on duration and live status
@@ -358,6 +361,14 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
           contentType,
           category: video.snippet.categoryId,
           tags: video.snippet.tags ? JSON.stringify(video.snippet.tags) : undefined,
+          
+          // Phase 2: Creator/Channel Information
+          creatorId: channelStats.id,
+          creatorName: channelStats.snippet.title,
+          creatorThumbnail: channelStats.snippet.thumbnails?.default?.url,
+          creatorVerified: channelStats.status?.isLinked || false,
+          creatorSubscriberCount: channelStats.statistics?.subscriberCount ? 
+            parseInt(channelStats.statistics.subscriberCount) : undefined,
           
           createdAt: new Date()
         } as FeedItem

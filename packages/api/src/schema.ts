@@ -92,6 +92,18 @@ export const subscriptions = sqliteTable('subscriptions', {
   uploadsPlaylistId: text('uploads_playlist_id'),          // NEW: Cache playlist ID
   etag: text('etag'),                                      // NEW: For ETag caching
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
+  
+  // Phase 2: Richer channel/show data
+  subscriberCount: integer('subscriber_count'),
+  isVerified: integer('is_verified', { mode: 'boolean' }).default(false),
+  contentCategories: text('content_categories'), // JSON array
+  primaryLanguage: text('primary_language'),
+  averageDuration: integer('average_duration'), // seconds
+  uploadFrequency: text('upload_frequency'), // 'daily', 'weekly', 'monthly'
+  lastContentDate: integer('last_content_date', { mode: 'timestamp' }),
+  totalContentCount: integer('total_content_count'),
+  channelMetadata: text('channel_metadata'), // JSON for platform-specific data
+  
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
@@ -129,6 +141,23 @@ export const feedItems = sqliteTable('feed_items', {
   contentType: text('content_type'), // 'video', 'podcast', 'short', 'live'
   category: text('category'),
   tags: text('tags'), // JSON array
+  
+  // Phase 2: Creator/Channel Information
+  creatorId: text('creator_id'),
+  creatorName: text('creator_name'),
+  creatorThumbnail: text('creator_thumbnail'),
+  creatorVerified: integer('creator_verified', { mode: 'boolean' }).default(false),
+  creatorSubscriberCount: integer('creator_subscriber_count'), // YouTube
+  creatorFollowerCount: integer('creator_follower_count'), // Spotify
+  
+  // Phase 2: Series/Show Context
+  seriesMetadata: text('series_metadata'), // JSON object
+  seriesId: text('series_id'),
+  seriesName: text('series_name'),
+  episodeNumber: integer('episode_number'),
+  seasonNumber: integer('season_number'),
+  totalEpisodesInSeries: integer('total_episodes_in_series'),
+  isLatestEpisode: integer('is_latest_episode', { mode: 'boolean' }).default(false),
   
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })

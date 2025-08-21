@@ -223,7 +223,7 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
       const subscription = subscriptionsByExternalId.get(show.id)
       if (!subscription) continue
 
-      const newItems: FeedItem[] = episodes.map(episode => ({
+      const newItems: FeedItem[] = episodes.map((episode, index) => ({
         id: `spotify-${episode.id}`,
         subscriptionId: subscription.id,
         externalId: episode.id,
@@ -246,6 +246,20 @@ export class SpotifyBatchProcessor extends BaseBatchProcessor {
         contentType: 'podcast',
         category: show.category || 'podcast',
         tags: undefined, // Spotify doesn't provide tags for episodes
+        
+        // Phase 2: Creator/Publisher Information
+        creatorId: show.id,
+        creatorName: show.publisher,
+        creatorThumbnail: show.images?.[0]?.url,
+        creatorVerified: false, // Spotify doesn't provide verification for podcasts
+        creatorFollowerCount: undefined, // Not available for podcasts
+        
+        // Phase 2: Series/Episode Context
+        seriesId: show.id,
+        seriesName: show.name,
+        episodeNumber: episode.episode_number,
+        totalEpisodesInSeries: show.total_episodes,
+        isLatestEpisode: index === 0, // First episode in list is usually latest
         
         createdAt: new Date()
       }))

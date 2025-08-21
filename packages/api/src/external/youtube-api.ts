@@ -10,10 +10,22 @@ export interface YouTubeChannel {
     }
     publishedAt: string
     customUrl?: string
+    country?: string
+    defaultLanguage?: string
   }
   statistics?: {
     subscriberCount: string
     videoCount: string
+    viewCount?: string
+    hiddenSubscriberCount?: boolean
+  }
+  status?: {
+    isLinked?: boolean
+    longUploadsStatus?: string
+    madeForKids?: boolean
+  }
+  topicDetails?: {
+    topicCategories?: string[]
   }
 }
 
