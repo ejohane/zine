@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1751912379959,
-      "tag": "0000_bent_expediter",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1753650855911,
-      "tag": "0001_plain_ma_gnuci",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1754268945264,
-      "tag": "0002_flaky_doctor_spectrum",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1754390924581,
-      "tag": "0003_exotic_maximus",
+      "when": 1755890908225,
+      "tag": "0000_broken_wasp",
       "breakpoints": true
     }
   ]
