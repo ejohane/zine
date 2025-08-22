@@ -56,7 +56,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: packages/api
-          command: d1 migrations apply zine-db-production --env production
+          command: d1 migrations apply zine-db-production --env production --remote
           
       - name: Set Clerk Secret (Production)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
