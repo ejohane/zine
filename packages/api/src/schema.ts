@@ -1,6 +1,10 @@
 import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
+// ============================================================================
+// EXISTING TABLES (unchanged)
+// ============================================================================
+
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),                    // Clerk user ID
   email: text('email').notNull(),                 // Primary email from Clerk
@@ -25,35 +29,6 @@ export const creators = sqliteTable('creators', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
 
-export const bookmarks = sqliteTable('bookmarks', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  userId: text('user_id').notNull().references(() => users.id),
-  url: text('url').notNull(),                        // Normalized canonical URL
-  originalUrl: text('original_url').notNull(),       // Original URL as submitted
-  title: text('title').notNull(),
-  description: text('description'),
-  source: text('source'),                            // Platform enum (youtube, spotify, etc.)
-  contentType: text('content_type'),                 // Content type enum (video, article, etc.)
-  thumbnailUrl: text('thumbnail_url'),
-  faviconUrl: text('favicon_url'),
-  publishedAt: integer('published_at', { mode: 'timestamp' }), // Original publish date
-  language: text('language'),
-  status: text('status').notNull().default('active'), // active, archived, deleted
-  creatorId: text('creator_id'),                      // FK to creators table
-  
-  // Extended metadata (JSON fields)
-  videoMetadata: text('video_metadata'),              // {duration, view_count}
-  podcastMetadata: text('podcast_metadata'),          // {episode_title, episode_number, series_name, duration}
-  articleMetadata: text('article_metadata'),          // {author_name, word_count, reading_time}
-  postMetadata: text('post_metadata'),                // {post_text, like_count, repost_count}
-  
-  // Standard fields
-  tags: text('tags'),                                 // JSON array
-  notes: text('notes'),                               // User notes
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-})
-
 // Subscription providers (spotify, youtube)
 export const subscriptionProviders = sqliteTable('subscription_providers', {
   id: text('id').primaryKey(),
@@ -68,10 +43,6 @@ export const userAccounts = sqliteTable('user_accounts', {
   userId: text('user_id').notNull().references(() => users.id),
   providerId: text('provider_id').notNull().references(() => subscriptionProviders.id),
   externalAccountId: text('external_account_id').notNull(),
-  // Tokens are now stored in Durable Objects, not in the database
-  // accessToken: text('access_token').notNull(), // REMOVED - stored in DO
-  // refreshToken: text('refresh_token'), // REMOVED - stored in DO
-  // expiresAt: integer('expires_at', { mode: 'timestamp' }), // REMOVED - stored in DO
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
@@ -88,9 +59,9 @@ export const subscriptions = sqliteTable('subscriptions', {
   thumbnailUrl: text('thumbnail_url'),
   subscriptionUrl: text('subscription_url'),
   totalEpisodes: integer('total_episodes'),
-  videoCount: integer('video_count'),                     // NEW: For YouTube change detection
-  uploadsPlaylistId: text('uploads_playlist_id'),          // NEW: Cache playlist ID
-  etag: text('etag'),                                      // NEW: For ETag caching
+  videoCount: integer('video_count'),                     // For YouTube change detection
+  uploadsPlaylistId: text('uploads_playlist_id'),          // Cache playlist ID
+  etag: text('etag'),                                      // For ETag caching
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
   
   // Phase 2: Richer channel/show data
@@ -120,85 +91,6 @@ export const userSubscriptions = sqliteTable('user_subscriptions', {
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-})
-
-// Feed items (episodes, videos)
-export const feedItems = sqliteTable('feed_items', {
-  id: text('id').primaryKey(),
-  subscriptionId: text('subscription_id').notNull().references(() => subscriptions.id),
-  externalId: text('external_id').notNull(),
-  title: text('title').notNull(),
-  description: text('description'),
-  thumbnailUrl: text('thumbnail_url'),
-  publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(),
-  durationSeconds: integer('duration_seconds'),
-  externalUrl: text('external_url').notNull(),
-  
-  // Phase 1: Engagement metrics
-  viewCount: integer('view_count'),
-  likeCount: integer('like_count'),
-  commentCount: integer('comment_count'),
-  popularityScore: integer('popularity_score'), // 0-100 normalized
-  
-  // Phase 1: Classification fields
-  language: text('language'),
-  isExplicit: integer('is_explicit', { mode: 'boolean' }).default(false),
-  contentType: text('content_type'), // 'video', 'podcast', 'short', 'live'
-  category: text('category'),
-  tags: text('tags'), // JSON array
-  
-  // Phase 2: Creator/Channel Information
-  creatorId: text('creator_id'),
-  creatorName: text('creator_name'),
-  creatorThumbnail: text('creator_thumbnail'),
-  creatorVerified: integer('creator_verified', { mode: 'boolean' }).default(false),
-  creatorSubscriberCount: integer('creator_subscriber_count'), // YouTube
-  creatorFollowerCount: integer('creator_follower_count'), // Spotify
-  
-  // Phase 2: Series/Show Context
-  seriesMetadata: text('series_metadata'), // JSON object
-  seriesId: text('series_id'),
-  seriesName: text('series_name'),
-  episodeNumber: integer('episode_number'),
-  seasonNumber: integer('season_number'),
-  totalEpisodesInSeries: integer('total_episodes_in_series'),
-  isLatestEpisode: integer('is_latest_episode', { mode: 'boolean' }).default(false),
-  
-  // Phase 3: Technical metadata
-  hasCaptions: integer('has_captions', { mode: 'boolean' }).default(false),
-  hasHd: integer('has_hd', { mode: 'boolean' }).default(false),
-  videoQuality: text('video_quality'), // '1080p', '4K', etc.
-  hasTranscript: integer('has_transcript', { mode: 'boolean' }).default(false),
-  audioLanguages: text('audio_languages'), // JSON array of ISO 639-1 codes
-  audioQuality: text('audio_quality'), // 'high', 'medium', 'low'
-  
-  // Phase 3: Aggregated metadata
-  statisticsMetadata: text('statistics_metadata'), // JSON object for engagement metrics
-  technicalMetadata: text('technical_metadata'), // JSON object for technical details
-  
-  // Phase 3: Calculated metrics
-  engagementRate: integer('engagement_rate'), // stored as integer (rate * 10000) for precision
-  trendingScore: integer('trending_score'), // 0-100 score
-  
-  // Phase 4: Cross-platform matching fields
-  contentFingerprint: text('content_fingerprint'), // Unique content identifier
-  publisherCanonicalId: text('publisher_canonical_id'), // Unified publisher ID
-  crossPlatformMetadata: text('cross_platform_metadata'), // JSON object for matches
-  normalizedTitle: text('normalized_title'), // For fuzzy matching
-  episodeIdentifier: text('episode_identifier'), // Standardized episode ID
-  
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-})
-
-// User's read/unread state
-export const userFeedItems = sqliteTable('user_feed_items', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => users.id),
-  feedItemId: text('feed_item_id').notNull().references(() => feedItems.id),
-  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
-  bookmarkId: integer('bookmark_id').references(() => bookmarks.id),
-  readAt: integer('read_at', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
 // Token migration tracking
@@ -273,10 +165,165 @@ export const contentMatches = sqliteTable('content_matches', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 })
 
+// ============================================================================
+// NEW UNIFIED CONTENT MODEL TABLES
+// ============================================================================
+
+// Main content table - single source of truth for all content metadata
+export const content = sqliteTable('content', {
+  // Primary identification
+  id: text('id').primaryKey(), // Format: "{provider}-{external_id}"
+  externalId: text('external_id').notNull(),
+  provider: text('provider').notNull(), // 'youtube', 'spotify', 'twitter', 'web'
+
+  // Core metadata
+  url: text('url').notNull(),
+  canonicalUrl: text('canonical_url'), // Normalized URL
+  title: text('title').notNull(),
+  description: text('description'),
+  thumbnailUrl: text('thumbnail_url'),
+  faviconUrl: text('favicon_url'),
+  publishedAt: integer('published_at', { mode: 'timestamp' }),
+  durationSeconds: integer('duration_seconds'),
+
+  // Engagement metrics (Phase 1 fields)
+  viewCount: integer('view_count'),
+  likeCount: integer('like_count'),
+  commentCount: integer('comment_count'),
+  shareCount: integer('share_count'),
+  saveCount: integer('save_count'),
+  popularityScore: integer('popularity_score'), // 0-100 normalized
+  engagementRate: real('engagement_rate'), // Decimal 0-1
+  trendingScore: integer('trending_score'), // 0-100
+
+  // Creator/Publisher information (Phase 2 fields)
+  creatorId: text('creator_id'),
+  creatorName: text('creator_name'),
+  creatorHandle: text('creator_handle'),
+  creatorThumbnail: text('creator_thumbnail'),
+  creatorVerified: integer('creator_verified', { mode: 'boolean' }).default(false),
+  creatorSubscriberCount: integer('creator_subscriber_count'),
+  creatorFollowerCount: integer('creator_follower_count'),
+
+  // Series/Episode context (Phase 2 fields)
+  seriesId: text('series_id'),
+  seriesName: text('series_name'),
+  episodeNumber: integer('episode_number'),
+  seasonNumber: integer('season_number'),
+  totalEpisodesInSeries: integer('total_episodes_in_series'),
+  isLatestEpisode: integer('is_latest_episode', { mode: 'boolean' }).default(false),
+  seriesMetadata: text('series_metadata'), // JSON for additional series data
+
+  // Content classification (Phase 1 fields)
+  contentType: text('content_type'), // 'video', 'podcast', 'article', 'post', 'short', 'live'
+  category: text('category'),
+  subcategory: text('subcategory'),
+  language: text('language'), // ISO 639-1 code
+  isExplicit: integer('is_explicit', { mode: 'boolean' }).default(false),
+  ageRestriction: text('age_restriction'),
+  tags: text('tags'), // JSON array of content tags
+  topics: text('topics'), // JSON array of detected topics
+
+  // Technical metadata (Phase 3 fields)
+  hasCaptions: integer('has_captions', { mode: 'boolean' }).default(false),
+  hasTranscript: integer('has_transcript', { mode: 'boolean' }).default(false),
+  hasHd: integer('has_hd', { mode: 'boolean' }).default(false),
+  has4k: integer('has_4k', { mode: 'boolean' }).default(false),
+  videoQuality: text('video_quality'), // '480p', '720p', '1080p', '4K'
+  audioQuality: text('audio_quality'), // 'low', 'medium', 'high', 'lossless'
+  audioLanguages: text('audio_languages'), // JSON array of ISO 639-1 codes
+  captionLanguages: text('caption_languages'), // JSON array of ISO 639-1 codes
+
+  // Cross-platform matching (Phase 4 fields)
+  contentFingerprint: text('content_fingerprint'), // SHA-256 hash for matching
+  publisherCanonicalId: text('publisher_canonical_id'), // Unified publisher ID
+  normalizedTitle: text('normalized_title'), // For fuzzy matching
+  episodeIdentifier: text('episode_identifier'), // Standardized episode ID
+  crossPlatformMatches: text('cross_platform_matches'), // JSON array of matches
+
+  // Aggregated metadata objects for flexibility
+  statisticsMetadata: text('statistics_metadata'), // JSON: platform-specific stats
+  technicalMetadata: text('technical_metadata'), // JSON: platform-specific technical details
+  enrichmentMetadata: text('enrichment_metadata'), // JSON: API response data
+  extendedMetadata: text('extended_metadata'), // JSON: future expansion fields
+
+  // Tracking
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  lastEnrichedAt: integer('last_enriched_at', { mode: 'timestamp' }),
+  enrichmentVersion: integer('enrichment_version').default(1),
+  enrichmentSource: text('enrichment_source'), // 'api', 'oembed', 'opengraph', 'manual'
+})
+
+// Simplified bookmarks table - references content
+export const bookmarks = sqliteTable('bookmarks', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  contentId: text('content_id').notNull().references(() => content.id),
+
+  // User-specific data only
+  notes: text('notes'),
+  userTags: text('user_tags'), // JSON array of user's personal tags
+  collections: text('collections'), // JSON array of collection IDs
+  status: text('status').notNull().default('active'), // 'active', 'archived', 'deleted'
+  isFavorite: integer('is_favorite', { mode: 'boolean' }).default(false),
+  readProgress: integer('read_progress'), // Percentage for articles/videos
+
+  // User timestamps
+  bookmarkedAt: integer('bookmarked_at', { mode: 'timestamp' }).notNull(),
+  lastAccessedAt: integer('last_accessed_at', { mode: 'timestamp' }),
+  archivedAt: integer('archived_at', { mode: 'timestamp' }),
+})
+
+// Simplified feed_items table - references content
+export const feedItems = sqliteTable('feed_items', {
+  id: text('id').primaryKey(),
+  subscriptionId: text('subscription_id').notNull().references(() => subscriptions.id),
+  contentId: text('content_id').notNull().references(() => content.id),
+
+  // Feed-specific data only
+  addedToFeedAt: integer('added_to_feed_at', { mode: 'timestamp' }).notNull(),
+  positionInFeed: integer('position_in_feed'), // For maintaining feed order
+})
+
+// User feed interactions table
+export const userFeedItems = sqliteTable('user_feed_items', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  feedItemId: text('feed_item_id').notNull().references(() => feedItems.id),
+
+  // Interaction tracking
+  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+  isSaved: integer('is_saved', { mode: 'boolean' }).notNull().default(false),
+  isHidden: integer('is_hidden', { mode: 'boolean' }).notNull().default(false),
+  readAt: integer('read_at', { mode: 'timestamp' }),
+  savedAt: integer('saved_at', { mode: 'timestamp' }),
+  engagementTime: integer('engagement_time'), // Seconds spent
+
+  // Connection to bookmark if saved
+  bookmarkId: text('bookmark_id').references(() => bookmarks.id),
+
+  // Timestamps
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+})
+
+// ============================================================================
+// SCHEMAS AND TYPES
+// ============================================================================
+
+// User schemas
 export const insertUserSchema = createInsertSchema(users)
 export const selectUserSchema = createSelectSchema(users)
+
+// Creator schemas
 export const insertCreatorSchema = createInsertSchema(creators)
 export const selectCreatorSchema = createSelectSchema(creators)
+
+// Content schemas (new)
+export const insertContentSchema = createInsertSchema(content)
+export const selectContentSchema = createSelectSchema(content)
+
+// Bookmark schemas (updated)
 export const insertBookmarkSchema = createInsertSchema(bookmarks)
 export const selectBookmarkSchema = createSelectSchema(bookmarks)
 
@@ -289,25 +336,40 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions)
 export const selectSubscriptionSchema = createSelectSchema(subscriptions)
 export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions)
 export const selectUserSubscriptionSchema = createSelectSchema(userSubscriptions)
+
+// Feed schemas (updated)
 export const insertFeedItemSchema = createInsertSchema(feedItems)
 export const selectFeedItemSchema = createSelectSchema(feedItems)
 export const insertUserFeedItemSchema = createInsertSchema(userFeedItems)
 export const selectUserFeedItemSchema = createSelectSchema(userFeedItems)
+
+// Token migration schemas
 export const insertTokenMigrationStatusSchema = createInsertSchema(tokenMigrationStatus)
 export const selectTokenMigrationStatusSchema = createSelectSchema(tokenMigrationStatus)
+
+// Durable Object schemas
 export const insertDurableObjectStatusSchema = createInsertSchema(durableObjectStatus)
 export const selectDurableObjectStatusSchema = createSelectSchema(durableObjectStatus)
 export const insertDurableObjectMetricsSchema = createInsertSchema(durableObjectMetrics)
 export const selectDurableObjectMetricsSchema = createSelectSchema(durableObjectMetrics)
+
+// Publisher schemas
 export const insertPublishersSchema = createInsertSchema(publishers)
 export const selectPublishersSchema = createSelectSchema(publishers)
 export const insertContentMatchesSchema = createInsertSchema(contentMatches)
 export const selectContentMatchesSchema = createSelectSchema(contentMatches)
 
+// Type exports
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Creator = typeof creators.$inferSelect
 export type NewCreator = typeof creators.$inferInsert
+
+// Content types (new)
+export type Content = typeof content.$inferSelect
+export type NewContent = typeof content.$inferInsert
+
+// Bookmark types (updated)
 export type Bookmark = typeof bookmarks.$inferSelect
 export type NewBookmark = typeof bookmarks.$inferInsert
 
@@ -320,16 +382,24 @@ export type Subscription = typeof subscriptions.$inferSelect
 export type NewSubscription = typeof subscriptions.$inferInsert
 export type UserSubscription = typeof userSubscriptions.$inferSelect
 export type NewUserSubscription = typeof userSubscriptions.$inferInsert
+
+// Feed types (updated)
 export type FeedItem = typeof feedItems.$inferSelect
 export type NewFeedItem = typeof feedItems.$inferInsert
 export type UserFeedItem = typeof userFeedItems.$inferSelect
 export type NewUserFeedItem = typeof userFeedItems.$inferInsert
+
+// Token migration types
 export type TokenMigrationStatus = typeof tokenMigrationStatus.$inferSelect
 export type NewTokenMigrationStatus = typeof tokenMigrationStatus.$inferInsert
+
+// Durable Object types
 export type DurableObjectStatus = typeof durableObjectStatus.$inferSelect
 export type NewDurableObjectStatus = typeof durableObjectStatus.$inferInsert
 export type DurableObjectMetrics = typeof durableObjectMetrics.$inferSelect
 export type NewDurableObjectMetrics = typeof durableObjectMetrics.$inferInsert
+
+// Publisher types
 export type Publisher = typeof publishers.$inferSelect
 export type NewPublisher = typeof publishers.$inferInsert
 export type ContentMatch = typeof contentMatches.$inferSelect
