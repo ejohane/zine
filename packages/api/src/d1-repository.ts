@@ -14,19 +14,21 @@ export class D1BookmarkRepository implements BookmarkRepository {
       const result = await this.db.prepare(`
         SELECT 
           b.*,
-          c.id as creator_id,
-          c.name as creator_name,
-          c.handle as creator_handle,
-          c.avatar_url as creator_avatar_url,
-          c.bio as creator_bio,
-          c.url as creator_url,
-          c.platforms as creator_platforms,
-          c.external_links as creator_external_links,
-          c.created_at as creator_created_at,
-          c.updated_at as creator_updated_at
+          c.id as content_id,
+          c.url as content_url,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.favicon_url as content_favicon_url,
+          c.creator_id,
+          c.creator_name,
+          c.creator_handle,
+          c.creator_thumbnail as creator_avatar_url,
+          c.content_type,
+          c.published_at as content_published_at
         FROM bookmarks b
-        LEFT JOIN creators c ON b.creator_id = c.id
-        ORDER BY b.created_at DESC
+        LEFT JOIN content c ON b.content_id = c.id
+        ORDER BY b.bookmarked_at DESC
       `).all()
 
       return result.results.map(row => this.mapRowToBookmark(row))
@@ -41,18 +43,20 @@ export class D1BookmarkRepository implements BookmarkRepository {
       const result = await this.db.prepare(`
         SELECT 
           b.*,
-          c.id as creator_id,
-          c.name as creator_name,
-          c.handle as creator_handle,
-          c.avatar_url as creator_avatar_url,
-          c.bio as creator_bio,
-          c.url as creator_url,
-          c.platforms as creator_platforms,
-          c.external_links as creator_external_links,
-          c.created_at as creator_created_at,
-          c.updated_at as creator_updated_at
+          c.id as content_id,
+          c.url as content_url,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.favicon_url as content_favicon_url,
+          c.creator_id,
+          c.creator_name,
+          c.creator_handle,
+          c.creator_thumbnail as creator_avatar_url,
+          c.content_type,
+          c.published_at as content_published_at
         FROM bookmarks b
-        LEFT JOIN creators c ON b.creator_id = c.id
+        LEFT JOIN content c ON b.content_id = c.id
         WHERE b.id = ?
       `).bind(id).first()
 
@@ -71,36 +75,39 @@ export class D1BookmarkRepository implements BookmarkRepository {
     try {
       const now = Date.now()
       
+      // First, create or get content
+      const contentId = `web-${Buffer.from(bookmark.url || '').toString('base64').substring(0, 20)}`
+      
+      // Insert content if not exists
+      await this.db.prepare(`
+        INSERT OR IGNORE INTO content (
+          id, external_id, provider, url, canonical_url, title, description,
+          content_type, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        contentId,
+        contentId,
+        'web',
+        bookmark.url || '',
+        bookmark.url || '',
+        bookmark.title,
+        bookmark.description || null,
+        'article', // default content type
+        now,
+        now
+      ).run()
+      
       // Insert the bookmark
       const result = await this.db.prepare(`
         INSERT INTO bookmarks (
-          user_id, url, original_url, title, description, source, content_type,
-          thumbnail_url, favicon_url, published_at, language, status, creator_id,
-          video_metadata, podcast_metadata, article_metadata, post_metadata,
-          tags, notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          user_id, content_id, user_tags, status, bookmarked_at
+        ) VALUES (?, ?, ?, ?, ?)
         RETURNING *
       `).bind(
         bookmark.userId,
-        bookmark.url || '',
-        bookmark.url || '', // original_url same as url for basic create
-        bookmark.title,
-        bookmark.description || null,
-        null, // source
-        null, // content_type
-        null, // thumbnail_url
-        null, // favicon_url
-        null, // published_at
-        null, // language
-        'active', // status
-        null, // creator_id
-        null, // video_metadata
-        null, // podcast_metadata
-        null, // article_metadata
-        null, // post_metadata
+        contentId,
         bookmark.tags ? JSON.stringify(bookmark.tags) : null,
-        null, // notes
-        now,
+        'active',
         now
       ).first()
 
@@ -108,7 +115,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
         throw new Error('Failed to create bookmark - no result returned')
       }
 
-      return this.mapRowToBookmark(result)
+      // Get full bookmark with content
+      const fullBookmark = await this.getByIdAndUserId(String(result.id), bookmark.userId)
+      if (!fullBookmark) {
+        throw new Error('Failed to retrieve created bookmark')
+      }
+      return fullBookmark
     } catch (error) {
       console.error('Error creating bookmark:', error)
       throw new Error('Failed to create bookmark in database')
@@ -186,20 +198,22 @@ export class D1BookmarkRepository implements BookmarkRepository {
       const result = await this.db.prepare(`
         SELECT 
           b.*,
-          c.id as creator_id,
-          c.name as creator_name,
-          c.handle as creator_handle,
-          c.avatar_url as creator_avatar_url,
-          c.bio as creator_bio,
-          c.url as creator_url,
-          c.platforms as creator_platforms,
-          c.external_links as creator_external_links,
-          c.created_at as creator_created_at,
-          c.updated_at as creator_updated_at
+          c.id as content_id,
+          c.url as content_url,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.favicon_url as content_favicon_url,
+          c.creator_id,
+          c.creator_name,
+          c.creator_handle,
+          c.creator_thumbnail as creator_avatar_url,
+          c.content_type,
+          c.published_at as content_published_at
         FROM bookmarks b
-        LEFT JOIN creators c ON b.creator_id = c.id
+        LEFT JOIN content c ON b.content_id = c.id
         WHERE b.user_id = ?
-        ORDER BY b.created_at DESC
+        ORDER BY b.bookmarked_at DESC
       `).bind(userId).all()
 
       return result.results.map(row => this.mapRowToBookmark(row))
@@ -214,18 +228,20 @@ export class D1BookmarkRepository implements BookmarkRepository {
       const result = await this.db.prepare(`
         SELECT 
           b.*,
-          c.id as creator_id,
-          c.name as creator_name,
-          c.handle as creator_handle,
-          c.avatar_url as creator_avatar_url,
-          c.bio as creator_bio,
-          c.url as creator_url,
-          c.platforms as creator_platforms,
-          c.external_links as creator_external_links,
-          c.created_at as creator_created_at,
-          c.updated_at as creator_updated_at
+          c.id as content_id,
+          c.url as content_url,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.favicon_url as content_favicon_url,
+          c.creator_id,
+          c.creator_name,
+          c.creator_handle,
+          c.creator_thumbnail as creator_avatar_url,
+          c.content_type,
+          c.published_at as content_published_at
         FROM bookmarks b
-        LEFT JOIN creators c ON b.creator_id = c.id
+        LEFT JOIN content c ON b.content_id = c.id
         WHERE b.id = ? AND b.user_id = ?
       `).bind(id, userId).first()
 
@@ -341,35 +357,49 @@ export class D1BookmarkRepository implements BookmarkRepository {
         creatorId: bookmarkData.creatorId
       })
       
-      const result = await this.db.prepare(`
-        INSERT INTO bookmarks (
-          user_id, url, original_url, title, description, source, content_type,
-          thumbnail_url, favicon_url, published_at, language, status, creator_id,
-          video_metadata, podcast_metadata, article_metadata, post_metadata,
-          tags, notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING *
+      // Generate content ID based on provider or URL
+      const provider = bookmarkData.source || 'web'
+      const contentId = `${provider}-${Buffer.from(bookmarkData.url).toString('base64').substring(0, 20)}`
+      
+      // Insert or update content
+      await this.db.prepare(`
+        INSERT OR REPLACE INTO content (
+          id, external_id, provider, url, canonical_url, title, description,
+          thumbnail_url, favicon_url, published_at, content_type,
+          creator_id, creator_name, creator_handle,
+          created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        bookmarkData.userId,
+        contentId,
+        contentId,
+        provider,
         bookmarkData.url,
         bookmarkData.originalUrl,
         bookmarkData.title,
         bookmarkData.description || null,
-        bookmarkData.source || null,
-        bookmarkData.contentType || null,
         bookmarkData.thumbnailUrl || null,
         bookmarkData.faviconUrl || null,
         bookmarkData.publishedAt ? bookmarkData.publishedAt.getTime() : null,
-        bookmarkData.language || null,
-        bookmarkData.status || 'active',
+        bookmarkData.contentType || null,
         bookmarkData.creatorId || null,
-        bookmarkData.videoMetadata ? JSON.stringify(bookmarkData.videoMetadata) : null,
-        bookmarkData.podcastMetadata ? JSON.stringify(bookmarkData.podcastMetadata) : null,
-        bookmarkData.articleMetadata ? JSON.stringify(bookmarkData.articleMetadata) : null,
-        bookmarkData.postMetadata ? JSON.stringify(bookmarkData.postMetadata) : null,
+        null, // creator_name - would need to be passed separately
+        null, // creator_handle - would need to be passed separately
+        now,
+        now
+      ).run()
+      
+      // Insert bookmark
+      const result = await this.db.prepare(`
+        INSERT INTO bookmarks (
+          user_id, content_id, user_tags, notes, status, bookmarked_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        RETURNING *
+      `).bind(
+        bookmarkData.userId,
+        contentId,
         bookmarkData.tags ? JSON.stringify(bookmarkData.tags) : null,
         bookmarkData.notes || null,
-        now,
+        bookmarkData.status || 'active',
         now
       ).first()
 
@@ -377,7 +407,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
         throw new Error('Failed to create bookmark - no result returned')
       }
 
-      return this.mapRowToBookmark(result)
+      // Get full bookmark with content
+      const fullBookmark = await this.getByIdAndUserId(String(result.id), bookmarkData.userId)
+      if (!fullBookmark) {
+        throw new Error('Failed to retrieve created bookmark')
+      }
+      return fullBookmark
     } catch (error) {
       console.error('Error creating bookmark with metadata:', error)
       throw new Error('Failed to create bookmark with metadata in database')
@@ -388,29 +423,30 @@ export class D1BookmarkRepository implements BookmarkRepository {
    * Map database row to Bookmark object
    */
   private mapRowToBookmark(row: any): Bookmark {
+    // Map from new schema where content is separate
     const bookmark: Bookmark = {
       id: String(row.id),
       userId: row.user_id,
-      url: row.url,
-      originalUrl: row.original_url,
-      title: row.title,
-      description: row.description || undefined,
-      source: row.source || undefined,
+      url: row.content_url || '',
+      originalUrl: row.content_url || '',
+      title: row.content_title || '',
+      description: row.content_description || undefined,
+      source: undefined, // Not in new schema
       contentType: row.content_type || undefined,
-      thumbnailUrl: row.thumbnail_url || undefined,
-      faviconUrl: row.favicon_url || undefined,
-      publishedAt: row.published_at ? Number(row.published_at) : undefined,
-      language: row.language || undefined,
+      thumbnailUrl: row.content_thumbnail_url || undefined,
+      faviconUrl: row.content_favicon_url || undefined,
+      publishedAt: row.content_published_at ? Number(row.content_published_at) : undefined,
+      language: undefined, // Not in query result
       status: row.status || 'active',
       creatorId: row.creator_id || undefined,
-      videoMetadata: row.video_metadata ? JSON.parse(row.video_metadata) : undefined,
-      podcastMetadata: row.podcast_metadata ? JSON.parse(row.podcast_metadata) : undefined,
-      articleMetadata: row.article_metadata ? JSON.parse(row.article_metadata) : undefined,
-      postMetadata: row.post_metadata ? JSON.parse(row.post_metadata) : undefined,
-      tags: row.tags ? JSON.parse(row.tags) : undefined,
+      videoMetadata: undefined, // Not in new schema
+      podcastMetadata: undefined, // Not in new schema
+      articleMetadata: undefined, // Not in new schema
+      postMetadata: undefined, // Not in new schema
+      tags: row.user_tags ? JSON.parse(row.user_tags) : undefined,
       notes: row.notes || undefined,
-      createdAt: Number(row.created_at),
-      updatedAt: Number(row.updated_at)
+      createdAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
+      updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now()
     }
 
     // Add creator if present
@@ -420,12 +456,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
         name: row.creator_name,
         handle: row.creator_handle || undefined,
         avatarUrl: row.creator_avatar_url || undefined,
-        bio: row.creator_bio || undefined,
-        url: row.creator_url || undefined,
-        platforms: row.creator_platforms ? JSON.parse(row.creator_platforms) : undefined,
-        externalLinks: row.creator_external_links ? JSON.parse(row.creator_external_links) : undefined,
-        createdAt: row.creator_created_at ? Number(row.creator_created_at) : undefined,
-        updatedAt: row.creator_updated_at ? Number(row.creator_updated_at) : undefined
+        bio: undefined, // Not in content table
+        url: undefined, // Not in content table
+        platforms: undefined, // Not in content table
+        externalLinks: undefined, // Not in content table
+        createdAt: undefined,
+        updatedAt: undefined
       }
     }
 
