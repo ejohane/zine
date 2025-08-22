@@ -7,6 +7,8 @@ export * from './metadata-extractor'
 export * from './enhanced-metadata-extractor'
 export * from './bookmark-save-service'
 export * from './creator-service'
+export * from './content-enrichment-service'
+export * from './integrated-enrichment-service'
 
 // Subscription system exports
 export * from './repositories/subscription-repository'

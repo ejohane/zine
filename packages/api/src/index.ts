@@ -186,6 +186,7 @@ app.use('/api/v1/bookmarks/*', authMiddleware)
 app.use('/api/v1/accounts/*', authMiddleware)
 app.use('/api/v1/subscriptions/*', authMiddleware)
 app.use('/api/v1/feed/*', authMiddleware)
+app.use('/api/v1/enriched-bookmarks/*', authMiddleware)
 
 // Apply auth middleware only to specific auth endpoints (not callbacks)
 app.use('/api/v1/auth/*/connect', authMiddleware)
@@ -1316,7 +1317,7 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
   return c.json({ message: result.message })
 })
 
-// New save endpoint
+// New save endpoint with enhanced API enrichment
 app.post('/api/v1/bookmarks/save', async (c) => {
   const { bookmarkSaveService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)
@@ -1339,6 +1340,9 @@ app.post('/api/v1/bookmarks/save', async (c) => {
       userId: auth.userId
     }
     
+
+    
+    // Fall back to regular save if API enrichment not used or failed
     const result = await bookmarkSaveService.saveBookmark(saveData, auth.userId)
     
     if (!result.success) {
@@ -1401,6 +1405,10 @@ app.use('/api/v1/user-state/*', authMiddleware)
 
 // Mount user state routes (imported at top of file)
 app.route('/api/v1/user-state', userStateRoutes)
+
+// Mount enriched bookmarks routes
+import { enrichedBookmarksRoutes } from './routes/enriched-bookmarks'
+app.route('/api/v1/enriched-bookmarks', enrichedBookmarksRoutes)
 
 // Scheduled event handler for cron triggers
 export default {
