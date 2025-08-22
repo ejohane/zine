@@ -416,10 +416,13 @@ export class OptimizedFeedPollingService {
     if (subscribedUserIds.length === 0) return 0
 
     // Use batch operations to create user feed items
-    await this.batchOps.batchCreateUserFeedItems(
-      subscribedUserIds,
-      newFeedItems
-    )
+    // Note: batchInsertUserFeedItems expects a single userId and array of feedItemIds
+    for (const userId of subscribedUserIds) {
+      await this.batchOps.batchInsertUserFeedItems(
+        userId,
+        newFeedItems.map(item => item.id)
+      )
+    }
     this.dbQueryCount++
     
     return subscribedUserIds.length

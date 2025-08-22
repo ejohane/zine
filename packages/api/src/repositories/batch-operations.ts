@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, inArray, or, gt } from 'drizzle-orm'
+import { eq, and, inArray, gt, sql } from 'drizzle-orm'
 import * as schema from '../schema'
 import { FeedItem } from '@zine/shared'
 
@@ -16,8 +16,9 @@ export class BatchDatabaseOperations {
   // NOTE: Some queries (like getRecentFeedItemIds) may need even lower limits
   // due to complex WHERE clauses with multiple parameters
   private static readonly SQLITE_MAX_VARIABLES = 250
-  private static readonly VARIABLES_PER_FEED_ITEM = 31 // Number of columns in feed_items insert (including Phase 1 & 2 fields)
-  private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert (id, userId, feedItemId, isRead, bookmarkId, readAt, createdAt)
+  private static readonly VARIABLES_PER_CONTENT_ITEM = 50 // Approximate number of columns in content table
+  private static readonly VARIABLES_PER_FEED_ITEM = 5 // Number of columns in feed_items insert
+  private static readonly VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert
   private static readonly VARIABLES_PER_CONDITION = 2 // subscriptionId + externalId per condition
   private static readonly SAFETY_BUFFER = 10 // Safety buffer to ensure we never exceed the limit
 
@@ -55,26 +56,35 @@ export class BatchDatabaseOperations {
       console.log(`[BatchOps:checkExistingFeedItems] Processing chunk ${chunkNum}/${totalChunks} with ${chunk.length} items`)
       
       try {
-        // Create conditions for this chunk
-        const conditions = chunk.map(item => 
-          and(
-            eq(schema.feedItems.subscriptionId, item.subscriptionId),
-            eq(schema.feedItems.externalId, item.externalId)
-          )
-        )
+        // Build a list of content IDs to look for based on provider and externalId
+        // Since content.id is in format "{provider}-{external_id}", we can construct it
+        const contentIds = chunk.map(item => {
+          // Determine provider from subscriptionId format
+          const provider = item.subscriptionId.startsWith('spotify:') ? 'spotify' : 
+                          item.subscriptionId.startsWith('youtube:') ? 'youtube' : 
+                          'unknown'
+          return `${provider}-${item.externalId}`
+        })
         
-        // Query this chunk
+        // Query with join to get both feed items and content
         const existingItems = await this.db
-          .select()
+          .select({
+            feedItem: schema.feedItems,
+            content: schema.content
+          })
           .from(schema.feedItems)
-          .where(or(...conditions))
+          .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+          .where(and(
+            inArray(schema.feedItems.subscriptionId, chunk.map(c => c.subscriptionId)),
+            inArray(schema.content.id, contentIds)
+          ))
         
         console.log(`[BatchOps:checkExistingFeedItems] Chunk ${chunkNum} found ${existingItems.length} existing items`)
         
         // Add to map
         for (const item of existingItems) {
-          const key = `${item.subscriptionId}-${item.externalId}`
-          existingMap.set(key, this.mapFeedItem(item))
+          const key = `${item.feedItem.subscriptionId}-${item.content.externalId}`
+          existingMap.set(key, this.mapFeedItemWithContent(item.feedItem, item.content))
         }
       } catch (error) {
         console.error(`[BatchOps:checkExistingFeedItems] Error processing chunk ${chunkNum}:`, error)
@@ -93,7 +103,7 @@ export class BatchDatabaseOperations {
   }
 
   /**
-   * Batch insert multiple feed items in a single transaction
+   * Batch insert multiple feed items and content in a single transaction
    * Skips items that already exist based on prior checking
    */
   async batchInsertFeedItems(
@@ -104,33 +114,41 @@ export class BatchDatabaseOperations {
 
     const now = new Date()
     const newItems: FeedItem[] = []
-    const itemsToInsert: any[] = []
+    const contentToInsert: any[] = []
+    const feedItemsToInsert: any[] = []
 
     // Filter out existing items and prepare new ones
     for (const feedItem of feedItems) {
       const key = `${feedItem.subscriptionId}-${feedItem.externalId}`
       
       if (!existingItemsMap.has(key)) {
-        // Generate deterministic ID without timestamp to prevent duplicates
-        const id = `${feedItem.subscriptionId}-${feedItem.externalId}`
+        // Determine provider from subscriptionId
+        const provider = feedItem.subscriptionId.startsWith('spotify:') ? 'spotify' : 
+                        feedItem.subscriptionId.startsWith('youtube:') ? 'youtube' : 
+                        'web'
+        
+        // Create content ID
+        const contentId = `${provider}-${feedItem.externalId}`
         
         const newItem: FeedItem = {
           ...feedItem,
-          id,
+          id: `${feedItem.subscriptionId}-${feedItem.externalId}`,
           createdAt: now
         }
         
         newItems.push(newItem)
-        itemsToInsert.push({
-          id,
-          subscriptionId: feedItem.subscriptionId,
+        
+        // Prepare content record
+        contentToInsert.push({
+          id: contentId,
           externalId: feedItem.externalId,
+          provider,
+          url: feedItem.externalUrl,
           title: feedItem.title,
           description: feedItem.description || null,
           thumbnailUrl: feedItem.thumbnailUrl || null,
           publishedAt: feedItem.publishedAt.getTime(),
           durationSeconds: feedItem.durationSeconds || null,
-          externalUrl: feedItem.externalUrl,
           
           // Phase 1: New engagement metrics
           viewCount: (feedItem as any).viewCount || null,
@@ -148,226 +166,246 @@ export class BatchDatabaseOperations {
           // Phase 2: Creator/Channel Information
           creatorId: (feedItem as any).creatorId || null,
           creatorName: (feedItem as any).creatorName || null,
+          creatorHandle: (feedItem as any).creatorHandle || null,
           creatorThumbnail: (feedItem as any).creatorThumbnail || null,
           creatorVerified: (feedItem as any).creatorVerified ? 1 : 0,
-          creatorSubscriberCount: (feedItem as any).creatorSubscriberCount || null,
-          creatorFollowerCount: (feedItem as any).creatorFollowerCount || null,
           
-          // Phase 2: Series/Show Context
-          seriesMetadata: (feedItem as any).seriesMetadata || null,
+          // Phase 2: Series/Episode Information
           seriesId: (feedItem as any).seriesId || null,
           seriesName: (feedItem as any).seriesName || null,
           episodeNumber: (feedItem as any).episodeNumber || null,
           seasonNumber: (feedItem as any).seasonNumber || null,
-          totalEpisodesInSeries: (feedItem as any).totalEpisodesInSeries || null,
-          isLatestEpisode: (feedItem as any).isLatestEpisode ? 1 : 0,
           
-          createdAt: now.getTime()
+          // Phase 3: Technical metadata
+          videoQuality: (feedItem as any).videoQuality || null,
+          hasHd: (feedItem as any).hasHd ? 1 : 0,
+          hasCaptions: (feedItem as any).hasCaptions ? 1 : 0,
+          
+          // Phase 4: Cross-platform matching
+          contentFingerprint: (feedItem as any).contentFingerprint || null,
+          normalizedTitle: (feedItem as any).normalizedTitle || null,
+          episodeIdentifier: (feedItem as any).episodeIdentifier || null,
+          
+          // Metadata fields
+          statisticsMetadata: (feedItem as any).statisticsMetadata || null,
+          technicalMetadata: (feedItem as any).technicalMetadata || null,
+          enrichmentMetadata: (feedItem as any).enrichmentMetadata || null,
+          
+          createdAt: now.getTime(),
+          updatedAt: now.getTime()
+        })
+        
+        // Prepare feed_items record
+        feedItemsToInsert.push({
+          id: newItem.id,
+          subscriptionId: feedItem.subscriptionId,
+          contentId,
+          addedToFeedAt: now.getTime(),
+          positionInFeed: null
         })
       }
     }
 
-    // Calculate max items per insert based on variables per item
-    const maxItemsPerInsert = Math.floor(
+    if (contentToInsert.length === 0) {
+      console.log('[BatchOps:batchInsertFeedItems] No new items to insert')
+      return []
+    }
+
+    console.log(`[BatchOps:batchInsertFeedItems] Inserting ${contentToInsert.length} new items`)
+
+    // Calculate safe batch sizes
+    const maxContentPerBatch = Math.floor(
+      (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
+      BatchDatabaseOperations.VARIABLES_PER_CONTENT_ITEM
+    )
+    const maxFeedItemsPerBatch = Math.floor(
       (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
       BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM
     )
+    
+    console.log(`[BatchOps:batchInsertFeedItems] Max content per batch: ${maxContentPerBatch}, Max feed items per batch: ${maxFeedItemsPerBatch}`)
 
-    // Batch insert all new items in chunks
-    if (itemsToInsert.length > 0) {
+    // Insert content in batches (with upsert to handle potential duplicates)
+    for (let i = 0; i < contentToInsert.length; i += maxContentPerBatch) {
+      const contentBatch = contentToInsert.slice(i, i + maxContentPerBatch)
+      const batchNum = Math.floor(i / maxContentPerBatch) + 1
+      const totalBatches = Math.ceil(contentToInsert.length / maxContentPerBatch)
+      
+      console.log(`[BatchOps:batchInsertFeedItems] Inserting content batch ${batchNum}/${totalBatches} with ${contentBatch.length} items`)
+      
       try {
-        let totalInserted = 0
-        
-        // Insert in chunks to avoid SQLite variable limit
-        for (let i = 0; i < itemsToInsert.length; i += maxItemsPerInsert) {
-          const chunk = itemsToInsert.slice(i, i + maxItemsPerInsert)
-          const chunkNum = Math.floor(i / maxItemsPerInsert) + 1
-          const totalChunks = Math.ceil(itemsToInsert.length / maxItemsPerInsert)
-          
-          console.log(`[BatchOps:batchInsertFeedItems] Inserting chunk ${chunkNum}/${totalChunks} with ${chunk.length} items (max per chunk: ${maxItemsPerInsert})`)
-          
-          try {
-            await this.db.insert(schema.feedItems).values(chunk)
-            totalInserted += chunk.length
-          } catch (error) {
-            console.error(`[BatchOps:batchInsertFeedItems] Error inserting chunk ${chunkNum}:`, error)
-            console.error(`[BatchOps:batchInsertFeedItems] Chunk details:`, {
-              chunkSize: chunk.length,
-              variablesUsed: chunk.length * BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM,
-              maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES
-            })
-            throw error
-          }
-        }
-        
-        console.log(`[BatchOps] Inserted ${totalInserted} new feed items in ${Math.ceil(itemsToInsert.length / maxItemsPerInsert)} chunks`)
+        // Use INSERT OR IGNORE to skip duplicates
+        await this.db.insert(schema.content)
+          .values(contentBatch)
+          .onConflictDoNothing()
       } catch (error) {
-        // Handle potential unique constraint violations gracefully
-        if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-          console.warn('[BatchOps] Some items already existed, handling gracefully')
-          // Re-check and return only successfully inserted items
-          const recheckMap = await this.checkExistingFeedItems(
-            feedItems.map(item => ({ 
-              subscriptionId: item.subscriptionId, 
-              externalId: item.externalId 
-            }))
-          )
-          return Array.from(recheckMap.values()).filter(item => 
-            new Date(item.createdAt).getTime() > now.getTime() - 1000
-          )
-        }
+        console.error(`[BatchOps:batchInsertFeedItems] Error inserting content batch ${batchNum}:`, error)
+        throw error
+      }
+    }
+    
+    // Insert feed items in batches
+    for (let i = 0; i < feedItemsToInsert.length; i += maxFeedItemsPerBatch) {
+      const feedItemBatch = feedItemsToInsert.slice(i, i + maxFeedItemsPerBatch)
+      const batchNum = Math.floor(i / maxFeedItemsPerBatch) + 1
+      const totalBatches = Math.ceil(feedItemsToInsert.length / maxFeedItemsPerBatch)
+      
+      console.log(`[BatchOps:batchInsertFeedItems] Inserting feed item batch ${batchNum}/${totalBatches} with ${feedItemBatch.length} items`)
+      
+      try {
+        await this.db.insert(schema.feedItems).values(feedItemBatch)
+      } catch (error) {
+        console.error(`[BatchOps:batchInsertFeedItems] Error inserting feed item batch ${batchNum}:`, error)
+        console.error(`[BatchOps:batchInsertFeedItems] Batch details:`, {
+          batchSize: feedItemBatch.length,
+          variablesUsed: feedItemBatch.length * BatchDatabaseOperations.VARIABLES_PER_FEED_ITEM,
+          maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES,
+          firstItem: feedItemBatch[0],
+          errorMessage: error instanceof Error ? error.message : String(error)
+        })
         throw error
       }
     }
 
+    console.log(`[BatchOps:batchInsertFeedItems] Successfully inserted ${newItems.length} new items`)
     return newItems
   }
 
   /**
-   * Check existing user feed items for multiple users and feed items
-   * Returns a set of existing userFeedItem IDs
+   * Batch insert user feed items for multiple users
+   * Creates entries in user_feed_items table to track read status
    */
-  async checkExistingUserFeedItems(
-    userIds: string[],
+  async batchInsertUserFeedItems(
+    userId: string,
     feedItemIds: string[]
-  ): Promise<Set<string>> {
-    if (userIds.length === 0 || feedItemIds.length === 0) return new Set()
+  ): Promise<void> {
+    if (feedItemIds.length === 0) return
 
-    const existingIds = new Set<string>()
-    
-    // SQLite inArray has limits, so we need to chunk
-    // Each item in the query uses 2 variables (userId, feedItemId)
-    const maxIdsPerChunk = Math.floor(BatchDatabaseOperations.SQLITE_MAX_VARIABLES / 2)
-    
-    // Process user IDs in chunks
-    for (let i = 0; i < userIds.length; i += maxIdsPerChunk) {
-      const userChunk = userIds.slice(i, i + maxIdsPerChunk)
-      
-      // Process feed item IDs in chunks for each user chunk
-      for (let j = 0; j < feedItemIds.length; j += maxIdsPerChunk) {
-        const feedItemChunk = feedItemIds.slice(j, j + maxIdsPerChunk)
-        
-        const existingUserFeedItems = await this.db
-          .select()
-          .from(schema.userFeedItems)
-          .where(and(
-            inArray(schema.userFeedItems.userId, userChunk),
-            inArray(schema.userFeedItems.feedItemId, feedItemChunk)
-          ))
-        
-        // Add to set
-        for (const item of existingUserFeedItems) {
-          existingIds.add(item.id)
-        }
-      }
-    }
+    console.log(`[BatchOps:batchInsertUserFeedItems] Creating ${feedItemIds.length} user feed items for user ${userId}`)
 
-    return existingIds
-  }
-
-  /**
-   * Batch create user feed items for multiple users and feed items
-   * Skips items that already exist
-   */
-  async batchCreateUserFeedItems(
-    userIds: string[],
-    feedItems: FeedItem[]
-  ): Promise<number> {
-    if (userIds.length === 0 || feedItems.length === 0) return 0
-
-    const feedItemIds = feedItems.map(item => item.id)
-    
-    // Check existing items first
-    const existingIds = await this.checkExistingUserFeedItems(userIds, feedItemIds)
-    
     const now = new Date()
-    const userFeedItemsToInsert: any[] = []
+    const userFeedItems = feedItemIds.map(feedItemId => ({
+      id: `${userId}-${feedItemId}`,
+      userId,
+      feedItemId,
+      isRead: false,
+      isSaved: false,
+      isHidden: false,
+      readAt: null,
+      savedAt: null,
+      hiddenAt: null,
+      createdAt: now
+    }))
 
-    // Prepare batch insert data
-    for (const userId of userIds) {
-      for (const feedItem of feedItems) {
-        const id = `${userId}-${feedItem.id}`
-        
-        if (!existingIds.has(id)) {
-          userFeedItemsToInsert.push({
-            id,
-            userId,
-            feedItemId: feedItem.id,
-            isRead: false,
-            bookmarkId: null,
-            readAt: null,
-            createdAt: now.getTime()
-          })
-        }
-      }
-    }
-
-    // Calculate max items per insert based on variables per item
-    const maxItemsPerInsert = Math.floor(
+    // Calculate safe batch size
+    const maxItemsPerBatch = Math.floor(
       (BatchDatabaseOperations.SQLITE_MAX_VARIABLES - BatchDatabaseOperations.SAFETY_BUFFER) / 
       BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM
     )
+    
+    console.log(`[BatchOps:batchInsertUserFeedItems] Max items per batch: ${maxItemsPerBatch}`)
 
-    // Batch insert all new user feed items in chunks
-    if (userFeedItemsToInsert.length > 0) {
+    // Insert in batches
+    for (let i = 0; i < userFeedItems.length; i += maxItemsPerBatch) {
+      const batch = userFeedItems.slice(i, i + maxItemsPerBatch)
+      const batchNum = Math.floor(i / maxItemsPerBatch) + 1
+      const totalBatches = Math.ceil(userFeedItems.length / maxItemsPerBatch)
+      
+      console.log(`[BatchOps:batchInsertUserFeedItems] Processing batch ${batchNum}/${totalBatches} with ${batch.length} items`)
+      
       try {
-        let totalInserted = 0
-        
-        // Insert in chunks to avoid SQLite variable limit
-        for (let i = 0; i < userFeedItemsToInsert.length; i += maxItemsPerInsert) {
-          const chunk = userFeedItemsToInsert.slice(i, i + maxItemsPerInsert)
-          const chunkNum = Math.floor(i / maxItemsPerInsert) + 1
-          const totalChunks = Math.ceil(userFeedItemsToInsert.length / maxItemsPerInsert)
-          
-          console.log(`[BatchOps:batchCreateUserFeedItems] Inserting chunk ${chunkNum}/${totalChunks} with ${chunk.length} items (max per chunk: ${maxItemsPerInsert})`)
-          
-          try {
-            await this.db.insert(schema.userFeedItems).values(chunk)
-            totalInserted += chunk.length
-          } catch (error) {
-            console.error(`[BatchOps:batchCreateUserFeedItems] Error inserting chunk ${chunkNum}:`, error)
-            console.error(`[BatchOps:batchCreateUserFeedItems] Chunk details:`, {
-              chunkSize: chunk.length,
-              variablesUsed: chunk.length * BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM,
-              maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES
-            })
-            throw error
-          }
-        }
-        
-        console.log(`[BatchOps] Created ${totalInserted} user feed items in ${Math.ceil(userFeedItemsToInsert.length / maxItemsPerInsert)} chunks`)
+        await this.db.insert(schema.userFeedItems).values(batch)
       } catch (error) {
-        // Handle potential unique constraint violations
-        if (error instanceof Error && error.message.includes('UNIQUE constraint')) {
-          console.warn('[BatchOps] Some user feed items already existed, handled gracefully')
-          // Count only successfully inserted items
-          const afterCount = await this.checkExistingUserFeedItems(userIds, feedItemIds)
-          return afterCount.size - existingIds.size
-        }
+        console.error(`[BatchOps:batchInsertUserFeedItems] Error inserting batch ${batchNum}:`, error)
+        console.error(`[BatchOps:batchInsertUserFeedItems] Batch details:`, {
+          batchSize: batch.length,
+          variablesUsed: batch.length * BatchDatabaseOperations.VARIABLES_PER_USER_FEED_ITEM,
+          maxVariables: BatchDatabaseOperations.SQLITE_MAX_VARIABLES,
+          errorMessage: error instanceof Error ? error.message : String(error)
+        })
         throw error
       }
     }
 
-    return userFeedItemsToInsert.length
+    console.log(`[BatchOps:batchInsertUserFeedItems] Successfully created ${feedItemIds.length} user feed items`)
   }
 
   /**
-   * Get recent feed item IDs for a set of subscriptions
-   * Used for cache warming
+   * Get subscription statistics for multiple subscriptions
+   */
+  async getSubscriptionStats(
+    subscriptionIds: string[]
+  ): Promise<Map<string, { totalItems: number; latestPublishedAt: Date | null }>> {
+    if (subscriptionIds.length === 0) return new Map()
+
+    console.log(`[BatchOps:getSubscriptionStats] Getting stats for ${subscriptionIds.length} subscriptions`)
+
+    const statsMap = new Map<string, { totalItems: number; latestPublishedAt: Date | null }>()
+    
+    // Use a conservative chunk size for IN queries
+    const maxIdsPerChunk = 50
+    
+    for (let i = 0; i < subscriptionIds.length; i += maxIdsPerChunk) {
+      const chunk = subscriptionIds.slice(i, i + maxIdsPerChunk)
+      const chunkNum = Math.floor(i / maxIdsPerChunk) + 1
+      const totalChunks = Math.ceil(subscriptionIds.length / maxIdsPerChunk)
+      
+      console.log(`[BatchOps:getSubscriptionStats] Processing chunk ${chunkNum}/${totalChunks} with ${chunk.length} subscription IDs`)
+      
+      try {
+        const stats = await this.db
+          .select({
+            subscriptionId: schema.feedItems.subscriptionId,
+            totalItems: sql<number>`count(*)`,
+            latestPublishedAt: sql<number>`max(${schema.content.publishedAt})`
+          })
+          .from(schema.feedItems)
+          .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+          .where(inArray(schema.feedItems.subscriptionId, chunk))
+          .groupBy(schema.feedItems.subscriptionId)
+        
+        console.log(`[BatchOps:getSubscriptionStats] Chunk ${chunkNum} returned stats for ${stats.length} subscriptions`)
+        
+        for (const stat of stats) {
+          statsMap.set(stat.subscriptionId, {
+            totalItems: stat.totalItems,
+            latestPublishedAt: stat.latestPublishedAt ? new Date(stat.latestPublishedAt) : null
+          })
+        }
+      } catch (error) {
+        console.error(`[BatchOps:getSubscriptionStats] Error processing chunk ${chunkNum}:`, error)
+        throw error
+      }
+    }
+
+    // Set default stats for subscriptions with no items
+    for (const subscriptionId of subscriptionIds) {
+      if (!statsMap.has(subscriptionId)) {
+        statsMap.set(subscriptionId, { totalItems: 0, latestPublishedAt: null })
+      }
+    }
+
+    console.log(`[BatchOps:getSubscriptionStats] Completed. Got stats for ${statsMap.size} subscriptions`)
+    return statsMap
+  }
+
+  /**
+   * Get recent feed item IDs for multiple subscriptions
+   * Used for duplicate detection within a time window
    */
   async getRecentFeedItemIds(
     subscriptionIds: string[],
-    hoursBack: number = 24
+    hoursAgo: number = 24
   ): Promise<Map<string, Set<string>>> {
     if (subscriptionIds.length === 0) return new Map()
 
-    console.log(`[BatchOps:getRecentFeedItemIds] Starting with ${subscriptionIds.length} subscription IDs`)
-    const cutoffTime = new Date(Date.now() - hoursBack * 60 * 60 * 1000)
+    console.log(`[BatchOps:getRecentFeedItemIds] Getting recent items for ${subscriptionIds.length} subscriptions (last ${hoursAgo} hours)`)
+
+    const cutoffTime = Date.now() - (hoursAgo * 60 * 60 * 1000)
     const resultMap = new Map<string, Set<string>>()
     
-    // Process subscription IDs in chunks to avoid SQLite variable limit
-    // Be extra conservative - Cloudflare D1 seems to have issues with too many parameters
-    // Use a much smaller chunk size to ensure we stay well below the limit
+    // Use a very conservative chunk size for complex queries with WHERE conditions
+    // The query has both IN and GT conditions which use more variables
     const maxIdsPerChunk = 50 // Conservative limit to avoid "too many SQL variables" error
     
     console.log(`[BatchOps:getRecentFeedItemIds] Max IDs per chunk: ${maxIdsPerChunk}`)
@@ -384,12 +422,13 @@ export class BatchDatabaseOperations {
         const recentItems = await this.db
           .select({
             subscriptionId: schema.feedItems.subscriptionId,
-            externalId: schema.feedItems.externalId
+            externalId: schema.content.externalId
           })
           .from(schema.feedItems)
+          .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
           .where(and(
             inArray(schema.feedItems.subscriptionId, chunk),
-            gt(schema.feedItems.publishedAt, cutoffTime)
+            gt(schema.content.publishedAt, new Date(cutoffTime))
           ))
         
         console.log(`[BatchOps:getRecentFeedItemIds] Chunk ${chunkNum} returned ${recentItems.length} items`)
@@ -417,18 +456,18 @@ export class BatchDatabaseOperations {
     return resultMap
   }
 
-  private mapFeedItem(row: any): FeedItem {
+  private mapFeedItemWithContent(feedItemRow: any, contentRow: any): FeedItem {
     return {
-      id: row.id,
-      subscriptionId: row.subscriptionId,
-      externalId: row.externalId,
-      title: row.title,
-      description: row.description || undefined,
-      thumbnailUrl: row.thumbnailUrl || undefined,
-      publishedAt: new Date(row.publishedAt),
-      durationSeconds: row.durationSeconds || undefined,
-      externalUrl: row.externalUrl,
-      createdAt: new Date(row.createdAt)
+      id: feedItemRow.id,
+      subscriptionId: feedItemRow.subscriptionId,
+      externalId: contentRow.externalId,
+      title: contentRow.title,
+      description: contentRow.description,
+      thumbnailUrl: contentRow.thumbnailUrl,
+      publishedAt: new Date(contentRow.publishedAt),
+      durationSeconds: contentRow.durationSeconds,
+      externalUrl: contentRow.url,
+      createdAt: new Date(feedItemRow.addedToFeedAt)
     }
   }
 }
