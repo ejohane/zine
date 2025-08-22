@@ -93,8 +93,13 @@ async function initializeServices(db: D1Database, env: Bindings) {
     // Setup database tables and providers
     await setupDatabase(db)
     
-    // Create optimized indexes for feed operations
-    await queryOptimizer.createOptimizedIndexes()
+    // Create optimized indexes for feed operations (non-blocking)
+    try {
+      await queryOptimizer.createOptimizedIndexes()
+    } catch (error) {
+      console.error('[API] Failed to create optimized indexes (non-fatal):', error)
+      // Continue execution - indexes are optimizations, not required for functionality
+    }
   }
   return { 
     bookmarkService, 

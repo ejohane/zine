@@ -14,16 +14,43 @@ export class QueryOptimizer {
   }
 
   /**
+   * Check if a table exists in the database
+   */
+  private async tableExists(tableName: string): Promise<boolean> {
+    try {
+      const result = await this.db.get(sql.raw(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='${tableName}'`
+      ))
+      return result !== null && result !== undefined
+    } catch (error) {
+      console.error(`[QueryOptimizer] Failed to check if table ${tableName} exists:`, error)
+      return false
+    }
+  }
+
+  /**
    * Create optimized indexes for feed operations
    * Call this during database setup or migration
    */
   async createOptimizedIndexes(): Promise<void> {
     console.log('[QueryOptimizer] Creating optimized indexes...')
 
+    // Check if required tables exist before creating indexes
+    const requiredTables = ['feed_items', 'user_feed_items', 'user_subscriptions', 'subscriptions']
+    const tablesExist: Record<string, boolean> = {}
+    
+    for (const table of requiredTables) {
+      tablesExist[table] = await this.tableExists(table)
+      if (!tablesExist[table]) {
+        console.log(`[QueryOptimizer] Table ${table} does not exist, skipping related indexes`)
+      }
+    }
+
     const indexes = [
       // Composite index for feed item lookups
       {
         name: 'idx_feed_items_subscription_external',
+        table: 'feed_items',
         sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_subscription_external 
               ON feed_items(subscription_id, external_id)`
       },
@@ -31,6 +58,7 @@ export class QueryOptimizer {
       // Index for recent items by subscription
       {
         name: 'idx_feed_items_subscription_published',
+        table: 'feed_items',
         sql: `CREATE INDEX IF NOT EXISTS idx_feed_items_subscription_published 
               ON feed_items(subscription_id, published_at DESC)`
       },
@@ -38,6 +66,7 @@ export class QueryOptimizer {
       // Index for user feed items lookups
       {
         name: 'idx_user_feed_items_user_feed',
+        table: 'user_feed_items',
         sql: `CREATE INDEX IF NOT EXISTS idx_user_feed_items_user_feed 
               ON user_feed_items(user_id, feed_item_id)`
       },
@@ -45,6 +74,7 @@ export class QueryOptimizer {
       // Index for unread items by user
       {
         name: 'idx_user_feed_items_user_read',
+        table: 'user_feed_items',
         sql: `CREATE INDEX IF NOT EXISTS idx_user_feed_items_user_read 
               ON user_feed_items(user_id, is_read) 
               WHERE is_read = 0`
@@ -53,6 +83,7 @@ export class QueryOptimizer {
       // Index for user subscriptions
       {
         name: 'idx_user_subscriptions_subscription',
+        table: 'user_subscriptions',
         sql: `CREATE INDEX IF NOT EXISTS idx_user_subscriptions_subscription 
               ON user_subscriptions(subscription_id, is_active) 
               WHERE is_active = 1`
@@ -61,12 +92,19 @@ export class QueryOptimizer {
       // Index for subscription provider lookups
       {
         name: 'idx_subscriptions_provider',
+        table: 'subscriptions',
         sql: `CREATE INDEX IF NOT EXISTS idx_subscriptions_provider 
               ON subscriptions(provider_id)`
       }
     ]
 
     for (const index of indexes) {
+      // Skip index if the required table doesn't exist
+      if (!tablesExist[index.table]) {
+        console.log(`[QueryOptimizer] Skipping index ${index.name} - table ${index.table} does not exist`)
+        continue
+      }
+
       try {
         await this.db.run(sql.raw(index.sql))
         console.log(`[QueryOptimizer] Created index: ${index.name}`)
@@ -75,7 +113,7 @@ export class QueryOptimizer {
       }
     }
 
-    // Analyze tables for query planner
+    // Analyze tables for query planner - only analyze existing tables
     await this.analyzeTables()
   }
 
@@ -86,6 +124,13 @@ export class QueryOptimizer {
     const tables = ['feed_items', 'user_feed_items', 'subscriptions', 'user_subscriptions']
     
     for (const table of tables) {
+      // Check if table exists before analyzing
+      const exists = await this.tableExists(table)
+      if (!exists) {
+        console.log(`[QueryOptimizer] Skipping analyze for non-existent table: ${table}`)
+        continue
+      }
+
       try {
         await this.db.run(sql.raw(`ANALYZE ${table}`))
         console.log(`[QueryOptimizer] Analyzed table: ${table}`)
@@ -120,6 +165,13 @@ export class QueryOptimizer {
     // Get table statistics
     const tables = ['feed_items', 'user_feed_items', 'subscriptions', 'user_subscriptions']
     for (const table of tables) {
+      // Check if table exists before getting stats
+      const exists = await this.tableExists(table)
+      if (!exists) {
+        console.log(`[QueryOptimizer] Skipping stats for non-existent table: ${table}`)
+        continue
+      }
+
       try {
         const countResult = await this.db.get(sql.raw(`SELECT COUNT(*) as count FROM ${table}`))
         stats.tables[table] = {
