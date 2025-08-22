@@ -21,6 +21,7 @@ import { QueryOptimizer } from './repositories/query-optimizer'
 import { InitialFeedPopulationService } from './services/initial-feed-population-service'
 import { DualModeSubscriptionRepository } from './repositories/dual-mode-subscription-repository'
 import { userStateRoutes } from './routes/user-state'
+import { enrichedBookmarksRoutes } from './routes/enriched-bookmarks'
 
 export type Bindings = {
   DB: D1Database
@@ -1407,7 +1408,6 @@ app.use('/api/v1/user-state/*', authMiddleware)
 app.route('/api/v1/user-state', userStateRoutes)
 
 // Mount enriched bookmarks routes
-import { enrichedBookmarksRoutes } from './routes/enriched-bookmarks'
 app.route('/api/v1/enriched-bookmarks', enrichedBookmarksRoutes)
 
 // Scheduled event handler for cron triggers

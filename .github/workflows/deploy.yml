@@ -100,15 +100,20 @@ jobs:
         id: api_preview_deploy
         run: |
           set -e
-          OUTPUT=$(bunx wrangler deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
-          if [ $? -ne 0 ]; then
-            echo "::error::Deployment failed"
+          echo "Deploying API preview to ${{ env.API_PREVIEW_NAME }}..."
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.API_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1) || {
+            echo "::error::Deployment failed with exit code $?"
+            echo "Wrangler output:"
+            echo "$OUTPUT"
             exit 1
-          fi
+          }
+          echo "Deployment output:"
+          echo "$OUTPUT"
           URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
           if [ -z "$URL" ]; then
             echo "::error::Could not extract deployment URL from wrangler output"
-            echo "::debug::Wrangler output: $OUTPUT"
+            echo "Full wrangler output:"
+            echo "$OUTPUT"
             exit 1
           fi
           echo "deployment-url=$URL" >> $GITHUB_OUTPUT
@@ -217,15 +222,20 @@ jobs:
         id: web_preview_deploy
         run: |
           set -e
-          OUTPUT=$(bunx wrangler deploy --name ${{ env.WEB_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1)
-          if [ $? -ne 0 ]; then
-            echo "::error::Deployment failed"
+          echo "Deploying web preview to ${{ env.WEB_PREVIEW_NAME }}..."
+          OUTPUT=$(bunx wrangler deploy --name ${{ env.WEB_PREVIEW_NAME }} --config wrangler.preview.toml 2>&1) || {
+            echo "::error::Deployment failed with exit code $?"
+            echo "Wrangler output:"
+            echo "$OUTPUT"
             exit 1
-          fi
+          }
+          echo "Deployment output:"
+          echo "$OUTPUT"
           URL=$(echo "$OUTPUT" | grep -o 'https://[^[:space:]]*\.workers\.dev[^[:space:]]*' | tail -1)
           if [ -z "$URL" ]; then
             echo "::error::Could not extract deployment URL from wrangler output"
-            echo "::debug::Wrangler output: $OUTPUT"
+            echo "Full wrangler output:"
+            echo "$OUTPUT"
             exit 1
           fi
           echo "deployment-url=$URL" >> $GITHUB_OUTPUT
