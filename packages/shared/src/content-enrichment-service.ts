@@ -6,7 +6,7 @@
 import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
 import { normalizeUrl } from './url-normalizer'
 import { DateNormalizer } from './date-normalizer'
-import crypto from 'crypto'
+import crypto from 'node:crypto'
 
 // Content type definitions
 export interface Content {
