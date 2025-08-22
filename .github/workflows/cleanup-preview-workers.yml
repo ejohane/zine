@@ -180,6 +180,21 @@ jobs:
             let shouldDelete = false;
             let reason = '';
             
+            // NEVER delete production workers
+            if (branchName === 'production' || branchName === 'main') {
+              shouldDelete = false;
+              reason = 'Production/Main worker - protected';
+              workersToKeep.push({
+                name: worker.name,
+                branch: branchName,
+                created: worker.created,
+                modified: worker.modified,
+                age_days: Math.floor((now - createdDate) / (24*60*60*1000)),
+                reason: reason
+              });
+              return;
+            }
+            
             // Check if branch is protected
             const isProtected = protectedBranches.includes(branchName);
             
