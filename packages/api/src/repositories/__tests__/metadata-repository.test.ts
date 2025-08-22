@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/d1'
 import { sql } from 'drizzle-orm'
 import Database from 'better-sqlite3'
-import { D1MetadataRepository } from '../metadata-repository'
+import { MetadataRepository } from '../metadata-repository'
 
 // Mock D1Database
 class MockD1Database {
@@ -40,7 +40,7 @@ class MockD1Database {
 
 describe('MetadataRepository', () => {
   let db: any
-  let repository: D1MetadataRepository
+  let repository: MetadataRepository
   let sqliteDb: any
   
   beforeAll(async () => {
@@ -121,7 +121,7 @@ describe('MetadataRepository', () => {
     `)
     
     db = new MockD1Database(sqliteDb) as any
-    repository = new D1MetadataRepository(db as any)
+    repository = new MetadataRepository(db as any)
   })
   
   afterEach(() => {
@@ -353,7 +353,7 @@ describe('MetadataRepository', () => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run('youtube:video:abc123', 'youtube:channel:UC123', 'abc123', 'Feed Item Title', url, now, now)
       
-      const result = await repository.findByUrl(url)
+      const result = await repository.findExistingMetadata(url)
       
       expect(result?.title).toBe('Bookmark Title')
       expect(result?.source).toBe('bookmark')
@@ -376,7 +376,7 @@ describe('MetadataRepository', () => {
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run('spotify:episode:xyz789', 'spotify:show:show123', 'xyz789', 'Episode Title', url, now, now)
       
-      const result = await repository.findByUrl(url)
+      const result = await repository.findExistingMetadata(url)
       
       expect(result?.title).toBe('Episode Title')
       expect(result?.source).toBe('feed_item')
@@ -406,7 +406,7 @@ describe('MetadataRepository', () => {
       )
       
       // Search with non-normalized URL
-      const result = await repository.findByUrl('https://www.youtube.com/watch?v=test123&utm_campaign=test')
+      const result = await repository.findExistingMetadata('https://www.youtube.com/watch?v=test123&utm_campaign=test')
       
       expect(result).toBeTruthy()
       expect(result?.title).toBe('Test Video')

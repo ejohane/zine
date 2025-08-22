@@ -7,51 +7,129 @@ import {
   UserFeedItem,
   FeedItemWithReadState
 } from '@zine/shared'
+import { ContentRepository } from './repositories/content-repository'
+import type { Content } from './schema'
 
 // SQLite has a limit of 999 variables per query
 const SQLITE_MAX_VARIABLES = 999
-const VARIABLES_PER_USER_FEED_ITEM = 7 // Number of columns in user_feed_items insert
+const VARIABLES_PER_USER_FEED_ITEM = 10 // Number of columns in user_feed_items insert
 
 export class D1FeedItemRepository implements FeedItemRepository {
   private db: ReturnType<typeof drizzle>
+  private contentRepository: ContentRepository
 
   constructor(d1Database: D1Database) {
     this.db = drizzle(d1Database, { schema })
+    this.contentRepository = new ContentRepository(d1Database)
   }
 
   async getFeedItem(id: string): Promise<FeedItem | null> {
-    const feedItems = await this.db
-      .select()
+    const results = await this.db
+      .select({
+        feedItem: schema.feedItems,
+        content: schema.content
+      })
       .from(schema.feedItems)
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .where(eq(schema.feedItems.id, id))
       .limit(1)
     
-    return feedItems.length > 0 ? this.mapFeedItem(feedItems[0]) : null
+    return results.length > 0 ? this.mapFeedItemWithContent(results[0].feedItem, results[0].content) : null
   }
 
   async getFeedItemsBySubscription(subscriptionId: string): Promise<FeedItem[]> {
-    const feedItems = await this.db
-      .select()
+    const results = await this.db
+      .select({
+        feedItem: schema.feedItems,
+        content: schema.content
+      })
       .from(schema.feedItems)
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .where(eq(schema.feedItems.subscriptionId, subscriptionId))
-      .orderBy(desc(schema.feedItems.publishedAt))
+      .orderBy(desc(schema.content.publishedAt))
     
-    return feedItems.map(this.mapFeedItem)
+    return results.map(row => this.mapFeedItemWithContent(row.feedItem, row.content))
   }
 
   async createFeedItem(feedItem: Omit<FeedItem, 'createdAt'>): Promise<FeedItem> {
     const now = new Date()
+    
+    // Extract provider from subscription ID (format: provider-externalId)
+    const provider = feedItem.subscriptionId.split('-')[0] || 'unknown'
+    
+    // Create content ID
+    const contentId = `${provider}-${feedItem.externalId}`
+    
+    // First, upsert the content
+    const contentData: Partial<Content> = {
+      id: contentId,
+      externalId: feedItem.externalId,
+      provider,
+      url: feedItem.externalUrl,
+      title: feedItem.title,
+      description: feedItem.description || undefined,
+      thumbnailUrl: feedItem.thumbnailUrl || undefined,
+      publishedAt: feedItem.publishedAt,
+      durationSeconds: feedItem.durationSeconds,
+      
+      // Map Phase 1 fields
+      viewCount: feedItem.viewCount,
+      likeCount: feedItem.likeCount,
+      commentCount: feedItem.commentCount,
+      popularityScore: feedItem.popularityScore,
+      language: feedItem.language,
+      isExplicit: feedItem.isExplicit,
+      contentType: feedItem.contentType,
+      category: feedItem.category,
+      tags: feedItem.tags,
+      
+      // Map Phase 2 fields
+      creatorId: feedItem.creatorId,
+      creatorName: feedItem.creatorName,
+      creatorThumbnail: feedItem.creatorThumbnail,
+      creatorVerified: feedItem.creatorVerified,
+      creatorSubscriberCount: feedItem.creatorSubscriberCount,
+      creatorFollowerCount: feedItem.creatorFollowerCount,
+      seriesMetadata: feedItem.seriesMetadata,
+      seriesId: feedItem.seriesId,
+      seriesName: feedItem.seriesName,
+      episodeNumber: feedItem.episodeNumber,
+      seasonNumber: feedItem.seasonNumber,
+      totalEpisodesInSeries: feedItem.totalEpisodesInSeries,
+      isLatestEpisode: feedItem.isLatestEpisode,
+      
+      // Map Phase 3 fields
+      hasCaptions: feedItem.hasCaptions,
+      hasHd: feedItem.hasHd,
+      videoQuality: feedItem.videoQuality,
+      hasTranscript: feedItem.hasTranscript,
+      audioLanguages: feedItem.audioLanguages,
+      audioQuality: feedItem.audioQuality,
+      statisticsMetadata: feedItem.statisticsMetadata,
+      technicalMetadata: feedItem.technicalMetadata,
+      engagementRate: feedItem.engagementRate,
+      trendingScore: feedItem.trendingScore,
+      
+      // Map Phase 4 fields
+      contentFingerprint: feedItem.contentFingerprint,
+      publisherCanonicalId: feedItem.publisherCanonicalId,
+      crossPlatformMatches: feedItem.crossPlatformMetadata,
+      normalizedTitle: feedItem.normalizedTitle,
+      episodeIdentifier: feedItem.episodeIdentifier,
+      
+      createdAt: now,
+      updatedAt: now
+    }
+    
+    await this.contentRepository.upsert(contentData)
+    
+    // Then create the feed item
     const newFeedItem = {
       id: feedItem.id,
       subscriptionId: feedItem.subscriptionId,
-      externalId: feedItem.externalId,
-      title: feedItem.title,
-      description: feedItem.description || null,
-      thumbnailUrl: feedItem.thumbnailUrl || null,
-      publishedAt: feedItem.publishedAt,
-      durationSeconds: feedItem.durationSeconds || null,
-      externalUrl: feedItem.externalUrl,
-      createdAt: now
+      contentId,
+      addedToFeedAt: now,
+      positionInFeed: null
     }
 
     await this.db.insert(schema.feedItems).values(newFeedItem)
@@ -66,19 +144,83 @@ export class D1FeedItemRepository implements FeedItemRepository {
     if (feedItems.length === 0) return []
 
     const now = new Date()
-    const newFeedItems = feedItems.map(feedItem => ({
-      id: feedItem.id,
-      subscriptionId: feedItem.subscriptionId,
-      externalId: feedItem.externalId,
-      title: feedItem.title,
-      description: feedItem.description || null,
-      thumbnailUrl: feedItem.thumbnailUrl || null,
-      publishedAt: feedItem.publishedAt,
-      durationSeconds: feedItem.durationSeconds || null,
-      externalUrl: feedItem.externalUrl,
-      createdAt: now
-    }))
-
+    const contents: Partial<Content>[] = []
+    const newFeedItems: any[] = []
+    
+    for (const feedItem of feedItems) {
+      // Extract provider from subscription ID
+      const provider = feedItem.subscriptionId.split('-')[0] || 'unknown'
+      const contentId = `${provider}-${feedItem.externalId}`
+      
+      // Prepare content data
+      contents.push({
+        id: contentId,
+        externalId: feedItem.externalId,
+        provider,
+        url: feedItem.externalUrl,
+        title: feedItem.title,
+        description: feedItem.description || undefined,
+        thumbnailUrl: feedItem.thumbnailUrl || undefined,
+        publishedAt: feedItem.publishedAt,
+        durationSeconds: feedItem.durationSeconds,
+        
+        // Map all phase fields
+        viewCount: feedItem.viewCount,
+        likeCount: feedItem.likeCount,
+        commentCount: feedItem.commentCount,
+        popularityScore: feedItem.popularityScore,
+        language: feedItem.language,
+        isExplicit: feedItem.isExplicit,
+        contentType: feedItem.contentType,
+        category: feedItem.category,
+        tags: feedItem.tags,
+        creatorId: feedItem.creatorId,
+        creatorName: feedItem.creatorName,
+        creatorThumbnail: feedItem.creatorThumbnail,
+        creatorVerified: feedItem.creatorVerified,
+        creatorSubscriberCount: feedItem.creatorSubscriberCount,
+        creatorFollowerCount: feedItem.creatorFollowerCount,
+        seriesMetadata: feedItem.seriesMetadata,
+        seriesId: feedItem.seriesId,
+        seriesName: feedItem.seriesName,
+        episodeNumber: feedItem.episodeNumber,
+        seasonNumber: feedItem.seasonNumber,
+        totalEpisodesInSeries: feedItem.totalEpisodesInSeries,
+        isLatestEpisode: feedItem.isLatestEpisode,
+        hasCaptions: feedItem.hasCaptions,
+        hasHd: feedItem.hasHd,
+        videoQuality: feedItem.videoQuality,
+        hasTranscript: feedItem.hasTranscript,
+        audioLanguages: feedItem.audioLanguages,
+        audioQuality: feedItem.audioQuality,
+        statisticsMetadata: feedItem.statisticsMetadata,
+        technicalMetadata: feedItem.technicalMetadata,
+        engagementRate: feedItem.engagementRate,
+        trendingScore: feedItem.trendingScore,
+        contentFingerprint: feedItem.contentFingerprint,
+        publisherCanonicalId: feedItem.publisherCanonicalId,
+        crossPlatformMatches: feedItem.crossPlatformMetadata,
+        normalizedTitle: feedItem.normalizedTitle,
+        episodeIdentifier: feedItem.episodeIdentifier,
+        
+        createdAt: now,
+        updatedAt: now
+      })
+      
+      // Prepare feed item data
+      newFeedItems.push({
+        id: feedItem.id,
+        subscriptionId: feedItem.subscriptionId,
+        contentId,
+        addedToFeedAt: now,
+        positionInFeed: null
+      })
+    }
+    
+    // Batch upsert contents
+    await this.contentRepository.upsertBatch(contents)
+    
+    // Batch insert feed items
     await this.db.insert(schema.feedItems).values(newFeedItems)
     
     return feedItems.map(feedItem => ({
@@ -88,18 +230,26 @@ export class D1FeedItemRepository implements FeedItemRepository {
   }
 
   async findOrCreateFeedItem(feedItem: Omit<FeedItem, 'id' | 'createdAt'>): Promise<FeedItem> {
-    // Check if feed item already exists
+    // Extract provider from subscription ID
+    const provider = feedItem.subscriptionId.split('-')[0] || 'unknown'
+    const contentId = `${provider}-${feedItem.externalId}`
+    
+    // Check if feed item already exists by checking for the content
     const existingItems = await this.db
-      .select()
+      .select({
+        feedItem: schema.feedItems,
+        content: schema.content
+      })
       .from(schema.feedItems)
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .where(and(
         eq(schema.feedItems.subscriptionId, feedItem.subscriptionId),
-        eq(schema.feedItems.externalId, feedItem.externalId)
+        eq(schema.feedItems.contentId, contentId)
       ))
       .limit(1)
     
     if (existingItems.length > 0) {
-      return this.mapFeedItem(existingItems[0])
+      return this.mapFeedItemWithContent(existingItems[0].feedItem, existingItems[0].content)
     }
     
     // Create new feed item with deterministic ID
@@ -132,9 +282,11 @@ export class D1FeedItemRepository implements FeedItemRepository {
     let query = this.db
       .select({
         feedItem: schema.feedItems,
+        content: schema.content,
         userFeedItem: schema.userFeedItems
       })
       .from(schema.feedItems)
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .leftJoin(
         schema.userFeedItems,
         and(
@@ -150,6 +302,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       if (options.isRead) {
         conditions.push(eq(schema.userFeedItems.isRead, true))
       } else {
+        // For unread, we need items that are either explicitly false or don't have a user feed item entry yet
         conditions.push(eq(schema.userFeedItems.isRead, false))
       }
     }
@@ -177,7 +330,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       query = query.where(and(...conditions))
     }
 
-    query = query.orderBy(desc(schema.feedItems.publishedAt))
+    query = query.orderBy(desc(schema.content.publishedAt))
 
     if (options?.limit) {
       query = query.limit(options.limit)
@@ -190,7 +343,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const results = await query
 
     return results.map(row => ({
-      ...this.mapFeedItem(row.feedItem),
+      ...this.mapFeedItemWithContent(row.feedItem, row.content),
       userFeedItem: row.userFeedItem ? this.mapUserFeedItem(row.userFeedItem) : undefined
     }))
   }
@@ -200,10 +353,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .select({
         userFeedItem: schema.userFeedItems,
         feedItem: schema.feedItems,
+        content: schema.content,
         subscription: schema.subscriptions
       })
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
@@ -220,7 +375,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     }
 
     query = query
-      .orderBy(desc(schema.feedItems.publishedAt))
+      .orderBy(desc(schema.content.publishedAt))
       .limit(limit)
       .offset(offset)
 
@@ -229,7 +384,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     return results.map(row => ({
       id: row.userFeedItem.id,
       feedItem: {
-        ...this.mapFeedItem(row.feedItem),
+        ...this.mapFeedItemWithContent(row.feedItem, row.content),
         subscription: this.mapSubscription(row.subscription)
       },
       isRead: Boolean(row.userFeedItem.isRead),
@@ -244,15 +399,16 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .select({
         subscription: schema.subscriptions,
         unreadCount: schema.userFeedItems.isRead,
-        lastUpdated: schema.feedItems.publishedAt
+        lastUpdated: schema.content.publishedAt
       })
       .from(schema.subscriptions)
       .innerJoin(schema.feedItems, eq(schema.subscriptions.id, schema.feedItems.subscriptionId))
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .leftJoin(schema.userFeedItems, and(
         eq(schema.feedItems.id, schema.userFeedItems.feedItemId),
         eq(schema.userFeedItems.userId, userId)
       ))
-      .orderBy(desc(schema.feedItems.publishedAt))
+      .orderBy(desc(schema.content.publishedAt))
 
     // Group by subscription and calculate unread counts
     const subscriptionMap = new Map<string, SubscriptionWithUnreadCount>()
@@ -264,7 +420,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
         subscriptionMap.set(subId, {
           subscription: this.mapSubscription(row.subscription),
           unreadCount: 0,
-          lastUpdated: new Date(row.lastUpdated)
+          lastUpdated: row.lastUpdated ? new Date(row.lastUpdated) : new Date()
         })
       }
       
@@ -276,9 +432,11 @@ export class D1FeedItemRepository implements FeedItemRepository {
       }
       
       // Update last updated time if this item is newer
-      const itemDate = new Date(row.lastUpdated)
-      if (itemDate > subscription.lastUpdated) {
-        subscription.lastUpdated = itemDate
+      if (row.lastUpdated) {
+        const itemDate = new Date(row.lastUpdated)
+        if (itemDate > subscription.lastUpdated) {
+          subscription.lastUpdated = itemDate
+        }
       }
     }
 
@@ -291,10 +449,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .select({
         userFeedItem: schema.userFeedItems,
         feedItem: schema.feedItems,
+        content: schema.content,
         subscription: schema.subscriptions
       })
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
+      .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(eq(schema.userFeedItems.userId, userId))
       .$dynamic()
@@ -307,7 +467,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     }
 
     query = query
-      .orderBy(desc(schema.feedItems.publishedAt))
+      .orderBy(desc(schema.content.publishedAt))
       .limit(limit)
       .offset(offset)
 
@@ -316,7 +476,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     return results.map(row => ({
       id: row.userFeedItem.id,
       feedItem: {
-        ...this.mapFeedItem(row.feedItem),
+        ...this.mapFeedItemWithContent(row.feedItem, row.content),
         subscription: this.mapSubscription(row.subscription)
       },
       isRead: Boolean(row.userFeedItem.isRead),
@@ -333,7 +493,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: userFeedItem.userId,
       feedItemId: userFeedItem.feedItemId,
       isRead: userFeedItem.isRead,
-      bookmarkId: userFeedItem.bookmarkId || null,
+      bookmarkId: userFeedItem.bookmarkId?.toString() || null,
       readAt: userFeedItem.readAt || null,
       createdAt: now
     }
@@ -355,7 +515,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: userFeedItem.userId,
       feedItemId: userFeedItem.feedItemId,
       isRead: userFeedItem.isRead,
-      bookmarkId: userFeedItem.bookmarkId || null,
+      bookmarkId: userFeedItem.bookmarkId?.toString() || null,
       readAt: userFeedItem.readAt || null,
       createdAt: now
     }))
@@ -464,7 +624,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       await this.db
         .update(schema.userFeedItems)
         .set({
-          bookmarkId: bookmarkId
+          bookmarkId: bookmarkId.toString()
         })
         .where(and(
           eq(schema.userFeedItems.userId, userId),
@@ -494,18 +654,64 @@ export class D1FeedItemRepository implements FeedItemRepository {
     }
   }
 
-  private mapFeedItem(row: any): FeedItem {
+  private mapFeedItemWithContent(feedItemRow: any, contentRow: any): FeedItem {
     return {
-      id: row.id,
-      subscriptionId: row.subscriptionId,
-      externalId: row.externalId,
-      title: row.title,
-      description: row.description || undefined,
-      thumbnailUrl: row.thumbnailUrl || undefined,
-      publishedAt: new Date(row.publishedAt),
-      durationSeconds: row.durationSeconds || undefined,
-      externalUrl: row.externalUrl,
-      createdAt: new Date(row.createdAt)
+      id: feedItemRow.id,
+      subscriptionId: feedItemRow.subscriptionId,
+      externalId: contentRow.externalId,
+      title: contentRow.title,
+      description: contentRow.description || undefined,
+      thumbnailUrl: contentRow.thumbnailUrl || undefined,
+      publishedAt: contentRow.publishedAt ? new Date(contentRow.publishedAt) : new Date(),
+      durationSeconds: contentRow.durationSeconds || undefined,
+      externalUrl: contentRow.url,
+      
+      // Phase 1 fields
+      viewCount: contentRow.viewCount || undefined,
+      likeCount: contentRow.likeCount || undefined,
+      commentCount: contentRow.commentCount || undefined,
+      popularityScore: contentRow.popularityScore || undefined,
+      language: contentRow.language || undefined,
+      isExplicit: contentRow.isExplicit || undefined,
+      contentType: contentRow.contentType || undefined,
+      category: contentRow.category || undefined,
+      tags: contentRow.tags || undefined,
+      
+      // Phase 2 fields
+      creatorId: contentRow.creatorId || undefined,
+      creatorName: contentRow.creatorName || undefined,
+      creatorThumbnail: contentRow.creatorThumbnail || undefined,
+      creatorVerified: contentRow.creatorVerified || undefined,
+      creatorSubscriberCount: contentRow.creatorSubscriberCount || undefined,
+      creatorFollowerCount: contentRow.creatorFollowerCount || undefined,
+      seriesMetadata: contentRow.seriesMetadata || undefined,
+      seriesId: contentRow.seriesId || undefined,
+      seriesName: contentRow.seriesName || undefined,
+      episodeNumber: contentRow.episodeNumber || undefined,
+      seasonNumber: contentRow.seasonNumber || undefined,
+      totalEpisodesInSeries: contentRow.totalEpisodesInSeries || undefined,
+      isLatestEpisode: contentRow.isLatestEpisode || undefined,
+      
+      // Phase 3 fields
+      hasCaptions: contentRow.hasCaptions || undefined,
+      hasHd: contentRow.hasHd || undefined,
+      videoQuality: contentRow.videoQuality || undefined,
+      hasTranscript: contentRow.hasTranscript || undefined,
+      audioLanguages: contentRow.audioLanguages || undefined,
+      audioQuality: contentRow.audioQuality || undefined,
+      statisticsMetadata: contentRow.statisticsMetadata || undefined,
+      technicalMetadata: contentRow.technicalMetadata || undefined,
+      engagementRate: contentRow.engagementRate || undefined,
+      trendingScore: contentRow.trendingScore || undefined,
+      
+      // Phase 4 fields
+      contentFingerprint: contentRow.contentFingerprint || undefined,
+      publisherCanonicalId: contentRow.publisherCanonicalId || undefined,
+      crossPlatformMetadata: contentRow.crossPlatformMatches || undefined,
+      normalizedTitle: contentRow.normalizedTitle || undefined,
+      episodeIdentifier: contentRow.episodeIdentifier || undefined,
+      
+      createdAt: new Date(feedItemRow.addedToFeedAt)
     }
   }
 
@@ -515,7 +721,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: row.userId,
       feedItemId: row.feedItemId,
       isRead: Boolean(row.isRead),
-      bookmarkId: row.bookmarkId || undefined,
+      bookmarkId: row.bookmarkId ? parseInt(row.bookmarkId) : undefined,
       readAt: row.readAt ? new Date(row.readAt) : undefined,
       createdAt: new Date(row.createdAt)
     }
@@ -542,7 +748,7 @@ interface UserFeedItemWithDetails {
   feedItem: FeedItem & { subscription: any }
   isRead: boolean
   readAt?: Date
-  bookmarkId?: number
+  bookmarkId?: string
   createdAt: Date
 }
 

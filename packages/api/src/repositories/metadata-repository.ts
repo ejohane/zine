@@ -1,7 +1,6 @@
-import { eq, or, sql } from 'drizzle-orm'
-import type { D1Database } from '@cloudflare/workers-types'
 import { drizzle } from 'drizzle-orm/d1'
-import { bookmarks, feedItems } from '../schema'
+import { eq, or } from 'drizzle-orm'
+import { bookmarks, feedItems, content } from '../schema'
 import { normalizeUrl } from '@zine/shared'
 
 export interface ExistingMetadata {
@@ -16,28 +15,30 @@ export interface ExistingMetadata {
   duration: number | null
   viewCount: number | null
   platform: string | null
-  source: 'bookmark' | 'feed_item'
+  source: 'bookmark' | 'feed'
   createdAt: Date
-  updatedAt?: Date
+  updatedAt: Date
 }
 
-export interface MetadataRepository {
-  findByUrl(url: string): Promise<ExistingMetadata | null>
-  findInBookmarks(url: string): Promise<ExistingMetadata | null>
-  findInFeedItems(url: string): Promise<ExistingMetadata | null>
-}
-
-export class D1MetadataRepository implements MetadataRepository {
-  private db
+export class MetadataRepository {
+  private db: ReturnType<typeof drizzle>
   
-  constructor(d1: D1Database) {
-    this.db = drizzle(d1)
+  constructor(database: D1Database) {
+    this.db = drizzle(database)
   }
   
-  async findByUrl(url: string): Promise<ExistingMetadata | null> {
-    // Try bookmarks first, then feed items
-    const bookmark = await this.findInBookmarks(url)
-    if (bookmark) return bookmark
+  /**
+   * Check if metadata already exists for a URL
+   * Searches in both bookmarks and feed items with normalized URL matching
+   */
+  async findExistingMetadata(url: string): Promise<ExistingMetadata | null> {
+    // Try bookmarks first (user's own data is priority)
+    const bookmarkData = await this.findInBookmarks(url)
+    if (bookmarkData) {
+      return bookmarkData
+    }
+    
+    // Then check feed items (shared subscription data)
     
     return this.findInFeedItems(url)
   }
@@ -46,68 +47,63 @@ export class D1MetadataRepository implements MetadataRepository {
     const normalized = normalizeUrl(url)
     const normalizedUrl = normalized.normalized
     
-    // Query bookmarks with both original and normalized URL
+    // Query bookmarks joined with content table
     const results = await this.db
       .select({
-        url: bookmarks.url,
-        title: bookmarks.title,
-        description: bookmarks.description,
-        imageUrl: bookmarks.thumbnailUrl,
-        publishedAt: bookmarks.publishedAt,
-        createdAt: bookmarks.createdAt,
-        updatedAt: bookmarks.updatedAt,
-        source: bookmarks.source,
-        videoMetadata: bookmarks.videoMetadata,
-        articleMetadata: bookmarks.articleMetadata
+        bookmark: bookmarks,
+        content: content
       })
       .from(bookmarks)
+      .innerJoin(content, eq(bookmarks.contentId, content.id))
       .where(
         or(
-          eq(bookmarks.url, url),
-          eq(bookmarks.url, normalizedUrl),
-          eq(bookmarks.originalUrl, url),
-          eq(bookmarks.originalUrl, normalizedUrl)
+          eq(content.url, url),
+          eq(content.url, normalizedUrl),
+          eq(content.canonicalUrl, url),
+          eq(content.canonicalUrl, normalizedUrl)
         )
       )
       .limit(1)
     
     if (results.length === 0) return null
     
-    // Parse metadata for additional fields
-    let duration = null
-    let viewCount = null
-    let author = null
+    const result = results[0]
     
-    if (results[0].videoMetadata) {
+    // Parse metadata for additional fields
+    let duration = result.content.durationSeconds
+    let viewCount = result.content.viewCount
+    let author = result.content.creatorName
+    
+    // Try to get more data from metadata fields if available
+    if (result.content.statisticsMetadata) {
       try {
-        const videoMeta = JSON.parse(results[0].videoMetadata)
-        duration = videoMeta.duration || null
-        viewCount = videoMeta.view_count || null
+        const stats = JSON.parse(result.content.statisticsMetadata)
+        viewCount = stats.viewCount || viewCount
       } catch {}
     }
     
-    if (results[0].articleMetadata) {
+    if (result.content.technicalMetadata) {
       try {
-        const articleMeta = JSON.parse(results[0].articleMetadata)
-        author = articleMeta.author_name || null
+        const tech = JSON.parse(result.content.technicalMetadata)
+        duration = tech.duration || duration
       } catch {}
     }
     
     return {
-      url: results[0].url,
-      normalizedUrl,
-      title: results[0].title,
-      description: results[0].description,
-      imageUrl: results[0].imageUrl,
-      publishedAt: results[0].publishedAt,
+      url: result.content.url,
+      normalizedUrl: result.content.canonicalUrl || normalizedUrl,
+      title: result.content.title,
+      description: result.content.description,
+      imageUrl: result.content.thumbnailUrl,
+      publishedAt: result.content.publishedAt,
       author,
-      provider: results[0].source,
+      provider: result.content.provider,
       duration,
       viewCount,
-      platform: results[0].source,
+      platform: result.content.provider,
       source: 'bookmark',
-      createdAt: results[0].createdAt,
-      updatedAt: results[0].updatedAt
+      createdAt: result.content.createdAt,
+      updatedAt: result.content.updatedAt
     }
   }
   
@@ -115,136 +111,104 @@ export class D1MetadataRepository implements MetadataRepository {
     const normalized = normalizeUrl(url)
     const normalizedUrl = normalized.normalized
     
-    // Query feed items with both original and normalized URL
+    // Query feed items joined with content table
     const results = await this.db
       .select({
-        url: feedItems.externalUrl,
-        title: feedItems.title,
-        description: feedItems.description,
-        imageUrl: feedItems.thumbnailUrl,
-        publishedAt: feedItems.publishedAt,
-        duration: feedItems.durationSeconds,
-        createdAt: feedItems.createdAt,
-        subscriptionId: feedItems.subscriptionId
+        feedItem: feedItems,
+        content: content
       })
       .from(feedItems)
+      .innerJoin(content, eq(feedItems.contentId, content.id))
       .where(
         or(
-          eq(feedItems.externalUrl, url),
-          eq(feedItems.externalUrl, normalizedUrl)
+          eq(content.url, url),
+          eq(content.url, normalizedUrl),
+          eq(content.canonicalUrl, url),
+          eq(content.canonicalUrl, normalizedUrl)
         )
       )
       .limit(1)
     
     if (results.length === 0) return null
     
-    // Determine provider from subscription
-    let provider = 'unknown'
-    const subscriptionId = results[0].subscriptionId
-    if (subscriptionId.startsWith('spotify:')) {
-      provider = 'spotify'
-    } else if (subscriptionId.startsWith('youtube:')) {
-      provider = 'youtube'
+    const result = results[0]
+    
+    // Parse metadata for additional fields
+    let duration = result.content.durationSeconds
+    let viewCount = result.content.viewCount
+    let author = result.content.creatorName
+    
+    // Try to get more data from metadata fields if available
+    if (result.content.statisticsMetadata) {
+      try {
+        const stats = JSON.parse(result.content.statisticsMetadata)
+        viewCount = stats.viewCount || viewCount
+      } catch {}
+    }
+    
+    if (result.content.technicalMetadata) {
+      try {
+        const tech = JSON.parse(result.content.technicalMetadata)
+        duration = tech.duration || duration
+      } catch {}
     }
     
     return {
-      url: results[0].url,
-      normalizedUrl,
-      title: results[0].title,
-      description: results[0].description,
-      imageUrl: results[0].imageUrl,
-      publishedAt: results[0].publishedAt,
-      author: null,
-      provider,
-      duration: results[0].duration,
-      viewCount: null,
-      platform: provider,
-      source: 'feed_item',
-      createdAt: results[0].createdAt
+      url: result.content.url,
+      normalizedUrl: result.content.canonicalUrl || normalizedUrl,
+      title: result.content.title,
+      description: result.content.description,
+      imageUrl: result.content.thumbnailUrl,
+      publishedAt: result.content.publishedAt,
+      author,
+      provider: result.content.provider,
+      duration,
+      viewCount,
+      platform: result.content.provider,
+      source: 'feed',
+      createdAt: result.content.createdAt,
+      updatedAt: result.content.updatedAt
     }
   }
   
   /**
-   * Optimized composite query using UNION for single database hit
-   * This is more efficient than two separate queries
+   * Get metadata stats for dashboard
    */
-  async findByUrlOptimized(url: string): Promise<ExistingMetadata | null> {
-    const normalized = normalizeUrl(url)
-    const normalizedUrl = normalized.normalized
+  async getMetadataStats(): Promise<{
+    totalBookmarks: number
+    totalFeedItems: number
+    bookmarksWithMetadata: number
+    feedItemsWithMetadata: number
+  }> {
+    // Count total bookmarks
+    const bookmarksCount = await this.db
+      .select({
+        total: content.id,
+        hasMetadata: content.enrichmentMetadata
+      })
+      .from(bookmarks)
+      .innerJoin(content, eq(bookmarks.contentId, content.id))
     
-    // Raw SQL query with UNION for optimal performance
-    const query = sql`
-      WITH metadata AS (
-        SELECT 
-          url,
-          title,
-          description,
-          thumbnail_url as imageUrl,
-          published_at as publishedAt,
-          NULL as author,
-          source as provider,
-          NULL as duration,
-          NULL as viewCount,
-          source as platform,
-          'bookmark' as source,
-          created_at as createdAt,
-          updated_at as updatedAt
-        FROM bookmarks
-        WHERE url = ${url} OR url = ${normalizedUrl} OR original_url = ${url} OR original_url = ${normalizedUrl}
-        
-        UNION ALL
-        
-        SELECT 
-          external_url as url,
-          title,
-          description,
-          thumbnail_url as imageUrl,
-          published_at as publishedAt,
-          NULL as author,
-          CASE
-            WHEN subscription_id LIKE 'spotify:%' THEN 'spotify'
-            WHEN subscription_id LIKE 'youtube:%' THEN 'youtube'
-            ELSE 'unknown'
-          END as provider,
-          duration_seconds as duration,
-          NULL as viewCount,
-          CASE
-            WHEN subscription_id LIKE 'spotify:%' THEN 'spotify'
-            WHEN subscription_id LIKE 'youtube:%' THEN 'youtube'
-            ELSE 'unknown'
-          END as platform,
-          'feed_item' as source,
-          created_at as createdAt,
-          NULL as updatedAt
-        FROM feed_items
-        WHERE external_url = ${url} OR external_url = ${normalizedUrl}
-      )
-      SELECT * FROM metadata
-      ORDER BY createdAt DESC
-      LIMIT 1
-    `
+    // Count total feed items
+    const feedItemsCount = await this.db
+      .select({
+        total: content.id,
+        hasMetadata: content.enrichmentMetadata
+      })
+      .from(feedItems)
+      .innerJoin(content, eq(feedItems.contentId, content.id))
     
-    const results = await this.db.all(query)
+    const totalBookmarks = bookmarksCount.length
+    const bookmarksWithMetadata = bookmarksCount.filter(b => b.hasMetadata).length
     
-    if (results.length === 0) return null
-    
-    const result = results[0] as any
+    const totalFeedItems = feedItemsCount.length
+    const feedItemsWithMetadata = feedItemsCount.filter(f => f.hasMetadata).length
     
     return {
-      url: result.url,
-      normalizedUrl,
-      title: result.title,
-      description: result.description,
-      imageUrl: result.imageUrl,
-      publishedAt: result.publishedAt ? new Date(result.publishedAt) : null,
-      author: result.author,
-      provider: result.provider,
-      duration: result.duration,
-      viewCount: result.viewCount,
-      platform: result.platform,
-      source: result.source as 'bookmark' | 'feed_item',
-      createdAt: new Date(result.createdAt),
-      updatedAt: result.updatedAt ? new Date(result.updatedAt) : undefined
+      totalBookmarks,
+      totalFeedItems,
+      bookmarksWithMetadata,
+      feedItemsWithMetadata
     }
   }
 }
