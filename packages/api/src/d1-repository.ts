@@ -76,7 +76,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
       const now = Date.now()
       
       // First, create or get content
-      const contentId = `web-${Buffer.from(bookmark.url || '').toString('base64').substring(0, 20)}`
+      // Use btoa for base64 encoding (available in Cloudflare Workers)
+      const urlHash = btoa(bookmark.url || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+      const contentId = `web-${urlHash}`
       
       // Insert content if not exists
       await this.db.prepare(`
@@ -359,7 +361,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
       
       // Generate content ID based on provider or URL
       const provider = bookmarkData.source || 'web'
-      const contentId = `${provider}-${Buffer.from(bookmarkData.url).toString('base64').substring(0, 20)}`
+      // Use btoa for base64 encoding (available in Cloudflare Workers)
+      const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+      const contentId = `${provider}-${urlHash}`
       
       // Insert or update content
       await this.db.prepare(`
