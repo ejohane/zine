@@ -363,9 +363,48 @@ export class D1BookmarkRepository implements BookmarkRepository {
       
       // Generate content ID based on provider or URL
       const provider = bookmarkData.source || 'web'
-      // Use btoa for base64 encoding (available in Cloudflare Workers)
-      const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
-      const contentId = `${provider}-${urlHash}`
+      let contentId: string
+      
+      // Extract platform-specific IDs for YouTube and Spotify
+      if (provider === 'youtube') {
+        // Support various YouTube URL formats
+        const patterns = [
+          /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([^&\n?#/]+)/,
+          /youtube\.com\/.*[?&]v=([^&\n?#]+)/
+        ]
+        let videoId: string | null = null
+        for (const pattern of patterns) {
+          const match = bookmarkData.url.match(pattern)
+          if (match) {
+            videoId = match[1]
+            break
+          }
+        }
+        if (videoId) {
+          contentId = `youtube-${videoId}`
+        } else {
+          // Fallback for malformed YouTube URLs
+          console.warn(`Failed to extract YouTube ID from URL: ${bookmarkData.url}`)
+          const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+          contentId = `youtube-malformed-${urlHash}`
+        }
+      } else if (provider === 'spotify') {
+        // Extract Spotify ID for all content types
+        const match = bookmarkData.url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
+        const spotifyId = match ? match[1] : null
+        if (spotifyId) {
+          contentId = `spotify-${spotifyId}`
+        } else {
+          // Fallback for malformed Spotify URLs
+          console.warn(`Failed to extract Spotify ID from URL: ${bookmarkData.url}`)
+          const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+          contentId = `spotify-malformed-${urlHash}`
+        }
+      } else {
+        // Default for web and other providers - use URL hash
+        const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+        contentId = `${provider}-${urlHash}`
+      }
       
       // Insert or update content
       await this.db.prepare(`
