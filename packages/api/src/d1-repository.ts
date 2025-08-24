@@ -99,13 +99,15 @@ export class D1BookmarkRepository implements BookmarkRepository {
         now
       ).run()
       
-      // Insert the bookmark
+      // Insert the bookmark with generated ID
+      const bookmarkId = crypto.randomUUID()
       const result = await this.db.prepare(`
         INSERT INTO bookmarks (
-          user_id, content_id, user_tags, status, bookmarked_at
-        ) VALUES (?, ?, ?, ?, ?)
+          id, user_id, content_id, user_tags, status, bookmarked_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
         RETURNING *
       `).bind(
+        bookmarkId,
         bookmark.userId,
         contentId,
         bookmark.tags ? JSON.stringify(bookmark.tags) : null,
@@ -392,13 +394,15 @@ export class D1BookmarkRepository implements BookmarkRepository {
         now
       ).run()
       
-      // Insert bookmark
+      // Insert bookmark with generated ID
+      const bookmarkId = crypto.randomUUID()
       const result = await this.db.prepare(`
         INSERT INTO bookmarks (
-          user_id, content_id, user_tags, notes, status, bookmarked_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+          id, user_id, content_id, user_tags, notes, status, bookmarked_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         RETURNING *
       `).bind(
+        bookmarkId,
         bookmarkData.userId,
         contentId,
         bookmarkData.tags ? JSON.stringify(bookmarkData.tags) : null,
