@@ -442,7 +442,7 @@ export class IntegratedEnrichmentService {
   }
 
   private extractSpotifyId(url: string): string | null {
-    const match = url.match(/spotify\.com\/episode\/([^?]+)/)
+    const match = url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
     return match ? match[1] : null
   }
 

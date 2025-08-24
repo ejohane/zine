@@ -268,20 +268,38 @@ export class ContentEnrichmentService {
   private parseProviderInfo(url: string, _metadata: any): { provider: string, externalId: string } {
     // YouTube
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      const videoId = this.extractYouTubeId(url) || crypto.randomBytes(8).toString('hex')
-      return { provider: 'youtube', externalId: videoId }
+      const videoId = this.extractYouTubeId(url)
+      if (videoId) {
+        return { provider: 'youtube', externalId: videoId }
+      }
+      // Fall back to URL hash for malformed YouTube URLs
+      console.warn(`Failed to extract YouTube ID from URL: ${url}`)
+      const urlHash = crypto.createHash('sha256').update(url).digest('hex').substring(0, 16)
+      return { provider: 'youtube', externalId: `malformed-${urlHash}` }
     }
     
     // Spotify
     if (url.includes('spotify.com')) {
-      const episodeId = this.extractSpotifyId(url) || crypto.randomBytes(8).toString('hex')
-      return { provider: 'spotify', externalId: episodeId }
+      const contentId = this.extractSpotifyId(url)
+      if (contentId) {
+        return { provider: 'spotify', externalId: contentId }
+      }
+      // Fall back to URL hash for malformed Spotify URLs
+      console.warn(`Failed to extract Spotify ID from URL: ${url}`)
+      const urlHash = crypto.createHash('sha256').update(url).digest('hex').substring(0, 16)
+      return { provider: 'spotify', externalId: `malformed-${urlHash}` }
     }
     
     // Twitter/X
     if (url.includes('twitter.com') || url.includes('x.com')) {
-      const tweetId = this.extractTwitterId(url) || crypto.randomBytes(8).toString('hex')
-      return { provider: 'twitter', externalId: tweetId }
+      const tweetId = this.extractTwitterId(url)
+      if (tweetId) {
+        return { provider: 'twitter', externalId: tweetId }
+      }
+      // Fall back to URL hash for malformed Twitter URLs
+      console.warn(`Failed to extract Twitter/X ID from URL: ${url}`)
+      const urlHash = crypto.createHash('sha256').update(url).digest('hex').substring(0, 16)
+      return { provider: 'twitter', externalId: `malformed-${urlHash}` }
     }
     
     // Default to web with URL hash
@@ -408,10 +426,10 @@ export class ContentEnrichmentService {
   }
 
   /**
-   * Extract Spotify episode ID from URL
+   * Extract Spotify content ID from URL (supports tracks, albums, artists, playlists, episodes, shows)
    */
   private extractSpotifyId(url: string): string | null {
-    const match = url.match(/spotify\.com\/episode\/([^?]+)/)
+    const match = url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
     return match ? match[1] : null
   }
 

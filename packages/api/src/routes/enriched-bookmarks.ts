@@ -48,7 +48,7 @@ app.post('/save-enriched', async (c) => {
         const match = validatedData.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/)
         contentId = match ? match[1] : null
       } else if (platform === 'spotify') {
-        const match = validatedData.url.match(/spotify\.com\/episode\/([^?]+)/)
+        const match = validatedData.url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
         contentId = match ? match[1] : null
       }
       
