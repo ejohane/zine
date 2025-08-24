@@ -6,7 +6,7 @@
       "args": ["run"],
       "env": {
         "CLOUDFLARE_ACCOUNT_ID": "887513bb1f71a8ef2029e2f9bd3086b2",
-        "CLOUDFLARE_API_TOKEN": "Tg23M3SYy-Skf7dCN8lGmogzyX_rX06Z04rsQfbR"
+        "CLOUDFLARE_API_TOKEN": "YsyojHYh3ka8TCjFfrrYZzVwJOZCdPBYueYRCa3"
       }
     },
     "playwright": {
