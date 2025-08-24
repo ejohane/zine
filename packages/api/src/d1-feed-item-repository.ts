@@ -350,12 +350,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
 
   async getUserFeedItemsBySubscription(userId: string, subscriptionId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
     let query = this.db
-      .select({
-        userFeedItem: schema.userFeedItems,
-        feedItem: schema.feedItems,
-        content: schema.content,
-        subscription: schema.subscriptions
-      })
+      .select()
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
@@ -382,15 +377,56 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const results = await query
 
     return results.map(row => ({
-      id: row.userFeedItem.id,
+      id: row.user_feed_items.id,
       feedItem: {
-        ...this.mapFeedItemWithContent(row.feedItem, row.content),
-        subscription: this.mapSubscription(row.subscription)
+        id: row.feed_items.id,
+        subscriptionId: row.feed_items.subscriptionId,
+        externalId: row.content.externalId,
+        title: row.content.title,
+        description: row.content.description || undefined,
+        thumbnailUrl: row.content.thumbnailUrl || undefined,
+        publishedAt: row.content.publishedAt ? new Date(row.content.publishedAt) : new Date(),
+        durationSeconds: row.content.durationSeconds || undefined,
+        externalUrl: row.content.url,
+        
+        // Phase 1 fields
+        viewCount: row.content.viewCount || undefined,
+        likeCount: row.content.likeCount || undefined,
+        commentCount: row.content.commentCount || undefined,
+        popularityScore: row.content.popularityScore || undefined,
+        language: row.content.language || undefined,
+        isExplicit: row.content.isExplicit || undefined,
+        contentType: row.content.contentType || undefined,
+        category: row.content.category || undefined,
+        tags: row.content.tags || undefined,
+        
+        // Phase 2 fields
+        creatorId: row.content.creatorId || undefined,
+        creatorName: row.content.creatorName || undefined,
+        creatorThumbnail: row.content.creatorThumbnail || undefined,
+        creatorVerified: row.content.creatorVerified || undefined,
+        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
+        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        seriesMetadata: row.content.seriesMetadata || undefined,
+        
+        subscription: {
+          id: row.subscriptions.id,
+          providerId: row.subscriptions.providerId,
+          externalId: row.subscriptions.externalId,
+          title: row.subscriptions.title,
+          creatorName: row.subscriptions.creatorName,
+          description: row.subscriptions.description || undefined,
+          thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
+          subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,
+          totalEpisodes: row.subscriptions.totalEpisodes || undefined
+        },
+        
+        createdAt: new Date(row.feed_items.addedToFeedAt || row.content.createdAt)
       },
-      isRead: Boolean(row.userFeedItem.isRead),
-      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
-      bookmarkId: row.userFeedItem.bookmarkId || undefined,
-      createdAt: new Date(row.userFeedItem.createdAt)
+      isRead: Boolean(row.user_feed_items.isRead),
+      readAt: row.user_feed_items.readAt ? new Date(row.user_feed_items.readAt) : undefined,
+      bookmarkId: row.user_feed_items.bookmarkId || undefined,
+      createdAt: new Date(row.user_feed_items.createdAt)
     }))
   }
 
@@ -446,121 +482,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
 
   async getUserFeedItemsWithDetails(userId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
     let query = this.db
-      .select({
-        userFeedItem: {
-          id: schema.userFeedItems.id,
-          userId: schema.userFeedItems.userId,
-          feedItemId: schema.userFeedItems.feedItemId,
-          isRead: schema.userFeedItems.isRead,
-          isSaved: schema.userFeedItems.isSaved,
-          isHidden: schema.userFeedItems.isHidden,
-          readAt: schema.userFeedItems.readAt,
-          savedAt: schema.userFeedItems.savedAt,
-          engagementTime: schema.userFeedItems.engagementTime,
-          bookmarkId: schema.userFeedItems.bookmarkId,
-          createdAt: schema.userFeedItems.createdAt
-        },
-        feedItem: {
-          id: schema.feedItems.id,
-          subscriptionId: schema.feedItems.subscriptionId,
-          contentId: schema.feedItems.contentId,
-          addedToFeedAt: schema.feedItems.addedToFeedAt,
-          positionInFeed: schema.feedItems.positionInFeed
-        },
-        content: {
-          id: schema.content.id,
-          externalId: schema.content.externalId,
-          provider: schema.content.provider,
-          url: schema.content.url,
-          canonicalUrl: schema.content.canonicalUrl,
-          title: schema.content.title,
-          description: schema.content.description,
-          thumbnailUrl: schema.content.thumbnailUrl,
-          faviconUrl: schema.content.faviconUrl,
-          publishedAt: schema.content.publishedAt,
-          durationSeconds: schema.content.durationSeconds,
-          viewCount: schema.content.viewCount,
-          likeCount: schema.content.likeCount,
-          commentCount: schema.content.commentCount,
-          shareCount: schema.content.shareCount,
-          saveCount: schema.content.saveCount,
-          popularityScore: schema.content.popularityScore,
-          engagementRate: schema.content.engagementRate,
-          trendingScore: schema.content.trendingScore,
-          creatorId: schema.content.creatorId,
-          creatorName: schema.content.creatorName,
-          creatorHandle: schema.content.creatorHandle,
-          creatorThumbnail: schema.content.creatorThumbnail,
-          creatorVerified: schema.content.creatorVerified,
-          creatorSubscriberCount: schema.content.creatorSubscriberCount,
-          creatorFollowerCount: schema.content.creatorFollowerCount,
-          seriesId: schema.content.seriesId,
-          seriesName: schema.content.seriesName,
-          episodeNumber: schema.content.episodeNumber,
-          seasonNumber: schema.content.seasonNumber,
-          totalEpisodesInSeries: schema.content.totalEpisodesInSeries,
-          isLatestEpisode: schema.content.isLatestEpisode,
-          seriesMetadata: schema.content.seriesMetadata,
-          contentType: schema.content.contentType,
-          category: schema.content.category,
-          subcategory: schema.content.subcategory,
-          language: schema.content.language,
-          isExplicit: schema.content.isExplicit,
-          ageRestriction: schema.content.ageRestriction,
-          tags: schema.content.tags,
-          topics: schema.content.topics,
-          hasCaptions: schema.content.hasCaptions,
-          hasTranscript: schema.content.hasTranscript,
-          hasHd: schema.content.hasHd,
-          has4k: schema.content.has4k,
-          videoQuality: schema.content.videoQuality,
-          audioQuality: schema.content.audioQuality,
-          audioLanguages: schema.content.audioLanguages,
-          captionLanguages: schema.content.captionLanguages,
-          contentFingerprint: schema.content.contentFingerprint,
-          publisherCanonicalId: schema.content.publisherCanonicalId,
-          normalizedTitle: schema.content.normalizedTitle,
-          episodeIdentifier: schema.content.episodeIdentifier,
-          crossPlatformMatches: schema.content.crossPlatformMatches,
-          statisticsMetadata: schema.content.statisticsMetadata,
-          technicalMetadata: schema.content.technicalMetadata,
-          enrichmentMetadata: schema.content.enrichmentMetadata,
-          extendedMetadata: schema.content.extendedMetadata,
-          createdAt: schema.content.createdAt,
-          updatedAt: schema.content.updatedAt,
-          lastEnrichedAt: schema.content.lastEnrichedAt,
-          enrichmentVersion: schema.content.enrichmentVersion,
-          enrichmentSource: schema.content.enrichmentSource
-        },
-        subscription: {
-          id: schema.subscriptions.id,
-          providerId: schema.subscriptions.providerId,
-          externalId: schema.subscriptions.externalId,
-          title: schema.subscriptions.title,
-          creatorName: schema.subscriptions.creatorName,
-          description: schema.subscriptions.description,
-          thumbnailUrl: schema.subscriptions.thumbnailUrl,
-          subscriptionUrl: schema.subscriptions.subscriptionUrl,
-          totalEpisodes: schema.subscriptions.totalEpisodes,
-          videoCount: schema.subscriptions.videoCount,
-          uploadsPlaylistId: schema.subscriptions.uploadsPlaylistId,
-          etag: schema.subscriptions.etag,
-          lastPolledAt: schema.subscriptions.lastPolledAt,
-          subscriberCount: schema.subscriptions.subscriberCount,
-          isVerified: schema.subscriptions.isVerified,
-          contentCategories: schema.subscriptions.contentCategories,
-          primaryLanguage: schema.subscriptions.primaryLanguage,
-          averageDuration: schema.subscriptions.averageDuration,
-          uploadFrequency: schema.subscriptions.uploadFrequency,
-          lastContentDate: schema.subscriptions.lastContentDate,
-          totalContentCount: schema.subscriptions.totalContentCount,
-          channelMetadata: schema.subscriptions.channelMetadata,
-          engagementRateAvg: schema.subscriptions.engagementRateAvg,
-          popularityAvg: schema.subscriptions.popularityAvg,
-          uploadSchedule: schema.subscriptions.uploadSchedule,
-          createdAt: schema.subscriptions.createdAt
-        }
-      })
+      .select()
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
@@ -583,15 +505,56 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const results = await query
 
     return results.map(row => ({
-      id: row.userFeedItem.id,
+      id: row.user_feed_items.id,
       feedItem: {
-        ...this.mapFeedItemWithContent(row.feedItem, row.content),
-        subscription: this.mapSubscription(row.subscription)
+        id: row.feed_items.id,
+        subscriptionId: row.feed_items.subscriptionId,
+        externalId: row.content.externalId,
+        title: row.content.title,
+        description: row.content.description || undefined,
+        thumbnailUrl: row.content.thumbnailUrl || undefined,
+        publishedAt: row.content.publishedAt ? new Date(row.content.publishedAt) : new Date(),
+        durationSeconds: row.content.durationSeconds || undefined,
+        externalUrl: row.content.url,
+        
+        // Phase 1 fields
+        viewCount: row.content.viewCount || undefined,
+        likeCount: row.content.likeCount || undefined,
+        commentCount: row.content.commentCount || undefined,
+        popularityScore: row.content.popularityScore || undefined,
+        language: row.content.language || undefined,
+        isExplicit: row.content.isExplicit || undefined,
+        contentType: row.content.contentType || undefined,
+        category: row.content.category || undefined,
+        tags: row.content.tags || undefined,
+        
+        // Phase 2 fields
+        creatorId: row.content.creatorId || undefined,
+        creatorName: row.content.creatorName || undefined,
+        creatorThumbnail: row.content.creatorThumbnail || undefined,
+        creatorVerified: row.content.creatorVerified || undefined,
+        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
+        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        seriesMetadata: row.content.seriesMetadata || undefined,
+        
+        subscription: {
+          id: row.subscriptions.id,
+          providerId: row.subscriptions.providerId,
+          externalId: row.subscriptions.externalId,
+          title: row.subscriptions.title,
+          creatorName: row.subscriptions.creatorName,
+          description: row.subscriptions.description || undefined,
+          thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
+          subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,
+          totalEpisodes: row.subscriptions.totalEpisodes || undefined
+        },
+        
+        createdAt: new Date(row.feed_items.addedToFeedAt || row.content.createdAt)
       },
-      isRead: Boolean(row.userFeedItem.isRead),
-      readAt: row.userFeedItem.readAt ? new Date(row.userFeedItem.readAt) : undefined,
-      bookmarkId: row.userFeedItem.bookmarkId || undefined,
-      createdAt: new Date(row.userFeedItem.createdAt)
+      isRead: Boolean(row.user_feed_items.isRead),
+      readAt: row.user_feed_items.readAt ? new Date(row.user_feed_items.readAt) : undefined,
+      bookmarkId: row.user_feed_items.bookmarkId || undefined,
+      createdAt: new Date(row.user_feed_items.createdAt)
     }))
   }
 
