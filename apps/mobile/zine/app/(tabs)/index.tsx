@@ -1,10 +1,12 @@
-import { ScrollView, YStack, H1, Paragraph, Card, XStack, Button, Spinner } from 'tamagui';
-import { RefreshCw, Filter, Bookmark, Share2 } from '@tamagui/lucide-icons';
+import { ScrollView, YStack, H1, Paragraph, XStack, Spinner } from 'tamagui';
+import { RefreshCw, Filter } from '@tamagui/lucide-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RefreshControl } from 'react-native';
 import { useState } from 'react';
 import { useFeed, useRefreshFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
+import { FeedItemCard } from '@/components/cards/FeedItemCard';
+import { Button } from '@/components/ui/Button';
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
@@ -17,6 +19,65 @@ export default function HomeScreen() {
     await refreshFeed.mutateAsync();
     setRefreshing(false);
   };
+
+  const handlePlay = (id: string) => {
+    console.log('Play item:', id);
+  };
+
+  const handleBookmark = (id: string) => {
+    console.log('Toggle bookmark:', id);
+  };
+
+  const handleMore = (id: string) => {
+    console.log('More options for:', id);
+  };
+
+  const handleCardPress = (id: string) => {
+    console.log('Open feed item:', id);
+  };
+
+  // Mock data for demonstration
+  const mockFeedItems = [
+    {
+      id: '1',
+      title: 'The Tim Ferriss Show: Derek Sivers on Developing Strong Philosophies',
+      description: 'Derek Sivers shares his unconventional approach to life and business.',
+      imageUrl: 'https://picsum.photos/200/200?random=4',
+      source: 'Tim Ferriss',
+      platform: 'spotify' as const,
+      duration: '1:45:23',
+      publishedAt: new Date().toISOString(),
+      isPlayed: false,
+      isBookmarked: false,
+      episodeNumber: '655',
+      contentType: 'podcast' as const,
+    },
+    {
+      id: '2',
+      title: 'How to Build a Second Brain',
+      description: 'Tiago Forte explains his revolutionary method for organizing your digital life.',
+      imageUrl: 'https://picsum.photos/200/200?random=5',
+      source: 'Ali Abdaal',
+      platform: 'youtube' as const,
+      duration: '18:42',
+      publishedAt: new Date(Date.now() - 3600000).toISOString(),
+      isPlayed: true,
+      isBookmarked: false,
+      contentType: 'video' as const,
+    },
+    {
+      id: '3',
+      title: 'The State of JavaScript 2024',
+      description: 'Annual survey results showing the latest trends in JavaScript frameworks.',
+      imageUrl: 'https://picsum.photos/200/200?random=6',
+      source: 'Dev.to',
+      platform: 'default' as const,
+      publishedAt: new Date(Date.now() - 7200000).toISOString(),
+      isPlayed: false,
+      isBookmarked: true,
+      contentType: 'article' as const,
+    },
+  ];
 
   if (!isSignedIn) {
     return (
@@ -42,12 +103,11 @@ export default function HomeScreen() {
             )}
           </YStack>
           <XStack gap="$2">
-            <Button size="$3" circular icon={Filter} chromeless />
+            <Button size="sm" variant="ghost" icon={Filter} />
             <Button 
-              size="$3" 
-              circular 
+              size="sm" 
+              variant="ghost"
               icon={RefreshCw} 
-              chromeless 
               onPress={handleRefresh}
               disabled={refreshing}
             />
@@ -64,7 +124,7 @@ export default function HomeScreen() {
             <Paragraph size="$5" color="$red10" textAlign="center">
               Failed to load feed
             </Paragraph>
-            <Button marginTop="$3" onPress={handleRefresh}>
+            <Button variant="primary" marginTop="$3" onPress={handleRefresh}>
               Retry
             </Button>
           </YStack>
@@ -79,52 +139,30 @@ export default function HomeScreen() {
             <YStack gap="$3">
               {(feedData as any)?.items?.length > 0 ? (
                 (feedData as any).items.map((item: any) => (
-                  <Card key={item.id} elevate bordered animation="quick">
-                    <Card.Header padded>
-                      <YStack gap="$2">
-                        <Paragraph size="$5" fontWeight="600">
-                          {item.title}
-                        </Paragraph>
-                        <Paragraph size="$3" color="$color" opacity={0.7} numberOfLines={2}>
-                          {item.description || 'No description available'}
-                        </Paragraph>
-                        <XStack gap="$2" justifyContent="space-between" alignItems="center">
-                          <Paragraph size="$2" color="$color" opacity={0.5}>
-                            {item.source} • {new Date(item.publishedAt).toLocaleDateString()}
-                          </Paragraph>
-                          <XStack gap="$2">
-                            <Button size="$2" icon={Bookmark} chromeless />
-                            <Button size="$2" icon={Share2} chromeless />
-                          </XStack>
-                        </XStack>
-                      </YStack>
-                    </Card.Header>
-                  </Card>
+                  <FeedItemCard
+                    key={item.id}
+                    item={{
+                      ...item,
+                      platform: item.platform || 'default',
+                      contentType: item.contentType || 'article',
+                    }}
+                    onPress={() => handleCardPress(item.id)}
+                    onPlay={handlePlay}
+                    onBookmark={handleBookmark}
+                    onMore={handleMore}
+                  />
                 ))
               ) : (
-                // Fallback to placeholder data when API not connected
-                [1, 2, 3, 4, 5].map((item) => (
-                  <Card key={item} elevate bordered animation="quick">
-                    <Card.Header padded>
-                      <YStack gap="$2">
-                        <Paragraph size="$5" fontWeight="600">
-                          Feed Item {item}
-                        </Paragraph>
-                        <Paragraph size="$3" color="$color" opacity={0.7}>
-                          This is a placeholder for a feed item. Connect to the API to see real content.
-                        </Paragraph>
-                        <XStack gap="$2" justifyContent="space-between" alignItems="center">
-                          <Paragraph size="$2" color="$color" opacity={0.5}>
-                            Source • 2 hours ago
-                          </Paragraph>
-                          <XStack gap="$2">
-                            <Button size="$2" icon={Bookmark} chromeless />
-                            <Button size="$2" icon={Share2} chromeless />
-                          </XStack>
-                        </XStack>
-                      </YStack>
-                    </Card.Header>
-                  </Card>
+                // Use mock data when API not connected
+                mockFeedItems.map((item) => (
+                  <FeedItemCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => handleCardPress(item.id)}
+                    onPlay={handlePlay}
+                    onBookmark={handleBookmark}
+                    onMore={handleMore}
+                  />
                 ))
               )}
             </YStack>
