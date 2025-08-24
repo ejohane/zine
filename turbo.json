@@ -21,6 +21,16 @@
     "storybook": {
       "cache": false,
       "persistent": true
+    },
+    "start": {
+      "cache": false,
+      "persistent": true
+    },
+    "ios": {
+      "cache": false
+    },
+    "android": {
+      "cache": false
     }
   }
 }

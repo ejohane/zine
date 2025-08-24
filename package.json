@@ -15,7 +15,10 @@
     "deploy:production": "turbo deploy:production",
     "prepare": "husky",
     "sync-db": "./scripts/sync-db-from-main.sh",
-    "storybook": "cd packages/design-system && bun run storybook"
+    "storybook": "cd packages/design-system && bun run storybook",
+    "mobile": "cd apps/mobile/zine && bun run start",
+    "mobile:ios": "cd apps/mobile/zine && bun run ios",
+    "mobile:android": "cd apps/mobile/zine && bun run android"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",

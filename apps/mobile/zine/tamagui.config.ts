@@ -1,0 +1,186 @@
+import { config } from '@tamagui/config/v3'
+import { createTamagui } from 'tamagui'
+
+const appConfig = createTamagui({
+  ...config,
+  themes: {
+    light: {
+      background: '#ffffff',
+      backgroundHover: '#f5f5f5',
+      backgroundPress: '#ebebeb',
+      backgroundFocus: '#e0e0e0',
+      backgroundStrong: '#f8f8f8',
+      backgroundTransparent: 'rgba(255,255,255,0)',
+      color: '#000000',
+      colorHover: '#111111',
+      colorPress: '#222222',
+      colorFocus: '#333333',
+      colorTransparent: 'rgba(0,0,0,0)',
+      borderColor: '#e5e5e5',
+      borderColorHover: '#d4d4d4',
+      borderColorFocus: '#a3a3a3',
+      borderColorPress: '#d4d4d4',
+      placeholderColor: '#737373',
+      
+      // Brand colors
+      primary: '#8b5cf6',
+      primaryLight: '#a78bfa',
+      primaryDark: '#7c3aed',
+      secondary: '#64748b',
+      secondaryLight: '#94a3b8',
+      secondaryDark: '#475569',
+      
+      // Semantic colors
+      success: '#22c55e',
+      successLight: '#4ade80',
+      successDark: '#16a34a',
+      warning: '#f59e0b',
+      warningLight: '#fbbf24',
+      warningDark: '#d97706',
+      error: '#ef4444',
+      errorLight: '#f87171',
+      errorDark: '#dc2626',
+      info: '#3b82f6',
+      infoLight: '#60a5fa',
+      infoDark: '#2563eb',
+      
+      // Platform colors
+      spotify: '#1DB954',
+      youtube: '#FF0000',
+      apple: '#000000',
+      google: '#4285F4',
+    },
+    dark: {
+      background: '#0a0a0a',
+      backgroundHover: '#171717',
+      backgroundPress: '#1f1f1f',
+      backgroundFocus: '#262626',
+      backgroundStrong: '#050505',
+      backgroundTransparent: 'rgba(10,10,10,0)',
+      color: '#ffffff',
+      colorHover: '#f5f5f5',
+      colorPress: '#e5e5e5',
+      colorFocus: '#d4d4d4',
+      colorTransparent: 'rgba(255,255,255,0)',
+      borderColor: '#262626',
+      borderColorHover: '#404040',
+      borderColorFocus: '#525252',
+      borderColorPress: '#404040',
+      placeholderColor: '#737373',
+      
+      // Brand colors
+      primary: '#a78bfa',
+      primaryLight: '#c4b5fd',
+      primaryDark: '#8b5cf6',
+      secondary: '#94a3b8',
+      secondaryLight: '#cbd5e1',
+      secondaryDark: '#64748b',
+      
+      // Semantic colors
+      success: '#4ade80',
+      successLight: '#86efac',
+      successDark: '#22c55e',
+      warning: '#fbbf24',
+      warningLight: '#fde047',
+      warningDark: '#f59e0b',
+      error: '#f87171',
+      errorLight: '#fca5a5',
+      errorDark: '#ef4444',
+      info: '#60a5fa',
+      infoLight: '#93c5fd',
+      infoDark: '#3b82f6',
+      
+      // Platform colors
+      spotify: '#1DB954',
+      youtube: '#FF0000',
+      apple: '#ffffff',
+      google: '#4285F4',
+    }
+  },
+  tokens: {
+    ...config.tokens,
+    color: {
+      ...config.tokens.color,
+      // Custom color tokens
+      primaryMain: '#8b5cf6',
+      primaryLight: '#a78bfa',
+      primaryDark: '#7c3aed',
+      secondaryMain: '#64748b',
+      secondaryLight: '#94a3b8',
+      secondaryDark: '#475569',
+    },
+    space: {
+      0: 0,
+      1: 4,
+      2: 8,
+      3: 12,
+      4: 16,
+      5: 20,
+      6: 24,
+      7: 28,
+      8: 32,
+      9: 36,
+      10: 40,
+      11: 44,
+      12: 48,
+      13: 52,
+      14: 56,
+      15: 60,
+      16: 64,
+      20: 80,
+      24: 96,
+      32: 128,
+      true: 16,
+    },
+    size: {
+      0: 0,
+      1: 4,
+      2: 8,
+      3: 12,
+      4: 16,
+      5: 20,
+      6: 24,
+      7: 28,
+      8: 32,
+      9: 36,
+      10: 40,
+      11: 44,
+      12: 48,
+      13: 52,
+      14: 56,
+      15: 60,
+      16: 64,
+      20: 80,
+      24: 96,
+      32: 128,
+      true: 16,
+    },
+    radius: {
+      0: 0,
+      1: 4,
+      2: 8,
+      3: 12,
+      4: 16,
+      5: 20,
+      6: 24,
+      true: 8,
+    },
+    zIndex: {
+      0: 0,
+      1: 100,
+      2: 200,
+      3: 300,
+      4: 400,
+      5: 500,
+    },
+  },
+  fonts: config.fonts,
+})
+
+export type AppConfig = typeof appConfig
+
+declare module 'tamagui' {
+  interface TamaguiCustomConfig extends AppConfig {}
+}
+
+export default appConfig
