@@ -89,6 +89,22 @@ echo "$WORKTREES" | while read -r worktree; do
         fi
     done
     
+    # Check if mobile app directory exists in this worktree
+    mobile_app_dir="$worktree/apps/mobile/zine"
+    if [ -d "$mobile_app_dir" ]; then
+        echo -e "  ${GREEN}Found React Native app, syncing environment...${NC}"
+        
+        # Copy web .env.local to mobile app location
+        if [ -f "$MAIN_DIR/apps/web/.env.local" ]; then
+            cp "$MAIN_DIR/apps/web/.env.local" "$mobile_app_dir/.env.local"
+            echo -e "  ${GREEN}✓${NC} Copied: apps/web/.env.local → apps/mobile/zine/.env.local"
+            ((files_synced++))
+        else
+            echo -e "  ${YELLOW}⚠${NC} Source .env.local not found"
+            ((files_skipped++))
+        fi
+    fi
+    
     # Also sync .wrangler/state directory if it exists (for D1 database)
     if [ -d "$MAIN_DIR/.wrangler/state" ]; then
         echo -e "  Syncing .wrangler/state directory..."
@@ -108,3 +124,4 @@ echo "  - API environment variables (.dev.vars, .env)"
 echo "  - Local database files (local.db and related)"
 echo "  - Web app environment variables (.env.local)"
 echo "  - Wrangler state directory (D1 database)"
+echo "  - React Native app environment (if apps/mobile/zine exists)"

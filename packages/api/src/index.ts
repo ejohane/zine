@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
+import { z } from 'zod'
 import { 
   CreateBookmarkSchema, 
   UpdateBookmarkSchema,
@@ -187,8 +188,14 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
   }
 })
 
-// Apply authentication middleware to protected routes
-app.use('/api/v1/bookmarks/*', authMiddleware)
+// Apply authentication middleware to protected routes (excluding preview)
+app.use('/api/v1/bookmarks/*', async (c, next) => {
+  // Skip auth for preview endpoint
+  if (c.req.path === '/api/v1/bookmarks/preview') {
+    return next()
+  }
+  return authMiddleware(c, next)
+})
 app.use('/api/v1/accounts/*', authMiddleware)
 app.use('/api/v1/subscriptions/*', authMiddleware)
 app.use('/api/v1/feed/*', authMiddleware)
@@ -1330,6 +1337,7 @@ app.post('/api/v1/bookmarks/save', async (c) => {
   
   try {
     const body = await c.req.json()
+    console.log('[Save Endpoint] Received body:', JSON.stringify(body))
     const validatedData = SaveBookmarkSchema.parse(body)
     
     // Ensure user exists in database before creating bookmark
@@ -1368,6 +1376,13 @@ app.post('/api/v1/bookmarks/save', async (c) => {
     }, 201)
   } catch (error) {
     console.error('Error creating bookmark with metadata:', error)
+    if (error instanceof z.ZodError) {
+      console.error('Validation errors:', error.errors)
+      return c.json({ 
+        error: 'Invalid request data', 
+        details: error.errors 
+      }, 400)
+    }
     return c.json({ error: 'Invalid request data' }, 400)
   }
 })
@@ -1655,4 +1670,4 @@ export default {
 
 // Export Durable Objects
 export { UserSubscriptionManager } from './durable-objects/user-subscription-manager'
-export { UserRecentBookmarksDO } from './durableObjects/UserRecentBookmarksDO'
+export { UserRecentBookmarksDO } from './durable-objects/user-recent-bookmarks-do'

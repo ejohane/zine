@@ -49,18 +49,18 @@ export class QueryOptimizer {
     const indexes = [
       // Composite index for feed item lookups
       {
-        name: 'idx_feed_items_subscription_external',
+        name: 'idx_feed_items_subscription_content',
         table: 'feed_items',
-        sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_subscription_external 
-              ON feed_items(subscription_id, external_id)`
+        sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_subscription_content 
+              ON feed_items(subscription_id, content_id)`
       },
       
       // Index for recent items by subscription
       {
-        name: 'idx_feed_items_subscription_published',
+        name: 'idx_feed_items_subscription_added',
         table: 'feed_items',
-        sql: `CREATE INDEX IF NOT EXISTS idx_feed_items_subscription_published 
-              ON feed_items(subscription_id, published_at DESC)`
+        sql: `CREATE INDEX IF NOT EXISTS idx_feed_items_subscription_added 
+              ON feed_items(subscription_id, added_to_feed_at DESC)`
       },
 
       // Index for user feed items lookups
@@ -241,7 +241,7 @@ export class QueryOptimizer {
         title: 'Use Covering Indexes',
         description: 'Ensure queries can be satisfied entirely from indexes',
         impact: 'Medium',
-        example: 'SELECT subscription_id, external_id uses idx_feed_items_subscription_external'
+        example: 'SELECT subscription_id, content_id uses idx_feed_items_subscription_content'
       },
       {
         title: 'Limit Result Sets',
