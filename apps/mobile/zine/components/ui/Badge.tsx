@@ -1,130 +1,76 @@
-import { styled, Text, View, ViewProps } from 'tamagui'
+import React from 'react'
+import { View, Text, ViewProps } from 'react-native'
+import { cn } from '../../lib/utils'
 
 export interface BadgeProps extends ViewProps {
   variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'spotify' | 'youtube' | 'apple'
   size?: 'sm' | 'md' | 'lg'
   children: React.ReactNode
+  className?: string
 }
 
-const StyledBadge = styled(View, {
-  name: 'Badge',
-  borderRadius: '$2',
-  paddingHorizontal: '$2',
-  paddingVertical: '$1',
-  alignItems: 'center',
-  justifyContent: 'center',
-  
-  variants: {
-    variant: {
-      default: {
-        backgroundColor: '$backgroundHover',
-      },
-      primary: {
-        backgroundColor: '$primary',
-      },
-      secondary: {
-        backgroundColor: '$secondary',
-      },
-      success: {
-        backgroundColor: '$success',
-      },
-      warning: {
-        backgroundColor: '$warning',
-      },
-      error: {
-        backgroundColor: '$error',
-      },
-      spotify: {
-        backgroundColor: '$spotify',
-      },
-      youtube: {
-        backgroundColor: '$youtube',
-      },
-      apple: {
-        backgroundColor: '$apple',
-      },
-    },
-    badgeSize: {
-      sm: {
-        paddingHorizontal: '$1.5',
-        paddingVertical: '$0.5',
-      },
-      md: {
-        paddingHorizontal: '$2',
-        paddingVertical: '$1',
-      },
-      lg: {
-        paddingHorizontal: '$3',
-        paddingVertical: '$1.5',
-      },
-    },
-  } as const,
-  
-  defaultVariants: {
-    variant: 'default',
-    badgeSize: 'md',
-  },
-})
+export const Badge = ({ 
+  variant = 'default', 
+  size = 'md', 
+  children, 
+  className,
+  ...props 
+}: BadgeProps) => {
+  const variantClasses = {
+    default: 'bg-gray-100',
+    primary: 'bg-blue-500',
+    secondary: 'bg-gray-500',
+    success: 'bg-green-500',
+    warning: 'bg-yellow-500',
+    error: 'bg-red-500',
+    spotify: 'bg-green-600',
+    youtube: 'bg-red-600',
+    apple: 'bg-black',
+  }
 
-const BadgeText = styled(Text, {
-  name: 'BadgeText',
-  fontWeight: '600',
-  
-  variants: {
-    variant: {
-      default: {
-        color: '$color',
-      },
-      primary: {
-        color: 'white',
-      },
-      secondary: {
-        color: 'white',
-      },
-      success: {
-        color: 'white',
-      },
-      warning: {
-        color: 'white',
-      },
-      error: {
-        color: 'white',
-      },
-      spotify: {
-        color: 'white',
-      },
-      youtube: {
-        color: 'white',
-      },
-      apple: {
-        color: 'white',
-      },
-    },
-    textSize: {
-      sm: {
-        fontSize: '$1',
-      },
-      md: {
-        fontSize: '$2',
-      },
-      lg: {
-        fontSize: '$3',
-      },
-    },
-  } as const,
-  
-  defaultVariants: {
-    variant: 'default',
-    textSize: 'md',
-  },
-})
+  const sizeClasses = {
+    sm: 'px-1.5 py-0.5',
+    md: 'px-2 py-1',
+    lg: 'px-3 py-1.5',
+  }
 
-export const Badge = ({ variant = 'default', size = 'md', children, ...props }: BadgeProps) => {
+  const textVariantClasses = {
+    default: 'text-gray-900',
+    primary: 'text-white',
+    secondary: 'text-white',
+    success: 'text-white',
+    warning: 'text-white',
+    error: 'text-white',
+    spotify: 'text-white',
+    youtube: 'text-white',
+    apple: 'text-white',
+  }
+
+  const textSizeClasses = {
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base',
+  }
+
   return (
-    <StyledBadge variant={variant} badgeSize={size} {...props}>
-      <BadgeText variant={variant} textSize={size}>
+    <View 
+      className={cn(
+        'rounded-md items-center justify-center',
+        variantClasses[variant],
+        sizeClasses[size],
+        className
+      )}
+      {...props}
+    >
+      <Text 
+        className={cn(
+          'font-semibold',
+          textVariantClasses[variant],
+          textSizeClasses[size]
+        )}
+      >
         {children}
-      </BadgeText>
-    </StyledBadge>
+      </Text>
+    </View>
   )
 }

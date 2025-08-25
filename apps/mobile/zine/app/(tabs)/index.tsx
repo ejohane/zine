@@ -1,174 +1,109 @@
-import { ScrollView, YStack, H1, Paragraph, XStack, Spinner } from 'tamagui';
-import { RefreshCw, Filter } from '@tamagui/lucide-icons';
+import { ScrollView, View, Text, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RefreshControl } from 'react-native';
 import { useState } from 'react';
-import { useFeed, useRefreshFeed } from '@/hooks/useFeed';
 import { useAuth } from '@/hooks/useAuth';
-import { FeedItemCard } from '@/components/cards/FeedItemCard';
-import { Button } from '@/components/ui/Button';
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
-  const { data: feedData, isLoading, error } = useFeed();
-  const refreshFeed = useRefreshFeed();
-  const { isSignedIn, userEmail } = useAuth();
+  const { isSignedIn } = useAuth();
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshFeed.mutateAsync();
-    setRefreshing(false);
+    // TODO: Refresh data
+    setTimeout(() => setRefreshing(false), 1000);
   };
 
-  const handlePlay = (id: string) => {
-    console.log('Play item:', id);
-  };
+  // TEMPORARY: Bypass auth for development
+  const BYPASS_AUTH = true;
 
-  const handleBookmark = (id: string) => {
-    console.log('Toggle bookmark:', id);
-  };
-
-  const handleMore = (id: string) => {
-    console.log('More options for:', id);
-  };
-
-  const handleCardPress = (id: string) => {
-    console.log('Open feed item:', id);
-  };
-
-  // Mock data for demonstration
-  const mockFeedItems = [
-    {
-      id: '1',
-      title: 'The Tim Ferriss Show: Derek Sivers on Developing Strong Philosophies',
-      description: 'Derek Sivers shares his unconventional approach to life and business.',
-      imageUrl: 'https://picsum.photos/200/200?random=4',
-      source: 'Tim Ferriss',
-      platform: 'spotify' as const,
-      duration: '1:45:23',
-      publishedAt: new Date().toISOString(),
-      isPlayed: false,
-      isBookmarked: false,
-      episodeNumber: '655',
-      contentType: 'podcast' as const,
-    },
-    {
-      id: '2',
-      title: 'How to Build a Second Brain',
-      description: 'Tiago Forte explains his revolutionary method for organizing your digital life.',
-      imageUrl: 'https://picsum.photos/200/200?random=5',
-      source: 'Ali Abdaal',
-      platform: 'youtube' as const,
-      duration: '18:42',
-      publishedAt: new Date(Date.now() - 3600000).toISOString(),
-      isPlayed: true,
-      isBookmarked: false,
-      contentType: 'video' as const,
-    },
-    {
-      id: '3',
-      title: 'The State of JavaScript 2024',
-      description: 'Annual survey results showing the latest trends in JavaScript frameworks.',
-      imageUrl: 'https://picsum.photos/200/200?random=6',
-      source: 'Dev.to',
-      platform: 'default' as const,
-      publishedAt: new Date(Date.now() - 7200000).toISOString(),
-      isPlayed: false,
-      isBookmarked: true,
-      contentType: 'article' as const,
-    },
-  ];
-
-  if (!isSignedIn) {
+  if (!isSignedIn && !BYPASS_AUTH) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <YStack f={1} backgroundColor="$background" alignItems="center" justifyContent="center" padding="$4">
-          <H1 size="$8" marginBottom="$4">Welcome to Zine</H1>
-          <Paragraph size="$5" textAlign="center" opacity={0.7}>
-            Please sign in to view your personalized feed
-          </Paragraph>
-        </YStack>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <View className="flex-1 items-center justify-center px-4">
+          <Text className="text-4xl font-bold mb-4">Welcome to Zine</Text>
+          <Text className="text-lg text-gray-600 text-center mb-8">
+            Your intelligent bookmark manager with a modern twist
+          </Text>
+          <View className="w-full max-w-xs gap-3">
+            <View className="bg-primary-500 py-3 px-6 rounded-lg">
+              <Text className="text-white text-center font-semibold">Sign In</Text>
+            </View>
+            <View className="border border-primary-500 py-3 px-6 rounded-lg">
+              <Text className="text-primary-500 text-center font-semibold">Create Account</Text>
+            </View>
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <YStack f={1} backgroundColor="$background">
-        <XStack padding="$4" alignItems="center" justifyContent="space-between">
-          <YStack>
-            <H1 size="$8">Feed</H1>
-            {userEmail && (
-              <Paragraph size="$2" opacity={0.5}>{userEmail}</Paragraph>
-            )}
-          </YStack>
-          <XStack gap="$2">
-            <Button size="sm" variant="ghost" icon={Filter} />
-            <Button 
-              size="sm" 
-              variant="ghost"
-              icon={RefreshCw} 
-              onPress={handleRefresh}
-              disabled={refreshing}
-            />
-          </XStack>
-        </XStack>
-        
-        {isLoading ? (
-          <YStack f={1} alignItems="center" justifyContent="center">
-            <Spinner size="large" />
-            <Paragraph marginTop="$3" opacity={0.7}>Loading feed...</Paragraph>
-          </YStack>
-        ) : error ? (
-          <YStack f={1} alignItems="center" justifyContent="center" padding="$4">
-            <Paragraph size="$5" color="$red10" textAlign="center">
-              Failed to load feed
-            </Paragraph>
-            <Button variant="primary" marginTop="$3" onPress={handleRefresh}>
-              Retry
-            </Button>
-          </YStack>
-        ) : (
-          <ScrollView 
-            flex={1} 
-            contentContainerStyle={{ padding: 16 }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-            }
-          >
-            <YStack gap="$3">
-              {(feedData as any)?.items?.length > 0 ? (
-                (feedData as any).items.map((item: any) => (
-                  <FeedItemCard
-                    key={item.id}
-                    item={{
-                      ...item,
-                      platform: item.platform || 'default',
-                      contentType: item.contentType || 'article',
-                    }}
-                    onPress={() => handleCardPress(item.id)}
-                    onPlay={handlePlay}
-                    onBookmark={handleBookmark}
-                    onMore={handleMore}
-                  />
-                ))
-              ) : (
-                // Use mock data when API not connected
-                mockFeedItems.map((item) => (
-                  <FeedItemCard
-                    key={item.id}
-                    item={item}
-                    onPress={() => handleCardPress(item.id)}
-                    onPlay={handlePlay}
-                    onBookmark={handleBookmark}
-                    onMore={handleMore}
-                  />
-                ))
-              )}
-            </YStack>
-          </ScrollView>
-        )}
-      </YStack>
+    <SafeAreaView className="flex-1 bg-gray-50">
+      <ScrollView
+        className="flex-1"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
+        <View className="pt-4 pb-8">
+          {/* Greeting Section */}
+          <View className="px-4 mb-6">
+            <Text className="text-3xl font-bold mb-2">Good morning!</Text>
+            <Text className="text-gray-600">Ready to explore your content?</Text>
+          </View>
+
+          {/* Quick Actions */}
+          <View className="px-4 mb-6">
+            <View className="flex-row gap-3">
+              <View className="flex-1 bg-white p-4 rounded-lg">
+                <Text className="text-center">Continue</Text>
+              </View>
+              <View className="flex-1 bg-white p-4 rounded-lg">
+                <Text className="text-center">Starred</Text>
+              </View>
+              <View className="flex-1 bg-white p-4 rounded-lg">
+                <Text className="text-center">Add New</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Recent Section */}
+          <View className="mb-6">
+            <Text className="text-xl font-semibold px-4 mb-3">Recently Added</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4">
+              <View className="bg-white rounded-lg p-4 mr-3 w-48">
+                <Text className="font-semibold">Sample Item 1</Text>
+                <Text className="text-gray-600 text-sm">Podcast</Text>
+              </View>
+              <View className="bg-white rounded-lg p-4 mr-3 w-48">
+                <Text className="font-semibold">Sample Item 2</Text>
+                <Text className="text-gray-600 text-sm">Video</Text>
+              </View>
+              <View className="bg-white rounded-lg p-4 mr-3 w-48">
+                <Text className="font-semibold">Sample Item 3</Text>
+                <Text className="text-gray-600 text-sm">Article</Text>
+              </View>
+            </ScrollView>
+          </View>
+
+          {/* Queue Section */}
+          <View className="px-4">
+            <Text className="text-xl font-semibold mb-3">Your Queue</Text>
+            <View className="bg-white rounded-lg p-4 mb-3">
+              <Text className="font-semibold">Queue Item 1</Text>
+              <Text className="text-gray-600 text-sm">10 min • Podcast</Text>
+            </View>
+            <View className="bg-white rounded-lg p-4 mb-3">
+              <Text className="font-semibold">Queue Item 2</Text>
+              <Text className="text-gray-600 text-sm">5 min • Article</Text>
+            </View>
+            <View className="bg-white rounded-lg p-4 mb-3">
+              <Text className="font-semibold">Queue Item 3</Text>
+              <Text className="text-gray-600 text-sm">20 min • Video</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

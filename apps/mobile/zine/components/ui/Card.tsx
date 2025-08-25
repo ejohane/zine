@@ -1,65 +1,75 @@
-import { Card as TamaguiCard, CardProps as TamaguiCardProps, styled } from 'tamagui'
+import React from 'react'
+import { View, ViewProps, Pressable, PressableProps } from 'react-native'
+import { cn } from '../../lib/utils'
 
-export interface CardProps extends TamaguiCardProps {
+export interface CardProps extends ViewProps {
   variant?: 'elevated' | 'outlined' | 'filled'
   fullWidth?: boolean
+  onPress?: () => void
+  pressable?: boolean
+  children?: React.ReactNode
+  className?: string
 }
 
-const StyledCard = styled(TamaguiCard, {
-  name: 'Card',
-  backgroundColor: '$background',
-  borderRadius: '$4',
-  padding: '$4',
-  
-  variants: {
-    variant: {
-      elevated: {
-        elevate: true,
-        bordered: false,
-        shadowColor: '$shadowColor',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-      },
-      outlined: {
-        bordered: true,
-        borderWidth: 1,
-        borderColor: '$borderColor',
-        elevate: false,
-      },
-      filled: {
-        backgroundColor: '$backgroundHover',
-        bordered: false,
-        elevate: false,
-      },
-    },
-    fullWidth: {
-      true: {
-        width: '100%',
-      },
-    },
-  } as const,
-  
-  defaultVariants: {
-    variant: 'elevated',
-  },
-})
+export const Card = ({ 
+  variant = 'elevated', 
+  fullWidth, 
+  onPress,
+  pressable,
+  children, 
+  className,
+  style,
+  ...props 
+}: CardProps) => {
+  const variantClasses = {
+    elevated: 'bg-white rounded-lg p-4 shadow-sm border border-gray-100',
+    outlined: 'bg-white rounded-lg p-4 border border-gray-200',
+    filled: 'bg-gray-50 rounded-lg p-4',
+  }
 
-export const Card = ({ variant = 'elevated', fullWidth, children, ...props }: CardProps) => {
+  const cardClassName = cn(
+    variantClasses[variant],
+    fullWidth && 'w-full',
+    className
+  )
+
+  if (pressable || onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        className={cardClassName}
+        style={({ pressed }) => [
+          style,
+          pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
+        ]}
+        {...(props as PressableProps)}
+      >
+        {children}
+      </Pressable>
+    )
+  }
+
   return (
-    <StyledCard
-      variant={variant}
-      fullWidth={fullWidth}
-      animation="quick"
-      pressStyle={{ scale: 0.97 }}
-      {...props}
-    >
+    <View className={cardClassName} style={style} {...props}>
       {children}
-    </StyledCard>
+    </View>
   )
 }
 
-Card.Header = TamaguiCard.Header
-Card.Footer = TamaguiCard.Footer
-Card.Background = TamaguiCard.Background
+Card.Header = ({ children, className, ...props }: ViewProps & { children?: React.ReactNode }) => (
+  <View className={cn('pb-2', className)} {...props}>
+    {children}
+  </View>
+)
+
+Card.Footer = ({ children, className, ...props }: ViewProps & { children?: React.ReactNode }) => (
+  <View className={cn('pt-2 mt-auto', className)} {...props}>
+    {children}
+  </View>
+)
+
+Card.Background = ({ children, className, ...props }: ViewProps & { children?: React.ReactNode }) => (
+  <View className={cn('absolute inset-0', className)} {...props}>
+    {children}
+  </View>
+)

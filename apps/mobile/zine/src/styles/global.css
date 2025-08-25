@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom global styles for the mobile app */
+@layer base {
+  /* Reset and defaults will be added here */
+  * {
+    @apply box-border;
+  }
+}
+
+@layer components {
+  /* Component styles will be migrated here from Tamagui */
+}

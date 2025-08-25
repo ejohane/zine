@@ -1,12 +1,11 @@
-import { ScrollView, YStack, H1, Paragraph, Card, XStack, Button, Avatar, Label } from 'tamagui';
-import { Settings, LogOut, BookOpen, Clock, Star, Moon, Sun, Smartphone } from '@tamagui/lucide-icons';
+import { ScrollView, View, Text, TouchableOpacity, Alert } from 'react-native';
+import { Settings, LogOut, BookOpen, Clock, Star, Moon, Sun, Smartphone } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/hooks/useTheme';
-import { Alert } from 'react-native';
 
 export default function ProfileScreen() {
-  const { isSignedIn, userEmail, userFullName, userImageUrl, signOut } = useAuth();
+  const { isSignedIn, userEmail, userFullName, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
 
   const handleSignOut = () => {
@@ -26,142 +25,115 @@ export default function ProfileScreen() {
 
   if (!isSignedIn) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <YStack f={1} backgroundColor="$background" alignItems="center" justifyContent="center" padding="$4">
-          <H1 size="$8" marginBottom="$4">Profile</H1>
-          <Paragraph size="$5" textAlign="center" opacity={0.7}>
+      <SafeAreaView className="flex-1 bg-gray-50">
+        <View className="flex-1 items-center justify-center p-4">
+          <Text className="text-2xl font-bold mb-4">Profile</Text>
+          <Text className="text-base text-gray-600 text-center">
             Please sign in to view your profile
-          </Paragraph>
-        </YStack>
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <YStack f={1} backgroundColor="$background">
-        <XStack padding="$4" alignItems="center" justifyContent="space-between">
-          <H1 size="$8">Profile</H1>
-          <Button size="$3" circular icon={Settings} chromeless />
-        </XStack>
+    <SafeAreaView className="flex-1 bg-gray-50">
+      <View className="flex-1">
+        <View className="flex-row items-center justify-between p-4">
+          <Text className="text-2xl font-bold">Profile</Text>
+          <TouchableOpacity className="p-2">
+            <Settings size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
         
-        <ScrollView flex={1} contentContainerStyle={{ padding: 16 }}>
-          <YStack gap="$4">
-            <Card elevate bordered>
-              <Card.Header padded>
-                <XStack gap="$3" alignItems="center">
-                  <Avatar circular size="$6">
-                    {userImageUrl ? (
-                      <Avatar.Image source={{ uri: userImageUrl }} />
-                    ) : null}
-                    <Avatar.Fallback backgroundColor="$primary">
-                      <Paragraph size="$7" color="white">
-                        {userFullName?.charAt(0) || userEmail?.charAt(0) || 'U'}
-                      </Paragraph>
-                    </Avatar.Fallback>
-                  </Avatar>
-                  <YStack f={1} gap="$1">
-                    <Paragraph size="$5" fontWeight="600">
-                      {userFullName || 'User'}
-                    </Paragraph>
-                    <Paragraph size="$3" color="$color" opacity={0.7}>
-                      {userEmail || 'No email'}
-                    </Paragraph>
-                  </YStack>
-                </XStack>
-              </Card.Header>
-            </Card>
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+          <View className="gap-4">
+            {/* User Info Card */}
+            <View className="bg-white rounded-lg p-4">
+              <View className="flex-row items-center gap-3">
+                <View className="w-16 h-16 rounded-full bg-primary-500 items-center justify-center">
+                  <Text className="text-white text-2xl font-bold">
+                    {userFullName?.charAt(0) || userEmail?.charAt(0) || 'U'}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-lg font-semibold">
+                    {userFullName || 'User'}
+                  </Text>
+                  <Text className="text-sm text-gray-600">
+                    {userEmail || 'No email'}
+                  </Text>
+                </View>
+              </View>
+            </View>
 
-            <YStack gap="$3">
-              <Paragraph size="$5" fontWeight="600">Statistics</Paragraph>
-              <XStack gap="$2">
-                <Card f={1} padding="$3" bordered>
-                  <YStack alignItems="center" gap="$1">
-                    <BookOpen size={20} color="$primary" />
-                    <Paragraph size="$6" fontWeight="600">42</Paragraph>
-                    <Paragraph size="$2" color="$color" opacity={0.7}>Bookmarks</Paragraph>
-                  </YStack>
-                </Card>
-                <Card f={1} padding="$3" bordered>
-                  <YStack alignItems="center" gap="$1">
-                    <Clock size={20} color="$primary" />
-                    <Paragraph size="$6" fontWeight="600">128</Paragraph>
-                    <Paragraph size="$2" color="$color" opacity={0.7}>Read</Paragraph>
-                  </YStack>
-                </Card>
-                <Card f={1} padding="$3" bordered>
-                  <YStack alignItems="center" gap="$1">
-                    <Star size={20} color="$primary" />
-                    <Paragraph size="$6" fontWeight="600">15</Paragraph>
-                    <Paragraph size="$2" color="$color" opacity={0.7}>Subscriptions</Paragraph>
-                  </YStack>
-                </Card>
-              </XStack>
-            </YStack>
+            {/* Statistics */}
+            <View className="gap-3">
+              <Text className="text-lg font-semibold">Statistics</Text>
+              <View className="flex-row gap-2">
+                <View className="flex-1 bg-white rounded-lg p-3 items-center">
+                  <BookOpen size={20} color="#3b82f6" />
+                  <Text className="text-xl font-semibold mt-1">42</Text>
+                  <Text className="text-xs text-gray-600">Bookmarks</Text>
+                </View>
+                <View className="flex-1 bg-white rounded-lg p-3 items-center">
+                  <Clock size={20} color="#3b82f6" />
+                  <Text className="text-xl font-semibold mt-1">128</Text>
+                  <Text className="text-xs text-gray-600">Read</Text>
+                </View>
+                <View className="flex-1 bg-white rounded-lg p-3 items-center">
+                  <Star size={20} color="#3b82f6" />
+                  <Text className="text-xl font-semibold mt-1">15</Text>
+                  <Text className="text-xs text-gray-600">Subscriptions</Text>
+                </View>
+              </View>
+            </View>
 
-            <YStack gap="$3">
-              <Paragraph size="$5" fontWeight="600">Appearance</Paragraph>
-              <Card bordered>
-                <Card.Header padded>
-                  <YStack gap="$3">
-                    <Label htmlFor="theme-switch">Theme</Label>
-                    <XStack gap="$2">
-                      <Button
-                        size="$3"
-                        variant={theme === 'light' ? undefined : 'outlined'}
-                        onPress={() => handleThemeChange('light')}
-                        icon={Sun}
-                      >
-                        Light
-                      </Button>
-                      <Button
-                        size="$3"
-                        variant={theme === 'dark' ? undefined : 'outlined'}
-                        onPress={() => handleThemeChange('dark')}
-                        icon={Moon}
-                      >
-                        Dark
-                      </Button>
-                      <Button
-                        size="$3"
-                        variant={theme === 'system' ? undefined : 'outlined'}
-                        onPress={() => handleThemeChange('system')}
-                        icon={Smartphone}
-                      >
-                        System
-                      </Button>
-                    </XStack>
-                  </YStack>
-                </Card.Header>
-              </Card>
-            </YStack>
+            {/* Theme Settings */}
+            <View className="gap-3">
+              <Text className="text-lg font-semibold">Theme</Text>
+              <View className="bg-white rounded-lg p-1 flex-row">
+                <TouchableOpacity 
+                  className={`flex-1 flex-row items-center justify-center p-3 rounded-md ${theme === 'light' ? 'bg-primary-100' : ''}`}
+                  onPress={() => handleThemeChange('light')}
+                >
+                  <Sun size={16} color={theme === 'light' ? '#3b82f6' : '#6b7280'} />
+                  <Text className={`ml-2 ${theme === 'light' ? 'text-primary-600 font-semibold' : 'text-gray-600'}`}>
+                    Light
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  className={`flex-1 flex-row items-center justify-center p-3 rounded-md ${theme === 'dark' ? 'bg-primary-100' : ''}`}
+                  onPress={() => handleThemeChange('dark')}
+                >
+                  <Moon size={16} color={theme === 'dark' ? '#3b82f6' : '#6b7280'} />
+                  <Text className={`ml-2 ${theme === 'dark' ? 'text-primary-600 font-semibold' : 'text-gray-600'}`}>
+                    Dark
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  className={`flex-1 flex-row items-center justify-center p-3 rounded-md ${theme === 'system' ? 'bg-primary-100' : ''}`}
+                  onPress={() => handleThemeChange('system')}
+                >
+                  <Smartphone size={16} color={theme === 'system' ? '#3b82f6' : '#6b7280'} />
+                  <Text className={`ml-2 ${theme === 'system' ? 'text-primary-600 font-semibold' : 'text-gray-600'}`}>
+                    System
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-            <YStack gap="$3">
-              <Paragraph size="$5" fontWeight="600">Account</Paragraph>
-              <Card bordered animation="quick">
-                <Card.Header padded>
-                  <Button chromeless justifyContent="flex-start" icon={Settings}>
-                    Settings
-                  </Button>
-                </Card.Header>
-              </Card>
-              <Card bordered animation="quick">
-                <Card.Header padded>
-                  <Button 
-                    chromeless 
-                    justifyContent="flex-start" 
-                    icon={LogOut} 
-                    color="$error"
-                    onPress={handleSignOut}
-                  >
-                    Sign Out
-                  </Button>
-                </Card.Header>
-              </Card>
-            </YStack>
-          </YStack>
+            {/* Sign Out Button */}
+            <TouchableOpacity 
+              className="bg-red-500 rounded-lg p-3 flex-row items-center justify-center mt-4"
+              onPress={handleSignOut}
+            >
+              <LogOut size={20} color="#fff" />
+              <Text className="text-white font-semibold ml-2">Sign Out</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
-      </YStack>
+      </View>
     </SafeAreaView>
   );
 }

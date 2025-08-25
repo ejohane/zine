@@ -19,6 +19,8 @@
     "@tanstack/react-query": "^5.81.5",
     "@tanstack/react-router": "^1.45.0",
     "@zine/shared": "workspace:*",
+    "@zine/ui": "workspace:*",
+    "@zine/design-tokens": "workspace:*",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.400.0",

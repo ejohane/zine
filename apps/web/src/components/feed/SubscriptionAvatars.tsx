@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Badge } from '../ui/badge'
+import { Badge } from '@zine/ui'
 
 interface Subscription {
   id: string

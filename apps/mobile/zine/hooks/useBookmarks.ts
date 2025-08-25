@@ -11,6 +11,89 @@ export const bookmarkKeys = {
   detail: (id: string) => [...bookmarkKeys.details(), id] as const,
 }
 
+// Mock data for development
+const MOCK_BOOKMARKS = {
+  items: [
+    {
+      id: '1',
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      title: '19 - The Human Edge w. Bethan Winn',
+      description: 'A fascinating conversation about the future of human-AI collaboration',
+      thumbnailUrl: 'https://picsum.photos/seed/1/400/300',
+      contentType: 'podcast' as const,
+      source: 'The Good Stuff',
+      platform: 'spotify',
+      creator: { name: 'The Good Stuff Podcast', url: 'https://thegoodstuff.com' },
+      status: 'active' as const,
+      tags: ['podcast', 'AI', 'technology'],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    {
+      id: '2',
+      url: 'https://www.youtube.com/watch?v=example',
+      title: 'The Hidden Art Of Reinventing Yourself - Matthew McConaughey',
+      description: 'Matthew McConaughey shares insights on personal transformation',
+      thumbnailUrl: 'https://picsum.photos/seed/2/400/300',
+      contentType: 'video' as const,
+      source: 'YouTube',
+      platform: 'youtube',
+      creator: { name: 'Change Your Reality', url: 'https://youtube.com' },
+      videoMetadata: { duration: 3600 },
+      status: 'active' as const,
+      tags: ['video', 'self-improvement'],
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 86400000).toISOString(),
+    },
+    {
+      id: '3',
+      url: 'https://medium.com/article',
+      title: 'How to Build Better Mobile Apps with React Native',
+      description: 'Best practices and patterns for React Native development',
+      thumbnailUrl: 'https://picsum.photos/seed/3/400/300',
+      contentType: 'article' as const,
+      source: 'Dev.to',
+      platform: 'medium',
+      articleMetadata: { readingTime: 8 },
+      status: 'active' as const,
+      tags: ['React Native', 'Mobile', 'Tutorial'],
+      createdAt: new Date(Date.now() - 172800000).toISOString(),
+      updatedAt: new Date(Date.now() - 172800000).toISOString(),
+    },
+    {
+      id: '4',
+      url: 'https://spotify.com/podcast',
+      title: 'The Future of AI in Software Development',
+      description: 'Exploring how AI is changing the landscape of software engineering',
+      thumbnailUrl: 'https://picsum.photos/seed/4/400/300',
+      contentType: 'article' as const,
+      source: 'Medium',
+      platform: 'medium',
+      articleMetadata: { readingTime: 12 },
+      status: 'active' as const,
+      tags: ['AI', 'Future', 'Development'],
+      createdAt: new Date(Date.now() - 259200000).toISOString(),
+      updatedAt: new Date(Date.now() - 259200000).toISOString(),
+    },
+    {
+      id: '5',
+      url: 'https://spotify.com/show/design',
+      title: 'Design Systems at Scale',
+      description: 'Building and maintaining design systems for large organizations',
+      thumbnailUrl: 'https://picsum.photos/seed/5/400/300',
+      contentType: 'podcast' as const,
+      source: 'Spotify',
+      platform: 'spotify',
+      creator: { name: 'Design Better', url: 'https://spotify.com' },
+      status: 'active' as const,
+      tags: ['Design', 'Scale', 'Systems'],
+      createdAt: new Date(Date.now() - 345600000).toISOString(),
+      updatedAt: new Date(Date.now() - 345600000).toISOString(),
+    },
+  ],
+  total: 5,
+}
+
 // Fetch bookmarks
 export function useBookmarks(options?: {
   sortBy?: 'date' | 'title' | 'source'
@@ -19,6 +102,15 @@ export function useBookmarks(options?: {
   return useQuery({
     queryKey: bookmarkKeys.list(options || {}),
     queryFn: async () => {
+      // TEMPORARY: Return mock data for development
+      const USE_MOCK_DATA = true;
+      
+      if (USE_MOCK_DATA) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return MOCK_BOOKMARKS;
+      }
+      
       // Try to get from cache first
       const cached = await cacheUtils.getWithExpiry(
         StorageKeys.BOOKMARKS_CACHE,

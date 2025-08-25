@@ -1,14 +1,19 @@
+const baseConfig = require('@zine/design-tokens/tailwind.config');
+
 /** @type {import('tailwindcss').Config} */
 export default {
+  ...baseConfig,
   darkMode: ["class"],
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
+    '../../packages/ui/src/**/*.{ts,tsx}', // Include UI package
   ],
   prefix: "",
   theme: {
+    ...baseConfig.theme,
     container: {
       center: true,
       padding: "2rem",
@@ -17,12 +22,32 @@ export default {
       },
     },
     extend: {
+      ...baseConfig.theme.extend,
       colors: {
+        ...baseConfig.theme.extend?.colors,
+        // Keep CSS variable-based colors for compatibility
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        'brand-orange': 'var(--brand-orange)',
+        'brand-orange-hover': 'var(--brand-orange-hover)',
+        'brand-orange-light': 'var(--brand-orange-light)',
+        'spotify-green': 'var(--spotify-green)',
+        'spotify-green-hover': 'var(--spotify-green-hover)',
+        'surface': 'var(--surface)',
+        'surface-hover': 'var(--surface-hover)',
+        'surface-active': 'var(--surface-active)',
+        // Content type colors for gradients
+        'video-orange': '#ff6b35',
+        'podcast-pink': '#ff69b4',
+        'article-blue': '#4a9eff',
+        'playlist-gradient-start': '#ff6b35',
+        'playlist-gradient-end': '#ff9558',
+        'collection-gradient-start': '#ff69b4',
+        'collection-gradient-end': '#ffa0c9',
+        // Override specific CSS variable-based colors with proper theme colors
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -51,22 +76,6 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        'brand-orange': 'var(--brand-orange)',
-        'brand-orange-hover': 'var(--brand-orange-hover)',
-        'brand-orange-light': 'var(--brand-orange-light)',
-        'spotify-green': 'var(--spotify-green)',
-        'spotify-green-hover': 'var(--spotify-green-hover)',
-        'surface': 'var(--surface)',
-        'surface-hover': 'var(--surface-hover)',
-        'surface-active': 'var(--surface-active)',
-        // Content type colors for gradients
-        'video-orange': '#ff6b35',
-        'podcast-pink': '#ff69b4',
-        'article-blue': '#4a9eff',
-        'playlist-gradient-start': '#ff6b35',
-        'playlist-gradient-end': '#ff9558',
-        'collection-gradient-start': '#ff69b4',
-        'collection-gradient-end': '#ffa0c9',
       },
       borderRadius: {
         lg: "var(--radius)",

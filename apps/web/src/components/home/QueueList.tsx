@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { useBookmarks } from '@/hooks/useBookmarks'
 import { BookmarkCard } from './BookmarkCard'
-import { Button } from '../ui/button'
+import { Button } from '@zine/ui'
 import { ArrowRight } from 'lucide-react'
 
 export function QueueList() {

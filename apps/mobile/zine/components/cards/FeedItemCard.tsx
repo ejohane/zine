@@ -1,8 +1,7 @@
-import { H4, Paragraph, XStack, YStack, Image } from 'tamagui'
-import { Card } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
-import { Play, Bookmark, MoreVertical, Clock } from '@tamagui/lucide-icons'
+import React from 'react'
+import { View, Text, Image } from 'react-native'
+import { Card, Button, Badge } from '@zine/ui'
+import { Play, Bookmark, MoreVertical, Clock } from 'lucide-react-native'
 
 interface FeedItemCardProps {
   item: {
@@ -49,79 +48,66 @@ export function FeedItemCard({ item, onPress, onPlay, onBookmark, onMore }: Feed
       variant="elevated" 
       fullWidth
       onPress={onPress}
-      animation="quick"
-      hoverStyle={{ scale: 0.99 }}
-      pressStyle={{ scale: 0.97 }}
-      marginBottom="$3"
-      opacity={item.isPlayed ? 0.7 : 1}
+      pressable
+      className="mb-3"
+      style={{ opacity: item.isPlayed ? 0.7 : 1 }}
     >
-      <XStack gap="$3">
+      <View className="flex-row gap-3">
         {item.imageUrl && (
-          <YStack position="relative">
+          <View className="relative">
             <Image 
               source={{ uri: item.imageUrl }}
-              width={100}
-              height={100}
-              borderRadius="$2"
+              className="w-24 h-24 rounded-md"
             />
             {item.contentType !== 'article' && (
-              <YStack
-                position="absolute"
-                bottom={0}
-                left={0}
-                right={0}
-                backgroundColor="rgba(0,0,0,0.7)"
-                padding="$1"
-                borderBottomLeftRadius="$2"
-                borderBottomRightRadius="$2"
-              >
-                <XStack alignItems="center" justifyContent="center" gap="$1">
+              <View className="absolute bottom-0 left-0 right-0 bg-black/70 p-1 rounded-b-md">
+                <View className="flex-row items-center justify-center gap-1">
                   <Clock size={12} color="white" />
-                  <Paragraph size="$1" color="white">
+                  <Text className="text-xs text-white">
                     {item.duration || '00:00'}
-                  </Paragraph>
-                </XStack>
-              </YStack>
+                  </Text>
+                </View>
+              </View>
             )}
-          </YStack>
+          </View>
         )}
         
-        <YStack flex={1} gap="$2">
-          <XStack gap="$2" alignItems="center">
+        <View className="flex-1 gap-2">
+          <View className="flex-row gap-2 items-center">
             <Badge variant={item.platform} size="sm">
               {item.source}
             </Badge>
             {item.episodeNumber && (
-              <Paragraph size="$2" color="$colorTransparent">
+              <Text className="text-xs text-gray-500">
                 Ep. {item.episodeNumber}
-              </Paragraph>
+              </Text>
             )}
             {item.isPlayed && (
               <Badge variant="success" size="sm">
                 Played
               </Badge>
             )}
-          </XStack>
+          </View>
           
-          <H4 size="$4" numberOfLines={2}>
+          <Text className="text-base font-semibold text-gray-900" numberOfLines={2}>
             {item.title}
-          </H4>
+          </Text>
           
           {item.description && (
-            <Paragraph size="$2" color="$colorTransparent" numberOfLines={2}>
+            <Text className="text-xs text-gray-500" numberOfLines={2}>
               {item.description}
-            </Paragraph>
+            </Text>
           )}
           
-          <Paragraph size="$1" color="$colorTransparent">
+          <Text className="text-xs text-gray-500">
             {new Date(item.publishedAt).toLocaleDateString()}
-          </Paragraph>
-        </YStack>
-      </XStack>
+          </Text>
+        </View>
+      </View>
       
-      <Card.Footer padded paddingTop="$3">
-        <XStack gap="$2" justifyContent="space-between">
-          <XStack gap="$2">
+      <Card.Footer className="pt-3">
+        <View className="flex-row justify-between">
+          <View className="flex-row gap-2">
             {item.contentType !== 'article' && (
               <Button 
                 size="sm" 
@@ -139,7 +125,7 @@ export function FeedItemCard({ item, onPress, onPlay, onBookmark, onMore }: Feed
               icon={Bookmark} 
               onPress={handleBookmark}
             />
-          </XStack>
+          </View>
           
           <Button 
             size="sm" 
@@ -147,7 +133,7 @@ export function FeedItemCard({ item, onPress, onPlay, onBookmark, onMore }: Feed
             icon={MoreVertical} 
             onPress={handleMore}
           />
-        </XStack>
+        </View>
       </Card.Footer>
     </Card>
   )

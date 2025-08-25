@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
-import { Button } from '../components/ui/button'
+import { Button } from '@zine/ui'
 import { QuickActions } from '../components/home/QuickActions'
 import { RecentCarousel } from '../components/home/RecentCarousel'
 import { QueueList } from '../components/home/QueueList'

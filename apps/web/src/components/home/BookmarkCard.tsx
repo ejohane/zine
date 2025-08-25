@@ -1,7 +1,7 @@
 import { ExternalLink, Clock, User, Calendar, Play, Headphones, FileText } from 'lucide-react'
 import type { Bookmark } from '../../lib/api'
 import { cn } from '@/lib/utils'
-import { Badge } from '../ui/badge'
+import { Badge } from '@zine/ui'
 
 interface BookmarkCardProps {
   bookmark: Bookmark

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Button } from '../ui/button'
+import { Button } from '@zine/ui'
 import { Card, CardContent } from '../ui/card'
-import { Badge } from '../ui/badge'
+import { Badge } from '@zine/ui'
 
 interface FeedItem {
   id: string

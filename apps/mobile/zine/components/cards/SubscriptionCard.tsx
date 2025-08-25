@@ -1,8 +1,7 @@
-import { H4, Paragraph, XStack, YStack, Image } from 'tamagui'
-import { Card } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
-import { CheckCircle, PlusCircle, RefreshCw } from '@tamagui/lucide-icons'
+import React from 'react'
+import { View, Text, Image } from 'react-native'
+import { Card, Button, Badge } from '@zine/ui'
+import { CheckCircle, PlusCircle, RefreshCw } from 'lucide-react-native'
 
 interface SubscriptionCardProps {
   subscription: {
@@ -40,23 +39,19 @@ export function SubscriptionCard({ subscription, onPress, onSubscribe, onRefresh
       variant="elevated" 
       fullWidth
       onPress={onPress}
-      animation="quick"
-      hoverStyle={{ scale: 0.99 }}
-      pressStyle={{ scale: 0.97 }}
-      marginBottom="$3"
+      pressable
+      className="mb-3"
     >
-      <XStack gap="$3" alignItems="center">
+      <View className="flex-row gap-3 items-center">
         {subscription.imageUrl && (
           <Image 
             source={{ uri: subscription.imageUrl }}
-            width={60}
-            height={60}
-            borderRadius="$2"
+            className="w-16 h-16 rounded-md"
           />
         )}
         
-        <YStack flex={1} gap="$2">
-          <XStack gap="$2" alignItems="center">
+        <View className="flex-1 gap-2">
+          <View className="flex-row gap-2 items-center">
             <Badge variant={subscription.platform} size="sm">
               {subscription.platform.charAt(0).toUpperCase() + subscription.platform.slice(1)}
             </Badge>
@@ -66,42 +61,42 @@ export function SubscriptionCard({ subscription, onPress, onSubscribe, onRefresh
               </Badge>
             )}
             {subscription.isSubscribed && (
-              <CheckCircle size={16} color="$success" />
+              <CheckCircle size={16} color="#10B981" />
             )}
-          </XStack>
+          </View>
           
-          <H4 size="$4" numberOfLines={1}>
+          <Text className="text-base font-semibold text-gray-900" numberOfLines={1}>
             {subscription.name}
-          </H4>
+          </Text>
           
           {subscription.description && (
-            <Paragraph size="$2" color="$colorTransparent" numberOfLines={2}>
+            <Text className="text-xs text-gray-500" numberOfLines={2}>
               {subscription.description}
-            </Paragraph>
+            </Text>
           )}
           
-          <XStack gap="$3" alignItems="center">
+          <View className="flex-row gap-3 items-center">
             {subscription.subscriberCount && (
-              <Paragraph size="$1" color="$colorTransparent">
+              <Text className="text-xs text-gray-500">
                 {subscription.subscriberCount.toLocaleString()} subscribers
-              </Paragraph>
+              </Text>
             )}
             {subscription.episodeCount && (
-              <Paragraph size="$1" color="$colorTransparent">
+              <Text className="text-xs text-gray-500">
                 {subscription.episodeCount} episodes
-              </Paragraph>
+              </Text>
             )}
             {subscription.lastUpdated && (
-              <Paragraph size="$1" color="$colorTransparent">
+              <Text className="text-xs text-gray-500">
                 Updated {new Date(subscription.lastUpdated).toLocaleDateString()}
-              </Paragraph>
+              </Text>
             )}
-          </XStack>
-        </YStack>
-      </XStack>
+          </View>
+        </View>
+      </View>
       
-      <Card.Footer padded paddingTop="$3">
-        <XStack gap="$2" justifyContent="space-between">
+      <Card.Footer className="pt-3">
+        <View className="flex-row justify-between">
           <Button 
             size="sm" 
             variant={subscription.isSubscribed ? 'secondary' : 'primary'}
@@ -121,7 +116,7 @@ export function SubscriptionCard({ subscription, onPress, onSubscribe, onRefresh
               Refresh
             </Button>
           )}
-        </XStack>
+        </View>
       </Card.Footer>
     </Card>
   )

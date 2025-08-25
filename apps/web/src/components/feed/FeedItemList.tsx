@@ -1,5 +1,5 @@
 import { FeedItemCard } from './FeedItemCard'
-import { Button } from '../ui/button'
+import { Button } from '@zine/ui'
 import { Card, CardContent } from '../ui/card'
 
 interface FeedItem {

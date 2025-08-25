@@ -1,4 +1,4 @@
-import * as Icons from '@tamagui/lucide-icons'
+import * as Icons from 'lucide-react-native'
 
 export interface IconProps {
   name: keyof typeof Icons
@@ -7,7 +7,7 @@ export interface IconProps {
   strokeWidth?: number
 }
 
-export const Icon = ({ name, size = 24, color = '$color', strokeWidth = 2 }: IconProps) => {
+export const Icon = ({ name, size = 24, color = '#000000', strokeWidth = 2 }: IconProps) => {
   const IconComponent = Icons[name] as any
   
   if (!IconComponent) {
@@ -56,4 +56,4 @@ export {
   Video,
   FileText,
   Rss,
-} from '@tamagui/lucide-icons'
+} from 'lucide-react-native'

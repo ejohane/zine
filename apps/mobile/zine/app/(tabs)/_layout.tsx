@@ -1,47 +1,41 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { Home, Bookmark, Compass, User } from '@tamagui/lucide-icons';
-import { useTheme } from 'tamagui';
+import { Home, Search, User } from 'lucide-react-native';
 
 export default function TabLayout() {
-  const theme = useTheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: theme.primary.val,
-        tabBarInactiveTintColor: theme.color.val,
+        tabBarActiveTintColor: '#3b82f6', // primary-500
+        tabBarInactiveTintColor: '#6b7280', // gray-500
         headerShown: false,
         tabBarStyle: Platform.select({
           ios: {
             position: 'absolute',
-            backgroundColor: theme.background.val,
+            backgroundColor: '#ffffff',
+            borderTopColor: '#e5e5e5',
+            borderTopWidth: 1,
           },
           default: {
-            backgroundColor: theme.background.val,
+            backgroundColor: '#ffffff',
+            borderTopColor: '#e5e5e5',
+            borderTopWidth: 1,
           },
         }),
       }}>
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="bookmarks"
+        name="search"
         options={{
-          title: 'Bookmarks',
-          tabBarIcon: ({ color, size }) => <Bookmark size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'Discover',
-          tabBarIcon: ({ color, size }) => <Compass size={size} color={color} />,
+          title: 'Search',
+          tabBarIcon: ({ color, size }) => <Search size={size} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -49,6 +43,19 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+        }}
+      />
+      {/* Hidden screens that are still accessible programmatically */}
+      <Tabs.Screen
+        name="bookmarks"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="discover"
+        options={{
+          href: null, // Hide from tab bar
         }}
       />
     </Tabs>

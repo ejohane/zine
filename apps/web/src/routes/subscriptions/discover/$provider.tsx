@@ -1,10 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { Card, CardContent } from '../../../components/ui/card'
-import { Button } from '../../../components/ui/button'
-import { Badge } from '../../../components/ui/badge'
-import { Alert, AlertDescription } from '../../../components/ui/alert'
-import { Checkbox } from '../../../components/ui/checkbox'
+import { 
+  Card, 
+  CardContent,
+  Button,
+  Badge,
+  Alert, 
+  AlertDescription,
+  Checkbox
+} from '@zine/ui'
 import { Loader2, Search, CheckCircle, ExternalLink } from 'lucide-react'
 import { useProviderSubscriptions } from '../../../hooks/useSubscriptions'
 import { useAccounts } from '../../../hooks/useAccounts'

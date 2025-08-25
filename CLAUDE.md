@@ -187,112 +187,234 @@ To enable Spotify and YouTube account connections:
 - ⚠️ Using mock data (InMemoryBookmarkRepository)
 - 🔄 Ready to connect D1 database
 
-## Design System (@zine/design-system)
+## Unified Design System Architecture
 
-### Architecture
+### Overview
 
-The design system uses a **hybrid approach**: shadcn/ui for primitive components with custom Zine-specific patterns.
-
-- **Location**: `packages/design-system/`
-- **Build Tool**: tsup for bundling
-- **Documentation**: Storybook on port 6006
-- **Styling**: Tailwind CSS with CSS variables for theming
-- **Components**: Radix UI primitives wrapped with shadcn/ui patterns
+The Zine design system has been unified across web and mobile platforms using:
+- **@zine/design-tokens**: Centralized design tokens (colors, spacing, typography)
+- **@zine/ui**: Cross-platform component library supporting both React and React Native
+- **NativeWind v4**: Enables Tailwind CSS classes in React Native
 
 ### Package Structure
 
 ```
-packages/design-system/
-├── src/
-│   ├── tokens/              # Design tokens (colors, typography, spacing, breakpoints)
-│   ├── components/
-│   │   ├── ui/             # shadcn/ui components (Button, Card, Badge, etc.)
-│   │   └── patterns/       # Zine-specific patterns (BookmarkCard, SubscriptionItem)
-│   ├── lib/                # Utilities (cn function for className merging)
-│   └── styles/             # Global CSS with Tailwind directives
-├── .storybook/             # Storybook configuration
-├── components.json         # shadcn/ui configuration
-├── tailwind.config.ts      # Tailwind configuration with custom tokens
-└── tsup.config.ts         # Build configuration
+packages/
+├── design-tokens/           # Design tokens package
+│   ├── src/
+│   │   ├── colors.ts       # Color palette
+│   │   ├── spacing.ts      # Spacing scale
+│   │   ├── typography.ts   # Font system
+│   │   ├── shadows.ts      # Shadow definitions
+│   │   ├── borders.ts      # Border styles
+│   │   └── breakpoints.ts  # Responsive breakpoints
+│   └── tailwind.config.js  # Unified Tailwind configuration
+│
+├── ui/                      # Cross-platform component library
+│   ├── src/
+│   │   ├── components/     # UI components
+│   │   │   ├── Alert/      # Alert & AlertDescription
+│   │   │   ├── Badge/      # Badge component
+│   │   │   ├── Button/     # Button with variants
+│   │   │   ├── Card/       # Card & subcomponents
+│   │   │   ├── Checkbox/   # Checkbox component
+│   │   │   ├── Input/      # Input with validation
+│   │   │   └── Text/       # Typography component
+│   │   ├── lib/
+│   │   │   ├── platform.ts # Platform detection
+│   │   │   ├── cn.ts       # className merging
+│   │   │   └── variants.ts # CVA variants
+│   │   └── providers/
+│   │       └── ThemeProvider.tsx # Theme management
+│   └── tsup.config.ts      # Build configuration
+│
+└── design-system/           # Legacy (will be deprecated)
 ```
 
-### Design Tokens
+### Design Tokens (@zine/design-tokens)
 
-- **Colors**: Brand colors (primary), neutral scale, semantic colors (success/warning/error), platform colors (Spotify/YouTube/Apple/Google)
-- **Typography**: Font families (sans/mono/display), size scale (xs to 6xl), weights, letter spacing
-- **Spacing**: Consistent spacing scale from 0 to 32 (0px to 128px)
-- **Breakpoints**: Mobile-first responsive breakpoints (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px)
+#### Color System
+- **Brand Colors**: Zine orange (#ff6b35) as primary
+- **Neutral Scale**: 0 (white) to 1000 (black)
+- **Semantic Colors**: Success, warning, error, info
+- **Platform Colors**: Spotify, YouTube, Apple, Google, RSS, Podcast
 
-### Component Categories
+#### Typography
+- **Font Families**: Inter (sans), JetBrains Mono (mono)
+- **Font Sizes**: xs (12px) to 6xl (60px)
+- **Font Weights**: 100-900
+- **Line Heights**: Optimized for readability
 
-1. **UI Components** (from shadcn/ui):
-   - Primitives: Button, Input, Label
-   - Layout: Card, Separator
-   - Feedback: Badge, Skeleton
-   - Overlay: Dialog, Dropdown Menu
-   - Navigation: Tabs
-   - Display: Avatar
+#### Spacing
+- **Scale**: 0px to 384px (0-96 in Tailwind units)
+- **Consistent increments**: Follows 4px base unit
 
-2. **Zine-Specific Patterns**:
-   - `BookmarkCard`: Display bookmarks with platform-specific styling
-   - `SubscriptionItem`: Display subscription content (podcasts, videos)
+### Cross-Platform Components (@zine/ui)
 
-### Usage in Web App
+All components work on both web and React Native:
 
 ```typescript
-// Import components and utilities
-import { Button, Card, BookmarkCard, cn, tokens } from '@zine/design-system';
+// Import components
+import { 
+  Button, 
+  Card, 
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  Badge, 
+  Input, 
+  Text, 
+  Alert,
+  AlertDescription,
+  Checkbox,
+  ThemeProvider 
+} from '@zine/ui';
 
-// Use components in your app
-<Button variant="primary" size="md">Click me</Button>
-<BookmarkCard {...bookmarkProps} />
+// Use with consistent API
+<Button variant="primary" size="md" onPress={handlePress}>
+  Click me
+</Button>
 
-// Access design tokens
-const primaryColor = tokens.colors.primary[500];
-const spacing = tokens.spacing[4];
+<Card variant="elevated">
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+    <CardDescription>Description</CardDescription>
+  </CardHeader>
+  <CardContent>
+    Content here
+  </CardContent>
+</Card>
+```
+
+### Platform Detection
+
+Components automatically adapt to the platform:
+
+```typescript
+// In @zine/ui components
+import { isReactNative, isWeb, isIOS, isAndroid } from '@zine/ui/lib/platform';
+
+if (isReactNative()) {
+  // React Native specific code
+  return <TouchableOpacity />;
+} else {
+  // Web specific code
+  return <button />;
+}
+```
+
+### Theme System
+
+#### ThemeProvider
+Supports light/dark/system themes across all platforms:
+
+```typescript
+// Web app (main.tsx)
+import { ThemeProvider } from '@zine/ui';
+
+<ThemeProvider>
+  <App />
+</ThemeProvider>
+
+// Mobile app (_layout.tsx)
+import { ThemeProvider } from '@zine/ui';
+
+<ThemeProvider>
+  <Stack />
+</ThemeProvider>
+```
+
+#### Using Theme
+```typescript
+import { useTheme } from '@zine/ui';
+
+const { theme, resolvedTheme, setTheme } = useTheme();
+// theme: 'light' | 'dark' | 'system'
+// resolvedTheme: 'light' | 'dark' (actual theme being used)
+// setTheme: function to change theme
+```
+
+### Tailwind Configuration
+
+Both apps extend from the unified token system:
+
+```javascript
+// apps/web/tailwind.config.js or apps/mobile/zine/tailwind.config.js
+const designTokens = require('@zine/design-tokens/tailwind.config');
+
+module.exports = {
+  ...designTokens,
+  content: [
+    './src/**/*.{ts,tsx}',
+    '../../../packages/ui/src/**/*.{ts,tsx}', // Include UI package
+  ],
+};
+```
+
+### Mobile App Setup (NativeWind)
+
+```javascript
+// metro.config.js
+const { withNativeWind } = require('nativewind/metro');
+module.exports = withNativeWind(config, { input: './src/styles/global.css' });
+
+// babel.config.js
+plugins: ['nativewind/babel']
+
+// Global CSS import in _layout.tsx
+import '../src/styles/global.css';
 ```
 
 ### Development Commands
 
 ```bash
-# Development with watch mode
-cd packages/design-system
-bun run dev
-
-# Run Storybook for component development
-bun run storybook
-
-# Build the package
+# Build all packages
 bun run build
 
-# Add new shadcn component
-bun run add-component
-# or
-npx shadcn@latest add [component-name]
-
-# Type checking
+# Type check everything
 bun run type-check
+
+# Development mode
+turbo dev
+
+# Build specific package
+cd packages/ui && bun run build
+
+# Add new dependencies
+cd packages/ui && bun add [package-name]
 ```
 
 ### Adding New Components
 
-1. **For shadcn/ui components**: Use `npx shadcn@latest add [component]`
-2. **For custom patterns**: Create in `src/components/patterns/`
-3. **Always export from `src/index.ts`**
-4. **Create Storybook stories for documentation**
+1. Create component in `packages/ui/src/components/[ComponentName]/`
+2. Use platform detection for cross-platform support
+3. Apply design tokens for styling
+4. Export from `packages/ui/src/index.ts`
+5. Test on both web and mobile
 
-### Styling Approach
+Example structure:
+```typescript
+// packages/ui/src/components/MyComponent/index.tsx
+import { isReactNative } from '../../lib/platform';
 
-- **Tailwind CSS**: Primary styling method
-- **CSS Variables**: For theming support (defined in globals.css)
-- **class-variance-authority (CVA)**: For component variants
-- **tailwind-merge + clsx**: For conditional className handling via `cn()` utility
+export function MyComponent({ className, ...props }) {
+  if (isReactNative()) {
+    // React Native implementation
+    return <View className={className} {...props} />;
+  }
+  // Web implementation
+  return <div className={className} {...props} />;
+}
+```
 
-### Platform Support Strategy
+### Migration Notes
 
-- **Web**: Primary target, full component library
-- **Mobile (Future)**: React Native variants in `components/mobile/`
-- **Desktop (Future)**: Electron/Tauri enhancements
+- **@zine/design-system**: Legacy package, will be deprecated
+- **Local UI components**: Migrated to @zine/ui
+- **Tamagui**: Completely removed from mobile app
+- **NativeWind v4**: Enables Tailwind classes in React Native
+- **Theme consistency**: Both platforms use same ThemeProvider
 
 ## Git Worktree Database Sync
 

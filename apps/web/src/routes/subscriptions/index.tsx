@@ -1,8 +1,15 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
-import { Button } from '../../components/ui/button'
-import { Badge } from '../../components/ui/badge'
-import { Alert, AlertDescription } from '../../components/ui/alert'
+import { 
+  Card, 
+  CardContent, 
+  CardDescription, 
+  CardHeader, 
+  CardTitle, 
+  Button, 
+  Badge, 
+  Alert, 
+  AlertDescription 
+} from '@zine/ui'
 import { Loader2, Plus, Settings, ExternalLink } from 'lucide-react'
 import { useUserSubscriptions, useRefreshSubscriptions } from '../../hooks/useSubscriptions'
 import { useAccounts } from '../../hooks/useAccounts'

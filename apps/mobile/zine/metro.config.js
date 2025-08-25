@@ -1,10 +1,8 @@
 const { getDefaultConfig } = require('expo/metro-config')
+const { withNativeWind } = require('nativewind/metro')
 const path = require('path')
 
 const config = getDefaultConfig(__dirname)
-
-// Tamagui configuration
-config.resolver.sourceExts.push('mjs')
 
 // Monorepo configuration
 const projectRoot = __dirname
@@ -21,4 +19,8 @@ config.resolver.extraNodeModules = {
   '@zine/shared': path.resolve(workspaceRoot, 'packages/shared'),
 }
 
-module.exports = config
+// NativeWind v4 configuration
+module.exports = withNativeWind(config, {
+  input: './src/styles/global.css',
+  configPath: './tailwind.config.js',
+})

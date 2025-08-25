@@ -7,8 +7,7 @@ import { useTheme } from '../hooks/useTheme'
 import { useAccounts } from '../hooks/useAccounts'
 import { User, Settings, Palette, BookOpen, LogOut, Link as LinkIcon, CheckCircle, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { Button } from '../components/ui/button'
-import { Badge } from '../components/ui/badge'
+import { Button, Badge } from '@zine/ui'
 
 export const Route = createFileRoute('/profile')({
   component: ProfilePage,

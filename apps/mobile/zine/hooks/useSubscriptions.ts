@@ -11,6 +11,43 @@ export const subscriptionKeys = {
   detail: (id: string) => [...subscriptionKeys.details(), id] as const,
 }
 
+// Mock subscriptions data for development
+const MOCK_SUBSCRIPTIONS = {
+  items: [
+    {
+      id: 's1',
+      name: 'The Tim Ferriss Show',
+      platform: 'spotify' as Platform,
+      url: 'https://spotify.com/show/timferriss',
+      thumbnailUrl: 'https://picsum.photos/seed/sub1/200/200',
+      description: 'Tim Ferriss deconstructs world-class performers',
+      lastUpdated: new Date().toISOString(),
+      isSubscribed: true,
+    },
+    {
+      id: 's2',
+      name: 'Veritasium',
+      platform: 'youtube' as Platform,
+      url: 'https://youtube.com/veritasium',
+      thumbnailUrl: 'https://picsum.photos/seed/sub2/200/200',
+      description: 'Science and engineering videos',
+      lastUpdated: new Date(Date.now() - 86400000).toISOString(),
+      isSubscribed: true,
+    },
+    {
+      id: 's3',
+      name: 'Lex Fridman Podcast',
+      platform: 'apple' as Platform,
+      url: 'https://podcasts.apple.com/lexfridman',
+      thumbnailUrl: 'https://picsum.photos/seed/sub3/200/200',
+      description: 'Conversations about AI, science, technology, and the human condition',
+      lastUpdated: new Date(Date.now() - 172800000).toISOString(),
+      isSubscribed: false,
+    },
+  ],
+  total: 3,
+}
+
 // Fetch subscriptions
 export function useSubscriptions(options?: {
   platform?: Platform
@@ -19,6 +56,36 @@ export function useSubscriptions(options?: {
   return useQuery({
     queryKey: subscriptionKeys.list(options || {}),
     queryFn: async () => {
+      // TEMPORARY: Return mock data for development
+      const USE_MOCK_DATA = true;
+      
+      if (USE_MOCK_DATA) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 400));
+        
+        // Filter by platform if specified
+        if (options?.platform) {
+          return {
+            ...MOCK_SUBSCRIPTIONS,
+            items: MOCK_SUBSCRIPTIONS.items.filter(sub => sub.platform === options.platform),
+          };
+        }
+        
+        // Filter by search if specified
+        if (options?.search) {
+          const searchLower = options.search.toLowerCase();
+          return {
+            ...MOCK_SUBSCRIPTIONS,
+            items: MOCK_SUBSCRIPTIONS.items.filter(sub => 
+              sub.name.toLowerCase().includes(searchLower) ||
+              sub.description?.toLowerCase().includes(searchLower)
+            ),
+          };
+        }
+        
+        return MOCK_SUBSCRIPTIONS;
+      }
+      
       // Try cache first
       const cached = await cacheUtils.getWithExpiry(
         StorageKeys.SUBSCRIPTIONS_CACHE,

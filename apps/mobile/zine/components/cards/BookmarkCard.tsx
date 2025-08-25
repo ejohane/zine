@@ -1,9 +1,7 @@
-import { H3, Paragraph, XStack, YStack, Image } from 'tamagui'
-import { Card } from '../ui/Card'
-import { Button } from '../ui/Button'
-import { Badge } from '../ui/Badge'
-import { Bookmark, Share2, ExternalLink } from '@tamagui/lucide-icons'
-import { Share } from 'react-native'
+import React from 'react'
+import { View, Text, Image, Share } from 'react-native'
+import { Card, Button, Badge } from '@zine/ui'
+import { Bookmark, Share2, ExternalLink } from 'lucide-react-native'
 
 interface BookmarkCardProps {
   bookmark: {
@@ -48,35 +46,30 @@ export function BookmarkCard({ bookmark, onPress, onBookmark, onShare }: Bookmar
   return (
     <Card 
       variant="elevated" 
-      fullWidth
       onPress={onPress}
-      animation="quick"
-      hoverStyle={{ scale: 0.99 }}
-      pressStyle={{ scale: 0.97 }}
-      marginBottom="$3"
+      pressable
+      className="mb-3 w-full"
     >
-      <XStack gap="$3">
+      <View className="flex-row gap-3">
         {bookmark.imageUrl && (
           <Image 
             source={{ uri: bookmark.imageUrl }}
-            width={80}
-            height={80}
-            borderRadius="$2"
+            className="w-20 h-20 rounded-md"
           />
         )}
         
-        <YStack flex={1} gap="$2">
-          <H3 size="$5" numberOfLines={2}>
+        <View className="flex-1 gap-2">
+          <Text className="text-lg font-semibold text-gray-900" numberOfLines={2}>
             {bookmark.title}
-          </H3>
+          </Text>
           
           {bookmark.description && (
-            <Paragraph size="$3" color="$colorTransparent" numberOfLines={2}>
+            <Text className="text-sm text-gray-500" numberOfLines={2}>
               {bookmark.description}
-            </Paragraph>
+            </Text>
           )}
           
-          <XStack gap="$2" alignItems="center" flexWrap="wrap">
+          <View className="flex-row gap-2 items-center flex-wrap">
             {bookmark.sourcePlatform && (
               <Badge variant={bookmark.sourcePlatform} size="sm">
                 {bookmark.source}
@@ -89,29 +82,29 @@ export function BookmarkCard({ bookmark, onPress, onBookmark, onShare }: Bookmar
               </Badge>
             )}
             
-            <Paragraph size="$2" color="$colorTransparent">
+            <Text className="text-xs text-gray-500">
               • {new Date(bookmark.createdAt).toLocaleDateString()}
-            </Paragraph>
-          </XStack>
+            </Text>
+          </View>
           
           {bookmark.tags && bookmark.tags.length > 0 && (
-            <XStack gap="$2" flexWrap="wrap">
+            <View className="flex-row gap-2 flex-wrap">
               {bookmark.tags.map((tag) => (
                 <Badge key={tag} variant="secondary" size="sm">
                   {tag}
                 </Badge>
               ))}
-            </XStack>
+            </View>
           )}
-        </YStack>
-      </XStack>
+        </View>
+      </View>
       
-      <Card.Footer padded paddingTop="$3">
-        <XStack gap="$2" justifyContent="flex-end">
+      <View className="pt-3 border-t border-gray-200">
+        <View className="flex-row gap-2 justify-end">
           <Button 
             size="sm" 
-            variant={bookmark.isBookmarked ? 'primary' : 'outlined'}
-            icon={Bookmark} 
+            variant={bookmark.isBookmarked ? 'primary' : 'outline'}
+            leftIcon={<Bookmark size={16} />} 
             onPress={handleBookmark}
           >
             {bookmark.isBookmarked ? 'Saved' : 'Save'}
@@ -119,23 +112,25 @@ export function BookmarkCard({ bookmark, onPress, onBookmark, onShare }: Bookmar
           
           <Button 
             size="sm" 
-            variant="ghost" 
-            icon={Share2} 
+            variant="ghost"
+            leftIcon={<Share2 size={16} />} 
             onPress={handleShare}
           >
             Share
           </Button>
           
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            icon={ExternalLink} 
-            onPress={() => {}}
-          >
-            Open
-          </Button>
-        </XStack>
-      </Card.Footer>
+          {bookmark.url && (
+            <Button 
+              size="sm" 
+              variant="ghost"
+              leftIcon={<ExternalLink size={16} />} 
+              onPress={handleOpen}
+            >
+              Open
+            </Button>
+          )}
+        </View>
+      </View>
     </Card>
   )
 }

@@ -6,7 +6,7 @@ import { FeedItemList } from './FeedItemList'
 import { useFeedManager } from '../../hooks/useFeed'
 import { useRefreshSubscriptions } from '../../hooks/useSubscriptions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
-import { Button } from '../ui/button'
+import { Button } from '@zine/ui'
 import { RefreshButton } from '../subscriptions/RefreshButton'
 import { Alert, AlertDescription } from '../ui/alert'
 

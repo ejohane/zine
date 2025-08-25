@@ -1,8 +1,6 @@
-import { ScrollView, YStack, H1, XStack } from 'tamagui';
-import { Search } from '@tamagui/lucide-icons';
+import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { Search } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { BookmarkCard } from '../../components/cards/BookmarkCard';
-import { Button } from '../../components/ui/Button';
 import { useState } from 'react';
 
 export default function BookmarksScreen() {
@@ -45,44 +43,47 @@ export default function BookmarksScreen() {
     },
   ]);
 
-  const handleBookmark = (id: string) => {
-    console.log('Toggle bookmark:', id);
-  };
-
-  const handleShare = (bookmark: any) => {
-    console.log('Share bookmark:', bookmark);
-  };
-
   const handleCardPress = (id: string) => {
     console.log('Open bookmark:', id);
   };
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
-      <YStack f={1} backgroundColor="$background">
-        <XStack padding="$4" alignItems="center" justifyContent="space-between">
-          <H1 size="$8">Bookmarks</H1>
-          <Button 
-            size="sm" 
-            variant="ghost" 
-            icon={Search}
-          />
-        </XStack>
+    <SafeAreaView className="flex-1 bg-gray-50">
+      <View className="flex-1">
+        <View className="flex-row items-center justify-between p-4">
+          <Text className="text-2xl font-bold">Bookmarks</Text>
+          <TouchableOpacity className="p-2">
+            <Search size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
         
-        <ScrollView flex={1} contentContainerStyle={{ padding: 16 }}>
-          <YStack gap="$3">
+        <ScrollView className="flex-1" contentContainerStyle={{ padding: 16 }}>
+          <View className="gap-3">
             {bookmarks.map((bookmark) => (
-              <BookmarkCard
+              <TouchableOpacity
                 key={bookmark.id}
-                bookmark={bookmark}
+                className="bg-white rounded-lg p-4"
                 onPress={() => handleCardPress(bookmark.id)}
-                onBookmark={handleBookmark}
-                onShare={handleShare}
-              />
+              >
+                <Text className="text-lg font-semibold mb-1">{bookmark.title}</Text>
+                <Text className="text-gray-600 text-sm mb-2" numberOfLines={2}>
+                  {bookmark.description}
+                </Text>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-xs text-gray-500">{bookmark.source}</Text>
+                  <View className="flex-row gap-1">
+                    {bookmark.tags.slice(0, 2).map((tag, index) => (
+                      <View key={index} className="bg-gray-100 px-2 py-1 rounded">
+                        <Text className="text-xs text-gray-700">{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </TouchableOpacity>
             ))}
-          </YStack>
+          </View>
         </ScrollView>
-      </YStack>
+      </View>
     </SafeAreaView>
   );
 }

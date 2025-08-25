@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useRef, useState, useEffect } from 'react'
 import { BookmarkCard } from './BookmarkCard'
-import { Button } from '../ui/button'
+import { Button } from '@zine/ui'
 import type { Bookmark } from '../../lib/api'
 
 interface BookmarkSectionProps {

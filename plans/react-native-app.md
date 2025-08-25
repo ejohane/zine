@@ -3,6 +3,35 @@
 ## Overview
 Add a React Native mobile app to the Zine monorepo using Expo SDK 53+ that closely matches the web app's design and functionality.
 
+## Design Alignment Requirements
+
+### Core Design Principles
+The mobile app MUST match the web app's design language exactly:
+
+1. **Visual Hierarchy**
+   - Gray background (#f5f5f5) with white content cards
+   - Minimal, clean card design with subtle shadows
+   - Consistent spacing and typography scale
+   - Platform-specific color badges (Spotify green, YouTube red, etc.)
+
+2. **Navigation Pattern**
+   - 3-tab bottom navigation: Home, Search, Profile (NOT 4 tabs)
+   - Primary actions on Home screen: Continue, Favorites, Add New
+   - Bookmarks and Discover are features within screens, not separate tabs
+
+3. **Content Organization**
+   - Time-based greeting header ("Good morning/afternoon/evening")
+   - Personalized subtitle ("Welcome back to your personalized content hub")
+   - Recent section with large media cards
+   - Queue section with compact list items
+   - "See all" links for expandable sections
+
+4. **Component Styling**
+   - Cards: White background, subtle shadow, no heavy borders
+   - Buttons: Minimal, icon-based actions
+   - Badges: Small, colored labels for platforms and categories
+   - Typography: Clear hierarchy with bold headers, regular body text
+
 ## Technology Stack
 
 ### Core Framework
@@ -62,17 +91,21 @@ zine/
 │   └── mobile/        # New React Native app
 │       ├── app/       # Expo Router screens
 │       │   ├── (tabs)/
-│       │   │   ├── index.tsx        # Home/Feed
-│       │   │   ├── bookmarks.tsx    # Saved bookmarks
-│       │   │   ├── discover.tsx     # Discovery/Browse
+│       │   │   ├── index.tsx        # Home (with Continue/Favorites/Add actions)
+│       │   │   ├── search.tsx       # Search & Discovery
 │       │   │   ├── profile.tsx      # User profile
-│       │   │   └── _layout.tsx      # Tab layout
+│       │   │   └── _layout.tsx      # Tab layout (3 tabs only)
 │       │   ├── (auth)/
 │       │   │   ├── sign-in.tsx      # Sign in screen
 │       │   │   ├── sign-up.tsx      # Sign up screen
 │       │   │   └── _layout.tsx      # Auth layout
-│       │   ├── bookmark/
+│       │   ├── bookmarks/
+│       │   │   ├── index.tsx        # Bookmarks list (navigated from Home)
 │       │   │   └── [id].tsx         # Bookmark detail
+│       │   ├── favorites/
+│       │   │   └── index.tsx        # Favorites list
+│       │   ├── queue/
+│       │   │   └── index.tsx        # Full queue view
 │       │   ├── subscription/
 │       │   │   └── [id].tsx         # Subscription detail
 │       │   ├── settings/
@@ -90,16 +123,18 @@ zine/
 │       │   │   ├── Skeleton.tsx
 │       │   │   └── Text.tsx
 │       │   ├── cards/               # Content cards
-│       │   │   ├── BookmarkCard.tsx
-│       │   │   ├── FeedItemCard.tsx
-│       │   │   └── SubscriptionCard.tsx
+│       │   │   ├── MediaCard.tsx        # Large card for Recent section
+│       │   │   ├── QueueItem.tsx        # Compact item for Queue
+│       │   │   ├── BookmarkCard.tsx     # Minimal bookmark card
+│       │   │   └── ActionCard.tsx       # Continue/Favorites/Add cards
 │       │   ├── lists/               # List components
 │       │   │   ├── BookmarkList.tsx
 │       │   │   ├── FeedList.tsx
 │       │   │   └── QueueList.tsx
 │       │   ├── navigation/          # Navigation components
-│       │   │   ├── TabBar.tsx
-│       │   │   └── Header.tsx
+│       │   │   ├── TabBar.tsx          # Custom 3-tab bar
+│       │   │   ├── GreetingHeader.tsx  # Time-based greeting
+│       │   │   └── SectionHeader.tsx   # Recent/Queue headers
 │       │   └── auth/                # Auth components
 │       │       ├── SignInForm.tsx
 │       │       └── OAuthButtons.tsx
@@ -184,6 +219,7 @@ zine/
 - [x] Create `app/(tabs)/_layout.tsx` for tab navigation
 - [x] Create placeholder screens for tabs (index, bookmarks, discover, profile)
 - [x] Verify navigation between tabs works
+- [ ] UPDATE: Restructure to 3 tabs (Home, Search, Profile) to match web
 
 #### 1.7 Development Environment ✅
 - [x] Configure Metro bundler for monorepo (`metro.config.js`)
@@ -253,6 +289,8 @@ zine/
 - [x] Create `Badge.tsx` with color variants (includes platform colors)
 - [x] Create `Text.tsx` with typography variants (handled by Tamagui)
 - [x] Create `Skeleton.tsx` for loading states with pulse animation
+- [ ] UPDATE: Simplify Card to match web's minimal design (white bg, subtle shadow)
+- [ ] UPDATE: Adjust Button to be more minimal/icon-focused
 
 #### 3.2 Icon System ✅
 - [x] Set up Lucide icons from `@tamagui/lucide-icons`
@@ -260,13 +298,16 @@ zine/
 - [x] Define commonly used icon exports for convenience
 - [x] Icons properly sized and colored
 
-#### 3.3 BookmarkCard Component ✅
+#### 3.3 Card Components ✅
 - [x] Create `components/cards/BookmarkCard.tsx`
 - [x] Implement card layout with image and text
 - [x] Add bookmark/unbookmark button functionality
 - [x] Add share button with native share sheet integration
 - [x] Implement press handler for navigation
 - [x] Platform-specific badge styling
+- [ ] UPDATE: Create `MediaCard.tsx` for Recent section (larger, image-focused)
+- [ ] UPDATE: Create `QueueItem.tsx` for Queue section (compact list item)
+- [ ] UPDATE: Create `ActionCard.tsx` for Continue/Favorites/Add actions
 
 #### 3.4 FeedItemCard Component ✅
 - [x] Create `components/cards/FeedItemCard.tsx`
@@ -289,46 +330,79 @@ zine/
 - [x] Components ready for FlashList integration
 - [x] Screens updated to use new card components
 
+### Phase 3.5: Design Alignment Update (URGENT - Week 2)
+
+#### 3.5.1 Navigation Restructure
+- [ ] Update tab navigation to 3 tabs: Home, Search, Profile
+- [ ] Remove Bookmarks and Discover as separate tabs
+- [ ] Update tab icons: Home, Search (magnifying glass), Profile (user)
+- [ ] Ensure tab bar matches web styling (minimal, clean)
+
+#### 3.5.2 Theme Configuration Update
+- [ ] Update background color to #f5f5f5 (light gray)
+- [ ] Ensure cards have white background (#ffffff)
+- [ ] Add subtle shadow tokens for cards
+- [ ] Update typography scale to match web
+- [ ] Ensure platform colors match exactly (Spotify: #1DB954, YouTube: #FF0000)
+
+#### 3.5.3 Home Screen Redesign
+- [ ] Add GreetingHeader component with time-based greeting
+- [ ] Add personalized subtitle text
+- [ ] Create 3 action cards: Continue, Favorites, Add New
+- [ ] Implement Recent section with MediaCard components
+- [ ] Implement Queue section with horizontal scroll
+- [ ] Add "See all" links for each section
+
+#### 3.5.4 Component Updates
+- [ ] Simplify Card component (remove heavy borders)
+- [ ] Update BookmarkCard to match web's minimal style
+- [ ] Create MediaCard for Recent section (image-focused)
+- [ ] Create QueueItem for compact queue display
+- [ ] Create ActionCard for primary actions
+- [ ] Update all buttons to be more icon-focused
+
 ### Phase 4: Core Features (Week 3-4)
 
 #### 4.1 Tab Navigation Implementation
-- [ ] Create custom `TabBar.tsx` component
-- [ ] Implement tab icons with badges
+- [ ] Create custom `TabBar.tsx` component (3 tabs only)
+- [ ] Implement tab icons: Home, Search, Profile
 - [ ] Add tab press animations
-- [ ] Configure tab bar styling
+- [ ] Configure tab bar styling to match web
 - [ ] Test navigation state persistence
 
-#### 4.2 Home/Feed Screen
-- [ ] Create `app/(tabs)/index.tsx`
-- [ ] Implement `useFeed` hook with TanStack Query
-- [ ] Display feed items in FeedList
-- [ ] Add category filters (All, Podcasts, Videos, Articles)
-- [ ] Implement mark as played/read functionality
-- [ ] Add error boundary and retry logic
+#### 4.2 Home Screen
+- [ ] Update `app/(tabs)/index.tsx` with new layout
+- [ ] Implement greeting header with time logic
+- [ ] Create action cards section (Continue, Favorites, Add)
+- [ ] Implement Recent section with `useFeed` hook
+- [ ] Implement Queue section with `useQueue` hook
+- [ ] Add navigation to Bookmarks/Favorites screens
+- [ ] Add "See all" navigation for sections
 
-#### 4.3 Bookmarks Screen
-- [ ] Create `app/(tabs)/bookmarks.tsx`
+#### 4.3 Search Screen
+- [ ] Create `app/(tabs)/search.tsx`
+- [ ] Implement search bar at top
+- [ ] Add discovery section below search
+- [ ] Implement `useSearch` hook
+- [ ] Display search results
+- [ ] Add filters for content types
+- [ ] Include subscription discovery
+
+#### 4.4 Bookmarks Screen (Nested)
+- [ ] Create `app/bookmarks/index.tsx` (not a tab)
+- [ ] Navigate from Home's action card or "See all"
 - [ ] Implement `useBookmarks` hook
-- [ ] Display bookmarks in BookmarkList
-- [ ] Add sorting options (date, title, source)
-- [ ] Implement search/filter functionality
-- [ ] Add bookmark deletion with swipe gesture
-
-#### 4.4 Discover Screen
-- [ ] Create `app/(tabs)/discover.tsx`
-- [ ] Implement `useSubscriptions` hook
-- [ ] Display subscription suggestions
-- [ ] Add platform filters (Spotify, YouTube, RSS)
-- [ ] Implement subscription search
-- [ ] Add "Add Subscription" flow
+- [ ] Display bookmarks with minimal cards
+- [ ] Add sorting options
+- [ ] Add bookmark deletion with swipe
 
 #### 4.5 Profile Screen
-- [ ] Create `app/(tabs)/profile.tsx`
+- [ ] Update `app/(tabs)/profile.tsx`
 - [ ] Display user information from Clerk
-- [ ] Show usage statistics (bookmarks count, etc.)
+- [ ] Show usage statistics
 - [ ] Add settings navigation button
 - [ ] Implement sign out functionality
-- [ ] Add account deletion option
+- [ ] Match web's profile layout
 
 #### 4.6 Bookmark Actions
 - [ ] Implement `useSaveBookmark` mutation
@@ -514,28 +588,37 @@ const appConfig = createTamagui({
   ...config,
   themes: {
     light: {
-      background: '#ffffff',
-      backgroundHover: '#f5f5f5',
-      backgroundPress: '#ebebeb',
-      backgroundFocus: '#e0e0e0',
+      // UPDATED: Match web's color scheme exactly
+      background: '#f5f5f5',        // Gray background like web
+      backgroundHover: '#ebebeb',
+      backgroundPress: '#e0e0e0',
+      backgroundFocus: '#d6d6d6',
+      backgroundStrong: '#ffffff',   // White for cards
       color: '#000000',
       colorHover: '#111111',
       colorPress: '#222222',
       colorFocus: '#333333',
-      // Map your existing design tokens
-      primary: '#8b5cf6',
+      colorTransparent: 'rgba(0,0,0,0.05)',
+      // Shadows for cards (subtle like web)
+      shadowColor: 'rgba(0,0,0,0.1)',
+      shadowColorHover: 'rgba(0,0,0,0.15)',
+      shadowColorPress: 'rgba(0,0,0,0.2)',
+      // Brand colors
+      primary: '#ff6b35',            // Orange accent like web
       secondary: '#64748b',
       success: '#22c55e',
       warning: '#f59e0b',
       error: '#ef4444',
-      // Platform colors
+      // Platform colors (exact matches)
       spotify: '#1DB954',
       youtube: '#FF0000',
       apple: '#000000',
       google: '#4285F4',
+      medium: '#000000',
+      devto: '#0a0a0a',
     },
     dark: {
-      // Dark theme tokens
+      // Dark theme tokens (if needed)
     }
   },
   tokens: {
@@ -605,79 +688,105 @@ export const apiClient = {
 }
 ```
 
-### 4. Component Porting Strategy with Tamagui
+### 4. Component Implementation Examples
 
 ```typescript
-// Example: Porting BookmarkCard with Tamagui
-// apps/mobile/components/cards/BookmarkCard.tsx
-import { Card, H3, Paragraph, XStack, YStack, Image, Button } from 'tamagui'
-import { Bookmark, Share2 } from '@tamagui/lucide-icons'
+// Example: MediaCard for Recent Section (matches web design)
+// apps/mobile/components/cards/MediaCard.tsx
+import { Card, H4, Paragraph, XStack, YStack, Image, Badge } from 'tamagui'
+import { Play } from '@tamagui/lucide-icons'
 
-interface BookmarkCardProps {
-  bookmark: {
-    id: string
-    title: string
-    description?: string
-    imageUrl?: string
-    source: string
-    createdAt: string
-  }
-  onPress: () => void
-}
-
-export function BookmarkCard({ bookmark, onPress }: BookmarkCardProps) {
+export function MediaCard({ item, onPress }) {
   return (
     <Card 
-      elevate 
-      bordered 
       pressable
       onPress={onPress}
-      animation="quick"
-      scale={0.98}
-      hoverStyle={{ scale: 0.985 }}
-      pressStyle={{ scale: 0.975 }}
+      backgroundColor="$backgroundStrong"  // White card
+      borderRadius="$3"
+      shadowColor="$shadowColor"           // Subtle shadow
+      shadowOffset={{ width: 0, height: 2 }}
+      shadowOpacity={0.1}
+      shadowRadius={8}
+      margin="$2"
+      overflow="hidden"
     >
-      <Card.Header padded>
-        <XStack gap="$3">
-          {bookmark.imageUrl && (
-            <Image 
-              source={{ uri: bookmark.imageUrl }}
-              width={80}
-              height={80}
-              borderRadius="$2"
-            />
-          )}
-          <YStack flex={1} gap="$2">
-            <H3 size="$5" numberOfLines={2}>
-              {bookmark.title}
-            </H3>
-            {bookmark.description && (
-              <Paragraph size="$3" theme="alt2" numberOfLines={2}>
-                {bookmark.description}
-              </Paragraph>
-            )}
-            <XStack gap="$2" alignItems="center">
-              <Paragraph size="$2" theme="alt2">
-                {bookmark.source}
-              </Paragraph>
-              <Paragraph size="$2" theme="alt2">
-                • {new Date(bookmark.createdAt).toLocaleDateString()}
-              </Paragraph>
-            </XStack>
-          </YStack>
-        </XStack>
-      </Card.Header>
-      <Card.Footer padded>
-        <XStack gap="$2">
-          <Button size="$3" icon={Bookmark} variant="outlined">
-            Save
-          </Button>
-          <Button size="$3" icon={Share2} variant="outlined">
-            Share
-          </Button>
-        </XStack>
-      </Card.Footer>
+      <Image 
+        source={{ uri: item.imageUrl }}
+        width="100%"
+        height={200}
+        resizeMode="cover"
+      />
+      <YStack padding="$3" gap="$2">
+        <Badge 
+          size="$1" 
+          backgroundColor={`$${item.platform.toLowerCase()}`}
+          color="white"
+        >
+          {item.type.toUpperCase()}
+        </Badge>
+        <H4 size="$6" fontWeight="600" numberOfLines={2}>
+          {item.title}
+        </H4>
+        <Paragraph size="$3" color="$colorHover" numberOfLines={1}>
+          {item.creator}
+        </Paragraph>
+      </YStack>
     </Card>
+  )
+}
+
+// Example: ActionCard for Continue/Favorites/Add (matches web)
+// apps/mobile/components/cards/ActionCard.tsx
+import { Card, Text, YStack } from 'tamagui'
+
+export function ActionCard({ icon: Icon, label, onPress }) {
+  return (
+    <Card
+      pressable
+      onPress={onPress}
+      backgroundColor="$backgroundStrong"
+      borderRadius="$4"
+      shadowColor="$shadowColor"
+      shadowOffset={{ width: 0, height: 1 }}
+      shadowOpacity={0.05}
+      shadowRadius={4}
+      padding="$6"
+      alignItems="center"
+      justifyContent="center"
+      width={100}
+      height={120}
+    >
+      <YStack alignItems="center" gap="$3">
+        <Icon size={32} color="$color" />
+        <Text fontSize="$4" fontWeight="500">
+          {label}
+        </Text>
+      </YStack>
+    </Card>
+  )
+}
+
+// Example: GreetingHeader Component
+// apps/mobile/components/navigation/GreetingHeader.tsx
+import { H1, Paragraph, YStack } from 'tamagui'
+
+export function GreetingHeader() {
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
+
+  return (
+    <YStack padding="$4" gap="$2">
+      <H1 size="$9" fontWeight="700">
+        {getGreeting()}
+      </H1>
+      <Paragraph size="$5" color="$colorHover">
+        Welcome back to your personalized content hub
+      </Paragraph>
+    </YStack>
   )
 }
 ```
@@ -812,8 +921,23 @@ bun run e2e:android
 6. **Animation**: Powerful animation system with React Native Reanimated
 7. **Component Library**: Rich set of pre-built, customizable components
 
+## Design Alignment Checklist
+
+### Must Match Web Design
+- [ ] Gray background (#f5f5f5) with white cards
+- [ ] 3-tab navigation (Home, Search, Profile)
+- [ ] Time-based greeting header
+- [ ] Action cards for Continue/Favorites/Add
+- [ ] Recent section with large media cards
+- [ ] Queue section with compact items
+- [ ] Minimal card design with subtle shadows
+- [ ] Platform-specific color badges
+- [ ] "See all" navigation pattern
+- [ ] Clean typography hierarchy
+
 ## Success Metrics
 
+- [ ] Visual parity with web app design
 - [ ] Feature parity with web app core functionality
 - [ ] < 3% crash rate
 - [ ] 4.5+ app store rating
@@ -829,6 +953,81 @@ bun run e2e:android
 | Large bundle size | Use Tamagui compiler optimization |
 | Platform differences | Use Tamagui's platform variants |
 | API compatibility | Version API endpoints |
+
+## Screen Layout Specifications
+
+### Home Screen Layout
+```
+┌─────────────────────────────────────┐
+│  Good [morning/afternoon/evening]   │ <- GreetingHeader
+│  Welcome back to your personalized  │
+│  content hub                        │
+├─────────────────────────────────────┤
+│ ┌──────┐ ┌──────┐ ┌──────┐        │ <- Action Cards
+│ │  ▶️  │ │  ⭐  │ │  ➕  │        │
+│ │Contin│ │Favor-│ │ Add  │        │
+│ │  ue  │ │ ites │ │ New  │        │
+│ └──────┘ └──────┘ └──────┘        │
+├─────────────────────────────────────┤
+│ Recent                    See all > │ <- Section Header
+├─────────────────────────────────────┤
+│ ┌─────────────┐ ┌─────────────┐    │ <- MediaCard Grid
+│ │   [Image]   │ │   [Image]   │    │
+│ │ [PODCAST]   │ │   [VIDEO]   │    │
+│ │    Title    │ │    Title    │    │
+│ │   Creator   │ │   Creator   │    │
+│ └─────────────┘ └─────────────┘    │
+├─────────────────────────────────────┤
+│ Queue                     See all > │ <- Section Header
+├─────────────────────────────────────┤
+│ [icon] Title - Creator    podcast   │ <- QueueItem List
+│ [icon] Title - Creator    video     │
+│ [icon] Title - Creator    article   │
+└─────────────────────────────────────┘
+│ [Home]    [Search]    [Profile]    │ <- Tab Bar (3 tabs)
+└─────────────────────────────────────┘
+```
+
+### Search Screen Layout
+```
+┌─────────────────────────────────────┐
+│ ┌─────────────────────────────┐    │
+│ │ 🔍 Search...                │    │ <- Search Bar
+│ └─────────────────────────────┘    │
+├─────────────────────────────────────┤
+│ Discover                            │ <- Section Header
+├─────────────────────────────────────┤
+│ Browse by Platform:                 │
+│ [Spotify] [YouTube] [Apple] [RSS]   │ <- Filter Pills
+├─────────────────────────────────────┤
+│ Suggested Subscriptions             │
+│ ┌─────────────────────────────┐    │
+│ │ [img] Subscription Name      │    │
+│ │       Platform • Updated     │    │
+│ └─────────────────────────────┘    │
+└─────────────────────────────────────┘
+```
+
+### Profile Screen Layout
+```
+┌─────────────────────────────────────┐
+│ ┌──────┐                           │
+│ │ User │  User Name                │ <- User Info
+│ │ Icon │  user@email.com           │
+│ └──────┘                           │
+├─────────────────────────────────────┤
+│ Your Stats                          │
+│ • 42 Bookmarks                     │
+│ • 12 Subscriptions                 │
+│ • 5 Items in Queue                 │
+├─────────────────────────────────────┤
+│ Settings                        >   │ <- Navigation Items
+│ Connected Accounts              >   │
+│ Help & Support                  >   │
+├─────────────────────────────────────┤
+│ [Sign Out Button]                   │
+└─────────────────────────────────────┘
+```
 
 ## Resources & References
 
