@@ -6,6 +6,11 @@ const config: Config = {
   content: [
     './src/**/*.{ts,tsx}',
     './stories/**/*.{ts,tsx}',
+    // Include platform-specific files
+    './src/**/*.web.{ts,tsx}',
+    './src/**/*.native.{ts,tsx}',
+    './src/**/*.ios.{ts,tsx}',
+    './src/**/*.android.{ts,tsx}',
   ],
   theme: {
     extend: {
@@ -18,7 +23,7 @@ const config: Config = {
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
-          ...colors.primary,
+          ...colors.brand.primary,
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -40,11 +45,13 @@ const config: Config = {
       },
       spacing,
       fontFamily: {
-        sans: [typography.fonts.sans],
-        mono: [typography.fonts.mono],
-        display: [typography.fonts.display],
+        sans: [...typography.fontFamily.sans],
+        mono: [...typography.fontFamily.mono],
+        display: [...typography.fontFamily.display],
       },
-      fontSize: typography.sizes,
+      fontSize: Object.fromEntries(
+        Object.entries(typography.fontSize).map(([key, value]) => [key, [...value]])
+      ) as any,
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

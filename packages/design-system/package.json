@@ -1,18 +1,21 @@
 {
   "name": "@zine/design-system",
-  "version": "0.1.0",
+  "version": "2.0.0",
+  "description": "Unified design system for Zine web and mobile platforms",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "tailwind.config.ts"
   ],
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
     "lint": "eslint src/",
     "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "add-component": "npx shadcn@latest add"
@@ -23,12 +26,31 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./styles": "./dist/styles.css",
-    "./tokens": "./dist/tokens/index.mjs"
+    "./tokens": {
+      "types": "./dist/tokens/index.d.ts",
+      "import": "./dist/tokens/index.mjs",
+      "require": "./dist/tokens/index.js"
+    },
+    "./styles": {
+      "import": "./dist/styles.css"
+    },
+    "./tailwind": {
+      "import": "./tailwind.config.ts",
+      "require": "./tailwind.config.ts"
+    }
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": ">=18",
+    "react-dom": ">=18",
+    "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "react-native": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^4.1.0",
@@ -40,13 +62,18 @@
     "@types/bun": "latest",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
+    "@types/react-native": "^0.72.8",
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "@typescript-eslint/parser": "^8.39.1",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.33.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
+    "nativewind": "^4.1.23",
     "postcss": "^8.5.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-native": "^0.73.2",
     "storybook": "^9.1.2",
     "tailwindcss": "^3.4.4",
     "tailwindcss-animate": "^1.0.7",
@@ -70,6 +97,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.539.0",
+    "lucide-react-native": "^0.542.0",
     "tailwind-merge": "^3.3.1"
   }
 }
