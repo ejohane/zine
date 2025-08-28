@@ -9,3 +9,4 @@ build/
 .wrangler/
 .dev.vars
 .drizzle.env.branches/
+.metro-cache/
