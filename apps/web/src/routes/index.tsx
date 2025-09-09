@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useAuth } from '../lib/auth'
 import { Button } from '../components/ui/button'
+import { Button as HeroButton } from '@zine/design-system/web'
 import { QuickActions } from '../components/home/QuickActions'
 import { RecentCarousel } from '../components/home/RecentCarousel'
 import { QueueList } from '../components/home/QueueList'
@@ -20,9 +21,9 @@ function Home() {
           </div>
           <div className="space-y-4">
             <Link to="/sign-in" className="block">
-              <Button size="lg" className="w-full bg-spotify-green hover:bg-spotify-green-hover text-white">
+              <HeroButton size="lg" color="primary" className="w-full">
                 Sign In
-              </Button>
+              </HeroButton>
             </Link>
             <Link to="/sign-up" className="block">
               <Button size="lg" variant="outline" className="w-full">

@@ -1,15 +1,17 @@
-# Zine - Bookmark Manager
+# Zine - Cross-Platform Bookmark Manager
 
-A modern bookmark manager built with React, TypeScript, and Cloudflare.
+A modern bookmark manager built with React, React Native, TypeScript, and Cloudflare. Features unified design system with HeroUI for web and HeroUI Native for mobile.
 
 ## Tech Stack
 
-- **Frontend**: React + TypeScript + Vite
-- **Routing**: Tanstack Router
-- **UI Components**: shadcn/ui
-- **Styling**: Tailwind CSS
+- **Web Frontend**: React 19 + TypeScript + Vite
+- **Mobile App**: React Native 0.79 + Expo
+- **Routing**: TanStack Router (web)
+- **UI Components**: HeroUI (web) + HeroUI Native (mobile)
+- **Styling**: Tailwind CSS + NativeWind
 - **API**: Hono + Cloudflare Workers
 - **Database**: Cloudflare D1 + Drizzle ORM
+- **Authentication**: Clerk
 - **Monorepo**: Turborepo
 - **Package Manager**: Bun
 - **Hosting**: Cloudflare Pages + Workers
@@ -18,10 +20,13 @@ A modern bookmark manager built with React, TypeScript, and Cloudflare.
 
 ```
 zine/
+├── apps/
+│   ├── web/          # React SPA frontend
+│   └── mobile/       # React Native mobile app
 ├── packages/
-│   ├── web/          # React frontend
 │   ├── api/          # Hono API (Cloudflare Workers)
-│   └── shared/       # Shared types and utilities
+│   ├── shared/       # Shared types and utilities
+│   └── design-system/# Unified design system (HeroUI)
 ├── package.json      # Root package.json
 ├── turbo.json        # Turborepo configuration
 └── tsconfig.json     # TypeScript configuration

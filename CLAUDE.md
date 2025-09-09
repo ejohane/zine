@@ -191,29 +191,36 @@ To enable Spotify and YouTube account connections:
 
 ### Architecture
 
-The design system uses a **hybrid approach**: shadcn/ui for primitive components with custom Zine-specific patterns.
+The design system uses a **unified cross-platform approach**: HeroUI (web) and HeroUI Native (mobile) with shared abstractions for maximum code reuse.
 
 - **Location**: `packages/design-system/`
-- **Build Tool**: tsup for bundling
-- **Documentation**: Storybook on port 6006
-- **Styling**: Tailwind CSS with CSS variables for theming
-- **Components**: Radix UI primitives wrapped with shadcn/ui patterns
+- **Build Tool**: tsup for bundling with multi-entry support
+- **Documentation**: Storybook on port 6006 (web components)
+- **Styling**: Tailwind CSS with NativeWind for mobile
+- **Components**: HeroUI primitives with custom Zine-specific patterns
+- **Platform Support**: Web (React) and Mobile (React Native)
 
 ### Package Structure
 
 ```
 packages/design-system/
 ├── src/
-│   ├── tokens/              # Design tokens (colors, typography, spacing, breakpoints)
-│   ├── components/
-│   │   ├── ui/             # shadcn/ui components (Button, Card, Badge, etc.)
-│   │   └── patterns/       # Zine-specific patterns (BookmarkCard, SubscriptionItem)
-│   ├── lib/                # Utilities (cn function for className merging)
-│   └── styles/             # Global CSS with Tailwind directives
-├── .storybook/             # Storybook configuration
-├── components.json         # shadcn/ui configuration
-├── tailwind.config.ts      # Tailwind configuration with custom tokens
-└── tsup.config.ts         # Build configuration
+│   ├── core/                    # Shared abstractions
+│   │   ├── tokens/              # Design tokens (colors, typography, spacing)
+│   │   ├── types/               # Shared TypeScript types
+│   │   └── utils/               # Shared utilities
+│   ├── web/                     # Web-specific exports
+│   │   ├── components/          # HeroUI web component wrappers
+│   │   ├── providers/           # Web providers
+│   │   └── index.ts
+│   ├── native/                  # Mobile-specific exports
+│   │   ├── components/          # HeroUI Native component wrappers
+│   │   ├── providers/           # Native providers
+│   │   └── index.ts
+│   └── index.ts                 # Main export (web by default)
+├── tailwind.config.shared.js    # Shared Tailwind config
+├── .storybook/                  # Storybook configuration
+└── tsup.config.ts               # Build configuration
 ```
 
 ### Design Tokens
@@ -225,17 +232,14 @@ packages/design-system/
 
 ### Component Categories
 
-1. **UI Components** (from shadcn/ui):
-   - Primitives: Button, Input, Label
-   - Layout: Card, Separator
-   - Feedback: Badge, Skeleton
-   - Overlay: Dialog, Dropdown Menu
-   - Navigation: Tabs
-   - Display: Avatar
+1. **Core Components** (Platform-agnostic interfaces):
+   - Button, Input, Card, Badge, Avatar, Spinner, Modal, Select
+   - Unified prop types across web and mobile platforms
 
 2. **Zine-Specific Patterns**:
    - `BookmarkCard`: Display bookmarks with platform-specific styling
    - `SubscriptionItem`: Display subscription content (podcasts, videos)
+   - `FeedCard`: Feed management with subscribe/unsubscribe functionality
 
 ### Usage in Web App
 
@@ -252,6 +256,19 @@ const primaryColor = tokens.colors.primary[500];
 const spacing = tokens.spacing[4];
 ```
 
+### Usage in Mobile App
+
+```typescript
+// Import components from native exports
+import { Button, Card, BookmarkCard } from '@zine/design-system/native';
+
+// Use components in React Native
+<Button variant="primary" size="md" onPress={handlePress}>
+  Click me
+</Button>
+<BookmarkCard {...bookmarkProps} />
+```
+
 ### Development Commands
 
 ```bash
@@ -265,34 +282,50 @@ bun run storybook
 # Build the package
 bun run build
 
-# Add new shadcn component
-bun run add-component
-# or
-npx shadcn@latest add [component-name]
-
 # Type checking
 bun run type-check
+
+# Run tests
+bun run test
 ```
 
 ### Adding New Components
 
-1. **For shadcn/ui components**: Use `npx shadcn@latest add [component]`
-2. **For custom patterns**: Create in `src/components/patterns/`
-3. **Always export from `src/index.ts`**
-4. **Create Storybook stories for documentation**
+1. **Create shared interface** in `src/core/types/components.ts`
+2. **Implement web wrapper** in `src/web/components/` using HeroUI React
+3. **Implement native wrapper** in `src/native/components/` using HeroUI Native
+4. **Export from appropriate index files** (`src/web/index.ts`, `src/native/index.ts`)
+5. **Create Storybook stories** for web components
 
 ### Styling Approach
 
-- **Tailwind CSS**: Primary styling method
+- **Tailwind CSS**: Primary styling method for web
+- **NativeWind**: Tailwind for React Native mobile
+- **Shared Config**: `tailwind.config.shared.js` for consistent tokens
 - **CSS Variables**: For theming support (defined in globals.css)
-- **class-variance-authority (CVA)**: For component variants
-- **tailwind-merge + clsx**: For conditional className handling via `cn()` utility
+- **tailwind-variants**: For consistent variant handling across platforms
 
 ### Platform Support Strategy
 
-- **Web**: Primary target, full component library
-- **Mobile (Future)**: React Native variants in `components/mobile/`
-- **Desktop (Future)**: Electron/Tauri enhancements
+- **Web**: Full HeroUI React component library with Storybook documentation
+- **Mobile**: HeroUI Native components with NativeWind styling
+- **Cross-platform**: Shared component interfaces and design tokens
+- **Conditional Exports**: Automatic platform detection via package.json exports
+
+### Implementation Status
+
+All phases of HeroUI integration are functionally complete:
+- ✅ **Phase 1**: Foundation setup with dependencies and configuration
+- ✅ **Phase 2**: Provider setup for both platforms
+- ✅ **Phase 3**: Core component migration (8 components)
+- ✅ **Phase 4**: Zine-specific components (3 patterns)
+- ✅ **Phase 5**: Testing and documentation
+- ✅ **Native Implementation**: All Zine-specific components implemented for React Native
+
+### Test Pages
+
+- **Web Components**: Visit `/test-heroui-components` in web app
+- **Zine Components**: Visit `/test-zine-components` in web app
 
 ## Git Worktree Database Sync
 

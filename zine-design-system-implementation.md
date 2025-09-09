@@ -1,40 +1,46 @@
 # Zine Design System Implementation Guide
 
+> **Note**: This document reflects the current HeroUI-based implementation. For the latest implementation details, see [hero-ui.md](./hero-ui.md).
+
 ## Overview
 
-This guide outlines the implementation of a cross-platform design system for the Zine application using a hybrid approach: shadcn/ui for primitive components and custom patterns for Zine-specific features.
+This guide outlines the implementation of a cross-platform design system for the Zine application using HeroUI for web and HeroUI Native for mobile, with shared abstractions for maximum code reuse.
 
 ## Architecture Decision
 
-**Approach**: Hybrid (shadcn/ui + Custom Components)
-- **Primitives**: Use shadcn/ui components (customized with our tokens)
-- **Patterns**: Build Zine-specific components from scratch
-- **Platform Support**: Web-first with React Native variants
+**Approach**: Unified Cross-Platform (HeroUI + HeroUI Native)
+- **Primitives**: Use HeroUI components for web and HeroUI Native for mobile
+- **Patterns**: Build Zine-specific components using HeroUI primitives
+- **Platform Support**: True cross-platform with shared component interfaces
 
 ## Project Structure
 
 ```
 zine/
 ├── apps/
-│   ├── web/           # Existing Vite SPA
-│   ├── mobile/        # Future React Native app
+│   ├── web/           # Vite SPA with HeroUI
+│   ├── mobile/        # React Native app with HeroUI Native
 │   └── desktop/       # Future Electron/Tauri app
 ├── packages/
-│   ├── api/           # Existing Cloudflare Workers API
-│   ├── shared/        # Existing shared types & services
-│   └── design-system/ # NEW: Design system package
+│   ├── api/           # Cloudflare Workers API
+│   ├── shared/        # Shared types & services
+│   └── design-system/ # Unified design system package
 │       ├── src/
-│       │   ├── tokens/           # Design tokens
-│       │   ├── components/       
-│       │   │   ├── ui/          # shadcn/ui components (customized)
-│       │   │   ├── patterns/    # Zine-specific components
-│       │   │   └── mobile/      # React Native variants
-│       │   ├── hooks/           # Custom hooks
-│       │   ├── lib/             # Utilities
-│       │   └── styles/          # Global styles
-│       ├── .storybook/          # Storybook config
-│       ├── components.json      # shadcn config
-│       ├── tailwind.config.ts
+│       │   ├── core/             # Shared abstractions
+│       │   │   ├── tokens/       # Design tokens
+│       │   │   ├── types/        # Shared TypeScript types
+│       │   │   └── utils/        # Shared utilities
+│       │   ├── web/              # Web-specific exports
+│       │   │   ├── components/   # HeroUI React wrappers
+│       │   │   ├── patterns/     # Zine-specific web components
+│       │   │   └── providers/    # Web providers
+│       │   ├── native/           # Mobile-specific exports
+│       │   │   ├── components/   # HeroUI Native wrappers
+│       │   │   ├── patterns/     # Zine-specific native components
+│       │   │   └── providers/    # Native providers
+│       │   └── lib/              # Shared utilities
+│       ├── .storybook/           # Storybook config
+│       ├── tailwind.config.shared.js # Shared Tailwind config
 │       ├── package.json
 │       └── tsconfig.json
 ```

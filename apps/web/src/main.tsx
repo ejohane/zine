@@ -3,22 +3,12 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { createRouter } from './router'
-import { ThemeProvider } from './components/theme/ThemeProvider'
+import { DesignSystemProvider } from '@zine/design-system/web'
 import { SetupPage } from './components/SetupPage'
-import { registerSW } from 'virtual:pwa-register'
+
 import './App.css'
 
-// Register service worker
-const updateSW = registerSW({
-  onNeedRefresh() {
-    if (confirm('New content available. Reload?')) {
-      updateSW(true)
-    }
-  },
-  onOfflineReady() {
-    console.log('App ready to work offline')
-  },
-})
+
 
 // Environment-based Clerk key selection
 const getClerkPublishableKey = (): string | null => {
@@ -58,7 +48,7 @@ const router = createRouter()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ThemeProvider defaultTheme="system">
+    <DesignSystemProvider>
       {PUBLISHABLE_KEY ? (
         <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
           <RouterProvider router={router} />
@@ -66,6 +56,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       ) : (
         <SetupPage />
       )}
-    </ThemeProvider>
+    </DesignSystemProvider>
   </React.StrictMode>,
 )

@@ -1,13 +1,15 @@
+import { sharedTheme, sharedContent } from '@zine/design-system/tailwind.config.shared';
+import { heroui } from '@heroui/theme';
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  darkMode: ["class"],
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
+    ...sharedContent,
+    './src/**/*.{js,ts,jsx,tsx}',
+    './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}',
+    '../../packages/design-system/dist/web/**/*.{js,ts,jsx,tsx}',
+    '../../packages/design-system/src/**/*.{js,ts,jsx,tsx}',
   ],
-  prefix: "",
   theme: {
     container: {
       center: true,
@@ -17,16 +19,15 @@ export default {
       },
     },
     extend: {
+      ...sharedTheme,
       colors: {
+        ...sharedTheme.colors,
+        // Preserve existing custom colors
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -89,5 +90,28 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
-}
+  darkMode: 'class',
+  plugins: [
+    require("tailwindcss-animate"),
+    heroui({
+      themes: {
+        light: {
+          colors: {
+            primary: sharedTheme.colors.primary,
+            // Map existing brand colors
+            warning: '#ff6b35',
+            success: '#1DB954',
+          },
+        },
+        dark: {
+          colors: {
+            primary: sharedTheme.colors.primary,
+            // Map existing brand colors
+            warning: '#ff6b35',
+            success: '#1DB954',
+          },
+        },
+      },
+    }),
+  ],
+};

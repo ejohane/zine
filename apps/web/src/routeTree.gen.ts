@@ -9,8 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as Test2RouteImport } from './routes/test2'
-import { Route as Test1RouteImport } from './routes/test1'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SearchRouteImport } from './routes/search'
@@ -24,16 +22,6 @@ import { Route as SubscriptionsIndexRouteImport } from './routes/subscriptions/i
 import { Route as FeedSubscriptionIdRouteImport } from './routes/feed/$subscriptionId'
 import { Route as SubscriptionsDiscoverProviderRouteImport } from './routes/subscriptions/discover/$provider'
 
-const Test2Route = Test2RouteImport.update({
-  id: '/test2',
-  path: '/test2',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const Test1Route = Test1RouteImport.update({
-  id: '/test1',
-  path: '/test1',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignUpRoute = SignUpRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
@@ -106,8 +94,6 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
-  '/test1': typeof Test1Route
-  '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
@@ -122,8 +108,6 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
-  '/test1': typeof Test1Route
-  '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
@@ -139,8 +123,6 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
-  '/test1': typeof Test1Route
-  '/test2': typeof Test2Route
   '/feed/$subscriptionId': typeof FeedSubscriptionIdRoute
   '/subscriptions/': typeof SubscriptionsIndexRoute
   '/subscriptions/discover/$provider': typeof SubscriptionsDiscoverProviderRoute
@@ -157,8 +139,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
-    | '/test1'
-    | '/test2'
     | '/feed/$subscriptionId'
     | '/subscriptions'
     | '/subscriptions/discover/$provider'
@@ -173,8 +153,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
-    | '/test1'
-    | '/test2'
     | '/feed/$subscriptionId'
     | '/subscriptions'
     | '/subscriptions/discover/$provider'
@@ -189,8 +167,6 @@ export interface FileRouteTypes {
     | '/search'
     | '/sign-in'
     | '/sign-up'
-    | '/test1'
-    | '/test2'
     | '/feed/$subscriptionId'
     | '/subscriptions/'
     | '/subscriptions/discover/$provider'
@@ -206,28 +182,12 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
-  Test1Route: typeof Test1Route
-  Test2Route: typeof Test2Route
   SubscriptionsIndexRoute: typeof SubscriptionsIndexRoute
   SubscriptionsDiscoverProviderRoute: typeof SubscriptionsDiscoverProviderRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/test2': {
-      id: '/test2'
-      path: '/test2'
-      fullPath: '/test2'
-      preLoaderRoute: typeof Test2RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/test1': {
-      id: '/test1'
-      path: '/test1'
-      fullPath: '/test1'
-      preLoaderRoute: typeof Test1RouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sign-up': {
       id: '/sign-up'
       path: '/sign-up'
@@ -335,8 +295,6 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
-  Test1Route: Test1Route,
-  Test2Route: Test2Route,
   SubscriptionsIndexRoute: SubscriptionsIndexRoute,
   SubscriptionsDiscoverProviderRoute: SubscriptionsDiscoverProviderRoute,
 }

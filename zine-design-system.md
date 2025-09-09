@@ -1,5 +1,7 @@
 # Zine Design System Architecture
 
+> **Note**: This document outlines the design principles. For the current HeroUI implementation details, see [hero-ui.md](./hero-ui.md).
+
 ## Core Principles
 
 ### Design Philosophy
