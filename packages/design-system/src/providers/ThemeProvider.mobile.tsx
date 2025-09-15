@@ -27,7 +27,7 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ 
   children, 
   defaultMode = 'system',
-  storageKey = 'zine-theme-mode' 
+  storageKey: _storageKey = 'zine-theme-mode' 
 }) => {
   const [mode, setMode] = useState<ThemeMode>(defaultMode);
   

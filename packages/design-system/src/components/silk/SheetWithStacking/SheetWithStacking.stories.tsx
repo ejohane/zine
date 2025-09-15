@@ -1,12 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { SheetWithStacking, type StackedSheet } from './SheetWithStacking';
+import { SheetWithStacking } from './SheetWithStacking';
 import { Button } from '../../ui/button';
 import { Badge } from '../../ui/badge';
 import { 
   Folder, 
   File, 
   ChevronRight, 
-  Settings, 
   User, 
   CreditCard, 
   Bell, 
@@ -20,7 +19,6 @@ import {
   Calendar,
   Clock,
   MapPin,
-  Info,
   Edit,
   Trash2
 } from 'lucide-react';
@@ -73,7 +71,16 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // File Explorer Example
-const FileExplorerContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({ onOpenSheet }) => {
+interface SheetData {
+  type: string;
+  data?: unknown;
+  id?: string;
+  title?: string;
+  description?: string;
+  children?: React.ReactNode;
+}
+
+const FileExplorerContent: React.FC<{ onOpenSheet?: (sheet: SheetData) => void }> = ({ onOpenSheet }) => {
   const folders = [
     { name: 'Documents', icon: Folder, count: 25 },
     { name: 'Photos', icon: Image, count: 150 },
@@ -96,6 +103,7 @@ const FileExplorerContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({
             <button
               key={folder.name}
               onClick={() => onOpenSheet?.({
+                type: 'folder',
                 id: folder.name.toLowerCase(),
                 title: folder.name,
                 description: `${folder.count} items`,
@@ -121,6 +129,7 @@ const FileExplorerContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({
             <button
               key={file.name}
               onClick={() => onOpenSheet?.({
+                type: 'file',
                 id: file.name.toLowerCase().replace(/\./g, '-'),
                 title: file.name,
                 description: 'File details',
@@ -142,7 +151,13 @@ const FileExplorerContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({
   );
 };
 
-const FolderContent: React.FC<{ folder: any, onOpenSheet?: (sheet: any) => void }> = ({ folder, onOpenSheet }) => {
+interface FolderData {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  count: number;
+}
+
+const FolderContent: React.FC<{ folder: FolderData, onOpenSheet?: (sheet: SheetData) => void }> = ({ folder, onOpenSheet }) => {
   const items = Array.from({ length: folder.count }, (_, i) => ({
     name: `${folder.name.slice(0, -1)} ${i + 1}`,
     type: folder.name === 'Photos' ? 'image' : folder.name === 'Videos' ? 'video' : 'file',
@@ -155,6 +170,7 @@ const FolderContent: React.FC<{ folder: any, onOpenSheet?: (sheet: any) => void 
         <button
           key={index}
           onClick={() => onOpenSheet?.({
+            type: 'file',
             id: `${folder.name.toLowerCase()}-${index}`,
             title: item.name,
             description: 'Item details',
@@ -174,7 +190,13 @@ const FolderContent: React.FC<{ folder: any, onOpenSheet?: (sheet: any) => void 
   );
 };
 
-const FileDetails: React.FC<{ file: any }> = ({ file }) => (
+interface FileData {
+  name: string;
+  size: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}
+
+const FileDetails: React.FC<{ file: FileData }> = ({ file }) => (
   <div className="space-y-4">
     <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-lg flex items-center justify-center">
       <File className="h-16 w-16 text-gray-400" />
@@ -209,7 +231,7 @@ const FileDetails: React.FC<{ file: any }> = ({ file }) => (
 );
 
 // Settings Navigation Example
-const SettingsContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({ onOpenSheet }) => {
+const SettingsContent: React.FC<{ onOpenSheet?: (sheet: SheetData) => void }> = ({ onOpenSheet }) => {
   const settings = [
     { 
       icon: User, 
@@ -243,6 +265,7 @@ const SettingsContent: React.FC<{ onOpenSheet?: (sheet: any) => void }> = ({ onO
         <button
           key={setting.id}
           onClick={() => onOpenSheet?.({
+            type: 'setting',
             id: setting.id,
             title: setting.label,
             description: setting.description,
@@ -266,12 +289,20 @@ type SettingOption =
   | { label: string; action: () => void; toggle?: never }
   | { label: string; toggle: boolean; action?: never };
 
-const SettingDetails: React.FC<{ setting: any, onOpenSheet?: (sheet: any) => void }> = ({ setting, onOpenSheet }) => {
+interface SettingData {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const SettingDetails: React.FC<{ setting: SettingData, onOpenSheet?: (sheet: SheetData) => void }> = ({ setting, onOpenSheet }) => {
   const getSettingOptions = (): SettingOption[] => {
     switch (setting.id) {
       case 'profile':
         return [
           { label: 'Edit Profile', action: () => onOpenSheet?.({
+            type: 'form',
             id: 'edit-profile',
             title: 'Edit Profile',
             children: <EditProfileForm />
@@ -294,6 +325,7 @@ const SettingDetails: React.FC<{ setting: any, onOpenSheet?: (sheet: any) => voi
       case 'billing':
         return [
           { label: 'Payment Methods', action: () => onOpenSheet?.({
+            type: 'list',
             id: 'payment-methods',
             title: 'Payment Methods',
             children: <PaymentMethods />

@@ -5,8 +5,7 @@ import {
   SheetPortal,
   SheetView,
   SheetBackdrop,
-  SheetContent,
-  SheetHandle
+  SheetContent
 } from '../Sheet';
 import { cn } from '../../../lib/utils';
 import { X } from 'lucide-react';

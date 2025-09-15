@@ -8,7 +8,7 @@ interface DesignSystemProviderProps {
 
 export const DesignSystemProvider: React.FC<DesignSystemProviderProps> = ({ 
   children,
-  theme = 'system',
+  theme: _theme = 'system',
   ...props 
 }) => {
   // For now, we'll use HeroUI's built-in theme handling

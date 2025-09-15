@@ -1,5 +1,8 @@
 // Native-specific exports for the design system
 
+// Token exports
+export * as tokens from '../tokens';
+
 // Provider exports
 export { DesignSystemProvider } from './providers/DesignSystemProvider';
 

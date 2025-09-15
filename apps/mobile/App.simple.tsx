@@ -1,42 +1,39 @@
-import './global.css';
-import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text } from 'react-native';
-import { DesignSystemProvider, Button } from '@zine/design-system/native';
-
-function MainContent() {
-  return (
-    <View style={{ flex: 1, backgroundColor: '#fafafa' }}>
-      <StatusBar style="dark" />
-
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: 'black' }}>
-          HeroUI Native Test
-        </Text>
-
-        <Text style={{ fontSize: 18, marginBottom: 20, color: '#6B7280' }}>
-          Testing HeroUI Native components
-        </Text>
-
-        <View style={{ gap: 10 }}>
-          <Button color="primary">Primary Button</Button>
-          <Button color="secondary">Secondary Button</Button>
-          <Button color="success">Success Button</Button>
-          <Button color="warning">Warning Button</Button>
-          <Button color="danger">Danger Button</Button>
-        </View>
-      </SafeAreaView>
-    </View>
-  );
-}
+import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <DesignSystemProvider>
-        <MainContent />
-      </DesignSystemProvider>
-    </SafeAreaProvider>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Zine Test App</Text>
+        <Text style={styles.subtitle}>Basic functionality test</Text>
+        <StatusBar style="auto" />
+      </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 18,
+    marginBottom: 8,
+    color: '#666',
+  },
+});

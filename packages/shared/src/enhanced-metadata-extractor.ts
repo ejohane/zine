@@ -196,7 +196,7 @@ export class EnhancedMetadataExtractor {
    */
   private async extractEnhancedWebMetadata(url: string, signal: AbortSignal): Promise<EnhancedExtractedMetadata> {
     const response = await fetch(url, {
-      signal,
+      signal: signal as any,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Zine/1.0; +https://zine.dev)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -812,7 +812,7 @@ export class EnhancedMetadataExtractor {
       // In production, you'd want to use YouTube Data API v3 with proper API key
       const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
       
-      const response = await fetch(oembedUrl, { signal })
+      const response = await fetch(oembedUrl, { signal: signal as any })
       if (!response.ok) {
         throw new Error(`YouTube oEmbed API failed: ${response.status}`)
       }
@@ -897,7 +897,7 @@ export class EnhancedMetadataExtractor {
       let response: Response
       try {
         response = await fetch(oembedUrl, { 
-          signal,
+          signal: signal as any,
           headers: {
             'Accept': 'application/json'
           }
@@ -1004,7 +1004,7 @@ export class EnhancedMetadataExtractor {
       // Use Twitter oEmbed API (public, no authentication required)
       const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`
       
-      const response = await fetch(oembedUrl, { signal })
+      const response = await fetch(oembedUrl, { signal: signal as any })
       if (!response.ok) {
         throw new Error(`Twitter oEmbed API failed: ${response.status}`)
       }

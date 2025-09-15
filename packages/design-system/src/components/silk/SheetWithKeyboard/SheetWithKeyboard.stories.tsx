@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { SheetWithKeyboard } from './SheetWithKeyboard';
 import { Button } from '../../ui/button';
-import { Badge } from '../../ui/badge';
 import { 
   MessageSquare, 
   Send, 
@@ -9,15 +8,9 @@ import {
   Smile, 
   Mic,
   User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Clock,
   CreditCard,
   Search,
   Filter,
-  SortAsc
 } from 'lucide-react';
 
 const meta: Meta<typeof SheetWithKeyboard> = {

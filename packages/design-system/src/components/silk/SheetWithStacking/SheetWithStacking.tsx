@@ -155,7 +155,7 @@ export const SheetWithStacking: React.FC<SheetWithStackingProps> = ({
                 )}
                 
                  <div className="flex-1 overflow-y-auto">
-                   {React.cloneElement(sheet.children as React.ReactElement<any>, {
+                   {React.cloneElement(sheet.children as React.ReactElement<{ onOpenSheet?: (sheet: Omit<StackedSheet, 'level'>) => void }>, {
                      onOpenSheet: (newSheet: Omit<StackedSheet, 'level'>) => {
                        addSheet({
                          ...newSheet,

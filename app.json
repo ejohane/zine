@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "c14045ec-332f-40ed-92dc-f8814f0102c0"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.ejohane.zine",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

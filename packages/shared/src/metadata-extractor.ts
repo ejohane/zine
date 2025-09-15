@@ -169,7 +169,7 @@ export class MetadataExtractor {
    */
   private async extractGenericMetadata(url: string, signal: AbortSignal): Promise<ExtractedMetadata> {
     const response = await fetch(url, {
-      signal,
+      signal: signal as any,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Zine/1.0; +https://zine.dev)'
       }

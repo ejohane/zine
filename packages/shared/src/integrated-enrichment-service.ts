@@ -188,7 +188,7 @@ export class IntegratedEnrichmentService {
 
       const response = await fetch(oembedUrl, {
         headers: { 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(5000) as any
       })
 
       if (!response.ok) {

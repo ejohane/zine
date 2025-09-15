@@ -3,7 +3,10 @@ const { sharedTheme } = require('@zine/design-system/tailwind.config.shared');
 module.exports = {
   content: [
     './App.{js,jsx,ts,tsx}',
+    './app/**/*.{js,jsx,ts,tsx}',
     './src/**/*.{js,jsx,ts,tsx}',
+    './components/**/*.{js,jsx,ts,tsx}',
+    './contexts/**/*.{js,jsx,ts,tsx}',
     './node_modules/heroui-native/lib/**/*.{js,ts,jsx,tsx}',
     '../../packages/design-system/dist/native/**/*.{js,ts,jsx,tsx}',
     '../../packages/design-system/src/**/*.{js,ts,jsx,tsx}',

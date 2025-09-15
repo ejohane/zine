@@ -43,7 +43,13 @@ const meta: Meta<typeof Toast> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const ToastDemo: React.FC<{ variant?: any, title?: string, description?: string, action?: any }> = ({ 
+type ToastVariant = 'default' | 'success' | 'error' | 'warning' | 'info';
+type ToastAction = {
+  label: string;
+  onClick: () => void;
+};
+
+const ToastDemo: React.FC<{ variant?: ToastVariant, title?: string, description?: string, action?: ToastAction }> = ({ 
   variant = 'default', 
   title = 'Notification', 
   description = 'This is a toast notification', 
@@ -326,7 +332,7 @@ export const MediaUpload: Story = {
   render: () => {
     const { addToast } = useToast();
 
-    const simulateUpload = (type: string, icon: any) => {
+    const simulateUpload = (type: string, _icon: React.ComponentType<{ className?: string }>) => {
       // Start upload
       addToast({
         variant: 'info',
@@ -435,7 +441,7 @@ export const MultipleToasts: Story = {
 
       messages.forEach((message, index) => {
         setTimeout(() => {
-          addToast(message as any);
+          addToast(message as Parameters<typeof addToast>[0]);
         }, index * 300);
       });
     };

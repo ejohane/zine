@@ -161,7 +161,7 @@ export interface ModalProps {
   isKeyboardDismissDisabled?: boolean;
   hideCloseButton?: boolean;
   closeButton?: ReactNode;
-  motionProps?: any;
+  motionProps?: Record<string, unknown>;
   portalContainer?: Element;
   children?: ReactNode;
   className?: string;

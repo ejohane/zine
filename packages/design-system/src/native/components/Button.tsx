@@ -5,16 +5,16 @@ import type { ButtonProps } from '../../core/types/components';
 // Map web variants to native variants
 const mapVariantToNative = (variant?: ButtonProps['variant']) => {
   const variantMap: Record<string, string> = {
-    'solid': 'filled',
-    'bordered': 'outlined',
-    'light': 'text',
-    'flat': 'filled',
-    'faded': 'tonal',
-    'shadow': 'elevated',
-    'ghost': 'text'
+    'solid': 'primary',
+    'bordered': 'secondary',
+    'light': 'secondary',
+    'flat': 'primary',
+    'faded': 'secondary',
+    'shadow': 'primary',
+    'ghost': 'secondary'
   };
   
-  return variant ? variantMap[variant] || 'filled' : undefined;
+  return variant ? variantMap[variant] || 'primary' : undefined;
 };
 
 export const Button: React.FC<ButtonProps> = ({ 
@@ -33,7 +33,7 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <HeroUINativeButton 
       onPress={handlePress}
-      variant={nativeVariant as any}
+      variant={nativeVariant as Parameters<typeof HeroUINativeButton>[0]['variant']}
       {...props}
     >
       {children}

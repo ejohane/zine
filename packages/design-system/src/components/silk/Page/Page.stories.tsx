@@ -7,7 +7,6 @@ import {
   Search,
   Filter,
   MoreVertical,
-  Heart,
   Share2,
   Bookmark,
   Settings,

@@ -5,10 +5,8 @@ import { Badge } from '../../ui/badge';
 import { 
   Heart, 
   Share2, 
-  Bookmark, 
-  MoreVertical,
+  Bookmark,
   Play,
-  Clock,
   User,
   Calendar,
   ChevronRight,

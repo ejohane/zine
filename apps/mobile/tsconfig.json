@@ -5,12 +5,16 @@
     "strict": false,
     "skipLibCheck": true,
     "types": ["react", "react-native"],
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts",
-    "types/**/*.d.ts"
+    "types/**/*.d.ts",
+    "app/**/*.tsx",
+    "app/**/*.ts"
   ]
 }

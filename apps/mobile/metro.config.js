@@ -1,11 +1,13 @@
-const { getDefaultConfig } = require('expo/metro-config');
-const { withNativeWind } = require('nativewind/metro');
+// Learn more https://docs.expo.dev/guides/customizing-metro/
+const { getDefaultConfig } = require('@expo/metro-config');
 const path = require('path');
 
+// Get the default config from @expo/metro-config
+const config = getDefaultConfig(__dirname);
+
+// Monorepo setup
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
-
-const config = getDefaultConfig(projectRoot);
 
 // Watch all files in the monorepo
 config.watchFolders = [workspaceRoot];
@@ -16,19 +18,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, 'node_modules'),
 ];
 
-// Force Metro to resolve these packages from the root to avoid duplicates
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'react' || moduleName === 'react-native') {
-    return {
-      filePath: require.resolve(moduleName, {
-        paths: [workspaceRoot],
-      }),
-      type: 'sourceFile',
-    };
-  }
-  
-  // Default resolution for other modules
-  return context.resolveRequest(context, moduleName, platform);
-};
+// Apply NativeWind configuration
+const { withNativeWind } = require('nativewind/metro');
+const finalConfig = withNativeWind(config, { input: './global.css' });
 
-module.exports = withNativeWind(config, { input: './global.css' });
+module.exports = finalConfig;
