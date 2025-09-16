@@ -1,6 +1,5 @@
 -- Current sql file was generated after introspecting the database
--- If you want to run this migration please uncomment this code before executing migrations
-/*
+-- Migration uncommented for production deployment
 CREATE TABLE `d1_migrations` (
 	`id` integer PRIMARY KEY AUTOINCREMENT,
 	`name` text,
@@ -144,5 +143,3 @@ CREATE TABLE `token_migration_status` (
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
-
-*/
