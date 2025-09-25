@@ -1,4 +1,5 @@
 import type { Bookmark, CreateBookmark, UpdateBookmark } from '@zine/shared';
+import type { Creator } from '../types/bookmark';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -265,6 +266,10 @@ export const bookmarksApi = {
     const response = await apiClient.put<{ data: Bookmark; message?: string }>(`/api/v1/bookmarks/${id}/refresh`);
     return response.data;
   },
+  getBookmarksByCreator: async (creatorId: string): Promise<Bookmark[]> => {
+    const response = await apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}`);
+    return response.bookmarks || [];
+  },
 };
 
 // Feed-specific API methods
@@ -301,5 +306,8 @@ export const api = {
   },
   getRecentBookmarks: async (_token: string, limit: number = 10): Promise<Bookmark[]> => {
     return bookmarksApi.getRecent(limit);
+  },
+  getBookmarksByCreator: async (creatorId: string, _token: string): Promise<Bookmark[]> => {
+    return bookmarksApi.getBookmarksByCreator(creatorId);
   },
 };
