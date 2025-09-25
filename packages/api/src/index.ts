@@ -1331,13 +1331,43 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
   return c.json({ message: result.message })
 })
 
-// Get bookmarks by creator endpoint
+// Get bookmarks by creator endpoint with pagination
 app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
   const auth = getAuthContext(c)
   const creatorId = c.req.param('creatorId')
   
+  // Get pagination parameters from query string
+  const page = parseInt(c.req.query('page') || '1', 10)
+  const limit = parseInt(c.req.query('limit') || '20', 10)
+  const offset = (page - 1) * limit
+  
+  // Ensure reasonable limits
+  const safeLimit = Math.min(Math.max(limit, 1), 50)
+  
   try {
-    // Get all bookmarks for the authenticated user with this creator
+    // First get the total count
+    const countResult = await c.env.DB.prepare(`
+      SELECT COUNT(*) as total
+      FROM bookmarks b
+      LEFT JOIN content c ON b.content_id = c.id
+      WHERE b.user_id = ? AND c.creator_id = ?
+    `).bind(auth.userId, creatorId).first()
+    
+    const totalCount = Number(countResult?.total || 0)
+    
+    if (totalCount === 0) {
+      return c.json({ 
+        creator: null, 
+        bookmarks: [], 
+        totalCount: 0,
+        page: page,
+        limit: safeLimit,
+        hasNextPage: false,
+        hasPreviousPage: false
+      })
+    }
+    
+    // Get paginated bookmarks for the authenticated user with this creator
     const result = await c.env.DB.prepare(`
       SELECT 
         b.*,
@@ -1361,13 +1391,18 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
       LEFT JOIN content c ON b.content_id = c.id
       WHERE b.user_id = ? AND c.creator_id = ?
       ORDER BY c.published_at DESC, b.bookmarked_at DESC
-    `).bind(auth.userId, creatorId).all()
+      LIMIT ? OFFSET ?
+    `).bind(auth.userId, creatorId, safeLimit, offset).all()
     
     if (!result.results || result.results.length === 0) {
       return c.json({ 
         creator: null, 
         bookmarks: [], 
-        totalCount: 0 
+        totalCount: totalCount,
+        page: page,
+        limit: safeLimit,
+        hasNextPage: false,
+        hasPreviousPage: page > 1
       })
     }
     
@@ -1428,10 +1463,18 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
         : undefined
     } : null
     
+    const hasNextPage = offset + safeLimit < totalCount
+    const hasPreviousPage = page > 1
+    
     return c.json({
       creator,
       bookmarks,
-      totalCount: bookmarks.length
+      totalCount: totalCount,
+      page: page,
+      limit: safeLimit,
+      hasNextPage,
+      hasPreviousPage,
+      totalPages: Math.ceil(totalCount / safeLimit)
     })
   } catch (error) {
     console.error('Error fetching bookmarks by creator:', error)

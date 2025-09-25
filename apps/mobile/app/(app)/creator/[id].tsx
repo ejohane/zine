@@ -30,24 +30,33 @@ export default function CreatorScreen() {
   const [creator, setCreator] = useState<Creator | null>(null);
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (id && isSignedIn) {
-      fetchCreatorBookmarks();
+      fetchCreatorBookmarks(1, true);
     }
   }, [id, isSignedIn]);
 
-  const fetchCreatorBookmarks = async () => {
+  const fetchCreatorBookmarks = async (pageNum: number = 1, reset: boolean = false) => {
     try {
-      setLoading(true);
+      if (reset) {
+        setLoading(true);
+        setBookmarks([]);
+      } else {
+        setLoadingMore(true);
+      }
       setError(null);
       const token = await getToken();
       if (!token) {
         throw new Error('Not authenticated');
       }
       
-      const data = await api.getBookmarksByCreatorWithDetails(id!, token);
+      const data = await api.getBookmarksByCreatorWithDetails(id!, token, pageNum, 20);
       
       if (data.creator) {
         // Ensure required fields are present for Creator type
@@ -62,7 +71,19 @@ export default function CreatorScreen() {
           url: data.creator.url,
         };
         setCreator(creatorData);
+      } else if (pageNum === 1) {
+        // If no creator data on first page load, use fallback
+        setCreator({
+          id: id!,
+          name: 'Unknown Creator',
+          platform: 'web',
+        });
       }
+      
+      // Set pagination info
+      setHasNextPage(data.hasNextPage || false);
+      setTotalCount(data.totalCount || 0);
+      setPage(pageNum);
       
       if (data.bookmarks && data.bookmarks.length > 0) {
         // Map bookmarks ensuring required fields
@@ -89,8 +110,14 @@ export default function CreatorScreen() {
             : b.publishedAt,
           duration: b.duration,
         }));
-        setBookmarks(mappedBookmarks);
-      } else {
+        
+        // Append or replace bookmarks depending on reset flag
+        if (reset) {
+          setBookmarks(mappedBookmarks);
+        } else {
+          setBookmarks(prev => [...prev, ...mappedBookmarks]);
+        }
+      } else if (reset) {
         setError('No bookmarks found for this creator');
       }
     } catch (err) {
@@ -98,6 +125,7 @@ export default function CreatorScreen() {
       setError('Failed to load creator bookmarks');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -160,9 +188,13 @@ export default function CreatorScreen() {
         <View style={styles.compactThumbnailContainer}>
           {item.thumbnailUrl ? (
             <Image
-              source={{ uri: item.thumbnailUrl }}
+              source={{ 
+                uri: item.thumbnailUrl,
+                cache: 'force-cache'
+              }}
               style={styles.compactThumbnail}
               resizeMode="cover"
+              onError={() => {}}
             />
           ) : (
             <View style={[styles.compactThumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
@@ -241,7 +273,7 @@ export default function CreatorScreen() {
           <Text style={[styles.errorText, { color: colors.foreground }]}>{error}</Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
-            onPress={fetchCreatorBookmarks}
+            onPress={() => fetchCreatorBookmarks(1, true)}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -268,8 +300,13 @@ export default function CreatorScreen() {
             <View style={styles.avatarContainer}>
               {creator.avatarUrl ? (
                 <Image
-                  source={{ uri: creator.avatarUrl }}
+                  source={{ 
+                    uri: creator.avatarUrl,
+                    cache: 'force-cache'
+                  }}
                   style={styles.avatar}
+                  resizeMode="cover"
+                  onError={() => {}}
                 />
               ) : (
                 <View style={[styles.avatarPlaceholder, { backgroundColor: colors.secondary }]}>
@@ -329,7 +366,7 @@ export default function CreatorScreen() {
       {/* Bookmarks Count */}
       <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Saved Bookmarks ({bookmarks.length})
+          Saved Bookmarks {totalCount > 0 ? `(${totalCount})` : `(${bookmarks.length})`}
         </Text>
       </View>
 
@@ -347,6 +384,22 @@ export default function CreatorScreen() {
               No bookmarks from this creator
             </Text>
           </View>
+        }
+        onEndReached={() => {
+          if (hasNextPage && !loadingMore) {
+            fetchCreatorBookmarks(page + 1, false);
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingFooter}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingMoreText, { color: colors.mutedForeground }]}>
+                Loading more bookmarks...
+              </Text>
+            </View>
+          ) : null
         }
       />
     </SafeAreaView>
@@ -531,5 +584,13 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 12,
     fontSize: 16,
+  },
+  loadingFooter: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loadingMoreText: {
+    marginTop: 8,
+    fontSize: 14,
   },
 });

@@ -266,12 +266,30 @@ export const bookmarksApi = {
     const response = await apiClient.put<{ data: Bookmark; message?: string }>(`/api/v1/bookmarks/${id}/refresh`);
     return response.data;
   },
-  getBookmarksByCreator: async (creatorId: string): Promise<Bookmark[]> => {
-    const response = await apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}`);
+  getBookmarksByCreator: async (creatorId: string, page: number = 1, limit: number = 20): Promise<Bookmark[]> => {
+    const response = await apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}?page=${page}&limit=${limit}`);
     return response.bookmarks || [];
   },
-  getBookmarksByCreatorWithDetails: async (creatorId: string): Promise<{ creator: any; bookmarks: Bookmark[] }> => {
-    return apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}`);
+  getBookmarksByCreatorWithDetails: async (creatorId: string, page: number = 1, limit: number = 20): Promise<{ 
+    creator: any; 
+    bookmarks: Bookmark[];
+    totalCount: number;
+    page: number;
+    limit: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    totalPages: number;
+  }> => {
+    return apiClient.get<{ 
+      creator: any; 
+      bookmarks: Bookmark[];
+      totalCount: number;
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+      totalPages: number;
+    }>(`/api/v1/bookmarks/creator/${creatorId}?page=${page}&limit=${limit}`);
   },
 };
 
@@ -310,10 +328,19 @@ export const api = {
   getRecentBookmarks: async (_token: string, limit: number = 10): Promise<Bookmark[]> => {
     return bookmarksApi.getRecent(limit);
   },
-  getBookmarksByCreator: async (creatorId: string, _token: string): Promise<Bookmark[]> => {
-    return bookmarksApi.getBookmarksByCreator(creatorId);
+  getBookmarksByCreator: async (creatorId: string, _token: string, page: number = 1, limit: number = 20): Promise<Bookmark[]> => {
+    return bookmarksApi.getBookmarksByCreator(creatorId, page, limit);
   },
-  getBookmarksByCreatorWithDetails: async (creatorId: string, _token: string): Promise<{ creator: any; bookmarks: Bookmark[] }> => {
-    return bookmarksApi.getBookmarksByCreatorWithDetails(creatorId);
+  getBookmarksByCreatorWithDetails: async (creatorId: string, _token: string, page: number = 1, limit: number = 20): Promise<{ 
+    creator: any; 
+    bookmarks: Bookmark[];
+    totalCount: number;
+    page: number;
+    limit: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    totalPages: number;
+  }> => {
+    return bookmarksApi.getBookmarksByCreatorWithDetails(creatorId, page, limit);
   },
 };
