@@ -16,7 +16,7 @@ export interface Bookmark {
   description?: string;
   thumbnailUrl?: string;
   creator?: Creator;
-  contentType?: string;
+  contentType?: 'video' | 'podcast' | 'article' | 'post' | 'link';
   createdAt: string;
   publishedAt?: string;
   duration?: number;
@@ -25,4 +25,5 @@ export interface Bookmark {
   notes?: string;
   isFavorite?: boolean;
   isArchived?: boolean;
+  originalUrl?: string;  // Added for compatibility with shared types
 }

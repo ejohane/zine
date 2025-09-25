@@ -9,6 +9,7 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import { api } from '../../../lib/api';
 import type { Bookmark, Creator } from '../../../types/bookmark';
 import { formatDistanceToNow } from '../../../lib/dateUtils';
 import { PlatformIcon } from '../../../lib/platformIcons';
+
 
 export default function CreatorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -131,63 +133,78 @@ export default function CreatorScreen() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const renderBookmarkItem = ({ item }: { item: Bookmark }) => (
-    <TouchableOpacity
-      style={[styles.bookmarkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-      onPress={() => router.push(`/bookmark/${item.id}`)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.bookmarkContent}>
+  const renderBookmarkItem = ({ item }: { item: Bookmark }) => {
+    const getContentTypeIcon = () => {
+      switch (item.contentType) {
+        case 'video':
+          return { name: 'play-circle', color: '#FF0000' };
+        case 'podcast':
+          return { name: 'mic', color: '#1DB954' };
+        case 'article':
+        case 'post':
+          return { name: 'file-text', color: colors.primary };
+        default:
+          return { name: 'bookmark', color: colors.mutedForeground };
+      }
+    };
+
+    const contentIcon = getContentTypeIcon();
+
+    return (
+      <TouchableOpacity
+        style={[styles.compactCard, { backgroundColor: colors.card }]}
+        onPress={() => router.push(`/bookmark/${item.id}`)}
+        activeOpacity={0.7}
+      >
         {/* Thumbnail */}
-        <View style={styles.thumbnailContainer}>
+        <View style={styles.compactThumbnailContainer}>
           {item.thumbnailUrl ? (
             <Image
               source={{ uri: item.thumbnailUrl }}
-              style={styles.thumbnail}
+              style={styles.compactThumbnail}
               resizeMode="cover"
             />
           ) : (
-            <View style={[styles.thumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
+            <View style={[styles.compactThumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
               <Feather name="image" size={20} color={colors.mutedForeground} />
             </View>
           )}
           {item.duration && (
-            <View style={styles.durationBadge}>
-              <Text style={styles.durationText}>{formatDuration(item.duration)}</Text>
+            <View style={styles.compactDurationBadge}>
+              <Text style={styles.compactDurationText}>{formatDuration(item.duration)}</Text>
             </View>
           )}
         </View>
 
         {/* Content */}
-        <View style={styles.bookmarkInfo}>
-          <Text style={[styles.bookmarkTitle, { color: colors.foreground }]} numberOfLines={2}>
+        <View style={styles.compactInfo}>
+          <Text style={[styles.compactTitle, { color: colors.foreground }]} numberOfLines={2}>
             {item.title}
           </Text>
           
-          {item.description && (
-            <Text style={[styles.bookmarkDescription, { color: colors.mutedForeground }]} numberOfLines={2}>
-              {item.description}
-            </Text>
-          )}
-          
-          <View style={styles.bookmarkMeta}>
-            {item.contentType && (
-              <View style={[styles.typeBadge, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.typeBadgeText, { color: colors.foreground }]}>
-                  {item.contentType}
-                </Text>
-              </View>
-            )}
+          <View style={styles.compactMeta}>
+            <Feather 
+              name={contentIcon.name as any} 
+              size={14} 
+              color={contentIcon.color} 
+            />
             {item.publishedAt && (
-              <Text style={[styles.publishedDate, { color: colors.mutedForeground }]}>
+              <Text style={[styles.compactDate, { color: colors.mutedForeground }]}>
                 {formatDistanceToNow(item.publishedAt)}
               </Text>
             )}
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+
+        {/* Chevron */}
+        <Feather 
+          name="chevron-right" 
+          size={20} 
+          color={colors.mutedForeground} 
+        />
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -446,79 +463,66 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
   },
-  bookmarkCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginHorizontal: 20,
-  },
-  bookmarkContent: {
+  // Compact card styles
+  compactCard: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
+    marginHorizontal: 16,
+    borderRadius: 12,
   },
-  thumbnailContainer: {
+  compactThumbnailContainer: {
+    width: 60,
+    height: 60,
     position: 'relative',
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
+  compactThumbnail: {
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
   },
-  thumbnailPlaceholder: {
-    width: 60,
-    height: 60,
+  compactThumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  durationBadge: {
+  compactDurationBadge: {
     position: 'absolute',
     bottom: 4,
     right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  durationText: {
+  compactDurationText: {
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
   },
-  bookmarkInfo: {
+  compactInfo: {
     flex: 1,
     marginLeft: 12,
+    marginRight: 8,
   },
-  bookmarkTitle: {
+  compactTitle: {
     fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 20,
   },
-  bookmarkDescription: {
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  bookmarkMeta: {
+  compactMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  typeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '500',
-    textTransform: 'capitalize',
-  },
-  publishedDate: {
+  compactDate: {
     fontSize: 12,
   },
   separator: {
-    height: 10,
+    height: 8,
   },
   emptyState: {
     alignItems: 'center',
