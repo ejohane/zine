@@ -7,7 +7,8 @@ import {
   UpdateBookmarkSchema,
   SaveBookmarkSchema,
   BookmarkService,
-  BookmarkSaveService
+  BookmarkSaveService,
+  type Bookmark
 } from '@zine/shared'
 import { D1BookmarkRepository } from './d1-repository'
 import { D1FeedItemRepository } from './d1-feed-item-repository'
@@ -1328,6 +1329,114 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
     return c.json({ error: result.error }, result.error === 'Bookmark not found' ? 404 : 500)
   }
   return c.json({ message: result.message })
+})
+
+// Get bookmarks by creator endpoint
+app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
+  const auth = getAuthContext(c)
+  const creatorId = c.req.param('creatorId')
+  
+  try {
+    // Get all bookmarks for the authenticated user with this creator
+    const result = await c.env.DB.prepare(`
+      SELECT 
+        b.*,
+        c.id as content_id,
+        c.url as content_url,
+        c.title as content_title,
+        c.description as content_description,
+        c.thumbnail_url as content_thumbnail_url,
+        c.favicon_url as content_favicon_url,
+        c.creator_id,
+        c.creator_name,
+        c.creator_handle,
+        c.creator_thumbnail as creator_avatar_url,
+        c.creator_verified,
+        c.creator_subscriber_count,
+        c.creator_follower_count,
+        c.content_type,
+        c.published_at as content_published_at,
+        c.provider as creator_platform
+      FROM bookmarks b
+      LEFT JOIN content c ON b.content_id = c.id
+      WHERE b.user_id = ? AND c.creator_id = ?
+      ORDER BY c.published_at DESC, b.bookmarked_at DESC
+    `).bind(auth.userId, creatorId).all()
+    
+    if (!result.results || result.results.length === 0) {
+      return c.json({ 
+        creator: null, 
+        bookmarks: [], 
+        totalCount: 0 
+      })
+    }
+    
+    // Map bookmarks
+    const bookmarks = result.results.map((row: any) => {
+      // Use the private mapRowToBookmark method logic
+      const bookmark: Bookmark = {
+        id: String(row.id),
+        userId: row.user_id,
+        url: row.content_url || '',
+        originalUrl: row.content_url || '',
+        title: row.content_title || '',
+        description: row.content_description || undefined,
+        contentType: row.content_type || undefined,
+        thumbnailUrl: row.content_thumbnail_url || undefined,
+        faviconUrl: row.content_favicon_url || undefined,
+        publishedAt: row.content_published_at ? Number(row.content_published_at) : undefined,
+        status: row.status || 'active',
+        creatorId: row.creator_id || undefined,
+        tags: row.user_tags ? JSON.parse(row.user_tags) : undefined,
+        notes: row.notes || undefined,
+        createdAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
+        updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now()
+      }
+      
+      // Add creator if present
+      if (row.creator_id && row.creator_name) {
+        bookmark.creator = {
+          id: row.creator_id,
+          name: row.creator_name,
+          handle: row.creator_handle || undefined,
+          avatarUrl: row.creator_avatar_url || undefined,
+          verified: row.creator_verified === 1 || row.creator_verified === true || undefined,
+          subscriberCount: row.creator_subscriber_count ? Number(row.creator_subscriber_count) : undefined,
+          followerCount: row.creator_follower_count ? Number(row.creator_follower_count) : undefined,
+          platform: row.creator_platform || undefined,
+        }
+      }
+      
+      return bookmark
+    })
+    
+    // Get creator info from first bookmark
+    const firstRow = result.results[0]
+    const creator = firstRow.creator_id && firstRow.creator_name ? {
+      id: firstRow.creator_id,
+      name: firstRow.creator_name,
+      handle: firstRow.creator_handle || undefined,
+      avatarUrl: firstRow.creator_avatar_url || undefined,
+      verified: firstRow.creator_verified === 1 || firstRow.creator_verified === true || undefined,
+      subscriberCount: firstRow.creator_subscriber_count ? Number(firstRow.creator_subscriber_count) : undefined,
+      followerCount: firstRow.creator_follower_count ? Number(firstRow.creator_follower_count) : undefined,
+      platform: firstRow.creator_platform || undefined,
+      url: firstRow.creator_platform === 'youtube' 
+        ? `https://youtube.com/channel/${String(firstRow.creator_id).replace('youtube:', '')}`
+        : firstRow.creator_platform === 'spotify' 
+        ? `https://open.spotify.com/show/${String(firstRow.creator_id).replace('spotify:', '')}`
+        : undefined
+    } : null
+    
+    return c.json({
+      creator,
+      bookmarks,
+      totalCount: bookmarks.length
+    })
+  } catch (error) {
+    console.error('Error fetching bookmarks by creator:', error)
+    return c.json({ error: 'Failed to fetch bookmarks by creator' }, 500)
+  }
 })
 
 // New save endpoint with enhanced API enrichment

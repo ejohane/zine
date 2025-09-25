@@ -24,8 +24,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.creator_name,
           c.creator_handle,
           c.creator_thumbnail as creator_avatar_url,
+          c.creator_verified,
+          c.creator_subscriber_count,
+          c.creator_follower_count,
           c.content_type,
-          c.published_at as content_published_at
+          c.published_at as content_published_at,
+          c.provider as creator_platform
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
         ORDER BY b.bookmarked_at DESC
@@ -53,8 +57,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.creator_name,
           c.creator_handle,
           c.creator_thumbnail as creator_avatar_url,
+          c.creator_verified,
+          c.creator_subscriber_count,
+          c.creator_follower_count,
           c.content_type,
-          c.published_at as content_published_at
+          c.published_at as content_published_at,
+          c.provider as creator_platform
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
         WHERE b.id = ?
@@ -242,8 +250,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.creator_name,
           c.creator_handle,
           c.creator_thumbnail as creator_avatar_url,
+          c.creator_verified,
+          c.creator_subscriber_count,
+          c.creator_follower_count,
           c.content_type,
-          c.published_at as content_published_at
+          c.published_at as content_published_at,
+          c.provider as creator_platform
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
         WHERE b.id = ? AND b.user_id = ?
@@ -407,13 +419,15 @@ export class D1BookmarkRepository implements BookmarkRepository {
       }
       
       // Insert or update content
+      // Note: Creator fields will be populated by enrichment services
       await this.db.prepare(`
         INSERT OR REPLACE INTO content (
           id, external_id, provider, url, canonical_url, title, description,
           thumbnail_url, favicon_url, published_at, content_type,
-          creator_id, creator_name, creator_handle,
+          creator_id, creator_name, creator_handle, creator_thumbnail, 
+          creator_verified, creator_subscriber_count, creator_follower_count,
           created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         contentId,
         contentId,
@@ -427,8 +441,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
         bookmarkData.publishedAt ? bookmarkData.publishedAt.getTime() : null,
         bookmarkData.contentType || null,
         bookmarkData.creatorId || null,
-        null, // creator_name - would need to be passed separately
-        null, // creator_handle - would need to be passed separately
+        null, // creator_name - populated by enrichment
+        null, // creator_handle - populated by enrichment  
+        null, // creator_thumbnail - populated by enrichment
+        null, // creator_verified - populated by enrichment
+        null, // creator_subscriber_count - populated by enrichment
+        null, // creator_follower_count - populated by enrichment
         now,
         now
       ).run()
@@ -503,6 +521,10 @@ export class D1BookmarkRepository implements BookmarkRepository {
         name: row.creator_name,
         handle: row.creator_handle || undefined,
         avatarUrl: row.creator_avatar_url || undefined,
+        verified: row.creator_verified === 1 || row.creator_verified === true || undefined,
+        subscriberCount: row.creator_subscriber_count ? Number(row.creator_subscriber_count) : undefined,
+        followerCount: row.creator_follower_count ? Number(row.creator_follower_count) : undefined,
+        platform: row.creator_platform || undefined,
         bio: undefined, // Not in content table
         url: undefined, // Not in content table
         platforms: undefined, // Not in content table

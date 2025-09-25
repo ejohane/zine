@@ -409,8 +409,12 @@ export class ApiEnrichmentService {
       likeCount: parseInt(video.statistics?.likeCount || '0'),
       commentCount: parseInt(video.statistics?.commentCount || '0'),
       durationSeconds: duration,
-      creatorId: video.snippet?.channelId,
+      creatorId: video.snippet?.channelId ? `youtube:${video.snippet.channelId}` : undefined,
       creatorName: video.snippet?.channelTitle,
+      creatorHandle: undefined, // YouTube doesn't provide handles in video API
+      creatorThumbnail: undefined, // Would need channel API call
+      creatorVerified: undefined, // Would need channel API call
+      creatorSubscriberCount: undefined, // Would need channel API call
       category: video.snippet?.categoryId,
       tags: video.snippet?.tags || [],
       language: video.snippet?.defaultAudioLanguage,
@@ -424,7 +428,10 @@ export class ApiEnrichmentService {
   transformSpotifyApiResponse(episode: SpotifyEpisodeDetails): any {
     return {
       durationSeconds: Math.floor(episode.duration_ms / 1000),
+      creatorId: episode.show?.id ? `spotify:${episode.show.id}` : undefined,
       creatorName: episode.show?.publisher,
+      creatorHandle: undefined, // Spotify doesn't provide handles
+      creatorThumbnail: episode.show?.images?.[0]?.url,
       seriesId: episode.show?.id,
       seriesName: episode.show?.name,
       language: episode.languages?.[0],
