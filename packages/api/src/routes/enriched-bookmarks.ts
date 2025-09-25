@@ -9,6 +9,7 @@ import { SaveBookmarkSchema } from '@zine/shared'
 import { getAuthContext } from '../middleware/auth'
 import { D1BookmarkRepository } from '../d1-repository'
 import { ContentRepository } from '../repositories/content-repository'
+import { CreatorRepository } from '../repositories/creator-repository'
 import { ApiEnrichmentService } from '../services/api-enrichment-service'
 import { detectPlatform } from '@zine/shared'
 import type { Content } from '../schema'
@@ -245,6 +246,26 @@ app.post('/save-enriched', async (c) => {
     }
     const contentRepo = new ContentRepository(c.env.DB)
     const savedContent = await contentRepo.upsert(enrichedContent)
+    
+    // Upsert creator data if available
+    if (enrichedContent.creatorId && enrichedContent.creatorName) {
+      const creatorRepo = new CreatorRepository(c.env.DB)
+      await creatorRepo.upsertCreator({
+        id: enrichedContent.creatorId,
+        name: enrichedContent.creatorName,
+        handle: enrichedContent.creatorHandle || undefined,
+        avatarUrl: enrichedContent.creatorThumbnail || undefined,
+        platform: enrichedContent.provider,
+        verified: enrichedContent.creatorVerified === true || undefined,
+        subscriberCount: enrichedContent.creatorSubscriberCount ? Number(enrichedContent.creatorSubscriberCount) : undefined,
+        followerCount: enrichedContent.creatorFollowerCount ? Number(enrichedContent.creatorFollowerCount) : undefined,
+        url: enrichedContent.provider === 'youtube' 
+          ? `https://youtube.com/channel/${enrichedContent.creatorId.replace('youtube:', '')}`
+          : enrichedContent.provider === 'spotify'
+          ? `https://open.spotify.com/show/${enrichedContent.creatorId.replace('spotify:', '')}`
+          : undefined
+      })
+    }
     
     // Create bookmark linking to the content
     const bookmarkId = `bookmark-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`

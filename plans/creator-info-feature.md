@@ -70,6 +70,30 @@ Ensure creator data flows through the system:
 - New endpoint for fetching bookmarks by creator
 - Ensure creator data is properly extracted and stored
 
+## Implementation Status
+
+### ✅ Phase 1: Backend - Enhance Bookmark Endpoints (COMPLETED)
+
+**Status**: Fully implemented and tested
+**Date Completed**: September 25, 2025
+**Implementation Details**:
+- Updated bookmark GET endpoints to include creator fields from content table
+- Added `/api/v1/bookmarks/creator/:creatorId` endpoint for fetching bookmarks by creator
+- Modified `mapRowToBookmark` method in D1Repository to include creator information
+- All queries now join with content table and select creator fields
+
+### ✅ Phase 2: Backend - Creator Management (COMPLETED)
+
+**Status**: Fully implemented 
+**Date Completed**: September 25, 2025
+**Implementation Details**:
+- Created `CreatorRepository` class at `/packages/api/src/repositories/creator-repository.ts`
+- Implemented `upsertCreator` method for insert/update operations
+- Implemented `getCreator` method for fetching creator by ID
+- Implemented `getCreatorBookmarksCount` for counting bookmarks per creator
+- Added creator data upsert to enriched bookmark save flow
+- Creator data is now persisted to dedicated `creators` table when saving enriched content
+
 ## Implementation Phases
 
 ### Phase 1: Backend - Enhance Bookmark Endpoints
@@ -137,33 +161,17 @@ creatorThumbnail: episode.show?.images?.[0]?.url,
 creatorHandle: // Format from show name
 ```
 
-### Phase 2: Backend - Creator Management
+### Phase 2: Backend - Creator Management ✅ COMPLETED
 
-#### 2.1 Create Creator Repository
+#### 2.1 Create Creator Repository ✅
 **File**: `/packages/api/src/repositories/creator-repository.ts`
 
-```typescript
-export class CreatorRepository {
-  async upsertCreator(creatorData: {
-    id: string;
-    name: string;
-    avatarUrl?: string;
-    platform: string;
-    // ... other fields
-  }): Promise<Creator>
-  
-  async getCreator(id: string): Promise<Creator | null>
-  
-  async getCreatorBookmarksCount(creatorId: string, userId: string): Promise<number>
-}
-```
+**Implementation**: Complete with full TypeScript interfaces and D1 database integration.
 
-#### 2.2 Update Content Saving Flow
-**Files**: 
-- `/packages/api/src/routes/enriched-bookmarks.ts`
-- `/packages/api/src/index.ts` (save endpoint)
-
-When saving enriched content, also upsert creator data to the creators table for better performance and data consistency.
+#### 2.2 Update Content Saving Flow ✅
+**Files Modified**: 
+- `/packages/api/src/routes/enriched-bookmarks.ts` - Added creator upsert when saving enriched content
+- Creator data is automatically upserted to the `creators` table when bookmarks are saved with creator information
 
 ### Phase 3: Mobile App - Update Data Types
 
