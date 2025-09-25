@@ -15,6 +15,12 @@ export function useRecentBookmarks(options: UseRecentBookmarksOptions = {}) {
     queryFn: async () => {
       const bookmarks = await bookmarksApi.getRecent(limit);
       
+      // Handle undefined or non-array responses
+      if (!bookmarks || !Array.isArray(bookmarks)) {
+        console.warn('API returned invalid bookmarks data:', bookmarks);
+        return [];
+      }
+      
       // Sort by createdAt (newest first) - API should already do this, but ensure it
       return bookmarks.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;

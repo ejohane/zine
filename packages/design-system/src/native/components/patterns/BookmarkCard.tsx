@@ -11,6 +11,10 @@ export interface BookmarkCardProps {
   platform?: 'spotify' | 'youtube' | 'apple' | 'google' | 'web';
   createdAt?: Date | string;
   tags?: string[];
+  author?: {
+    name?: string;
+    avatarUrl?: string;
+  };
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onView?: (id: string) => void;
@@ -40,6 +44,7 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
   platform,
   createdAt,
   tags,
+  author,
   onEdit,
   onDelete,
   onView,
@@ -55,8 +60,6 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
   const handleOpenUrl = () => {
     Linking.openURL(url);
   };
-
-  const hostname = new URL(url).hostname;
 
   return (
     <TouchableOpacity 
@@ -97,11 +100,19 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
                 </Text>
               )}
               
-              <TouchableOpacity onPress={handleOpenUrl}>
-                <Text style={styles.link}>
-                  {hostname} 🔗
-                </Text>
-              </TouchableOpacity>
+              {author?.name && (
+                <View style={styles.authorContainer}>
+                  {author.avatarUrl && (
+                    <Image
+                      source={{ uri: author.avatarUrl }}
+                      style={styles.authorAvatar}
+                    />
+                  )}
+                  <Text style={styles.authorName}>
+                    {author.name}
+                  </Text>
+                </View>
+              )}
               
               {tags && tags.length > 0 && (
                 <View style={styles.tagsContainer}>
@@ -198,6 +209,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textDecorationLine: 'underline',
+  },
+  authorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  authorAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  authorName: {
+    fontSize: 14,
+    color: '#666',
   },
   tagsContainer: {
     flexDirection: 'row',

@@ -11,6 +11,10 @@ export interface BookmarkCardProps {
   platform?: 'spotify' | 'youtube' | 'apple' | 'google' | 'web';
   createdAt?: Date | string;
   tags?: string[];
+  author?: {
+    name?: string;
+    avatarUrl?: string;
+  };
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onView?: (id: string) => void;
@@ -56,6 +60,7 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
   platform,
   createdAt,
   tags,
+  author,
   onEdit,
   onDelete,
   onView,
@@ -113,15 +118,20 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
               </p>
             )}
             
-            <Link
-              href={url}
-              size="sm"
-              isExternal
-              showAnchorIcon
-              className="text-default-400"
-            >
-              {new URL(url).hostname}
-            </Link>
+            {author?.name && (
+              <div className="flex items-center gap-2 mt-2">
+                {author.avatarUrl && (
+                  <Avatar
+                    src={author.avatarUrl}
+                    className="w-5 h-5"
+                    size="sm"
+                  />
+                )}
+                <span className="text-sm text-default-500">
+                  {author.name}
+                </span>
+              </div>
+            )}
             
             {tags && tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2">

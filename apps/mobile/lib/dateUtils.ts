@@ -61,3 +61,20 @@ export function formatShortDate(date: string | number | Date | undefined): strin
 
 // Alias for compatibility
 export const formatDistanceToNow = formatRelativeTime;
+
+/**
+ * Format duration in seconds to human-readable format (e.g., "10:28", "1:23:45")
+ */
+export function formatDuration(seconds: number | undefined): string {
+  if (!seconds || seconds < 0) return '';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  
+  return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}

@@ -3,9 +3,9 @@ import { useAuth } from '../../contexts/auth';
 import { View, ActivityIndicator } from 'react-native';
 
 export default function AuthLayout() {
-  const { isSignedIn, isLoading } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
-  if (isLoading) {
+  if (!isLoaded) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
         <ActivityIndicator size="large" color="#3b82f6" />

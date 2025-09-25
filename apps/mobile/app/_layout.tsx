@@ -5,8 +5,8 @@ import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { AuthProvider } from '../contexts/auth';
 import { ApiProvider } from '../contexts/api';
 import { QueryProvider } from '../contexts/query';
-import { DesignSystemProvider } from '@zine/design-system/native';
 import { clerkTokenCache } from '../lib/tokenCache';
+import { ThemeProvider } from '../contexts/theme';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -24,12 +24,12 @@ export default function RootLayout() {
         <AuthProvider>
           <ApiProvider>
             <QueryProvider>
-              <DesignSystemProvider>
+              <ThemeProvider>
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(app)" />
                 </Stack>
-              </DesignSystemProvider>
+              </ThemeProvider>
             </QueryProvider>
           </ApiProvider>
         </AuthProvider>

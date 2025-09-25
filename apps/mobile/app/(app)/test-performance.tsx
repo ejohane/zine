@@ -4,11 +4,11 @@ import {
   ScrollView,
   View,
   Text,
-  SafeAreaView,
   Button as RNButton,
   Switch,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { OptimizedRecentBookmarksSection } from '../../components/OptimizedRecentBookmarksSection';
 import { RecentBookmarksSection } from '../../components/RecentBookmarksSection';

@@ -10,3 +10,4 @@ build/
 .dev.vars
 .drizzle.env.branches/
 .metro-cache/
+*.ipa

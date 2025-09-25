@@ -106,7 +106,8 @@ export const createNewBookmark = async (bookmark: CreateBookmark, token: string 
 }
 
 export const saveBookmark = async (bookmark: SaveBookmark, token: string | null): Promise<Bookmark> => {
-  const response = await fetch(`${API_BASE_URL}/bookmarks/save`, {
+  // Use the enriched save endpoint for better metadata extraction
+  const response = await fetch(`${API_BASE_URL}/enriched-bookmarks/save-enriched`, {
     method: 'POST',
     headers: createAuthHeaders(token),
     body: JSON.stringify(bookmark),

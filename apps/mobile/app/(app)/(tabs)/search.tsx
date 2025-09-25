@@ -1,14 +1,18 @@
 // @ts-nocheck
 import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.headerBar}>
+        <Text style={styles.headerBarTitle}>Search</Text>
+      </View>
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
           <FontAwesome name="search" size={20} color="#a3a3a3" style={styles.searchIcon} />
@@ -67,7 +71,7 @@ export default function SearchScreen() {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -75,6 +79,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+  },
+  headerBar: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    alignItems: 'center',
+  },
+  headerBarTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#171717',
   },
   searchContainer: {
     padding: 16,

@@ -16,6 +16,7 @@ import { Route as SaveRouteImport } from './routes/save'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as FeedRouteImport } from './routes/feed'
 import { Route as BookmarksRouteImport } from './routes/bookmarks'
+import { Route as ApiDebuggerRouteImport } from './routes/debugger'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SubscriptionsIndexRouteImport } from './routes/subscriptions/index'
@@ -57,6 +58,11 @@ const BookmarksRoute = BookmarksRouteImport.update({
   path: '/bookmarks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDebuggerRoute = ApiDebuggerRouteImport.update({
+  id: '/debugger',
+  path: '/debugger',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AccountsRoute = AccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -87,6 +93,7 @@ const SubscriptionsDiscoverProviderRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/api-debugger': typeof ApiDebuggerRoute
   '/bookmarks': typeof BookmarksRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/api-debugger': typeof ApiDebuggerRoute
   '/bookmarks': typeof BookmarksRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
+  '/api-debugger': typeof ApiDebuggerRoute
   '/bookmarks': typeof BookmarksRoute
   '/feed': typeof FeedRouteWithChildren
   '/profile': typeof ProfileRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/accounts'
+    | '/api-debugger'
     | '/bookmarks'
     | '/feed'
     | '/profile'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/accounts'
+    | '/api-debugger'
     | '/bookmarks'
     | '/feed'
     | '/profile'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/accounts'
+    | '/api-debugger'
     | '/bookmarks'
     | '/feed'
     | '/profile'
@@ -175,6 +187,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountsRoute: typeof AccountsRoute
+  ApiDebuggerRoute: typeof ApiDebuggerRoute
   BookmarksRoute: typeof BookmarksRoute
   FeedRoute: typeof FeedRouteWithChildren
   ProfileRoute: typeof ProfileRoute
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookmarksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api-debugger': {
+      id: '/api-debugger'
+      path: '/api-debugger'
+      fullPath: '/api-debugger'
+      preLoaderRoute: typeof ApiDebuggerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/accounts': {
       id: '/accounts'
       path: '/accounts'
@@ -288,6 +308,7 @@ const FeedRouteWithChildren = FeedRoute._addFileChildren(FeedRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountsRoute: AccountsRoute,
+  ApiDebuggerRoute: ApiDebuggerRoute,
   BookmarksRoute: BookmarksRoute,
   FeedRoute: FeedRouteWithChildren,
   ProfileRoute: ProfileRoute,

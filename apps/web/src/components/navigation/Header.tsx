@@ -1,5 +1,5 @@
 import { Link, useLocation } from '@tanstack/react-router'
-import { Home, Search, Settings } from 'lucide-react'
+import { Home, Search, Settings, Bug } from 'lucide-react'
 import { UserButton } from '@clerk/clerk-react'
 import { cn } from '@/lib/utils'
 
@@ -7,6 +7,7 @@ const navItems = [
   { path: '/', label: 'Home', icon: Home },
   { path: '/search', label: 'Search', icon: Search },
   { path: '/profile', label: 'Profile', icon: Settings },
+  { path: '/api-debugger', label: 'API', icon: Bug },
 ]
 
 export function Header() {

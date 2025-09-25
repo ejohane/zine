@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zine API Debugger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script 
+      crossorigin="anonymous"
+      data-clerk-publishable-key="pk_test_Z3Jvd2luZy1maWxseS00NS5jbGVyay5hY2NvdW50cy5kZXYk"
+      onload="window.Clerk.load()"
+      src="https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest/dist/clerk.browser.js"
+      type="text/javascript">
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <style>
+        .hljs { background: transparent !important; }
+        .json-viewer { font-family: 'Fira Code', 'Courier New', monospace; }
+        .endpoint-preset { cursor: pointer; transition: all 0.2s; }
+        .endpoint-preset:hover { transform: translateX(4px); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div id="app" class="container mx-auto p-6 max-w-7xl">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">🔧 Zine API Debugger</h1>
+                <p class="text-gray-400">Test your API endpoints locally</p>
+            </div>
+            <div id="auth-container" class="flex items-center gap-4">
+                <div id="user-info" class="hidden">
+                    <span class="text-sm text-gray-400">Signed in as:</span>
+                    <span id="user-email" class="text-sm font-medium ml-2"></span>
+                    <button id="sign-out-btn" class="ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm">
+                        Sign Out
+                    </button>
+                </div>
+                <button id="sign-in-btn" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm hidden">
+                    Sign In with Clerk (Optional)
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Sidebar with Presets -->
+            <div class="lg:col-span-1">
+                <div class="bg-gray-800 rounded-xl p-6 sticky top-6">
+                    <h2 class="text-lg font-semibold mb-4">API Endpoints</h2>
+                    <div class="space-y-2" id="presets-container">
+                        <!-- Bookmarks -->
+                        <div class="mb-4">
+                            <h3 class="text-xs uppercase text-gray-500 mb-2">Bookmarks</h3>
+                            <div class="space-y-1">
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/bookmarks">
+                                    <span class="text-green-400 font-mono text-xs">GET</span>
+                                    <span class="ml-2 text-sm">/bookmarks</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/bookmarks/{id}">
+                                    <span class="text-green-400 font-mono text-xs">GET</span>
+                                    <span class="ml-2 text-sm">/bookmarks/{id}</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="POST" data-path="/api/v1/bookmarks" 
+                                     data-body='{"url":"","title":"","description":""}'>
+                                    <span class="text-yellow-400 font-mono text-xs">POST</span>
+                                    <span class="ml-2 text-sm">/bookmarks</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="DELETE" data-path="/api/v1/bookmarks/{id}">
+                                    <span class="text-red-400 font-mono text-xs">DEL</span>
+                                    <span class="ml-2 text-sm">/bookmarks/{id}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- User -->
+                        <div class="mb-4">
+                            <h3 class="text-xs uppercase text-gray-500 mb-2">User</h3>
+                            <div class="space-y-1">
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/users/me">
+                                    <span class="text-green-400 font-mono text-xs">GET</span>
+                                    <span class="ml-2 text-sm">/users/me</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/users/me/stats">
+                                    <span class="text-green-400 font-mono text-xs">GET</span>
+                                    <span class="ml-2 text-sm">/users/me/stats</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feeds -->
+                        <div class="mb-4">
+                            <h3 class="text-xs uppercase text-gray-500 mb-2">Feeds</h3>
+                            <div class="space-y-1">
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/feeds">
+                                    <span class="text-green-400 font-mono text-xs">GET</span>
+                                    <span class="ml-2 text-sm">/feeds</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="POST" data-path="/api/v1/feeds/subscribe" 
+                                     data-body='{"url":"","platform":""}'>
+                                    <span class="text-yellow-400 font-mono text-xs">POST</span>
+                                    <span class="ml-2 text-sm">/feeds/subscribe</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OAuth -->
+                        <div class="mb-4">
+                            <h3 class="text-xs uppercase text-gray-500 mb-2">OAuth</h3>
+                            <div class="space-y-1">
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/auth/spotify/authorize">
+                                    <span class="text-blue-400 font-mono text-xs">AUTH</span>
+                                    <span class="ml-2 text-sm">/auth/spotify</span>
+                                </div>
+                                <div class="endpoint-preset p-2 rounded hover:bg-gray-700" 
+                                     data-method="GET" data-path="/api/v1/auth/youtube/authorize">
+                                    <span class="text-blue-400 font-mono text-xs">AUTH</span>
+                                    <span class="ml-2 text-sm">/auth/youtube</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Request Builder -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <h2 class="text-lg font-semibold mb-4">Request</h2>
+                    
+                    <div class="flex gap-2 mb-4">
+                        <select id="method-select" class="bg-gray-700 rounded-lg px-3 py-2 text-sm">
+                            <option value="GET">GET</option>
+                            <option value="POST">POST</option>
+                            <option value="PUT">PUT</option>
+                            <option value="PATCH">PATCH</option>
+                            <option value="DELETE">DELETE</option>
+                        </select>
+                        <input type="text" id="url-input" 
+                               placeholder="http://localhost:8787/api/v1/bookmarks" 
+                               class="flex-1 bg-gray-700 rounded-lg px-4 py-2 text-sm"
+                               value="http://localhost:8787/api/v1/bookmarks">
+                        <button id="send-btn" 
+                                class="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium">
+                            Send Request
+                        </button>
+                    </div>
+
+                    <!-- Headers -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-sm text-gray-400">Headers</label>
+                            <button id="add-header-btn" class="text-xs text-blue-400 hover:text-blue-300">
+                                + Add Header
+                            </button>
+                        </div>
+                        <div id="headers-container" class="space-y-2">
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Key" class="header-key flex-1 bg-gray-700 rounded px-3 py-1 text-sm" value="Content-Type">
+                                <input type="text" placeholder="Value" class="header-value flex-1 bg-gray-700 rounded px-3 py-1 text-sm" value="application/json">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Request Body -->
+                    <div id="body-section" class="mb-4">
+                        <label class="text-sm text-gray-400 block mb-2">Body</label>
+                        <textarea id="body-input" 
+                                  class="w-full h-32 bg-gray-700 rounded-lg px-4 py-3 text-sm font-mono"
+                                  placeholder='{"key": "value"}'></textarea>
+                    </div>
+                </div>
+
+                <!-- Response Display -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold">Response</h2>
+                        <div id="response-meta" class="flex items-center gap-4 text-sm">
+                            <span id="status-badge" class="hidden px-2 py-1 rounded"></span>
+                            <span id="response-time" class="text-gray-400 hidden"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="response-tabs" class="mb-4 border-b border-gray-700">
+                        <button class="tab-btn px-4 py-2 text-sm active" data-tab="body">Body</button>
+                        <button class="tab-btn px-4 py-2 text-sm" data-tab="headers">Headers</button>
+                        <button class="tab-btn px-4 py-2 text-sm" data-tab="raw">Raw</button>
+                    </div>
+
+                    <div id="response-content" class="bg-gray-900 rounded-lg p-4 min-h-[200px] max-h-[600px] overflow-auto">
+                        <div id="body-tab" class="tab-content">
+                            <pre><code id="response-body" class="json-viewer text-sm text-gray-400">No response yet. Send a request to see the response here.</code></pre>
+                        </div>
+                        <div id="headers-tab" class="tab-content hidden">
+                            <pre><code id="response-headers" class="json-viewer text-sm"></code></pre>
+                        </div>
+                        <div id="raw-tab" class="tab-content hidden">
+                            <pre><code id="response-raw" class="text-sm"></code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Request History -->
+                <div class="bg-gray-800 rounded-xl p-6">
+                    <h2 class="text-lg font-semibold mb-4">History</h2>
+                    <div id="history-container" class="space-y-2 max-h-60 overflow-auto">
+                        <p class="text-sm text-gray-500">No requests yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Clerk
+        let currentUser = null;
+
+        async function initializeClerk() {
+            try {
+                // Make sign-in button visible immediately for optional auth
+                document.getElementById('sign-in-btn').classList.remove('hidden');
+                
+                // Wait for Clerk to be ready
+                if (!window.Clerk) {
+                    console.warn('Clerk not fully loaded, authentication optional');
+                    return;
+                }
+                
+                // Check if user is already signed in
+                setTimeout(() => {
+                    if (window.Clerk && window.Clerk.user) {
+                        handleSignIn(window.Clerk.user);
+                    }
+                }, 1000);
+            } catch (error) {
+                console.warn('Clerk initialization error (auth is optional):', error);
+                document.getElementById('sign-in-btn').classList.remove('hidden');
+            }
+        }
+
+        function handleSignIn(user) {
+            currentUser = user;
+            document.getElementById('user-email').textContent = user.primaryEmailAddress?.emailAddress || 'User';
+            document.getElementById('user-info').classList.remove('hidden');
+            document.getElementById('sign-in-btn').classList.add('hidden');
+        }
+
+        // Event Listeners
+        document.getElementById('sign-in-btn')?.addEventListener('click', async () => {
+            if (window.Clerk) {
+                try {
+                    await window.Clerk.openSignIn();
+                } catch (error) {
+                    console.error('Error opening sign-in:', error);
+                    alert('Sign-in is currently unavailable. You can still test public endpoints.');
+                }
+            } else {
+                alert('Authentication is optional. You can test public endpoints without signing in.');
+            }
+        });
+
+        document.getElementById('sign-out-btn')?.addEventListener('click', async () => {
+            if (window.Clerk) {
+                await window.Clerk.signOut();
+                currentUser = null;
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('sign-in-btn').classList.remove('hidden');
+            }
+        });
+
+        // API Request functionality
+        let requestHistory = [];
+
+        async function sendRequest() {
+            const method = document.getElementById('method-select').value;
+            const url = document.getElementById('url-input').value;
+            const bodyInput = document.getElementById('body-input').value;
+            
+            // Collect headers
+            const headers = {};
+            document.querySelectorAll('#headers-container > div').forEach(div => {
+                const key = div.querySelector('.header-key').value;
+                const value = div.querySelector('.header-value').value;
+                if (key && value) {
+                    headers[key] = value;
+                }
+            });
+
+            // Add auth token if user is signed in
+            if (currentUser && window.Clerk) {
+                try {
+                    const session = window.Clerk.session;
+                    if (session) {
+                        const token = await session.getToken();
+                        if (token) {
+                            headers['Authorization'] = `Bearer ${token}`;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error getting auth token:', error);
+                }
+            }
+
+            const options = {
+                method,
+                headers
+            };
+
+            if (['POST', 'PUT', 'PATCH'].includes(method) && bodyInput) {
+                options.body = bodyInput;
+            }
+
+            const startTime = performance.now();
+
+            try {
+                const response = await fetch(url, options);
+                const endTime = performance.now();
+                const responseTime = Math.round(endTime - startTime);
+
+                // Update response meta
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.textContent = `${response.status} ${response.statusText}`;
+                statusBadge.className = response.ok 
+                    ? 'px-2 py-1 rounded bg-green-600 text-white text-xs' 
+                    : 'px-2 py-1 rounded bg-red-600 text-white text-xs';
+                statusBadge.classList.remove('hidden');
+
+                document.getElementById('response-time').textContent = `${responseTime}ms`;
+                document.getElementById('response-time').classList.remove('hidden');
+
+                // Get response body
+                const contentType = response.headers.get('content-type');
+                let responseBody;
+                if (contentType?.includes('application/json')) {
+                    responseBody = await response.json();
+                    document.getElementById('response-body').textContent = JSON.stringify(responseBody, null, 2);
+                    document.getElementById('response-body').className = 'json';
+                    hljs.highlightElement(document.getElementById('response-body'));
+                } else {
+                    responseBody = await response.text();
+                    document.getElementById('response-body').textContent = responseBody;
+                    document.getElementById('response-body').className = '';
+                }
+
+                // Update headers tab
+                const responseHeaders = {};
+                response.headers.forEach((value, key) => {
+                    responseHeaders[key] = value;
+                });
+                document.getElementById('response-headers').textContent = JSON.stringify(responseHeaders, null, 2);
+                hljs.highlightElement(document.getElementById('response-headers'));
+
+                // Update raw tab
+                const rawResponse = `HTTP/1.1 ${response.status} ${response.statusText}\n` +
+                    Object.entries(responseHeaders).map(([k, v]) => `${k}: ${v}`).join('\n') +
+                    '\n\n' +
+                    (typeof responseBody === 'object' ? JSON.stringify(responseBody, null, 2) : responseBody);
+                document.getElementById('response-raw').textContent = rawResponse;
+
+                // Add to history
+                addToHistory(method, url, response.status, responseTime);
+
+            } catch (error) {
+                document.getElementById('response-body').textContent = `Error: ${error.message}`;
+                document.getElementById('response-body').className = 'text-red-400';
+                
+                const statusBadge = document.getElementById('status-badge');
+                statusBadge.textContent = 'ERROR';
+                statusBadge.className = 'px-2 py-1 rounded bg-red-600 text-white text-xs';
+                statusBadge.classList.remove('hidden');
+            }
+        }
+
+        function addToHistory(method, url, status, time) {
+            const historyItem = { method, url, status, time, timestamp: new Date() };
+            requestHistory.unshift(historyItem);
+            if (requestHistory.length > 20) requestHistory.pop();
+
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('history-container');
+            if (requestHistory.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500">No requests yet</p>';
+                return;
+            }
+
+            container.innerHTML = requestHistory.map(item => `
+                <div class="flex items-center justify-between p-2 hover:bg-gray-700 rounded cursor-pointer history-item" 
+                     data-method="${item.method}" data-url="${item.url}">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono ${getMethodColor(item.method)}">${item.method}</span>
+                        <span class="text-sm truncate max-w-xs">${item.url.replace('http://localhost:8787', '')}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs ${item.status < 400 ? 'text-green-400' : 'text-red-400'}">${item.status}</span>
+                        <span class="text-xs text-gray-500">${item.time}ms</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers to history items
+            container.querySelectorAll('.history-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    document.getElementById('method-select').value = item.dataset.method;
+                    document.getElementById('url-input').value = item.dataset.url;
+                });
+            });
+        }
+
+        function getMethodColor(method) {
+            const colors = {
+                'GET': 'text-green-400',
+                'POST': 'text-yellow-400',
+                'PUT': 'text-blue-400',
+                'PATCH': 'text-purple-400',
+                'DELETE': 'text-red-400'
+            };
+            return colors[method] || 'text-gray-400';
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('text-blue-400', 'border-b-2', 'border-blue-400'));
+                btn.classList.add('text-blue-400', 'border-b-2', 'border-blue-400');
+                
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById(`${tab}-tab`).classList.remove('hidden');
+            });
+        });
+
+        // Preset endpoints
+        document.querySelectorAll('.endpoint-preset').forEach(preset => {
+            preset.addEventListener('click', () => {
+                const method = preset.dataset.method;
+                const path = preset.dataset.path;
+                const body = preset.dataset.body;
+                
+                document.getElementById('method-select').value = method;
+                document.getElementById('url-input').value = `http://localhost:8787${path}`;
+                
+                if (body) {
+                    document.getElementById('body-input').value = body;
+                }
+            });
+        });
+
+        // Add header functionality
+        document.getElementById('add-header-btn').addEventListener('click', () => {
+            const container = document.getElementById('headers-container');
+            const headerRow = document.createElement('div');
+            headerRow.className = 'flex gap-2';
+            headerRow.innerHTML = `
+                <input type="text" placeholder="Key" class="header-key flex-1 bg-gray-700 rounded px-3 py-1 text-sm">
+                <input type="text" placeholder="Value" class="header-value flex-1 bg-gray-700 rounded px-3 py-1 text-sm">
+                <button class="remove-header text-red-400 hover:text-red-300 px-2">×</button>
+            `;
+            container.appendChild(headerRow);
+            
+            headerRow.querySelector('.remove-header').addEventListener('click', () => {
+                headerRow.remove();
+            });
+        });
+
+        // Hide/show body input based on method
+        document.getElementById('method-select').addEventListener('change', (e) => {
+            const showBody = ['POST', 'PUT', 'PATCH'].includes(e.target.value);
+            document.getElementById('body-section').style.display = showBody ? 'block' : 'none';
+        });
+
+        // Send request button
+        document.getElementById('send-btn').addEventListener('click', sendRequest);
+
+        // Allow Enter key to send request
+        document.getElementById('url-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendRequest();
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            initializeClerk(); // Initialize immediately, auth is optional
+        });
+    </script>
+</body>
+</html>

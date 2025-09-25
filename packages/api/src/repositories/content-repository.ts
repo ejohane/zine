@@ -115,6 +115,39 @@ export class ContentRepository {
       delete updateData.createdAt
       delete updateData.id // Can't update primary key
 
+      // JSON stringify any object/array fields before update
+      if (updateData.seriesMetadata && typeof updateData.seriesMetadata === 'object') {
+        updateData.seriesMetadata = JSON.stringify(updateData.seriesMetadata)
+      }
+      if (updateData.statisticsMetadata && typeof updateData.statisticsMetadata === 'object') {
+        updateData.statisticsMetadata = JSON.stringify(updateData.statisticsMetadata)
+      }
+      if (updateData.technicalMetadata && typeof updateData.technicalMetadata === 'object') {
+        updateData.technicalMetadata = JSON.stringify(updateData.technicalMetadata)
+      }
+      if (updateData.enrichmentMetadata && typeof updateData.enrichmentMetadata === 'object') {
+        updateData.enrichmentMetadata = JSON.stringify(updateData.enrichmentMetadata)
+      }
+      if (updateData.extendedMetadata && typeof updateData.extendedMetadata === 'object') {
+        updateData.extendedMetadata = JSON.stringify(updateData.extendedMetadata)
+      }
+      if (updateData.crossPlatformMatches && typeof updateData.crossPlatformMatches === 'object') {
+        updateData.crossPlatformMatches = JSON.stringify(updateData.crossPlatformMatches)
+      }
+      // Handle arrays
+      if (updateData.tags && Array.isArray(updateData.tags)) {
+        updateData.tags = JSON.stringify(updateData.tags)
+      }
+      if (updateData.topics && Array.isArray(updateData.topics)) {
+        updateData.topics = JSON.stringify(updateData.topics)
+      }
+      if (updateData.audioLanguages && Array.isArray(updateData.audioLanguages)) {
+        updateData.audioLanguages = JSON.stringify(updateData.audioLanguages)
+      }
+      if (updateData.captionLanguages && Array.isArray(updateData.captionLanguages)) {
+        updateData.captionLanguages = JSON.stringify(updateData.captionLanguages)
+      }
+
       await this.db
         .update(schema.content)
         .set(updateData)
@@ -132,6 +165,39 @@ export class ContentRepository {
         updatedAt: now,
         ...contentData
       } as NewContent
+
+      // JSON stringify any object/array fields before insertion
+      if (insertData.seriesMetadata && typeof insertData.seriesMetadata === 'object') {
+        insertData.seriesMetadata = JSON.stringify(insertData.seriesMetadata) as any
+      }
+      if (insertData.statisticsMetadata && typeof insertData.statisticsMetadata === 'object') {
+        insertData.statisticsMetadata = JSON.stringify(insertData.statisticsMetadata) as any
+      }
+      if (insertData.technicalMetadata && typeof insertData.technicalMetadata === 'object') {
+        insertData.technicalMetadata = JSON.stringify(insertData.technicalMetadata) as any
+      }
+      if (insertData.enrichmentMetadata && typeof insertData.enrichmentMetadata === 'object') {
+        insertData.enrichmentMetadata = JSON.stringify(insertData.enrichmentMetadata) as any
+      }
+      if (insertData.extendedMetadata && typeof insertData.extendedMetadata === 'object') {
+        insertData.extendedMetadata = JSON.stringify(insertData.extendedMetadata) as any
+      }
+      if (insertData.crossPlatformMatches && typeof insertData.crossPlatformMatches === 'object') {
+        insertData.crossPlatformMatches = JSON.stringify(insertData.crossPlatformMatches) as any
+      }
+      // Handle arrays
+      if (insertData.tags && Array.isArray(insertData.tags)) {
+        insertData.tags = JSON.stringify(insertData.tags) as any
+      }
+      if (insertData.topics && Array.isArray(insertData.topics)) {
+        insertData.topics = JSON.stringify(insertData.topics) as any
+      }
+      if (insertData.audioLanguages && Array.isArray(insertData.audioLanguages)) {
+        insertData.audioLanguages = JSON.stringify(insertData.audioLanguages) as any
+      }
+      if (insertData.captionLanguages && Array.isArray(insertData.captionLanguages)) {
+        insertData.captionLanguages = JSON.stringify(insertData.captionLanguages) as any
+      }
 
       await this.db
         .insert(schema.content)

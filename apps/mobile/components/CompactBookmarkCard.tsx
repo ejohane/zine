@@ -1,6 +1,6 @@
 // @ts-nocheck
 import * as React from 'react';
-import { View, Text, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, Pressable, Image } from 'react-native';
 import { Card, Chip, Button } from 'heroui-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -65,10 +65,21 @@ export function CompactBookmarkCard({
       className="active:opacity-80"
     >
       <Card className="w-[280px] h-[140px] p-3 mr-3">
-        {/* Header with platform icon and time */}
+        {/* Header with author and time */}
         <View className="flex-row items-center justify-between mb-2">
           <View className="flex-row items-center gap-2">
-            <PlatformIcon source={bookmark.source} size={18} />
+            {bookmark.creator?.avatarUrl && (
+              <Image
+                source={{ uri: bookmark.creator.avatarUrl }}
+                style={{ width: 18, height: 18, borderRadius: 9 }}
+                onError={() => {}}
+              />
+            )}
+            {bookmark.creator?.name ? (
+              <Text className="text-xs text-gray-700" numberOfLines={1}>
+                {bookmark.creator.name}
+              </Text>
+            ) : null}
             <Text className="text-xs text-gray-500">
               {formatRelativeTime(bookmark.createdAt)}
             </Text>

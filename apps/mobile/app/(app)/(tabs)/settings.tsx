@@ -1,20 +1,22 @@
 // @ts-nocheck
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../../contexts/auth';
 import { useRouter } from 'expo-router';
 import { useClerk, useUser } from '@clerk/clerk-expo';
+import { useTheme, ThemeMode } from '../../../contexts/theme';
 
 export default function SettingsScreen() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { theme, setTheme, colors, isDark } = useTheme();
   
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [autoSave, setAutoSave] = useState(true);
 
   const handleSignOut = async () => {
@@ -46,12 +48,12 @@ export default function SettingsScreen() {
 
   const SettingRow = ({ icon, title, subtitle, children }) => (
     <View style={styles.settingRow}>
-      <View style={styles.settingIcon}>
-        <FontAwesome name={icon} size={20} color="#3b82f6" />
+      <View style={[styles.settingIcon, { backgroundColor: isDark ? colors.secondary : '#eff6ff' }]}>
+        <FontAwesome name={icon} size={20} color={colors.primary} />
       </View>
       <View style={styles.settingContent}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
+        <Text style={[styles.settingTitle, { color: colors.foreground }]}>{title}</Text>
+        {subtitle && <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>}
       </View>
       {children}
     </View>
@@ -59,24 +61,27 @@ export default function SettingsScreen() {
 
   const SettingSection = ({ title, children }) => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionContent}>{children}</View>
+      <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{title}</Text>
+      <View style={[styles.sectionContent, { backgroundColor: colors.card, borderColor: colors.border }]}>{children}</View>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
+      <View style={[styles.headerBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerBarTitle, { color: colors.foreground }]}>Settings</Text>
+      </View>
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <View style={styles.profileContainer}>
             <View style={styles.avatar}>
               <FontAwesome name="user" size={32} color="#ffffff" />
             </View>
             <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>
+              <Text style={[styles.profileName, { color: colors.foreground }]}>
                 {isSignedIn && user ? user.fullName || user.emailAddresses[0]?.emailAddress?.split('@')[0] || 'User' : 'Guest User'}
               </Text>
-              <Text style={styles.profileEmail}>
+              <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>
                 {isSignedIn && user ? user.emailAddresses[0]?.emailAddress : 'Sign in to sync your data'}
               </Text>
             </View>
@@ -105,18 +110,26 @@ export default function SettingsScreen() {
               thumbColor={notifications ? '#3b82f6' : '#f5f5f5'}
             />
           </SettingRow>
-          <SettingRow
-            icon="moon-o"
-            title="Dark Mode"
-            subtitle="Easier on the eyes at night"
-          >
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: '#d4d4d4', true: '#93c5fd' }}
-              thumbColor={darkMode ? '#3b82f6' : '#f5f5f5'}
-            />
-          </SettingRow>
+          <TouchableOpacity onPress={() => {
+            Alert.alert(
+              'Theme',
+              'Choose your preferred theme',
+              [
+                { text: 'Light', onPress: () => setTheme('light') },
+                { text: 'Dark', onPress: () => setTheme('dark') },
+                { text: 'System', onPress: () => setTheme('system') },
+                { text: 'Cancel', style: 'cancel' }
+              ]
+            );
+          }}>
+            <SettingRow
+              icon="moon-o"
+              title="Theme"
+              subtitle={`Currently: ${theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light'}`}
+            >
+              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
+            </SettingRow>
+          </TouchableOpacity>
           <SettingRow
             icon="save"
             title="Auto-save"
@@ -174,7 +187,7 @@ export default function SettingsScreen() {
           <Text style={styles.version}>Version 1.0.0</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -182,6 +195,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fafafa',
+  },
+  headerBar: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e5e5',
+    alignItems: 'center',
+  },
+  headerBarTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#171717',
   },
   scrollView: {
     flex: 1,

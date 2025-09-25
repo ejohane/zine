@@ -1,7 +1,53 @@
 import type { Bookmark, CreateBookmark, UpdateBookmark } from '@zine/shared';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// @ts-ignore - Expo environment variable
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8787';
+// Determine the API URL based on the environment
+function getApiUrl(): string {
+  // If explicitly set in environment, use that
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // In production builds, always use the production API
+  if (!__DEV__) {
+    return 'https://api.myzine.app';
+  }
+
+  // In development, check if we're on a simulator or physical device
+  const isSimulator = Constants.isDevice === false;
+  
+  if (Platform.OS === 'ios') {
+    // iOS Simulator can use localhost
+    if (isSimulator) {
+      return 'http://localhost:8787';
+    }
+    // Physical iOS device needs your Mac's IP address
+    // You can use either your local network IP or Tailscale IP
+    return process.env.EXPO_PUBLIC_TAILSCALE_API_URL || 'http://100.90.89.84:8787';
+  }
+
+  if (Platform.OS === 'android') {
+    // Android Emulator uses 10.0.2.2 to reach host machine
+    if (isSimulator) {
+      return 'http://10.0.2.2:8787';
+    }
+    // Physical Android device needs your Mac's IP address
+    return process.env.EXPO_PUBLIC_TAILSCALE_API_URL || 'http://100.90.89.84:8787';
+  }
+
+  // Fallback
+  return 'http://localhost:8787';
+}
+
+const API_URL = getApiUrl();
+
+// Log the API URL being used (only in development)
+if (__DEV__) {
+  console.log(`🔗 API URL: ${API_URL}`);
+  console.log(`📱 Device: ${Constants.isDevice ? 'Physical' : 'Simulator'}`);
+  console.log(`🖥️ Platform: ${Platform.OS}`);
+}
 
 // Store the getToken function reference
 let getTokenFunction: (() => Promise<string | null>) | null = null;
@@ -138,21 +184,86 @@ export const apiClient = {
   },
 };
 
+// Types for bookmark operations
+interface PreviewResponse {
+  data: Bookmark;
+  source: string;
+  cached: boolean;
+}
+
+interface SaveBookmarkResponse {
+  data?: Bookmark;
+  duplicate?: Bookmark;
+  error?: string;
+}
+
+// Types for API responses
+interface BookmarksResponse {
+  data: Bookmark[];
+  meta: {
+    total: number;
+    userId: string;
+    status: string;
+    source?: string;
+    contentType?: string;
+  };
+}
+
 // Bookmark-specific API methods
 export const bookmarksApi = {
-  getAll: () => apiClient.get<Bookmark[]>('/api/v1/bookmarks'),
+  getAll: async () => {
+    const response = await apiClient.get<BookmarksResponse>('/api/v1/bookmarks');
+    // Extract the data array from the response
+    if (!response.data) {
+      console.warn('API returned invalid bookmarks data:', response);
+      return [];
+    }
+    return response.data;
+  },
   getById: (id: string) => apiClient.get<Bookmark>(`/api/v1/bookmarks/${id}`),
   create: (bookmark: CreateBookmark) => apiClient.post<Bookmark>('/api/v1/bookmarks', bookmark),
   update: (id: string, bookmark: UpdateBookmark) => apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}`, bookmark),
   delete: (id: string) => apiClient.delete<void>(`/api/v1/bookmarks/${id}`),
-  getRecent: (limit: number = 10) => {
+  getRecent: async (limit: number = 10) => {
     const params = new URLSearchParams({
       limit: limit.toString(),
       status: 'active',
       sort: 'createdAt',
       order: 'desc'
     });
-    return apiClient.get<Bookmark[]>(`/api/v1/bookmarks?${params.toString()}`);
+    const response = await apiClient.get<BookmarksResponse>(`/api/v1/bookmarks?${params.toString()}`);
+    // Extract the data array from the response
+    if (!response.data) {
+      console.warn('API returned invalid bookmarks data:', response);
+      return [];
+    }
+    return response.data;
+  },
+  preview: async (url: string): Promise<Bookmark> => {
+    const response = await apiClient.post<PreviewResponse>('/api/v1/bookmarks/preview', { url });
+    return response.data;
+  },
+  save: async (url: string): Promise<Bookmark> => {
+    // Use the enriched save endpoint for better metadata extraction
+    const response = await apiClient.post<SaveBookmarkResponse>('/api/v1/enriched-bookmarks/save-enriched', { url });
+    
+    if (response.duplicate) {
+      throw new Error(`Bookmark already exists: ${response.duplicate.title}`);
+    }
+    
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    
+    if (!response.data) {
+      throw new Error('Failed to save bookmark');
+    }
+    
+    return response.data;
+  },
+  refreshMetadata: async (id: string): Promise<Bookmark> => {
+    const response = await apiClient.put<{ data: Bookmark; message?: string }>(`/api/v1/bookmarks/${id}/refresh`);
+    return response.data;
   },
 };
 

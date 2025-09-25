@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from 'react';
 import {
   View,
@@ -7,15 +6,19 @@ import {
   Alert,
   Share,
   Linking,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, Chip, Skeleton } from 'heroui-native';
 import { Feather } from '@expo/vector-icons';
 import { useBookmarkDetail } from '../../../hooks/useBookmarkDetail';
 import { useAuth } from '../../../contexts/auth';
+import { useTheme } from '../../../contexts/theme';
 import { formatDistanceToNow } from '../../../lib/dateUtils';
-import { getPlatformInfo } from '../../../lib/platformIcons';
+import { PlatformIcon } from '../../../lib/platformIcons';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -23,8 +26,10 @@ export default function BookmarkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { isSignedIn, getToken } = useAuth();
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   const {
     data: bookmark,
@@ -59,8 +64,28 @@ export default function BookmarkDetailScreen() {
     }
   };
 
-  const handleEdit = () => {
-    router.push(`/bookmark/edit/${id}`);
+  const handleArchive = () => {
+    Alert.alert(
+      'Archive Bookmark',
+      'This feature is coming soon!',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
+  const handleAddToCollection = () => {
+    Alert.alert(
+      'Add to Collection',
+      'This feature is coming soon!',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
+  const handleAddTag = () => {
+    Alert.alert(
+      'Add Tag',
+      'This feature is coming soon!',
+      [{ text: 'OK', style: 'default' }]
+    );
   };
 
   const handleDelete = () => {
@@ -97,29 +122,50 @@ export default function BookmarkDetailScreen() {
     );
   };
 
+  // Format duration
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return null;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m ${secs}s`;
+  };
+
+  // Get platform color
+  const getPlatformColor = (source?: string) => {
+    switch (source) {
+      case 'youtube': return '#FF0000';
+      case 'spotify': return '#1DB954';
+      case 'twitter':
+      case 'x': return '#000000';
+      case 'substack': return '#FF6719';
+      default: return colors.primary;
+    }
+  };
+
   if (!isSignedIn) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50">
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
             title: 'Bookmark',
             headerBackTitle: 'Back',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.foreground,
           }}
         />
-        <View className="flex-1 items-center justify-center px-6">
-          <Feather name="lock" size={64} color="#6b7280" />
-          <Text className="mt-4 text-lg font-semibold text-gray-900">
+        <View style={styles.centerContent}>
+          <Feather name="lock" size={64} color={colors.mutedForeground} />
+          <Text style={[styles.errorTitle, { color: colors.foreground }]}>
             Sign in required
           </Text>
-          <Text className="mt-2 text-center text-gray-600">
+          <Text style={[styles.errorMessage, { color: colors.mutedForeground }]}>
             Please sign in to view bookmark details
           </Text>
-          <Button
-            onPress={() => router.push('/sign-in')}
-            className="mt-6"
-          >
-            Sign In
-          </Button>
         </View>
       </SafeAreaView>
     );
@@ -127,28 +173,74 @@ export default function BookmarkDetailScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50">
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: 'Loading...',
+            title: '',
             headerBackTitle: 'Back',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.foreground,
+            headerRight: () => (
+              <View style={[styles.headerButton, styles.skeletonButton, { backgroundColor: colors.secondary }]} />
+            ),
           }}
         />
-        <ScrollView className="flex-1 px-4 py-4">
-          <Card className="p-4">
-            <Skeleton className="h-8 w-3/4 mb-4" />
-            <Skeleton className="h-4 w-full mb-2" />
-            <Skeleton className="h-4 w-5/6 mb-4" />
-            <View className="flex-row gap-2 mb-4">
-              <Skeleton className="h-6 w-20 rounded-full" />
-              <Skeleton className="h-6 w-20 rounded-full" />
+        
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Skeleton Hero Image */}
+          <View style={[styles.heroSection, styles.skeletonHero, { backgroundColor: colors.secondary }]} />
+          
+          <View style={styles.contentSection}>
+            {/* Skeleton Title */}
+            <View style={[styles.skeletonTitle, { backgroundColor: colors.secondary }]} />
+            <View style={[styles.skeletonTitleLine2, { backgroundColor: colors.secondary }]} />
+            
+            {/* Skeleton Meta Row */}
+            <View style={styles.metaRow}>
+              <View style={styles.platformInfo}>
+                <View style={[styles.skeletonIcon, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.skeletonPlatformText, { backgroundColor: colors.secondary }]} />
+              </View>
+              <View style={[styles.skeletonDate, { backgroundColor: colors.secondary }]} />
             </View>
-            <Skeleton className="h-32 w-full mb-4" />
-            <View className="flex-row gap-2">
-              <Skeleton className="h-10 flex-1" />
-              <Skeleton className="h-10 flex-1" />
+            
+            {/* Skeleton Description */}
+            <View style={[styles.skeletonDescription, { backgroundColor: colors.secondary }]} />
+            <View style={[styles.skeletonDescriptionLine2, { backgroundColor: colors.secondary }]} />
+            <View style={[styles.skeletonDescriptionLine3, { backgroundColor: colors.secondary }]} />
+            
+            {/* Skeleton Metadata Cards */}
+            <View style={styles.metadataGrid}>
+              <View style={[styles.metaCard, styles.skeletonMetaCard, { backgroundColor: colors.secondary }]} />
+              <View style={[styles.metaCard, styles.skeletonMetaCard, { backgroundColor: colors.secondary }]} />
+              <View style={[styles.metaCard, styles.skeletonMetaCard, { backgroundColor: colors.secondary }]} />
             </View>
-          </Card>
+            
+            {/* Skeleton Tags */}
+            <View style={styles.tagsSection}>
+              <View style={[styles.skeletonSectionTitle, { backgroundColor: colors.secondary }]} />
+              <View style={styles.tagsContainer}>
+                <View style={[styles.skeletonTag, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.skeletonTag, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.skeletonTag, { backgroundColor: colors.secondary }]} />
+              </View>
+            </View>
+            
+            {/* Skeleton Action Buttons */}
+            <View style={styles.actionButtons}>
+              <View style={[styles.skeletonPrimaryButton, { backgroundColor: colors.secondary }]} />
+              <View style={styles.secondaryActions}>
+                <View style={[styles.actionIcon, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.actionIcon, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.actionIcon, { backgroundColor: colors.secondary }]} />
+                <View style={[styles.actionIcon, { backgroundColor: colors.secondary }]} />
+              </View>
+            </View>
+          </View>
         </ScrollView>
       </SafeAreaView>
     );
@@ -156,149 +248,585 @@ export default function BookmarkDetailScreen() {
 
   if (error || !bookmark) {
     return (
-      <SafeAreaView className="flex-1 bg-gray-50">
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
             title: 'Error',
             headerBackTitle: 'Back',
+            headerStyle: { backgroundColor: colors.background },
+            headerTintColor: colors.foreground,
           }}
         />
-        <View className="flex-1 items-center justify-center px-6">
-          <Feather name="alert-circle" size={64} color="#ef4444" />
-          <Text className="mt-4 text-lg font-semibold text-gray-900">
+        <View style={styles.centerContent}>
+          <Feather name="alert-circle" size={64} color={colors.destructive} />
+          <Text style={[styles.errorTitle, { color: colors.foreground }]}>
             {error ? 'Failed to load bookmark' : 'Bookmark not found'}
           </Text>
-          <Text className="mt-2 text-center text-gray-600">
+          <Text style={[styles.errorMessage, { color: colors.mutedForeground }]}>
             {error?.message || 'This bookmark may have been deleted'}
           </Text>
-          <View className="flex-row gap-2 mt-6">
-            <Button
-              onPress={() => router.back()}
-            >
+          <TouchableOpacity 
+            onPress={() => router.back()}
+            style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+          >
+            <Text style={[styles.buttonText, { color: colors.primaryForeground || '#fff' }]}>
               Go Back
-            </Button>
-            {error && (
-              <Button onPress={() => refetch()}>
-                Retry
-              </Button>
-            )}
-          </View>
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  const platformInfo = getPlatformInfo(bookmark.url);
+  const duration = bookmark.videoMetadata?.duration || bookmark.podcastMetadata?.duration;
+  const formattedDuration = formatDuration(duration);
+  const platformColor = getPlatformColor(bookmark.source);
+  const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <Stack.Screen
         options={{
-          title: bookmark.title.slice(0, 30) + (bookmark.title.length > 30 ? '...' : ''),
+          title: '',
           headerBackTitle: 'Back',
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.foreground,
+          headerRight: () => (
+            <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
+              <Feather name="share-2" size={22} color={colors.foreground} />
+            </TouchableOpacity>
+          ),
         }}
       />
-      <ScrollView className="flex-1 px-4 py-4">
-        <Card className="p-4 mb-4">
-          <Text className="text-xl font-bold text-gray-900 mb-2">
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Section with Thumbnail */}
+        {bookmark.thumbnailUrl && !imageError ? (
+          <View style={styles.heroSection}>
+            <Image
+              source={{ uri: bookmark.thumbnailUrl }}
+              style={styles.heroImage}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+            />
+            {isMediaContent && (
+              <View style={styles.mediaOverlay}>
+                <TouchableOpacity 
+                  style={styles.playButton}
+                  onPress={handleOpenLink}
+                  activeOpacity={0.9}
+                >
+                  <Feather name="play" size={32} color="#fff" style={styles.playIcon} />
+                </TouchableOpacity>
+              </View>
+            )}
+            {formattedDuration && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationText}>{formattedDuration}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
+            <Feather name="image" size={48} color={colors.mutedForeground} />
+          </View>
+        )}
+
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          {/* Title */}
+          <Text style={[styles.title, { color: colors.foreground }]}>
             {bookmark.title}
           </Text>
-          
-          {bookmark.description && (
-            <Text className="text-gray-600 mb-4">{bookmark.description}</Text>
-          )}
 
-          <View className="flex-row flex-wrap gap-2 mb-4">
-            <Chip
-              startContent={platformInfo.icon}
-            >
-              {platformInfo.name}
-            </Chip>
-            
-            {bookmark.contentType && (
-              <Chip>
-                {bookmark.contentType.charAt(0).toUpperCase() + 
-                 bookmark.contentType.slice(1).toLowerCase()}
-              </Chip>
-            )}
-            
-            <Chip>
-              {formatDistanceToNow(bookmark.createdAt)}
-            </Chip>
-          </View>
-
-          {bookmark.excerpt && (
-            <View className="bg-gray-50 rounded-lg p-3 mb-4">
-              <Text className="text-sm text-gray-700">{bookmark.excerpt}</Text>
+          {/* Author and Metadata */}
+          <View style={styles.metaRow}>
+            <View style={styles.platformInfo}>
+              {bookmark.creator?.avatarUrl && (
+                <Image
+                  source={{ uri: bookmark.creator.avatarUrl }}
+                  style={styles.authorAvatar}
+                  onError={() => {}}
+                />
+              )}
+              <Text style={[styles.platformText, { color: colors.mutedForeground }]}>
+                {bookmark.creator?.name || 'Unknown Author'}
+              </Text>
             </View>
-          )}
-
-          <View className="border-t border-gray-200 pt-4 mb-4">
-            <Text className="text-xs text-gray-500 mb-1">URL</Text>
-            <Text 
-              className="text-sm text-blue-600"
-              numberOfLines={2}
-              onPress={handleOpenLink}
-            >
-              {bookmark.url}
+            <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
+              {formatDistanceToNow(bookmark.publishedAt || bookmark.createdAt)}
             </Text>
           </View>
 
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={[styles.primaryActionButton, { backgroundColor: colors.primary }]}
+              onPress={handleOpenLink}
+              activeOpacity={0.8}
+            >
+              <Feather name="external-link" size={20} color={colors.primaryForeground || '#fff'} />
+              <Text style={[styles.primaryActionText, { color: colors.primaryForeground || '#fff' }]}>
+                Open Link
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.secondaryActions}>
+              <TouchableOpacity 
+                style={[styles.actionIcon, { backgroundColor: colors.secondary }]}
+                onPress={handleArchive}
+                activeOpacity={0.7}
+              >
+                <Feather name="archive" size={20} color={colors.foreground} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionIcon, { backgroundColor: colors.secondary }]}
+                onPress={handleAddToCollection}
+                activeOpacity={0.7}
+              >
+                <Feather name="folder-plus" size={20} color={colors.foreground} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionIcon, { backgroundColor: colors.secondary }]}
+                onPress={handleAddTag}
+                activeOpacity={0.7}
+              >
+                <Feather name="tag" size={20} color={colors.foreground} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.actionIcon, { backgroundColor: colors.destructive + '20' }]}
+                onPress={handleDelete}
+                activeOpacity={0.7}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color={colors.destructive} />
+                ) : (
+                  <Feather name="trash-2" size={20} color={colors.destructive} />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Metadata Cards */}
+          <View style={styles.metadataGrid}>
+            {/* Content Type */}
+            {bookmark.contentType && bookmark.contentType !== 'link' && (
+              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
+                <Feather 
+                  name={bookmark.contentType === 'video' ? 'play-circle' : 
+                        bookmark.contentType === 'podcast' ? 'headphones' :
+                        bookmark.contentType === 'article' ? 'file-text' : 'message-square'} 
+                  size={20} 
+                  color={platformColor} 
+                />
+                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Type</Text>
+                <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                  {bookmark.contentType.charAt(0).toUpperCase() + bookmark.contentType.slice(1)}
+                </Text>
+              </View>
+            )}
+
+            {/* View Count for Videos */}
+            {bookmark.videoMetadata?.viewCount && (
+              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
+                <Feather name="eye" size={20} color={colors.primary} />
+                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Views</Text>
+                <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                  {bookmark.videoMetadata.viewCount.toLocaleString('en')}
+                </Text>
+              </View>
+            )}
+
+            {/* Reading Time for Articles */}
+            {bookmark.articleMetadata?.readingTime && (
+              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
+                <Feather name="clock" size={20} color={colors.primary} />
+                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Read Time</Text>
+                <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                  {bookmark.articleMetadata.readingTime} min
+                </Text>
+              </View>
+            )}
+
+            {/* Episode Info for Podcasts */}
+            {bookmark.podcastMetadata?.episodeNumber && (
+              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
+                <Feather name="mic" size={20} color={colors.primary} />
+                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Episode</Text>
+                <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                  #{bookmark.podcastMetadata.episodeNumber}
+                </Text>
+              </View>
+            )}
+
+            {/* Published Date */}
+            {bookmark.publishedAt && (
+              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
+                <Feather name="calendar" size={20} color={colors.primary} />
+                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Published</Text>
+                <Text style={[styles.metaValue, { color: colors.foreground }]}>
+                  {new Date(bookmark.publishedAt).toLocaleDateString('en', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: bookmark.publishedAt ? new Date(bookmark.publishedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined : undefined
+                  })}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Tags */}
           {bookmark.tags && bookmark.tags.length > 0 && (
-            <View className="mb-4">
-              <Text className="text-xs text-gray-500 mb-2">Tags</Text>
-              <View className="flex-row flex-wrap gap-1">
+            <View style={styles.tagsSection}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
+              <View style={styles.tagsContainer}>
                 {bookmark.tags.map((tag, index) => (
-                  <Chip key={index} size="sm">
-                    {tag}
-                  </Chip>
+                  <View key={index} style={[styles.tag, { backgroundColor: colors.primary + '20' }]}>
+                    <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
+                  </View>
                 ))}
               </View>
             </View>
           )}
 
-          <View className="flex-row gap-2">
-            <Button
-              onPress={handleOpenLink}
-              className="flex-1"
-              startContent={<Feather name="external-link" size={16} color="white" />}
-            >
-              Open Link
-            </Button>
-            <Button
-              onPress={handleShare}
-              className="flex-1"
-              startContent={<Feather name="share-2" size={16} color="#7c3aed" />}
-            >
-              Share
-            </Button>
-          </View>
-        </Card>
+          {/* Notes */}
+          {bookmark.notes && (
+            <View style={styles.notesSection}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Notes</Text>
+              <View style={[styles.notesCard, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.notesText, { color: colors.foreground }]}>{bookmark.notes}</Text>
+              </View>
+            </View>
+          )}
 
-        <Card className="p-4">
-          <Text className="text-sm font-semibold text-gray-700 mb-3">
-            Actions
-          </Text>
-          <View className="gap-2">
-            <Button
-              onPress={handleEdit}
-              startContent={<Feather name="edit-2" size={16} color="#6b7280" />}
-              className="justify-start"
-            >
-              Edit Bookmark
-            </Button>
-            <Button
-              onPress={handleDelete}
-              startContent={<Feather name="trash-2" size={16} color="#ef4444" />}
-              className="justify-start"
-              isLoading={isDeleting}
-              disabled={isDeleting}
-            >
-              Delete Bookmark
-            </Button>
-          </View>
-        </Card>
+          {/* Description */}
+          {bookmark.description && (
+            <Text style={[styles.description, { color: colors.mutedForeground }]}>
+              {bookmark.description}
+            </Text>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 32,
+  },
+  centerContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  headerButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  
+  // Hero Section
+  heroSection: {
+    position: 'relative',
+    width: '100%',
+    height: 240,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+  },
+  heroPlaceholder: {
+    width: '100%',
+    height: 240,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playButton: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  playIcon: {
+    marginLeft: 4,
+  },
+  durationBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  durationText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  
+  // Content Section
+  contentSection: {
+    padding: 20,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '700',
+    marginBottom: 12,
+    letterSpacing: -0.5,
+    lineHeight: 32,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  platformInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  platformText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  authorAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  dateText: {
+    fontSize: 14,
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 0,
+    marginBottom: 20,
+  },
+  
+  // Metadata Grid
+  metadataGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  metaCard: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    minWidth: 90,
+    gap: 4,
+  },
+  metaLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  metaValue: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  
+  // Sections
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+    letterSpacing: -0.3,
+  },
+  tagsSection: {
+    marginBottom: 20,
+  },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tag: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  tagText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  notesSection: {
+    marginBottom: 24,
+  },
+  notesCard: {
+    padding: 16,
+    borderRadius: 12,
+  },
+  notesText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  
+  // Action Buttons
+  actionButtons: {
+    gap: 12,
+  },
+  primaryActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 8,
+  },
+  primaryActionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  secondaryActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  
+  // Error states
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  primaryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  buttonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  
+  // Skeleton styles
+  skeletonButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+  },
+  skeletonHero: {
+    opacity: 0.3,
+  },
+  skeletonTitle: {
+    height: 28,
+    borderRadius: 8,
+    marginBottom: 8,
+    width: '90%',
+    opacity: 0.3,
+  },
+  skeletonTitleLine2: {
+    height: 28,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: '60%',
+    opacity: 0.3,
+  },
+  skeletonIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    opacity: 0.3,
+  },
+  skeletonPlatformText: {
+    height: 18,
+    width: 100,
+    borderRadius: 6,
+    opacity: 0.3,
+  },
+  skeletonDate: {
+    height: 16,
+    width: 60,
+    borderRadius: 6,
+    opacity: 0.3,
+  },
+  skeletonDescription: {
+    height: 20,
+    borderRadius: 6,
+    marginBottom: 8,
+    width: '100%',
+    opacity: 0.3,
+  },
+  skeletonDescriptionLine2: {
+    height: 20,
+    borderRadius: 6,
+    marginBottom: 8,
+    width: '95%',
+    opacity: 0.3,
+  },
+  skeletonDescriptionLine3: {
+    height: 20,
+    borderRadius: 6,
+    marginBottom: 20,
+    width: '75%',
+    opacity: 0.3,
+  },
+  skeletonMetaCard: {
+    opacity: 0.3,
+  },
+  skeletonSectionTitle: {
+    height: 20,
+    width: 60,
+    borderRadius: 6,
+    marginBottom: 12,
+    opacity: 0.3,
+  },
+  skeletonTag: {
+    height: 36,
+    width: 80,
+    borderRadius: 20,
+    opacity: 0.3,
+  },
+  skeletonPrimaryButton: {
+    height: 52,
+    borderRadius: 14,
+    opacity: 0.3,
+  },
+});

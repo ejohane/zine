@@ -6,32 +6,131 @@ import {
   Text,
   FlatList,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ScrollShadow, Card, Button } from 'heroui-native';
+import { Card, Button } from 'heroui-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { OptimizedCompactBookmarkCard } from './OptimizedCompactBookmarkCard';
+import { MediaRichBookmarkCard } from './MediaRichBookmarkCard';
 import { useRecentBookmarks } from '../hooks/useRecentBookmarks';
 import { useAuth } from '../contexts/auth';
 import type { Bookmark } from '@zine/shared';
 
 const { width: screenWidth } = Dimensions.get('window');
-const CARD_WIDTH = 280;
-const CARD_MARGIN = 16;
+const CARD_WIDTH = 300;
+const CARD_MARGIN = 12;
 
-const SkeletonCard = React.memo(() => (
-  <Card className="w-[280px] h-[140px] p-4 mr-3 bg-gray-100">
-    <View className="space-y-3">
-      <View className="h-4 bg-gray-200 rounded-md w-3/4 animate-pulse" />
-      <View className="h-3 bg-gray-200 rounded-md w-1/2 animate-pulse" />
-      <View className="flex-row space-x-2 mt-auto">
-        <View className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" />
-        <View className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" />
+const SkeletonCard = React.memo(() => {
+  const [opacity] = React.useState(new React.useRef(new Animated.Value(0.3)).current);
+  
+  React.useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [opacity]);
+  
+  return (
+    <View style={{ 
+      width: 300, 
+      height: 240, 
+      backgroundColor: 'white', 
+      borderRadius: 12, 
+      overflow: 'hidden', 
+      marginRight: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2
+    }}>
+      {/* Media Preview Skeleton */}
+      <Animated.View style={{ 
+        width: '100%', 
+        height: 169, 
+        backgroundColor: '#e5e7eb',
+        opacity: opacity,
+      }}>
+        {/* Play button skeleton for media content */}
+        <View style={{ 
+          position: 'absolute', 
+          top: '50%', 
+          left: '50%', 
+          transform: [{ translateX: -24 }, { translateY: -24 }],
+        }}>
+          <View style={{ 
+            backgroundColor: 'rgba(255, 255, 255, 0.5)', 
+            borderRadius: 999, 
+            width: 48,
+            height: 48,
+          }} />
+        </View>
+        
+        {/* Duration badge skeleton */}
+        <View style={{ 
+          position: 'absolute', 
+          bottom: 8, 
+          right: 8, 
+          backgroundColor: 'rgba(0, 0, 0, 0.3)', 
+          width: 40,
+          height: 20,
+          borderRadius: 4 
+        }} />
+      </Animated.View>
+      
+      {/* Content Section Skeleton */}
+      <View style={{ padding: 12, height: 71 }}>
+        {/* Title skeleton - two lines */}
+        <Animated.View style={{ 
+          height: 14, 
+          backgroundColor: '#e5e7eb', 
+          borderRadius: 4, 
+          marginBottom: 4,
+          opacity: opacity,
+        }} />
+        <Animated.View style={{ 
+          height: 14, 
+          backgroundColor: '#e5e7eb', 
+          borderRadius: 4, 
+          marginBottom: 10,
+          width: '75%',
+          opacity: opacity,
+        }} />
+        
+        {/* Author/Platform skeleton */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Animated.View style={{ 
+            width: 14, 
+            height: 14, 
+            backgroundColor: '#e5e7eb', 
+            borderRadius: 7,
+            opacity: opacity,
+          }} />
+          <Animated.View style={{ 
+            height: 12, 
+            backgroundColor: '#e5e7eb', 
+            borderRadius: 4,
+            width: 80,
+            opacity: opacity,
+          }} />
+        </View>
       </View>
     </View>
-  </Card>
-));
+  );
+});
 
 SkeletonCard.displayName = 'SkeletonCard';
 
@@ -95,7 +194,7 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
           paddingRight: index === (bookmarks?.length ?? 0) - 1 ? 16 : 0,
         }}
       >
-        <OptimizedCompactBookmarkCard
+        <MediaRichBookmarkCard
           bookmark={item}
           onPress={() => router.push(`/bookmark/${item.id}`)}
         />
@@ -144,14 +243,20 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
 
     if (isLoading) {
       return (
-        <View className="pb-4">
+        <View style={{ marginBottom: 16 }}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
+            contentContainerStyle={{ 
+              paddingHorizontal: 16,
+              paddingVertical: 4,
+            }}
+            snapToInterval={CARD_WIDTH + CARD_MARGIN}
+            snapToAlignment="start"
+            decelerationRate="fast"
           >
-            {[1, 2, 3, 4].map((i) => (
-              <SkeletonCard key={i} />
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={`skeleton-${i}`} />
             ))}
           </ScrollView>
         </View>
@@ -160,7 +265,7 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
 
     if (!bookmarks || bookmarks.length === 0) {
       return (
-        <View className="pb-4">
+        <View className="mb-4">
           <EmptyState />
         </View>
       );
@@ -169,7 +274,7 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
     // Use FlatList for better performance with large lists
     if (useVirtualization && bookmarks.length > 5) {
       return (
-        <View className="pb-4">
+        <View className="mb-4">
           <FlatList
             data={bookmarks}
             renderItem={renderBookmarkItem}
@@ -193,42 +298,33 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
       );
     }
 
-    // Use ScrollView with ScrollShadow for smaller lists
+    // Use ScrollView without ScrollShadow for now to avoid the displayName error
     return (
-      <View className="pb-4">
-        <ScrollShadow
-          size={50}
-          visibility="both"
-          hideScrollBar
-          orientation="horizontal"
-          className="w-full"
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingHorizontal: 16,
+          }}
+          snapToInterval={CARD_WIDTH + CARD_MARGIN}
+          snapToAlignment="start"
+          decelerationRate="fast"
         >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
-            }}
-            snapToInterval={CARD_WIDTH + CARD_MARGIN}
-            snapToAlignment="start"
-            decelerationRate="fast"
-          >
-            {bookmarks.map((bookmark, index) => (
-              <View
-                key={bookmark.id}
-                style={{
-                  marginRight: index === bookmarks.length - 1 ? 0 : 16,
-                }}
-              >
-                <OptimizedCompactBookmarkCard
-                  bookmark={bookmark}
-                  onPress={() => router.push(`/bookmark/${bookmark.id}`)}
-                />
-              </View>
-            ))}
-          </ScrollView>
-        </ScrollShadow>
+          {bookmarks.map((bookmark, index) => (
+            <View
+              key={bookmark.id}
+              style={{
+                marginRight: index === bookmarks.length - 1 ? 0 : 16,
+              }}
+            >
+              <MediaRichBookmarkCard
+                bookmark={bookmark}
+                onPress={() => router.push(`/bookmark/${bookmark.id}`)}
+              />
+            </View>
+          ))}
+        </ScrollView>
       </View>
     );
   }

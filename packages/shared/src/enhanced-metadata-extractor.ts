@@ -851,9 +851,21 @@ export class EnhancedMetadataExtractor {
         categoryId: undefined // Would need YouTube Data API for this
       }
 
+      // Note: YouTube oEmbed API doesn't provide video descriptions.
+      // The pageMetadata description is from HTML meta tags which often contains
+      // generic YouTube homepage text rather than the actual video description.
+      // Full video description is only available via YouTube Data API v3 with OAuth.
+      let description = pageMetadata?.description
+      if (description && (
+        description.includes('Enjoy the videos and music you love') ||
+        description.includes('Share your videos with friends, family, and the world')
+      )) {
+        description = undefined // Don't use generic YouTube description
+      }
+
       return {
         title: oembedData.title || pageMetadata?.title || 'Untitled Video',
-        description: pageMetadata?.description,
+        description: description,
         thumbnailUrl: oembedData.thumbnail_url || pageMetadata?.thumbnailUrl,
         faviconUrl: pageMetadata?.faviconUrl || 'https://www.youtube.com/favicon.ico',
         publishedAt: pageMetadata?.publishedAt,

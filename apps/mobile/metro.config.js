@@ -9,8 +9,8 @@ const config = getDefaultConfig(__dirname);
 const projectRoot = __dirname;
 const workspaceRoot = path.resolve(projectRoot, '../..');
 
-// Watch all files in the monorepo
-config.watchFolders = [workspaceRoot];
+// Watch all files in the monorepo - include Expo's defaults
+config.watchFolders = [...(config.watchFolders || []), workspaceRoot];
 
 // Ensure we're using the same React instance across the monorepo
 config.resolver.nodeModulesPaths = [
