@@ -270,6 +270,9 @@ export const bookmarksApi = {
     const response = await apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}`);
     return response.bookmarks || [];
   },
+  getBookmarksByCreatorWithDetails: async (creatorId: string): Promise<{ creator: any; bookmarks: Bookmark[] }> => {
+    return apiClient.get<{ creator: any; bookmarks: Bookmark[] }>(`/api/v1/bookmarks/creator/${creatorId}`);
+  },
 };
 
 // Feed-specific API methods
@@ -309,5 +312,8 @@ export const api = {
   },
   getBookmarksByCreator: async (creatorId: string, _token: string): Promise<Bookmark[]> => {
     return bookmarksApi.getBookmarksByCreator(creatorId);
+  },
+  getBookmarksByCreatorWithDetails: async (creatorId: string, _token: string): Promise<{ creator: any; bookmarks: Bookmark[] }> => {
+    return bookmarksApi.getBookmarksByCreatorWithDetails(creatorId);
   },
 };
