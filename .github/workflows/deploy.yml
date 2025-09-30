@@ -143,6 +143,8 @@ jobs:
   deploy-web:
     runs-on: ubuntu-latest
     name: Deploy Web App
+    # Note: Web app deployment maintained for development/testing purposes only
+    # Web app is not the primary platform - mobile app is the focus
     permissions:
       contents: read
       pull-requests: write
