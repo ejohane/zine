@@ -1,5 +1,14 @@
 # Claude Development Guidelines
 
+## Project Focus
+
+**🎯 Mobile-First Architecture**
+
+Zine is now a **mobile-first application**:
+- **Primary Platform**: React Native mobile app (actively developed)
+- **Web App**: Development/testing tool only (not actively maintained)
+- **Design System**: Mobile-only with heroui-native
+
 ## Project Architecture
 
 This is a **monorepo with microservices architecture** using Turborepo:
@@ -7,20 +16,24 @@ This is a **monorepo with microservices architecture** using Turborepo:
 ```
 zine/ (Monorepo Root)
 ├── apps/
-│   └── web/           # Vite SPA Frontend (React + TanStack Router)
+│   ├── mobile/        # 📱 React Native Mobile App (PRIMARY PLATFORM)
+│   └── web/           # 🌐 Vite SPA (Development Tool Only)
 ├── packages/
 │   ├── api/           # Cloudflare Workers API (Hono + D1)
-│   └── shared/        # Shared Types & Services (Repository Pattern)
+│   ├── shared/        # Shared Types & Services
+│   └── design-system/ # Mobile-Only Design System (heroui-native)
 ```
 
 ## Technology Stack
 
-### Frontend (apps/web)
+### Mobile App (PRIMARY PLATFORM) 📱
 
-- **Framework**: Vite SPA with React 18
-- **Routing**: TanStack Router (client-side routing)
+- **Framework**: React Native 0.81 + Expo 54
+- **Routing**: Expo Router 6
+- **UI Components**: HeroUI Native (mobile-native components)
+- **Styling**: NativeWind (Tailwind CSS for React Native)
 - **State Management**: TanStack Query for server state
-- **Styling**: Tailwind CSS + Radix UI components
+- **Authentication**: Clerk Expo
 - **Type Safety**: TypeScript + Zod validation
 
 ### Backend (packages/api)
@@ -30,12 +43,28 @@ zine/ (Monorepo Root)
 - **Database**: D1 (Cloudflare's SQLite)
 - **ORM**: Drizzle ORM
 - **Deployment**: Wrangler
+- **Authentication**: Clerk
+
+### Design System (packages/design-system) - MOBILE ONLY
+
+- **Platform**: React Native only (web support removed)
+- **UI Library**: HeroUI Native (1.0.0-alpha.12)
+- **Styling**: NativeWind + tailwind-variants
+- **Components**: 13 mobile-native components
+- **Export**: Single entry point `@zine/design-system`
 
 ### Shared Package (packages/shared)
 
 - **Architecture**: Repository pattern with service layer
 - **Validation**: Zod schemas for type safety
-- **Business Logic**: BookmarkService with repository abstraction
+- **Business Logic**: Services with repository abstraction
+
+### Web App (apps/web) - DEVELOPMENT TOOL ONLY ⚠️
+
+- **Status**: Not actively maintained
+- **Purpose**: Development and testing tool
+- **Framework**: Vite SPA with React 19
+- **Note**: May have build errors due to removed web design system support
 
 ## Package Manager
 
@@ -45,33 +74,121 @@ zine/ (Monorepo Root)
 - Use `bun add <package>` instead of `npm install <package>`
 - Use `bun remove <package>` instead of `npm uninstall <package>`
 
-## Data Fetching Rules
+## Mobile Development Workflow
 
-- **Always use TanStack Query for all data fetching in the UI**
-- Create custom hooks for data fetching operations (e.g., `useBookmarks`)
-- Use the `useQuery` hook for GET requests
-- Place API functions in `apps/web/src/lib/api.ts`
-- Place custom hooks in `apps/web/src/hooks/`
-- All data operations go through the shared `bookmarkService` from `@zine/shared`
+### Starting Mobile App
 
-## Repository Pattern
+```bash
+# Development mode
+cd apps/mobile
+bun run dev
 
-The shared package uses a repository pattern:
+# iOS (requires Mac + Xcode)
+bun run ios
 
-- `BookmarkRepository` interface defines the contract
-- `InMemoryBookmarkRepository` (current) for mock data
-- `BookmarkService` provides business logic
-- Easy to swap repositories (e.g., for D1 database)
+# Android (requires Android Studio)
+bun run android
+```
 
-## API Endpoints
+### Building Mobile App
 
-All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
+```bash
+cd apps/mobile
+
+# Development build
+bun run build:ios:development
+bun run build:android:development
+
+# Preview build
+bun run build:ios:preview
+bun run build:android:preview
+
+# Production build (requires EAS configuration)
+bun run build:ios:production
+bun run build:android:production
+```
+
+## Design System (@zine/design-system) - MOBILE ONLY
+
+### Architecture
+
+- **Platform**: React Native only
+- **Library**: HeroUI Native
+- **No Web Support**: Web components have been removed
+- **Components**: 13 files total (down from 139)
+
+### Usage
+
+```typescript
+// Import components directly from design system
+import { Button, Card, BookmarkCard, SubscriptionItem } from '@zine/design-system';
+
+// All components are React Native compatible
+<Button variant="primary" onPress={handlePress}>
+  Save Bookmark
+</Button>
+
+<BookmarkCard
+  title="Example Bookmark"
+  url="https://example.com"
+  onPress={handleBookmark}
+/>
+```
+
+### Available Components
+
+1. **Core Components**:
+   - Button (re-exported from heroui-native)
+
+2. **Pattern Components**:
+   - BookmarkCard - Display bookmark items
+   - SubscriptionItem - Display subscription content
+   - FeedCard - Display feed items
+
+3. **Providers**:
+   - DesignSystemProvider - HeroUI Native provider
+
+4. **Tokens**:
+   - Design tokens (colors, typography, spacing)
+
+5. **Utilities**:
+   - cn() - className utilities
+
+### Import Path
+
+**Always use the default export:**
+```typescript
+import { ... } from '@zine/design-system';
+```
+
+**Do NOT use** (these no longer exist):
+```typescript
+import { ... } from '@zine/design-system/web';    // ❌ Removed
+import { ... } from '@zine/design-system/native';  // ❌ Removed
+```
+
+## API Development
+
+### Local Development
+
+```bash
+cd packages/api
+bun run dev  # Starts local Cloudflare Workers dev server
+```
+
+### API Endpoints
+
+All API endpoints use `/api/v1/` prefix:
 
 - `GET /api/v1/bookmarks` - Get all bookmarks
 - `GET /api/v1/bookmarks/:id` - Get bookmark by ID
 - `POST /api/v1/bookmarks` - Create new bookmark
 - `PUT /api/v1/bookmarks/:id` - Update bookmark
 - `DELETE /api/v1/bookmarks/:id` - Delete bookmark
+- `GET /api/v1/subscriptions` - Get user subscriptions
+- `POST /api/v1/subscriptions` - Create subscription
+- `GET /api/v1/feed` - Get feed items
+- OAuth endpoints for Spotify/YouTube
 
 ## Database & ORM
 
@@ -81,66 +198,80 @@ All API endpoints are in `packages/api/src/index.ts` with `/api/v1/` prefix:
 - **Config**: `packages/api/drizzle.config.ts`
 - **Migrations**: Use `bun run db:generate` and `bun run db:migrate`
 
-## Component Architecture
+## Data Fetching (Mobile)
 
-- **UI Components**: Located in `apps/web/src/components/ui/`
-- **Base**: Radix UI primitives
-- **Styling**: Tailwind CSS with `class-variance-authority`
-- **Utilities**: `clsx` and `tailwind-merge` for conditional classes
+- **Always use TanStack Query** for all data fetching
+- Create custom hooks for data fetching operations
+- Place API functions in `apps/mobile/lib/api.ts`
+- Place custom hooks in `apps/mobile/hooks/`
 
-## Development Workflow
+Example:
+```typescript
+// In apps/mobile/hooks/useBookmarks.ts
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../lib/api';
 
-- **Monorepo**: Use `turbo dev` to run all services
-- **Frontend Only**: `cd apps/web && bun run dev`
-- **API Only**: `cd packages/api && bun run dev`
-- **Type Checking**: `turbo type-check` for all packages
-- **Building**: `turbo build` for production builds
+export function useBookmarks() {
+  return useQuery({
+    queryKey: ['bookmarks'],
+    queryFn: () => api.getBookmarks(),
+  });
+}
 
-## Deployment
+// In component
+const { data: bookmarks, isLoading } = useBookmarks();
+```
 
-- **Frontend**: Cloudflare Workers (SPA)
-- **API**: Cloudflare Workers
-- **Database**: Cloudflare D1
-- **Commands**: `turbo deploy` (staging) or `turbo deploy:production`
+## Authentication
+
+### Mobile App (Clerk Expo)
+
+```typescript
+import { ClerkProvider, useAuth } from '@clerk/clerk-expo';
+import { tokenCache } from './lib/tokenCache';
+
+// Wrap app with ClerkProvider
+<ClerkProvider publishableKey={CLERK_KEY} tokenCache={tokenCache}>
+  <App />
+</ClerkProvider>
+
+// Use auth in components
+const { isSignedIn, userId } = useAuth();
+```
+
+### API Authentication
+
+- Uses Clerk secret key for validation
+- Middleware validates JWT tokens
+- User ID extracted from token claims
 
 ## Environment Variables
 
-### Frontend Environment Variables (apps/web)
+### Mobile App Environment Variables
 
-- **Naming Convention**: All frontend environment variables must be prefixed with `VITE_`
-- **Local Development**: Use `.env.local` for local development environment variables
-- **Production**: Environment variables are handled through GitHub Actions during deployment
+- **Naming Convention**: Prefix with `EXPO_PUBLIC_`
+- **Local Development**: Use `.env.development` file
+- **Files**: `.env.development`, `.env.preview`, `.env.production`
 
-### GitHub Actions Environment Variable Setup
-
-Due to limitations with how Vite handles environment variables in GitHub Actions, the following process is required:
-
-1. **Add secrets to GitHub repository** under Settings → Secrets and variables → Actions
-2. **Install dotenv-cli** as a dev dependency: `bun add -D dotenv-cli`
-3. **Create .env file during build process** in GitHub Actions workflow:
-   ```yaml
-   - name: Build Web App (Production)
-     run: |
-       echo "VITE_YOUR_VAR=$VITE_YOUR_VAR" > .env.production
-       bunx dotenv-cli -e .env.production -- bun run build
-     working-directory: apps/web
-     env:
-       VITE_YOUR_VAR: ${{ secrets.VITE_YOUR_VAR }}
-   ```
+Example:
+```bash
+EXPO_PUBLIC_API_URL=https://api.myzine.app
+EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
 
 ### Backend Environment Variables (packages/api)
 
 - **Local Development**: Use `.dev.vars` file (not committed to git)
-- **Production**: Environment variables are set through Cloudflare Workers dashboard or wrangler.toml
-- **GitHub Actions**: Use `env` section in workflow for deployment secrets
+- **Production**: Set through Cloudflare Workers dashboard
+- **GitHub Actions**: Use `env` section in workflow
 
 #### OAuth Setup (Required for Subscription Features)
 
 To enable Spotify and YouTube account connections:
 
 1. **Create OAuth Applications**:
-   - **Spotify**: Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create a new app
-   - **YouTube**: Go to [Google Cloud Console](https://console.developers.google.com) and create a new project with YouTube Data API v3 enabled
+   - **Spotify**: [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   - **YouTube**: [Google Cloud Console](https://console.developers.google.com)
 
 2. **Configure Redirect URIs**:
    - **Development**: `http://localhost:8787/api/v1/auth/{provider}/callback`
@@ -150,206 +281,153 @@ To enable Spotify and YouTube account connections:
    - **Spotify**: `user-read-playback-position`, `user-library-read`
    - **YouTube**: `https://www.googleapis.com/auth/youtube.readonly`
 
-4. **Local Development Setup**:
-   ```bash
-   cd packages/api
-   cp .dev.vars.example .dev.vars
-   # Edit .dev.vars with your OAuth credentials
-   ```
-
-5. **Required Environment Variables**:
+4. **Required Environment Variables**:
    ```
    API_BASE_URL=http://localhost:8787
    SPOTIFY_CLIENT_ID=your_spotify_client_id
    SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
    YOUTUBE_CLIENT_ID=your_youtube_client_id
    YOUTUBE_CLIENT_SECRET=your_youtube_client_secret
+   CLERK_SECRET_KEY=your_clerk_secret_key
    ```
 
-### Important Notes
+## Development Workflow
 
-- **Security**: Never commit actual environment variable values to git
-- **Prefixes**: Frontend variables must use `VITE_` prefix, backend variables don't need prefixes
-- **GitHub Actions**: Standard `env` section in GitHub Actions doesn't work directly with Vite builds - must use dotenv-cli workaround
+### Monorepo Commands
+
+```bash
+# Start all services
+bun dev
+
+# Build all packages
+bun build
+
+# Type check all packages
+bun type-check
+
+# Lint all packages
+bun lint
+
+# Clean build artifacts
+bun clean
+```
+
+### Mobile-Specific Commands
+
+```bash
+cd apps/mobile
+
+# Development
+bun run dev          # Start Expo dev server
+bun run ios          # Run on iOS simulator
+bun run android      # Run on Android emulator
+
+# Building
+bun run build:ios:preview
+bun run build:android:preview
+```
+
+### API-Specific Commands
+
+```bash
+cd packages/api
+
+# Development
+bun run dev          # Start local dev server
+
+# Database
+bun run db:generate  # Generate migrations
+bun run db:migrate   # Run migrations
+
+# Deployment
+bun run deploy       # Deploy to preview
+bun run deploy:production  # Deploy to production
+```
+
+## Deployment
+
+### Mobile App Deployment
+
+- **Platform**: Expo Application Services (EAS)
+- **Builds**: Configured in `eas.json`
+- **Profiles**: development, preview, production
+
+```bash
+cd apps/mobile
+
+# Build and submit to stores
+eas build --platform ios --profile production
+eas build --platform android --profile production
+
+# Submit to stores
+eas submit --platform ios
+eas submit --platform android
+```
+
+### API Deployment
+
+- **Platform**: Cloudflare Workers
+- **Automatic**: GitHub Actions on push to main
+- **Manual**: `bun run deploy:production`
+
+### Web App Deployment (Optional)
+
+- **Platform**: Cloudflare Pages
+- **Status**: Tool only, not actively maintained
+- **May fail**: Due to removed web design system support
 
 ## Deployment Guidelines
 
-- **Do not run deploy scripts locally, always go through github ci/cd**
-
-## Current Status
-
-- ✅ Frontend SPA with TanStack Router
-- ✅ API with full CRUD endpoints
-- ✅ Shared types and business logic
-- ✅ Authentication with Clerk
-- ✅ OAuth Integration (Spotify & YouTube)
-- ✅ Subscription Discovery & Management
-- ⚠️ Using mock data (InMemoryBookmarkRepository)
-- 🔄 Ready to connect D1 database
-
-## Design System (@zine/design-system)
-
-### Architecture
-
-The design system uses a **unified cross-platform approach**: HeroUI (web) and HeroUI Native (mobile) with shared abstractions for maximum code reuse.
-
-- **Location**: `packages/design-system/`
-- **Build Tool**: tsup for bundling with multi-entry support
-- **Documentation**: Storybook on port 6006 (web components)
-- **Styling**: Tailwind CSS with NativeWind for mobile
-- **Components**: HeroUI primitives with custom Zine-specific patterns
-- **Platform Support**: Web (React) and Mobile (React Native)
-
-### Package Structure
-
-```
-packages/design-system/
-├── src/
-│   ├── core/                    # Shared abstractions
-│   │   ├── tokens/              # Design tokens (colors, typography, spacing)
-│   │   ├── types/               # Shared TypeScript types
-│   │   └── utils/               # Shared utilities
-│   ├── web/                     # Web-specific exports
-│   │   ├── components/          # HeroUI web component wrappers
-│   │   ├── providers/           # Web providers
-│   │   └── index.ts
-│   ├── native/                  # Mobile-specific exports
-│   │   ├── components/          # HeroUI Native component wrappers
-│   │   ├── providers/           # Native providers
-│   │   └── index.ts
-│   └── index.ts                 # Main export (web by default)
-├── tailwind.config.shared.js    # Shared Tailwind config
-├── .storybook/                  # Storybook configuration
-└── tsup.config.ts               # Build configuration
-```
-
-### Design Tokens
-
-- **Colors**: Brand colors (primary), neutral scale, semantic colors (success/warning/error), platform colors (Spotify/YouTube/Apple/Google)
-- **Typography**: Font families (sans/mono/display), size scale (xs to 6xl), weights, letter spacing
-- **Spacing**: Consistent spacing scale from 0 to 32 (0px to 128px)
-- **Breakpoints**: Mobile-first responsive breakpoints (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px)
-
-### Component Categories
-
-1. **Core Components** (Platform-agnostic interfaces):
-   - Button, Input, Card, Badge, Avatar, Spinner, Modal, Select
-   - Unified prop types across web and mobile platforms
-
-2. **Zine-Specific Patterns**:
-   - `BookmarkCard`: Display bookmarks with platform-specific styling
-   - `SubscriptionItem`: Display subscription content (podcasts, videos)
-   - `FeedCard`: Feed management with subscribe/unsubscribe functionality
-
-### Usage in Web App
-
-```typescript
-// Import components and utilities
-import { Button, Card, BookmarkCard, cn, tokens } from '@zine/design-system';
-
-// Use components in your app
-<Button variant="primary" size="md">Click me</Button>
-<BookmarkCard {...bookmarkProps} />
-
-// Access design tokens
-const primaryColor = tokens.colors.primary[500];
-const spacing = tokens.spacing[4];
-```
-
-### Usage in Mobile App
-
-```typescript
-// Import components from native exports
-import { Button, Card, BookmarkCard } from '@zine/design-system/native';
-
-// Use components in React Native
-<Button variant="primary" size="md" onPress={handlePress}>
-  Click me
-</Button>
-<BookmarkCard {...bookmarkProps} />
-```
-
-### Development Commands
-
-```bash
-# Development with watch mode
-cd packages/design-system
-bun run dev
-
-# Run Storybook for component development
-bun run storybook
-
-# Build the package
-bun run build
-
-# Type checking
-bun run type-check
-
-# Run tests
-bun run test
-```
-
-### Adding New Components
-
-1. **Create shared interface** in `src/core/types/components.ts`
-2. **Implement web wrapper** in `src/web/components/` using HeroUI React
-3. **Implement native wrapper** in `src/native/components/` using HeroUI Native
-4. **Export from appropriate index files** (`src/web/index.ts`, `src/native/index.ts`)
-5. **Create Storybook stories** for web components
-
-### Styling Approach
-
-- **Tailwind CSS**: Primary styling method for web
-- **NativeWind**: Tailwind for React Native mobile
-- **Shared Config**: `tailwind.config.shared.js` for consistent tokens
-- **CSS Variables**: For theming support (defined in globals.css)
-- **tailwind-variants**: For consistent variant handling across platforms
-
-### Platform Support Strategy
-
-- **Web**: Full HeroUI React component library with Storybook documentation
-- **Mobile**: HeroUI Native components with NativeWind styling
-- **Cross-platform**: Shared component interfaces and design tokens
-- **Conditional Exports**: Automatic platform detection via package.json exports
-
-### Implementation Status
-
-All phases of HeroUI integration are functionally complete:
-- ✅ **Phase 1**: Foundation setup with dependencies and configuration
-- ✅ **Phase 2**: Provider setup for both platforms
-- ✅ **Phase 3**: Core component migration (8 components)
-- ✅ **Phase 4**: Zine-specific components (3 patterns)
-- ✅ **Phase 5**: Testing and documentation
-- ✅ **Native Implementation**: All Zine-specific components implemented for React Native
-
-### Test Pages
-
-- **Web Components**: Visit `/test-heroui-components` in web app
-- **Zine Components**: Visit `/test-zine-components` in web app
+- **Do not run deploy scripts locally**
+- **Always use GitHub CI/CD** for production deployments
+- **Test in preview environment** before production
 
 ## Git Worktree Database Sync
 
-When working with git worktrees, you need to sync the database from the main project to avoid "no such table" errors.
+When working with git worktrees, sync the database from main project:
 
-### Syncing Database for Worktrees
+```bash
+# Run sync script
+bun run sync-db
 
-The main project is located at `/Users/erikjohansson/dev/2025/zine`. When creating or switching to a worktree branch:
+# Or manually
+./scripts/sync-db-from-main.sh
+```
 
-1. **Run the sync script**:
-   ```bash
-   bun run sync-db
-   # or
-   ./scripts/sync-db-from-main.sh
-   ```
+This copies:
+- `.wrangler/state` directory (D1 database)
+- `local.db` and related WAL/SHM files
 
-2. **What it does**:
-   - Copies the `.wrangler/state` directory (contains D1 database)
-   - Copies `local.db` and related WAL/SHM files
-   - Preserves all database tables and data from the main project
+## Web App Status - IMPORTANT ⚠️
 
-3. **When to use**:
-   - After creating a new worktree
-   - When encountering "no such table" errors
-   - After database schema changes in the main project
+The web app is **NOT actively maintained**:
 
-The sync script is idempotent and safe to run multiple times.
+- **Purpose**: Development and testing tool only
+- **Status**: May have build errors
+- **Reason**: Web design system support removed (mobile-only)
+- **Support**: No active development or bug fixes
+- **Use Case**: Internal testing and API debugging only
+
+**For production use, use the mobile app.**
+
+## Current Status
+
+- ✅ Mobile app (React Native) - Primary platform, actively developed
+- ✅ API (Cloudflare Workers) - Fully functional
+- ✅ Design system (heroui-native) - Mobile-only, simplified
+- ✅ Authentication (Clerk) - Working for mobile and API
+- ✅ Database (D1) - Production ready
+- ⚠️ Web app - Development tool only, not maintained
+
+## Project Statistics
+
+- **Design System**: 13 files (down from 139) - 91% reduction
+- **Dependencies**: 10 packages (down from 30) - 67% reduction
+- **Focus**: 100% mobile-first development
+- **Platforms**: React Native (primary), Web (tool only)
+
+---
+
+**Primary Development**: Mobile App (React Native)  
+**Design System**: Mobile-only (heroui-native)  
+**Web App**: Development tool (not maintained)
