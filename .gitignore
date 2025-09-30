@@ -10,4 +10,5 @@ build/
 .dev.vars
 .drizzle.env.branches/
 .metro-cache/
+*.ipa.mcp.json
 *.ipa
