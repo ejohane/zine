@@ -1,1 +1,0 @@
-export { DetachedSheet, type DetachedSheetProps } from './DetachedSheet';
