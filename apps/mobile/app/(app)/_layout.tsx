@@ -32,10 +32,8 @@ export default function AppLayout() {
         name="bookmark/[id]"
         options={{
           headerShown: true,
-          headerTransparent: true,
-          headerTitle: '',
-          headerBackTitle: '',
-          headerShadowVisible: false,
+          headerBackButtonDisplayMode: 'minimal',
+          headerTransparent: false,
         }}
       />
     </Stack>

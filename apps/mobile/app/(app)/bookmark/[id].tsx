@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Image,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,7 +31,7 @@ export default function BookmarkDetailScreen() {
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
   const [imageError, setImageError] = useState(false);
-
+  const scrollY = useRef(new Animated.Value(0)).current;
   const {
     data: bookmark,
     isLoading,
@@ -180,9 +181,6 @@ export default function BookmarkDetailScreen() {
             headerBackTitle: 'Back',
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.foreground,
-            headerRight: () => (
-              <View style={[styles.headerButton, styles.skeletonButton, { backgroundColor: colors.secondary }]} />
-            ),
           }}
         />
         
@@ -283,58 +281,91 @@ export default function BookmarkDetailScreen() {
   const platformColor = getPlatformColor(bookmark.source);
   const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
 
+  const HEADER_HEIGHT = 240;
+  const TITLE_OFFSET = 260;
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [TITLE_OFFSET - 50, TITLE_OFFSET],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
+  const headerBackgroundColor = scrollY.interpolate({
+    inputRange: [TITLE_OFFSET - 50, TITLE_OFFSET],
+    outputRange: ['rgba(0, 0, 0, 0)', colors.background],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
+      <Stack.Screen 
         options={{
-          headerStyle: {
-            backgroundColor: 'transparent',
-          },
-          headerLeft: () => (
-            <TouchableOpacity 
-              onPress={() => router.back()} 
-              style={styles.customBackButton}
-              activeOpacity={0.7}
+          headerTitle: () => (
+            <Animated.Text
+              style={[
+                styles.headerTitle,
+                { 
+                  color: colors.foreground,
+                  opacity: headerOpacity,
+                }
+              ]}
+              numberOfLines={1}
             >
-              <Feather name="chevron-left" size={24} color="#000" />
-            </TouchableOpacity>
+              {bookmark.title}
+            </Animated.Text>
           ),
+          headerBackTitle: 'Back',
+          headerTransparent: true,
+          headerBackground: () => (
+            <Animated.View
+              style={[
+                styles.headerBackground,
+                { backgroundColor: headerBackgroundColor }
+              ]}
+            />
+          ),
+          headerTintColor: colors.foreground,
         }}
       />
       
-      <ScrollView 
+      <Animated.ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
       >
-        {/* Full-width Hero Image */}
+        {/* Hero Image */}
         <View style={styles.heroSection}>
-          {bookmark.thumbnailUrl && !imageError ? (
-            <Image
-              source={{ uri: bookmark.thumbnailUrl }}
-              style={styles.heroImage}
-              resizeMode="cover"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
-              <Feather name="image" size={48} color={colors.mutedForeground} />
-            </View>
-          )}
-          {formattedDuration && (
-            <View style={styles.durationBadge}>
-              <Text style={styles.durationText}>{formattedDuration}</Text>
-            </View>
-          )}
+            {bookmark.thumbnailUrl && !imageError ? (
+              <Image
+                source={{ uri: bookmark.thumbnailUrl }}
+                style={styles.heroImage}
+                resizeMode="cover"
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
+                <Feather name="image" size={48} color={colors.mutedForeground} />
+              </View>
+            )}
+            {formattedDuration && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationText}>{formattedDuration}</Text>
+              </View>
+            )}
         </View>
 
-        {/* Content Section */}
-        <View style={styles.contentSection}>
+        {/* Content Section with white background overlay */}
+        <View style={[styles.contentSection, { backgroundColor: colors.background }]}>
           {/* Title */}
-          <Text style={[styles.title, { color: colors.foreground }]}>
+          <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={3}>
             {bookmark.title}
           </Text>
-          
+
           {/* Creator and Date Row */}
           <View style={styles.creatorDateRow}>
             {/* Creator Info on the left */}
@@ -525,7 +556,7 @@ export default function BookmarkDetailScreen() {
             </Text>
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -538,7 +569,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 32,
+    paddingBottom: 0,
   },
   centerContent: {
     flex: 1,
@@ -550,27 +581,17 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
-  customBackButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  headerBackground: {
+    flex: 1,
+    width: '100%',
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '600',
   },
   
   // Hero Section
   heroSection: {
-    position: 'relative',
     width: '100%',
     height: 240,
   },
@@ -588,7 +609,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 12,
     marginBottom: 16,
   },
   creatorInfo: {
@@ -661,10 +682,12 @@ const styles = StyleSheet.create({
   // Content Section
   contentSection: {
     padding: 20,
+    paddingBottom: 32,
   },
   title: {
     fontSize: 26,
     fontWeight: '700',
+    marginTop: 0,
     marginBottom: 12,
     letterSpacing: -0.5,
     lineHeight: 32,
