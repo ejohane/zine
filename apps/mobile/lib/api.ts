@@ -312,6 +312,49 @@ export const userApi = {
   updateProfile: (data: any) => apiClient.patch<any>('/api/v1/users/me', data),
 };
 
+// OAuth/Account Types
+export interface ConnectedAccount {
+  provider: 'spotify' | 'youtube';
+  isConnected: boolean;
+  connectedAt?: string;
+  email?: string;
+  name?: string;
+}
+
+export interface AccountsResponse {
+  accounts: ConnectedAccount[];
+}
+
+export interface OAuthConnectResponse {
+  authUrl: string;
+}
+
+// OAuth/Account API methods
+export const accountsApi = {
+  fetchAccounts: async (): Promise<ConnectedAccount[]> => {
+    try {
+      const response = await apiClient.get<AccountsResponse>('/api/v1/auth/health');
+      // Ensure we return an array even if accounts is undefined
+      return response?.accounts || [];
+    } catch (error) {
+      console.error('Failed to fetch accounts from API:', error);
+      // Return empty array on error instead of throwing
+      return [];
+    }
+  },
+  
+  connectAccount: async (provider: string, redirectUrl?: string): Promise<string> => {
+    const response = await apiClient.post<OAuthConnectResponse>(`/api/v1/auth/${provider}/connect`, {
+      redirectUrl
+    });
+    return response.authUrl;
+  },
+  
+  disconnectAccount: async (provider: string): Promise<void> => {
+    return apiClient.delete<void>(`/api/v1/auth/${provider}/disconnect`);
+  }
+};
+
 // Re-export the recent bookmarks method for backward compatibility
 export const getRecentBookmarks = (_token: string, limit: number = 10) => {
   return bookmarksApi.getRecent(limit);

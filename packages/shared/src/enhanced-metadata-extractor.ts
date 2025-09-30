@@ -835,11 +835,36 @@ export class EnhancedMetadataExtractor {
       }
 
       // Parse creator information from oEmbed
+      // Extract channel ID from author_url if available
+      let channelId: string | undefined
+      if (oembedData.author_url) {
+        // Try to extract channel ID from URL patterns:
+        // https://www.youtube.com/channel/UCxxxxxx
+        // https://www.youtube.com/c/channelname
+        // https://www.youtube.com/@handle
+        const channelMatch = oembedData.author_url.match(/\/channel\/([^/?]+)/)
+        const customMatch = oembedData.author_url.match(/\/c\/([^/?]+)/)
+        const handleMatch = oembedData.author_url.match(/\/@([^/?]+)/)
+        
+        if (channelMatch) {
+          channelId = channelMatch[1]
+        } else if (customMatch) {
+          // For custom URLs, we'd need to resolve to channel ID via API
+          channelId = customMatch[1]
+        } else if (handleMatch) {
+          // For @handles, we'd need to resolve to channel ID via API
+          channelId = handleMatch[1]
+        }
+      }
+      
       const creator: Creator = {
-        id: `youtube:${oembedData.author_name || 'unknown'}`,
+        id: channelId ? `youtube:${channelId}` : `youtube:${oembedData.author_name || 'unknown'}`,
         name: oembedData.author_name || 'Unknown Creator',
         url: oembedData.author_url,
-        handle: oembedData.author_name ? `@${oembedData.author_name.replace(/\s+/g, '')}` : undefined
+        handle: oembedData.author_name ? `@${oembedData.author_name.replace(/\s+/g, '')}` : undefined,
+        // Note: Avatar URL cannot be obtained from oEmbed API
+        // It requires YouTube Data API with authentication
+        avatarUrl: undefined
       }
 
       // Extract video metadata

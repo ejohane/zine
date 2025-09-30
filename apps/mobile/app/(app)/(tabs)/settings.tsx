@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { useAuth } from '../../../contexts/auth';
 import { useRouter } from 'expo-router';
 import { useClerk, useUser } from '@clerk/clerk-expo';
 import { useTheme, ThemeMode } from '../../../contexts/theme';
+import { useAccounts } from '../../../hooks/useAccounts';
 
 export default function SettingsScreen() {
   const { isSignedIn } = useAuth();
@@ -15,6 +16,15 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme, setTheme, colors, isDark } = useTheme();
+  const { 
+    connect, 
+    disconnect, 
+    isSpotifyConnected, 
+    isYouTubeConnected, 
+    isConnecting,
+    isDisconnecting,
+    refetch: refetchAccounts
+  } = useAccounts();
   
   const [notifications, setNotifications] = useState(true);
   const [autoSave, setAutoSave] = useState(true);
@@ -44,6 +54,41 @@ export default function SettingsScreen() {
 
   const handleSignIn = () => {
     router.push('/(auth)/sign-in');
+  };
+
+  const handleConnectProvider = async (provider: 'spotify' | 'youtube') => {
+    if (!isSignedIn) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to connect your accounts',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign In', onPress: handleSignIn }
+        ]
+      );
+      return;
+    }
+
+    const isConnected = provider === 'spotify' ? isSpotifyConnected : isYouTubeConnected;
+    
+    if (isConnected) {
+      // Disconnect
+      Alert.alert(
+        `Disconnect ${provider === 'spotify' ? 'Spotify' : 'YouTube'}`,
+        `Are you sure you want to disconnect your ${provider === 'spotify' ? 'Spotify' : 'YouTube'} account?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Disconnect',
+            style: 'destructive',
+            onPress: () => disconnect(provider)
+          }
+        ]
+      );
+    } else {
+      // Connect
+      connect({ provider });
+    }
   };
 
   const SettingRow = ({ icon, title, subtitle, children }) => (
@@ -145,22 +190,40 @@ export default function SettingsScreen() {
         </SettingSection>
 
         <SettingSection title="Account">
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => handleConnectProvider('spotify')} disabled={isConnecting || isDisconnecting}>
             <SettingRow
               icon="spotify"
-              title="Connect Spotify"
-              subtitle="Import your podcasts and playlists"
+              title={isSpotifyConnected ? "Spotify Connected" : "Connect Spotify"}
+              subtitle={isSpotifyConnected ? "Your podcasts are synced" : "Import your podcasts and playlists"}
             >
-              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
+              {isConnecting || isDisconnecting ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : isSpotifyConnected ? (
+                <View style={styles.connectedIndicator}>
+                  <FontAwesome name="check-circle" size={16} color="#22c55e" />
+                  <Text style={[styles.connectedText, { color: colors.mutedForeground }]}>Connected</Text>
+                </View>
+              ) : (
+                <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
+              )}
             </SettingRow>
           </TouchableOpacity>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => handleConnectProvider('youtube')} disabled={isConnecting || isDisconnecting}>
             <SettingRow
               icon="youtube-play"
-              title="Connect YouTube"
-              subtitle="Import your subscriptions"
+              title={isYouTubeConnected ? "YouTube Connected" : "Connect YouTube"}
+              subtitle={isYouTubeConnected ? "Your subscriptions are synced" : "Import your subscriptions"}
             >
-              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
+              {isConnecting || isDisconnecting ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : isYouTubeConnected ? (
+                <View style={styles.connectedIndicator}>
+                  <FontAwesome name="check-circle" size={16} color="#22c55e" />
+                  <Text style={[styles.connectedText, { color: colors.mutedForeground }]}>Connected</Text>
+                </View>
+              ) : (
+                <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
+              )}
             </SettingRow>
           </TouchableOpacity>
         </SettingSection>
@@ -311,5 +374,14 @@ const styles = StyleSheet.create({
   version: {
     fontSize: 12,
     color: '#a3a3a3',
+  },
+  connectedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  connectedText: {
+    fontSize: 12,
+    marginLeft: 4,
   },
 });

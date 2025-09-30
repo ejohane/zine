@@ -21,17 +21,21 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.thumbnail_url as content_thumbnail_url,
           c.favicon_url as content_favicon_url,
           c.creator_id,
-          c.creator_name,
-          c.creator_handle,
-          c.creator_thumbnail as creator_avatar_url,
-          c.creator_verified,
-          c.creator_subscriber_count,
-          c.creator_follower_count,
           c.content_type,
           c.published_at as content_published_at,
-          c.provider as creator_platform
+          c.provider as content_provider,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.subscriber_count as creator_subscriber_count,
+          cr.follower_count as creator_follower_count,
+          cr.bio as creator_bio,
+          cr.url as creator_url,
+          cr.platforms as creator_platforms
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
         ORDER BY b.bookmarked_at DESC
       `).all()
 
@@ -54,17 +58,21 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.thumbnail_url as content_thumbnail_url,
           c.favicon_url as content_favicon_url,
           c.creator_id,
-          c.creator_name,
-          c.creator_handle,
-          c.creator_thumbnail as creator_avatar_url,
-          c.creator_verified,
-          c.creator_subscriber_count,
-          c.creator_follower_count,
           c.content_type,
           c.published_at as content_published_at,
-          c.provider as creator_platform
+          c.provider as content_provider,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.subscriber_count as creator_subscriber_count,
+          cr.follower_count as creator_follower_count,
+          cr.bio as creator_bio,
+          cr.url as creator_url,
+          cr.platforms as creator_platforms
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
         WHERE b.id = ?
       `).bind(id).first()
 
@@ -217,13 +225,21 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.thumbnail_url as content_thumbnail_url,
           c.favicon_url as content_favicon_url,
           c.creator_id,
-          c.creator_name,
-          c.creator_handle,
-          c.creator_thumbnail as creator_avatar_url,
           c.content_type,
-          c.published_at as content_published_at
+          c.published_at as content_published_at,
+          c.provider as content_provider,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.subscriber_count as creator_subscriber_count,
+          cr.follower_count as creator_follower_count,
+          cr.bio as creator_bio,
+          cr.url as creator_url,
+          cr.platforms as creator_platforms
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
         WHERE b.user_id = ?
         ORDER BY b.bookmarked_at DESC
       `).bind(userId).all()
@@ -247,17 +263,21 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.thumbnail_url as content_thumbnail_url,
           c.favicon_url as content_favicon_url,
           c.creator_id,
-          c.creator_name,
-          c.creator_handle,
-          c.creator_thumbnail as creator_avatar_url,
-          c.creator_verified,
-          c.creator_subscriber_count,
-          c.creator_follower_count,
           c.content_type,
           c.published_at as content_published_at,
-          c.provider as creator_platform
+          c.provider as content_provider,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.subscriber_count as creator_subscriber_count,
+          cr.follower_count as creator_follower_count,
+          cr.bio as creator_bio,
+          cr.url as creator_url,
+          cr.platforms as creator_platforms
         FROM bookmarks b
         LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
         WHERE b.id = ? AND b.user_id = ?
       `).bind(id, userId).first()
 
@@ -339,8 +359,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
   }
 
   /**
-   * Enhanced method for saving bookmarks with full metadata
-   */
+    * Enhanced method for saving bookmarks with full metadata
+    */
   async createWithMetadata(bookmarkData: {
     userId: string
     url: string
@@ -355,6 +375,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
     language?: string
     status?: string
     creatorId?: string
+    creatorName?: string
+    creatorHandle?: string
+    creatorThumbnail?: string
+    creatorVerified?: boolean
+    creatorSubscriberCount?: number
+    creatorFollowerCount?: number
     videoMetadata?: any
     podcastMetadata?: any
     articleMetadata?: any
@@ -418,38 +444,37 @@ export class D1BookmarkRepository implements BookmarkRepository {
         contentId = `${provider}-${urlHash}`
       }
       
-      // Insert or update content
-      // Note: Creator fields will be populated by enrichment services
-      await this.db.prepare(`
-        INSERT OR REPLACE INTO content (
-          id, external_id, provider, url, canonical_url, title, description,
-          thumbnail_url, favicon_url, published_at, content_type,
-          creator_id, creator_name, creator_handle, creator_thumbnail, 
-          creator_verified, creator_subscriber_count, creator_follower_count,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
-        contentId,
-        contentId,
-        provider,
-        bookmarkData.url,
-        bookmarkData.originalUrl,
-        bookmarkData.title,
-        bookmarkData.description || null,
-        bookmarkData.thumbnailUrl || null,
-        bookmarkData.faviconUrl || null,
-        bookmarkData.publishedAt ? bookmarkData.publishedAt.getTime() : null,
-        bookmarkData.contentType || null,
-        bookmarkData.creatorId || null,
-        null, // creator_name - populated by enrichment
-        null, // creator_handle - populated by enrichment  
-        null, // creator_thumbnail - populated by enrichment
-        null, // creator_verified - populated by enrichment
-        null, // creator_subscriber_count - populated by enrichment
-        null, // creator_follower_count - populated by enrichment
-        now,
-        now
-      ).run()
+       // Insert or update content
+       await this.db.prepare(`
+         INSERT OR REPLACE INTO content (
+           id, external_id, provider, url, canonical_url, title, description,
+           thumbnail_url, favicon_url, published_at, content_type,
+           creator_id, creator_name, creator_handle, creator_thumbnail,
+           creator_verified, creator_subscriber_count, creator_follower_count,
+           created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       `).bind(
+         contentId,
+         contentId,
+         provider,
+         bookmarkData.url,
+         bookmarkData.originalUrl,
+         bookmarkData.title,
+         bookmarkData.description || null,
+         bookmarkData.thumbnailUrl || null,
+         bookmarkData.faviconUrl || null,
+         bookmarkData.publishedAt ? bookmarkData.publishedAt.getTime() : null,
+         bookmarkData.contentType || null,
+         bookmarkData.creatorId || null,
+         bookmarkData.creatorName || null,
+         bookmarkData.creatorHandle || null,
+         bookmarkData.creatorThumbnail || null,
+         bookmarkData.creatorVerified ? 1 : 0,
+         bookmarkData.creatorSubscriberCount || null,
+         bookmarkData.creatorFollowerCount || null,
+         now,
+         now
+       ).run()
       
       // Insert bookmark with generated ID
       const bookmarkId = crypto.randomUUID()
@@ -500,7 +525,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
       contentType: row.content_type || undefined,
       thumbnailUrl: row.content_thumbnail_url || undefined,
       faviconUrl: row.content_favicon_url || undefined,
-      publishedAt: row.content_published_at ? Number(row.content_published_at) : undefined,
+      // Convert from seconds (database) to milliseconds (API response)
+      publishedAt: row.content_published_at ? Number(row.content_published_at) * 1000 : undefined,
       language: undefined, // Not in query result
       status: row.status || 'active',
       creatorId: row.creator_id || undefined,
@@ -511,12 +537,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
       tags: row.user_tags ? JSON.parse(row.user_tags) : undefined,
       notes: row.notes || undefined,
       createdAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
-      updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now()
-    }
-
-    // Add creator if present
-    if (row.creator_id && row.creator_name) {
-      bookmark.creator = {
+      updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
+      // Always include creator field for consistent API contract
+      creator: row.creator_id && row.creator_name ? {
         id: row.creator_id,
         name: row.creator_name,
         handle: row.creator_handle || undefined,
@@ -524,14 +547,14 @@ export class D1BookmarkRepository implements BookmarkRepository {
         verified: row.creator_verified === 1 || row.creator_verified === true || undefined,
         subscriberCount: row.creator_subscriber_count ? Number(row.creator_subscriber_count) : undefined,
         followerCount: row.creator_follower_count ? Number(row.creator_follower_count) : undefined,
-        platform: row.creator_platform || undefined,
-        bio: undefined, // Not in content table
-        url: undefined, // Not in content table
-        platforms: undefined, // Not in content table
-        externalLinks: undefined, // Not in content table
+        platform: row.content_provider || undefined,
+        bio: row.creator_bio || undefined,
+        url: row.creator_url || undefined,
+        platforms: row.creator_platforms ? JSON.parse(String(row.creator_platforms)) : undefined,
+        externalLinks: undefined, // Not fetched in queries
         createdAt: undefined,
         updatedAt: undefined
-      }
+      } : null
     }
 
     return bookmark

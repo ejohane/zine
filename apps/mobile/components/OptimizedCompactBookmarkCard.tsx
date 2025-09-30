@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
 import type { Bookmark } from '@zine/shared';
-import { formatRelativeTime } from '../lib/dateUtils';
+import { formatRelativeTime, formatShortDate } from '../lib/dateUtils';
 import { PlatformIcon, ContentTypeIcon, ExternalLinkIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 
@@ -103,9 +103,10 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
           </View>
         )}
         
-        {/* Header with author and time */}
+        {/* Header with author and publish date */}
         <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center gap-2">
+          {/* Creator on the left */}
+          <View className="flex-row items-center gap-2 flex-1">
             {bookmark.creator?.avatarUrl && (
               <Image
                 source={{ uri: bookmark.creator.avatarUrl }}
@@ -114,14 +115,18 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
               />
             )}
             {bookmark.creator?.name ? (
-              <Text className="text-xs text-gray-700" numberOfLines={1}>
+              <Text className="text-xs text-gray-700 flex-1" numberOfLines={1}>
                 {bookmark.creator.name}
               </Text>
             ) : null}
-            <Text className="text-xs text-gray-500">
-              {formatRelativeTime(bookmark.createdAt)}
-            </Text>
           </View>
+          
+          {/* Publish date on the right */}
+          {bookmark.publishedAt && (
+            <Text className="text-xs text-gray-500 ml-2">
+              {formatShortDate(bookmark.publishedAt)}
+            </Text>
+          )}
         </View>
         
         {/* Title - truncated to 2 lines */}

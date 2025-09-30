@@ -2,6 +2,7 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
+import { HeroUINativeProvider } from 'heroui-native';
 import { AuthProvider } from '../contexts/auth';
 import { ApiProvider } from '../contexts/api';
 import { QueryProvider } from '../contexts/query';
@@ -24,12 +25,14 @@ export default function RootLayout() {
         <AuthProvider>
           <ApiProvider>
             <QueryProvider>
-              <ThemeProvider>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="(app)" />
-                </Stack>
-              </ThemeProvider>
+              <HeroUINativeProvider>
+                <ThemeProvider>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(app)" />
+                  </Stack>
+                </ThemeProvider>
+              </HeroUINativeProvider>
             </QueryProvider>
           </ApiProvider>
         </AuthProvider>

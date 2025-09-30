@@ -114,6 +114,11 @@ export class ContentRepository {
       // Don't overwrite createdAt
       delete updateData.createdAt
       delete updateData.id // Can't update primary key
+      
+      // Ensure publishedAt is a Date object for Drizzle's timestamp column
+      if (updateData.publishedAt && !(updateData.publishedAt instanceof Date)) {
+        updateData.publishedAt = new Date(updateData.publishedAt)
+      }
 
       // JSON stringify any object/array fields before update
       if (updateData.seriesMetadata && typeof updateData.seriesMetadata === 'object') {
@@ -165,6 +170,11 @@ export class ContentRepository {
         updatedAt: now,
         ...contentData
       } as NewContent
+      
+      // Ensure publishedAt is a Date object for Drizzle's timestamp column
+      if (insertData.publishedAt && !(insertData.publishedAt instanceof Date)) {
+        insertData.publishedAt = new Date(insertData.publishedAt) as any
+      }
 
       // JSON stringify any object/array fields before insertion
       if (insertData.seriesMetadata && typeof insertData.seriesMetadata === 'object') {

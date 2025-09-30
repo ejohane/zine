@@ -25,6 +25,9 @@ export const creators = sqliteTable('creators', {
   url: text('url'),                         // Canonical profile URL
   platforms: text('platforms'),            // JSON array of platforms
   externalLinks: text('external_links'),   // JSON array of {title, url} objects
+  verified: integer('verified', { mode: 'boolean' }).default(false), // Verification status
+  subscriberCount: integer('subscriber_count'),    // Number of subscribers/followers
+  followerCount: integer('follower_count'),        // Alternative follower count
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })

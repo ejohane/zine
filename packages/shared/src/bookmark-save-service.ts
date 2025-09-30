@@ -28,6 +28,12 @@ export interface EnhancedBookmarkRepository extends BookmarkRepository {
     language?: string
     status?: string
     creatorId?: string
+    creatorName?: string
+    creatorHandle?: string
+    creatorThumbnail?: string
+    creatorVerified?: boolean
+    creatorSubscriberCount?: number
+    creatorFollowerCount?: number
     videoMetadata?: any
     podcastMetadata?: any
     articleMetadata?: any
@@ -97,7 +103,7 @@ export class BookmarkSaveService {
       const metadata = metadataResult.metadata!
 
       // Step 4: Ensure creator exists if we have creator metadata
-      let creatorId: string | undefined = undefined
+      let creatorDetails: any = {}
       if (metadata.creator && this.repository.ensureCreator) {
         try {
           await this.repository.ensureCreator({
@@ -110,10 +116,18 @@ export class BookmarkSaveService {
             platforms: metadata.creator.platforms,
             externalLinks: metadata.creator.externalLinks
           })
-          creatorId = metadata.creator.id
+          creatorDetails = {
+            creatorId: metadata.creator.id,
+            creatorName: metadata.creator.name,
+            creatorHandle: metadata.creator.handle,
+            creatorThumbnail: metadata.creator.avatarUrl,
+            creatorVerified: metadata.creator.verified,
+            creatorSubscriberCount: metadata.creator.subscriberCount,
+            creatorFollowerCount: metadata.creator.followerCount
+          }
         } catch (error) {
-          console.warn('Failed to ensure creator exists, setting creatorId to null:', error)
-          creatorId = undefined
+          console.warn('Failed to ensure creator exists, proceeding without creator details:', error)
+          creatorDetails = {}
         }
       }
 
@@ -135,7 +149,7 @@ export class BookmarkSaveService {
           publishedAt: metadata.publishedAt,
           language: metadata.language,
           status: 'active',
-          creatorId: creatorId,
+          ...creatorDetails,
           videoMetadata: metadata.videoMetadata,
           podcastMetadata: metadata.podcastMetadata,
           articleMetadata: metadata.articleMetadata,
@@ -173,7 +187,7 @@ export class BookmarkSaveService {
           articleMetadata: metadata.articleMetadata,
           postMetadata: metadata.postMetadata,
           notes: input.notes,
-          creator: metadata.creator,
+          creator: metadata.creator ?? null,
           createdAt: DateNormalizer.now(),
           updatedAt: DateNormalizer.now()
         }
@@ -232,7 +246,7 @@ export class BookmarkSaveService {
         podcastMetadata: metadata.podcastMetadata,
         articleMetadata: metadata.articleMetadata,
         postMetadata: metadata.postMetadata,
-        creator: metadata.creator,
+        creator: metadata.creator ?? null,
         createdAt: DateNormalizer.now(),
         updatedAt: DateNormalizer.now()
       }

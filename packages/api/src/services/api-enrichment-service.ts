@@ -5,6 +5,7 @@
 
 import type { Bindings } from '../index'
 import { DualModeTokenService } from './dual-mode-token-service'
+import { parseYouTubeDate, parseSpotifyDate } from '../utils/date-normalization'
 
 export interface ApiEnrichmentOptions {
   provider: 'youtube' | 'spotify'
@@ -97,6 +98,7 @@ export interface ApiEnrichmentResult {
  */
 export class ApiEnrichmentService {
   private tokenService: DualModeTokenService
+  private env: Bindings
   private cache: Map<string, { data: any; timestamp: number }> = new Map()
   private readonly CACHE_TTL = 15 * 60 * 1000 // 15 minutes
   private readonly YOUTUBE_API_BASE = 'https://www.googleapis.com/youtube/v3'
@@ -109,6 +111,7 @@ export class ApiEnrichmentService {
   }
 
   constructor(env: Bindings) {
+    this.env = env
     this.tokenService = new DualModeTokenService(env as any)
   }
 
@@ -131,6 +134,28 @@ export class ApiEnrichmentService {
       }
     }
 
+    // LOCAL DEVELOPMENT: Try API key approach for YouTube
+    if (options.provider === 'youtube' && (this.env as any).YOUTUBE_API_KEY) {
+      console.log('[ApiEnrichment] LOCAL DEV: Using YouTube API key instead of OAuth')
+      const { LocalDevEnrichmentService } = await import('./local-dev-enrichment')
+      const localService = new LocalDevEnrichmentService((this.env as any).YOUTUBE_API_KEY)
+      
+      try {
+        const videoData = await localService.enrichYouTubeWithApiKey(options.contentId)
+        if (videoData) {
+          console.log('[ApiEnrichment] LOCAL DEV: Success with API key')
+          return {
+            success: true,
+            data: videoData,
+            source: 'youtube_api',
+            quotaUsed: 4
+          }
+        }
+      } catch (error) {
+        console.error('[ApiEnrichment] LOCAL DEV: API key approach failed:', error)
+      }
+    }
+
     // Check if we have a valid token for the user
     if (!options.userId) {
       return {
@@ -142,16 +167,22 @@ export class ApiEnrichmentService {
 
     try {
       // Get tokens for the user and check if the provider token exists and is valid
+      console.log(`[ApiEnrichment] Getting tokens for user: ${options.userId}, provider: ${options.provider}`)
       const tokens = await this.tokenService.getTokens(options.userId)
+      console.log(`[ApiEnrichment] Found ${tokens.size} tokens for user`)
+      
       const tokenData = tokens.get(options.provider)
+      console.log(`[ApiEnrichment] Token data for ${options.provider}:`, tokenData ? 'found' : 'not found')
       
       if (!tokenData || !tokenData.accessToken) {
+        console.log(`[ApiEnrichment] No valid token - returning with error`)
         return {
           success: false,
           source: 'none',
           error: `No valid ${options.provider} token available`
         }
       }
+      console.log(`[ApiEnrichment] Valid token found, proceeding with API enrichment`)
       
       // Check if token needs refresh
       if (tokenData.expiresAt && tokenData.expiresAt < new Date()) {
@@ -214,16 +245,39 @@ export class ApiEnrichmentService {
    * Enrich YouTube video using YouTube Data API v3
    */
   private async enrichYouTubeContent(videoId: string, accessToken: string): Promise<ApiEnrichmentResult> {
+    console.log(`[ApiEnrichment] ===== YOUTUBE ENRICHMENT START =====`)
+    console.log(`[ApiEnrichment] Video ID: ${videoId}`)
+    
+    // Check if this is an API key (for local dev) or OAuth token
+    const isApiKey = accessToken && !accessToken.startsWith('ya29.'); // OAuth tokens start with ya29
+    console.log(`[ApiEnrichment] Token type: ${isApiKey ? 'API_KEY' : 'OAUTH_TOKEN'}`)
+    console.log(`[ApiEnrichment] Token present: ${!!accessToken}`)
+    
     try {
       const parts = ['snippet', 'statistics', 'contentDetails', 'status']
-      const url = `${this.YOUTUBE_API_BASE}/videos?part=${parts.join(',')}&id=${videoId}`
-
-      const response = await fetch(url, {
-        headers: {
+      
+      // Build URL based on token type
+      let url: string;
+      let headers: Record<string, string>;
+      
+      if (isApiKey) {
+        // Use API key in query parameter
+        url = `${this.YOUTUBE_API_BASE}/videos?part=${parts.join(',')}&id=${videoId}&key=${accessToken}`
+        headers = { 'Accept': 'application/json' }
+        console.log(`[ApiEnrichment] Using API key authentication`)
+      } else {
+        // Use OAuth token in header
+        url = `${this.YOUTUBE_API_BASE}/videos?part=${parts.join(',')}&id=${videoId}`
+        headers = {
           'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
-      })
+        console.log(`[ApiEnrichment] Using OAuth authentication`)
+      }
+      
+      console.log(`[ApiEnrichment] Fetching video...`)
+      const response = await fetch(url, { headers })
+      console.log(`[ApiEnrichment] Video response status: ${response.status}`)
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -251,15 +305,78 @@ export class ApiEnrichmentService {
       }
 
       const video = data.items[0] as YouTubeVideoDetails
+      console.log('[ApiEnrichment] Video fetched:', {
+        id: video.id,
+        title: video.snippet?.title,
+        channelId: video.snippet?.channelId,
+        channelTitle: video.snippet?.channelTitle
+      })
+      
+      // Fetch channel information to get the channel thumbnail and statistics
+      let channelData = null
+      if (video.snippet?.channelId) {
+        console.log(`[ApiEnrichment] ===== FETCHING CHANNEL DATA =====`)
+        console.log(`[ApiEnrichment] Channel ID: ${video.snippet.channelId}`)
+        
+        try {
+          let channelUrl: string;
+          let channelHeaders: Record<string, string>;
+          
+          if (isApiKey) {
+            // Use API key in query parameter
+            channelUrl = `${this.YOUTUBE_API_BASE}/channels?part=snippet,statistics&id=${video.snippet.channelId}&key=${accessToken}`
+            channelHeaders = { 'Accept': 'application/json' }
+            console.log(`[ApiEnrichment] Fetching channel with API key`)
+          } else {
+            // Use OAuth token in header
+            channelUrl = `${this.YOUTUBE_API_BASE}/channels?part=snippet,statistics&id=${video.snippet.channelId}`
+            channelHeaders = {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+            console.log(`[ApiEnrichment] Fetching channel with OAuth`)
+          }
+          
+          const channelResponse = await fetch(channelUrl, { headers: channelHeaders })
+          
+          if (channelResponse.ok) {
+            const channelResult = await channelResponse.json() as any
+            console.log('[ApiEnrichment] Raw channel API response:', JSON.stringify(channelResult, null, 2))
+            
+            if (channelResult.items && channelResult.items.length > 0) {
+              channelData = channelResult.items[0]
+              console.log('[ApiEnrichment] Channel data extracted:', {
+                channelId: channelData.id,
+                channelTitle: channelData.snippet?.title,
+                thumbnails: channelData.snippet?.thumbnails,
+                subscriberCount: channelData.statistics?.subscriberCount
+              })
+              console.log('[ApiEnrichment] Full channel snippet:', JSON.stringify(channelData.snippet, null, 2))
+            } else {
+              console.warn('[ApiEnrichment] No channel items in response')
+            }
+          } else {
+            console.warn('[ApiEnrichment] Channel fetch failed:', channelResponse.status)
+          }
+        } catch (channelError) {
+          console.warn('[ApiEnrichment] Failed to fetch channel data:', channelError)
+          // Continue without channel data
+        }
+      }
       
       // Update rate limit tracking (approximate)
-      this.rateLimits.youtube.remaining = Math.max(0, this.rateLimits.youtube.remaining - 3) // Each part costs quota
+      this.rateLimits.youtube.remaining = Math.max(0, this.rateLimits.youtube.remaining - 4) // Video parts + channel costs quota
+
+      // Add channel data to the video response
+      if (channelData) {
+        (video as any).channelData = channelData
+      }
 
       return {
         success: true,
         data: video,
         source: 'youtube_api',
-        quotaUsed: 3
+        quotaUsed: 4
       }
     } catch (error) {
       console.error('[ApiEnrichment] YouTube API error:', error)
@@ -401,28 +518,65 @@ export class ApiEnrichmentService {
   /**
    * Transform API response to ContentEnrichmentService format
    */
-  transformYouTubeApiResponse(video: YouTubeVideoDetails): any {
+  transformYouTubeApiResponse(video: YouTubeVideoDetails & { channelData?: any }): any {
+    console.log('[ApiEnrichment] transformYouTubeApiResponse called with:', {
+      hasChannelData: !!video.channelData,
+      channelSnippet: video.channelData?.snippet ? 'present' : 'missing',
+      channelThumbnails: video.channelData?.snippet?.thumbnails ? 'present' : 'missing'
+    })
+    
     const duration = this.parseYouTubeDuration(video.contentDetails?.duration || '')
     
-    return {
+    // Extract channel thumbnail from channel data if available
+    let channelThumbnail: string | undefined
+    if (video.channelData?.snippet?.thumbnails) {
+      const thumbnails = video.channelData.snippet.thumbnails
+      console.log('[ApiEnrichment] Available thumbnail sizes:', Object.keys(thumbnails))
+      
+      // Prefer high quality thumbnail
+      channelThumbnail = thumbnails.high?.url || 
+                        thumbnails.medium?.url || 
+                        thumbnails.default?.url
+      console.log('[ApiEnrichment] Selected channel thumbnail:', channelThumbnail)
+    } else {
+      console.log('[ApiEnrichment] No channel data or thumbnails available', {
+        hasChannelData: !!video.channelData,
+        hasSnippet: !!video.channelData?.snippet,
+        hasThumbnails: !!video.channelData?.snippet?.thumbnails
+      })
+    }
+    
+    const result = {
       viewCount: parseInt(video.statistics?.viewCount || '0'),
       likeCount: parseInt(video.statistics?.likeCount || '0'),
       commentCount: parseInt(video.statistics?.commentCount || '0'),
       durationSeconds: duration,
       creatorId: video.snippet?.channelId ? `youtube:${video.snippet.channelId}` : undefined,
       creatorName: video.snippet?.channelTitle,
-      creatorHandle: undefined, // YouTube doesn't provide handles in video API
-      creatorThumbnail: undefined, // Would need channel API call
-      creatorVerified: undefined, // Would need channel API call
-      creatorSubscriberCount: undefined, // Would need channel API call
+      creatorHandle: video.channelData?.snippet?.customUrl || undefined, // Custom URL can be used as handle
+      creatorThumbnail: channelThumbnail,
+      creatorVerified: undefined, // YouTube API doesn't provide verification status directly
+      creatorSubscriberCount: video.channelData?.statistics?.subscriberCount ? 
+        parseInt(video.channelData.statistics.subscriberCount) : undefined,
       category: video.snippet?.categoryId,
       tags: video.snippet?.tags || [],
       language: video.snippet?.defaultAudioLanguage,
       hasCaptions: video.contentDetails?.caption === 'true',
       videoQuality: video.contentDetails?.definition === 'hd' ? '1080p' : '480p',
-      publishedAt: video.snippet?.publishedAt ? new Date(video.snippet.publishedAt) : undefined,
+      // Return as Date object for Drizzle
+      publishedAt: video.snippet?.publishedAt ? parseYouTubeDate(video.snippet.publishedAt) : undefined,
       isExplicit: video.status?.madeForKids === false
     }
+    
+    console.log('[ApiEnrichment] Transform result:', {
+      creatorId: result.creatorId,
+      creatorName: result.creatorName,
+      creatorThumbnail: result.creatorThumbnail,
+      creatorHandle: result.creatorHandle,
+      creatorSubscriberCount: result.creatorSubscriberCount
+    })
+    
+    return result
   }
 
   transformSpotifyApiResponse(episode: SpotifyEpisodeDetails): any {
@@ -436,7 +590,8 @@ export class ApiEnrichmentService {
       seriesName: episode.show?.name,
       language: episode.languages?.[0],
       isExplicit: episode.explicit,
-      publishedAt: new Date(episode.release_date),
+      // Return as Date object for Drizzle
+      publishedAt: episode.release_date ? parseSpotifyDate(episode.release_date) : undefined,
       description: episode.description,
       thumbnailUrl: episode.images?.[0]?.url
     }

@@ -39,7 +39,9 @@ app.post('/save-enriched', async (c) => {
     
     // Try API enrichment first for supported platforms
     if (platform === 'youtube' || platform === 'spotify') {
-      console.log(`[EnrichedBookmark] Attempting API enrichment for ${platform}`)
+      console.log(`[EnrichedBookmark] ===== API ENRICHMENT ATTEMPT =====`)
+      console.log(`[EnrichedBookmark] Platform: ${platform}`)
+      console.log(`[EnrichedBookmark] User ID for OAuth: ${auth.userId}`)
       
       const apiEnrichmentService = new ApiEnrichmentService(c.env)
       
@@ -54,6 +56,9 @@ app.post('/save-enriched', async (c) => {
       }
       
       if (contentId) {
+        console.log(`[EnrichedBookmark] Extracted content ID: ${contentId}`)
+        console.log(`[EnrichedBookmark] Calling enrichWithApi...`)
+        
         const apiResult = await apiEnrichmentService.enrichWithApi({
           provider: platform as 'youtube' | 'spotify',
           contentId,
@@ -61,8 +66,15 @@ app.post('/save-enriched', async (c) => {
           forceRefresh: false
         })
         
+        console.log(`[EnrichedBookmark] API result:`, {
+          success: apiResult.success,
+          source: apiResult.source,
+          hasData: !!apiResult.data,
+          error: apiResult.error
+        })
+        
         if (apiResult.success && apiResult.data) {
-          console.log(`[EnrichedBookmark] API enrichment successful for ${platform}`)
+          console.log(`[EnrichedBookmark] ✅ API enrichment successful for ${platform}`)
           
           // Transform API data to Content format
           const now = new Date()
@@ -156,7 +168,10 @@ app.post('/save-enriched', async (c) => {
     
     // Fall back to standard enrichment if API enrichment failed or not available
     if (!enrichedContent) {
-      console.log('[EnrichedBookmark] Falling back to standard enrichment')
+      console.log('[EnrichedBookmark] ===== FALLBACK TO STANDARD ENRICHMENT =====')
+      console.log('[EnrichedBookmark] Reason: API enrichment failed or no OAuth/API key')
+      console.log('[EnrichedBookmark] Note: Standard enrichment uses oEmbed - NO CREATOR AVATARS')
+      
       const sharedModule = await import('@zine/shared')
       const ContentEnrichmentService = (sharedModule as any).ContentEnrichmentService
       const contentEnrichmentService = new ContentEnrichmentService()
@@ -164,6 +179,13 @@ app.post('/save-enriched', async (c) => {
         forceRefresh: false,
         includeEngagement: true,
         includeCreator: true
+      })
+      
+      console.log('[EnrichedBookmark] Standard enrichment result:', {
+        success: enrichResult.success,
+        source: enrichResult.source,
+        hasContent: !!enrichResult.content,
+        hasCreator: !!enrichResult.content?.creatorId
       })
       
       if (enrichResult.success && enrichResult.content) {
@@ -248,7 +270,15 @@ app.post('/save-enriched', async (c) => {
     const savedContent = await contentRepo.upsert(enrichedContent)
     
     // Upsert creator data if available
+    console.log('[EnrichedBookmark] ===== CREATOR DATA CHECK =====')
+    console.log('[EnrichedBookmark] Creator ID:', enrichedContent.creatorId || 'MISSING')
+    console.log('[EnrichedBookmark] Creator Name:', enrichedContent.creatorName || 'MISSING')
+    console.log('[EnrichedBookmark] Creator Thumbnail:', enrichedContent.creatorThumbnail || 'MISSING')
+    console.log('[EnrichedBookmark] Creator Handle:', enrichedContent.creatorHandle || 'MISSING')
+    
     if (enrichedContent.creatorId && enrichedContent.creatorName) {
+      console.log('[EnrichedBookmark] ✅ Upserting creator to database...')
+      
       const creatorRepo = new CreatorRepository(c.env.DB)
       await creatorRepo.upsertCreator({
         id: enrichedContent.creatorId,
@@ -281,26 +311,54 @@ app.post('/save-enriched', async (c) => {
       'active'
     ).run()
     
-    // Get the full bookmark with content (removed unused variable)
-    await c.env.DB.prepare(
+    // Get the full bookmark with content including creator data
+    const fullBookmark = await c.env.DB.prepare(
       `SELECT 
         b.id,
         b.user_id,
         b.notes,
         b.bookmarked_at,
+        b.status,
         c.url,
         c.title,
         c.description,
         c.thumbnail_url,
         c.content_type,
+        c.published_at,
+        c.creator_id,
         c.creator_name,
+        c.creator_handle,
+        c.creator_thumbnail,
+        c.creator_verified,
+        c.creator_subscriber_count,
+        c.creator_follower_count,
         c.view_count,
         c.like_count,
-        c.duration_seconds
+        c.duration_seconds,
+        c.provider as creator_platform
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
       WHERE b.id = ?`
     ).bind(bookmarkId).first()
+    
+    if (!fullBookmark) {
+      throw new Error('Failed to retrieve created bookmark')
+    }
+    
+    // Build creator object if creator data exists
+    let creator = undefined
+    if (fullBookmark.creator_id && fullBookmark.creator_name) {
+      creator = {
+        id: fullBookmark.creator_id,
+        name: fullBookmark.creator_name,
+        handle: fullBookmark.creator_handle || undefined,
+        avatarUrl: fullBookmark.creator_thumbnail || undefined,
+        verified: fullBookmark.creator_verified === 1 || fullBookmark.creator_verified === true || undefined,
+        subscriberCount: fullBookmark.creator_subscriber_count ? Number(fullBookmark.creator_subscriber_count) : undefined,
+        followerCount: fullBookmark.creator_follower_count ? Number(fullBookmark.creator_follower_count) : undefined,
+        platform: fullBookmark.creator_platform || undefined,
+      }
+    }
     
     return c.json({
       data: {
@@ -312,7 +370,12 @@ app.post('/save-enriched', async (c) => {
         thumbnailUrl: savedContent.thumbnailUrl,
         notes: validatedData.notes,
         contentType: savedContent.contentType,
-        creatorName: savedContent.creatorName,
+        // Convert from seconds (database) to milliseconds, then to ISO string
+        publishedAt: fullBookmark.published_at ? new Date((fullBookmark.published_at as number) * 1000).toISOString() : undefined,
+        creator,
+        creatorId: fullBookmark.creator_id || undefined,
+        creatorName: savedContent.creatorName, // Keep for backward compatibility
+        status: fullBookmark.status || 'active',
         metrics: {
           viewCount: savedContent.viewCount,
           likeCount: savedContent.likeCount,
@@ -323,7 +386,7 @@ app.post('/save-enriched', async (c) => {
           apiUsed,
           version: savedContent.enrichmentVersion
         },
-        createdAt: new Date()
+        createdAt: fullBookmark.bookmarked_at ? new Date(fullBookmark.bookmarked_at as string) : new Date()
       },
       message: `Bookmark saved successfully${apiUsed ? ' with API enrichment' : ''}`
     }, 201)

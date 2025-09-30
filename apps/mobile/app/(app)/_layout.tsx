@@ -28,6 +28,16 @@ export default function AppLayout() {
           headerShown: false,
         }}
       />
+      <Stack.Screen
+        name="bookmark/[id]"
+        options={{
+          headerShown: true,
+          headerTransparent: true,
+          headerTitle: '',
+          headerBackTitle: '',
+          headerShadowVisible: false,
+        }}
+      />
     </Stack>
   );
 }

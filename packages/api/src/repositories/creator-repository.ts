@@ -36,11 +36,22 @@ export class CreatorRepository {
    * Upsert creator data - insert if new, update if exists
    */
   async upsertCreator(creatorData: CreateCreatorInput): Promise<Creator> {
+    console.log('[CreatorRepository] ===== UPSERT CREATOR =====')
+    console.log('[CreatorRepository] Input data:', {
+      id: creatorData.id,
+      name: creatorData.name,
+      avatarUrl: creatorData.avatarUrl || 'NOT PROVIDED',
+      handle: creatorData.handle || 'NOT PROVIDED',
+      platform: creatorData.platform,
+      subscriberCount: creatorData.subscriberCount
+    })
+    
     try {
       const now = new Date()
       
       // Check if creator already exists
       const existing = await this.getCreator(creatorData.id)
+      console.log('[CreatorRepository] Existing creator found:', !!existing)
       
       if (existing) {
         // Update existing creator
@@ -54,7 +65,7 @@ export class CreatorRepository {
             url = ?,
             platforms = json(CASE 
               WHEN platforms IS NULL THEN json_array(?) 
-              WHEN NOT json_array_contains(platforms, ?) THEN json_insert(platforms, '$[#]', ?)
+              WHEN instr(platforms, json_quote(?)) = 0 THEN json_insert(platforms, '$[#]', ?)
               ELSE platforms
             END),
             verified = COALESCE(?, verified),
@@ -78,6 +89,11 @@ export class CreatorRepository {
           now.toISOString(),
           creatorData.id
         ).first()
+        
+        console.log('[CreatorRepository] UPDATE result:', {
+          hasResult: !!result,
+          avatarUrl: result?.avatar_url || 'NULL'
+        })
         
         return this.mapRowToCreator(result)
       } else {
@@ -103,6 +119,12 @@ export class CreatorRepository {
           now.toISOString(),
           now.toISOString()
         ).first()
+        
+        console.log('[CreatorRepository] INSERT result:', {
+          hasResult: !!result,
+          id: result?.id,
+          avatarUrl: result?.avatar_url || 'NULL'
+        })
         
         return this.mapRowToCreator(result)
       }

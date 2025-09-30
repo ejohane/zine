@@ -2,8 +2,8 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: [
-    'src/index.ts', 
-    'src/tokens/index.ts',
+    'src/index.ts',
+    'src/index.mobile.ts',
     'src/web/index.ts',
     'src/native/index.ts'
   ],

@@ -312,23 +312,30 @@ export class ContentEnrichmentService {
    */
   private enrichProviderSpecific(content: Content, metadata: any, _options: EnrichmentOptions) {
     // YouTube enrichment
-    if (content.provider === 'youtube' && metadata.videoMetadata) {
-      const vm = metadata.videoMetadata
-      content.durationSeconds = vm.duration
-      content.viewCount = vm.viewCount
-      content.likeCount = vm.likeCount
+    if (content.provider === 'youtube') {
       content.contentType = 'video'
-      content.category = vm.categoryId
-      
-      if (metadata.channelInfo) {
-        content.creatorId = metadata.channelInfo.channelId
-        content.creatorName = metadata.channelInfo.channelTitle
-        content.creatorThumbnail = metadata.channelInfo.channelThumbnail
-        content.creatorSubscriberCount = metadata.channelInfo.subscriberCount
+
+      // Use video metadata if available
+      if (metadata.videoMetadata) {
+        const vm = metadata.videoMetadata
+        content.durationSeconds = vm.duration
+        content.viewCount = vm.viewCount
+        content.likeCount = vm.likeCount
+        content.category = vm.categoryId
+        // Store raw statistics
+        content.statisticsMetadata = vm
       }
-      
-      // Store raw statistics
-      content.statisticsMetadata = vm
+
+      // Use creator information from metadata extractor
+      if (metadata.creator) {
+        content.creatorId = metadata.creator.id
+        content.creatorName = metadata.creator.name
+        content.creatorHandle = metadata.creator.handle
+        content.creatorThumbnail = metadata.creator.avatarUrl
+        content.creatorVerified = metadata.creator.verified
+        content.creatorSubscriberCount = metadata.creator.subscriberCount
+        content.creatorFollowerCount = metadata.creator.followerCount
+      }
     }
     
     // Spotify enrichment  

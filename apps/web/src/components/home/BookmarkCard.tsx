@@ -138,10 +138,19 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
           <h3 className="font-semibold text-sm line-clamp-2 mb-1 text-foreground">
             {displayTitle}
           </h3>
-          {bookmark.creator?.name && (
-            <p className="text-xs text-muted-foreground">
-              {bookmark.creator.name}
-            </p>
+          {bookmark.creator && (
+            <div className="flex items-center gap-2">
+              {bookmark.creator.avatarUrl && (
+                <img 
+                  src={bookmark.creator.avatarUrl} 
+                  alt={bookmark.creator.name}
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {bookmark.creator.name}
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -180,7 +189,18 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
             {displayTitle}
           </h3>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {bookmark.creator?.name && <span>{bookmark.creator.name}</span>}
+            {bookmark.creator && (
+              <>
+                {bookmark.creator.avatarUrl && (
+                  <img 
+                    src={bookmark.creator.avatarUrl} 
+                    alt={bookmark.creator.name}
+                    className="w-4 h-4 rounded-full object-cover"
+                  />
+                )}
+                <span>{bookmark.creator.name}</span>
+              </>
+            )}
             {bookmark.source && (
               <>
                 <span>•</span>
@@ -255,9 +275,17 @@ export function BookmarkCard({ bookmark, variant = 'default', onClick }: Bookmar
 
             {/* Metadata */}
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              {bookmark.creator?.name && (
-                <div className="flex items-center gap-1">
-                  <User className="w-3 h-3" />
+              {bookmark.creator && (
+                <div className="flex items-center gap-1.5">
+                  {bookmark.creator.avatarUrl ? (
+                    <img 
+                      src={bookmark.creator.avatarUrl} 
+                      alt={bookmark.creator.name}
+                      className="w-4 h-4 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="w-3 h-3" />
+                  )}
                   <span>{bookmark.creator.name}</span>
                 </div>
               )}

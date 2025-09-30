@@ -326,48 +326,48 @@ export default function ApiDebugger() {
               </div>
 
               <div className="mt-4">
-                {activeTab === 'body' && (
-                  <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
-                    {response ? (
-                      <pre>
-                        <code className="hljs language-json text-sm">
-                          {typeof response === 'object'
-                            ? JSON.stringify(response, null, 2)
-                            : String(response)}
-                        </code>
-                      </pre>
-                    ) : (
-                      <p className="text-gray-400">No response yet. Send a request to see the response here.</p>
-                    )}
-                  </div>
-                )}
+                 {activeTab === 'body' && (
+                   <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto content-area">
+                     {response ? (
+                       <pre>
+                         <code className="hljs language-json text-sm">
+                           {typeof response === 'object'
+                             ? JSON.stringify(response, null, 2)
+                             : String(response)}
+                         </code>
+                       </pre>
+                     ) : (
+                       <p className="text-gray-400">No response yet. Send a request to see the response here.</p>
+                     )}
+                   </div>
+                 )}
 
-                {activeTab === 'headers' && (
-                  <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
-                    <pre>
-                      <code className="hljs language-json text-sm">
-                        {JSON.stringify(responseHeaders, null, 2)}
-                      </code>
-                    </pre>
-                  </div>
-                )}
+                 {activeTab === 'headers' && (
+                   <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto content-area">
+                     <pre>
+                       <code className="hljs language-json text-sm">
+                         {JSON.stringify(responseHeaders, null, 2)}
+                       </code>
+                     </pre>
+                   </div>
+                 )}
 
-                {activeTab === 'raw' && (
-                  <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto">
-                    <pre className="text-sm text-gray-300">
-                      {status && `HTTP/1.1 ${status}\n`}
-                      {Object.entries(responseHeaders)
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join('\n')}
-                      {'\n\n'}
-                      {response ? (
-                        typeof response === 'object'
-                          ? JSON.stringify(response, null, 2)
-                          : String(response)
-                      ) : null}
-                    </pre>
-                  </div>
-                )}
+                 {activeTab === 'raw' && (
+                   <div className="bg-gray-900 rounded-lg p-4 max-h-96 overflow-auto content-area">
+                     <pre className="text-sm text-gray-300">
+                       {status && `HTTP/1.1 ${status}\n`}
+                       {Object.entries(responseHeaders)
+                         .map(([k, v]) => `${k}: ${v}`)
+                         .join('\n')}
+                       {'\n\n'}
+                       {response ? (
+                         typeof response === 'object'
+                           ? JSON.stringify(response, null, 2)
+                           : String(response)
+                       ) : null}
+                     </pre>
+                   </div>
+                 )}
               </div>
             </div>
           </Card>

@@ -13,17 +13,25 @@ export function useBookmarkDetail(
 ) {
   const { getToken, isSignedIn } = useAuth();
 
-  return useQuery<Bookmark>({
+  return useQuery<Bookmark | null>({
     queryKey: ['bookmark', bookmarkId],
     queryFn: async () => {
-      if (!bookmarkId) {
-        throw new Error('Bookmark ID is missing');
+      try {
+        if (!bookmarkId) {
+          console.warn('Bookmark ID is missing');
+          return null;
+        }
+        const token = await getToken();
+        if (!token) {
+          console.warn('Authentication token is missing');
+          return null;
+        }
+        const result = await api.getBookmark(bookmarkId, token);
+        return result || null;
+      } catch (error) {
+        console.error('Failed to fetch bookmark detail:', error);
+        return null;
       }
-      const token = await getToken();
-      if (!token) {
-        throw new Error('Authentication token is missing');
-      }
-      return api.getBookmark(bookmarkId, token);
     },
     enabled: options?.enabled !== false && isSignedIn && !!bookmarkId,
     staleTime: 5 * 60 * 1000, // 5 minutes

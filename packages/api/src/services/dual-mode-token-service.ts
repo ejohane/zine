@@ -42,7 +42,11 @@ export class DualModeTokenService {
     const featureFlags = getFeatureFlagService(this.env);
     const shouldUseDO = featureFlags.shouldUseDurableObjects(userId);
     
-    console.log(`[DualModeTokenService] Getting tokens for user ${userId}, shouldUseDO: ${shouldUseDO}`)
+    console.log(`[DualModeTokenService] ===== TOKEN RETRIEVAL START =====`)
+    console.log(`[DualModeTokenService] User ID: ${userId}`)
+    console.log(`[DualModeTokenService] Should use DO: ${shouldUseDO}`)
+    console.log(`[DualModeTokenService] Environment: ${(this.env as any).ENVIRONMENT || 'unknown'}`)
+    console.log(`[DualModeTokenService] Running locally: ${(this.env as any).MINIFLARE !== undefined ? 'YES' : 'MAYBE'}`)
     
     let doTokens: Map<string, TokenData> | null = null;
     let d1Tokens: Map<string, TokenData> | null = null;
@@ -54,14 +58,24 @@ export class DualModeTokenService {
       const user = await this.getUser(userId);
       const hasDurableObject = !!user?.durableObjectId;
       
-      console.log(`[DualModeTokenService] User ${userId} has DO ID: ${hasDurableObject}, DO ID: ${user?.durableObjectId?.substring(0, 8)}...`)
+      console.log(`[DualModeTokenService] User found: ${!!user}`)
+      console.log(`[DualModeTokenService] Has Durable Object ID: ${hasDurableObject}`)
+      if (hasDurableObject) {
+        console.log(`[DualModeTokenService] DO ID: ${user?.durableObjectId?.substring(0, 8)}...`)
+      }
 
       if (shouldUseDO && hasDurableObject) {
         // Try DO first
+        console.log(`[DualModeTokenService] Attempting to get tokens from Durable Object...`)
         try {
           doTokens = await this.getTokensFromDO(userId);
           source = 'do';
-          console.log(`[DualModeTokenService] Got ${doTokens.size} tokens from DO for user ${userId}`)
+          console.log(`[DualModeTokenService] ✅ Got ${doTokens.size} tokens from DO`)
+          if (doTokens.size > 0) {
+            doTokens.forEach((token, provider) => {
+              console.log(`[DualModeTokenService]   - ${provider}: has token = ${!!token.accessToken}`)
+            })
+          }
           
           // If dual mode is enabled, also fetch from D1 for comparison
           if (featureFlags.getFlag('enableDualModeTokenStorage')) {
@@ -72,20 +86,34 @@ export class DualModeTokenService {
             this.compareTokens(doTokens, d1Tokens, userId);
           }
         } catch (doError) {
-          console.error('Failed to get tokens from DO:', doError);
+          console.error('[DualModeTokenService] ❌ DO Error:', doError);
+          console.log('[DualModeTokenService] Falling back to D1...');
           error = doError instanceof Error ? doError.message : 'Unknown DO error';
           
           // Fall back to D1
           d1Tokens = await this.getTokensFromD1(userId);
           source = 'd1';
+          console.log(`[DualModeTokenService] D1 returned ${d1Tokens.size} tokens`);
         }
       } else {
         // Use D1 only
+        console.log('[DualModeTokenService] Using D1 (no DO or not enabled)');
         d1Tokens = await this.getTokensFromD1(userId);
         source = 'd1';
+        console.log(`[DualModeTokenService] D1 returned ${d1Tokens.size} tokens`);
       }
 
       const tokens = doTokens || d1Tokens || new Map();
+      console.log(`[DualModeTokenService] ===== FINAL RESULT =====`);
+      console.log(`[DualModeTokenService] Total tokens: ${tokens.size}`);
+      console.log(`[DualModeTokenService] Source: ${source}`);
+      if (tokens.size > 0) {
+        tokens.forEach((token, provider) => {
+          console.log(`[DualModeTokenService]   - ${provider}: ${token.accessToken ? 'valid' : 'invalid'}`);
+        });
+      } else {
+        console.log(`[DualModeTokenService] ⚠️ NO TOKENS AVAILABLE`);
+      }
 
       if (featureFlags.getFlag('enableMigrationMetrics')) {
         this.recordMetric({
@@ -221,27 +249,40 @@ export class DualModeTokenService {
    * Get tokens from Durable Object
    */
   private async getTokensFromDO(userId: string): Promise<Map<string, TokenData>> {
-    console.log(`[DualModeTokenService] Getting tokens from DO for user ${userId}`)
+    console.log(`[DualModeTokenService] ===== DURABLE OBJECT TOKEN FETCH =====`)
+    console.log(`[DualModeTokenService] User ID: ${userId}`)
     
     // Get the user's durableObjectId from the database
     const user = await this.getUser(userId);
     if (!user?.durableObjectId) {
+      console.log(`[DualModeTokenService] ❌ No Durable Object ID in DB for user ${userId}`);
       throw new Error(`No Durable Object ID found for user ${userId}`);
     }
     
-    console.log(`[DualModeTokenService] Using DO ID: ${user.durableObjectId.substring(0, 8)}...`)
+    console.log(`[DualModeTokenService] DO ID found: ${user.durableObjectId.substring(0, 8)}...`)
     
-    // Use idFromString with the stored DO ID (already a hex string)
-    const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
-    const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
-    
-    const response = await doStub.fetch(
-      new Request('https://do.internal/export-tokens')
-    );
+    let response: Response;
+    try {
+      console.log(`[DualModeTokenService] Creating DO stub...`)
+      // Use idFromString with the stored DO ID (already a hex string)
+      const doId = this.env.USER_SUBSCRIPTION_MANAGER.idFromString(user.durableObjectId);
+      const doStub = this.env.USER_SUBSCRIPTION_MANAGER.get(doId);
+      
+      console.log(`[DualModeTokenService] Fetching tokens from DO...`)
+      response = await doStub.fetch(
+        new Request('https://do.internal/export-tokens')
+      );
+      
+      console.log(`[DualModeTokenService] DO Response status: ${response.status}`)
+    } catch (error) {
+      console.error(`[DualModeTokenService] ❌ DO connection error:`, error);
+      console.log(`[DualModeTokenService] This is expected in local dev - DOs don't work with 'wrangler dev --local'`);
+      throw error;
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[DualModeTokenService] DO export-tokens failed: ${errorText}`)
+      console.error(`[DualModeTokenService] ❌ DO export-tokens failed: ${errorText}`)
       throw new Error(`Failed to get tokens from DO: ${errorText}`);
     }
 
@@ -267,11 +308,35 @@ export class DualModeTokenService {
   /**
    * Get tokens from D1 database
    */
-  private async getTokensFromD1(_userId: string): Promise<Map<string, TokenData>> {
+  private async getTokensFromD1(userId: string): Promise<Map<string, TokenData>> {
     // NOTE: Token columns have been removed from schema
-    // D1 tokens are only available during migration period
-    // This function will return empty map after migration
-    console.warn('[DualModeTokenService] Token columns removed from D1 - returning empty map');
+    console.log('[DualModeTokenService] ===== D1 TOKEN CHECK =====');
+    console.log('[DualModeTokenService] User ID:', userId);
+    console.log('[DualModeTokenService] Token columns removed from D1 schema');
+    
+    // LOCAL DEVELOPMENT WORKAROUND
+    // Check if we have a YouTube API key for local development
+    const youtubeApiKey = (this.env as any).YOUTUBE_API_KEY;
+    if (youtubeApiKey) {
+      console.log('[DualModeTokenService] 🔑 YOUTUBE_API_KEY found in environment!');
+      console.log('[DualModeTokenService] Creating mock token for local development with API key');
+      
+      const tokens = new Map<string, TokenData>();
+      tokens.set('youtube', {
+        provider: 'youtube',
+        accessToken: youtubeApiKey, // Use API key as "token"
+        refreshToken: undefined,
+        expiresAt: new Date(Date.now() + 3600000) // 1 hour from now
+      });
+      
+      console.log('[DualModeTokenService] ✅ Returning mock YouTube token with API key for local dev');
+      return tokens;
+    }
+    
+    console.log('[DualModeTokenService] No YOUTUBE_API_KEY found');
+    console.log('[DualModeTokenService] To enable local development:');
+    console.log('[DualModeTokenService]   1. Get API key from https://console.developers.google.com');
+    console.log('[DualModeTokenService]   2. Add YOUTUBE_API_KEY=your_key to .dev.vars');
     
     const tokens = new Map<string, TokenData>();
     return tokens;

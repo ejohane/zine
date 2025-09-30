@@ -1378,17 +1378,21 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
         c.thumbnail_url as content_thumbnail_url,
         c.favicon_url as content_favicon_url,
         c.creator_id,
-        c.creator_name,
-        c.creator_handle,
-        c.creator_thumbnail as creator_avatar_url,
-        c.creator_verified,
-        c.creator_subscriber_count,
-        c.creator_follower_count,
         c.content_type,
         c.published_at as content_published_at,
-        c.provider as creator_platform
+        c.provider as content_provider,
+        cr.name as creator_name,
+        cr.handle as creator_handle,
+        cr.avatar_url as creator_avatar_url,
+        cr.verified as creator_verified,
+        cr.subscriber_count as creator_subscriber_count,
+        cr.follower_count as creator_follower_count,
+        cr.bio as creator_bio,
+        cr.url as creator_url,
+        cr.platforms as creator_platforms
       FROM bookmarks b
       LEFT JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.user_id = ? AND c.creator_id = ?
       ORDER BY c.published_at DESC, b.bookmarked_at DESC
       LIMIT ? OFFSET ?
@@ -1419,18 +1423,15 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
         contentType: row.content_type || undefined,
         thumbnailUrl: row.content_thumbnail_url || undefined,
         faviconUrl: row.content_favicon_url || undefined,
-        publishedAt: row.content_published_at ? Number(row.content_published_at) : undefined,
+        // Convert from seconds (database) to milliseconds (API response)
+        publishedAt: row.content_published_at ? Number(row.content_published_at) * 1000 : undefined,
         status: row.status || 'active',
         creatorId: row.creator_id || undefined,
         tags: row.user_tags ? JSON.parse(row.user_tags) : undefined,
         notes: row.notes || undefined,
         createdAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
-        updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now()
-      }
-      
-      // Add creator if present
-      if (row.creator_id && row.creator_name) {
-        bookmark.creator = {
+        updatedAt: row.bookmarked_at ? Number(row.bookmarked_at) : Date.now(),
+        creator: row.creator_id && row.creator_name ? {
           id: row.creator_id,
           name: row.creator_name,
           handle: row.creator_handle || undefined,
@@ -1438,8 +1439,14 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
           verified: row.creator_verified === 1 || row.creator_verified === true || undefined,
           subscriberCount: row.creator_subscriber_count ? Number(row.creator_subscriber_count) : undefined,
           followerCount: row.creator_follower_count ? Number(row.creator_follower_count) : undefined,
-          platform: row.creator_platform || undefined,
-        }
+          platform: row.content_provider || undefined,
+          bio: row.creator_bio || undefined,
+          url: row.creator_url || undefined,
+          platforms: row.creator_platforms ? JSON.parse(String(row.creator_platforms)) : undefined,
+          externalLinks: undefined,
+          createdAt: undefined,
+          updatedAt: undefined
+        } : null
       }
       
       return bookmark
@@ -1455,12 +1462,14 @@ app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
       verified: firstRow.creator_verified === 1 || firstRow.creator_verified === true || undefined,
       subscriberCount: firstRow.creator_subscriber_count ? Number(firstRow.creator_subscriber_count) : undefined,
       followerCount: firstRow.creator_follower_count ? Number(firstRow.creator_follower_count) : undefined,
-      platform: firstRow.creator_platform || undefined,
-      url: firstRow.creator_platform === 'youtube' 
+      platform: firstRow.content_provider || undefined,
+      bio: firstRow.creator_bio || undefined,
+      url: firstRow.creator_url || (firstRow.content_provider === 'youtube' 
         ? `https://youtube.com/channel/${String(firstRow.creator_id).replace('youtube:', '')}`
-        : firstRow.creator_platform === 'spotify' 
+        : firstRow.content_provider === 'spotify' 
         ? `https://open.spotify.com/show/${String(firstRow.creator_id).replace('spotify:', '')}`
-        : undefined
+        : undefined),
+      platforms: firstRow.creator_platforms ? JSON.parse(String(firstRow.creator_platforms)) : undefined
     } : null
     
     const hasNextPage = offset + safeLimit < totalCount

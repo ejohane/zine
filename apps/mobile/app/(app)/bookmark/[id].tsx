@@ -199,9 +199,9 @@ export default function BookmarkDetailScreen() {
             <View style={[styles.skeletonTitle, { backgroundColor: colors.secondary }]} />
             <View style={[styles.skeletonTitleLine2, { backgroundColor: colors.secondary }]} />
             
-            {/* Skeleton Meta Row */}
-            <View style={styles.metaRow}>
-              <View style={styles.platformInfo}>
+            {/* Skeleton Creator and Date Row */}
+            <View style={styles.creatorDateRow}>
+              <View style={styles.creatorInfo}>
                 <View style={[styles.skeletonIcon, { backgroundColor: colors.secondary }]} />
                 <View style={[styles.skeletonPlatformText, { backgroundColor: colors.secondary }]} />
               </View>
@@ -284,16 +284,19 @@ export default function BookmarkDetailScreen() {
   const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
         options={{
-          title: '',
-          headerBackTitle: 'Back',
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.foreground,
-          headerRight: () => (
-            <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
-              <Feather name="share-2" size={22} color={colors.foreground} />
+          headerStyle: {
+            backgroundColor: 'transparent',
+          },
+          headerLeft: () => (
+            <TouchableOpacity 
+              onPress={() => router.back()} 
+              style={styles.customBackButton}
+              activeOpacity={0.7}
+            >
+              <Feather name="chevron-left" size={24} color="#000" />
             </TouchableOpacity>
           ),
         }}
@@ -304,58 +307,25 @@ export default function BookmarkDetailScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Section with Image and Creator Info */}
-        <View style={styles.headerSection}>
-          {/* Left: Hero Image */}
-          <View style={styles.heroImageContainer}>
-            {bookmark.thumbnailUrl && !imageError ? (
-              <Image
-                source={{ uri: bookmark.thumbnailUrl }}
-                style={styles.heroImage}
-                resizeMode="cover"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <View style={[styles.heroImagePlaceholder, { backgroundColor: colors.secondary }]}>
-                <Feather name="image" size={32} color={colors.mutedForeground} />
-              </View>
-            )}
-            {formattedDuration && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{formattedDuration}</Text>
-              </View>
-            )}
-          </View>
-          
-          {/* Right: Creator Info */}
-          <TouchableOpacity 
-            style={styles.creatorSection}
-            onPress={() => {
-              if (bookmark.creator?.id) {
-                router.push(`/creator/${bookmark.creator.id}` as any)
-              }
-            }}
-            activeOpacity={0.7}
-            disabled={!bookmark.creator?.id}
-          >
-            {bookmark.creator?.avatarUrl ? (
-              <Image
-                source={{ uri: bookmark.creator.avatarUrl }}
-                style={styles.creatorAvatar}
-                onError={() => {}}
-              />
-            ) : (
-              <View style={[styles.creatorAvatarPlaceholder, { backgroundColor: colors.secondary }]}>
-                <Feather name="user" size={20} color={colors.mutedForeground} />
-              </View>
-            )}
-            <Text style={[styles.creatorName, { color: colors.foreground }]} numberOfLines={2}>
-              {bookmark.creator?.name || 'Unknown Creator'}
-            </Text>
-            {bookmark.creator?.verified && (
-              <Feather name="check-circle" size={14} color={colors.primary} style={styles.verifiedBadge} />
-            )}
-          </TouchableOpacity>
+        {/* Full-width Hero Image */}
+        <View style={styles.heroSection}>
+          {bookmark.thumbnailUrl && !imageError ? (
+            <Image
+              source={{ uri: bookmark.thumbnailUrl }}
+              style={styles.heroImage}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
+              <Feather name="image" size={48} color={colors.mutedForeground} />
+            </View>
+          )}
+          {formattedDuration && (
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>{formattedDuration}</Text>
+            </View>
+          )}
         </View>
 
         {/* Content Section */}
@@ -364,9 +334,40 @@ export default function BookmarkDetailScreen() {
           <Text style={[styles.title, { color: colors.foreground }]}>
             {bookmark.title}
           </Text>
-
-          {/* Date and Platform Metadata */}
-          <View style={styles.metaRow}>
+          
+          {/* Creator and Date Row */}
+          <View style={styles.creatorDateRow}>
+            {/* Creator Info on the left */}
+            <TouchableOpacity 
+              style={styles.creatorInfo}
+              onPress={() => {
+                if (bookmark.creator?.id) {
+                  router.push(`/creator/${bookmark.creator.id}` as any)
+                }
+              }}
+              activeOpacity={0.7}
+              disabled={!bookmark.creator?.id}
+            >
+              {bookmark.creator?.avatarUrl ? (
+                <Image
+                  source={{ uri: bookmark.creator.avatarUrl }}
+                  style={styles.creatorAvatar}
+                  onError={() => {}}
+                />
+              ) : (
+                <View style={[styles.creatorAvatarPlaceholder, { backgroundColor: colors.secondary }]}>
+                  <Feather name="user" size={20} color={colors.mutedForeground} />
+                </View>
+              )}
+              <Text style={[styles.creatorName, { color: colors.foreground }]} numberOfLines={1}>
+                {bookmark.creator?.name || 'Unknown Creator'}
+              </Text>
+              {bookmark.creator?.verified && (
+                <Feather name="check-circle" size={14} color={colors.primary} style={styles.verifiedBadge} />
+              )}
+            </TouchableOpacity>
+            
+            {/* Publish date on the right */}
             <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
               {formatDistanceToNow(bookmark.publishedAt || bookmark.createdAt)}
             </Text>
@@ -525,7 +526,7 @@ export default function BookmarkDetailScreen() {
           )}
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -549,18 +550,25 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
+  customBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   
-  // Header Section with Image and Creator Info
-  headerSection: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 16,
-  },
-  heroImageContainer: {
-    width: 120,
-    height: 120,
-    position: 'relative',
-  },
+  // Hero Section
   heroSection: {
     position: 'relative',
     width: '100%',
@@ -569,7 +577,6 @@ const styles = StyleSheet.create({
   heroImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 12,
   },
   heroPlaceholder: {
     width: '100%',
@@ -577,18 +584,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 12,
+  creatorDateRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 16,
   },
-  creatorSection: {
-    flex: 1,
+  creatorInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 16,
+    marginBottom: 16,
   },
   creatorAvatar: {
     width: 40,
@@ -603,7 +617,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   creatorName: {
-    flex: 1,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -656,12 +669,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     lineHeight: 32,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
+
   platformInfo: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -16,7 +16,8 @@ const mockBookmarks: Bookmark[] = [
     thumbnailUrl: 'https://opengraph.githubassets.com/1/facebook/react',
     faviconUrl: 'https://github.com/favicon.ico',
     createdAt: DateNormalizer.toUnixTimestamp('2024-01-01'),
-    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-01')
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-01'),
+    creator: null
   },
   { 
     id: '2', 
@@ -31,7 +32,8 @@ const mockBookmarks: Bookmark[] = [
     thumbnailUrl: 'https://tanstack.com/images/query-og.png',
     faviconUrl: 'https://tanstack.com/favicon.ico',
     createdAt: DateNormalizer.toUnixTimestamp('2024-01-02'),
-    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-02')
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-02'),
+    creator: null
   },
   { 
     id: '3', 
@@ -46,7 +48,8 @@ const mockBookmarks: Bookmark[] = [
     thumbnailUrl: 'https://vitejs.dev/og-image.png',
     faviconUrl: 'https://vitejs.dev/favicon.ico',
     createdAt: DateNormalizer.toUnixTimestamp('2024-01-03'),
-    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-03')
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-03'),
+    creator: null
   },
   { 
     id: '4', 
@@ -61,7 +64,8 @@ const mockBookmarks: Bookmark[] = [
     thumbnailUrl: 'https://workers.cloudflare.com/resources/logo/logo.svg',
     faviconUrl: 'https://workers.cloudflare.com/favicon.ico',
     createdAt: DateNormalizer.toUnixTimestamp('2024-01-04'),
-    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-04')
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-04'),
+    creator: null
   },
   { 
     id: '5', 
@@ -77,7 +81,8 @@ const mockBookmarks: Bookmark[] = [
     faviconUrl: 'https://www.typescriptlang.org/favicon-32x32.png',
     language: 'en',
     createdAt: DateNormalizer.toUnixTimestamp('2024-01-05'),
-    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-05')
+    updatedAt: DateNormalizer.toUnixTimestamp('2024-01-05'),
+    creator: null
   },
 ]
 
@@ -120,6 +125,7 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
       tags: bookmark.tags,
       createdAt: DateNormalizer.now(),
       updatedAt: DateNormalizer.now(),
+      creator: null
     }
     this.bookmarks.push(newBookmark)
     return newBookmark

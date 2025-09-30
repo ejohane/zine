@@ -4,6 +4,7 @@
     "jsx": "react-jsx",
     "strict": false,
     "skipLibCheck": true,
+    "lib": ["ES2015", "ESNext"],
     "types": ["react", "react-native"],
     "noImplicitAny": false,
     "esModuleInterop": true,

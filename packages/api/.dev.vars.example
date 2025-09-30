@@ -15,3 +15,8 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
 # YouTube OAuth (get these from https://console.developers.google.com)
 YOUTUBE_CLIENT_ID=your_youtube_client_id_here
 YOUTUBE_CLIENT_SECRET=your_youtube_client_secret_here
+
+# YouTube API Key (for local development without OAuth)
+# Get this from https://console.developers.google.com
+# Enable YouTube Data API v3 and create an API key
+# YOUTUBE_API_KEY=your_youtube_api_key_here

@@ -41,7 +41,12 @@ DELETE FROM bookmarks;
 -- 11. Delete creators (no dependencies)
 DELETE FROM creators;
 
--- Note: The users table is explicitly preserved as requested
+-- 12. Delete users (WARNING: This deletes ALL user data!)
+-- Uncomment the line below if you want to delete users as well
+-- DELETE FROM users;
+
+-- Note: The users table is explicitly preserved by default
+-- To delete users, uncomment the DELETE FROM users line above
 -- If you need to preserve any other seed data, modify the DELETE statements above with appropriate WHERE clauses
 
 -- Vacuum the database to reclaim space (optional, may not work in all environments)

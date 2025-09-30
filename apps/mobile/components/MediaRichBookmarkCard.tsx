@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
 import { Play } from 'lucide-react-native';
 import type { Bookmark } from '@zine/shared';
-import { formatDuration } from '../lib/dateUtils';
+import { formatDuration, formatShortDate } from '../lib/dateUtils';
 import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 
@@ -142,18 +142,28 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
             {bookmark.title}
           </Text>
           
-          {/* Author Info */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {bookmark.creator?.avatarUrl ? (
-              <Image
-                source={{ uri: bookmark.creator.avatarUrl }}
-                style={{ width: 16, height: 16, borderRadius: 8 }}
-                onError={() => {}}
-              />
-            ) : null}
-            <Text style={{ fontSize: 12, color: '#6b7280' }} numberOfLines={1}>
-              {authorName}
-            </Text>
+          {/* Author Info and Publish Date */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* Creator on the left */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              {bookmark.creator?.avatarUrl ? (
+                <Image
+                  source={{ uri: bookmark.creator.avatarUrl }}
+                  style={{ width: 16, height: 16, borderRadius: 8 }}
+                  onError={() => {}}
+                />
+              ) : null}
+              <Text style={{ fontSize: 12, color: '#6b7280', flex: 1 }} numberOfLines={1}>
+                {authorName}
+              </Text>
+            </View>
+            
+            {/* Publish date on the right */}
+            {bookmark.publishedAt && (
+              <Text style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>
+                {formatShortDate(bookmark.publishedAt)}
+              </Text>
+            )}
           </View>
         </View>
       </View>

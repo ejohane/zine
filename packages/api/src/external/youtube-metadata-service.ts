@@ -8,6 +8,7 @@ export interface YouTubeMetadata {
   duration?: number
   channelName?: string
   channelId?: string
+  channelThumbnail?: string
   publishedAt?: string
   viewCount?: number
   likeCount?: number
@@ -229,6 +230,34 @@ export class YouTubeMetadataService {
         return null
       }
 
+      // Fetch channel data to get channel thumbnail
+      let channelThumbnail: string | undefined
+      if (video.snippet.channelId) {
+        try {
+          const channelParams = new URLSearchParams({
+            part: 'snippet',
+            id: video.snippet.channelId
+          })
+          
+          const channelResponse = await fetch(`${this.baseUrl}/channels?${channelParams}`, {
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Accept': 'application/json'
+            }
+          })
+          
+          if (channelResponse.ok) {
+            const channelData: any = await channelResponse.json()
+            const channel = channelData.items?.[0]
+            if (channel?.snippet?.thumbnails) {
+              channelThumbnail = this.getBestThumbnail(channel.snippet.thumbnails)
+            }
+          }
+        } catch (channelError) {
+          console.warn('[YouTubeMetadataService] Failed to fetch channel data:', channelError)
+        }
+      }
+
       // Parse ISO 8601 duration to seconds
       const duration = video.contentDetails?.duration
       const durationSeconds = duration ? this.parseISO8601Duration(duration) : undefined
@@ -240,6 +269,7 @@ export class YouTubeMetadataService {
         duration: durationSeconds,
         channelName: video.snippet.channelTitle,
         channelId: video.snippet.channelId,
+        channelThumbnail, // Add channel thumbnail
         publishedAt: video.snippet.publishedAt,
         viewCount: video.statistics?.viewCount ? parseInt(video.statistics.viewCount) : undefined,
         likeCount: video.statistics?.likeCount ? parseInt(video.statistics.likeCount) : undefined,

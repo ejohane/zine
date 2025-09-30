@@ -22,6 +22,7 @@
     "@zine/design-system": "workspace:*",
     "@zine/shared": "workspace:*",
     "expo": "~54.0.10",
+    "expo-auth-session": "^7.0.8",
     "expo-clipboard": "^8.0.7",
     "expo-crypto": "^15.0.7",
     "expo-file-system": "~19.0.15",
@@ -31,6 +32,7 @@
     "expo-router": "~6.0.8",
     "expo-secure-store": "~15.0.7",
     "expo-status-bar": "~3.0.8",
+    "expo-web-browser": "^15.0.7",
     "heroui-native": "1.0.0-alpha.12",
     "lucide-react-native": "^0.544.0",
     "react": "19.1.0",
@@ -47,6 +49,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.1.10",
+    "dotenv": "^17.2.2",
     "dotenv-cli": "^10.0.0",
     "nativewind": "^4.0.0",
     "tailwindcss": "^4.1.13",

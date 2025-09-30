@@ -11,8 +11,7 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.myzine.app",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"
+        "EXPO_PUBLIC_API_URL": "https://api.myzine.app"
       }
     },
     "preview": {
@@ -23,8 +22,7 @@
         "image": "latest"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.myzine.app",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"
+        "EXPO_PUBLIC_API_URL": "https://api.myzine.app"
       }
     },
     "production": {
@@ -33,8 +31,7 @@
         "buildConfiguration": "Release"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.myzine.app",
-        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY"
+        "EXPO_PUBLIC_API_URL": "https://api.myzine.app"
       }
     }
   },

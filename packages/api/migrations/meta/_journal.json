@@ -8,6 +8,13 @@
       "when": 1755890908225,
       "tag": "0000_broken_wasp",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1758924213462,
+      "tag": "0001_overrated_chamber",
+      "breakpoints": true
     }
   ]
 }
