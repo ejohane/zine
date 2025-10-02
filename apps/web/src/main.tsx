@@ -3,12 +3,9 @@ import ReactDOM from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { createRouter } from './router'
-import { DesignSystemProvider } from '@zine/design-system/web'
 import { SetupPage } from './components/SetupPage'
 
 import './App.css'
-
-
 
 // Environment-based Clerk key selection
 const getClerkPublishableKey = (): string | null => {
@@ -48,14 +45,12 @@ const router = createRouter()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <DesignSystemProvider>
-      {PUBLISHABLE_KEY ? (
-        <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
-          <RouterProvider router={router} />
-        </ClerkProvider>
-      ) : (
-        <SetupPage />
-      )}
-    </DesignSystemProvider>
+    {PUBLISHABLE_KEY ? (
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+        <RouterProvider router={router} />
+      </ClerkProvider>
+    ) : (
+      <SetupPage />
+    )}
   </React.StrictMode>,
 )

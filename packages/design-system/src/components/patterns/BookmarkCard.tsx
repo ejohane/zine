@@ -1,11 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Linking, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Card, Chip, Button } from 'heroui-native';
 
 export interface BookmarkCardProps {
   id: string;
   title: string;
-  url: string;
+  url?: string;
   thumbnail?: string;
   description?: string;
   platform?: 'spotify' | 'youtube' | 'apple' | 'google' | 'web';
@@ -38,7 +38,7 @@ const getPlatformIcon = (platform?: string) => {
 export const BookmarkCard: React.FC<BookmarkCardProps> = ({
   id,
   title,
-  url,
+  url: _url,
   thumbnail,
   description,
   platform,
@@ -56,10 +56,6 @@ export const BookmarkCard: React.FC<BookmarkCardProps> = ({
         year: 'numeric',
       })
     : undefined;
-
-  const handleOpenUrl = () => {
-    Linking.openURL(url);
-  };
 
   return (
     <TouchableOpacity 

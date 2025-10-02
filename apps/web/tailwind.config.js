@@ -1,14 +1,7 @@
-import { sharedTheme, sharedContent } from '@zine/design-system/tailwind.config.shared';
-import { heroui } from '@heroui/theme';
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    ...sharedContent,
     './src/**/*.{js,ts,jsx,tsx}',
-    './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx}',
-    '../../packages/design-system/dist/web/**/*.{js,ts,jsx,tsx}',
-    '../../packages/design-system/src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
     container: {
@@ -19,9 +12,26 @@ export default {
       },
     },
     extend: {
-      ...sharedTheme,
       colors: {
-        ...sharedTheme.colors,
+        // Zine brand colors
+        primary: {
+          50: '#fef2f2',
+          100: '#fee2e2',
+          200: '#fecaca',
+          300: '#fca5a5',
+          400: '#f87171',
+          500: '#ef4444',
+          600: '#dc2626',
+          700: '#b91c1c',
+          800: '#991b1b',
+          900: '#7f1d1d',
+          DEFAULT: '#ef4444',
+        },
+        // Platform colors
+        spotify: '#1DB954',
+        youtube: '#FF0000',
+        apple: '#000000',
+        google: '#4285F4',
         // Preserve existing custom colors
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -69,6 +79,11 @@ export default {
         'collection-gradient-start': '#ff69b4',
         'collection-gradient-end': '#ffa0c9',
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -93,25 +108,5 @@ export default {
   darkMode: 'class',
   plugins: [
     require("tailwindcss-animate"),
-    heroui({
-      themes: {
-        light: {
-          colors: {
-            primary: sharedTheme.colors.primary,
-            // Map existing brand colors
-            warning: '#ff6b35',
-            success: '#1DB954',
-          },
-        },
-        dark: {
-          colors: {
-            primary: sharedTheme.colors.primary,
-            // Map existing brand colors
-            warning: '#ff6b35',
-            success: '#1DB954',
-          },
-        },
-      },
-    }),
   ],
 };

@@ -13,6 +13,8 @@
 -- Delete from each table (SQLite will skip if table doesn't exist when using this approach)
 -- We'll use individual DELETE statements that won't fail if table doesn't exist
 
+-- Delete in reverse order of foreign key dependencies to avoid constraint violations
+
 -- Durable Object tables
 DELETE FROM durable_object_metrics WHERE 1=1;
 DELETE FROM durable_object_status WHERE 1=1;
@@ -26,8 +28,15 @@ DELETE FROM subscriptions WHERE 1=1;
 DELETE FROM user_accounts WHERE 1=1;
 DELETE FROM subscription_providers WHERE 1=1;
 
--- Bookmark and creator tables
+-- Bookmark table (depends on content)
 DELETE FROM bookmarks WHERE 1=1;
+
+-- Content and matching tables
+DELETE FROM content_matches WHERE 1=1;
+DELETE FROM content WHERE 1=1;
+
+-- Publisher and creator tables
+DELETE FROM publishers WHERE 1=1;
 DELETE FROM creators WHERE 1=1;
 
 -- Note: The users table is explicitly preserved as requested
