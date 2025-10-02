@@ -48,8 +48,10 @@ This document outlines the plan to enable the "Connect YouTube" feature in the Z
 
 ### 🔨 Implementation Status
 
-**Phase 0: Mobile OAuth Fix** - ❌ NOT STARTED (Critical Priority)
-- Fix API endpoint in mobile app (`/api/v1/accounts` instead of `/api/v1/auth/health`)
+**Phase 0: Mobile OAuth Fix** - ✅ COMPLETED
+- Fixed API endpoint in mobile app (`/api/v1/accounts` instead of `/api/v1/auth/health`)
+- Fixed HeadersInit TypeScript error
+- Implemented proper response mapping for nested provider object
 
 **Phase 1: Setup & Configuration** - ✅ COMPLETED
 - Environment variables configured
@@ -86,8 +88,8 @@ This document outlines the plan to enable the "Connect YouTube" feature in the Z
 - Unit tests needed
 
 ### 🔨 Needs Implementation
-1. **🚨 CRITICAL - Mobile OAuth Fix (Phase 0)**: Fix API endpoint in mobile app (`/api/v1/accounts` instead of `/api/v1/auth/health`)
-2. **Unit Tests (Phase 7)**: Write tests for YouTube enrichment flow
+1. **Unit Tests (Phase 7)**: Write tests for YouTube enrichment flow (Optional)
+2. **Manual Testing**: Verify OAuth flow works end-to-end on mobile device (See PHASE0_TESTING.md)
 
 ## Architecture
 
@@ -579,10 +581,12 @@ return response?.accounts || [];
 - Users won't see "Connected" status even after successfully connecting
 
 **Action Items**:
-- [ ] **CRITICAL**: Update `apps/mobile/lib/api.ts` line 336 to use `/api/v1/accounts`
-- [ ] Update `ConnectedAccount` type to match API response structure
-- [ ] Test connection status display in Settings screen
-- [ ] Verify OAuth flow completes successfully and updates UI
+- [x] **CRITICAL**: Update `apps/mobile/lib/api.ts` line 336 to use `/api/v1/accounts`
+- [x] Update `ConnectedAccount` type to match API response structure
+- [x] Implement response mapping for nested provider object
+- [x] Fix HeadersInit TypeScript error
+- [ ] Test connection status display in Settings screen (MANUAL TEST - See PHASE0_TESTING.md)
+- [ ] Verify OAuth flow completes successfully and updates UI (MANUAL TEST - See PHASE0_TESTING.md)
 
 #### 6.1.1 Type Mismatch Fix
 **File**: `apps/mobile/lib/api.ts`
@@ -859,14 +863,18 @@ save: async (url: string): Promise<Bookmark> => {
 
 ### Definition of Done
 
-#### Phase 0: Mobile OAuth Fix ✅
-- [ ] `/api/v1/accounts` endpoint is being called (not `/api/v1/auth/health`)
-- [ ] Connection status displays correctly in Settings
-- [ ] "Connect YouTube" button opens OAuth browser
-- [ ] OAuth callback returns to app successfully  
-- [ ] Status updates to "Connected" after OAuth
-- [ ] "Disconnect" button appears for connected accounts
-- [ ] Disconnect removes connection correctly
+#### Phase 0: Mobile OAuth Fix ✅ COMPLETED
+- [x] `/api/v1/accounts` endpoint is being called (not `/api/v1/auth/health`)
+- [x] Fixed HeadersInit TypeScript error
+- [x] Implemented response mapping for nested provider structure
+- [ ] **MANUAL TEST NEEDED**: Connection status displays correctly in Settings
+- [ ] **MANUAL TEST NEEDED**: "Connect YouTube" button opens OAuth browser
+- [ ] **MANUAL TEST NEEDED**: OAuth callback returns to app successfully  
+- [ ] **MANUAL TEST NEEDED**: Status updates to "Connected" after OAuth
+- [ ] **MANUAL TEST NEEDED**: "Disconnect" button appears for connected accounts
+- [ ] **MANUAL TEST NEEDED**: Disconnect removes connection correctly
+
+**Status**: Code implementation complete. See `PHASE0_TESTING.md` for manual testing instructions.
 
 #### Backend Integration ✅
 - [x] Users can connect YouTube account via mobile app (backend OAuth works)
@@ -1034,15 +1042,15 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Time Estimates
 
-- **Phase 0 (Mobile Fix)**: 1-2 hours - ❌ NOT STARTED
+- **Phase 0 (Mobile Fix)**: ✅ COMPLETED (Code implementation done, manual testing required)
 - **Phase 1 (Setup)**: ✅ COMPLETED
 - **Phase 2 (Backend Integration)**: ✅ COMPLETED
 - **Phase 3 (Creator Management)**: ✅ COMPLETED
 - **Phase 4 (Content Metadata)**: ✅ COMPLETED
 - **Phase 5 (Token & Error Handling)**: ✅ COMPLETED
 - **Phase 6 (Mobile App)**: ⚠️ PARTIAL (OAuth endpoint bug)
-- **Phase 7 (Unit Tests)**: 1 day - ❌ NOT STARTED
-- **Total Completed**: ~80% (Phase 0 and Phase 7 remain)
+- **Phase 7 (Unit Tests)**: 1 day - ❌ NOT STARTED (Optional)
+- **Total Completed**: ~90% (Phase 0 code complete, Phase 7 optional)
 
 ### Success Metrics
 
@@ -1055,14 +1063,18 @@ After implementation, users should be able to:
 
 ---
 
-**Document Version**: 3.0  
+**Document Version**: 4.0  
 **Last Updated**: 2025-10-01  
-**Status**: Phase 2 (Backend Integration) COMPLETED ✅  
+**Status**: Phase 0 (Mobile OAuth Fix) Code COMPLETED ✅  
 **Remaining Work**: 
-- Phase 0: Mobile OAuth endpoint fix (CRITICAL)
+- Phase 0: Manual testing on device (See PHASE0_TESTING.md)
 - Phase 7: Unit tests (OPTIONAL)
 
-**Critical Issue Identified**: Mobile OAuth endpoint mismatch (Phase 0)
+**Phase 0 Implementation Complete**: 
+- ✅ Fixed API endpoint: `/api/v1/accounts` instead of `/api/v1/auth/health`
+- ✅ Fixed HeadersInit TypeScript error
+- ✅ Implemented proper response mapping for nested provider structure
+- ⚠️ Manual testing required on physical device or simulator
 
 ---
 
@@ -1109,5 +1121,41 @@ After implementation, users should be able to:
    - Still creates bookmark with available data
 
 **Next Steps**:
-- Fix Phase 0 mobile OAuth endpoint bug to enable end-to-end testing
-- Write unit tests (Phase 7)
+- ✅ Phase 0 code implementation complete
+- ⚠️ Manual testing required (see PHASE0_TESTING.md)
+- Optional: Write unit tests (Phase 7)
+
+---
+
+## 🎉 Phase 0 Implementation Summary (October 1, 2025)
+
+**What Was Fixed**:
+1. ✅ **API Endpoint Change** - Changed from `/api/v1/auth/health` to `/api/v1/accounts`
+   - File: `apps/mobile/lib/api.ts` line 336
+   - Ensures mobile app calls the correct endpoint
+
+2. ✅ **Response Mapping** - Implemented proper transformation
+   - API returns nested structure: `{ provider: { id: "youtube", name: "YouTube" }, connected: true }`
+   - Mobile app expects flat structure: `{ provider: "youtube", isConnected: true }`
+   - Mapping function correctly transforms the response
+
+3. ✅ **Type Fix** - Fixed HeadersInit TypeScript error
+   - Changed `HeadersInit` to `Record<string, string>`
+   - Ensures TypeScript compilation succeeds
+
+**Testing Status**:
+- ✅ Code implementation verified
+- ✅ Response mapping tested with mock data
+- ✅ TypeScript types validated
+- ⚠️ Manual device testing required (see PHASE0_TESTING.md)
+
+**How to Test**:
+1. Start API: `cd packages/api && bun run dev`
+2. Start mobile app: `cd apps/mobile && bun run ios`
+3. Follow testing guide in `PHASE0_TESTING.md`
+
+**Expected Outcome**:
+- Connection status displays correctly in Settings
+- "Connect YouTube" button opens OAuth browser
+- OAuth callback returns to app successfully
+- Status updates to "Connected" after OAuth completion
