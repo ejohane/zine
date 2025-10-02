@@ -88,14 +88,14 @@ jobs:
           echo "API_PREVIEW_NAME=zine-api-$SANITIZED_BRANCH" >> $GITHUB_ENV
           
       - name: Set Clerk Secret (Preview)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != 108
         run: echo "${{ secrets.CLERK_SECRET_KEY_DEV }}" | bunx wrangler secret put CLERK_SECRET_KEY --name ${{ env.API_PREVIEW_NAME }}
         working-directory: packages/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           
       - name: Deploy Preview
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != 108
         id: api_preview_deploy
         run: |
           set -e
@@ -121,7 +121,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         
       - name: Comment Preview URL
-        if: github.event_name == 'pull_request' && steps.api_preview_deploy.outputs.deployment-url
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != 108 && steps.api_preview_deploy.outputs.deployment-url
         uses: actions/github-script@v7
         with:
           script: |
@@ -219,7 +219,7 @@ jobs:
           echo "WEB_PREVIEW_NAME=zine-web-$SANITIZED_BRANCH" >> $GITHUB_ENV
           
       - name: Deploy Preview
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != 108
         id: web_preview_deploy
         run: |
           set -e
@@ -245,7 +245,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         
       - name: Comment Preview URL
-        if: github.event_name == 'pull_request' && steps.web_preview_deploy.outputs.deployment-url
+        if: github.event_name == 'pull_request' && github.event.pull_request.number != 108 && steps.web_preview_deploy.outputs.deployment-url
         uses: actions/github-script@v7
         with:
           script: |
