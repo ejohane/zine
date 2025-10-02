@@ -8,6 +8,7 @@ import type { Bookmark } from '@zine/shared';
 import { formatDuration, formatShortDate } from '../lib/dateUtils';
 import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
+import { useTheme } from '../contexts/theme';
 
 interface MediaRichBookmarkCardProps {
   bookmark: Bookmark;
@@ -23,6 +24,7 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
   enableHaptics = true
 }) => {
   const router = useRouter();
+  const { colors } = useTheme();
   
   // Handle card press - navigate to detail view
   const handlePress = React.useCallback(() => {
@@ -96,7 +98,7 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
       onPress={handlePress}
       className="active:opacity-90"
     >
-      <View style={{ width: 300, height: 240, backgroundColor: 'white', borderRadius: 12, overflow: 'hidden', marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 }}>
+      <View style={{ width: 300, height: 240, borderRadius: 12, overflow: 'hidden', marginRight: 12, backgroundColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 }}>
         {/* Media Preview Section */}
         <View style={{ width: '100%', height: 169, backgroundColor: '#e5e7eb', position: 'relative' }}>
           {bookmark.thumbnailUrl ? (
@@ -135,7 +137,7 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
         <View style={{ padding: 12, height: 71 }}>
           {/* Title */}
           <Text 
-            style={{ fontSize: 14, fontWeight: '600', color: '#111827', marginBottom: 6, lineHeight: 18 }}
+            style={{ fontSize: 14, fontWeight: '600', marginBottom: 6, lineHeight: 18, color: colors.foreground }}
             numberOfLines={2}
             ellipsizeMode="tail"
           >
@@ -153,14 +155,14 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
                   onError={() => {}}
                 />
               ) : null}
-              <Text style={{ fontSize: 12, color: '#6b7280', flex: 1 }} numberOfLines={1}>
+              <Text style={{ fontSize: 12, flex: 1, color: colors.foreground }} numberOfLines={1}>
                 {authorName}
               </Text>
             </View>
             
             {/* Publish date on the right */}
             {bookmark.publishedAt && (
-              <Text style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>
+              <Text style={{ fontSize: 12, marginLeft: 8, color: colors.mutedForeground }}>
                 {formatShortDate(bookmark.publishedAt)}
               </Text>
             )}

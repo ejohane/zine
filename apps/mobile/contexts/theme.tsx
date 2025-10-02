@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
+import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
 import * as SecureStore from 'expo-secure-store';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -88,10 +89,11 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = '@zine/theme';
+const THEME_STORAGE_KEY = 'zine_theme';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
+  const { setColorScheme } = useNativeWindColorScheme();
   const [theme, setThemeState] = useState<ThemeMode>('system');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -120,6 +122,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Determine if dark mode should be used
   const isDark = theme === 'dark' || (theme === 'system' && systemColorScheme === 'dark');
   const colors = isDark ? darkTheme : lightTheme;
+
+  // Update NativeWind color scheme
+  useEffect(() => {
+    setColorScheme(isDark ? 'dark' : 'light');
+  }, [isDark, setColorScheme]);
 
   if (isLoading) {
     return null; // Or a loading screen
