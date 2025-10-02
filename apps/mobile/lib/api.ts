@@ -68,9 +68,9 @@ export async function authenticatedFetch(
   // Get the authentication token
   const token = getTokenFunction ? await getTokenFunction() : null;
   
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
+    ...(options.headers as Record<string, string>),
   };
   
   // Add authorization header if token exists
@@ -333,12 +333,16 @@ export interface OAuthConnectResponse {
 export const accountsApi = {
   fetchAccounts: async (): Promise<ConnectedAccount[]> => {
     try {
-      const response = await apiClient.get<AccountsResponse>('/api/v1/auth/health');
-      // Ensure we return an array even if accounts is undefined
-      return response?.accounts || [];
+      const response = await apiClient.get<{ accounts: any[] }>('/api/v1/accounts');
+      
+      return (response?.accounts || []).map(account => ({
+        provider: account.provider.id as 'spotify' | 'youtube',
+        isConnected: account.connected,
+        connectedAt: account.connectedAt || undefined,
+        externalAccountId: account.externalAccountId || undefined
+      }));
     } catch (error) {
       console.error('Failed to fetch accounts from API:', error);
-      // Return empty array on error instead of throwing
       return [];
     }
   },
