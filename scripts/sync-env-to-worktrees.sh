@@ -23,6 +23,10 @@ ENV_FILES=(
     "packages/api/local.db-shm"
     "packages/api/local.db-wal"
     "apps/web/.env.local"
+    "apps/mobile/.env.local"
+    "apps/mobile/.env.development"
+    "apps/mobile/.env.preview"
+    "apps/mobile/.env.production"
 )
 
 # Check if worktree directory exists
