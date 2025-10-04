@@ -54,12 +54,14 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
         const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
           await Linking.openURL(url);
+          // Navigate to bookmark detail page after opening link
+          router.push(`/bookmark/${bookmark.id}`);
         }
       } catch (error) {
         console.error('Error opening URL:', error);
       }
     }
-  }, [bookmark.originalUrl, bookmark.url, onOpenLink, enableHaptics]);
+  }, [bookmark.originalUrl, bookmark.url, bookmark.id, onOpenLink, router, enableHaptics]);
   
   // Get duration based on content type
   const duration = bookmark.videoMetadata?.duration || bookmark.podcastMetadata?.duration;
@@ -118,10 +120,18 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
           
           {/* Play button overlay for media content */}
           {isMediaContent && (
-            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-              <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 999, padding: 12 }}>
-                <Play fill="#FF6B35" color="#FF6B35" size={24} />
-              </View>
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', pointerEvents: 'box-none' }}>
+              <Pressable
+                onPress={(e) => {
+                  handleOpenLink();
+                }}
+                className="active:opacity-80"
+                hitSlop={8}
+              >
+                <View style={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 999, padding: 12 }}>
+                  <Play fill="#FF6B35" color="#FF6B35" size={24} />
+                </View>
+              </Pressable>
             </View>
           )}
           

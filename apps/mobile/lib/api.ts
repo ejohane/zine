@@ -291,6 +291,12 @@ export const bookmarksApi = {
       totalPages: number;
     }>(`/api/v1/bookmarks/creator/${creatorId}?page=${page}&limit=${limit}`);
   },
+  archive: async (id: string): Promise<Bookmark> => {
+    return apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}/archive`);
+  },
+  unarchive: async (id: string): Promise<Bookmark> => {
+    return apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}/unarchive`);
+  },
 };
 
 // Feed-specific API methods

@@ -36,6 +36,14 @@ export default function AppLayout() {
           headerTransparent: false,
         }}
       />
+      <Stack.Screen
+        name="recent-bookmarks"
+        options={{
+          headerShown: true,
+          headerBackButtonDisplayMode: 'minimal',
+          headerTransparent: false,
+        }}
+      />
     </Stack>
   );
 }

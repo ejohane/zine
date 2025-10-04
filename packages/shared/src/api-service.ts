@@ -98,6 +98,9 @@ export interface BookmarkRepository {
   getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null>
   updateByIdAndUserId(id: string, bookmark: UpdateBookmark, userId: string): Promise<Bookmark | null>
   deleteByIdAndUserId(id: string, userId: string): Promise<boolean>
+  // Archive methods
+  archive(id: string): Promise<Bookmark | null>
+  unarchive(id: string): Promise<Bookmark | null>
 }
 
 // In-memory implementation for development/testing
@@ -179,6 +182,32 @@ export class InMemoryBookmarkRepository implements BookmarkRepository {
     this.bookmarks.splice(index, 1)
     return true
   }
+
+  async archive(id: string): Promise<Bookmark | null> {
+    const index = this.bookmarks.findIndex(b => b.id === id)
+    if (index === -1) return null
+    
+    this.bookmarks[index] = {
+      ...this.bookmarks[index],
+      status: 'archived',
+      archivedAt: DateNormalizer.now(),
+      updatedAt: DateNormalizer.now(),
+    }
+    return this.bookmarks[index]
+  }
+
+  async unarchive(id: string): Promise<Bookmark | null> {
+    const index = this.bookmarks.findIndex(b => b.id === id)
+    if (index === -1) return null
+    
+    this.bookmarks[index] = {
+      ...this.bookmarks[index],
+      status: 'active',
+      archivedAt: undefined,
+      updatedAt: DateNormalizer.now(),
+    }
+    return this.bookmarks[index]
+  }
 }
 
 // Service class that implements the business logic
@@ -241,6 +270,30 @@ export class BookmarkService {
       return { message: 'Bookmark deleted successfully' }
     } catch (error) {
       return { error: 'Failed to delete bookmark' }
+    }
+  }
+
+  async archiveBookmark(id: string): Promise<BookmarkResponse> {
+    try {
+      const archivedBookmark = await this.repository.archive(id)
+      if (!archivedBookmark) {
+        return { error: 'Bookmark not found' }
+      }
+      return { data: archivedBookmark, message: 'Bookmark archived successfully' }
+    } catch (error) {
+      return { error: 'Failed to archive bookmark' }
+    }
+  }
+
+  async unarchiveBookmark(id: string): Promise<BookmarkResponse> {
+    try {
+      const unarchivedBookmark = await this.repository.unarchive(id)
+      if (!unarchivedBookmark) {
+        return { error: 'Bookmark not found' }
+      }
+      return { data: unarchivedBookmark, message: 'Bookmark restored successfully' }
+    } catch (error) {
+      return { error: 'Failed to restore bookmark' }
     }
   }
 }

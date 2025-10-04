@@ -64,31 +64,28 @@ export function CompactBookmarkCard({
       onLongPress={onLongPress}
       className="active:opacity-80"
     >
-      <Card className="w-[280px] h-[140px] p-3 mr-3 bg-white dark:bg-gray-900">
-        {/* Header with author and time */}
-        <View className="flex-row items-center justify-between mb-2">
-          <View className="flex-row items-center gap-2">
-            {bookmark.creator?.avatarUrl && (
-              <Image
-                source={{ uri: bookmark.creator.avatarUrl }}
-                style={{ width: 18, height: 18, borderRadius: 9 }}
-                onError={() => {}}
-              />
-            )}
-            {bookmark.creator?.name ? (
-              <Text className="text-xs text-gray-700 dark:text-gray-300" numberOfLines={1}>
+      <Card className="p-4 bg-white dark:bg-gray-900">
+        {/* Header with author info */}
+        <View className="flex-row items-center mb-3">
+          {bookmark.creator?.avatarUrl ? (
+            <Image
+              source={{ uri: bookmark.creator.avatarUrl }}
+              style={{ width: 32, height: 32, borderRadius: 16 }}
+              onError={() => {}}
+            />
+          ) : null}
+          <View className={bookmark.creator?.avatarUrl ? "ml-2 flex-1" : "flex-1"}>
+            {bookmark.creator?.name && (
+              <Text className="text-sm font-medium text-gray-900 dark:text-gray-100" numberOfLines={1}>
                 {bookmark.creator.name}
               </Text>
-            ) : null}
-            <Text className="text-xs text-gray-500 dark:text-gray-400">
-              {formatRelativeTime(bookmark.createdAt)}
-            </Text>
+            )}
           </View>
         </View>
         
         {/* Title - truncated to 2 lines */}
         <Text 
-          className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2"
+          className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2"
           numberOfLines={2}
           ellipsizeMode="tail"
         >
@@ -96,11 +93,11 @@ export function CompactBookmarkCard({
         </Text>
         
         {/* Bottom section with content type and open button */}
-        <View className="flex-row items-center justify-between mt-auto">
+        <View className="flex-row items-center justify-between mt-2">
           {/* Content type chip */}
-          <View className="flex-row items-center gap-1">
-            <ContentTypeIcon contentType={bookmark.contentType} size={14} />
-            <Text className={`text-xs px-2 py-1 rounded-full ${getContentTypeColor(bookmark.contentType)}`}>
+          <View className="flex-row items-center gap-1.5">
+            <ContentTypeIcon contentType={bookmark.contentType} size={16} />
+            <Text className="text-xs text-gray-600 dark:text-gray-400">
               {bookmark.contentType || 'link'}
             </Text>
           </View>
@@ -108,11 +105,11 @@ export function CompactBookmarkCard({
           {/* Open link button */}
           <TouchableOpacity
             onPress={handleOpenLink}
-            className="flex-row items-center gap-1 px-2 py-1 rounded-md bg-gray-100 active:bg-gray-200 dark:bg-gray-700 dark:active:bg-gray-600"
+            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 active:bg-gray-200 dark:bg-gray-800 dark:active:bg-gray-700"
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <ExternalLinkIcon size={14} color="#4B5563" />
-            <Text className="text-xs text-gray-600 dark:text-gray-300">Open</Text>
+            <ExternalLinkIcon size={16} color="#6B7280" />
+            <Text className="text-sm text-gray-700 dark:text-gray-300">Open</Text>
           </TouchableOpacity>
         </View>
       </Card>

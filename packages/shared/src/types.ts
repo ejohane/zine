@@ -95,6 +95,7 @@ export const BookmarkSchema = z.object({
   notes: z.string().optional(),
   createdAt: optionalUnixTimestamp(),
   updatedAt: optionalUnixTimestamp(),
+  archivedAt: optionalUnixTimestamp(),
   
   // Creator relation (always present for consistent API contract)
   creator: CreatorSchema.nullable(),

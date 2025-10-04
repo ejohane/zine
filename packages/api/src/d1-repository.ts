@@ -212,6 +212,49 @@ export class D1BookmarkRepository implements BookmarkRepository {
     }
   }
 
+  async archive(id: string): Promise<Bookmark | null> {
+    try {
+      const now = Date.now()
+      const result = await this.db.prepare(`
+        UPDATE bookmarks 
+        SET status = 'archived', 
+            archived_at = ?
+        WHERE id = ? AND status = 'active'
+        RETURNING id
+      `).bind(now, id).first()
+
+      if (!result) {
+        return null
+      }
+
+      return this.getById(id)
+    } catch (error) {
+      console.error('Error archiving bookmark:', error)
+      throw new Error('Failed to archive bookmark in database')
+    }
+  }
+
+  async unarchive(id: string): Promise<Bookmark | null> {
+    try {
+      const result = await this.db.prepare(`
+        UPDATE bookmarks 
+        SET status = 'active', 
+            archived_at = NULL
+        WHERE id = ? AND status = 'archived'
+        RETURNING id
+      `).bind(id).first()
+
+      if (!result) {
+        return null
+      }
+
+      return this.getById(id)
+    } catch (error) {
+      console.error('Error unarchiving bookmark:', error)
+      throw new Error('Failed to unarchive bookmark in database')
+    }
+  }
+
   // User-scoped methods for better security and performance
   async getByUserId(userId: string): Promise<Bookmark[]> {
     try {
