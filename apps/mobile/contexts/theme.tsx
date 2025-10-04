@@ -126,7 +126,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Update NativeWind color scheme
   useEffect(() => {
     setColorScheme(isDark ? 'dark' : 'light');
-  }, [isDark, setColorScheme]);
+  }, [isDark, setColorScheme, theme, systemColorScheme]);
 
   if (isLoading) {
     return null; // Or a loading screen
