@@ -175,6 +175,7 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
     const { 
       data: bookmarks, 
       isLoading, 
+      isFetching,
       error, 
       refetch 
     } = useRecentBookmarks({
@@ -241,7 +242,7 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
       );
     }
 
-    if (isLoading) {
+    if (isLoading && !bookmarks) {
       return (
         <View style={{ marginBottom: 16 }}>
           <ScrollView
@@ -301,6 +302,27 @@ export const OptimizedRecentBookmarksSection = React.memo<OptimizedRecentBookmar
     // Use ScrollView without ScrollShadow for now to avoid the displayName error
     return (
       <View>
+        {isFetching && !isLoading && (
+          <View style={{ 
+            position: 'absolute', 
+            top: -24, 
+            right: 16, 
+            zIndex: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <View style={{
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              borderWidth: 2,
+              borderColor: '#8b5cf6',
+              borderTopColor: 'transparent',
+            }} className="animate-spin" />
+            <Text style={{ fontSize: 12, color: '#6b7280' }}>Updating...</Text>
+          </View>
+        )}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

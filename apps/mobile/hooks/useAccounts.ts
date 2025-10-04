@@ -29,6 +29,8 @@ export function useAccounts() {
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours for persistence
+    retry: 2,
   });
 
   const connectMutation = useMutation({

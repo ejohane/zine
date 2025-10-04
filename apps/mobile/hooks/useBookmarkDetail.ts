@@ -14,7 +14,7 @@ export function useBookmarkDetail(
   const { getToken, isSignedIn } = useAuth();
 
   return useQuery<Bookmark | null>({
-    queryKey: ['bookmark', bookmarkId],
+    queryKey: ['bookmarks', bookmarkId],
     queryFn: async () => {
       try {
         if (!bookmarkId) {
@@ -35,6 +35,7 @@ export function useBookmarkDetail(
     },
     enabled: options?.enabled !== false && isSignedIn && !!bookmarkId,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours for persistence
     retry: 2,
   });
 }

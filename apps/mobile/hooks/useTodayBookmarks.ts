@@ -40,7 +40,7 @@ export function useTodayBookmarks(options: UseTodayBookmarksOptions = {}) {
     },
     enabled,
     staleTime: 1000 * 60 * 2, // Consider data fresh for 2 minutes (more frequent for "today" items)
-    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
+    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours for persistence
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
