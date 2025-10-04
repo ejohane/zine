@@ -30,7 +30,7 @@ export function useRecentBookmarks(options: UseRecentBookmarksOptions = {}) {
     },
     enabled,
     staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
-    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes (formerly cacheTime)
+    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours for persistence
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });

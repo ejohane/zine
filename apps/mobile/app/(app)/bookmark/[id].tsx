@@ -34,6 +34,7 @@ export default function BookmarkDetailScreen() {
   const {
     data: bookmark,
     isLoading,
+    isFetching,
     error,
     refetch,
   } = useBookmarkDetail(id, {
@@ -171,7 +172,7 @@ export default function BookmarkDetailScreen() {
     );
   }
 
-  if (isLoading) {
+  if (isLoading && !bookmark) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
@@ -309,6 +310,11 @@ export default function BookmarkDetailScreen() {
             <View style={{ flex: 1, backgroundColor: 'transparent' }} />
           ),
           headerTintColor: colors.foreground,
+          headerRight: () => isFetching && !isLoading ? (
+            <View style={{ marginRight: 16, opacity: 0.6 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null,
         }}
       />
       

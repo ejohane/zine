@@ -6,7 +6,7 @@ export function useCreatorBookmarks(creatorId: string | undefined, page: number 
   const { getToken, isSignedIn } = useAuth();
   
   return useQuery({
-    queryKey: ['creator-bookmarks', creatorId, page, limit],
+    queryKey: ['bookmarks', 'creator', creatorId, page, limit],
     queryFn: async () => {
       try {
         const token = await getToken();
@@ -51,5 +51,8 @@ export function useCreatorBookmarks(creatorId: string | undefined, page: number 
       }
     },
     enabled: isSignedIn && !!creatorId,
+    staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
+    gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours for persistence
+    retry: 2,
   });
 }

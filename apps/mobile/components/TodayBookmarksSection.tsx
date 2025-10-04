@@ -413,7 +413,7 @@ interface TodayBookmarksSectionProps {
 
 export const TodayBookmarksSection = React.memo<TodayBookmarksSectionProps>(() => {
   const { isSignedIn } = useAuth();
-  const { data: bookmarks, isLoading, error } = useTodayBookmarks({
+  const { data: bookmarks, isLoading, isFetching, error } = useTodayBookmarks({
     enabled: isSignedIn,
   });
   
@@ -421,7 +421,7 @@ export const TodayBookmarksSection = React.memo<TodayBookmarksSectionProps>(() =
     return null;
   }
   
-  if (isLoading) {
+  if (isLoading && !bookmarks) {
     return (
       <View style={{ paddingHorizontal: 16 }}>
         <SkeletonItem />
