@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   Alert,
   Share,
   Linking,
@@ -184,10 +183,15 @@ export default function BookmarkDetailScreen() {
           }}
         />
         
-        <ScrollView 
+        <Animated.ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: true }
+          )}
+          scrollEventThrottle={16}
         >
           {/* Skeleton Hero Image */}
           <View style={[styles.heroSection, styles.skeletonHero, { backgroundColor: colors.secondary }]} />
@@ -239,7 +243,7 @@ export default function BookmarkDetailScreen() {
               </View>
             </View>
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </SafeAreaView>
     );
   }
@@ -281,18 +285,16 @@ export default function BookmarkDetailScreen() {
   const platformColor = getPlatformColor(bookmark.source);
   const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
 
-  const HEADER_HEIGHT = 240;
-  const TITLE_OFFSET = 260;
-
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [TITLE_OFFSET - 50, TITLE_OFFSET],
-    outputRange: [0, 1],
+  const HEADER_HEIGHT = 300;
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
+    outputRange: [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT * 0.75],
     extrapolate: 'clamp',
   });
 
-  const headerBackgroundColor = scrollY.interpolate({
-    inputRange: [TITLE_OFFSET - 50, TITLE_OFFSET],
-    outputRange: ['rgba(0, 0, 0, 0)', colors.background],
+  const imageScale = scrollY.interpolate({
+    inputRange: [-HEADER_HEIGHT, 0],
+    outputRange: [2, 1],
     extrapolate: 'clamp',
   });
 
@@ -300,29 +302,11 @@ export default function BookmarkDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen 
         options={{
-          headerTitle: () => (
-            <Animated.Text
-              style={[
-                styles.headerTitle,
-                { 
-                  color: colors.foreground,
-                  opacity: headerOpacity,
-                }
-              ]}
-              numberOfLines={1}
-            >
-              {bookmark.title}
-            </Animated.Text>
-          ),
+          headerTitle: '',
           headerBackTitle: 'Back',
           headerTransparent: true,
           headerBackground: () => (
-            <Animated.View
-              style={[
-                styles.headerBackground,
-                { backgroundColor: headerBackgroundColor }
-              ]}
-            />
+            <View style={{ flex: 1, backgroundColor: 'transparent' }} />
           ),
           headerTintColor: colors.foreground,
         }}
@@ -330,7 +314,6 @@ export default function BookmarkDetailScreen() {
       
       <Animated.ScrollView 
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -338,8 +321,18 @@ export default function BookmarkDetailScreen() {
         )}
         scrollEventThrottle={16}
       >
-        {/* Hero Image */}
-        <View style={styles.heroSection}>
+        {/* Hero Image with Parallax */}
+        <Animated.View 
+          style={[
+            styles.heroSection, 
+            { 
+              transform: [
+                { translateY: imageTranslateY },
+                { scale: imageScale }
+              ] 
+            }
+          ]}
+        >
             {bookmark.thumbnailUrl && !imageError ? (
               <Image
                 source={{ uri: bookmark.thumbnailUrl }}
@@ -357,7 +350,7 @@ export default function BookmarkDetailScreen() {
                 <Text style={styles.durationText}>{formattedDuration}</Text>
               </View>
             )}
-        </View>
+        </Animated.View>
 
         {/* Content Section with white background overlay */}
         <View style={[styles.contentSection, { backgroundColor: colors.background }]}>
@@ -593,7 +586,8 @@ const styles = StyleSheet.create({
   // Hero Section
   heroSection: {
     width: '100%',
-    height: 240,
+    height: 300,
+    overflow: 'hidden',
   },
   heroImage: {
     width: '100%',
@@ -601,7 +595,7 @@ const styles = StyleSheet.create({
   },
   heroPlaceholder: {
     width: '100%',
-    height: 240,
+    height: 300,
     alignItems: 'center',
     justifyContent: 'center',
   },
