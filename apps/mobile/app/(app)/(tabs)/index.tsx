@@ -29,8 +29,7 @@ export default function HomeScreen() {
   }, [queryClient]);
 
   const handleSeeAllBookmarks = () => {
-    // Navigate to search tab which can be used to view all bookmarks
-    router.push('/(app)/(tabs)/search');
+    router.push('/recent-bookmarks');
   };
 
   return (

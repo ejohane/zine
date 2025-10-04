@@ -14,7 +14,9 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useBookmarkDetail } from '../../../hooks/useBookmarkDetail';
+import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
 import { useAuth } from '../../../contexts/auth';
 import { useTheme } from '../../../contexts/theme';
 import { formatDistanceToNow } from '../../../lib/dateUtils';
@@ -31,6 +33,7 @@ export default function BookmarkDetailScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [imageError, setImageError] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const archiveMutation = useArchiveBookmark();
   const {
     data: bookmark,
     isLoading,
@@ -44,6 +47,7 @@ export default function BookmarkDetailScreen() {
   const handleOpenLink = async () => {
     if (bookmark?.url) {
       try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         await Linking.openURL(bookmark.url);
       } catch (error) {
         Alert.alert('Error', 'Could not open the link');
@@ -66,10 +70,28 @@ export default function BookmarkDetailScreen() {
   };
 
   const handleArchive = () => {
+    if (!id) return;
+    
     Alert.alert(
       'Archive Bookmark',
-      'This feature is coming soon!',
-      [{ text: 'OK', style: 'default' }]
+      'Are you sure you want to archive this bookmark?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive',
+          style: 'default',
+          onPress: async () => {
+            try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await archiveMutation.mutateAsync(id);
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to archive bookmark');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -421,8 +443,13 @@ export default function BookmarkDetailScreen() {
                 style={[styles.actionIcon, { backgroundColor: colors.secondary }]}
                 onPress={handleArchive}
                 activeOpacity={0.7}
+                disabled={archiveMutation.isPending}
               >
-                <Feather name="archive" size={20} color={colors.foreground} />
+                {archiveMutation.isPending ? (
+                  <ActivityIndicator size="small" color={colors.foreground} />
+                ) : (
+                  <Feather name="archive" size={20} color={colors.foreground} />
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity 

@@ -92,15 +92,15 @@ export default function AddBookmarkModal() {
     checkClipboard();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-focus input if no clipboard URL was found
+  // Auto-focus input only if no clipboard URL was found
   useEffect(() => {
-    if (hasCheckedClipboard && !wasAutoPasted && urlInputRef.current) {
+    if (hasCheckedClipboard && !url && urlInputRef.current) {
       // Small delay to ensure the component is fully mounted
       setTimeout(() => {
         urlInputRef.current?.focus();
       }, 100);
     }
-  }, [hasCheckedClipboard, wasAutoPasted]);
+  }, [hasCheckedClipboard, url]);
 
   // Handle Android back button
   useEffect(() => {
@@ -217,6 +217,7 @@ export default function AddBookmarkModal() {
                     autoCorrect={false}
                     keyboardType="url"
                     returnKeyType="done"
+                    blurOnSubmit={true}
                     accessibilityLabel="URL input field"
                     accessibilityHint="Enter the URL of the page you want to bookmark"
                     accessibilityRole="text"

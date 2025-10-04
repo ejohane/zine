@@ -1331,6 +1331,66 @@ app.delete('/api/v1/bookmarks/:id', async (c) => {
   return c.json({ message: result.message })
 })
 
+// Archive bookmark endpoint
+app.put('/api/v1/bookmarks/:id/archive', async (c) => {
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
+  const auth = getAuthContext(c)
+  const id = c.req.param('id')
+  
+  // Check if bookmark exists and belongs to user
+  const existingResult = await bookmarkService.getBookmark(id)
+  if (existingResult.error) {
+    return c.json({ error: existingResult.error }, 404)
+  }
+  
+  if (existingResult.data?.userId !== auth.userId) {
+    return c.json({ error: 'Bookmark not found' }, 404)
+  }
+  
+  // Check if already archived
+  if (existingResult.data?.status === 'archived') {
+    return c.json({ error: 'Bookmark is already archived' }, 400)
+  }
+  
+  // Archive the bookmark
+  const result = await bookmarkService.archiveBookmark(id)
+  if (result.error) {
+    return c.json({ error: result.error }, 500)
+  }
+  
+  return c.json(result.data)
+})
+
+// Unarchive bookmark endpoint
+app.put('/api/v1/bookmarks/:id/unarchive', async (c) => {
+  const { bookmarkService } = await initializeServices(c.env.DB, c.env)
+  const auth = getAuthContext(c)
+  const id = c.req.param('id')
+  
+  // Check if bookmark exists and belongs to user
+  const existingResult = await bookmarkService.getBookmark(id)
+  if (existingResult.error) {
+    return c.json({ error: existingResult.error }, 404)
+  }
+  
+  if (existingResult.data?.userId !== auth.userId) {
+    return c.json({ error: 'Bookmark not found' }, 404)
+  }
+  
+  // Check if not archived
+  if (existingResult.data?.status !== 'archived') {
+    return c.json({ error: 'Bookmark is not archived' }, 400)
+  }
+  
+  // Unarchive the bookmark
+  const result = await bookmarkService.unarchiveBookmark(id)
+  if (result.error) {
+    return c.json({ error: result.error }, 500)
+  }
+  
+  return c.json(result.data)
+})
+
 // Get bookmarks by creator endpoint with pagination
 app.get('/api/v1/bookmarks/creator/:creatorId', async (c) => {
   const auth = getAuthContext(c)
