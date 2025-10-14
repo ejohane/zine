@@ -1,10 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { bookmarksApi } from '../lib/api';
 import { validateAndNormalizeUrl } from '../lib/url-validation';
-import type { Bookmark } from '@zine/shared';
+import type { Bookmark } from '../types/bookmark';
 
 interface UseSaveBookmarkOptions {
   skipDebounce?: boolean;
+}
+
+export interface SaveBookmarkResult {
+  bookmark: Bookmark;
+  duplicate: boolean;
+  duplicateContentId?: string;
+  duplicateReasons?: string[];
+  enrichmentSource?: string;
 }
 
 export function useSaveBookmark(options: UseSaveBookmarkOptions = {}) {
@@ -122,7 +130,7 @@ export function useSaveBookmark(options: UseSaveBookmarkOptions = {}) {
     }, 50);
   }, [lastUrl]);
 
-  const saveBookmark = useCallback(async (): Promise<Bookmark | null> => {
+  const saveBookmark = useCallback(async (): Promise<SaveBookmarkResult | null> => {
     if (!lastUrl) {
       setError('No URL to save');
       return null;
@@ -138,8 +146,8 @@ export function useSaveBookmark(options: UseSaveBookmarkOptions = {}) {
     setError(null);
 
     try {
-      const savedBookmark = await bookmarksApi.save(validation.normalizedUrl);
-      return savedBookmark;
+      const result = await bookmarksApi.save(validation.normalizedUrl);
+      return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save bookmark';
       setError(errorMessage);

@@ -92,6 +92,36 @@ describe('URL Normalizer', () => {
         const result = normalizeUrl('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8?highlight=spotify:track:1234&context=spotify:album:5678')
         expect(result.normalized).toBe('https://open.spotify.com/track/4PTG3Z6ehGkBFwjybzWkR8')
       })
+
+      it('should normalize locale-prefixed Spotify URLs', () => {
+        const result = normalizeUrl('https://open.spotify.com/intl-en/episode/4P86ZzHf7EOlRG7do9LkKZ?si=abc123')
+        expect(result.normalized).toBe('https://open.spotify.com/episode/4P86ZzHf7EOlRG7do9LkKZ')
+        expect(result.platform).toBe('spotify')
+      })
+
+      it('should normalize embedded Spotify URLs', () => {
+        const result = normalizeUrl('https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator')
+        expect(result.normalized).toBe('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')
+        expect(result.platform).toBe('spotify')
+      })
+
+      it('should normalize embedded podcast Spotify URLs', () => {
+        const result = normalizeUrl('https://open.spotify.com/embed-podcast/episode/4P86ZzHf7EOlRG7do9LkKZ?si=abc123')
+        expect(result.normalized).toBe('https://open.spotify.com/episode/4P86ZzHf7EOlRG7do9LkKZ')
+        expect(result.platform).toBe('spotify')
+      })
+
+      it('should normalize spotify URIs', () => {
+        const result = normalizeUrl('spotify:episode:4P86ZzHf7EOlRG7do9LkKZ')
+        expect(result.normalized).toBe('https://open.spotify.com/episode/4P86ZzHf7EOlRG7do9LkKZ')
+        expect(result.platform).toBe('spotify')
+      })
+
+      it('should normalize spotify user playlist URIs', () => {
+        const result = normalizeUrl('spotify:user:spotify:playlist:37i9dQZF1DXcBWIGoYBM5M')
+        expect(result.normalized).toBe('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M')
+        expect(result.platform).toBe('spotify')
+      })
     })
 
     describe('Twitter/X normalization', () => {
@@ -208,6 +238,12 @@ describe('URL Normalizer', () => {
     it('should detect duplicate YouTube URLs in different formats', () => {
       const url1 = 'https://youtu.be/dQw4w9WgXcQ'
       const url2 = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+      expect(areUrlsDuplicates(url1, url2)).toBe(true)
+    })
+
+    it('should detect duplicate Spotify URLs and URIs', () => {
+      const url1 = 'https://open.spotify.com/intl-en/episode/4P86ZzHf7EOlRG7do9LkKZ?si=abc123'
+      const url2 = 'spotify:episode:4P86ZzHf7EOlRG7do9LkKZ'
       expect(areUrlsDuplicates(url1, url2)).toBe(true)
     })
 

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, KeyboardAvoidingView, ScrollView, TextInput, Keyboard, BackHandler, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, KeyboardAvoidingView, ScrollView, TextInput, Keyboard, BackHandler, ActivityIndicator, ToastAndroid, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -19,6 +19,14 @@ export default function AddBookmarkModal() {
   const [hasInteracted, setHasInteracted] = useState(false);
   const [hasCheckedClipboard, setHasCheckedClipboard] = useState(false);
   const { colors } = useTheme();
+
+  const showSuccessMessage = useCallback((message: string) => {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(message, ToastAndroid.SHORT);
+    } else {
+      Alert.alert('Success', message);
+    }
+  }, []);
   
   // Use the save bookmark hook
   const {
@@ -140,20 +148,37 @@ export default function AddBookmarkModal() {
       return;
     }
 
-    const saved = await saveBookmark();
-    if (saved) {
-      // Invalidate queries to refresh bookmark lists
-      await queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
-      await queryClient.invalidateQueries({ queryKey: ['recent-bookmarks'] });
-
-      // Close modal and go back to previous screen
-      router.back();
+    const result = await saveBookmark();
+    if (!result) {
+      return;
     }
-  }, [hasValidUrl, isSaving, saveBookmark, queryClient, router]);
+
+    const { bookmark: savedBookmark, duplicate } = result;
+
+    await queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+    await queryClient.invalidateQueries({ queryKey: ['recent-bookmarks'] });
+
+    if (duplicate) {
+      showSuccessMessage('Linked to existing bookmark');
+      router.replace(`/bookmark/${savedBookmark.id}` as any);
+      return;
+    }
+
+    showSuccessMessage('Bookmark saved');
+    router.back();
+  }, [hasValidUrl, isSaving, saveBookmark, queryClient, router, showSuccessMessage]);
 
   const handleRetry = useCallback(() => {
     retry();
   }, [retry]);
+
+  const handleOpenExistingPreviewBookmark = useCallback(
+    (bookmarkId: string) => {
+      showSuccessMessage('Opening existing bookmark');
+      router.replace(`/bookmark/${bookmarkId}` as any);
+    },
+    [router, showSuccessMessage]
+  );
 
   // Memoize display error to prevent unnecessary re-renders
   const displayError = useMemo(() =>
@@ -254,6 +279,7 @@ export default function AddBookmarkModal() {
                     isLoading={isLoadingPreview}
                     error={displayError && !isLoadingPreview && !preview ? displayError : null}
                     onRetry={handleRetry}
+                    onOpenExisting={handleOpenExistingPreviewBookmark}
                   />
                 </View>
               </View>

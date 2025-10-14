@@ -1,5 +1,6 @@
 import type { Env } from '../types'
 import { OAuthTokenService } from '../services/oauth-token-service'
+import { resolveSpotifyResource } from '@zine/shared'
 
 export interface SpotifyMetadata {
   title: string
@@ -192,29 +193,14 @@ export class SpotifyMetadataService {
    * Parse Spotify URL to extract type and ID
    */
   private parseSpotifyUrl(url: string): { type: string; id: string } | null {
-    try {
-      const urlObj = new URL(url)
-      
-      // Handle open.spotify.com URLs
-      if (urlObj.hostname === 'open.spotify.com' || urlObj.hostname === 'play.spotify.com') {
-        const pathParts = urlObj.pathname.split('/').filter(Boolean)
-        if (pathParts.length >= 2) {
-          const [type, id] = pathParts
-          return { type, id: id.split('?')[0] }
-        }
-      }
-
-      // Handle spotify: URIs
-      if (url.startsWith('spotify:')) {
-        const parts = url.split(':')
-        if (parts.length >= 3) {
-          return { type: parts[1], id: parts[2] }
-        }
-      }
-
+    const resolved = resolveSpotifyResource(url)
+    if (!resolved) {
       return null
-    } catch {
-      return null
+    }
+
+    return {
+      type: resolved.type,
+      id: resolved.id
     }
   }
 

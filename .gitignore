@@ -12,3 +12,4 @@ build/
 .metro-cache/
 *.ipa.mcp.json
 *.ipa
+.branches/

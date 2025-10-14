@@ -28,14 +28,16 @@ export default function RecentBookmarksScreen() {
   };
 
   const renderBookmarkItem = ({ item }: { item: Bookmark }) => (
-    <CompactBookmarkCard
-      bookmark={item}
-      onPress={() => handleBookmarkPress(item.id)}
-    />
+    <View style={{ marginHorizontal: 16 }}>
+      <CompactBookmarkCard
+        bookmark={item}
+        onPress={() => handleBookmarkPress(item.id)}
+      />
+    </View>
   );
 
   const renderItemSeparator = () => (
-    <View style={{ height: 12 }} />
+    <View style={{ height: 8 }} />
   );
 
   const renderEmptyState = () => {
@@ -119,6 +121,7 @@ export default function RecentBookmarksScreen() {
       ) : error ? (
         <FlatList
           data={[]}
+          renderItem={() => null}
           ListEmptyComponent={renderErrorState}
           contentContainerStyle={styles.flatListContent}
           refreshControl={
@@ -168,7 +171,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   flatListContent: {
-    padding: 16,
+    paddingVertical: 16,
     paddingBottom: 100,
     flexGrow: 1,
   },

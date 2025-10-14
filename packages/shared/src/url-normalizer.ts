@@ -9,6 +9,20 @@ export interface NormalizedUrl {
   platform?: string
 }
 
+export type SpotifyResource = {
+  type: string
+  id: string
+}
+
+const SPOTIFY_SUPPORTED_TYPES = new Set([
+  'track',
+  'album',
+  'artist',
+  'playlist',
+  'episode',
+  'show'
+])
+
 // Tracking parameters to remove
 const TRACKING_PARAMS = [
   // UTM parameters
@@ -26,8 +40,17 @@ const TRACKING_PARAMS = [
  */
 export function normalizeUrl(url: string): NormalizedUrl {
   try {
+    const original = url
+    const trimmed = url.trim()
+
+    // Handle spotify:* URIs by converting to canonical web form for normalization
+    const spotifyResourceFromUri = parseSpotifyUri(trimmed)
+    const urlForParsing = spotifyResourceFromUri
+      ? `https://open.spotify.com/${spotifyResourceFromUri.type}/${spotifyResourceFromUri.id}`
+      : trimmed
+
     // Parse the URL
-    const parsed = new URL(url.trim())
+    const parsed = new URL(urlForParsing)
     
     // Force HTTPS where possible (except for localhost)
     if (parsed.protocol === 'http:' && !parsed.hostname.includes('localhost')) {
@@ -35,10 +58,9 @@ export function normalizeUrl(url: string): NormalizedUrl {
     }
     
     // Normalize domain
-    let domain = parsed.hostname.toLowerCase()
-    if (domain.startsWith('www.')) {
-      domain = domain.slice(4)
-      parsed.hostname = domain
+    parsed.hostname = parsed.hostname.toLowerCase()
+    if (parsed.hostname.startsWith('www.')) {
+      parsed.hostname = parsed.hostname.slice(4)
     }
     
     // Remove trailing slash from pathname
@@ -53,7 +75,17 @@ export function normalizeUrl(url: string): NormalizedUrl {
     })
     
     // Apply platform-specific normalization
-    const platformNormalized = applyPlatformNormalization(parsed, searchParams)
+    const hostForResource = parsed.hostname.toLowerCase()
+    const spotifyResource = spotifyResourceFromUri || (hostForResource.includes('spotify.com') ? deriveSpotifyResourceFromUrl(parsed) : null)
+
+    const platformNormalized = applyPlatformNormalization(parsed, searchParams, {
+      spotifyResource
+    })
+    
+    // Ensure trailing slash logic remains intact after platform adjustments
+    if (parsed.pathname.endsWith('/') && parsed.pathname.length > 1) {
+      parsed.pathname = parsed.pathname.slice(0, -1)
+    }
     
     // Rebuild the URL
     parsed.search = searchParams.toString()
@@ -61,8 +93,8 @@ export function normalizeUrl(url: string): NormalizedUrl {
     
     return {
       normalized: parsed.toString(),
-      original: url,
-      domain,
+      original,
+      domain: parsed.hostname,
       platform: platformNormalized.platform
     }
   } catch (error) {
@@ -81,7 +113,8 @@ export function normalizeUrl(url: string): NormalizedUrl {
  */
 function applyPlatformNormalization(
   parsed: URL, 
-  searchParams: URLSearchParams
+  searchParams: URLSearchParams,
+  options?: { spotifyResource?: SpotifyResource | null }
 ): { platform?: string } {
   const domain = parsed.hostname.toLowerCase()
   
@@ -121,7 +154,15 @@ function applyPlatformNormalization(
   }
   
   // Spotify normalization
-  if (domain.includes('spotify.com')) {
+  if (domain.includes('spotify.com') || options?.spotifyResource) {
+    parsed.hostname = 'open.spotify.com'
+
+    const resource = options?.spotifyResource ?? deriveSpotifyResourceFromUrl(parsed)
+
+    if (resource) {
+      parsed.pathname = `/${resource.type}/${resource.id}`
+    }
+
     // Remove Spotify-specific tracking
     const spotifyParams = ['highlight', 'context', 'go', 'nd']
     spotifyParams.forEach(param => {
@@ -157,6 +198,115 @@ function applyPlatformNormalization(
   }
   
   return { platform: 'web' }
+}
+
+function parseSpotifyUri(input: string): SpotifyResource | null {
+  if (!input.toLowerCase().startsWith('spotify:')) {
+    return null
+  }
+
+  const parts = input.split(':').map(part => part.trim()).filter(Boolean)
+  if (parts.length < 3) {
+    return null
+  }
+
+  // Handle user playlist URIs: spotify:user:<userId>:playlist:<playlistId>
+  if (parts[1]?.toLowerCase() === 'user' && parts.length >= 5 && parts[3]?.toLowerCase() === 'playlist') {
+    const playlistId = extractSpotifyId(parts[4])
+    return playlistId ? { type: 'playlist', id: playlistId } : null
+  }
+
+  const type = parts[1]?.toLowerCase()
+  const idCandidate = parts[2] ?? ''
+
+  if (!SPOTIFY_SUPPORTED_TYPES.has(type)) {
+    return null
+  }
+
+  const id = extractSpotifyId(idCandidate)
+  return id ? { type, id } : null
+}
+
+function deriveSpotifyResourceFromUrl(parsed: URL): SpotifyResource | null {
+  const segments = parsed.pathname.split('/').filter(Boolean)
+  if (!segments.length) {
+    return null
+  }
+
+  const sanitizedSegments = stripSpotifyPathPrefixes(segments)
+
+  // Handle user playlist paths: /user/:userId/playlist/:playlistId
+  if (
+    sanitizedSegments.length >= 4 &&
+    sanitizedSegments[0]?.toLowerCase() === 'user' &&
+    sanitizedSegments[2]?.toLowerCase() === 'playlist'
+  ) {
+    const playlistId = sanitizedSegments[3]
+    return playlistId ? { type: 'playlist', id: playlistId } : null
+  }
+
+  const [typeCandidate, idCandidate] = sanitizedSegments
+  if (!typeCandidate || !idCandidate) {
+    return null
+  }
+
+  const type = typeCandidate.toLowerCase()
+  if (!SPOTIFY_SUPPORTED_TYPES.has(type)) {
+    return null
+  }
+
+  return { type, id: idCandidate }
+}
+
+function stripSpotifyPathPrefixes(segments: string[]): string[] {
+  const result = [...segments]
+
+  while (result.length) {
+    const head = result[0]?.toLowerCase()
+    if (!head) {
+      break
+    }
+
+    if (head.startsWith('intl-') || head === 'embed' || head === 'embed-podcast') {
+      result.shift()
+      continue
+    }
+
+    break
+  }
+
+  return result
+}
+
+function extractSpotifyId(value: string | undefined): string | null {
+  if (!value) {
+    return null
+  }
+
+  const [id] = value.split('?')
+  return id || null
+}
+
+export function resolveSpotifyResource(input: string): SpotifyResource | null {
+  const trimmed = input.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const fromUri = parseSpotifyUri(trimmed)
+  if (fromUri) {
+    return fromUri
+  }
+
+  try {
+    const parsed = new URL(trimmed)
+    if (!parsed.hostname.toLowerCase().includes('spotify.com')) {
+      return null
+    }
+    return deriveSpotifyResourceFromUrl(parsed)
+  } catch {
+    return null
+  }
 }
 
 /**

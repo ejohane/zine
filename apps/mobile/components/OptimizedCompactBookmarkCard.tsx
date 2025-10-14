@@ -5,7 +5,7 @@ import { Card, Chip, Button } from 'heroui-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
-import type { Bookmark } from '@zine/shared';
+import type { Bookmark } from '../types/bookmark';
 import { formatRelativeTime, formatShortDate } from '../lib/dateUtils';
 import { PlatformIcon, ContentTypeIcon, ExternalLinkIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
@@ -79,7 +79,22 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
   }, []);
   
   const showThumbnail = bookmark.thumbnailUrl && bookmark.contentType !== 'post';
-  
+
+  const multiPlatformProviders = React.useMemo(() => {
+    const providers = new Set<string>();
+    if (bookmark.source) {
+      providers.add(bookmark.source);
+    }
+    (bookmark.alternateLinks ?? []).forEach((link) => {
+      if (link?.provider) {
+        providers.add(link.provider);
+      }
+    });
+    return Array.from(providers);
+  }, [bookmark.source, bookmark.alternateLinks]);
+
+  const showMultiPlatform = multiPlatformProviders.length > 1;
+
   return (
     <Pressable
       onPress={handlePress}
@@ -102,7 +117,21 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
             />
           </View>
         )}
-        
+
+        {showMultiPlatform && (
+          <Chip size="sm" className="self-start mb-2 flex-row items-center gap-1 bg-gray-100 text-gray-700">
+            <View className="flex-row items-center gap-1">
+              {multiPlatformProviders.slice(0, 2).map((provider) => (
+                <PlatformIcon key={provider} source={(provider as any) ?? 'web'} size={12} />
+              ))}
+              {multiPlatformProviders.length > 2 && (
+                <Text className="text-xs text-gray-600">+{multiPlatformProviders.length - 2}</Text>
+              )}
+              <Text className="text-xs text-gray-700">Multi-platform</Text>
+            </View>
+          </Chip>
+        )}
+
         {/* Header with author and publish date */}
         <View className="flex-row items-center justify-between mb-2">
           {/* Creator on the left */}

@@ -37,8 +37,14 @@ async function getCachedImagePath(url: string): Promise<string | null> {
       Crypto.CryptoDigestAlgorithm.SHA256,
       url
     );
-    const ext = url.split('.').pop()?.split('?')[0] || 'jpg';
-    return `${CACHE_DIR}${hash}.${ext}`;
+    const urlWithoutQuery = url.split('?')[0];
+    const rawExt = urlWithoutQuery.includes('.')
+      ? urlWithoutQuery.split('.').pop() || ''
+      : '';
+    const normalizedExt = rawExt && /^[a-zA-Z0-9]+$/.test(rawExt)
+      ? rawExt
+      : 'jpg';
+    return `${CACHE_DIR}${hash}.${normalizedExt}`;
   } catch {
     return null;
   }

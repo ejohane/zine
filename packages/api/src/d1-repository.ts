@@ -4,10 +4,52 @@
 
 import type { BookmarkRepository } from '@zine/shared'
 import type { Bookmark, CreateBookmark, UpdateBookmark } from '@zine/shared'
+import { normalizeUrl, resolveSpotifyResource } from '@zine/shared'
 // import { bookmarks, creators } from './schema' // TODO: Use these for type validation
 
 export class D1BookmarkRepository implements BookmarkRepository {
   constructor(private db: D1Database) {}
+
+  private static parseCrossPlatformMatches(raw: unknown): Array<{ platform?: string; id?: string; url?: string; confidence?: number }> {
+    if (!raw) return []
+    if (Array.isArray(raw)) return raw as Array<{ platform?: string; id?: string; url?: string; confidence?: number }>
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        return []
+      }
+    }
+    return []
+  }
+
+  private static buildAlternateLinks(row: any): Array<{ provider?: string; url: string; externalId?: string; confidence?: number }> {
+    const links: Array<{ provider?: string; url: string; externalId?: string; confidence?: number }> = []
+    const seen = new Set<string>()
+
+    const addLink = (provider?: string | null, url?: string | null, externalId?: string | null, confidence?: number) => {
+      if (!url) return
+      const key = `${provider ?? 'unknown'}::${url}`
+      if (seen.has(key)) return
+      seen.add(key)
+      links.push({
+        provider: provider ?? undefined,
+        url,
+        externalId: externalId ?? undefined,
+        confidence
+      })
+    }
+
+    addLink(row.content_provider, row.content_url, row.content_external_id)
+
+    const matches = D1BookmarkRepository.parseCrossPlatformMatches(row.content_cross_platform_matches)
+    for (const match of matches) {
+      addLink(match.platform, match.url, match.id, match.confidence)
+    }
+
+    return links
+  }
 
   async getAll(): Promise<Bookmark[]> {
     try {
@@ -16,6 +58,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           b.*,
           c.id as content_id,
           c.url as content_url,
+          c.external_id as content_external_id,
           c.title as content_title,
           c.description as content_description,
           c.thumbnail_url as content_thumbnail_url,
@@ -24,6 +67,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.content_type,
           c.published_at as content_published_at,
           c.provider as content_provider,
+          c.cross_platform_matches as content_cross_platform_matches,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -53,6 +97,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           b.*,
           c.id as content_id,
           c.url as content_url,
+          c.external_id as content_external_id,
           c.title as content_title,
           c.description as content_description,
           c.thumbnail_url as content_thumbnail_url,
@@ -61,6 +106,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.content_type,
           c.published_at as content_published_at,
           c.provider as content_provider,
+          c.cross_platform_matches as content_cross_platform_matches,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -263,6 +309,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           b.*,
           c.id as content_id,
           c.url as content_url,
+          c.external_id as content_external_id,
           c.title as content_title,
           c.description as content_description,
           c.thumbnail_url as content_thumbnail_url,
@@ -271,6 +318,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.content_type,
           c.published_at as content_published_at,
           c.provider as content_provider,
+          c.cross_platform_matches as content_cross_platform_matches,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -294,13 +342,50 @@ export class D1BookmarkRepository implements BookmarkRepository {
     }
   }
 
-  async getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null> {
+  async searchByUserId(
+    userId: string,
+    params: {
+      query: string
+      limit?: number
+      offset?: number
+    }
+  ): Promise<{ results: Bookmark[]; totalCount: number }> {
+    const safeLimit = Math.min(Math.max(params.limit ?? 20, 1), 500)
+    const safeOffset = Math.max(params.offset ?? 0, 0)
+    const trimmedQuery = params.query.trim().toLowerCase()
+
+    if (!trimmedQuery) {
+      return { results: [], totalCount: 0 }
+    }
+
+    const likeQuery = `%${trimmedQuery}%`
+
     try {
+      const countResult = await this.db.prepare(`
+        SELECT COUNT(*) as count
+        FROM bookmarks b
+        LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
+        WHERE b.user_id = ?
+          AND b.status IN ('active', 'archived')
+          AND (
+            LOWER(IFNULL(c.title, '')) LIKE ?
+            OR LOWER(IFNULL(cr.name, '')) LIKE ?
+          )
+      `).bind(userId, likeQuery, likeQuery).first()
+
+      const totalCount = countResult ? Number(countResult.count ?? 0) : 0
+
+      if (totalCount === 0) {
+        return { results: [], totalCount: 0 }
+      }
+
       const result = await this.db.prepare(`
         SELECT 
           b.*,
           c.id as content_id,
           c.url as content_url,
+          c.external_id as content_external_id,
           c.title as content_title,
           c.description as content_description,
           c.thumbnail_url as content_thumbnail_url,
@@ -309,6 +394,56 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.content_type,
           c.published_at as content_published_at,
           c.provider as content_provider,
+          c.cross_platform_matches as content_cross_platform_matches,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.subscriber_count as creator_subscriber_count,
+          cr.follower_count as creator_follower_count,
+          cr.bio as creator_bio,
+          cr.url as creator_url,
+          cr.platforms as creator_platforms
+        FROM bookmarks b
+        LEFT JOIN content c ON b.content_id = c.id
+        LEFT JOIN creators cr ON c.creator_id = cr.id
+        WHERE b.user_id = ?
+          AND b.status IN ('active', 'archived')
+          AND (
+            LOWER(IFNULL(c.title, '')) LIKE ?
+            OR LOWER(IFNULL(cr.name, '')) LIKE ?
+          )
+        ORDER BY b.bookmarked_at DESC
+        LIMIT ? OFFSET ?
+      `).bind(userId, likeQuery, likeQuery, safeLimit, safeOffset).all()
+
+      return {
+        results: result.results.map(row => this.mapRowToBookmark(row)),
+        totalCount
+      }
+    } catch (error) {
+      console.error('Error searching bookmarks for user:', error)
+      throw new Error('Failed to search user bookmarks in database')
+    }
+  }
+
+  async getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null> {
+    try {
+      const result = await this.db.prepare(`
+        SELECT 
+          b.*,
+          c.id as content_id,
+          c.url as content_url,
+          c.external_id as content_external_id,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.favicon_url as content_favicon_url,
+          c.creator_id,
+          c.content_type,
+          c.published_at as content_published_at,
+          c.provider as content_provider,
+          c.cross_platform_matches as content_cross_platform_matches,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -442,6 +577,10 @@ export class D1BookmarkRepository implements BookmarkRepository {
         creatorId: bookmarkData.creatorId
       })
       
+      const normalizedUrlResult = normalizeUrl(bookmarkData.url)
+      const canonicalUrl = normalizedUrlResult.normalized
+      const urlForMatching = canonicalUrl || bookmarkData.url
+
       // Generate content ID based on provider or URL
       const provider = bookmarkData.source || 'web'
       let contentId: string
@@ -455,7 +594,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
         ]
         let videoId: string | null = null
         for (const pattern of patterns) {
-          const match = bookmarkData.url.match(pattern)
+          const match = urlForMatching.match(pattern)
           if (match) {
             videoId = match[1]
             break
@@ -466,24 +605,25 @@ export class D1BookmarkRepository implements BookmarkRepository {
         } else {
           // Fallback for malformed YouTube URLs
           console.warn(`Failed to extract YouTube ID from URL: ${bookmarkData.url}`)
-          const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+          const urlHash = btoa(urlForMatching).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
           contentId = `youtube-malformed-${urlHash}`
         }
       } else if (provider === 'spotify') {
         // Extract Spotify ID for all content types
-        const match = bookmarkData.url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
-        const spotifyId = match ? match[1] : null
+        const resource = resolveSpotifyResource(urlForMatching) ||
+          (bookmarkData.originalUrl ? resolveSpotifyResource(bookmarkData.originalUrl) : null)
+        const spotifyId = resource?.id ?? null
         if (spotifyId) {
           contentId = `spotify-${spotifyId}`
         } else {
           // Fallback for malformed Spotify URLs
           console.warn(`Failed to extract Spotify ID from URL: ${bookmarkData.url}`)
-          const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+          const urlHash = btoa(urlForMatching).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
           contentId = `spotify-malformed-${urlHash}`
         }
       } else {
         // Default for web and other providers - use URL hash
-        const urlHash = btoa(bookmarkData.url).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
+        const urlHash = btoa(urlForMatching).replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
         contentId = `${provider}-${urlHash}`
       }
       
@@ -496,12 +636,12 @@ export class D1BookmarkRepository implements BookmarkRepository {
            creator_verified, creator_subscriber_count, creator_follower_count,
            created_at, updated_at
          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       `).bind(
-         contentId,
-         contentId,
-         provider,
-         bookmarkData.url,
-         bookmarkData.originalUrl,
+      `).bind(
+        contentId,
+        contentId,
+        provider,
+        urlForMatching,
+        canonicalUrl,
          bookmarkData.title,
          bookmarkData.description || null,
          bookmarkData.thumbnailUrl || null,
@@ -564,7 +704,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
       originalUrl: row.content_url || '',
       title: row.content_title || '',
       description: row.content_description || undefined,
-      source: undefined, // Not in new schema
+      source: row.content_provider || undefined,
       contentType: row.content_type || undefined,
       thumbnailUrl: row.content_thumbnail_url || undefined,
       faviconUrl: row.content_favicon_url || undefined,
@@ -598,6 +738,11 @@ export class D1BookmarkRepository implements BookmarkRepository {
         createdAt: undefined,
         updatedAt: undefined
       } : null
+      }
+
+    const alternateLinks = D1BookmarkRepository.buildAlternateLinks(row)
+    if (alternateLinks.length > 0) {
+      ;(bookmark as any).alternateLinks = alternateLinks
     }
 
     return bookmark

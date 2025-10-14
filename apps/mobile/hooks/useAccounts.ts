@@ -3,6 +3,7 @@ import { accountsApi, ConnectedAccount } from '../lib/api';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { Alert } from 'react-native';
+import Constants from 'expo-constants';
 
 // Complete the auth session to ensure browsers close properly on mobile
 WebBrowser.maybeCompleteAuthSession();
@@ -37,9 +38,11 @@ export function useAccounts() {
     mutationFn: async ({ provider }: { provider: 'spotify' | 'youtube' }) => {
       try {
         // Get the redirect URL for OAuth callback
+        const isExpoGo = Constants.appOwnership === 'expo';
         const redirectUrl = AuthSession.makeRedirectUri({
-          scheme: 'zine',
-          path: 'oauth-callback'
+          path: 'oauth-callback',
+          useProxy: isExpoGo,
+          ...(isExpoGo ? {} : { scheme: 'zine', preferLocalhost: true })
         });
 
         // Get the auth URL from the API

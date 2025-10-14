@@ -11,6 +11,7 @@ on:
     #   - 'bun.lockb'
     #   - '.github/workflows/deploy.yml'
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches: [main]
     # paths:
     #   - 'packages/api/**'
@@ -21,7 +22,54 @@ on:
     #   - '.github/workflows/deploy.yml'
 
 jobs:
+  cleanup-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    name: Cleanup Preview Workers
+    permissions:
+      contents: read
+    steps:
+      - name: Set Preview Variables
+        run: |
+          SANITIZED_BRANCH=$(echo "${{ github.head_ref }}" | sed 's|[^a-zA-Z0-9-]|-|g')
+          echo "SANITIZED_BRANCH=$SANITIZED_BRANCH" >> $GITHUB_ENV
+          echo "API_PREVIEW_NAME=zine-api-$SANITIZED_BRANCH" >> $GITHUB_ENV
+          echo "WEB_PREVIEW_NAME=zine-web-$SANITIZED_BRANCH" >> $GITHUB_ENV
+          
+      - name: Delete API Preview Worker
+        continue-on-error: true
+        run: |
+          echo "Deleting API preview worker: ${{ env.API_PREVIEW_NAME }}"
+          RESPONSE=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/services/${{ env.API_PREVIEW_NAME }}" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json")
+          
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" = "true" ]; then
+            echo "✅ API preview worker deleted successfully"
+          else
+            ERROR=$(echo "$RESPONSE" | jq -r '.errors[0].message // "Unknown error"')
+            echo "⚠️  Could not delete API preview worker: $ERROR"
+          fi
+          
+      - name: Delete Web Preview Worker
+        continue-on-error: true
+        run: |
+          echo "Deleting Web preview worker: ${{ env.WEB_PREVIEW_NAME }}"
+          RESPONSE=$(curl -s -X DELETE "https://api.cloudflare.com/client/v4/accounts/${{ secrets.CLOUDFLARE_ACCOUNT_ID }}/workers/services/${{ env.WEB_PREVIEW_NAME }}" \
+            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -H "Content-Type: application/json")
+          
+          SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
+          if [ "$SUCCESS" = "true" ]; then
+            echo "✅ Web preview worker deleted successfully"
+          else
+            ERROR=$(echo "$RESPONSE" | jq -r '.errors[0].message // "Unknown error"')
+            echo "⚠️  Could not delete Web preview worker: $ERROR"
+          fi
+
   deploy-api:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     name: Deploy API
     permissions:
@@ -146,7 +194,7 @@ jobs:
     # Note: Web app deployment maintained for development/testing purposes only
     # Web app is not the primary platform - mobile app is the focus
     # PR previews disabled to avoid Cloudflare worker limits
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.action != 'closed')
     permissions:
       contents: read
       pull-requests: write

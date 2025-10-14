@@ -1,121 +1,237 @@
-// @ts-nocheck
 import * as React from 'react';
-import { View, Text, TouchableOpacity, Pressable, Image } from 'react-native';
-import { Card, Chip, Button } from 'heroui-native';
-import { useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
-import type { Bookmark } from '@zine/shared';
-import { formatRelativeTime } from '../lib/dateUtils';
-import { PlatformIcon, ContentTypeIcon, ExternalLinkIcon } from '../lib/platformIcons';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { formatDistanceToNow } from '../lib/dateUtils';
+import { useTheme } from '../contexts/theme';
+import { PlatformIcon } from '../lib/platformIcons';
+
+type SupportedContentType = 'video' | 'podcast' | 'article' | 'post' | 'link';
 
 interface CompactBookmarkCardProps {
-  bookmark: Bookmark;
+  bookmark: {
+    id: string;
+    title: string;
+    thumbnailUrl?: string | null;
+    contentType?: SupportedContentType;
+    publishedAt?: string | number | null;
+    videoMetadata?: { duration?: number | null } | null;
+    podcastMetadata?: { duration?: number | null } | null;
+    duration?: number | null;
+    creator?: { avatarUrl?: string | null } | null;
+    metrics?: { durationSeconds?: number | null } | null;
+    source?: string | null;
+    alternateLinks?: Array<{ provider?: string | null; url: string }>;
+  };
   onPress?: () => void;
-  onLongPress?: () => void;
 }
 
-export function CompactBookmarkCard({ 
-  bookmark, 
+export function CompactBookmarkCard({
+  bookmark,
   onPress,
-  onLongPress 
 }: CompactBookmarkCardProps) {
-  const router = useRouter();
+  const { colors } = useTheme();
   
-  // Handle card press - navigate to detail view
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-    } else {
-      // Navigate to bookmark detail screen
-      router.push(`/bookmark/${bookmark.id}`);
+  const getContentTypeIcon = () => {
+    switch (bookmark.contentType) {
+      case 'video':
+        return { name: 'play-circle', color: '#FF0000' };
+      case 'podcast':
+        return { name: 'mic', color: '#1DB954' };
+      case 'article':
+      case 'post':
+        return { name: 'file-text', color: colors.primary };
+      default:
+        return { name: 'bookmark', color: colors.mutedForeground };
     }
   };
-  
-  // Handle open link button press - open in external browser
-  const handleOpenLink = async () => {
-    try {
-      const url = bookmark.originalUrl || bookmark.url;
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        console.warn('Cannot open URL:', url);
+
+  const formatDuration = (seconds?: number) => {
+    if (!seconds) return null;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes >= 60) {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${hours}h ${remainingMinutes}m`;
+    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const contentIcon = getContentTypeIcon();
+  const duration =
+    bookmark.duration ??
+    bookmark.videoMetadata?.duration ??
+    bookmark.podcastMetadata?.duration ??
+    bookmark.metrics?.durationSeconds ??
+    undefined;
+
+  const thumbnailUri = React.useMemo(() => {
+    if (bookmark.thumbnailUrl && bookmark.thumbnailUrl.trim().length > 0) {
+      return bookmark.thumbnailUrl;
+    }
+    const fallback = bookmark.creator?.avatarUrl;
+    if (fallback && fallback.trim().length > 0) {
+      return fallback;
+    }
+    return undefined;
+  }, [bookmark.thumbnailUrl, bookmark.creator?.avatarUrl]);
+
+  const multiPlatformProviders = React.useMemo(() => {
+    const providers = new Set<string>();
+    if (bookmark.source) {
+      providers.add(bookmark.source);
+    }
+    (bookmark.alternateLinks ?? []).forEach((link) => {
+      if (link?.provider) {
+        providers.add(link.provider);
       }
-    } catch (error) {
-      console.error('Error opening URL:', error);
-    }
-  };
-  
-  // Get content type badge color
-  const getContentTypeColor = (type?: string) => {
-    switch (type) {
-      case 'video': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'podcast': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case 'article': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'post': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'link': 
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-    }
-  };
-  
+    });
+    return Array.from(providers);
+  }, [bookmark.source, bookmark.alternateLinks]);
+
+  const showMultiPlatform = multiPlatformProviders.length > 1;
+
   return (
-    <Pressable
-      onPress={handlePress}
-      onLongPress={onLongPress}
-      className="active:opacity-80"
+    <TouchableOpacity
+      style={[styles.compactCard, { backgroundColor: colors.card }]}
+      onPress={onPress}
+      activeOpacity={0.7}
     >
-      <Card className="p-4 bg-white dark:bg-gray-900">
-        {/* Header with author info */}
-        <View className="flex-row items-center mb-3">
-          {bookmark.creator?.avatarUrl ? (
-            <Image
-              source={{ uri: bookmark.creator.avatarUrl }}
-              style={{ width: 32, height: 32, borderRadius: 16 }}
-              onError={() => {}}
-            />
-          ) : null}
-          <View className={bookmark.creator?.avatarUrl ? "ml-2 flex-1" : "flex-1"}>
-            {bookmark.creator?.name && (
-              <Text className="text-sm font-medium text-gray-900 dark:text-gray-100" numberOfLines={1}>
-                {bookmark.creator.name}
-              </Text>
+      <View style={styles.compactThumbnailContainer}>
+        {thumbnailUri ? (
+          <Image
+            source={{ 
+              uri: thumbnailUri,
+              cache: 'force-cache'
+            }}
+            style={styles.compactThumbnail}
+            resizeMode="cover"
+            onError={() => {}}
+          />
+        ) : (
+          <View style={[styles.compactThumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
+            <Feather name="image" size={20} color={colors.mutedForeground} />
+          </View>
+        )}
+        {duration && (
+          <View style={styles.compactDurationBadge}>
+            <Text style={styles.compactDurationText}>{formatDuration(duration)}</Text>
+          </View>
+        )}
+        {showMultiPlatform && (
+          <View style={[styles.multiPlatformChip, { backgroundColor: colors.background }]}>
+            {multiPlatformProviders.slice(0, 2).map((provider) => (
+              <PlatformIcon key={provider} source={(provider as any) ?? 'web'} size={12} />
+            ))}
+            {multiPlatformProviders.length > 2 && (
+              <Text style={[styles.multiPlatformMore, { color: colors.mutedForeground }]}>+{multiPlatformProviders.length - 2}</Text>
             )}
           </View>
-        </View>
-        
-        {/* Title - truncated to 2 lines */}
-        <Text 
-          className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2"
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
+        )}
+      </View>
+
+      <View style={styles.compactInfo}>
+        <Text style={[styles.compactTitle, { color: colors.foreground }]} numberOfLines={2}>
           {bookmark.title}
         </Text>
         
-        {/* Bottom section with content type and open button */}
-        <View className="flex-row items-center justify-between mt-2">
-          {/* Content type chip */}
-          <View className="flex-row items-center gap-1.5">
-            <ContentTypeIcon contentType={bookmark.contentType} size={16} />
-            <Text className="text-xs text-gray-600 dark:text-gray-400">
-              {bookmark.contentType || 'link'}
+        <View style={styles.compactMeta}>
+          <Feather 
+            name={contentIcon.name as any} 
+            size={14} 
+            color={contentIcon.color} 
+          />
+          {bookmark.publishedAt && (
+            <Text style={[styles.compactDate, { color: colors.mutedForeground }]}>
+              {formatDistanceToNow(bookmark.publishedAt)}
             </Text>
-          </View>
-          
-          {/* Open link button */}
-          <TouchableOpacity
-            onPress={handleOpenLink}
-            className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-md bg-gray-100 active:bg-gray-200 dark:bg-gray-800 dark:active:bg-gray-700"
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <ExternalLinkIcon size={16} color="#6B7280" />
-            <Text className="text-sm text-gray-700 dark:text-gray-300">Open</Text>
-          </TouchableOpacity>
+          )}
         </View>
-      </Card>
-    </Pressable>
+      </View>
+
+      <Feather 
+        name="chevron-right" 
+        size={20} 
+        color={colors.mutedForeground} 
+      />
+    </TouchableOpacity>
   );
 }
 
-// Memoized version for better performance in lists
+const styles = StyleSheet.create({
+  compactCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+  },
+  compactThumbnailContainer: {
+    width: 60,
+    height: 60,
+    position: 'relative',
+  },
+  compactThumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+  },
+  compactThumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactDurationBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  compactDurationText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  multiPlatformChip: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  multiPlatformMore: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  compactInfo: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 8,
+  },
+  compactTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  compactMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  compactDate: {
+    fontSize: 12,
+  },
+});
+
 export const MemoizedCompactBookmarkCard = React.memo(CompactBookmarkCard);

@@ -3,6 +3,7 @@
  */
 
 import { parseHTML } from 'linkedom'
+import { resolveSpotifyResource } from './url-normalizer'
 
 // Type definitions for linkedom
 type LinkedOMDocument = {
@@ -732,18 +733,15 @@ export class EnhancedMetadataExtractor {
    * Extract Spotify information from URL
    */
   private extractSpotifyInfo(url: string): SpotifyInfo | null {
-    // Pattern for Spotify URLs: https://open.spotify.com/{type}/{id}
-    const pattern = /(?:open\.spotify\.com\/|spotify:)(track|album|artist|playlist|episode|show)(?:\/|:)([a-zA-Z0-9]+)/
-    const match = url.match(pattern)
-    
-    if (match) {
-      return {
-        type: match[1] as SpotifyInfo['type'],
-        id: match[2]
-      }
+    const resource = resolveSpotifyResource(url)
+    if (!resource) {
+      return null
     }
 
-    return null
+    return {
+      type: resource.type as SpotifyInfo['type'],
+      id: resource.id
+    }
   }
 
   /**

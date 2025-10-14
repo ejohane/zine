@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { logger } from 'hono/logger'
 import { z } from 'zod'
+import { verifyToken } from '@clerk/backend'
 import { 
   CreateBookmarkSchema, 
   UpdateBookmarkSchema,
@@ -138,7 +139,24 @@ app.post('/api/v1/bookmarks/preview', async (c) => {
     
     // Check for conditional request headers
     const ifNoneMatch = c.req.header('If-None-Match')
-    const userId = c.req.header('x-user-id') // Optional user ID for authenticated previews
+    let userId = c.req.header('x-user-id') || undefined
+
+    if (!userId) {
+      const authHeader = c.req.header('Authorization')
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.substring(7)
+        try {
+          const payload = await verifyToken(token, {
+            secretKey: c.env.CLERK_SECRET_KEY
+          })
+          if (payload?.sub) {
+            userId = payload.sub
+          }
+        } catch (error) {
+          console.warn('[Preview] Authorization token verification failed, continuing without user context', error)
+        }
+      }
+    }
     
     // Use the new optimized PreviewService
     const { PreviewService } = await import('./services/preview-service')
@@ -201,10 +219,179 @@ app.use('/api/v1/accounts/*', authMiddleware)
 app.use('/api/v1/subscriptions/*', authMiddleware)
 app.use('/api/v1/feed/*', authMiddleware)
 app.use('/api/v1/enriched-bookmarks/*', authMiddleware)
+app.use('/api/v1/search', authMiddleware)
 
 // Apply auth middleware only to specific auth endpoints (not callbacks)
 app.use('/api/v1/auth/*/connect', authMiddleware)
 app.use('/api/v1/auth/*/disconnect', authMiddleware)
+
+// Search endpoint
+app.get('/api/v1/search', async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const query = c.req.query('q')
+    const type = c.req.query('type')
+    const limit = parseInt(c.req.query('limit') || '20', 10)
+    const offset = parseInt(c.req.query('offset') || '0', 10)
+
+    if (!query || query.trim().length === 0) {
+      return c.json({ error: 'Search query is required' }, 400)
+    }
+
+    if (query.length > 200) {
+      return c.json({ error: 'Search query too long (max 200 characters)' }, 400)
+    }
+
+    const safeLimit = Math.min(Math.max(limit, 1), 50)
+    const safeOffset = Math.max(offset, 0)
+
+    const { ContentRepository } = await import('./repositories/content-repository')
+    const contentRepo = new ContentRepository(c.env.DB)
+    const d1Repository = new D1BookmarkRepository(c.env.DB)
+
+    type SearchResponseItem = {
+      type: string
+      id: string
+      title: string
+      description?: string
+      url: string
+      thumbnailUrl?: string
+      creator?: {
+        id: string
+        name: string
+        avatarUrl?: string
+      }
+      contentType?: string
+      publishedAt?: string
+      relevanceScore: number
+      notes?: string
+    }
+
+    const mapBookmarkToResult = (bookmark: Bookmark): SearchResponseItem => ({
+      type: 'bookmark',
+      id: bookmark.id,
+      title: bookmark.title || 'Untitled',
+      description: bookmark.description,
+      url: bookmark.url,
+      thumbnailUrl: bookmark.thumbnailUrl,
+      creator: bookmark.creator ? {
+        id: bookmark.creator.id,
+        name: bookmark.creator.name,
+        avatarUrl: bookmark.creator.avatarUrl
+      } : undefined,
+      contentType: bookmark.contentType,
+      publishedAt: bookmark.publishedAt ? new Date(bookmark.publishedAt).toISOString() : undefined,
+      relevanceScore: 1.0,
+      notes: bookmark.notes
+    })
+
+    const includeBookmarks = type === 'bookmarks' || !type || type === 'all'
+    const includeContent = type === 'feeds' || type === 'content' || type === 'all'
+
+    let bookmarkResultsForResponse: SearchResponseItem[] = []
+    let bookmarkResultsForCombination: SearchResponseItem[] = []
+    let bookmarkTotalCount = 0
+
+    if (includeBookmarks) {
+      const bookmarkQueryLimit = type === 'all'
+        ? Math.min(safeOffset + safeLimit, 500)
+        : safeLimit
+
+      const bookmarkQueryOffset = type === 'all' ? 0 : safeOffset
+
+      const bookmarkSearch = await d1Repository.searchByUserId(auth.userId, {
+        query,
+        limit: bookmarkQueryLimit,
+        offset: bookmarkQueryOffset
+      })
+
+      bookmarkTotalCount = bookmarkSearch.totalCount
+      const mapped = bookmarkSearch.results.map(mapBookmarkToResult)
+
+      if (type === 'all') {
+        bookmarkResultsForCombination = mapped
+      }
+
+      if (type === 'bookmarks' || !type) {
+        bookmarkResultsForResponse = mapped
+      }
+    }
+
+    let contentResults: SearchResponseItem[] = []
+    let contentResultsForResponse: SearchResponseItem[] = []
+
+    if (includeContent) {
+      const baseContentLimit = safeLimit * 2
+      const contentQueryLimit = (type === 'feeds' || type === 'content')
+        ? Math.min(safeOffset + safeLimit, 200)
+        : baseContentLimit
+
+      const contentItems = await contentRepo.search(query, {
+        limit: contentQueryLimit,
+        offset: 0,
+        orderBy: 'createdAt',
+        orderDirection: 'desc'
+      })
+
+      contentResults = contentItems.map((contentItem) => ({
+        type: 'feed_item',
+        id: contentItem.id,
+        title: contentItem.title || 'Untitled',
+        description: contentItem.description || undefined,
+        url: contentItem.url,
+        thumbnailUrl: contentItem.thumbnailUrl || undefined,
+        creator: contentItem.creatorName ? {
+          id: contentItem.creatorId || '',
+          name: contentItem.creatorName,
+          avatarUrl: undefined
+        } : undefined,
+        contentType: contentItem.contentType || undefined,
+        publishedAt: contentItem.publishedAt ? new Date(Number(contentItem.publishedAt) * 1000).toISOString() : undefined,
+        relevanceScore: 0.8
+      }))
+
+      if (type === 'feeds' || type === 'content') {
+        contentResultsForResponse = contentResults.slice(safeOffset, safeOffset + safeLimit)
+      }
+    }
+
+    let results: SearchResponseItem[] = []
+    let totalCount = 0
+
+    if (type === 'feeds' || type === 'content') {
+      results = contentResultsForResponse
+      totalCount = contentResults.length
+    } else if (type === 'all') {
+      const combined = [...bookmarkResultsForCombination, ...contentResults]
+      results = combined.slice(safeOffset, safeOffset + safeLimit)
+      totalCount = bookmarkTotalCount + contentResults.length
+    } else {
+      results = bookmarkResultsForResponse
+      totalCount = bookmarkTotalCount
+    }
+
+    return c.json({
+      results,
+      totalCount,
+      query,
+      facets: {
+        bookmarks: bookmarkTotalCount,
+        content: contentResults.length
+      },
+      pagination: {
+        limit: safeLimit,
+        offset: safeOffset,
+        hasMore: safeOffset + safeLimit < totalCount
+      }
+    })
+  } catch (error) {
+    console.error('Search error:', error)
+    return c.json({
+      error: 'Search failed',
+      details: error instanceof Error ? error.message : String(error)
+    }, 500)
+  }
+})
 
 // OAuth endpoints
 app.post('/api/v1/auth/:provider/connect', async (c) => {

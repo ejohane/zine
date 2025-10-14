@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev src/index.ts --local --port 8788 --ip 0.0.0.0",
+    "dev": "wrangler dev src/index.ts --local --port 8787 --ip 0.0.0.0",
     "deploy": "wrangler deploy --minify src/index.ts",
     "type-check": "tsc --noEmit",
     "build": "tsc",
@@ -19,6 +19,7 @@
     "drizzle-orm": "^0.44.4",
     "drizzle-zod": "^0.5.1",
     "hono": "^4.4.0",
+    "nanoid": "^5.1.6",
     "zod": "^3.23.0"
   },
   "devDependencies": {

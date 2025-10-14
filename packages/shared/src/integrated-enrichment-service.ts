@@ -5,7 +5,7 @@
 
 import { ContentEnrichmentService, Content, EnrichmentOptions, EnrichmentResult } from './content-enrichment-service'
 import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
-import { normalizeUrl, detectPlatform } from './url-normalizer'
+import { normalizeUrl, detectPlatform, resolveSpotifyResource } from './url-normalizer'
 
 export interface IntegratedEnrichmentOptions extends EnrichmentOptions {
   userId?: string
@@ -442,8 +442,8 @@ export class IntegratedEnrichmentService {
   }
 
   private extractSpotifyId(url: string): string | null {
-    const match = url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
-    return match ? match[1] : null
+    const resource = resolveSpotifyResource(url)
+    return resource?.id ?? null
   }
 
   private generateContentId(url: string): string {
