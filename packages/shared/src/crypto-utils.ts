@@ -3,10 +3,21 @@
  * Works in both Node.js and browser environments
  */
 
-let nodeCrypto: typeof import('node:crypto') | null = null
+type NodeCrypto = {
+  createHash: (algorithm: string) => {
+    update: (data: string) => {
+      digest: (encoding: string) => string
+    }
+  }
+}
+
+let nodeCrypto: NodeCrypto | null = null
 
 try {
-  nodeCrypto = require('node:crypto')
+  // Use eval to prevent TypeScript from seeing 'require' at compile time
+  // This allows the code to work in both Node.js and browser environments
+  // eslint-disable-next-line no-eval
+  nodeCrypto = eval("require('node:crypto')")
 } catch {
   // Running in browser, nodeCrypto will remain null
 }
