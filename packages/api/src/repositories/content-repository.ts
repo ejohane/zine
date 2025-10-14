@@ -244,7 +244,7 @@ export class ContentRepository {
    */
   async findDuplicates(content: Content): Promise<ContentDeduplicationMatch[]> {
     const matches: ContentDeduplicationMatch[] = []
-    
+
     // 1. Check by fingerprint (exact match)
     if (content.contentFingerprint) {
       const fingerprintMatches = await this.findByFingerprint(content.contentFingerprint)
@@ -344,6 +344,53 @@ export class ContentRepository {
   }
 
   /**
+   * Find cross-platform candidates for a given content item.
+   * Used to locate complementary entries on the opposite provider (e.g., Spotify vs YouTube).
+   */
+  async findCrossPlatformCandidates(
+    content: Content,
+    targetProvider: string,
+    options: { limit?: number } = {}
+  ): Promise<Content[]> {
+    if (!content || !targetProvider) {
+      return []
+    }
+
+    // Candidate filters we can use to narrow down potential matches
+    const candidateMatchers: any[] = []
+
+    if (content.publisherCanonicalId) {
+      candidateMatchers.push(eq(schema.content.publisherCanonicalId, content.publisherCanonicalId))
+    }
+    if (content.normalizedTitle) {
+      candidateMatchers.push(eq(schema.content.normalizedTitle, content.normalizedTitle))
+    }
+    if (content.seriesId) {
+      candidateMatchers.push(eq(schema.content.seriesId, content.seriesId))
+    }
+    if (content.episodeIdentifier) {
+      candidateMatchers.push(eq(schema.content.episodeIdentifier, content.episodeIdentifier))
+    }
+
+    if (candidateMatchers.length === 0) {
+      return []
+    }
+
+    const baseCondition = eq(schema.content.provider, targetProvider)
+    const matchCondition = candidateMatchers.length === 1
+      ? candidateMatchers[0]
+      : or(...candidateMatchers)
+
+    const results = await this.db
+      .select()
+      .from(schema.content)
+      .where(and(baseCondition, matchCondition))
+      .limit(options.limit ?? 10)
+
+    return results.filter(candidate => candidate.id !== content.id)
+  }
+
+  /**
    * Merge duplicate content
    */
   async mergeDuplicates(primaryId: string, duplicateIds: string[]): Promise<void> {
@@ -426,7 +473,12 @@ export class ContentRepository {
    * Search content
    */
   async search(query: string, options: ContentRepositoryOptions = {}): Promise<Content[]> {
-    const searchPattern = `%${query}%`
+    const normalizedQuery = query.trim().toLowerCase()
+    if (!normalizedQuery) {
+      return []
+    }
+
+    const searchPattern = `%${normalizedQuery}%`
     
     // Build query with all conditions at once
     const orderColumn = options.orderBy === 'publishedAt' 
@@ -439,9 +491,9 @@ export class ContentRepository {
       .select()
       .from(schema.content)
       .where(or(
-        like(schema.content.title, searchPattern),
-        like(schema.content.description, searchPattern),
-        like(schema.content.creatorName, searchPattern),
+        sql`LOWER(${schema.content.title}) LIKE ${searchPattern}`,
+        sql`LOWER(${schema.content.description}) LIKE ${searchPattern}`,
+        sql`LOWER(${schema.content.creatorName}) LIKE ${searchPattern}`,
         like(schema.content.normalizedTitle, searchPattern)
       ))
       .orderBy(options.orderDirection === 'asc' ? orderColumn : desc(orderColumn))

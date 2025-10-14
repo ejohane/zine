@@ -9,7 +9,6 @@ import {
   Linking,
   ActivityIndicator,
   Alert,
-  ScrollView,
 } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,8 +17,8 @@ import { useAuth } from '../../../contexts/auth';
 import { useTheme } from '../../../contexts/theme';
 import { api } from '../../../lib/api';
 import type { Bookmark, Creator } from '../../../types/bookmark';
-import { formatDistanceToNow } from '../../../lib/dateUtils';
 import { PlatformIcon } from '../../../lib/platformIcons';
+import { CompactBookmarkCard } from '../../../components/CompactBookmarkCard';
 
 
 export default function CreatorScreen() {
@@ -149,94 +148,14 @@ export default function CreatorScreen() {
     return `${count} subscribers`;
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return null;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours}h ${remainingMinutes}m`;
-    }
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const renderBookmarkItem = ({ item }: { item: Bookmark }) => {
-    const getContentTypeIcon = () => {
-      switch (item.contentType) {
-        case 'video':
-          return { name: 'play-circle', color: '#FF0000' };
-        case 'podcast':
-          return { name: 'mic', color: '#1DB954' };
-        case 'article':
-        case 'post':
-          return { name: 'file-text', color: colors.primary };
-        default:
-          return { name: 'bookmark', color: colors.mutedForeground };
-      }
-    };
-
-    const contentIcon = getContentTypeIcon();
-
-    return (
-      <TouchableOpacity
-        style={[styles.compactCard, { backgroundColor: colors.card }]}
+  const renderBookmarkItem = ({ item }: { item: Bookmark }) => (
+    <View style={{ marginHorizontal: 16 }}>
+      <CompactBookmarkCard
+        bookmark={item}
         onPress={() => router.push(`/bookmark/${item.id}`)}
-        activeOpacity={0.7}
-      >
-        {/* Thumbnail */}
-        <View style={styles.compactThumbnailContainer}>
-          {item.thumbnailUrl ? (
-            <Image
-              source={{ 
-                uri: item.thumbnailUrl,
-                cache: 'force-cache'
-              }}
-              style={styles.compactThumbnail}
-              resizeMode="cover"
-              onError={() => {}}
-            />
-          ) : (
-            <View style={[styles.compactThumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
-              <Feather name="image" size={20} color={colors.mutedForeground} />
-            </View>
-          )}
-          {item.duration && (
-            <View style={styles.compactDurationBadge}>
-              <Text style={styles.compactDurationText}>{formatDuration(item.duration)}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Content */}
-        <View style={styles.compactInfo}>
-          <Text style={[styles.compactTitle, { color: colors.foreground }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          
-          <View style={styles.compactMeta}>
-            <Feather 
-              name={contentIcon.name as any} 
-              size={14} 
-              color={contentIcon.color} 
-            />
-            {item.publishedAt && (
-              <Text style={[styles.compactDate, { color: colors.mutedForeground }]}>
-                {formatDistanceToNow(item.publishedAt)}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Chevron */}
-        <Feather 
-          name="chevron-right" 
-          size={20} 
-          color={colors.mutedForeground} 
-        />
-      </TouchableOpacity>
-    );
-  };
+      />
+    </View>
+  );
 
   if (loading) {
     return (
@@ -515,64 +434,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
-  },
-  // Compact card styles
-  compactCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 16,
-    borderRadius: 12,
-  },
-  compactThumbnailContainer: {
-    width: 60,
-    height: 60,
-    position: 'relative',
-  },
-  compactThumbnail: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-  },
-  compactThumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compactDurationBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  compactDurationText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  compactInfo: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  compactTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 6,
-    lineHeight: 20,
-  },
-  compactMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  compactDate: {
-    fontSize: 12,
   },
   separator: {
     height: 8,

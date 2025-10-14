@@ -1,29 +1,23 @@
-export interface Creator {
-  id: string;
-  name: string;
-  handle?: string;
-  avatarUrl?: string;
-  verified?: boolean;
-  subscriberCount?: number;
-  platform: 'youtube' | 'spotify' | 'twitter' | 'web';
-  url?: string;
+import type { Bookmark as SharedBookmark } from '@zine/shared';
+
+export type AlternateLinkProvider = 'youtube' | 'spotify';
+
+export interface AlternateLink {
+  provider: AlternateLinkProvider;
+  url: string;
+  externalId?: string;
+  confidence?: number;
 }
 
-export interface Bookmark {
-  id: string;
-  title: string;
-  url: string;
-  description?: string;
-  thumbnailUrl?: string;
-  creator?: Creator;
-  contentType?: 'video' | 'podcast' | 'article' | 'post' | 'link';
-  createdAt: string;
-  publishedAt?: string;
-  duration?: number;
-  readingTime?: number;
-  tags?: string[];
-  notes?: string;
-  isFavorite?: boolean;
-  isArchived?: boolean;
-  originalUrl?: string;  // Added for compatibility with shared types
-}
+export type MobileBookmark = SharedBookmark & {
+  /**
+   * Additional platform links surfaced when the server merges cross-platform content.
+   */
+  alternateLinks?: AlternateLink[];
+  /**
+   * Present when preview or save detects that this URL already maps to an existing bookmark.
+   */
+  existingBookmarkId?: string;
+};
+
+export type Bookmark = MobileBookmark;

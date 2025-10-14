@@ -7,11 +7,14 @@ import type { Bindings } from '../index'
 import { DualModeTokenService } from './dual-mode-token-service'
 import { parseYouTubeDate, parseSpotifyDate } from '../utils/date-normalization'
 
+export type SpotifyResourceType = 'episode' | 'show' | 'track' | 'album' | 'playlist' | 'artist'
+
 export interface ApiEnrichmentOptions {
   provider: 'youtube' | 'spotify'
   contentId: string
   userId?: string
   forceRefresh?: boolean
+  resourceType?: SpotifyResourceType
 }
 
 export interface YouTubeVideoDetails {
@@ -84,6 +87,101 @@ export interface SpotifyEpisodeDetails {
   }
 }
 
+export interface SpotifyShowDetails {
+  id: string
+  name: string
+  description: string
+  html_description?: string
+  publisher: string
+  images: Array<{
+    url: string
+    height?: number
+    width?: number
+  }>
+  total_episodes?: number
+  languages?: string[]
+}
+
+export interface SpotifyTrackDetails {
+  id: string
+  name: string
+  description?: string | null
+  duration_ms: number
+  explicit: boolean
+  preview_url?: string | null
+  album: {
+    id: string
+    name: string
+    release_date: string
+    images: Array<{
+      url: string
+      height?: number
+      width?: number
+    }>
+  }
+  artists: Array<{
+    id: string
+    name: string
+  }>
+}
+
+export interface SpotifyAlbumDetails {
+  id: string
+  name: string
+  total_tracks: number
+  release_date: string
+  album_type?: string
+  images: Array<{
+    url: string
+    height?: number
+    width?: number
+  }>
+  artists: Array<{
+    id: string
+    name: string
+  }>
+}
+
+export interface SpotifyPlaylistDetails {
+  id: string
+  name: string
+  description: string | null
+  images: Array<{
+    url: string
+    height?: number
+    width?: number
+  }>
+  tracks: {
+    total: number
+  }
+  owner: {
+    display_name?: string | null
+    id?: string
+  }
+}
+
+export interface SpotifyArtistDetails {
+  id: string
+  name: string
+  genres: string[]
+  followers?: {
+    total: number
+  }
+  images: Array<{
+    url: string
+    height?: number
+    width?: number
+  }>
+}
+
+type SpotifyApiItem =
+  | (SpotifyEpisodeDetails & { __resourceType?: SpotifyResourceType })
+  | (SpotifyShowDetails & { __resourceType?: SpotifyResourceType })
+  | (SpotifyTrackDetails & { __resourceType?: SpotifyResourceType })
+  | (SpotifyAlbumDetails & { __resourceType?: SpotifyResourceType })
+  | (SpotifyPlaylistDetails & { __resourceType?: SpotifyResourceType })
+  | (SpotifyArtistDetails & { __resourceType?: SpotifyResourceType })
+
 export interface ApiEnrichmentResult {
   success: boolean
   data?: any
@@ -119,7 +217,7 @@ export class ApiEnrichmentService {
    * Enrich content using platform APIs
    */
   async enrichWithApi(options: ApiEnrichmentOptions): Promise<ApiEnrichmentResult> {
-    const cacheKey = `${options.provider}:${options.contentId}`
+    const cacheKey = `${options.provider}:${options.resourceType || 'unknown'}:${options.contentId}`
     
     // Check cache first
     if (!options.forceRefresh) {
@@ -215,7 +313,7 @@ export class ApiEnrichmentService {
           result = await this.enrichYouTubeContent(options.contentId, tokenData.accessToken)
           break
         case 'spotify':
-          result = await this.enrichSpotifyContent(options.contentId, tokenData.accessToken)
+          result = await this.enrichSpotifyContent(options.contentId, options.resourceType, tokenData.accessToken)
           break
         default:
           return {
@@ -389,57 +487,109 @@ export class ApiEnrichmentService {
   }
 
   /**
-   * Enrich Spotify episode using Spotify Web API
+   * Enrich Spotify content using the Spotify Web API
    */
-  private async enrichSpotifyContent(episodeId: string, accessToken: string): Promise<ApiEnrichmentResult> {
-    try {
-      const url = `${this.SPOTIFY_API_BASE}/episodes/${episodeId}`
+  private async enrichSpotifyContent(
+    contentId: string,
+    resourceType: SpotifyResourceType | undefined,
+    accessToken: string
+  ): Promise<ApiEnrichmentResult> {
+    const typesToTry: SpotifyResourceType[] = resourceType
+      ? [resourceType]
+      : ['episode', 'track', 'show', 'album', 'playlist', 'artist']
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
+    for (const type of typesToTry) {
+      try {
+        const resource = await this.fetchSpotifyResource(type, contentId, accessToken)
+        if (resource) {
+          return {
+            success: true,
+            data: { ...resource, __resourceType: type },
+            source: 'spotify_api'
+          }
         }
-      })
-
-      // Handle rate limiting
-      const rateLimitRemaining = response.headers.get('x-ratelimit-remaining')
-      const rateLimitReset = response.headers.get('x-ratelimit-reset')
-      
-      if (rateLimitRemaining) {
-        this.rateLimits.spotify.remaining = parseInt(rateLimitRemaining)
-      }
-      if (rateLimitReset) {
-        this.rateLimits.spotify.resetAt = parseInt(rateLimitReset) * 1000
-      }
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Spotify token expired or invalid')
+      } catch (error) {
+        console.error(`[ApiEnrichment] Spotify API error for ${type}:`, error)
+        return {
+          success: false,
+          source: 'spotify_api',
+          error: error instanceof Error ? error.message : 'Spotify API error'
         }
-        if (response.status === 429) {
-          const retryAfter = response.headers.get('retry-after')
-          this.rateLimits.spotify.remaining = 0
-          this.rateLimits.spotify.resetAt = Date.now() + (parseInt(retryAfter || '60') * 1000)
-          throw new Error(`Spotify rate limit exceeded. Retry after ${retryAfter} seconds`)
-        }
-        throw new Error(`Spotify API error: ${response.status}`)
       }
+    }
 
-      const episode = await response.json() as SpotifyEpisodeDetails
+    return {
+      success: false,
+      source: 'spotify_api',
+      error: 'Spotify resource not found for provided ID'
+    }
+  }
 
-      return {
-        success: true,
-        data: episode,
-        source: 'spotify_api'
+  private async fetchSpotifyResource(
+    type: SpotifyResourceType,
+    contentId: string,
+    accessToken: string
+  ): Promise<SpotifyApiItem | null> {
+    const endpoint = this.getSpotifyEndpoint(type)
+    const url = `${this.SPOTIFY_API_BASE}/${endpoint}/${contentId}`
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json'
       }
-    } catch (error) {
-      console.error('[ApiEnrichment] Spotify API error:', error)
-      return {
-        success: false,
-        source: 'spotify_api',
-        error: error instanceof Error ? error.message : 'Spotify API error'
+    })
+
+    this.updateSpotifyRateLimit(response)
+
+    if (response.status === 404) {
+      return null
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Spotify token expired or invalid')
       }
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after')
+        this.rateLimits.spotify.remaining = 0
+        this.rateLimits.spotify.resetAt = Date.now() + (parseInt(retryAfter || '60') * 1000)
+        throw new Error(`Spotify rate limit exceeded. Retry after ${retryAfter || '60'} seconds`)
+      }
+      throw new Error(`Spotify API error: ${response.status}`)
+    }
+
+    return (await response.json()) as SpotifyApiItem
+  }
+
+  private getSpotifyEndpoint(type: SpotifyResourceType): string {
+    switch (type) {
+      case 'episode':
+        return 'episodes'
+      case 'show':
+        return 'shows'
+      case 'track':
+        return 'tracks'
+      case 'album':
+        return 'albums'
+      case 'playlist':
+        return 'playlists'
+      case 'artist':
+        return 'artists'
+      default:
+        return 'episodes'
+    }
+  }
+
+  private updateSpotifyRateLimit(response: Response): void {
+    const rateLimitRemaining = response.headers.get('x-ratelimit-remaining')
+    const rateLimitReset = response.headers.get('x-ratelimit-reset')
+
+    if (rateLimitRemaining) {
+      this.rateLimits.spotify.remaining = parseInt(rateLimitRemaining, 10)
+    }
+    if (rateLimitReset) {
+      this.rateLimits.spotify.resetAt = parseInt(rateLimitReset, 10) * 1000
     }
   }
 
@@ -579,22 +729,159 @@ export class ApiEnrichmentService {
     return result
   }
 
-  transformSpotifyApiResponse(episode: SpotifyEpisodeDetails): any {
-    return {
-      durationSeconds: Math.floor(episode.duration_ms / 1000),
-      creatorId: episode.show?.id ? `spotify:${episode.show.id}` : undefined,
-      creatorName: episode.show?.publisher,
-      creatorHandle: undefined, // Spotify doesn't provide handles
-      creatorThumbnail: episode.show?.images?.[0]?.url,
-      seriesId: episode.show?.id,
-      seriesName: episode.show?.name,
-      language: episode.languages?.[0],
-      isExplicit: episode.explicit,
-      // Return as Date object for Drizzle
-      publishedAt: episode.release_date ? parseSpotifyDate(episode.release_date) : undefined,
-      description: episode.description,
-      thumbnailUrl: episode.images?.[0]?.url
+  transformSpotifyApiResponse(item: SpotifyApiItem, explicitType?: SpotifyResourceType): any {
+    const type = explicitType || (item as any).__resourceType || this.detectSpotifyResourceType(item)
+
+    switch (type) {
+      case 'episode': {
+        const episode = item as SpotifyEpisodeDetails
+        return {
+          title: episode.name,
+          description: episode.description,
+          durationSeconds: Math.floor(episode.duration_ms / 1000),
+          creatorId: episode.show?.id ? `spotify:${episode.show.id}` : undefined,
+          creatorName: episode.show?.name,
+          creatorHandle: undefined,
+          creatorThumbnail: episode.show?.images?.[0]?.url,
+          seriesId: episode.show?.id,
+          seriesName: episode.show?.name,
+          seriesMetadata: {
+            publisher: episode.show?.publisher ?? null
+          },
+          language: episode.languages?.[0],
+          isExplicit: episode.explicit,
+          publishedAt: episode.release_date ? parseSpotifyDate(episode.release_date) : undefined,
+          thumbnailUrl: episode.images?.[0]?.url,
+          enrichmentMetadata: {
+            spotifyResourceType: 'episode',
+            htmlDescription: episode.html_description || null,
+            resumePositionMs: episode.resume_point?.resume_position_ms ?? null
+          }
+        }
+      }
+      case 'show': {
+        const show = item as SpotifyShowDetails
+        return {
+          title: show.name,
+          description: show.description,
+          creatorId: show.id ? `spotify:${show.id}` : undefined,
+          creatorName: show.name,
+          creatorThumbnail: show.images?.[0]?.url,
+          seriesId: show.id,
+          seriesName: show.name,
+          language: show.languages?.[0],
+          thumbnailUrl: show.images?.[0]?.url,
+          seriesMetadata: {
+            totalEpisodes: show.total_episodes ?? null,
+            publisher: show.publisher ?? null
+          },
+          enrichmentMetadata: {
+            spotifyResourceType: 'show'
+          }
+        }
+      }
+      case 'track': {
+        const track = item as SpotifyTrackDetails
+        const primaryArtist = track.artists?.[0]
+        return {
+          title: track.name,
+          description: track.album ? `Track from ${track.album.name}` : track.description || null,
+          durationSeconds: Math.floor(track.duration_ms / 1000),
+          creatorId: primaryArtist?.id ? `spotify:${primaryArtist.id}` : undefined,
+          creatorName: primaryArtist?.name,
+          creatorThumbnail: undefined,
+          seriesId: track.album?.id,
+          seriesName: track.album?.name,
+          isExplicit: track.explicit,
+          publishedAt: track.album?.release_date ? parseSpotifyDate(track.album.release_date) : undefined,
+          thumbnailUrl: track.album?.images?.[0]?.url,
+          enrichmentMetadata: {
+            spotifyResourceType: 'track',
+            previewUrl: track.preview_url || null
+          }
+        }
+      }
+      case 'album': {
+        const album = item as SpotifyAlbumDetails
+        const primaryArtist = album.artists?.[0]
+        return {
+          title: album.name,
+          description: primaryArtist ? `${primaryArtist.name} • ${album.total_tracks} tracks` : `${album.total_tracks} tracks`,
+          creatorId: primaryArtist?.id ? `spotify:${primaryArtist.id}` : undefined,
+          creatorName: primaryArtist?.name,
+          seriesId: album.id,
+          seriesName: album.name,
+          publishedAt: album.release_date ? parseSpotifyDate(album.release_date) : undefined,
+          thumbnailUrl: album.images?.[0]?.url,
+          seriesMetadata: {
+            totalTracks: album.total_tracks,
+            albumType: album.album_type || null
+          },
+          enrichmentMetadata: {
+            spotifyResourceType: 'album'
+          }
+        }
+      }
+      case 'playlist': {
+        const playlist = item as SpotifyPlaylistDetails
+        return {
+          title: playlist.name,
+          description: playlist.description,
+          creatorId: playlist.owner?.id ? `spotify:user:${playlist.owner.id}` : undefined,
+          creatorName: playlist.owner?.display_name || playlist.owner?.id,
+          thumbnailUrl: playlist.images?.[0]?.url,
+          seriesMetadata: {
+            trackCount: playlist.tracks?.total ?? null
+          },
+          enrichmentMetadata: {
+            spotifyResourceType: 'playlist'
+          }
+        }
+      }
+      case 'artist': {
+        const artist = item as SpotifyArtistDetails
+        return {
+          title: artist.name,
+          description: artist.genres?.length ? `Genres: ${artist.genres.join(', ')}` : null,
+          creatorId: artist.id ? `spotify:${artist.id}` : undefined,
+          creatorName: artist.name,
+          creatorThumbnail: artist.images?.[0]?.url,
+          thumbnailUrl: artist.images?.[0]?.url,
+          statisticsMetadata: {
+            followerCount: artist.followers?.total ?? null
+          },
+          enrichmentMetadata: {
+            spotifyResourceType: 'artist'
+          }
+        }
+      }
+      default:
+        return {}
     }
+  }
+
+  private detectSpotifyResourceType(item: SpotifyApiItem): SpotifyResourceType {
+    const candidate = item as any
+
+    if (candidate?.show && typeof candidate?.duration_ms === 'number') {
+      return 'episode'
+    }
+    if (candidate?.album && typeof candidate?.duration_ms === 'number') {
+      return 'track'
+    }
+    if (candidate?.total_tracks !== undefined && candidate?.artists) {
+      return 'album'
+    }
+    if (candidate?.tracks && candidate?.owner) {
+      return 'playlist'
+    }
+    if (candidate?.publisher && candidate?.total_episodes !== undefined) {
+      return 'show'
+    }
+    if (candidate?.followers) {
+      return 'artist'
+    }
+    return 'episode'
   }
 
   /**

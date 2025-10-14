@@ -4,7 +4,7 @@
  */
 
 import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
-import { normalizeUrl } from './url-normalizer'
+import { normalizeUrl, resolveSpotifyResource } from './url-normalizer'
 import { DateNormalizer } from './date-normalizer'
 import crypto from 'node:crypto'
 
@@ -279,7 +279,7 @@ export class ContentEnrichmentService {
     }
     
     // Spotify
-    if (url.includes('spotify.com')) {
+    if (url.includes('spotify.com') || url.startsWith('spotify:')) {
       const contentId = this.extractSpotifyId(url)
       if (contentId) {
         return { provider: 'spotify', externalId: contentId }
@@ -436,8 +436,8 @@ export class ContentEnrichmentService {
    * Extract Spotify content ID from URL (supports tracks, albums, artists, playlists, episodes, shows)
    */
   private extractSpotifyId(url: string): string | null {
-    const match = url.match(/spotify\.com\/(?:track|album|artist|playlist|episode|show)\/([^?/]+)/)
-    return match ? match[1] : null
+    const resource = resolveSpotifyResource(url)
+    return resource?.id ?? null
   }
 
   /**

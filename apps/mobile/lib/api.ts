@@ -1,5 +1,5 @@
-import type { Bookmark, CreateBookmark, UpdateBookmark } from '@zine/shared';
-import type { Creator } from '../types/bookmark';
+import type { CreateBookmark, UpdateBookmark } from '@zine/shared';
+import type { Bookmark } from '../types/bookmark';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -194,9 +194,24 @@ interface PreviewResponse {
 
 interface SaveBookmarkResponse {
   data?: Bookmark;
-  duplicate?: Bookmark;
+  duplicate?: boolean;
+  duplicateContentId?: string;
+  duplicateReasons?: string[];
+  enrichmentSource?: string;
+  message?: string;
   error?: string;
 }
+
+const logAlternateLinks = (bookmark?: Bookmark | null, context?: string) => {
+  if (!__DEV__ || !bookmark?.alternateLinks?.length) {
+    return;
+  }
+
+  console.log(
+    `🔁 Alternate links${context ? ` (${context})` : ''}:`,
+    bookmark.alternateLinks.map(link => `${link.provider}:${link.externalId ?? link.url}`).join(', ')
+  );
+};
 
 // Types for API responses
 interface BookmarksResponse {
@@ -219,9 +234,16 @@ export const bookmarksApi = {
       console.warn('API returned invalid bookmarks data:', response);
       return [];
     }
+    if (__DEV__) {
+      response.data.forEach((bookmark) => logAlternateLinks(bookmark, 'list'));
+    }
     return response.data;
   },
-  getById: (id: string) => apiClient.get<Bookmark>(`/api/v1/bookmarks/${id}`),
+  getById: async (id: string) => {
+    const bookmark = await apiClient.get<Bookmark>(`/api/v1/bookmarks/${id}`);
+    logAlternateLinks(bookmark, 'detail');
+    return bookmark;
+  },
   create: (bookmark: CreateBookmark) => apiClient.post<Bookmark>('/api/v1/bookmarks', bookmark),
   update: (id: string, bookmark: UpdateBookmark) => apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}`, bookmark),
   delete: (id: string) => apiClient.delete<void>(`/api/v1/bookmarks/${id}`),
@@ -238,19 +260,19 @@ export const bookmarksApi = {
       console.warn('API returned invalid bookmarks data:', response);
       return [];
     }
+    if (__DEV__) {
+      response.data.forEach((bookmark) => logAlternateLinks(bookmark, 'recent'));
+    }
     return response.data;
   },
   preview: async (url: string): Promise<Bookmark> => {
     const response = await apiClient.post<PreviewResponse>('/api/v1/bookmarks/preview', { url });
+    logAlternateLinks(response.data, 'preview');
     return response.data;
   },
-  save: async (url: string): Promise<Bookmark> => {
+  save: async (url: string): Promise<{ bookmark: Bookmark; duplicate: boolean; duplicateContentId?: string; duplicateReasons?: string[]; enrichmentSource?: string }> => {
     // Use the enriched save endpoint for better metadata extraction
     const response = await apiClient.post<SaveBookmarkResponse>('/api/v1/enriched-bookmarks/save-enriched', { url });
-    
-    if (response.duplicate) {
-      throw new Error(`Bookmark already exists: ${response.duplicate.title}`);
-    }
     
     if (response.error) {
       throw new Error(response.error);
@@ -260,10 +282,26 @@ export const bookmarksApi = {
       throw new Error('Failed to save bookmark');
     }
     
-    return response.data;
+    logAlternateLinks(response.data, response.duplicate ? 'duplicate-save' : 'save');
+
+    return {
+      bookmark: response.data,
+      duplicate: Boolean(response.duplicate),
+      duplicateContentId: response.duplicateContentId,
+      duplicateReasons: response.duplicateReasons,
+      enrichmentSource: response.enrichmentSource,
+    };
   },
   refreshMetadata: async (id: string): Promise<Bookmark> => {
-    const response = await apiClient.put<{ data: Bookmark; message?: string }>(`/api/v1/bookmarks/${id}/refresh`);
+    const response = await apiClient.put<{ data?: Bookmark; message?: string; enrichmentSource?: string }>(
+      `/api/v1/enriched-bookmarks/${id}/refresh-enriched`
+    );
+
+    if (!response?.data) {
+      throw new Error(response?.message || 'Failed to refresh bookmark');
+    }
+
+    logAlternateLinks(response.data, 'refresh');
     return response.data;
   },
   getBookmarksByCreator: async (creatorId: string, page: number = 1, limit: number = 20): Promise<Bookmark[]> => {
@@ -309,7 +347,10 @@ export const feedsApi = {
 
 // Search API methods
 export const searchApi = {
-  search: (query: string) => apiClient.get<any[]>(`/api/v1/search?q=${encodeURIComponent(query)}`),
+  search: (query: string, params?: Record<string, string>) => {
+    const searchParams = new URLSearchParams({ q: query, ...params });
+    return apiClient.get<any>(`/api/v1/search?${searchParams.toString()}`);
+  },
 };
 
 // User API methods

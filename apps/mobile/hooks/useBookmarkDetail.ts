@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/auth';
-import type { Bookmark } from '@zine/shared';
+import type { Bookmark } from '../types/bookmark';
 
 interface UseBookmarkDetailOptions {
   enabled?: boolean;

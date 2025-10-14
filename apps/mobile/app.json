@@ -4,13 +4,13 @@
     "slug": "zine",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/zine-logo.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/zine-logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
@@ -20,10 +20,10 @@
       }
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/zine-logo.png",
+      "backgroundColor": "#000000"
+    },
       "edgeToEdgeEnabled": true,
       "package": "com.erikjohansson.zine"
     },
@@ -36,9 +36,17 @@
         "projectId": "c14045ec-332f-40ed-92dc-f8814f0102c0"
       }
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store"
+  "plugins": [
+    "expo-router",
+    "expo-secure-store",
+    [
+      "expo-splash-screen",
+      {
+        "backgroundColor": "#000000",
+        "image": "./assets/zine-logo.png",
+        "imageWidth": 200
+      }
     ]
+  ]
   }
 }

@@ -64,7 +64,12 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
   }, [bookmark.originalUrl, bookmark.url, bookmark.id, onOpenLink, router, enableHaptics]);
   
   // Get duration based on content type
-  const duration = bookmark.videoMetadata?.duration || bookmark.podcastMetadata?.duration;
+  const duration =
+    bookmark.videoMetadata?.duration ??
+    bookmark.podcastMetadata?.duration ??
+    bookmark.metrics?.durationSeconds ??
+    bookmark.duration ??
+    null;
   const formattedDuration = duration ? formatDuration(duration) : null;
   
   // Get author/source name
@@ -95,6 +100,17 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
     }
   };
   
+  const thumbnailUri = React.useMemo(() => {
+    if (bookmark.thumbnailUrl && bookmark.thumbnailUrl.trim().length > 0) {
+      return bookmark.thumbnailUrl;
+    }
+    const fallback = bookmark.creator?.avatarUrl;
+    if (fallback && fallback.trim().length > 0) {
+      return fallback;
+    }
+    return undefined;
+  }, [bookmark.thumbnailUrl, bookmark.creator?.avatarUrl]);
+
   return (
     <Pressable
       onPress={handlePress}
@@ -103,9 +119,9 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
       <View style={{ width: 300, height: 240, borderRadius: 12, overflow: 'hidden', marginRight: 12, backgroundColor: colors.card, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 2 }}>
         {/* Media Preview Section */}
         <View style={{ width: '100%', height: 169, backgroundColor: '#e5e7eb', position: 'relative' }}>
-          {bookmark.thumbnailUrl ? (
+          {thumbnailUri ? (
             <OptimizedBookmarkImage
-              url={bookmark.thumbnailUrl}
+              url={thumbnailUri}
               contentType={bookmark.contentType}
               style={{
                 width: '100%',

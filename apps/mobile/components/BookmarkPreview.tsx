@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, Image, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import type { Bookmark } from '@zine/shared';
+import type { Bookmark } from '../types/bookmark';
 import { useTheme } from '../contexts/theme';
 import { PlatformIcon } from '../lib/platformIcons';
 
@@ -10,9 +10,10 @@ interface BookmarkPreviewProps {
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  onOpenExisting?: (bookmarkId: string) => void;
 }
 
-export function BookmarkPreview({ preview, isLoading, error, onRetry }: BookmarkPreviewProps) {
+export function BookmarkPreview({ preview, isLoading, error, onRetry, onOpenExisting }: BookmarkPreviewProps) {
   const [imageError, setImageError] = useState(false);
   const { colors } = useTheme();
 
@@ -75,6 +76,8 @@ export function BookmarkPreview({ preview, isLoading, error, onRetry }: Bookmark
     // Format duration if available
     const duration = preview.videoMetadata?.duration || preview.podcastMetadata?.duration;
     const formattedDuration = duration ? formatDuration(duration) : null;
+
+    const existingBookmarkId = preview.existingBookmarkId;
 
     return (
       <View style={[styles.previewCard, { backgroundColor: colors.card }]}>
@@ -144,6 +147,21 @@ export function BookmarkPreview({ preview, isLoading, error, onRetry }: Bookmark
             </View>
           )}
         </View>
+
+        {existingBookmarkId && onOpenExisting && (
+          <TouchableOpacity
+            onPress={() => onOpenExisting(existingBookmarkId)}
+            style={[styles.duplicateHint, { backgroundColor: colors.secondary }]}
+            activeOpacity={0.8}
+          >
+            <Feather name="check-circle" size={18} color={colors.primary} />
+            <View style={styles.duplicateHintTextContainer}>
+              <Text style={[styles.duplicateHintTitle, { color: colors.foreground }]}>Already saved</Text>
+              <Text style={[styles.duplicateHintSubtitle, { color: colors.mutedForeground }]}>Open existing bookmark</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -327,5 +345,26 @@ const styles = StyleSheet.create({
   contentTypeText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  duplicateHint: {
+    marginTop: 16,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  duplicateHintTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  duplicateHintTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  duplicateHintSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   Animated,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,14 +46,18 @@ export default function BookmarkDetailScreen() {
     enabled: isSignedIn && !!id,
   });
 
+  const openUrl = async (targetUrl: string) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await Linking.openURL(targetUrl);
+    } catch (error) {
+      Alert.alert('Error', 'Could not open the link');
+    }
+  };
+
   const handleOpenLink = async () => {
     if (bookmark?.url) {
-      try {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        await Linking.openURL(bookmark.url);
-      } catch (error) {
-        Alert.alert('Error', 'Could not open the link');
-      }
+      await openUrl(bookmark.url);
     }
   };
 
@@ -143,6 +149,81 @@ export default function BookmarkDetailScreen() {
         },
       ]
     );
+  };
+
+  const alternateLinkOptions = useMemo(() => {
+    if (!bookmark?.url) {
+      return [] as Array<{ provider?: string; url: string; label: string; isPrimary: boolean }>;
+    }
+
+    const options = new Map<string, { provider?: string; url: string; label: string; isPrimary: boolean }>();
+
+    const addOption = (provider: string | undefined, url: string, isPrimary = false) => {
+      if (!url) return;
+      const key = `${provider ?? 'unknown'}::${url}`;
+      if (options.has(key)) return;
+      options.set(key, {
+        provider,
+        url,
+        label: getProviderLabel(provider, url),
+        isPrimary,
+      });
+    };
+
+    addOption(bookmark.source ?? inferProviderFromUrl(bookmark.url), bookmark.url, true);
+
+    (bookmark.alternateLinks ?? []).forEach((link) => {
+      addOption(link.provider, link.url);
+    });
+
+    return Array.from(options.values()).sort((a, b) => {
+      if (a.isPrimary && !b.isPrimary) return -1;
+      if (!a.isPrimary && b.isPrimary) return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [bookmark]);
+
+  const hasAlternateLinks = alternateLinkOptions.length > 1;
+
+  const handleOpenAlternateLink = () => {
+    if (!hasAlternateLinks) {
+      return;
+    }
+
+    const options = alternateLinkOptions.map((option) => ({
+      ...option,
+      displayLabel: option.isPrimary ? `${option.label} (Default)` : option.label,
+    }));
+
+    const openByIndex = (index: number) => {
+      const target = options[index];
+      if (target) {
+        openUrl(target.url);
+      }
+    };
+
+    const optionLabels = options.map((option) => `Open in ${option.displayLabel}`);
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...optionLabels, 'Cancel'],
+          cancelButtonIndex: optionLabels.length,
+        },
+        (buttonIndex) => {
+          if (buttonIndex < optionLabels.length) {
+            openByIndex(buttonIndex);
+          }
+        }
+      );
+    } else {
+      const buttons = options.map((option, index) => ({
+        text: `Open in ${option.displayLabel}`,
+        onPress: () => openByIndex(index),
+      }));
+
+      Alert.alert('Open in…', undefined, [...buttons, { text: 'Cancel', style: 'cancel' }]);
+    }
   };
 
   // Format duration
@@ -437,6 +518,30 @@ export default function BookmarkDetailScreen() {
                 Open Link
               </Text>
             </TouchableOpacity>
+
+            {hasAlternateLinks && (
+              <TouchableOpacity 
+                style={[styles.alternateLinksButton, { backgroundColor: colors.secondary }]}
+                onPress={handleOpenAlternateLink}
+                activeOpacity={0.8}
+              >
+                <View style={styles.alternateLinksIconRow}>
+                  {alternateLinkOptions.slice(0, 3).map((option) => (
+                    <PlatformIcon
+                      key={`${option.provider ?? 'web'}-${option.url}`}
+                      source={(option.provider as any) ?? 'web'}
+                      size={16}
+                    />
+                  ))}
+                  {alternateLinkOptions.length > 3 && (
+                    <Text style={[styles.alternateLinksMore, { color: colors.mutedForeground }]}>
+                      +{alternateLinkOptions.length - 3}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.alternateLinksText, { color: colors.foreground }]}>Open in…</Text>
+              </TouchableOpacity>
+            )}
 
             <View style={styles.secondaryActions}>
               <TouchableOpacity 
@@ -822,6 +927,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.3,
   },
+  alternateLinksButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 10,
+  },
+  alternateLinksIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  alternateLinksMore: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  alternateLinksText: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
   secondaryActions: {
     flexDirection: 'row',
     gap: 12,
@@ -942,3 +1069,47 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
 });
+
+function inferProviderFromUrl(url: string): string | undefined {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    if (hostname.includes('youtube') || hostname.includes('youtu.be')) {
+      return 'youtube';
+    }
+    if (hostname.includes('spotify')) {
+      return 'spotify';
+    }
+    if (hostname.includes('twitter') || hostname.includes('x.com')) {
+      return 'twitter';
+    }
+    if (hostname.includes('substack')) {
+      return 'substack';
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getProviderLabel(provider?: string, url?: string): string {
+  switch (provider) {
+    case 'youtube':
+      return 'YouTube';
+    case 'spotify':
+      return 'Spotify';
+    case 'twitter':
+    case 'x':
+      return 'Twitter';
+    case 'substack':
+      return 'Substack';
+    default:
+      if (url) {
+        try {
+          return new URL(url).hostname.replace(/^www\./, '');
+        } catch {
+          return 'Link';
+        }
+      }
+      return 'Link';
+  }
+}

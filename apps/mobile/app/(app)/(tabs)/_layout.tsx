@@ -1,11 +1,11 @@
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
+import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { useTheme } from '../../../contexts/theme';
 
 export default function TabLayout() {
+  const { colors } = useTheme();
+
   return (
-    <NativeTabs
-      tintColor="#ff6b35"
-      backgroundColor={null}
-    >
+    <NativeTabs tintColor={colors.primary}>
       <NativeTabs.Trigger name="index">
         <Label>Home</Label>
         <Icon
@@ -14,14 +14,14 @@ export default function TabLayout() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="search">
-        <Label>Search</Label>
+      <NativeTabs.Trigger name="inbox">
+        <Label>Inbox</Label>
         <Icon
           sf={{
-            default: "magnifyingglass",
-            selected: "magnifyingglass.circle.fill",
+            default: "tray",
+            selected: "tray.fill",
           }}
-          drawable="ic_search"
+          drawable="ic_inbox"
         />
       </NativeTabs.Trigger>
 
@@ -32,8 +32,18 @@ export default function TabLayout() {
           drawable="ic_settings"
         />
       </NativeTabs.Trigger>
+
+      {/* @ts-expect-error - role prop exists but types may not be updated */}
+      <NativeTabs.Trigger name="search" role="search">
+        <Label>Search</Label>
+        <Icon
+          sf={{
+            default: "magnifyingglass",
+            selected: "magnifyingglass.circle.fill",
+          }}
+          drawable="ic_search"
+        />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
-
-

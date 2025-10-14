@@ -412,5 +412,37 @@ describe('MetadataRepository', () => {
       expect(result?.title).toBe('Test Video')
       expect(result?.normalizedUrl).toBe('https://youtube.com/watch?v=test123')
     })
+
+    it('should handle Spotify URL variants and URIs', async () => {
+      const now = Date.now()
+      const canonical = 'https://open.spotify.com/episode/xyz789'
+
+      sqliteDb.prepare(`
+        INSERT INTO users (id, email, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+      `).run('user-spotify', 'spotify@example.com', now, now)
+
+      sqliteDb.prepare(`
+        INSERT INTO bookmarks (
+          user_id, url, original_url, title, source, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'user-spotify',
+        canonical,
+        canonical,
+        'Spotify Episode',
+        'spotify',
+        now,
+        now
+      )
+
+      const localeResult = await repository.findExistingMetadata('https://open.spotify.com/intl-en/episode/xyz789?si=abc123')
+      expect(localeResult).toBeTruthy()
+      expect(localeResult?.normalizedUrl).toBe(canonical)
+
+      const uriResult = await repository.findExistingMetadata('spotify:episode:xyz789')
+      expect(uriResult).toBeTruthy()
+      expect(uriResult?.normalizedUrl).toBe(canonical)
+    })
   })
 })
