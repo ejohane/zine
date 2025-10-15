@@ -247,15 +247,15 @@ export const bookmarksApi = {
   create: (bookmark: CreateBookmark) => apiClient.post<Bookmark>('/api/v1/bookmarks', bookmark),
   update: (id: string, bookmark: UpdateBookmark) => apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}`, bookmark),
   delete: (id: string) => apiClient.delete<void>(`/api/v1/bookmarks/${id}`),
-  getRecent: async (limit: number = 10) => {
+  getRecent: async (limit: number = 10, offset: number = 0) => {
     const params = new URLSearchParams({
       limit: limit.toString(),
+      offset: offset.toString(),
       status: 'active',
       sort: 'createdAt',
       order: 'desc'
     });
     const response = await apiClient.get<BookmarksResponse>(`/api/v1/bookmarks?${params.toString()}`);
-    // Extract the data array from the response
     if (!response.data) {
       console.warn('API returned invalid bookmarks data:', response);
       return [];
