@@ -1,17 +1,18 @@
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRecentBookmarks } from '../../hooks/useRecentBookmarks';
-import { CompactBookmarkCard } from '../../components/CompactBookmarkCard';
+import { BookmarkList } from '../../components/bookmark-list';
 import { useTheme } from '../../contexts/theme';
 import { useAuth } from '../../contexts/auth';
-import type { Bookmark } from '@zine/shared';
+import { useArchiveBookmark } from '../../hooks/useArchiveBookmark';
 
 export default function RecentBookmarksScreen() {
   const router = useRouter();
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { isSignedIn } = useAuth();
+  const archiveBookmark = useArchiveBookmark();
   const {
     data: bookmarks,
     isLoading,
@@ -27,18 +28,9 @@ export default function RecentBookmarksScreen() {
     router.push(`/bookmark/${bookmarkId}` as any);
   };
 
-  const renderBookmarkItem = ({ item }: { item: Bookmark }) => (
-    <View style={{ marginHorizontal: 16 }}>
-      <CompactBookmarkCard
-        bookmark={item}
-        onPress={() => handleBookmarkPress(item.id)}
-      />
-    </View>
-  );
-
-  const renderItemSeparator = () => (
-    <View style={{ height: 8 }} />
-  );
+  const handleArchive = (bookmarkId: string) => {
+    archiveBookmark.mutate(bookmarkId);
+  };
 
   const renderEmptyState = () => {
     if (isLoading) return null;
@@ -72,18 +64,18 @@ export default function RecentBookmarksScreen() {
     </View>
   );
 
+  const headerOptions = {
+    headerTitle: 'Recent Bookmarks',
+    headerBackTitle: 'Back',
+    headerStyle: { backgroundColor: colors.background },
+    headerTintColor: colors.foreground,
+    headerLargeTitleStyle: { color: colors.foreground },
+  };
+
   if (!isSignedIn) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            headerTitle: 'Recent Bookmarks',
-            headerBackTitle: 'Back',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.foreground,
-            headerLargeTitleStyle: { color: colors.foreground },
-          }}
-        />
+        <Stack.Screen options={headerOptions} />
         <View style={styles.emptyStateContainer}>
           <View style={[styles.emptyIconContainer, { backgroundColor: colors.secondary }]}>
             <Feather name="lock" size={48} color={colors.mutedForeground} />
@@ -101,57 +93,27 @@ export default function RecentBookmarksScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          headerTitle: 'Recent Bookmarks',
-          headerBackTitle: 'Back',
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.foreground,
-          headerLargeTitleStyle: { color: colors.foreground },
-        }}
+      <Stack.Screen options={headerOptions} />
+      
+      <BookmarkList
+        bookmarks={bookmarks || []}
+        variant="compact"
+        layout="vertical"
+        enableSwipeActions={true}
+        rightSwipeActions={[
+          {
+            id: 'archive',
+            icon: 'archive',
+            backgroundColor: '#6B7280',
+            onPress: handleArchive,
+          },
+        ]}
+        onBookmarkPress={handleBookmarkPress}
+        onRefresh={refetch}
+        refreshing={isFetching && !isLoading}
+        ListEmptyComponent={error ? renderErrorState : renderEmptyState}
+        enableHaptics={true}
       />
-
-      {isLoading && !bookmarks ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Loading bookmarks...
-          </Text>
-        </View>
-      ) : error ? (
-        <FlatList
-          data={[]}
-          renderItem={() => null}
-          ListEmptyComponent={renderErrorState}
-          contentContainerStyle={styles.flatListContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isFetching && !isLoading}
-              onRefresh={refetch}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-        />
-      ) : (
-        <FlatList
-          data={bookmarks || []}
-          keyExtractor={(item) => item.id}
-          renderItem={renderBookmarkItem}
-          ItemSeparatorComponent={renderItemSeparator}
-          ListEmptyComponent={renderEmptyState}
-          contentContainerStyle={styles.flatListContent}
-          showsVerticalScrollIndicator={true}
-          refreshControl={
-            <RefreshControl
-              refreshing={isFetching && !isLoading}
-              onRefresh={refetch}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-        />
-      )}
     </View>
   );
 }
@@ -159,21 +121,6 @@ export default function RecentBookmarksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  flatListContent: {
-    paddingVertical: 16,
-    paddingBottom: 100,
-    flexGrow: 1,
   },
   emptyStateContainer: {
     flex: 1,
