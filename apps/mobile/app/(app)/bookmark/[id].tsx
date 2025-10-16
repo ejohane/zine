@@ -25,6 +25,7 @@ import { formatDistanceToNow } from '../../../lib/dateUtils';
 import { PlatformIcon } from '../../../lib/platformIcons';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { LinkifiedText } from '../../../components/LinkifiedText';
 
 export default function BookmarkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -682,9 +683,10 @@ export default function BookmarkDetailScreen() {
 
           {/* Description */}
           {bookmark.description && (
-            <Text style={[styles.description, { color: colors.mutedForeground }]}>
-              {bookmark.description}
-            </Text>
+            <LinkifiedText 
+              text={bookmark.description}
+              style={[styles.description, { color: colors.mutedForeground }]}
+            />
           )}
         </View>
       </Animated.ScrollView>
@@ -1072,7 +1074,8 @@ const styles = StyleSheet.create({
 
 function inferProviderFromUrl(url: string): string | undefined {
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
+    const urlObj = new URL(url);
+    const hostname = (urlObj as any).hostname?.toLowerCase() || '';
     if (hostname.includes('youtube') || hostname.includes('youtu.be')) {
       return 'youtube';
     }
@@ -1105,7 +1108,9 @@ function getProviderLabel(provider?: string, url?: string): string {
     default:
       if (url) {
         try {
-          return new URL(url).hostname.replace(/^www\./, '');
+          const urlObj = new URL(url);
+          const hostname = (urlObj as any).hostname || '';
+          return hostname.replace(/^www\./, '');
         } catch {
           return 'Link';
         }
