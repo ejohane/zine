@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import type { Bookmark } from '../types/bookmark';
 import { useTheme } from '../contexts/theme';
 import { PlatformIcon } from '../lib/platformIcons';
+import { LinkifiedText } from './LinkifiedText';
 
 interface BookmarkPreviewProps {
   preview?: Bookmark | null;
@@ -124,16 +125,18 @@ export function BookmarkPreview({ preview, isLoading, error, onRetry, onOpenExis
               <PlatformIcon source={preview.source} size={16} color={platformColor} />
               <Text style={[styles.source, { color: colors.mutedForeground }]}>
                 {preview.creator?.name || 
-                 (preview.url ? new URL(preview.url).hostname.replace('www.', '') : 'Unknown')}
+                 (preview.url ? ((new URL(preview.url) as any).hostname || '').replace('www.', '') : 'Unknown')}
               </Text>
             </View>
           </View>
 
           {/* Description */}
           {preview.description && (
-            <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={2}>
-              {preview.description}
-            </Text>
+            <LinkifiedText 
+              text={preview.description}
+              style={[styles.description, { color: colors.mutedForeground }]}
+              numberOfLines={2}
+            />
           )}
 
           {/* Content Type Badge */}

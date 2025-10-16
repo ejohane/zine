@@ -33,7 +33,6 @@ export default function AppLayout() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: 'minimal',
-          headerTransparent: false,
         }}
       />
       <Stack.Screen
@@ -41,7 +40,6 @@ export default function AppLayout() {
         options={{
           headerShown: true,
           headerBackButtonDisplayMode: 'minimal',
-          headerTransparent: false,
         }}
       />
     </Stack>
