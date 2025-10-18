@@ -4,6 +4,7 @@
 
 import { parseHTML } from 'linkedom'
 import { resolveSpotifyResource } from './url-normalizer'
+import { extractArticleContent } from './article-content-extractor'
 
 // Type definitions for linkedom
 type LinkedOMDocument = {
@@ -103,6 +104,8 @@ export interface EnhancedExtractedMetadata {
   podcastMetadata?: PodcastMetadata
   articleMetadata?: ArticleMetadata
   postMetadata?: PostMetadata
+  fullTextContent?: string
+  fullTextExtractedAt?: Date
 }
 
 export interface EnhancedMetadataExtractionResult {
@@ -218,41 +221,58 @@ export class EnhancedMetadataExtractor {
   /**
    * Parse HTML with enhanced extraction including JSON-LD
    */
-  private parseEnhancedHtmlMetadata(html: string, url: string): EnhancedExtractedMetadata {
+  private async parseEnhancedHtmlMetadata(html: string, url: string): Promise<EnhancedExtractedMetadata> {
     // Parse HTML using linkedom for proper DOM manipulation
     const parsed = parseHTML(html) as any
     const document = parsed.document as LinkedOMDocument
-    
+
     // Extract JSON-LD structured data
     const jsonLdData = this.extractJsonLd(document)
-    
+
     // Get meta tags
     const metaTags = this.extractMetaTags(document)
-    
+
     // Extract title with priority: JSON-LD > Open Graph > Twitter > HTML title
     const title = this.extractTitle(jsonLdData, metaTags, document, url)
-    
+
     // Extract description
     const description = this.extractDescription(jsonLdData, metaTags, document)
-    
+
     // Extract images
     const { thumbnailUrl, faviconUrl } = this.extractImages(jsonLdData, metaTags, document, url)
-    
+
     // Extract dates
     const publishedAt = this.extractPublishedDate(jsonLdData, metaTags, document)
-    
+
     // Extract language
     const language = this.extractLanguage(document, metaTags)
-    
+
     // Extract creator information
     const creator = this.extractCreator(jsonLdData, metaTags, document, url)
-    
+
     // Determine content type and source
     const { contentType, source } = this.inferContentTypeAndSource(url, jsonLdData, metaTags)
-    
+
     // Extract content-specific metadata
-    const { videoMetadata, podcastMetadata, articleMetadata, postMetadata } = 
+    const { videoMetadata, podcastMetadata, articleMetadata, postMetadata } =
       this.extractContentSpecificMetadata(jsonLdData, metaTags, document, contentType)
+
+    // Extract full-text content for articles
+    let fullTextContent: string | undefined
+    let fullTextExtractedAt: Date | undefined
+
+    if (contentType === 'article') {
+      try {
+        const articleContent = await extractArticleContent(url, html)
+        if (articleContent.success && articleContent.html) {
+          fullTextContent = articleContent.html
+          fullTextExtractedAt = new Date()
+        }
+      } catch (error) {
+        console.error('[EnhancedMetadataExtractor] Full-text extraction failed:', error)
+        // Continue without full-text content
+      }
+    }
 
     return {
       title,
@@ -267,7 +287,9 @@ export class EnhancedMetadataExtractor {
       videoMetadata,
       podcastMetadata,
       articleMetadata,
-      postMetadata
+      postMetadata,
+      fullTextContent,
+      fullTextExtractedAt
     }
   }
 
@@ -400,40 +422,38 @@ export class EnhancedMetadataExtractor {
     let thumbnailUrl: string | undefined
     let faviconUrl: string | undefined
     
-    // Extract thumbnail
-    // Try JSON-LD first
-    for (const data of jsonLdData) {
-      if (data.image) {
-        thumbnailUrl = typeof data.image === 'string' ? data.image : data.image.url || data.image[0]?.url
-        if (thumbnailUrl) break
-      }
-      if (data.thumbnailUrl) {
-        thumbnailUrl = data.thumbnailUrl
-        break
-      }
-    }
-    
-    // Try Open Graph
+    // Extract featured image with priority:
+    // 1. og:image (Open Graph) - most reliable for articles
+    // 2. First content image (from article body)
+    // 3. JSON-LD image
+    // 4. Twitter image
+    // 5. Favicon as last resort
+
+    // Priority 1: Open Graph image
+    thumbnailUrl = metaTags.get('og:image') || metaTags.get('og:image:url')
+
+    // Priority 2: First content image (article-specific)
     if (!thumbnailUrl) {
-      thumbnailUrl = metaTags.get('og:image') || metaTags.get('og:image:url')
+      thumbnailUrl = this.extractFirstContentImage(document, url)
     }
-    
-    // Try Twitter
+
+    // Priority 3: JSON-LD image
     if (!thumbnailUrl) {
-      thumbnailUrl = metaTags.get('twitter:image') || metaTags.get('twitter:image:src')
-    }
-    
-    // Try to find first reasonable image in content
-    if (!thumbnailUrl) {
-      const images = document.querySelectorAll('img[src]')
-      for (const img of images) {
-        const imgElement = img as any
-        const src = imgElement.getAttribute('src')
-        if (src && !src.includes('icon') && !src.includes('logo') && !src.includes('avatar')) {
-          thumbnailUrl = this.resolveUrl(src, url)
+      for (const data of jsonLdData) {
+        if (data.image) {
+          thumbnailUrl = typeof data.image === 'string' ? data.image : data.image.url || data.image[0]?.url
+          if (thumbnailUrl) break
+        }
+        if (data.thumbnailUrl) {
+          thumbnailUrl = data.thumbnailUrl
           break
         }
       }
+    }
+
+    // Priority 4: Twitter image
+    if (!thumbnailUrl) {
+      thumbnailUrl = metaTags.get('twitter:image') || metaTags.get('twitter:image:src')
     }
     
     // Extract favicon
@@ -455,8 +475,69 @@ export class EnhancedMetadataExtractor {
         // Ignore
       }
     }
-    
+
+    // Priority 5: Use favicon as thumbnail if nothing else found
+    if (!thumbnailUrl && faviconUrl) {
+      thumbnailUrl = faviconUrl
+    }
+
+    // Resolve relative URLs
+    if (thumbnailUrl) {
+      thumbnailUrl = this.resolveUrl(thumbnailUrl, url)
+    }
+
     return { thumbnailUrl, faviconUrl }
+  }
+
+  /**
+   * Extract the first meaningful content image from article
+   */
+  private extractFirstContentImage(document: LinkedOMDocument, url: string): string | undefined {
+    // Look for images in common article content containers
+    const contentSelectors = [
+      'article img[src]',
+      '[role="main"] img[src]',
+      '.article-content img[src]',
+      '.post-content img[src]',
+      '.entry-content img[src]',
+      'main img[src]',
+      'img[src]'
+    ]
+
+    for (const selector of contentSelectors) {
+      const images = document.querySelectorAll(selector)
+      for (const img of images) {
+        const imgElement = img as any
+        const src = imgElement.getAttribute('src')
+
+        // Filter out common non-content images
+        if (src &&
+            !src.toLowerCase().includes('icon') &&
+            !src.toLowerCase().includes('logo') &&
+            !src.toLowerCase().includes('avatar') &&
+            !src.toLowerCase().includes('profile') &&
+            !src.toLowerCase().includes('badge') &&
+            !src.toLowerCase().includes('button') &&
+            !src.startsWith('data:')) {
+
+          // Check if image has reasonable dimensions (if available)
+          const width = imgElement.getAttribute('width')
+          const height = imgElement.getAttribute('height')
+          if (width && height) {
+            const w = parseInt(width)
+            const h = parseInt(height)
+            // Skip tiny images (likely icons/decorations)
+            if (w < 200 || h < 100) {
+              continue
+            }
+          }
+
+          return this.resolveUrl(src, url)
+        }
+      }
+    }
+
+    return undefined
   }
 
   /**
@@ -526,7 +607,7 @@ export class EnhancedMetadataExtractor {
         const author = Array.isArray(data.author) ? data.author[0] : data.author
         if (typeof author === 'object') {
           return {
-            id: author['@id'] || `web:${author.name || 'unknown'}`,
+            id: author['@id'] || `web:${this.slugifyAuthorName(author.name || 'unknown')}`,
             name: author.name || 'Unknown Author',
             url: author.url,
             bio: author.description,
@@ -534,17 +615,17 @@ export class EnhancedMetadataExtractor {
           }
         } else if (typeof author === 'string') {
           return {
-            id: `web:${author}`,
+            id: `web:${this.slugifyAuthorName(author)}`,
             name: author
           }
         }
       }
-      
+
       if (data.creator) {
         const creator = Array.isArray(data.creator) ? data.creator[0] : data.creator
         if (typeof creator === 'object') {
           return {
-            id: creator['@id'] || `web:${creator.name || 'unknown'}`,
+            id: creator['@id'] || `web:${this.slugifyAuthorName(creator.name || 'unknown')}`,
             name: creator.name || 'Unknown Creator',
             url: creator.url,
             bio: creator.description,
@@ -553,17 +634,87 @@ export class EnhancedMetadataExtractor {
         }
       }
     }
-    
-    // Try meta tags
-    const authorName = metaTags.get('author') || metaTags.get('article:author')
+
+    // Try article-specific meta tags (enhanced for articles)
+    const articleAuthor = metaTags.get('article:author')
+    if (articleAuthor) {
+      return {
+        id: `web:${this.slugifyAuthorName(articleAuthor)}`,
+        name: articleAuthor
+      }
+    }
+
+    // Try generic author meta tag
+    const authorName = metaTags.get('author')
     if (authorName) {
       return {
-        id: `web:${authorName}`,
+        id: `web:${this.slugifyAuthorName(authorName)}`,
         name: authorName
       }
     }
-    
+
     return undefined
+  }
+
+  /**
+   * Helper to slugify author names for consistent IDs
+   */
+  private slugifyAuthorName(name: string): string {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+  }
+
+  /**
+   * Extract all authors from article (primary + secondary)
+   */
+  private extractAllAuthors(jsonLdData: any[], metaTags: Map<string, string>): {
+    primary?: string
+    secondary?: string[]
+  } {
+    const authors: string[] = []
+
+    // Try JSON-LD first
+    for (const data of jsonLdData) {
+      if (data.author) {
+        if (Array.isArray(data.author)) {
+          // Multiple authors
+          data.author.forEach((author: any) => {
+            const name = typeof author === 'object' ? author.name : author
+            if (name && typeof name === 'string') {
+              authors.push(name)
+            }
+          })
+        } else {
+          // Single author
+          const name = typeof data.author === 'object' ? data.author.name : data.author
+          if (name && typeof name === 'string') {
+            authors.push(name)
+          }
+        }
+        break
+      }
+    }
+
+    if (authors.length === 0) {
+      // Try meta tags
+      const articleAuthor = metaTags.get('article:author') || metaTags.get('author')
+      if (articleAuthor) {
+        authors.push(articleAuthor)
+      }
+    }
+
+    if (authors.length === 0) {
+      return {}
+    }
+
+    return {
+      primary: authors[0],
+      secondary: authors.length > 1 ? authors.slice(1) : undefined
+    }
   }
 
   /**
@@ -574,15 +725,15 @@ export class EnhancedMetadataExtractor {
     source: Source
   } {
     const urlLower = url.toLowerCase()
-    
-    // Check JSON-LD for type information
+
+    // Check JSON-LD for type information (enhanced article detection)
     for (const data of jsonLdData) {
       const type = data['@type']?.toLowerCase()
       if (type) {
         if (type.includes('videoobject') || type.includes('video')) {
           return { contentType: 'video', source: 'web' }
         }
-        if (type.includes('article') || type.includes('blogposting') || type.includes('newsarticle')) {
+        if (type.includes('article') || type.includes('blogposting') || type.includes('newsarticle') || type.includes('scholarlyarticle') || type.includes('technicalArticle')) {
           return { contentType: 'article', source: 'web' }
         }
         if (type.includes('podcast') || type.includes('audio')) {
@@ -590,31 +741,40 @@ export class EnhancedMetadataExtractor {
         }
       }
     }
-    
-    // Check Open Graph type
+
+    // Check Open Graph type (prioritize article detection)
     const ogType = metaTags.get('og:type')
     if (ogType) {
-      if (ogType.includes('video')) {
+      const ogTypeLower = ogType.toLowerCase()
+      if (ogTypeLower.includes('video')) {
         return { contentType: 'video', source: 'web' }
       }
-      if (ogType.includes('article')) {
+      if (ogTypeLower === 'article' || ogTypeLower.includes('article')) {
         return { contentType: 'article', source: 'web' }
       }
     }
-    
+
+    // Check for article-specific meta tags
+    const articleAuthor = metaTags.get('article:author')
+    const articlePublishedTime = metaTags.get('article:published_time')
+    const articleModifiedTime = metaTags.get('article:modified_time')
+    if (articleAuthor || articlePublishedTime || articleModifiedTime) {
+      return { contentType: 'article', source: 'web' }
+    }
+
     // Infer from URL patterns
     if (urlLower.includes('blog') || urlLower.includes('article') || urlLower.includes('post')) {
       return { contentType: 'article', source: 'web' }
     }
-    
+
     if (urlLower.includes('video') || urlLower.includes('watch')) {
       return { contentType: 'video', source: 'web' }
     }
-    
+
     if (urlLower.includes('podcast') || urlLower.includes('audio')) {
       return { contentType: 'podcast', source: 'web' }
     }
-    
+
     return { contentType: 'link', source: 'web' }
   }
 
@@ -622,9 +782,9 @@ export class EnhancedMetadataExtractor {
    * Extract content-specific metadata
    */
   private extractContentSpecificMetadata(
-    jsonLdData: any[], 
-    _metaTags: Map<string, string>, 
-    document: LinkedOMDocument, 
+    jsonLdData: any[],
+    metaTags: Map<string, string>,
+    document: LinkedOMDocument,
     contentType: ContentType
   ): {
     videoMetadata?: VideoMetadata
@@ -633,7 +793,7 @@ export class EnhancedMetadataExtractor {
     postMetadata?: PostMetadata
   } {
     const result: any = {}
-    
+
     if (contentType === 'video') {
       // Extract video metadata
       for (const data of jsonLdData) {
@@ -645,19 +805,14 @@ export class EnhancedMetadataExtractor {
         }
       }
     }
-    
+
     if (contentType === 'article') {
       // Extract article metadata
       let wordCount: number | undefined
       let readingTime: number | undefined
-      
-      // Try to estimate word count from content
-      const textContent = (document.body as any)?.textContent || ''
-      if (textContent) {
-        wordCount = textContent.trim().split(/\s+/).length
-        readingTime = wordCount ? Math.ceil(wordCount / 200) : undefined // Assume 200 WPM reading speed
-      }
-      
+      let isPaywalled = false
+
+      // Try to get word count from JSON-LD first
       for (const data of jsonLdData) {
         if (data.wordCount) {
           wordCount = data.wordCount
@@ -665,13 +820,119 @@ export class EnhancedMetadataExtractor {
           break
         }
       }
-      
-      if (wordCount || readingTime) {
-        result.articleMetadata = { wordCount, readingTime }
+
+      // If not found, estimate word count from content
+      if (!wordCount) {
+        const textContent = this.extractMainTextContent(document)
+        if (textContent) {
+          const words = textContent.trim().split(/\s+/).filter(w => w.length > 0)
+          wordCount = words.length
+          readingTime = wordCount > 0 ? Math.ceil(wordCount / 200) : undefined
+        }
+      }
+
+      // Extract all authors (primary + secondary)
+      const authors = this.extractAllAuthors(jsonLdData, metaTags)
+
+      // Detect paywalled content
+      isPaywalled = this.detectPaywall(document, metaTags)
+
+      const articleMetadata: ArticleMetadata = {
+        wordCount,
+        readingTime,
+        authorName: authors.primary,
+        secondaryAuthors: authors.secondary,
+        isPaywalled: isPaywalled || undefined
+      }
+
+      // Remove undefined values
+      Object.keys(articleMetadata).forEach(key => {
+        if (articleMetadata[key as keyof ArticleMetadata] === undefined) {
+          delete articleMetadata[key as keyof ArticleMetadata]
+        }
+      })
+
+      if (Object.keys(articleMetadata).length > 0) {
+        result.articleMetadata = articleMetadata
       }
     }
-    
+
     return result
+  }
+
+  /**
+   * Extract main text content from article, excluding navigation, footer, ads
+   */
+  private extractMainTextContent(document: LinkedOMDocument): string {
+    const body = document.body as any
+    if (!body) return ''
+
+    // Clone the body to avoid modifying the original
+    const clone = body.cloneNode(true) as any
+
+    // Remove non-content elements
+    const selectorsToRemove = [
+      'script',
+      'style',
+      'nav',
+      'header',
+      'footer',
+      'aside',
+      'iframe',
+      '[role="navigation"]',
+      '[role="complementary"]',
+      '[role="banner"]',
+      '[role="contentinfo"]',
+      '.nav',
+      '.navigation',
+      '.sidebar',
+      '.footer',
+      '.header',
+      '.advertisement',
+      '.ad',
+      '.social-share',
+      '.comments'
+    ]
+
+    selectorsToRemove.forEach(selector => {
+      const elements = clone.querySelectorAll(selector)
+      elements.forEach((el: any) => el.remove())
+    })
+
+    return clone.textContent || ''
+  }
+
+  /**
+   * Detect if article is behind a paywall
+   */
+  private detectPaywall(document: LinkedOMDocument, metaTags: Map<string, string>): boolean {
+    // Check for paywall indicators in meta tags
+    const isAccessibleForFree = metaTags.get('isAccessibleForFree')
+    if (isAccessibleForFree === 'false' || isAccessibleForFree === 'False') {
+      return true
+    }
+
+    // Check HTML content for common paywall indicators
+    const body = document.body as any
+    if (!body) return false
+
+    const htmlContent = body.textContent?.toLowerCase() || ''
+    const paywallIndicators = [
+      'subscriber-only',
+      'subscribers only',
+      'member-only',
+      'members only',
+      'paywall',
+      'subscribe to read',
+      'subscription required',
+      'login to continue',
+      'sign in to read',
+      'become a member',
+      'premium content',
+      'exclusive to members'
+    ]
+
+    return paywallIndicators.some(indicator => htmlContent.includes(indicator))
   }
 
   /**

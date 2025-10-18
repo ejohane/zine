@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import * as Haptics from 'expo-haptics';
 import { Play } from 'lucide-react-native';
 import type { Bookmark } from '@zine/shared';
-import { formatDuration, formatShortDate } from '../lib/dateUtils';
+import { formatDuration, formatShortDate, formatPublicationDate } from '../lib/dateUtils';
 import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 import { useTheme } from '../contexts/theme';
@@ -26,19 +26,24 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
   const router = useRouter();
   const { colors } = useTheme();
   
-  // Handle card press - navigate to detail view
+  // Handle card press - navigate to detail view or article reader
   const handlePress = React.useCallback(() => {
     if (enableHaptics) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     if (onPress) {
       onPress();
     } else {
-      // Navigate to bookmark detail screen
-      router.push(`/bookmark/${bookmark.id}`);
+      // For articles, navigate to article reader
+      if (bookmark.contentType === 'article') {
+        router.push(`/article-reader?bookmarkId=${bookmark.id}`);
+      } else {
+        // For other content, navigate to bookmark detail screen
+        router.push(`/bookmark/${bookmark.id}`);
+      }
     }
-  }, [bookmark.id, onPress, router, enableHaptics]);
+  }, [bookmark.id, bookmark.contentType, onPress, router, enableHaptics]);
   
   // Handle open link/more options
   const handleOpenLink = React.useCallback(async () => {
@@ -63,21 +68,30 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
     }
   }, [bookmark.originalUrl, bookmark.url, bookmark.id, onOpenLink, router, enableHaptics]);
   
-  // Get duration based on content type
-  const duration =
-    bookmark.videoMetadata?.duration ??
-    bookmark.podcastMetadata?.duration ??
-    bookmark.metrics?.durationSeconds ??
-    bookmark.duration ??
-    null;
-  const formattedDuration = duration ? formatDuration(duration) : null;
-  
+  // Get duration/reading time based on content type
+  const displayTime = React.useMemo(() => {
+    if (bookmark.contentType === 'article') {
+      // Show reading time for articles
+      return bookmark.articleMetadata?.readingTime
+        ? `${bookmark.articleMetadata.readingTime} min read`
+        : null;
+    }
+
+    // Show duration for videos/podcasts
+    const duration =
+      bookmark.videoMetadata?.duration ??
+      bookmark.podcastMetadata?.duration ??
+      bookmark.metrics?.durationSeconds ??
+      bookmark.duration ??
+      null;
+    return duration ? formatDuration(duration) : null;
+  }, [bookmark.contentType, bookmark.articleMetadata, bookmark.videoMetadata, bookmark.podcastMetadata, bookmark.metrics, bookmark.duration]);
+
   // Get author/source name
-  const authorName = bookmark.creator?.name || 
-                     bookmark.articleMetadata?.authorName || 
-                     bookmark.source || 
-                     'Unknown';
-                     
+  const authorName = bookmark.contentType === 'article'
+    ? bookmark.creator?.name || bookmark.articleMetadata?.authorName || 'Unknown Author'
+    : bookmark.creator?.name || bookmark.source || 'Unknown';
+
   // Check if media content (show play button)
   const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
   
@@ -151,10 +165,17 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
             </View>
           )}
           
-          {/* Duration badge */}
-          {formattedDuration && (
+          {/* Duration/Reading time badge */}
+          {displayTime && (
             <View style={{ position: 'absolute', bottom: 8, right: 8, backgroundColor: 'rgba(0, 0, 0, 0.8)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-              <Text style={{ color: 'white', fontSize: 11, fontWeight: '500' }}>{formattedDuration}</Text>
+              <Text style={{ color: 'white', fontSize: 11, fontWeight: '500' }}>{displayTime}</Text>
+            </View>
+          )}
+
+          {/* Paywall indicator for articles */}
+          {bookmark.contentType === 'article' && bookmark.articleMetadata?.isPaywalled && (
+            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(255, 193, 7, 0.9)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={{ color: '#000', fontSize: 10, fontWeight: '600' }}>🔒 Limited</Text>
             </View>
           )}
         </View>
@@ -189,7 +210,10 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
             {/* Publish date on the right */}
             {bookmark.publishedAt && (
               <Text style={{ fontSize: 12, marginLeft: 8, color: colors.mutedForeground }}>
-                {formatShortDate(bookmark.publishedAt)}
+                {bookmark.contentType === 'article'
+                  ? formatPublicationDate(bookmark.publishedAt)
+                  : formatShortDate(bookmark.publishedAt)
+                }
               </Text>
             )}
           </View>

@@ -67,14 +67,45 @@ export const formatDistanceToNow = formatRelativeTime;
  */
 export function formatDuration(seconds: number | undefined): string {
   if (!seconds || seconds < 0) return '';
-  
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
-  
+
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Format publication date for articles
+ * - Recent articles (< 30 days): relative format (e.g., "3 days ago")
+ * - Older articles (≥ 30 days): absolute format (e.g., "Jan 15, 2024")
+ */
+export function formatPublicationDate(timestamp: number | string | Date | undefined): string {
+  if (!timestamp) return '';
+
+  const now = Date.now();
+  const date = new Date(timestamp);
+  const diffMs = now - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // Recent articles: relative format
+  if (diffDays < 30) {
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+
+    const weeks = Math.floor(diffDays / 7);
+    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  }
+
+  // Older articles: absolute format
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
