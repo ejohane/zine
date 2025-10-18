@@ -54,7 +54,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
   async getAll(): Promise<Bookmark[]> {
     try {
       const result = await this.db.prepare(`
-        SELECT 
+        SELECT
           b.*,
           c.id as content_id,
           c.url as content_url,
@@ -68,6 +68,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.published_at as content_published_at,
           c.provider as content_provider,
           c.cross_platform_matches as content_cross_platform_matches,
+          c.extended_metadata as content_extended_metadata,
+          c.full_text_content as content_full_text_content,
+          c.full_text_extracted_at as content_full_text_extracted_at,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -93,7 +96,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
   async getById(id: string): Promise<Bookmark | null> {
     try {
       const result = await this.db.prepare(`
-        SELECT 
+        SELECT
           b.*,
           c.id as content_id,
           c.url as content_url,
@@ -107,6 +110,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.published_at as content_published_at,
           c.provider as content_provider,
           c.cross_platform_matches as content_cross_platform_matches,
+          c.extended_metadata as content_extended_metadata,
+          c.full_text_content as content_full_text_content,
+          c.full_text_extracted_at as content_full_text_extracted_at,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -430,7 +436,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
   async getByIdAndUserId(id: string, userId: string): Promise<Bookmark | null> {
     try {
       const result = await this.db.prepare(`
-        SELECT 
+        SELECT
           b.*,
           c.id as content_id,
           c.url as content_url,
@@ -444,6 +450,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
           c.published_at as content_published_at,
           c.provider as content_provider,
           c.cross_platform_matches as content_cross_platform_matches,
+          c.extended_metadata as content_extended_metadata,
+          c.full_text_content as content_full_text_content,
+          c.full_text_extracted_at as content_full_text_extracted_at,
           cr.name as creator_name,
           cr.handle as creator_handle,
           cr.avatar_url as creator_avatar_url,
@@ -563,6 +572,8 @@ export class D1BookmarkRepository implements BookmarkRepository {
     podcastMetadata?: any
     articleMetadata?: any
     postMetadata?: any
+    fullTextContent?: string
+    fullTextExtractedAt?: Date
     tags?: string[]
     notes?: string
   }): Promise<Bookmark> {
@@ -627,6 +638,18 @@ export class D1BookmarkRepository implements BookmarkRepository {
         contentId = `${provider}-${urlHash}`
       }
       
+       // Prepare extended metadata for article content
+       let extendedMetadata: any = null
+       if (bookmarkData.contentType === 'article' && bookmarkData.articleMetadata) {
+         extendedMetadata = {
+           authorName: bookmarkData.articleMetadata.authorName,
+           wordCount: bookmarkData.articleMetadata.wordCount,
+           readingTime: bookmarkData.articleMetadata.readingTime,
+           isPaywalled: bookmarkData.articleMetadata.isPaywalled,
+           secondaryAuthors: bookmarkData.articleMetadata.secondaryAuthors
+         }
+       }
+
        // Insert or update content
        await this.db.prepare(`
          INSERT OR REPLACE INTO content (
@@ -634,8 +657,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
            thumbnail_url, favicon_url, published_at, content_type,
            creator_id, creator_name, creator_handle, creator_thumbnail,
            creator_verified, creator_subscriber_count, creator_follower_count,
+           extended_metadata, full_text_content, full_text_extracted_at,
            created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         contentId,
         contentId,
@@ -655,6 +679,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
          bookmarkData.creatorVerified ? 1 : 0,
          bookmarkData.creatorSubscriberCount || null,
          bookmarkData.creatorFollowerCount || null,
+         extendedMetadata ? JSON.stringify(extendedMetadata) : null,
+         bookmarkData.fullTextContent || null,
+         bookmarkData.fullTextExtractedAt ? bookmarkData.fullTextExtractedAt.getTime() : null,
          now,
          now
        ).run()
@@ -696,6 +723,23 @@ export class D1BookmarkRepository implements BookmarkRepository {
    * Map database row to Bookmark object
    */
   private mapRowToBookmark(row: any): Bookmark {
+    // Parse extended metadata for article content
+    let articleMetadata = undefined
+    if (row.content_type === 'article' && row.content_extended_metadata) {
+      try {
+        const extended = JSON.parse(row.content_extended_metadata)
+        articleMetadata = {
+          authorName: extended.authorName,
+          wordCount: extended.wordCount,
+          readingTime: extended.readingTime,
+          isPaywalled: extended.isPaywalled,
+          secondaryAuthors: extended.secondaryAuthors
+        }
+      } catch (error) {
+        console.warn('Failed to parse article extended metadata:', error)
+      }
+    }
+
     // Map from new schema where content is separate
     const bookmark: Bookmark = {
       id: String(row.id),
@@ -715,7 +759,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
       creatorId: row.creator_id || undefined,
       videoMetadata: undefined, // Not in new schema
       podcastMetadata: undefined, // Not in new schema
-      articleMetadata: undefined, // Not in new schema
+      articleMetadata: articleMetadata, // Parsed from extended_metadata
       postMetadata: undefined, // Not in new schema
       tags: row.user_tags ? JSON.parse(row.user_tags) : undefined,
       notes: row.notes || undefined,
@@ -739,6 +783,14 @@ export class D1BookmarkRepository implements BookmarkRepository {
         updatedAt: undefined
       } : null
       }
+
+    // Include full-text content for articles (for article reader)
+    if (row.content_type === 'article' && row.content_full_text_content) {
+      ;(bookmark as any).fullTextContent = row.content_full_text_content
+      ;(bookmark as any).fullTextExtractedAt = row.content_full_text_extracted_at
+        ? Number(row.content_full_text_extracted_at) * 1000
+        : undefined
+    }
 
     const alternateLinks = D1BookmarkRepository.buildAlternateLinks(row)
     if (alternateLinks.length > 0) {

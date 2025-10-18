@@ -154,6 +154,8 @@ export class BookmarkSaveService {
           podcastMetadata: metadata.podcastMetadata,
           articleMetadata: metadata.articleMetadata,
           postMetadata: metadata.postMetadata,
+          fullTextContent: metadata.fullTextContent,
+          fullTextExtractedAt: metadata.fullTextExtractedAt,
           tags: [],
           notes: input.notes
         })

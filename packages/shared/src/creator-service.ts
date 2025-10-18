@@ -9,6 +9,13 @@ export interface CreatorResolutionResult {
   resolved: Creator
   wasNormalized: boolean
   duplicateOf?: string
+  similarityScore?: number
+}
+
+export interface NameMatchResult {
+  match: boolean
+  similarity: number
+  method: 'exact' | 'fuzzy' | 'substring' | 'none'
 }
 
 /**
@@ -110,6 +117,87 @@ export class CreatorService {
   }
 
   /**
+   * Normalize name for comparison
+   */
+  private normalizeName(name: string): string {
+    return name
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '') // Remove punctuation
+      .replace(/\s+/g, ' ') // Normalize whitespace
+      .trim()
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  private levenshteinDistance(str1: string, str2: string): number {
+    const m = str1.length
+    const n = str2.length
+
+    // Create matrix
+    const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0))
+
+    // Initialize first row and column
+    for (let i = 0; i <= m; i++) dp[i][0] = i
+    for (let j = 0; j <= n; j++) dp[0][j] = j
+
+    // Fill matrix
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1]
+        } else {
+          dp[i][j] = Math.min(
+            dp[i - 1][j] + 1,    // deletion
+            dp[i][j - 1] + 1,    // insertion
+            dp[i - 1][j - 1] + 1 // substitution
+          )
+        }
+      }
+    }
+
+    return dp[m][n]
+  }
+
+  /**
+   * Calculate name similarity score (0-1)
+   */
+  calculateNameSimilarity(name1: string, name2: string): NameMatchResult {
+    const n1 = this.normalizeName(name1)
+    const n2 = this.normalizeName(name2)
+
+    // Exact match
+    if (n1 === n2) {
+      return { match: true, similarity: 1.0, method: 'exact' }
+    }
+
+    // Substring match
+    if (n1.includes(n2) || n2.includes(n1)) {
+      // Calculate ratio of shorter to longer
+      const shorter = Math.min(n1.length, n2.length)
+      const longer = Math.max(n1.length, n2.length)
+      const similarity = shorter / longer
+      return {
+        match: similarity > 0.7,
+        similarity,
+        method: 'substring'
+      }
+    }
+
+    // Fuzzy match using Levenshtein distance
+    const distance = this.levenshteinDistance(n1, n2)
+    const maxLength = Math.max(n1.length, n2.length)
+    const similarity = 1 - (distance / maxLength)
+
+    // Consider it a match if similarity > 0.85
+    return {
+      match: similarity > 0.85,
+      similarity,
+      method: similarity > 0.85 ? 'fuzzy' : 'none'
+    }
+  }
+
+  /**
    * Find existing creator by various matching strategies
    */
   private findExistingCreator(creator: Creator): Creator | undefined {
@@ -119,29 +207,53 @@ export class CreatorService {
       return exactMatch
     }
 
+    // Track best fuzzy match
+    let bestMatch: Creator | undefined
+    let bestSimilarity = 0.85 // Minimum threshold for fuzzy matching
+
     // Find by similar criteria
     for (const [, existingCreator] of this.creatorCache) {
-      // Same handle across platforms (e.g., @username on Twitter and YouTube)
-      if (creator.handle && existingCreator.handle && 
+      // 1. Same handle across platforms (e.g., @username on Twitter and YouTube)
+      if (creator.handle && existingCreator.handle &&
           creator.handle.toLowerCase() === existingCreator.handle.toLowerCase()) {
         return existingCreator
       }
 
-      // Same normalized name and similar URL domain
-      if (creator.name.toLowerCase() === existingCreator.name.toLowerCase() &&
-          creator.url && existingCreator.url) {
-        const creatorDomain = this.extractDomain(creator.url)
-        const existingDomain = this.extractDomain(existingCreator.url)
-        
-        // Allow cross-platform matching for verified creators
-        if (creatorDomain && existingDomain && 
-            (creatorDomain === existingDomain || this.areRelatedDomains(creatorDomain, existingDomain))) {
-          return existingCreator
+      // 2. Extract domains for domain-based matching
+      const creatorDomain = creator.url ? this.extractDomain(creator.url) : null
+      const existingDomain = existingCreator.url ? this.extractDomain(existingCreator.url) : null
+
+      // 3. Same domain - use fuzzy name matching
+      if (creatorDomain && existingDomain && creatorDomain === existingDomain) {
+        const nameMatch = this.calculateNameSimilarity(creator.name, existingCreator.name)
+        if (nameMatch.match && nameMatch.similarity > bestSimilarity) {
+          bestMatch = existingCreator
+          bestSimilarity = nameMatch.similarity
+        }
+      }
+
+      // 4. Related domains (e.g., youtube.com and youtu.be) - require higher similarity
+      if (creatorDomain && existingDomain && this.areRelatedDomains(creatorDomain, existingDomain)) {
+        const nameMatch = this.calculateNameSimilarity(creator.name, existingCreator.name)
+        // Require higher threshold (0.9) for cross-platform matching
+        if (nameMatch.match && nameMatch.similarity > 0.9) {
+          bestMatch = existingCreator
+          bestSimilarity = nameMatch.similarity
+        }
+      }
+
+      // 5. No domain available - use fuzzy matching with high threshold
+      if (!creatorDomain || !existingDomain) {
+        const nameMatch = this.calculateNameSimilarity(creator.name, existingCreator.name)
+        // Require very high threshold (0.95) when no domain to verify
+        if (nameMatch.match && nameMatch.similarity > 0.95) {
+          bestMatch = existingCreator
+          bestSimilarity = nameMatch.similarity
         }
       }
     }
 
-    return undefined
+    return bestMatch
   }
 
   /**

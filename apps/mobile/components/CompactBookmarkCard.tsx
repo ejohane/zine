@@ -16,6 +16,10 @@ interface CompactBookmarkCardProps {
     publishedAt?: string | number | null;
     videoMetadata?: { duration?: number | null } | null;
     podcastMetadata?: { duration?: number | null } | null;
+    articleMetadata?: {
+      readingTime?: number | null;
+      isPaywalled?: boolean | null;
+    } | null;
     duration?: number | null;
     creator?: { avatarUrl?: string | null } | null;
     metrics?: { durationSeconds?: number | null } | null;
@@ -58,12 +62,25 @@ export function CompactBookmarkCard({
   };
 
   const contentIcon = getContentTypeIcon();
-  const duration =
-    bookmark.duration ??
-    bookmark.videoMetadata?.duration ??
-    bookmark.podcastMetadata?.duration ??
-    bookmark.metrics?.durationSeconds ??
-    undefined;
+
+  // Get display duration/reading time based on content type
+  const displayDuration = React.useMemo(() => {
+    if (bookmark.contentType === 'article') {
+      // Show reading time for articles
+      const readingTime = bookmark.articleMetadata?.readingTime;
+      return readingTime ? `${readingTime} min read` : null;
+    }
+
+    // Show duration for videos/podcasts
+    const duration =
+      bookmark.duration ??
+      bookmark.videoMetadata?.duration ??
+      bookmark.podcastMetadata?.duration ??
+      bookmark.metrics?.durationSeconds ??
+      undefined;
+
+    return duration ? formatDuration(duration) : null;
+  }, [bookmark.contentType, bookmark.articleMetadata, bookmark.duration, bookmark.videoMetadata, bookmark.podcastMetadata, bookmark.metrics]);
 
   const thumbnailUri = React.useMemo(() => {
     if (bookmark.thumbnailUrl && bookmark.thumbnailUrl.trim().length > 0) {
@@ -113,9 +130,14 @@ export function CompactBookmarkCard({
             <Feather name="image" size={20} color={colors.mutedForeground} />
           </View>
         )}
-        {duration && (
+        {displayDuration && (
           <View style={styles.compactDurationBadge}>
-            <Text style={styles.compactDurationText}>{formatDuration(duration)}</Text>
+            <Text style={styles.compactDurationText}>{displayDuration}</Text>
+          </View>
+        )}
+        {bookmark.contentType === 'article' && bookmark.articleMetadata?.isPaywalled && (
+          <View style={[styles.compactDurationBadge, { backgroundColor: 'rgba(255, 193, 7, 0.9)', top: 4 }]}>
+            <Text style={[styles.compactDurationText, { color: '#000' }]}>🔒</Text>
           </View>
         )}
         {showMultiPlatform && (

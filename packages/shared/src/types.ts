@@ -38,6 +38,8 @@ export const ArticleMetadataSchema = z.object({
   authorName: z.string().optional(),
   wordCount: z.number().optional(),
   readingTime: z.number().optional(),
+  isPaywalled: z.boolean().optional(),
+  secondaryAuthors: z.array(z.string()).optional(),
 })
 
 export const PostMetadataSchema = z.object({

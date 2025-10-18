@@ -250,6 +250,10 @@ export const content = sqliteTable('content', {
   enrichmentMetadata: text('enrichment_metadata'), // JSON: API response data
   extendedMetadata: text('extended_metadata'), // JSON: future expansion fields
 
+  // Article full-text content (for offline reading)
+  fullTextContent: text('full_text_content'), // Cleaned article HTML
+  fullTextExtractedAt: integer('full_text_extracted_at', { mode: 'timestamp' }), // When full text was extracted
+
   // Tracking
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
