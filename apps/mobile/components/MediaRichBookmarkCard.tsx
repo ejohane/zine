@@ -9,6 +9,8 @@ import { formatDuration, formatShortDate, formatPublicationDate } from '../lib/d
 import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 import { useTheme } from '../contexts/theme';
+import { addRecentBookmark } from '../lib/recentBookmarks';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface MediaRichBookmarkCardProps {
   bookmark: Bookmark;
@@ -25,6 +27,7 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
 }) => {
   const router = useRouter();
   const { colors } = useTheme();
+  const queryClient = useQueryClient();
   
   // Handle card press - navigate to detail view or article reader
   const handlePress = React.useCallback(() => {
@@ -55,18 +58,20 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
       onOpenLink();
     } else {
       try {
+        await addRecentBookmark(bookmark.id);
+        queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+        
         const url = bookmark.originalUrl || bookmark.url;
         const canOpen = await Linking.canOpenURL(url);
         if (canOpen) {
           await Linking.openURL(url);
-          // Navigate to bookmark detail page after opening link
           router.push(`/bookmark/${bookmark.id}`);
         }
       } catch (error) {
         console.error('Error opening URL:', error);
       }
     }
-  }, [bookmark.originalUrl, bookmark.url, bookmark.id, onOpenLink, router, enableHaptics]);
+  }, [bookmark.originalUrl, bookmark.url, bookmark.id, onOpenLink, router, enableHaptics, queryClient]);
   
   // Get duration/reading time based on content type
   const displayTime = React.useMemo(() => {

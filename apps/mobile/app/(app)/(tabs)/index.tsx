@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/auth';
 import { OptimizedRecentBookmarksSection } from '../../../components/OptimizedRecentBookmarksSection';
+import { RecentlyOpenedBookmarksSection } from '../../../components/RecentlyOpenedBookmarksSection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { HomeHeader } from '../../../components/HomeHeader';
@@ -51,6 +52,11 @@ export default function HomeScreen() {
           />
         }
       >
+        
+        {/* Recently Opened Bookmarks Section - Only show when authenticated and has 4+ opened */}
+        {isLoaded && isSignedIn && (
+          <RecentlyOpenedBookmarksSection />
+        )}
         
         {/* Recent Bookmarks Section - Only show when authenticated */}
         {isLoaded && isSignedIn && (
