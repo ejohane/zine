@@ -765,7 +765,8 @@ app.post('/save-enriched', async (c) => {
         c.view_count,
         c.like_count,
         c.duration_seconds,
-        c.provider as creator_platform
+        c.provider as creator_platform,
+        c.extended_metadata as content_extended_metadata
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
       WHERE b.user_id = ? AND b.content_id = ?
@@ -774,6 +775,25 @@ app.post('/save-enriched', async (c) => {
 
     if (existingBookmark) {
       const duplicateReasons = duplicateContext?.reasons ?? []
+
+      // Parse article metadata from extended metadata
+      let existingArticleMetadata = undefined
+      if (existingBookmark.content_type === 'article' && existingBookmark.content_extended_metadata) {
+        try {
+          const extended = typeof existingBookmark.content_extended_metadata === 'string'
+            ? JSON.parse(existingBookmark.content_extended_metadata)
+            : existingBookmark.content_extended_metadata
+          existingArticleMetadata = {
+            authorName: extended.authorName,
+            wordCount: extended.wordCount,
+            readingTime: extended.readingTime,
+            isPaywalled: extended.isPaywalled,
+            secondaryAuthors: extended.secondaryAuthors
+          }
+        } catch (error) {
+          console.warn('[EnrichedBookmark] Failed to parse article extended metadata for existing bookmark:', error)
+        }
+      }
 
       let creator = undefined
       if (existingBookmark.creator_id && existingBookmark.creator_name) {
@@ -801,6 +821,7 @@ app.post('/save-enriched', async (c) => {
           contentType: existingBookmark.content_type,
           bookmarkedAt: existingBookmark.bookmarked_at,
           creator,
+          articleMetadata: existingArticleMetadata,
           viewCount: existingBookmark.view_count,
           likeCount: existingBookmark.like_count,
           durationSeconds: existingBookmark.duration_seconds,
@@ -882,7 +903,8 @@ app.post('/save-enriched', async (c) => {
         c.view_count,
         c.like_count,
         c.duration_seconds,
-        c.provider as creator_platform
+        c.provider as creator_platform,
+        c.extended_metadata as content_extended_metadata
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
       WHERE b.id = ?`
@@ -890,6 +912,25 @@ app.post('/save-enriched', async (c) => {
     
     if (!fullBookmark) {
       throw new Error('Failed to retrieve created bookmark')
+    }
+    
+    // Parse article metadata from extended metadata
+    let articleMetadata = undefined
+    if (fullBookmark.content_type === 'article' && fullBookmark.content_extended_metadata) {
+      try {
+        const extended = typeof fullBookmark.content_extended_metadata === 'string'
+          ? JSON.parse(fullBookmark.content_extended_metadata)
+          : fullBookmark.content_extended_metadata
+        articleMetadata = {
+          authorName: extended.authorName,
+          wordCount: extended.wordCount,
+          readingTime: extended.readingTime,
+          isPaywalled: extended.isPaywalled,
+          secondaryAuthors: extended.secondaryAuthors
+        }
+      } catch (error) {
+        console.warn('[EnrichedBookmark] Failed to parse article extended metadata:', error)
+      }
     }
     
     // Build creator object if creator data exists
@@ -924,6 +965,7 @@ app.post('/save-enriched', async (c) => {
       creator,
       creatorId: fullBookmark.creator_id || undefined,
       creatorName: savedContent.creatorName, // Keep for backward compatibility
+      articleMetadata,
       status: fullBookmark.status || 'active',
       source: contentForLinks?.provider,
       alternateLinks,

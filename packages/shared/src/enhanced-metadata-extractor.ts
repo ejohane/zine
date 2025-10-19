@@ -199,97 +199,133 @@ export class EnhancedMetadataExtractor {
    * Enhanced web metadata extraction with proper HTML parsing and JSON-LD
    */
   private async extractEnhancedWebMetadata(url: string, signal: AbortSignal): Promise<EnhancedExtractedMetadata> {
-    const response = await fetch(url, {
-      signal: signal as any,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Zine/1.0; +https://zine.dev)',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache'
+    console.log('[EnhancedMetadataExtractor] Fetching HTML from:', url)
+    
+    try {
+      const response = await fetch(url, {
+        signal: signal as any,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Zine/1.0; +https://zine.dev)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache'
+        }
+      })
+
+      console.log('[EnhancedMetadataExtractor] Received response:', {
+        status: response.status,
+        statusText: response.statusText,
+        contentType: response.headers.get('content-type')
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-    })
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      const html = await response.text()
+      console.log('[EnhancedMetadataExtractor] Received HTML:', `${html.length} bytes`)
+      
+      return this.parseEnhancedHtmlMetadata(html, url)
+    } catch (error) {
+      console.error('[EnhancedMetadataExtractor] Error fetching or parsing HTML:', error)
+      throw error
     }
-
-    const html = await response.text()
-    return this.parseEnhancedHtmlMetadata(html, url)
   }
 
   /**
    * Parse HTML with enhanced extraction including JSON-LD
    */
   private async parseEnhancedHtmlMetadata(html: string, url: string): Promise<EnhancedExtractedMetadata> {
-    // Parse HTML using linkedom for proper DOM manipulation
-    const parsed = parseHTML(html) as any
-    const document = parsed.document as LinkedOMDocument
+    try {
+      console.log('[EnhancedMetadataExtractor] Parsing HTML for:', url, `(${html.length} bytes)`)
+      
+      // Parse HTML using linkedom for proper DOM manipulation
+      const parsed = parseHTML(html) as any
+      const document = parsed.document as LinkedOMDocument
 
-    // Extract JSON-LD structured data
-    const jsonLdData = this.extractJsonLd(document)
+      // Extract JSON-LD structured data
+      const jsonLdData = this.extractJsonLd(document)
+      console.log('[EnhancedMetadataExtractor] Found JSON-LD data:', jsonLdData.length, 'entries')
 
-    // Get meta tags
-    const metaTags = this.extractMetaTags(document)
+      // Get meta tags
+      const metaTags = this.extractMetaTags(document)
+      console.log('[EnhancedMetadataExtractor] Extracted meta tags:', metaTags.size)
 
-    // Extract title with priority: JSON-LD > Open Graph > Twitter > HTML title
-    const title = this.extractTitle(jsonLdData, metaTags, document, url)
+      // Extract title with priority: JSON-LD > Open Graph > Twitter > HTML title
+      const title = this.extractTitle(jsonLdData, metaTags, document, url)
+      console.log('[EnhancedMetadataExtractor] Extracted title:', title)
 
-    // Extract description
-    const description = this.extractDescription(jsonLdData, metaTags, document)
+      // Extract description
+      const description = this.extractDescription(jsonLdData, metaTags, document)
+      console.log('[EnhancedMetadataExtractor] Extracted description:', description ? `${description.substring(0, 50)}...` : 'none')
 
-    // Extract images
-    const { thumbnailUrl, faviconUrl } = this.extractImages(jsonLdData, metaTags, document, url)
+      // Extract images
+      const { thumbnailUrl, faviconUrl } = this.extractImages(jsonLdData, metaTags, document, url)
 
-    // Extract dates
-    const publishedAt = this.extractPublishedDate(jsonLdData, metaTags, document)
+      // Extract dates
+      const publishedAt = this.extractPublishedDate(jsonLdData, metaTags, document)
 
-    // Extract language
-    const language = this.extractLanguage(document, metaTags)
+      // Extract language
+      const language = this.extractLanguage(document, metaTags)
 
-    // Extract creator information
-    const creator = this.extractCreator(jsonLdData, metaTags, document, url)
+      // Extract creator information
+      const creator = this.extractCreator(jsonLdData, metaTags, document, url)
+      console.log('[EnhancedMetadataExtractor] Extracted creator:', creator?.name || 'none')
 
-    // Determine content type and source
-    const { contentType, source } = this.inferContentTypeAndSource(url, jsonLdData, metaTags)
+      // Determine content type and source
+      const { contentType, source } = this.inferContentTypeAndSource(url, jsonLdData, metaTags)
 
-    // Extract content-specific metadata
-    const { videoMetadata, podcastMetadata, articleMetadata, postMetadata } =
-      this.extractContentSpecificMetadata(jsonLdData, metaTags, document, contentType)
+      // Extract content-specific metadata
+      const { videoMetadata, podcastMetadata, articleMetadata, postMetadata } =
+        this.extractContentSpecificMetadata(jsonLdData, metaTags, document, contentType)
 
-    // Extract full-text content for articles
-    let fullTextContent: string | undefined
-    let fullTextExtractedAt: Date | undefined
+      // Extract full-text content for articles
+      let fullTextContent: string | undefined
+      let fullTextExtractedAt: Date | undefined
 
-    if (contentType === 'article') {
-      try {
-        const articleContent = await extractArticleContent(url, html)
-        if (articleContent.success && articleContent.html) {
-          fullTextContent = articleContent.html
-          fullTextExtractedAt = new Date()
+      if (contentType === 'article') {
+        try {
+          const articleContent = await extractArticleContent(url, html)
+          if (articleContent.success && articleContent.html) {
+            fullTextContent = articleContent.html
+            fullTextExtractedAt = new Date()
+          }
+        } catch (error) {
+          console.error('[EnhancedMetadataExtractor] Full-text extraction failed:', error)
+          // Continue without full-text content
         }
-      } catch (error) {
-        console.error('[EnhancedMetadataExtractor] Full-text extraction failed:', error)
-        // Continue without full-text content
       }
-    }
 
-    return {
-      title,
-      description,
-      thumbnailUrl,
-      faviconUrl,
-      publishedAt,
-      language,
-      source,
-      contentType,
-      creator: this.resolveCreator(creator),
-      videoMetadata,
-      podcastMetadata,
-      articleMetadata,
-      postMetadata,
-      fullTextContent,
-      fullTextExtractedAt
+      const result = {
+        title,
+        description,
+        thumbnailUrl,
+        faviconUrl,
+        publishedAt,
+        language,
+        source,
+        contentType,
+        creator: this.resolveCreator(creator),
+        videoMetadata,
+        podcastMetadata,
+        articleMetadata,
+        postMetadata,
+        fullTextContent,
+        fullTextExtractedAt
+      }
+      
+      console.log('[EnhancedMetadataExtractor] Successfully parsed metadata:', {
+        title: result.title,
+        hasDescription: !!result.description,
+        hasCreator: !!result.creator,
+        contentType: result.contentType
+      })
+      
+      return result
+    } catch (error) {
+      console.error('[EnhancedMetadataExtractor] Error parsing HTML metadata:', error)
+      throw error
     }
   }
 
@@ -322,23 +358,35 @@ export class EnhancedMetadataExtractor {
   private extractMetaTags(document: LinkedOMDocument): Map<string, string> {
     const metaTags = new Map<string, string>()
     
-    // Extract meta tags with property attribute (Open Graph, etc.)
-    document.querySelectorAll('meta[property]').forEach((meta: any) => {
-      const property = meta.getAttribute('property')
-      const content = meta.getAttribute('content')
-      if (property && content) {
-        metaTags.set(property.toLowerCase(), content)
-      }
-    })
-    
-    // Extract meta tags with name attribute (Twitter, description, etc.)
-    document.querySelectorAll('meta[name]').forEach((meta: any) => {
-      const name = meta.getAttribute('name')
-      const content = meta.getAttribute('content')
-      if (name && content) {
-        metaTags.set(name.toLowerCase(), content)
-      }
-    })
+    try {
+      // Extract meta tags with property attribute (Open Graph, etc.)
+      const propertyMetas = document.querySelectorAll('meta[property]')
+      console.log('[EnhancedMetadataExtractor] Found meta[property] tags:', propertyMetas.length)
+      
+      propertyMetas.forEach((meta: any) => {
+        const property = meta.getAttribute('property')
+        const content = meta.getAttribute('content')
+        if (property && content) {
+          metaTags.set(property.toLowerCase(), content)
+          console.log('[EnhancedMetadataExtractor] Meta property:', property, '=', content.substring(0, 50))
+        }
+      })
+      
+      // Extract meta tags with name attribute (Twitter, description, etc.)
+      const nameMetas = document.querySelectorAll('meta[name]')
+      console.log('[EnhancedMetadataExtractor] Found meta[name] tags:', nameMetas.length)
+      
+      nameMetas.forEach((meta: any) => {
+        const name = meta.getAttribute('name')
+        const content = meta.getAttribute('content')
+        if (name && content) {
+          metaTags.set(name.toLowerCase(), content)
+          console.log('[EnhancedMetadataExtractor] Meta name:', name, '=', content.substring(0, 50))
+        }
+      })
+    } catch (error) {
+      console.error('[EnhancedMetadataExtractor] Error extracting meta tags:', error)
+    }
     
     return metaTags
   }
@@ -598,11 +646,127 @@ export class EnhancedMetadataExtractor {
   }
 
   /**
-   * Extract creator information
+   * Extract creator information with confidence-based fallback chain
    */
-  private extractCreator(jsonLdData: any[], metaTags: Map<string, string>, _document: LinkedOMDocument, _url: string): Creator | undefined {
+  private extractCreator(jsonLdData: any[], metaTags: Map<string, string>, document: LinkedOMDocument, url: string): Creator | undefined {
+    const context = this.analyzeContentContext(url, metaTags, document)
+    
+    console.log('[CreatorExtraction] Starting extraction for:', url)
+    console.log('[CreatorExtraction] Context:', {
+      isPersonalSite: context.isPersonalSite,
+      isNewsOrganization: context.isNewsOrganization,
+      contentType: context.contentType,
+      hasByline: context.hasByline
+    })
+    
+    // TIER 1: Structured Metadata (Confidence: 95%)
+    const structuredCreator = this.extractFromStructuredData(jsonLdData, metaTags)
+    if (structuredCreator) {
+      console.log('[CreatorExtraction] ✅ TIER 1: Found creator via structured data:', structuredCreator.name)
+      return { ...structuredCreator, extractionMethod: 'json-ld', confidence: 95 }
+    }
+    console.log('[CreatorExtraction] ❌ TIER 1: No structured data found')
+
+    // TIER 2: Semantic HTML (Confidence: 75-85%)
+    const semanticCreator = this.extractFromSemanticHtml(document, url)
+    if (semanticCreator) {
+      console.log('[CreatorExtraction] ✅ TIER 2: Found creator via semantic HTML:', semanticCreator.name)
+      return { ...semanticCreator, extractionMethod: 'semantic-html', confidence: 80 }
+    }
+    console.log('[CreatorExtraction] ❌ TIER 2: No semantic HTML found')
+
+    // TIER 3: Heuristic Patterns (Confidence: 50-70%)
+    const heuristicCreator = this.extractFromHeuristics(document, url, context)
+    if (heuristicCreator) {
+      console.log('[CreatorExtraction] ✅ TIER 3: Found creator via heuristics:', heuristicCreator.name, `(confidence: ${heuristicCreator.confidence})`)
+      return { ...heuristicCreator, extractionMethod: 'heuristic', confidence: heuristicCreator.confidence || 60 }
+    }
+    console.log('[CreatorExtraction] ❌ TIER 3: No heuristic patterns found')
+
+    // TIER 4: Domain-based (Personal sites only, Confidence: 40-60%)
+    if (context.isPersonalSite) {
+      const domainCreator = this.extractFromDomain(url, document, context)
+      if (domainCreator) {
+        console.log('[CreatorExtraction] ✅ TIER 4: Found creator via domain:', domainCreator.name, `(confidence: ${domainCreator.confidence})`)
+        return { ...domainCreator, extractionMethod: 'domain', confidence: domainCreator.confidence || 50 }
+      }
+      console.log('[CreatorExtraction] ❌ TIER 4: No domain match found')
+    } else {
+      console.log('[CreatorExtraction] ⏭️  TIER 4: Skipped (not a personal site)')
+    }
+
+    console.log('[CreatorExtraction] ⚠️  All extraction tiers failed - no creator found')
+    return undefined
+  }
+
+  /**
+   * Analyze content context to guide extraction strategy
+   */
+  private analyzeContentContext(url: string, metaTags: Map<string, string>, document: LinkedOMDocument): {
+    isPersonalSite: boolean
+    isNewsOrganization: boolean
+    contentType: 'article' | 'blog-post' | 'news' | 'unknown'
+    hasByline: boolean
+  } {
+    try {
+      const urlObj = new URL(url)
+      const domain = urlObj.hostname.toLowerCase()
+
+      // Known news organizations (should NOT use site header as author)
+      const newsOrganizations = [
+        'nytimes.com', 'washingtonpost.com', 'wsj.com', 'ft.com',
+        'theguardian.com', 'bbc.com', 'cnn.com', 'reuters.com',
+        'bloomberg.com', 'techcrunch.com', 'theverge.com', 'wired.com'
+      ]
+      const isNewsOrganization = newsOrganizations.some(org => domain.includes(org))
+
+      // Personal site indicators
+      const hasPersonalPatterns = (
+        !domain.includes('www.') ||
+        domain.split('.').length === 2 ||
+        metaTags.get('og:type') === 'blog'
+      )
+
+      // Check if there's a visible byline
+      const hasByline = !!(
+        document.querySelector('[rel="author"]') ||
+        document.querySelector('.byline') ||
+        document.querySelector('.author') ||
+        document.querySelector('.post-author')
+      )
+
+      // Determine content type
+      let contentType: 'article' | 'blog-post' | 'news' | 'unknown' = 'unknown'
+      const ogType = metaTags.get('og:type')
+      if (ogType === 'article' || metaTags.get('article:author')) {
+        contentType = isNewsOrganization ? 'news' : 'article'
+      } else if (url.includes('/blog/') || url.includes('/post/')) {
+        contentType = 'blog-post'
+      }
+
+      return {
+        isPersonalSite: hasPersonalPatterns && !isNewsOrganization,
+        isNewsOrganization,
+        contentType,
+        hasByline
+      }
+    } catch {
+      return {
+        isPersonalSite: false,
+        isNewsOrganization: false,
+        contentType: 'unknown',
+        hasByline: false
+      }
+    }
+  }
+
+  /**
+   * TIER 1: Extract from structured data (JSON-LD, meta tags)
+   */
+  private extractFromStructuredData(jsonLdData: any[], metaTags: Map<string, string>): Creator | undefined {
     // Try JSON-LD first
     for (const data of jsonLdData) {
+      // Try author field
       if (data.author) {
         const author = Array.isArray(data.author) ? data.author[0] : data.author
         if (typeof author === 'object') {
@@ -621,6 +785,7 @@ export class EnhancedMetadataExtractor {
         }
       }
 
+      // Try creator field
       if (data.creator) {
         const creator = Array.isArray(data.creator) ? data.creator[0] : data.creator
         if (typeof creator === 'object') {
@@ -633,9 +798,34 @@ export class EnhancedMetadataExtractor {
           }
         }
       }
+
+      // Try publisher field (for personal blogs that use Organization schema)
+      // Only use if publisher is a Person or has a personal name
+      if (data.publisher && data['@type'] === 'Article') {
+        const publisher = data.publisher
+        if (typeof publisher === 'object' && publisher.name) {
+          // Check if publisher looks like a personal blog (not a big organization)
+          const name = publisher.name
+          const isLikelyPersonal = (
+            publisher['@type'] === 'Person' ||
+            // Name looks like a person's name (2-4 words, each capitalized)
+            /^[A-Z][a-z]+(\s[A-Z][a-z]+){1,3}$/.test(name)
+          )
+          
+          if (isLikelyPersonal) {
+            return {
+              id: publisher['@id'] || `web:${this.slugifyAuthorName(name)}`,
+              name,
+              url: publisher.url,
+              bio: publisher.description,
+              avatarUrl: publisher.logo?.url || publisher.image?.url
+            }
+          }
+        }
+      }
     }
 
-    // Try article-specific meta tags (enhanced for articles)
+    // Try article-specific meta tags
     const articleAuthor = metaTags.get('article:author')
     if (articleAuthor) {
       return {
@@ -654,6 +844,262 @@ export class EnhancedMetadataExtractor {
     }
 
     return undefined
+  }
+
+  /**
+   * TIER 2: Extract from semantic HTML
+   */
+  private extractFromSemanticHtml(document: LinkedOMDocument, url: string): Creator | undefined {
+    // Try rel="author" links
+    const authorLink = document.querySelector('[rel="author"]') as any
+    if (authorLink) {
+      const name = authorLink.textContent?.trim()
+      const href = authorLink.getAttribute('href')
+      if (name) {
+        return {
+          id: `web:${this.slugifyAuthorName(name)}`,
+          name,
+          url: href ? this.resolveUrl(href, url) : undefined
+        }
+      }
+    }
+
+    // Try common author class selectors
+    const authorSelectors = [
+      '.author-name',
+      '.byline',
+      '.post-author',
+      '.article-author',
+      '[itemprop="author"]',
+      '[itemprop="author"] [itemprop="name"]'
+    ]
+
+    for (const selector of authorSelectors) {
+      const element = document.querySelector(selector) as any
+      if (element) {
+        const name = element.textContent?.trim()
+        if (name && name.length > 0 && name.length < 100) {
+          // Get associated URL if available
+          let authorUrl: string | undefined
+          const linkElement = element.closest('a') || element.querySelector('a')
+          if (linkElement) {
+            const href = linkElement.getAttribute('href')
+            if (href) {
+              authorUrl = this.resolveUrl(href, url)
+            }
+          }
+
+          return {
+            id: `web:${this.slugifyAuthorName(name)}`,
+            name,
+            url: authorUrl
+          }
+        }
+      }
+    }
+
+    // Try <address> in <article> context
+    const articleElement = document.querySelector('article')
+    if (articleElement) {
+      const addressElement = articleElement.querySelector('address') as any
+      if (addressElement) {
+        const name = addressElement.textContent?.trim()
+        if (name && name.length > 0 && name.length < 100) {
+          return {
+            id: `web:${this.slugifyAuthorName(name)}`,
+            name
+          }
+        }
+      }
+    }
+
+    return undefined
+  }
+
+  /**
+   * TIER 3: Extract using heuristic patterns
+   */
+  private extractFromHeuristics(document: LinkedOMDocument, _url: string, context: any): (Creator & { confidence?: number }) | undefined {
+    // Look for "By [Name]" patterns in article header
+    const articleElement = document.querySelector('article') || document.body
+    if (articleElement) {
+      const headerText = this.extractArticleHeader(articleElement as any)
+      const bylineMatch = headerText.match(/(?:by|written by|posted by|author:)\s+([A-Z][a-zA-Z\s\-']+?)(?:\s+on|\s+\||$|\n)/i)
+      if (bylineMatch) {
+        const name = bylineMatch[1].trim()
+        if (name.length > 2 && name.length < 50) {
+          return {
+            id: `web:${this.slugifyAuthorName(name)}`,
+            name,
+            confidence: 65
+          }
+        }
+      }
+    }
+
+    // Check footer for author information (lower confidence)
+    const footer = document.querySelector('footer') as any
+    if (footer && context.isPersonalSite) {
+      const footerText = footer.textContent || ''
+      const copyrightMatch = footerText.match(/©\s*\d{4}\s+([A-Z][a-zA-Z\s\-']+?)(?:\s|$|\.|,)/i)
+      if (copyrightMatch) {
+        const name = copyrightMatch[1].trim()
+        if (name.length > 2 && name.length < 50 && !name.toLowerCase().includes('all rights')) {
+          return {
+            id: `web:${this.slugifyAuthorName(name)}`,
+            name,
+            confidence: 55
+          }
+        }
+      }
+    }
+
+    return undefined
+  }
+
+  /**
+   * TIER 4: Extract from domain (personal sites only)
+   */
+  private extractFromDomain(url: string, document: LinkedOMDocument, context: any): (Creator & { confidence?: number }) | undefined {
+    try {
+      const urlObj = new URL(url)
+      const domain = urlObj.hostname.toLowerCase().replace('www.', '')
+
+      // Extract site header/branding (highest confidence for personal sites)
+      const headerSelectors = [
+        'header h1 a',
+        'header h2 a',
+        'header h3 a',
+        'header .site-title',
+        'header .blog-title',
+        '.site-header h1',
+        '.site-header h2',
+        '.site-header h3'
+      ]
+
+      for (const selector of headerSelectors) {
+        const element = document.querySelector(selector) as any
+        if (element) {
+          const name = element.textContent?.trim()
+          const href = element.getAttribute('href')
+          
+          // Validate: should be short, point to home, and match domain pattern
+          if (name && 
+              name.length > 2 && 
+              name.length < 50 && 
+              (href === '/' || href === urlObj.origin || href === url)) {
+            
+            // Cross-validate with domain name
+            const confidence = this.calculateDomainNameMatch(name, domain)
+            
+            if (confidence >= 40) {
+              return {
+                id: `web:${this.slugifyAuthorName(name)}`,
+                name: this.capitalizeProperName(name),
+                url: urlObj.origin,
+                confidence
+              }
+            }
+          }
+        }
+      }
+
+      // Fallback: Extract from domain name itself
+      if (context.isPersonalSite && domain.split('.').length === 2) {
+        const domainName = domain.split('.')[0]
+        const name = this.extractNameFromDomain(domainName)
+        if (name) {
+          return {
+            id: `web:${this.slugifyAuthorName(name)}`,
+            name,
+            url: urlObj.origin,
+            confidence: 40
+          }
+        }
+      }
+
+      return undefined
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * Extract text from article header area
+   */
+  private extractArticleHeader(element: any): string {
+    const headerSelectors = ['header', '.article-header', '.post-header', '.entry-header']
+    
+    for (const selector of headerSelectors) {
+      const header = element.querySelector(selector)
+      if (header) {
+        return header.textContent || ''
+      }
+    }
+
+    // Fallback: Get first 500 characters
+    const text = element.textContent || ''
+    return text.substring(0, 500)
+  }
+
+  /**
+   * Calculate confidence score based on domain name match
+   */
+  private calculateDomainNameMatch(name: string, domain: string): number {
+    const normalizedName = name.toLowerCase().replace(/[^a-z]/g, '')
+    const domainPart = domain.split('.')[0].replace(/[^a-z]/g, '')
+    
+    // Exact match or very close match
+    if (normalizedName === domainPart) return 75
+    if (domainPart.includes(normalizedName) || normalizedName.includes(domainPart)) return 60
+    
+    // Partial match (e.g., "sean goedecke" vs "seangoedecke")
+    const nameWithoutSpaces = name.toLowerCase().replace(/\s+/g, '')
+    if (nameWithoutSpaces === domainPart) return 70
+    if (domainPart.includes(nameWithoutSpaces) || nameWithoutSpaces.includes(domainPart)) return 55
+    
+    // Check if it's a reasonable personal name pattern
+    const words = name.split(/\s+/)
+    if (words.length >= 2 && words.length <= 4) {
+      return 45
+    }
+    
+    return 0
+  }
+
+  /**
+   * Extract likely name from domain
+   */
+  private extractNameFromDomain(domain: string): string | null {
+    // Remove common prefixes/suffixes
+    let cleaned = domain.replace(/^(blog|site|web|my)/, '')
+                       .replace(/(blog|site|web)$/, '')
+    
+    // Check for name patterns (firstname, firstnamelastname, firstname-lastname)
+    if (cleaned.length < 3 || cleaned.length > 30) return null
+    
+    // Convert camelCase or dash-separated to proper name
+    const name = cleaned
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/[-_]/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+    
+    return name
+  }
+
+  /**
+   * Capitalize proper names correctly
+   */
+  private capitalizeProperName(name: string): string {
+    return name
+      .split(' ')
+      .map(word => {
+        if (word.length === 0) return word
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      })
+      .join(' ')
   }
 
   /**
@@ -1053,7 +1499,78 @@ export class EnhancedMetadataExtractor {
     if (!creator) return undefined
     
     const resolution = creatorService.resolveCreator(creator)
-    return resolution.resolved
+    const resolved = resolution.resolved
+    
+    // If avatar is missing and we have a URL, try to enhance with avatar
+    if (resolved && !resolved.avatarUrl && resolved.url) {
+      this.enhanceCreatorWithAvatar(resolved).catch(err => {
+        console.warn('[EnhancedMetadataExtractor] Failed to enhance creator avatar:', err)
+      })
+    }
+    
+    return resolved
+  }
+  
+  /**
+   * Enhance creator with avatar by scraping their profile page or using fallbacks
+   */
+  private async enhanceCreatorWithAvatar(creator: Creator): Promise<void> {
+    if (!creator.url) return
+    
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      
+      // Try to fetch the author's profile page
+      const response = await fetch(creator.url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; Zine/1.0)',
+          'Accept': 'text/html'
+        },
+        signal: controller.signal as any
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) return
+      
+      const html = await response.text()
+      const parsed = parseHTML(html) as any
+      const document = parsed.document as LinkedOMDocument
+      
+      // Try common avatar selectors
+      const avatarSelectors = [
+        'img.avatar',
+        'img.author-avatar',
+        'img.profile-image',
+        'img.author-image',
+        '[itemprop="image"]',
+        '.about img',
+        '.profile img',
+        'header img'
+      ]
+      
+      for (const selector of avatarSelectors) {
+        const img = document.querySelector(selector) as any
+        if (img) {
+          const src = img.getAttribute('src')
+          if (src && !src.includes('placeholder') && !src.includes('default')) {
+            creator.avatarUrl = this.resolveUrl(src, creator.url)
+            return
+          }
+        }
+      }
+      
+      // Fallback: Look for og:image on the profile page
+      const metaTags = this.extractMetaTags(document)
+      const ogImage = metaTags.get('og:image')
+      if (ogImage) {
+        creator.avatarUrl = ogImage
+      }
+    } catch (error) {
+      // Silently fail - avatar is optional
+      console.warn('[EnhancedMetadataExtractor] Could not fetch creator avatar:', error)
+    }
   }
 
   /**

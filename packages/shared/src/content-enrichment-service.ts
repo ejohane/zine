@@ -6,7 +6,7 @@
 import { enhancedMetadataExtractor } from './enhanced-metadata-extractor'
 import { normalizeUrl, resolveSpotifyResource } from './url-normalizer'
 import { DateNormalizer } from './date-normalizer'
-import { sha256HashSync } from './crypto-utils'
+import { sha256Hash } from './crypto-utils'
 
 // Content type definitions
 export interface Content {
@@ -164,7 +164,7 @@ export class ContentEnrichmentService {
       const now = new Date()
 
       // Determine provider and external ID
-      const { provider, externalId } = this.parseProviderInfo(url, metadata)
+      const { provider, externalId } = await this.parseProviderInfo(url, metadata)
 
       // Create content object
       const content: Content = {
@@ -189,7 +189,7 @@ export class ContentEnrichmentService {
       this.enrichProviderSpecific(content, metadata, options)
 
       // Generate content fingerprint for deduplication
-      content.contentFingerprint = this.generateFingerprint(content)
+      content.contentFingerprint = await this.generateFingerprint(content)
       content.normalizedTitle = this.normalizeTitle(content.title)
 
       // Store enrichment metadata
@@ -265,7 +265,7 @@ export class ContentEnrichmentService {
   /**
    * Parse provider and external ID from URL
    */
-  private parseProviderInfo(url: string, _metadata: any): { provider: string, externalId: string } {
+  private async parseProviderInfo(url: string, _metadata: any): Promise<{ provider: string, externalId: string }> {
     // YouTube
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       const videoId = this.extractYouTubeId(url)
@@ -274,7 +274,7 @@ export class ContentEnrichmentService {
       }
       // Fall back to URL hash for malformed YouTube URLs
       console.warn(`Failed to extract YouTube ID from URL: ${url}`)
-      const urlHash = sha256HashSync(url).substring(0, 16)
+      const urlHash = (await sha256Hash(url)).substring(0, 16)
       return { provider: 'youtube', externalId: `malformed-${urlHash}` }
     }
     
@@ -286,7 +286,7 @@ export class ContentEnrichmentService {
       }
       // Fall back to URL hash for malformed Spotify URLs
       console.warn(`Failed to extract Spotify ID from URL: ${url}`)
-      const urlHash = sha256HashSync(url).substring(0, 16)
+      const urlHash = (await sha256Hash(url)).substring(0, 16)
       return { provider: 'spotify', externalId: `malformed-${urlHash}` }
     }
     
@@ -298,12 +298,12 @@ export class ContentEnrichmentService {
       }
       // Fall back to URL hash for malformed Twitter URLs
       console.warn(`Failed to extract Twitter/X ID from URL: ${url}`)
-      const urlHash = sha256HashSync(url).substring(0, 16)
+      const urlHash = (await sha256Hash(url)).substring(0, 16)
       return { provider: 'twitter', externalId: `malformed-${urlHash}` }
     }
     
     // Default to web with URL hash
-    const urlHash = sha256HashSync(url).substring(0, 16)
+    const urlHash = (await sha256Hash(url)).substring(0, 16)
     return { provider: 'web', externalId: urlHash }
   }
 
@@ -376,6 +376,16 @@ export class ContentEnrichmentService {
       content.extendedMetadata = am
     }
     
+    // Web content creator enrichment (for articles, blogs, etc.)
+    if ((content.provider === 'web' || content.contentType === 'article') && metadata.creator) {
+      content.creatorId = metadata.creator.id
+      content.creatorName = metadata.creator.name
+      content.creatorHandle = metadata.creator.handle
+      content.creatorThumbnail = metadata.creator.avatarUrl || metadata.faviconUrl
+      content.creatorVerified = metadata.creator.verified
+      content.creatorFollowerCount = metadata.creator.followerCount
+    }
+    
     // Calculate engagement metrics if we have data
     if (content.viewCount) {
       const engagements = (content.likeCount || 0) + (content.commentCount || 0) + (content.shareCount || 0)
@@ -391,7 +401,7 @@ export class ContentEnrichmentService {
   /**
    * Generate content fingerprint for deduplication
    */
-  private generateFingerprint(content: Content): string {
+  private async generateFingerprint(content: Content): Promise<string> {
     const parts = [
       content.provider,
       content.externalId,
@@ -401,7 +411,7 @@ export class ContentEnrichmentService {
       content.episodeNumber?.toString() || ''
     ].filter(Boolean).join('|')
     
-    return sha256HashSync(parts)
+    return await sha256Hash(parts)
   }
 
   /**

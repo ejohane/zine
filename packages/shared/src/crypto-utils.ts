@@ -28,3 +28,15 @@ export function sha256HashSync(text: string): string {
   }
   return nodeCrypto.createHash('sha256').update(text).digest('hex')
 }
+
+export async function sha256Hash(text: string): Promise<string> {
+  if (nodeCrypto) {
+    return nodeCrypto.createHash('sha256').update(text).digest('hex')
+  }
+  
+  const encoder = new TextEncoder()
+  const data = encoder.encode(text)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
