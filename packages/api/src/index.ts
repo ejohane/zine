@@ -1376,6 +1376,8 @@ app.get('/api/v1/bookmarks', async (c) => {
     const status = c.req.query('status') || 'active'
     const source = c.req.query('source')
     const contentType = c.req.query('contentType')
+    const limit = parseInt(c.req.query('limit') || '50', 10)
+    const offset = parseInt(c.req.query('offset') || '0', 10)
     
     const result = await bookmarkService.getBookmarks()
     if (result.error) {
@@ -1408,10 +1410,18 @@ app.get('/api/v1/bookmarks', async (c) => {
       return dateB - dateA
     })
     
+    // Get total count before pagination
+    const totalCount = bookmarks.length
+    
+    // Apply pagination
+    const paginatedBookmarks = bookmarks.slice(offset, offset + limit)
+    
     return c.json({
-      data: bookmarks,
+      data: paginatedBookmarks,
       meta: {
-        total: bookmarks.length,
+        total: totalCount,
+        limit,
+        offset,
         userId: auth.userId,
         status,
         ...(source && { source }),
@@ -1422,7 +1432,6 @@ app.get('/api/v1/bookmarks', async (c) => {
     return c.json({ error: 'Failed to fetch bookmarks' }, 500)
   }
 })
-
 app.get('/api/v1/bookmarks/:id', async (c) => {
   const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)

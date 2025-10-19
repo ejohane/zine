@@ -48,6 +48,15 @@ export const PostMetadataSchema = z.object({
   repostCount: z.number().optional(),
 })
 
+// Creator extraction metadata
+export const CreatorExtractionMethodEnum = z.enum([
+  'json-ld',
+  'meta-tag',
+  'semantic-html',
+  'heuristic',
+  'domain'
+])
+
 // Creator schema
 export const CreatorSchema = z.object({
   id: z.string(),
@@ -65,6 +74,8 @@ export const CreatorSchema = z.object({
     title: z.string(),
     url: z.string(),
   })).optional(),
+  extractionMethod: CreatorExtractionMethodEnum.optional(),
+  confidence: z.number().min(0).max(100).optional(),
   createdAt: optionalUnixTimestamp(),
   updatedAt: optionalUnixTimestamp(),
 })
@@ -135,6 +146,7 @@ export const CreateCreatorSchema = z.object({
 // Type exports
 export type User = z.infer<typeof UserSchema>
 export type Creator = z.infer<typeof CreatorSchema>
+export type CreatorExtractionMethod = z.infer<typeof CreatorExtractionMethodEnum>
 export type Bookmark = z.infer<typeof BookmarkSchema>
 export type CreateBookmark = z.infer<typeof CreateBookmarkSchema>
 export type SaveBookmark = z.infer<typeof SaveBookmarkSchema>

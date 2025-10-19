@@ -236,9 +236,11 @@ export class MetadataOrchestrator {
    */
   private async tryOEmbed(url: string, _platform: string): Promise<any | null> {
     try {
+      console.log('[MetadataOrchestrator] Attempting enhanced metadata extraction for:', url)
       const result = await this.withRetry(
         async () => {
           const extraction = await enhancedMetadataExtractor.extractMetadata(url)
+          console.log('[MetadataOrchestrator] Enhanced extraction result:', { success: extraction.success, hasMetadata: !!extraction.metadata, error: extraction.error })
           if (extraction.success && extraction.metadata) {
             return extraction.metadata
           }
@@ -254,7 +256,7 @@ export class MetadataOrchestrator {
   }
 
   /**
-   * Try basic HTML scraping
+   * Try basic HTML scraping with improved meta tag extraction
    */
   private async tryHtmlScraping(url: string): Promise<any | null> {
     try {
@@ -271,16 +273,36 @@ export class MetadataOrchestrator {
 
       const html = await response.text()
       
-      // Extract basic metadata from HTML
+      // Extract metadata with improved regex patterns
+      // Title: try og:title, twitter:title, then <title>
+      const ogTitleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i)
+      const twitterTitleMatch = html.match(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i)
       const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
-      const descriptionMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)
-      const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
       
-      if (titleMatch || descriptionMatch) {
+      // Description: try og:description, twitter:description, then meta description
+      const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i)
+      const twitterDescMatch = html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/i)
+      const descriptionMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i)
+      
+      // Image: try og:image, twitter:image
+      const ogImageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i)
+      const twitterImageMatch = html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i)
+      
+      // Author: try article:author, og:article:author, author meta tag
+      const ogAuthorMatch = html.match(/<meta\s+property=["'](?:og:)?article:author["']\s+content=["']([^"']+)["']/i)
+      const authorMatch = html.match(/<meta\s+name=["']author["']\s+content=["']([^"']+)["']/i)
+      
+      const title = ogTitleMatch?.[1]?.trim() || twitterTitleMatch?.[1]?.trim() || titleMatch?.[1]?.trim()
+      const description = ogDescMatch?.[1]?.trim() || twitterDescMatch?.[1]?.trim() || descriptionMatch?.[1]?.trim()
+      const thumbnailUrl = ogImageMatch?.[1]?.trim() || twitterImageMatch?.[1]?.trim()
+      const author = ogAuthorMatch?.[1]?.trim() || authorMatch?.[1]?.trim()
+      
+      if (title || description) {
         return {
-          title: titleMatch?.[1]?.trim() || 'Untitled',
-          description: descriptionMatch?.[1]?.trim(),
-          thumbnailUrl: ogImageMatch?.[1]?.trim()
+          title: title || 'Untitled',
+          description,
+          thumbnailUrl,
+          creator: author ? { name: author } : undefined
         }
       }
 
