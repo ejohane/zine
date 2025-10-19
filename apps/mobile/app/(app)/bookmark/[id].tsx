@@ -259,7 +259,10 @@ export default function BookmarkDetailScreen() {
           options={{
             title: 'Bookmark',
             headerBackTitle: 'Back',
-            headerStyle: { backgroundColor: colors.background },
+            headerTransparent: true,
+            headerBackground: () => (
+              <View style={{ flex: 1, backgroundColor: 'transparent' }} />
+            ),
             headerTintColor: colors.foreground,
           }}
         />
@@ -283,7 +286,10 @@ export default function BookmarkDetailScreen() {
           options={{
             title: '',
             headerBackTitle: 'Back',
-            headerStyle: { backgroundColor: colors.background },
+            headerTransparent: true,
+            headerBackground: () => (
+              <View style={{ flex: 1, backgroundColor: 'transparent' }} />
+            ),
             headerTintColor: colors.foreground,
           }}
         />
@@ -360,7 +366,10 @@ export default function BookmarkDetailScreen() {
           options={{
             title: 'Error',
             headerBackTitle: 'Back',
-            headerStyle: { backgroundColor: colors.background },
+            headerTransparent: true,
+            headerBackground: () => (
+              <View style={{ flex: 1, backgroundColor: 'transparent' }} />
+            ),
             headerTintColor: colors.foreground,
           }}
         />
