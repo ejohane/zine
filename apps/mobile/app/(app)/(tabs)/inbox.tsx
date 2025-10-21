@@ -12,9 +12,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/auth';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
 import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
+import { BookmarkListSkeleton } from '../../../components/bookmark-list/BookmarkListSkeleton';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
 import { useUnarchiveBookmark } from '../../../hooks/useUnarchiveBookmark';
@@ -121,6 +123,9 @@ export default function InboxScreen() {
   // Undo handler
   const handleUndo = useCallback(async () => {
     if (!archivedBookmarkId) return;
+
+    // Light haptic feedback on undo
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
       // Unarchive the bookmark
@@ -274,30 +279,35 @@ export default function InboxScreen() {
         onCategoryChange={setSelectedCategory}
       />
 
-      <FlatList
-        data={bookmarks ?? []}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        getItemLayout={getItemLayout}
-        ListEmptyComponent={renderEmpty}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-        contentContainerStyle={
-          !bookmarks || bookmarks.length === 0
-            ? styles.emptyContainer
-            : styles.listContent
-        }
-        windowSize={10}
-        maxToRenderPerBatch={10}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews={true}
-      />
+      {/* Show skeleton on initial load */}
+      {isLoading && !bookmarks ? (
+        <BookmarkListSkeleton variant="compact" layout="vertical" count={8} />
+      ) : (
+        <FlatList
+          data={bookmarks ?? []}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          getItemLayout={getItemLayout}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading && bookmarks !== undefined}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          contentContainerStyle={
+            !bookmarks || bookmarks.length === 0
+              ? styles.emptyContainer
+              : styles.listContent
+          }
+          windowSize={10}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={true}
+        />
+      )}
 
       {/* Toast Notification */}
       {toastVisible && (
