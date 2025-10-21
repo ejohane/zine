@@ -17,6 +17,7 @@ import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
 import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
+import { useUnarchiveBookmark } from '../../../hooks/useUnarchiveBookmark';
 import { useTheme } from '../../../contexts/theme';
 import type { Bookmark } from '@zine/shared';
 import type { SwipeAction } from '../../../components/bookmark-list/types';
@@ -32,6 +33,7 @@ export default function InboxScreen() {
   const [archivedBookmarkTitle, setArchivedBookmarkTitle] = useState<string>('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = React.useRef(new Animated.Value(0)).current;
+  const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Data fetching
   const { data: bookmarks, isLoading, refetch } = useInboxBookmarks({
@@ -41,6 +43,7 @@ export default function InboxScreen() {
 
   // Mutations
   const archiveMutation = useArchiveBookmark();
+  const unarchiveMutation = useUnarchiveBookmark();
 
   // Handlers
   const handleBookmarkPress = useCallback(
@@ -56,6 +59,11 @@ export default function InboxScreen() {
 
   // Toast functions
   const showToast = useCallback((bookmarkId: string, title: string) => {
+    // Clear any existing timeout
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+
     setArchivedBookmarkId(bookmarkId);
     setArchivedBookmarkTitle(title);
     setToastVisible(true);
@@ -68,12 +76,18 @@ export default function InboxScreen() {
     }).start();
 
     // Auto-hide after 5 seconds
-    setTimeout(() => {
+    toastTimeoutRef.current = setTimeout(() => {
       hideToast();
     }, 5000);
   }, [toastOpacity]);
 
   const hideToast = useCallback(() => {
+    // Clear timeout if exists
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+      toastTimeoutRef.current = null;
+    }
+
     // Fade out animation
     Animated.timing(toastOpacity, {
       toValue: 0,
@@ -103,6 +117,22 @@ export default function InboxScreen() {
       // Could show error toast here
     }
   }, [bookmarks, archiveMutation, showToast]);
+
+  // Undo handler
+  const handleUndo = useCallback(async () => {
+    if (!archivedBookmarkId) return;
+
+    try {
+      // Unarchive the bookmark
+      await unarchiveMutation.mutateAsync(archivedBookmarkId);
+
+      // Hide the toast immediately
+      hideToast();
+    } catch (error) {
+      console.error('Failed to unarchive bookmark:', error);
+      // Could show error toast here
+    }
+  }, [archivedBookmarkId, unarchiveMutation, hideToast]);
 
   // Swipe actions configuration
   const swipeActions: SwipeAction[] = useCallback(() => [
@@ -289,10 +319,19 @@ export default function InboxScreen() {
             >
               {archivedBookmarkTitle}
             </Text>
+            <Text style={[styles.toastMessage, { color: colors.mutedForeground }]}>
+              Archived
+            </Text>
           </View>
-          <Text style={[styles.toastMessage, { color: colors.mutedForeground }]}>
-            Archived
-          </Text>
+          <TouchableOpacity
+            onPress={handleUndo}
+            style={styles.undoButton}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.undoButtonText, { color: colors.primary }]}>
+              Undo
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       )}
     </SafeAreaView>
@@ -393,5 +432,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginLeft: 8,
+  },
+  undoButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 8,
+  },
+  undoButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
