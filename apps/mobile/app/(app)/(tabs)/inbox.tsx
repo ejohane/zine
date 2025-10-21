@@ -5,6 +5,8 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
+  TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,10 +14,12 @@ import { useAuth } from '../../../contexts/auth';
 import { Feather } from '@expo/vector-icons';
 
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
-import { BookmarkListItem } from '../../../components/bookmark-list/BookmarkListItem';
+import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
+import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
 import { useTheme } from '../../../contexts/theme';
 import type { Bookmark } from '@zine/shared';
+import type { SwipeAction } from '../../../components/bookmark-list/types';
 
 export default function InboxScreen() {
   const { isSignedIn } = useAuth();
@@ -24,12 +28,19 @@ export default function InboxScreen() {
 
   // State
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
+  const [archivedBookmarkId, setArchivedBookmarkId] = useState<string | null>(null);
+  const [archivedBookmarkTitle, setArchivedBookmarkTitle] = useState<string>('');
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = React.useRef(new Animated.Value(0)).current;
 
   // Data fetching
   const { data: bookmarks, isLoading, refetch } = useInboxBookmarks({
     filter: selectedCategory,
     enabled: isSignedIn,
   });
+
+  // Mutations
+  const archiveMutation = useArchiveBookmark();
 
   // Handlers
   const handleBookmarkPress = useCallback(
@@ -43,10 +54,72 @@ export default function InboxScreen() {
     await refetch();
   }, [refetch]);
 
+  // Toast functions
+  const showToast = useCallback((bookmarkId: string, title: string) => {
+    setArchivedBookmarkId(bookmarkId);
+    setArchivedBookmarkTitle(title);
+    setToastVisible(true);
+
+    // Fade in animation
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      hideToast();
+    }, 5000);
+  }, [toastOpacity]);
+
+  const hideToast = useCallback(() => {
+    // Fade out animation
+    Animated.timing(toastOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setToastVisible(false);
+      setArchivedBookmarkId(null);
+      setArchivedBookmarkTitle('');
+    });
+  }, [toastOpacity]);
+
+  // Archive handler
+  const handleArchive = useCallback(async (bookmarkId: string) => {
+    try {
+      // Find bookmark title for toast
+      const bookmark = bookmarks?.find(b => b.id === bookmarkId);
+      const title = bookmark?.title || 'Bookmark';
+
+      // Archive the bookmark
+      await archiveMutation.mutateAsync(bookmarkId);
+
+      // Show success toast
+      showToast(bookmarkId, title);
+    } catch (error) {
+      console.error('Failed to archive bookmark:', error);
+      // Could show error toast here
+    }
+  }, [bookmarks, archiveMutation, showToast]);
+
+  // Swipe actions configuration
+  const swipeActions: SwipeAction[] = useCallback(() => [
+    {
+      id: 'archive',
+      icon: 'archive',
+      iconColor: '#ffffff',
+      backgroundColor: colors.primary,
+      onPress: handleArchive,
+      label: 'Archive',
+    },
+  ], [colors.primary, handleArchive])();
+
   // Render functions
   const renderItem = useCallback(
     ({ item }: { item: Bookmark }) => (
-      <BookmarkListItem
+      <SwipeableBookmarkItem
         bookmark={item}
         variant="compact"
         onPress={handleBookmarkPress}
@@ -55,9 +128,11 @@ export default function InboxScreen() {
         showPublishDate={true}
         showPlatformIcon={true}
         enableHaptics={true}
+        rightActions={swipeActions}
+        enableHapticFeedback={true}
       />
     ),
-    [handleBookmarkPress]
+    [handleBookmarkPress, swipeActions]
   );
 
   const renderEmpty = useCallback(() => {
@@ -193,6 +268,33 @@ export default function InboxScreen() {
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
       />
+
+      {/* Toast Notification */}
+      {toastVisible && (
+        <Animated.View
+          style={[
+            styles.toast,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              opacity: toastOpacity,
+            },
+          ]}
+        >
+          <View style={styles.toastContent}>
+            <Feather name="archive" size={20} color={colors.primary} />
+            <Text
+              style={[styles.toastText, { color: colors.foreground }]}
+              numberOfLines={1}
+            >
+              {archivedBookmarkTitle}
+            </Text>
+          </View>
+          <Text style={[styles.toastMessage, { color: colors.mutedForeground }]}>
+            Archived
+          </Text>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -257,5 +359,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  toast: {
+    position: 'absolute',
+    bottom: 90,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  toastText: {
+    fontSize: 15,
+    fontWeight: '600',
+    flex: 1,
+  },
+  toastMessage: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
