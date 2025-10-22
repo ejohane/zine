@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useState, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../../contexts/auth';
 import { OptimizedRecentBookmarksSection } from '../../../components/OptimizedRecentBookmarksSection';
 import { RecentlyOpenedBookmarksSection } from '../../../components/RecentlyOpenedBookmarksSection';
@@ -22,12 +22,17 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Invalidate all queries to refresh data
       await queryClient.invalidateQueries();
     } finally {
       setRefreshing(false);
     }
   }, [queryClient]);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+    }, [queryClient])
+  );
 
   const handleSeeAllBookmarks = () => {
     router.push('/recent-bookmarks');

@@ -21,6 +21,6 @@ export function useRecentlyOpenedBookmarks() {
       
       return recentBookmarks;
     },
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
   });
 }

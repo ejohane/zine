@@ -26,6 +26,7 @@ import { PlatformIcon } from '../../../lib/platformIcons';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { LinkifiedText } from '../../../components/LinkifiedText';
+import { addRecentBookmark } from '../../../lib/recentBookmarks';
 
 export default function BookmarkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,7 +58,8 @@ export default function BookmarkDetailScreen() {
   };
 
   const handleOpenLink = async () => {
-    if (bookmark?.url) {
+    if (bookmark?.url && id) {
+      await addRecentBookmark(id);
       await openUrl(bookmark.url);
     }
   };
@@ -196,9 +198,10 @@ export default function BookmarkDetailScreen() {
       displayLabel: option.isPrimary ? `${option.label} (Default)` : option.label,
     }));
 
-    const openByIndex = (index: number) => {
+    const openByIndex = async (index: number) => {
       const target = options[index];
-      if (target) {
+      if (target && id) {
+        await addRecentBookmark(id);
         openUrl(target.url);
       }
     };
