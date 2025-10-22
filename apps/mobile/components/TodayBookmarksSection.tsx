@@ -11,10 +11,13 @@ import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 import { useTodayBookmarks } from '../hooks/useTodayBookmarks';
 import { useAuth } from '../contexts/auth';
+import { addRecentBookmark } from '../lib/recentBookmarks';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Component for video/article items with thumbnail
 const MediaBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   
   const duration = bookmark.videoMetadata?.duration || bookmark.podcastMetadata?.duration;
   const formattedDuration = duration ? formatDuration(duration) : null;
@@ -27,6 +30,9 @@ const MediaBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const handleMoreOptions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      await addRecentBookmark(bookmark.id);
+      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      
       const url = bookmark.originalUrl || bookmark.url;
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
@@ -105,6 +111,7 @@ MediaBookmarkItem.displayName = 'MediaBookmarkItem';
 // Component for social posts (Twitter/X, etc)
 const PostBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -114,6 +121,9 @@ const PostBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const handleMoreOptions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      await addRecentBookmark(bookmark.id);
+      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      
       const url = bookmark.originalUrl || bookmark.url;
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {

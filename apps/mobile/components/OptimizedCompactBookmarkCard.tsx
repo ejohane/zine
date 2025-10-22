@@ -9,6 +9,8 @@ import type { Bookmark } from '../types/bookmark';
 import { formatRelativeTime, formatShortDate } from '../lib/dateUtils';
 import { PlatformIcon, ContentTypeIcon, ExternalLinkIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
+import { addRecentBookmark } from '../lib/recentBookmarks';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface OptimizedCompactBookmarkCardProps {
   bookmark: Bookmark;
@@ -24,6 +26,7 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
   enableHaptics = true
 }) => {
   const router = useRouter();
+  const queryClient = useQueryClient();
   
   // Handle card press - navigate to detail view
   const handlePress = React.useCallback(() => {
@@ -46,6 +49,9 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
     }
     
     try {
+      await addRecentBookmark(bookmark.id);
+      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      
       const url = bookmark.originalUrl || bookmark.url;
       const canOpen = await Linking.canOpenURL(url);
       if (canOpen) {
@@ -56,7 +62,7 @@ export const OptimizedCompactBookmarkCard = React.memo<OptimizedCompactBookmarkC
     } catch (error) {
       console.error('Error opening URL:', error);
     }
-  }, [bookmark.originalUrl, bookmark.url, enableHaptics]);
+  }, [bookmark.id, bookmark.originalUrl, bookmark.url, enableHaptics, queryClient]);
   
   // Handle long press with haptic feedback
   const handleLongPress = React.useCallback(() => {
