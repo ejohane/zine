@@ -15,7 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
-import { SwipeableBookmarkItemV2 } from '../../../components/bookmark-list/SwipeableBookmarkItemV2';
+import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
 import { BookmarkListSkeleton } from '../../../components/bookmark-list/BookmarkListSkeleton';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
@@ -154,7 +154,7 @@ export default function InboxScreen() {
   // Render functions
   const renderItem = useCallback(
     ({ item }: { item: Bookmark }) => (
-      <SwipeableBookmarkItemV2
+      <SwipeableBookmarkItem
         bookmark={item}
         variant="compact"
         onPress={handleBookmarkPress}

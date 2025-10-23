@@ -1,1 +1,0 @@
-export { SwipeableItemExample } from './SwipeableItemExample';

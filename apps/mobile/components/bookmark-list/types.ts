@@ -42,11 +42,18 @@ export interface SwipeAction {
   label?: string;
 }
 
+export interface SwipeChangeParams {
+  openDirection: OpenDirection;
+  snapPoint: number;
+}
+
 export interface SwipeableBookmarkItemProps extends BookmarkListItemProps {
   leftActions?: SwipeAction[];
   rightActions?: SwipeAction[];
-  swipeThreshold?: number;
-  overshootFriction?: number;
+  onSwipeChange?: (params: SwipeChangeParams) => void;
+  swipeEnabled?: boolean;
+  activationThreshold?: number;
+  swipeDamping?: number;
   enableHapticFeedback?: boolean;
 }
 
@@ -78,19 +85,4 @@ export interface BookmarkListHeaderProps {
     icon?: string;
     onPress: () => void;
   };
-}
-
-export interface SwipeChangeParams {
-  openDirection: OpenDirection;
-  snapPoint: number;
-}
-
-export interface SwipeableBookmarkItemV2Props extends BookmarkListItemProps {
-  leftActions?: SwipeAction[];
-  rightActions?: SwipeAction[];
-  onSwipeChange?: (params: SwipeChangeParams) => void;
-  swipeEnabled?: boolean;
-  activationThreshold?: number;
-  swipeDamping?: number;
-  enableHapticFeedback?: boolean;
 }

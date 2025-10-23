@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { FlatList, View, RefreshControl, StyleSheet } from 'react-native';
 import { useTheme } from '../../contexts/theme';
 import { BookmarkListItem } from './BookmarkListItem';
-import { SwipeableBookmarkItemV2 } from './SwipeableBookmarkItemV2';
+import { SwipeableBookmarkItem } from './SwipeableBookmarkItem';
 import { BookmarkListSkeleton } from './BookmarkListSkeleton';
 import { BookmarkListEmptyState } from './BookmarkListEmptyState';
 import { CARD_STYLES, SPACING } from './constants';
@@ -50,7 +50,7 @@ export function BookmarkList({
     ({ item }: { item: Bookmark }) => {
       if (enableSwipeActions && (leftSwipeActions || rightSwipeActions)) {
         return (
-          <SwipeableBookmarkItemV2
+          <SwipeableBookmarkItem
             bookmark={item}
             variant={variant}
             onPress={onBookmarkPress}
