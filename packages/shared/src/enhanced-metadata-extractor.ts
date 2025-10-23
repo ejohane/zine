@@ -761,6 +761,18 @@ export class EnhancedMetadataExtractor {
   }
 
   /**
+   * Extract image URL from various structured data formats
+   */
+  private extractImageUrl(image: any): string | undefined {
+    if (!image) return undefined
+    if (typeof image === 'string') return image
+    if (typeof image === 'object') {
+      return image.url || image.contentUrl || image.thumbnailUrl || undefined
+    }
+    return undefined
+  }
+
+  /**
    * TIER 1: Extract from structured data (JSON-LD, meta tags)
    */
   private extractFromStructuredData(jsonLdData: any[], metaTags: Map<string, string>): Creator | undefined {
@@ -775,7 +787,7 @@ export class EnhancedMetadataExtractor {
             name: author.name || 'Unknown Author',
             url: author.url,
             bio: author.description,
-            avatarUrl: author.image?.url || author.image
+            avatarUrl: this.extractImageUrl(author.image)
           }
         } else if (typeof author === 'string') {
           return {
@@ -794,7 +806,7 @@ export class EnhancedMetadataExtractor {
             name: creator.name || 'Unknown Creator',
             url: creator.url,
             bio: creator.description,
-            avatarUrl: creator.image?.url || creator.image
+            avatarUrl: this.extractImageUrl(creator.image)
           }
         }
       }
@@ -818,7 +830,7 @@ export class EnhancedMetadataExtractor {
               name,
               url: publisher.url,
               bio: publisher.description,
-              avatarUrl: publisher.logo?.url || publisher.image?.url
+              avatarUrl: this.extractImageUrl(publisher.logo) || this.extractImageUrl(publisher.image)
             }
           }
         }
