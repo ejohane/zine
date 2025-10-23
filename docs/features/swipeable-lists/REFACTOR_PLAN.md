@@ -170,21 +170,26 @@ interface SwipeChangeParams {
 
 **Status:** Phase 2 is complete and ready for Phase 3 implementation (Inbox page migration).
 
-### Phase 3: Update Inbox Page
+### Phase 3: Update Inbox Page ✅ COMPLETED
 **Goal:** Migrate inbox page to use new swipeable implementation
 
 **Tasks:**
-1. Replace `SwipeableBookmarkItem` with `SwipeableBookmarkItemV2` in inbox
-2. Verify archive action works correctly
-3. Test toast notification and undo functionality
-4. Verify haptic feedback works as expected
-5. Test with category filtering
-6. Validate performance with large lists
+1. ✅ Replace `SwipeableBookmarkItem` with `SwipeableBookmarkItemV2` in inbox
+2. ✅ Fix TypeScript timeout type issue (NodeJS.Timeout -> ReturnType<typeof setTimeout>)
+3. Manual testing required for runtime verification
 
-**Files to Update:**
-- `apps/mobile/app/(app)/(tabs)/inbox.tsx`
+**Files Updated:**
+- `apps/mobile/app/(app)/(tabs)/inbox.tsx` - Migrated to SwipeableBookmarkItemV2
+
+**Implementation Details:**
+- Changed import from `SwipeableBookmarkItem` to `SwipeableBookmarkItemV2`
+- Updated component usage in `renderItem` function
+- Fixed timeout type to use `ReturnType<typeof setTimeout>` for better cross-platform compatibility
+- All existing props and functionality preserved (archive action, toast, undo, haptic feedback, etc.)
+- Type checking passes successfully
 
 **Testing Checklist:**
+Manual testing required (requires physical device or simulator):
 - [ ] Swipe right reveals archive action
 - [ ] Archive action triggers mutation
 - [ ] Toast notification appears with correct bookmark title
@@ -195,7 +200,16 @@ interface SwipeChangeParams {
 - [ ] Pull to refresh works
 - [ ] Empty states render correctly
 
-**Estimated Time:** 2-3 hours
+**Validation:**
+- ✅ Type checks passing
+- ✅ Code compiles without errors
+- ✅ Component API compatibility maintained
+- ⚠️ Build issues with design-system package (pre-existing, unrelated to changes)
+- ⏳ Manual runtime testing pending (requires device/simulator)
+
+**Actual Time:** ~30 minutes
+
+**Status:** Phase 3 implementation complete. Component migration successful with type safety verified. Ready for Phase 4 implementation or manual testing on device.
 
 ### Phase 4: Update Recent Bookmarks Page
 **Goal:** Migrate recent bookmarks page to new implementation

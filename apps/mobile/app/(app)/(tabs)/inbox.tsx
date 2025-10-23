@@ -15,7 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
-import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
+import { SwipeableBookmarkItemV2 } from '../../../components/bookmark-list/SwipeableBookmarkItemV2';
 import { BookmarkListSkeleton } from '../../../components/bookmark-list/BookmarkListSkeleton';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
@@ -35,7 +35,7 @@ export default function InboxScreen() {
   const [archivedBookmarkTitle, setArchivedBookmarkTitle] = useState<string>('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = React.useRef(new Animated.Value(0)).current;
-  const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Data fetching
   const { data: bookmarks, isLoading, refetch } = useInboxBookmarks({
@@ -154,7 +154,7 @@ export default function InboxScreen() {
   // Render functions
   const renderItem = useCallback(
     ({ item }: { item: Bookmark }) => (
-      <SwipeableBookmarkItem
+      <SwipeableBookmarkItemV2
         bookmark={item}
         variant="compact"
         onPress={handleBookmarkPress}
