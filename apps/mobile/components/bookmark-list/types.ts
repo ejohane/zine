@@ -1,5 +1,6 @@
 import type { Bookmark } from '@zine/shared';
 import type { ComponentType } from 'react';
+import type { OpenDirection } from 'react-native-swipeable-item';
 
 export interface BookmarkListItemProps {
   bookmark: Bookmark;
@@ -77,4 +78,19 @@ export interface BookmarkListHeaderProps {
     icon?: string;
     onPress: () => void;
   };
+}
+
+export interface SwipeChangeParams {
+  openDirection: OpenDirection;
+  snapPoint: number;
+}
+
+export interface SwipeableBookmarkItemV2Props extends BookmarkListItemProps {
+  leftActions?: SwipeAction[];
+  rightActions?: SwipeAction[];
+  onSwipeChange?: (params: SwipeChangeParams) => void;
+  swipeEnabled?: boolean;
+  activationThreshold?: number;
+  swipeDamping?: number;
+  enableHapticFeedback?: boolean;
 }
