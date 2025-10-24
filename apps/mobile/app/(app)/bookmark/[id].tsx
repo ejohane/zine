@@ -26,7 +26,7 @@ import { PlatformIcon } from '../../../lib/platformIcons';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { LinkifiedText } from '../../../components/LinkifiedText';
-import { addRecentBookmark } from '../../../lib/recentBookmarks';
+import { trackBookmarkAccessedOptimistic } from '../../../lib/recentBookmarks';
 
 export default function BookmarkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -59,7 +59,17 @@ export default function BookmarkDetailScreen() {
 
   const handleOpenLink = async () => {
     if (bookmark?.url && id) {
-      await addRecentBookmark(id);
+      await trackBookmarkAccessedOptimistic(id);
+      
+      queryClient.setQueryData(
+        ['recently-opened-bookmarks'],
+        (old: any[] | undefined) => {
+          if (!old || !bookmark) return old;
+          const filtered = old.filter(b => b.id !== bookmark.id);
+          return [bookmark, ...filtered].slice(0, 4);
+        }
+      );
+      
       await openUrl(bookmark.url);
     }
   };
@@ -201,7 +211,17 @@ export default function BookmarkDetailScreen() {
     const openByIndex = async (index: number) => {
       const target = options[index];
       if (target && id) {
-        await addRecentBookmark(id);
+        await trackBookmarkAccessedOptimistic(id);
+        
+        queryClient.setQueryData(
+          ['recently-opened-bookmarks'],
+          (old: any[] | undefined) => {
+            if (!old || !bookmark) return old;
+            const filtered = old.filter(b => b.id !== bookmark.id);
+            return [bookmark, ...filtered].slice(0, 4);
+          }
+        );
+        
         openUrl(target.url);
       }
     };

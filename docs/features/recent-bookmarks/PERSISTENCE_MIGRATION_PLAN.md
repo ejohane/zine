@@ -3,7 +3,7 @@
 ## Status
 **Created**: 2025-10-24  
 **Updated**: 2025-10-24  
-**Status**: 🚧 Phase 1 Complete - API Endpoints Implemented
+**Status**: 🚧 Phase 2 Complete - Mobile App Updates Implemented
 
 ### Implementation Progress
 
@@ -26,11 +26,26 @@
   - Added `lastAccessedAt` field to `BookmarkSchema` in `@zine/shared`
   - Type checking passed across all packages
 
-#### 🔄 Phase 2: Mobile App Updates (Pending)
-- [ ] Task 2.1: Update Bookmark Tracking Service
-- [ ] Task 2.2: Update Recent Bookmarks Hook
-- [ ] Task 2.3: Update Bookmark Open Tracking
-- [ ] Task 2.4: Add API Client Methods
+#### ✅ Phase 2: Mobile App Updates (Completed - 2025-10-24)
+- [x] Task 2.1: Update Bookmark Tracking Service
+  - Added `trackBookmarkAccessedOptimistic` function for optimistic tracking with background sync
+  - Added `syncRecentBookmarksFromStorage` helper function
+  - Function immediately updates AsyncStorage and fires background API call
+- [x] Task 2.2: Update Recent Bookmarks Hook
+  - Updated `useRecentlyOpenedBookmarks` to read from AsyncStorage instantly
+  - Added background sync from server with `syncRecentBookmarksFromServer`
+  - Synced data updates AsyncStorage and invalidates query for smooth UX
+  - Set `gcTime: Infinity` to keep data in memory
+- [x] Task 2.3: Add API Client Methods
+  - Added `bookmarksApi.trackAccessed(bookmarkId)` for updating last_accessed_at
+  - Added `bookmarksApi.getRecentlyAccessed(limit)` for fetching recent bookmarks
+  - Both methods use proper error handling and return typed responses
+- [x] Task 2.4: Update Bookmark Open Tracking
+  - Updated `TodayBookmarksSection.tsx` (2 occurrences)
+  - Updated `OptimizedCompactBookmarkCard.tsx`
+  - Updated `MediaRichBookmarkCard.tsx`
+  - Updated `app/(app)/bookmark/[id].tsx` (2 occurrences)
+  - All components now use optimistic updates with React Query cache manipulation
 
 #### ⏳ Phase 3: Migration & Cleanup (Pending)
 #### ⏳ Phase 4: Testing (Pending)
@@ -360,10 +375,10 @@ export async function trackBookmarkAccessedOptimistic(
 - Background sync keeps database in sync
 
 **Acceptance Criteria**:
-- [ ] Immediately updates AsyncStorage (optimistic)
-- [ ] Calls API in background (fire-and-forget)
-- [ ] Never blocks UI or shows loading spinner
-- [ ] Handles network errors gracefully (local state already updated)
+- [x] Immediately updates AsyncStorage (optimistic)
+- [x] Calls API in background (fire-and-forget)
+- [x] Never blocks UI or shows loading spinner
+- [x] Handles network errors gracefully (local state already updated)
 
 ---
 
@@ -449,11 +464,11 @@ async function syncRecentBookmarksFromServer(
 - **Offline**: Works perfectly with AsyncStorage only
 
 **Acceptance Criteria**:
-- [ ] Returns AsyncStorage data immediately (no loading state)
-- [ ] Syncs from database in background
-- [ ] Updates UI only if server data differs
-- [ ] Works offline (AsyncStorage only)
-- [ ] Never blocks render with loading spinner
+- [x] Returns AsyncStorage data immediately (no loading state)
+- [x] Syncs from database in background
+- [x] Updates UI only if server data differs
+- [x] Works offline (AsyncStorage only)
+- [x] Never blocks render with loading spinner
 
 ---
 
@@ -543,12 +558,12 @@ trackAccessMutation.mutate(bookmark.id);
 ```
 
 **Acceptance Criteria**:
-- [ ] UI updates instantly (no loading spinner)
-- [ ] AsyncStorage updated immediately
-- [ ] Database syncs in background
-- [ ] React Query cache updated optimistically
-- [ ] No perceived latency for user
-- [ ] Works offline (AsyncStorage + local cache)
+- [x] UI updates instantly (no loading spinner)
+- [x] AsyncStorage updated immediately
+- [x] Database syncs in background
+- [x] React Query cache updated optimistically
+- [x] No perceived latency for user
+- [x] Works offline (AsyncStorage + local cache)
 
 ---
 
@@ -583,10 +598,10 @@ export const bookmarksApi = {
 ```
 
 **Acceptance Criteria**:
-- [ ] Methods use correct API endpoints
-- [ ] Handles authentication automatically
-- [ ] Returns typed responses
-- [ ] Throws errors on failure
+- [x] Methods use correct API endpoints
+- [x] Handles authentication automatically
+- [x] Returns typed responses
+- [x] Throws errors on failure
 
 ---
 

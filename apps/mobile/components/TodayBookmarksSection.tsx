@@ -11,7 +11,7 @@ import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 import { useTodayBookmarks } from '../hooks/useTodayBookmarks';
 import { useAuth } from '../contexts/auth';
-import { addRecentBookmark } from '../lib/recentBookmarks';
+import { trackBookmarkAccessedOptimistic } from '../lib/recentBookmarks';
 import { useQueryClient } from '@tanstack/react-query';
 
 // Component for video/article items with thumbnail
@@ -30,8 +30,16 @@ const MediaBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const handleMoreOptions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await addRecentBookmark(bookmark.id);
-      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      await trackBookmarkAccessedOptimistic(bookmark.id);
+      
+      queryClient.setQueryData(
+        ['recently-opened-bookmarks'],
+        (old: any[] | undefined) => {
+          if (!old) return old;
+          const filtered = old.filter(b => b.id !== bookmark.id);
+          return [bookmark, ...filtered].slice(0, 4);
+        }
+      );
       
       const url = bookmark.originalUrl || bookmark.url;
       const canOpen = await Linking.canOpenURL(url);
@@ -121,8 +129,16 @@ const PostBookmarkItem = React.memo<{ bookmark: Bookmark }>(({ bookmark }) => {
   const handleMoreOptions = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await addRecentBookmark(bookmark.id);
-      queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      await trackBookmarkAccessedOptimistic(bookmark.id);
+      
+      queryClient.setQueryData(
+        ['recently-opened-bookmarks'],
+        (old: any[] | undefined) => {
+          if (!old) return old;
+          const filtered = old.filter(b => b.id !== bookmark.id);
+          return [bookmark, ...filtered].slice(0, 4);
+        }
+      );
       
       const url = bookmark.originalUrl || bookmark.url;
       const canOpen = await Linking.canOpenURL(url);

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { bookmarksApi } from './api';
 
 export interface RecentBookmark {
   bookmarkId: string;
@@ -50,5 +51,25 @@ export async function clearRecentBookmarks(): Promise<void> {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch (error) {
     console.error('Failed to clear recent bookmarks:', error);
+  }
+}
+
+export async function trackBookmarkAccessedOptimistic(
+  bookmarkId: string
+): Promise<void> {
+  await addRecentBookmark(bookmarkId);
+  
+  bookmarksApi.trackAccessed(bookmarkId).catch(error => {
+    console.error('Background sync failed for bookmark access:', error);
+  });
+}
+
+export async function syncRecentBookmarksFromStorage(
+  data: RecentBookmarksData
+): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to sync recent bookmarks to storage:', error);
   }
 }

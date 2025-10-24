@@ -9,7 +9,7 @@ import { formatDuration, formatShortDate, formatPublicationDate } from '../lib/d
 import { PlatformIcon } from '../lib/platformIcons';
 import { OptimizedBookmarkImage } from './OptimizedBookmarkImage';
 import { useTheme } from '../contexts/theme';
-import { addRecentBookmark } from '../lib/recentBookmarks';
+import { trackBookmarkAccessedOptimistic } from '../lib/recentBookmarks';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface MediaRichBookmarkCardProps {
@@ -58,8 +58,16 @@ export const MediaRichBookmarkCard = React.memo<MediaRichBookmarkCardProps>(({
       onOpenLink();
     } else {
       try {
-        await addRecentBookmark(bookmark.id);
-        queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+        await trackBookmarkAccessedOptimistic(bookmark.id);
+        
+        queryClient.setQueryData(
+          ['recently-opened-bookmarks'],
+          (old: any[] | undefined) => {
+            if (!old) return old;
+            const filtered = old.filter(b => b.id !== bookmark.id);
+            return [bookmark, ...filtered].slice(0, 4);
+          }
+        );
         
         const url = bookmark.originalUrl || bookmark.url;
         const canOpen = await Linking.canOpenURL(url);
