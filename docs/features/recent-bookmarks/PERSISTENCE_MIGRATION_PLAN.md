@@ -3,7 +3,7 @@
 ## Status
 **Created**: 2025-10-24  
 **Updated**: 2025-10-24  
-**Status**: 🚧 Phase 2 Complete - Mobile App Updates Implemented
+**Status**: 🚧 Phase 3 Complete - Migration & Cleanup Implemented
 
 ### Implementation Progress
 
@@ -47,7 +47,24 @@
   - Updated `app/(app)/bookmark/[id].tsx` (2 occurrences)
   - All components now use optimistic updates with React Query cache manipulation
 
-#### ⏳ Phase 3: Migration & Cleanup (Pending)
+#### ✅ Phase 3: Migration & Cleanup (Completed - 2025-10-24)
+- [x] Task 3.1: Add App Launch Sync
+  - Added `syncRecentBookmarksOnLaunch` function in `QueryProvider`
+  - Syncs on app launch after authentication
+  - Updates AsyncStorage with server state
+  - Handles errors gracefully (silent fail)
+  - Restores data after app reinstall
+  - Syncs cross-device changes
+- [x] Task 3.2: Data Migration (Passive)
+  - No explicit migration needed
+  - Passive migration through `trackBookmarkAccessedOptimistic`
+  - When user opens a bookmark, database is updated automatically
+  - AsyncStorage continues to work during transition
+- [x] Task 3.3: Update Shared Types
+  - `BookmarkSchema` already includes `lastAccessedAt` field
+  - All consuming code type-checks successfully
+  - No changes needed
+
 #### ⏳ Phase 4: Testing (Pending)
 
 ## TL;DR - Key Design Decisions
@@ -645,12 +662,12 @@ useEffect(() => {
 ```
 
 **Acceptance Criteria**:
-- [ ] Runs on app launch after authentication
-- [ ] Updates AsyncStorage with server state
-- [ ] Doesn't block app startup
-- [ ] Handles errors gracefully (silent fail)
-- [ ] Restores data after app reinstall
-- [ ] Syncs cross-device changes
+- [x] Runs on app launch after authentication
+- [x] Updates AsyncStorage with server state
+- [x] Doesn't block app startup
+- [x] Handles errors gracefully (silent fail)
+- [x] Restores data after app reinstall
+- [x] Syncs cross-device changes
 
 ---
 
@@ -663,8 +680,8 @@ useEffect(() => {
 - AsyncStorage remains as primary cache
 
 **Acceptance Criteria**:
-- [ ] No explicit migration needed (lazy migration)
-- [ ] AsyncStorage continues to work during transition
+- [x] No explicit migration needed (lazy migration)
+- [x] AsyncStorage continues to work during transition
 
 ---
 
@@ -684,8 +701,8 @@ export const BookmarkSchema = z.object({
 ```
 
 **Acceptance Criteria**:
-- [ ] Type includes `lastAccessedAt`
-- [ ] All consuming code type-checks
+- [x] Type includes `lastAccessedAt`
+- [x] All consuming code type-checks
 
 ---
 

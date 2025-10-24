@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useEffect } from 'react';
 import { QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { asyncStoragePersister } from '../lib/persistor';
@@ -8,6 +9,9 @@ import {
   logPersistenceSuccess, 
   logPersistenceFailure 
 } from '../lib/persistErrorHandler';
+import { bookmarksApi } from '../lib/api';
+import { syncRecentBookmarksFromStorage } from '../lib/recentBookmarks';
+import { useAuth } from './auth';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +33,31 @@ interface QueryProviderProps {
 }
 
 export function QueryProvider({ children }: QueryProviderProps) {
+  const { isSignedIn } = useAuth();
+
+  useEffect(() => {
+    async function syncRecentBookmarksOnLaunch() {
+      try {
+        const serverBookmarks = await bookmarksApi.getRecentlyAccessed(4);
+        
+        if (serverBookmarks.length > 0) {
+          const recentItems = serverBookmarks.map(b => ({
+            bookmarkId: b.id,
+            openedAt: b.lastAccessedAt || Date.now(),
+          }));
+          
+          await syncRecentBookmarksFromStorage({ bookmarks: recentItems });
+        }
+      } catch (error) {
+        console.error('Launch sync failed:', error);
+      }
+    }
+    
+    if (isSignedIn) {
+      syncRecentBookmarksOnLaunch();
+    }
+  }, [isSignedIn]);
+
   return (
     <PersistQueryClientProvider
       client={queryClient}
