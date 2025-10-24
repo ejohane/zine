@@ -1,9 +1,44 @@
-import { useQuery } from '@tanstack/react-query';
-import { getRecentBookmarks } from '../lib/recentBookmarks';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getRecentBookmarks, syncRecentBookmarksFromStorage } from '../lib/recentBookmarks';
 import { bookmarksApi } from '../lib/api';
 import type { Bookmark } from '@zine/shared';
 
 export function useRecentlyOpenedBookmarks() {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function syncFromServer() {
+      try {
+        const serverBookmarks = await bookmarksApi.getRecentlyAccessed(4);
+        
+        if (!isMounted) return;
+        
+        if (serverBookmarks.length >= 4) {
+          const recentItems = serverBookmarks.map(b => ({
+            bookmarkId: b.id,
+            openedAt: b.lastAccessedAt || Date.now(),
+          }));
+          
+          await syncRecentBookmarksFromStorage({ bookmarks: recentItems });
+          queryClient.invalidateQueries({ 
+            queryKey: ['recently-opened-bookmarks'] 
+          });
+        }
+      } catch (error) {
+        console.error('Background sync failed:', error);
+      }
+    }
+    
+    syncFromServer();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [queryClient]);
+  
   return useQuery({
     queryKey: ['recently-opened-bookmarks'],
     queryFn: async () => {
@@ -15,12 +50,13 @@ export function useRecentlyOpenedBookmarks() {
       
       const allBookmarks = await bookmarksApi.getAll();
       
-      const recentBookmarks = recentIds
+      const localBookmarks = recentIds
         .map(recent => allBookmarks.find(b => b.id === recent.bookmarkId))
         .filter((b): b is Bookmark => b !== undefined);
       
-      return recentBookmarks;
+      return localBookmarks;
     },
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5,
+    gcTime: Infinity,
   });
 }

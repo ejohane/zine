@@ -1432,6 +1432,98 @@ app.get('/api/v1/bookmarks', async (c) => {
     return c.json({ error: 'Failed to fetch bookmarks' }, 500)
   }
 })
+
+// Get recent bookmarks endpoint
+app.get('/api/v1/bookmarks/recent', async (c) => {
+  const auth = getAuthContext(c)
+  const limit = parseInt(c.req.query('limit') || '4', 10)
+  
+  try {
+    // Ensure limit is reasonable (between 1 and 20)
+    const safeLimit = Math.min(Math.max(limit, 1), 20)
+    
+    // Query for recent bookmarks
+    const result = await c.env.DB.prepare(`
+      SELECT 
+        b.id,
+        b.user_id,
+        b.notes,
+        b.bookmarked_at,
+        b.last_accessed_at,
+        b.status,
+        c.url,
+        c.title,
+        c.description,
+        c.thumbnail_url,
+        c.content_type,
+        c.creator_name
+      FROM bookmarks b
+      JOIN content c ON b.content_id = c.id
+      WHERE b.user_id = ? 
+        AND b.status = 'active'
+        AND b.last_accessed_at IS NOT NULL
+      ORDER BY b.last_accessed_at DESC
+      LIMIT ?
+    `).bind(auth.userId, safeLimit).all()
+    
+    if (!result.results) {
+      return c.json({ data: [] })
+    }
+    
+    // Map results to bookmark format
+    const bookmarks = result.results.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      url: row.url,
+      title: row.title,
+      description: row.description,
+      thumbnailUrl: row.thumbnail_url,
+      contentType: row.content_type,
+      notes: row.notes,
+      bookmarkedAt: row.bookmarked_at,
+      lastAccessedAt: row.last_accessed_at,
+      status: row.status,
+      creatorName: row.creator_name
+    }))
+    
+    return c.json({ data: bookmarks })
+  } catch (error) {
+    console.error('Error fetching recent bookmarks:', error)
+    return c.json({ error: 'Failed to fetch recent bookmarks' }, 500)
+  }
+})
+
+// Track bookmark accessed endpoint
+app.patch('/api/v1/bookmarks/:id/accessed', async (c) => {
+  const auth = getAuthContext(c)
+  const bookmarkId = c.req.param('id')
+  
+  try {
+    const now = Date.now()
+    
+    // Update last_accessed_at timestamp
+    const result = await c.env.DB.prepare(`
+      UPDATE bookmarks 
+      SET last_accessed_at = ?
+      WHERE id = ? AND user_id = ?
+    `).bind(now, bookmarkId, auth.userId).run()
+    
+    // Check if bookmark was found and updated
+    if (result.meta.changes === 0) {
+      return c.json({ error: 'Bookmark not found' }, 404)
+    }
+    
+    return c.json({ 
+      success: true, 
+      bookmarkId,
+      lastAccessedAt: now
+    })
+  } catch (error) {
+    console.error('Error tracking bookmark access:', error)
+    return c.json({ error: 'Failed to track bookmark access' }, 500)
+  }
+})
+
 app.get('/api/v1/bookmarks/:id', async (c) => {
   const { bookmarkService } = await initializeServices(c.env.DB, c.env)
   const auth = getAuthContext(c)

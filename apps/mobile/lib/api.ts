@@ -335,6 +335,20 @@ export const bookmarksApi = {
   unarchive: async (id: string): Promise<Bookmark> => {
     return apiClient.put<Bookmark>(`/api/v1/bookmarks/${id}/unarchive`);
   },
+  trackAccessed: async (bookmarkId: string): Promise<void> => {
+    await apiClient.patch(`/api/v1/bookmarks/${bookmarkId}/accessed`);
+  },
+  getRecentlyAccessed: async (limit: number = 4): Promise<Bookmark[]> => {
+    const response = await apiClient.get<BookmarksResponse>(`/api/v1/bookmarks/recent?limit=${limit}`);
+    if (!response.data) {
+      console.warn('API returned invalid recent bookmarks data:', response);
+      return [];
+    }
+    if (__DEV__) {
+      response.data.forEach((bookmark) => logAlternateLinks(bookmark, 'recently-accessed'));
+    }
+    return response.data;
+  },
 };
 
 // Feed-specific API methods
