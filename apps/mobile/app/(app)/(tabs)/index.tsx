@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { HomeHeader } from '../../../components/HomeHeader';
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
 import { useTheme } from '../../../contexts/theme';
+import { useRefreshFeed } from '../../../hooks/useRefreshFeed';
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
@@ -18,15 +19,21 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { colors } = useTheme();
+  const { mutateAsync: refreshFeed } = useRefreshFeed();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Trigger feed polling in the background
+      if (isSignedIn) {
+        await refreshFeed();
+      }
+      // Also invalidate local queries to refresh the UI
       await queryClient.invalidateQueries();
     } finally {
       setRefreshing(false);
     }
-  }, [queryClient]);
+  }, [queryClient, refreshFeed, isSignedIn]);
 
   useFocusEffect(
     useCallback(() => {

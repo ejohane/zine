@@ -1966,7 +1966,7 @@ export default {
       const activeUsers = await env.DB.prepare(`
         SELECT DISTINCT u.id, u.durable_object_id as durableObjectId
         FROM users u
-        INNER JOIN user_accounts ua ON u.id = ua.userId
+        INNER JOIN user_accounts ua ON u.id = ua.user_id
         WHERE u.durable_object_id IS NOT NULL
         LIMIT 100
       `).all()
@@ -2122,29 +2122,29 @@ export default {
         for (const update of doStatusUpdates) {
           await env.DB.prepare(`
             INSERT INTO durable_object_status (
-              id, userId, durableObjectId, status, lastPollTime, 
-              lastPollSuccess, lastPollError, totalPollCount, 
-              successfulPollCount, failedPollCount, totalNewItems,
-              createdAt, updatedAt
+              id, user_id, durable_object_id, status, last_poll_time,
+              last_poll_success, last_poll_error, total_poll_count,
+              successful_poll_count, failed_poll_count, total_new_items,
+              created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
               status = excluded.status,
-              lastPollTime = excluded.lastPollTime,
-              lastPollSuccess = excluded.lastPollSuccess,
-              lastPollError = excluded.lastPollError,
-              totalPollCount = durable_object_status.totalPollCount + 1,
-              successfulPollCount = CASE 
-                WHEN excluded.lastPollSuccess = 1 
-                THEN durable_object_status.successfulPollCount + 1 
-                ELSE durable_object_status.successfulPollCount 
+              last_poll_time = excluded.last_poll_time,
+              last_poll_success = excluded.last_poll_success,
+              last_poll_error = excluded.last_poll_error,
+              total_poll_count = durable_object_status.total_poll_count + 1,
+              successful_poll_count = CASE
+                WHEN excluded.last_poll_success = 1
+                THEN durable_object_status.successful_poll_count + 1
+                ELSE durable_object_status.successful_poll_count
               END,
-              failedPollCount = CASE 
-                WHEN excluded.lastPollSuccess = 0 
-                THEN durable_object_status.failedPollCount + 1 
-                ELSE durable_object_status.failedPollCount 
+              failed_poll_count = CASE
+                WHEN excluded.last_poll_success = 0
+                THEN durable_object_status.failed_poll_count + 1
+                ELSE durable_object_status.failed_poll_count
               END,
-              totalNewItems = durable_object_status.totalNewItems + excluded.totalNewItems,
-              updatedAt = excluded.updatedAt
+              total_new_items = durable_object_status.total_new_items + excluded.total_new_items,
+              updated_at = excluded.updated_at
           `).bind(
             `${update.userId}-do-status`,
             update.userId,

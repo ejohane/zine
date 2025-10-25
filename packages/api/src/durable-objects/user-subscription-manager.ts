@@ -314,12 +314,12 @@ export class UserSubscriptionManager {
       // Only fetch provider information from database (no tokens)
       // This method is primarily used during migration when tokens are still in DB
       const accounts = await this.env.DB.prepare(`
-        SELECT 
+        SELECT
           id,
-          providerId as provider,
-          isActive
-        FROM userAccounts
-        WHERE userId = ? AND isActive = 1
+          provider_id as provider,
+          is_active as isActive
+        FROM user_accounts
+        WHERE user_id = ? AND is_active = 1
       `).bind(userId).all();
       
       console.log(`Found ${accounts.results.length} active accounts for user ${userId}`);
