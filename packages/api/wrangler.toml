@@ -21,6 +21,10 @@ binding = "DB"
 database_name = "zine-db2"
 database_id = "d300ef3e-0ed7-43b4-869d-bbd8a8136507"
 
+[[kv_namespaces]]
+binding = "KV"
+id = "ce14c60be91a4d02bd4ad62a3d55eb68"
+
 [[durable_objects.bindings]]
 name = "USER_SUBSCRIPTION_MANAGER"
 class_name = "UserSubscriptionManager"
@@ -54,6 +58,10 @@ ENVIRONMENT = "production"
 binding = "DB"
 database_name = "zine-db-production"
 database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
+
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "0b616611b20a49abbe2d67ef42540fd9"
 
 [[env.production.durable_objects.bindings]]
 name = "USER_SUBSCRIPTION_MANAGER"
