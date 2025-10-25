@@ -359,6 +359,11 @@ export const feedsApi = {
   getItems: (feedId: string) => apiClient.get<any[]>(`/api/v1/feeds/${feedId}/items`),
 };
 
+// Subscription API methods
+export const subscriptionsApi = {
+  refresh: () => apiClient.post<{ message: string }>('/api/v1/subscriptions/refresh', {}),
+};
+
 // Search API methods
 export const searchApi = {
   search: (query: string, params?: Record<string, string>) => {
