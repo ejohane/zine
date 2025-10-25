@@ -1,62 +1,24 @@
-import { useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRecentBookmarks, syncRecentBookmarksFromStorage } from '../lib/recentBookmarks';
+import { useQuery } from '@tanstack/react-query';
 import { bookmarksApi } from '../lib/api';
-import type { Bookmark } from '@zine/shared';
 
 export function useRecentlyOpenedBookmarks() {
-  const queryClient = useQueryClient();
-  
-  useEffect(() => {
-    let isMounted = true;
-    
-    async function syncFromServer() {
-      try {
-        const serverBookmarks = await bookmarksApi.getRecentlyAccessed(4);
-        
-        if (!isMounted) return;
-        
-        if (serverBookmarks.length >= 4) {
-          const recentItems = serverBookmarks.map(b => ({
-            bookmarkId: b.id,
-            openedAt: b.lastAccessedAt || Date.now(),
-          }));
-          
-          await syncRecentBookmarksFromStorage({ bookmarks: recentItems });
-          queryClient.invalidateQueries({ 
-            queryKey: ['recently-opened-bookmarks'] 
-          });
-        }
-      } catch (error) {
-        console.error('Background sync failed:', error);
-      }
-    }
-    
-    syncFromServer();
-    
-    return () => {
-      isMounted = false;
-    };
-  }, [queryClient]);
-  
   return useQuery({
     queryKey: ['recently-opened-bookmarks'],
     queryFn: async () => {
-      const recentIds = await getRecentBookmarks();
-      
-      if (recentIds.length < 4) {
+      console.log('[RecentlyOpened] Fetching from server...');
+      const bookmarks = await bookmarksApi.getRecentlyAccessed(4);
+      console.log('[RecentlyOpened] Server returned:', bookmarks.length, 'bookmarks');
+
+      // Only show section if we have at least 4 bookmarks
+      if (bookmarks.length < 4) {
+        console.log('[RecentlyOpened] Hiding section - need 4 bookmarks, got', bookmarks.length);
         return [];
       }
-      
-      const allBookmarks = await bookmarksApi.getAll();
-      
-      const localBookmarks = recentIds
-        .map(recent => allBookmarks.find(b => b.id === recent.bookmarkId))
-        .filter((b): b is Bookmark => b !== undefined);
-      
-      return localBookmarks;
+
+      console.log('[RecentlyOpened] Showing section with', bookmarks.length, 'bookmarks');
+      return bookmarks;
     },
-    staleTime: 1000 * 60 * 5,
-    gcTime: Infinity,
+    staleTime: 1000 * 60 * 2, // Consider stale after 2 minutes
+    gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
   });
 }
