@@ -870,6 +870,28 @@ export class D1FeedItemRepository implements FeedItemRepository {
       totalEpisodes: row.totalEpisodes || undefined
     }
   }
+
+  /**
+   * Check if content IDs are already bookmarked by a user (including archived bookmarks).
+   * Returns a Set of content IDs that are already bookmarked.
+   */
+  async getBookmarkedContentIds(userId: string, contentIds: string[]): Promise<Set<string>> {
+    if (contentIds.length === 0) return new Set()
+
+    const bookmarkedContent = await this.db
+      .select({
+        contentId: schema.bookmarks.contentId
+      })
+      .from(schema.bookmarks)
+      .where(and(
+        eq(schema.bookmarks.userId, userId),
+        inArray(schema.bookmarks.contentId, contentIds)
+        // Note: We check both 'active' and 'archived' bookmarks
+        // by not filtering on status
+      ))
+
+    return new Set(bookmarkedContent.map(b => b.contentId))
+  }
 }
 
 // Type definitions for internal use

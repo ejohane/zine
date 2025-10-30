@@ -101,4 +101,7 @@ export interface FeedItemRepository {
   markAsRead(userId: string, feedItemId: string): Promise<UserFeedItem>
   markAsUnread(userId: string, feedItemId: string): Promise<UserFeedItem>
   addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number): Promise<UserFeedItem>
+  
+  // Bookmark checking
+  getBookmarkedContentIds(userId: string, contentIds: string[]): Promise<Set<string>>
 }
