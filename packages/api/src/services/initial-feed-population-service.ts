@@ -100,22 +100,40 @@ export class InitialFeedPopulationService {
           }
         }
 
-        // Create user feed items
+        // Filter out items that are already bookmarked
+        let itemsAddedCount = 0
         if (feedItems.length > 0) {
-          const userFeedItems = feedItems.map(feedItem => ({
-            id: `${userId}-${feedItem.id}`,
-            userId,
-            feedItemId: feedItem.id,
-            isRead: false
-          }))
+          const provider = subscription.id.split('-')[0] || 'unknown'
+          const contentIds = feedItems.map(item => `${provider}-${item.externalId}`)
+          const bookmarkedContentIds = await this.feedItemRepository.getBookmarkedContentIds(userId, contentIds)
 
-          await this.feedItemRepository.createUserFeedItems(userFeedItems)
+          const unbookmarkedFeedItems = feedItems.filter((item) => {
+            const contentId = `${provider}-${item.externalId}`
+            return !bookmarkedContentIds.has(contentId)
+          })
+
+          // Create user feed items only for unbookmarked content
+          if (unbookmarkedFeedItems.length > 0) {
+            const userFeedItems = unbookmarkedFeedItems.map(feedItem => ({
+              id: `${userId}-${feedItem.id}`,
+              userId,
+              feedItemId: feedItem.id,
+              isRead: false
+            }))
+
+            await this.feedItemRepository.createUserFeedItems(userFeedItems)
+            itemsAddedCount = unbookmarkedFeedItems.length
+          }
+
+          if (feedItems.length - unbookmarkedFeedItems.length > 0) {
+            console.log(`[InitialFeedPopulation] Filtered out ${feedItems.length - unbookmarkedFeedItems.length} bookmarked items for ${subscription.title}`)
+          }
         }
 
         results.push({
           subscriptionId: subscription.id,
           subscriptionTitle: subscription.title,
-          itemsAdded: feedItems.length
+          itemsAdded: itemsAddedCount
         })
       } catch (error) {
         const subscription = await this.subscriptionRepository.getSubscription(subscriptionId)
@@ -174,22 +192,40 @@ export class InitialFeedPopulationService {
           }
         }
 
-        // Create user feed items
+        // Filter out items that are already bookmarked
+        let itemsAddedCount = 0
         if (feedItems.length > 0) {
-          const userFeedItems = feedItems.map(feedItem => ({
-            id: `${userId}-${feedItem.id}`,
-            userId,
-            feedItemId: feedItem.id,
-            isRead: false
-          }))
+          const provider = subscription.id.split('-')[0] || 'unknown'
+          const contentIds = feedItems.map(item => `${provider}-${item.externalId}`)
+          const bookmarkedContentIds = await this.feedItemRepository.getBookmarkedContentIds(userId, contentIds)
 
-          await this.feedItemRepository.createUserFeedItems(userFeedItems)
+          const unbookmarkedFeedItems = feedItems.filter((item) => {
+            const contentId = `${provider}-${item.externalId}`
+            return !bookmarkedContentIds.has(contentId)
+          })
+
+          // Create user feed items only for unbookmarked content
+          if (unbookmarkedFeedItems.length > 0) {
+            const userFeedItems = unbookmarkedFeedItems.map(feedItem => ({
+              id: `${userId}-${feedItem.id}`,
+              userId,
+              feedItemId: feedItem.id,
+              isRead: false
+            }))
+
+            await this.feedItemRepository.createUserFeedItems(userFeedItems)
+            itemsAddedCount = unbookmarkedFeedItems.length
+          }
+
+          if (feedItems.length - unbookmarkedFeedItems.length > 0) {
+            console.log(`[InitialFeedPopulation] Filtered out ${feedItems.length - unbookmarkedFeedItems.length} bookmarked items for ${subscription.title}`)
+          }
         }
 
         results.push({
           subscriptionId: subscription.id,
           subscriptionTitle: subscription.title,
-          itemsAdded: feedItems.length
+          itemsAdded: itemsAddedCount
         })
       } catch (error) {
         const subscription = await this.subscriptionRepository.getSubscription(subscriptionId)
