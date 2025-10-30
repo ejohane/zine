@@ -1,25 +1,42 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tsConfigPaths from 'vite-tsconfig-paths'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 // import { createRouterPlugin } from '@tanstack/router-vite-plugin'
+
+// Read port offset from .env.worktree
+let portOffset = 0
+try {
+  const envWorktree = readFileSync(join(__dirname, '../../.env.worktree'), 'utf-8')
+  const match = envWorktree.match(/PORT_OFFSET=(\d+)/)
+  if (match) {
+    portOffset = parseInt(match[1], 10)
+  }
+} catch {
+  // No worktree config, use default ports
+}
+
+const webPort = 3000 + portOffset
+const apiPort = 8787 + portOffset
 
 export default defineConfig({
   server: {
     host: '0.0.0.0',
-    port: 3000,
+    port: webPort,
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: `http://localhost:${apiPort}`,
         changeOrigin: true,
       },
     },
   },
   preview: {
-    port: 3000,
+    port: webPort,
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: `http://localhost:${apiPort}`,
         changeOrigin: true,
       },
     },

@@ -3,6 +3,25 @@ import type { Bookmark } from '../types/bookmark';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+// Get API port from environment or calculate from port offset
+function getApiPort(): number {
+  // Read port offset from environment (set by metro.config.js via .env.worktree)
+  const portOffset = process.env.PORT_OFFSET ? parseInt(process.env.PORT_OFFSET, 10) : 0;
+  return 8787 + portOffset;
+}
+
+// Replace port in URL string
+function replacePortInUrl(url: string, newPort: number): string {
+  // Match protocol://host:port or protocol://host
+  const match = url.match(/^(https?:\/\/[^:\/]+)(:\d+)?(\/.*)?$/);
+  if (match) {
+    const protocol = match[1]; // http://hostname or https://hostname
+    const path = match[3] || ''; // path or empty
+    return `${protocol}:${newPort}${path}`;
+  }
+  return url; // Return original if pattern doesn't match
+}
+
 // Determine the API URL based on the environment
 function getApiUrl(): string {
   // If explicitly set in environment, use that
@@ -15,30 +34,38 @@ function getApiUrl(): string {
     return 'https://api.myzine.app';
   }
 
+  const apiPort = getApiPort();
+
   // In development, check if we're on a simulator or physical device
   const isSimulator = Constants.isDevice === false;
   
   if (Platform.OS === 'ios') {
     // iOS Simulator can use localhost
     if (isSimulator) {
-      return 'http://localhost:8787';
+      return `http://localhost:${apiPort}`;
     }
     // Physical iOS device needs your Mac's IP address
     // You can use either your local network IP or Tailscale IP
-    return process.env.EXPO_PUBLIC_TAILSCALE_API_URL || 'http://100.90.89.84:8787';
+    if (process.env.EXPO_PUBLIC_TAILSCALE_API_URL) {
+      return replacePortInUrl(process.env.EXPO_PUBLIC_TAILSCALE_API_URL, apiPort);
+    }
+    return `http://100.90.89.84:${apiPort}`;
   }
 
   if (Platform.OS === 'android') {
     // Android Emulator uses 10.0.2.2 to reach host machine
     if (isSimulator) {
-      return 'http://10.0.2.2:8787';
+      return `http://10.0.2.2:${apiPort}`;
     }
     // Physical Android device needs your Mac's IP address
-    return process.env.EXPO_PUBLIC_TAILSCALE_API_URL || 'http://100.90.89.84:8787';
+    if (process.env.EXPO_PUBLIC_TAILSCALE_API_URL) {
+      return replacePortInUrl(process.env.EXPO_PUBLIC_TAILSCALE_API_URL, apiPort);
+    }
+    return `http://100.90.89.84:${apiPort}`;
   }
 
   // Fallback
-  return 'http://localhost:8787';
+  return `http://localhost:${apiPort}`;
 }
 
 const API_URL = getApiUrl();

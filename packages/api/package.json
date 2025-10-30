@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev src/index.ts --local --port 8787 --ip 0.0.0.0",
+    "dev": "bash -c 'source ../../.env.worktree 2>/dev/null || true; PORT=$((8787 + ${PORT_OFFSET:-0})); echo \"Starting API on port $PORT\"; wrangler dev src/index.ts --local --port $PORT --ip 0.0.0.0'",
     "deploy": "wrangler deploy --minify src/index.ts",
     "type-check": "tsc --noEmit",
     "build": "tsc",
