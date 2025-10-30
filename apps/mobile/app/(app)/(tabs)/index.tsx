@@ -25,11 +25,18 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Trigger feed polling in the background
+      // Trigger feed polling in the background (may be rate limited)
       if (isSignedIn) {
-        await refreshFeed();
+        try {
+          await refreshFeed();
+        } catch (error: any) {
+          // Rate limiting is expected - don't show error since we'll still refresh local data
+          if (error?.status !== 429) {
+            console.error('Failed to refresh feed:', error);
+          }
+        }
       }
-      // Also invalidate local queries to refresh the UI
+      // Always invalidate local queries to refresh the UI with latest data from backend
       await queryClient.invalidateQueries();
     } finally {
       setRefreshing(false);
@@ -39,6 +46,10 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['feed-items'],
+        refetchType: 'active'
+      });
     }, [queryClient])
   );
 

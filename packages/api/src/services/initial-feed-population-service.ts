@@ -20,10 +20,8 @@ export class InitialFeedPopulationService {
     subscriptionIds: string[]
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    console.log(`[InitialFeedPopulation] Populating initial feed for user ${userId} with ${subscriptionIds.length} subscriptions (last 7 days)`)
+    console.log(`[InitialFeedPopulation] Populating initial feed for user ${userId} with ${subscriptionIds.length} subscriptions (latest item only)`)
 
     // Group subscriptions by provider
     const subscriptionsByProvider = new Map<string, string[]>()
@@ -46,10 +44,10 @@ export class InitialFeedPopulationService {
       }
 
       if (providerId === 'spotify') {
-        const spotifyResults = await this.populateSpotifyFeeds(subIds, userAccount, sevenDaysAgo, userId)
+        const spotifyResults = await this.populateSpotifyFeeds(subIds, userAccount, userId)
         results.push(...spotifyResults)
       } else if (providerId === 'youtube') {
-        const youtubeResults = await this.populateYouTubeFeeds(subIds, userAccount, sevenDaysAgo, userId)
+        const youtubeResults = await this.populateYouTubeFeeds(subIds, userAccount, userId)
         results.push(...youtubeResults)
       }
     }
@@ -62,7 +60,6 @@ export class InitialFeedPopulationService {
   private async populateSpotifyFeeds(
     subscriptionIds: string[],
     userAccount: UserAccount,
-    cutoffDate: Date,
     userId: string
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
@@ -77,20 +74,14 @@ export class InitialFeedPopulationService {
         const subscription = await this.subscriptionRepository.getSubscription(subscriptionId)
         if (!subscription) continue
 
-        // Fetch latest episodes (limited to 20)
-        const episodes = await spotifyAPI.getLatestEpisodes(subscription.externalId, 20)
+        // Fetch only the latest episode
+        const episodes = await spotifyAPI.getLatestEpisodes(subscription.externalId, 1)
         
-        // Filter to only episodes from the last 7 days
-        const recentEpisodes = episodes.filter(episode => {
-          const publishedAt = new Date(episode.release_date)
-          return publishedAt >= cutoffDate
-        })
+        console.log(`[InitialFeedPopulation] Found ${episodes.length} latest episode for ${subscription.title}`)
 
-        console.log(`[InitialFeedPopulation] Found ${recentEpisodes.length} recent episodes for ${subscription.title}`)
-
-        // Create feed items for recent episodes
+        // Create feed items for the latest episode
         const feedItems = []
-        for (const episode of recentEpisodes) {
+        for (const episode of episodes) {
           const feedItem = await this.feedItemRepository.findOrCreateFeedItem({
             subscriptionId: subscription.id,
             externalId: episode.id,
@@ -143,7 +134,6 @@ export class InitialFeedPopulationService {
   private async populateYouTubeFeeds(
     subscriptionIds: string[],
     userAccount: UserAccount,
-    cutoffDate: Date,
     userId: string
   ): Promise<InitialFeedPopulationResult[]> {
     const results: InitialFeedPopulationResult[] = []
@@ -158,20 +148,14 @@ export class InitialFeedPopulationService {
         const subscription = await this.subscriptionRepository.getSubscription(subscriptionId)
         if (!subscription) continue
 
-        // Fetch latest videos (limited to 20)
-        const videos = await youtubeAPI.getLatestVideos(subscription.externalId, 20)
+        // Fetch only the latest video
+        const videos = await youtubeAPI.getLatestVideos(subscription.externalId, 1)
         
-        // Filter to only videos from the last 7 days
-        const recentVideos = videos.filter(video => {
-          const publishedAt = new Date(video.snippet.publishedAt)
-          return publishedAt >= cutoffDate
-        })
+        console.log(`[InitialFeedPopulation] Found ${videos.length} latest video for ${subscription.title}`)
 
-        console.log(`[InitialFeedPopulation] Found ${recentVideos.length} recent videos for ${subscription.title}`)
-
-        // Create feed items for recent videos
+        // Create feed items for the latest video
         const feedItems = []
-        for (const video of recentVideos) {
+        for (const video of videos) {
           const feedItem = await this.feedItemRepository.findOrCreateFeedItem({
             subscriptionId: subscription.id,
             externalId: video.id,

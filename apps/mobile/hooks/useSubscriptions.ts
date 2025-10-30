@@ -28,6 +28,7 @@ export function useUpdateSubscriptions(provider: 'spotify' | 'youtube') {
       }))),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['feed-items'] });
       Alert.alert('Success', 'Subscriptions updated!');
     },
     onError: (error) => {
