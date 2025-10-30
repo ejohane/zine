@@ -356,9 +356,12 @@ export class UserSubscriptionManager {
       // Refresh expired tokens before polling
       await this.refreshExpiredTokens();
       
+      // Reload tokens after refresh to get the updated access tokens
+      const refreshedTokens = await this.state.storage.get<Map<string, OAuthTokenData>>('tokens') || new Map();
+      
       // Use the single-user polling service
       const pollingService = new SingleUserPollingService(userId, this.env);
-      const pollResults = await pollingService.pollUserSubscriptions(tokens);
+      const pollResults = await pollingService.pollUserSubscriptions(refreshedTokens);
       
       // Aggregate results
       result.results = pollResults;
