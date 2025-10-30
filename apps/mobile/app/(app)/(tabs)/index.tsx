@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../../contexts/auth';
 import { OptimizedRecentBookmarksSection } from '../../../components/OptimizedRecentBookmarksSection';
 import { RecentlyOpenedBookmarksSection } from '../../../components/RecentlyOpenedBookmarksSection';
+import { FeedSection } from '../../../components/FeedSection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { HomeHeader } from '../../../components/HomeHeader';
@@ -68,6 +69,16 @@ export default function HomeScreen() {
         {/* Recently Opened Bookmarks Section - Only show when authenticated and has 4+ opened */}
         {isLoaded && isSignedIn && (
           <RecentlyOpenedBookmarksSection />
+        )}
+
+        {/* Feed Section - Only show when authenticated and has new items */}
+        {isLoaded && isSignedIn && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>From your Feed</Text>
+            </View>
+            <FeedSection onRefresh={onRefresh} />
+          </View>
         )}
         
         {/* Recent Bookmarks Section - Only show when authenticated */}

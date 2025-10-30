@@ -482,7 +482,57 @@ export class D1FeedItemRepository implements FeedItemRepository {
 
   async getUserFeedItemsWithDetails(userId: string, unreadOnly: boolean = false, limit: number = 50, offset: number = 0): Promise<UserFeedItemWithDetails[]> {
     let query = this.db
-      .select()
+      .select({
+        user_feed_items: {
+          id: schema.userFeedItems.id,
+          isRead: schema.userFeedItems.isRead,
+          readAt: schema.userFeedItems.readAt,
+          bookmarkId: schema.userFeedItems.bookmarkId,
+          createdAt: schema.userFeedItems.createdAt,
+        },
+        feed_items: {
+          id: schema.feedItems.id,
+          subscriptionId: schema.feedItems.subscriptionId,
+          addedToFeedAt: schema.feedItems.addedToFeedAt,
+        },
+        content: {
+          externalId: schema.content.externalId,
+          title: schema.content.title,
+          description: schema.content.description,
+          thumbnailUrl: schema.content.thumbnailUrl,
+          publishedAt: schema.content.publishedAt,
+          durationSeconds: schema.content.durationSeconds,
+          url: schema.content.url,
+          viewCount: schema.content.viewCount,
+          likeCount: schema.content.likeCount,
+          commentCount: schema.content.commentCount,
+          popularityScore: schema.content.popularityScore,
+          language: schema.content.language,
+          isExplicit: schema.content.isExplicit,
+          contentType: schema.content.contentType,
+          category: schema.content.category,
+          tags: schema.content.tags,
+          creatorId: schema.content.creatorId,
+          creatorName: schema.content.creatorName,
+          creatorThumbnail: schema.content.creatorThumbnail,
+          creatorVerified: schema.content.creatorVerified,
+          creatorSubscriberCount: schema.content.creatorSubscriberCount,
+          creatorFollowerCount: schema.content.creatorFollowerCount,
+          seriesMetadata: schema.content.seriesMetadata,
+          createdAt: schema.content.createdAt,
+        },
+        subscriptions: {
+          id: schema.subscriptions.id,
+          providerId: schema.subscriptions.providerId,
+          externalId: schema.subscriptions.externalId,
+          title: schema.subscriptions.title,
+          creatorName: schema.subscriptions.creatorName,
+          description: schema.subscriptions.description,
+          thumbnailUrl: schema.subscriptions.thumbnailUrl,
+          subscriptionUrl: schema.subscriptions.subscriptionUrl,
+          totalEpisodes: schema.subscriptions.totalEpisodes,
+        },
+      })
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))

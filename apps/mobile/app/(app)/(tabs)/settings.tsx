@@ -190,40 +190,26 @@ export default function SettingsScreen() {
         </SettingSection>
 
         <SettingSection title="Account">
-          <TouchableOpacity onPress={() => handleConnectProvider('spotify')} disabled={isConnecting || isDisconnecting}>
+          <TouchableOpacity 
+            onPress={() => router.push('/subscriptions/spotify')}
+          >
             <SettingRow
               icon="spotify"
-              title={isSpotifyConnected ? "Spotify Connected" : "Connect Spotify"}
-              subtitle={isSpotifyConnected ? "Your podcasts are synced" : "Import your podcasts and playlists"}
+              title="Spotify"
+              subtitle={isSpotifyConnected ? "Manage your podcast subscriptions" : "Connect and manage subscriptions"}
             >
-              {isConnecting || isDisconnecting ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : isSpotifyConnected ? (
-                <View style={styles.connectedIndicator}>
-                  <FontAwesome name="check-circle" size={16} color="#22c55e" />
-                  <Text style={[styles.connectedText, { color: colors.mutedForeground }]}>Connected</Text>
-                </View>
-              ) : (
-                <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
-              )}
+              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
             </SettingRow>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleConnectProvider('youtube')} disabled={isConnecting || isDisconnecting}>
+          <TouchableOpacity 
+            onPress={() => router.push('/subscriptions/youtube')}
+          >
             <SettingRow
               icon="youtube-play"
-              title={isYouTubeConnected ? "YouTube Connected" : "Connect YouTube"}
-              subtitle={isYouTubeConnected ? "Your subscriptions are synced" : "Import your subscriptions"}
+              title="YouTube"
+              subtitle={isYouTubeConnected ? "Manage your subscriptions" : "Connect and manage subscriptions"}
             >
-              {isConnecting || isDisconnecting ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : isYouTubeConnected ? (
-                <View style={styles.connectedIndicator}>
-                  <FontAwesome name="check-circle" size={16} color="#22c55e" />
-                  <Text style={[styles.connectedText, { color: colors.mutedForeground }]}>Connected</Text>
-                </View>
-              ) : (
-                <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
-              )}
+              <FontAwesome name="chevron-right" size={16} color="#a3a3a3" />
             </SettingRow>
           </TouchableOpacity>
         </SettingSection>
