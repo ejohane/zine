@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and, desc, inArray, or } from 'drizzle-orm'
+import { eq, and, desc, inArray, or, isNull } from 'drizzle-orm'
 import * as schema from './schema'
 import { 
   FeedItemRepository,
@@ -365,7 +365,8 @@ export class D1FeedItemRepository implements FeedItemRepository {
       query = query.where(and(
         eq(schema.userFeedItems.userId, userId),
         eq(schema.feedItems.subscriptionId, subscriptionId),
-        eq(schema.userFeedItems.isRead, false)
+        eq(schema.userFeedItems.isRead, false),
+        isNull(schema.userFeedItems.bookmarkId)
       ))
     }
 
@@ -380,6 +381,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       id: row.user_feed_items.id,
       feedItem: {
         id: row.feed_items.id,
+        contentId: row.content.id,
         subscriptionId: row.feed_items.subscriptionId,
         externalId: row.content.externalId,
         title: row.content.title,
@@ -496,6 +498,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           addedToFeedAt: schema.feedItems.addedToFeedAt,
         },
         content: {
+          id: schema.content.id,
           externalId: schema.content.externalId,
           title: schema.content.title,
           description: schema.content.description,
@@ -543,7 +546,8 @@ export class D1FeedItemRepository implements FeedItemRepository {
     if (unreadOnly) {
       query = query.where(and(
         eq(schema.userFeedItems.userId, userId),
-        eq(schema.userFeedItems.isRead, false)
+        eq(schema.userFeedItems.isRead, false),
+        isNull(schema.userFeedItems.bookmarkId)
       ))
     }
 
@@ -558,6 +562,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       id: row.user_feed_items.id,
       feedItem: {
         id: row.feed_items.id,
+        contentId: row.content.id,
         subscriptionId: row.feed_items.subscriptionId,
         externalId: row.content.externalId,
         title: row.content.title,
@@ -738,15 +743,18 @@ export class D1FeedItemRepository implements FeedItemRepository {
     }
   }
 
-  async addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number): Promise<UserFeedItem> {
+  async addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number | string): Promise<UserFeedItem> {
     // First check if user feed item exists
     const existing = await this.getUserFeedItem(userId, feedItemId)
+    
+    const bookmarkIdStr = typeof bookmarkId === 'number' ? bookmarkId.toString() : bookmarkId
+    const bookmarkIdNum = typeof bookmarkId === 'number' ? bookmarkId : parseInt(bookmarkId)
     
     if (existing) {
       await this.db
         .update(schema.userFeedItems)
         .set({
-          bookmarkId: bookmarkId.toString()
+          bookmarkId: bookmarkIdStr
         })
         .where(and(
           eq(schema.userFeedItems.userId, userId),
@@ -755,7 +763,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       
       return {
         ...existing,
-        bookmarkId
+        bookmarkId: bookmarkIdNum
       }
     } else {
       // Verify that the feed item exists before creating user feed item
@@ -771,7 +779,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
         userId,
         feedItemId,
         isRead: false,
-        bookmarkId
+        bookmarkId: bookmarkIdNum
       })
     }
   }
@@ -867,7 +875,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
 // Type definitions for internal use
 interface UserFeedItemWithDetails {
   id: string
-  feedItem: FeedItem & { subscription: any }
+  feedItem: FeedItem & { contentId: string; subscription: any }
   isRead: boolean
   readAt?: Date
   bookmarkId?: string

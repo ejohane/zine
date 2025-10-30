@@ -1075,6 +1075,7 @@ app.get('/api/v1/feed', async (c) => {
         id: item.id,
         feedItem: {
           id: item.feedItem.id,
+          contentId: item.feedItem.contentId,
           title: item.feedItem.title,
           description: item.feedItem.description,
           thumbnailUrl: item.feedItem.thumbnailUrl,
@@ -1106,7 +1107,7 @@ app.get('/api/v1/feed', async (c) => {
   }
 })
 
-app.put('/api/v1/feed/:itemId/read', async (c) => {
+app.put('/api/v1/feed/:itemId/read', authMiddleware, async (c) => {
   try {
     const auth = getAuthContext(c)
     const itemId = c.req.param('itemId')
@@ -1927,6 +1928,215 @@ app.put('/api/v1/bookmarks/:id/refresh', async (c) => {
     })
   } catch (error) {
     return c.json({ error: 'Failed to refresh metadata' }, 500)
+  }
+})
+
+// Get content by ID endpoint (for feed items that aren't bookmarked yet)
+app.get('/api/v1/content/:contentId', authMiddleware, async (c) => {
+  try {
+    const contentId = c.req.param('contentId')
+    
+    // Use ContentRepository to fetch content
+    const { ContentRepository } = await import('./repositories/content-repository')
+    const contentRepository = new ContentRepository(c.env.DB)
+    
+    const content = await contentRepository.findById(contentId)
+    
+    if (!content) {
+      return c.json({ error: 'Content not found' }, 404)
+    }
+    
+    // Join with creator data if creatorId exists
+    const { CreatorRepository } = await import('./repositories/creator-repository')
+    const creatorRepository = new CreatorRepository(c.env.DB)
+    
+    let creator = null
+    if (content.creatorId) {
+      creator = await creatorRepository.getCreator(content.creatorId)
+    }
+    
+    // If no creator info in content table, try to get it from feed item's subscription
+    let subscriptionCreatorName = null
+    let subscriptionCreatorThumbnail = null
+    if (!creator && !content.creatorName) {
+      const feedItemResult = await c.env.DB.prepare(`
+        SELECT 
+          s.creator_name,
+          s.thumbnail_url
+        FROM feed_items fi
+        JOIN subscriptions s ON fi.subscription_id = s.id
+        WHERE fi.content_id = ?
+        LIMIT 1
+      `).bind(contentId).first()
+      
+      if (feedItemResult) {
+        subscriptionCreatorName = feedItemResult.creator_name as string
+        subscriptionCreatorThumbnail = feedItemResult.thumbnail_url as string
+      }
+    }
+    
+    // Format response with creator data
+    const response = {
+      id: content.id,
+      externalId: content.externalId,
+      provider: content.provider,
+      contentType: content.contentType,
+      title: content.title,
+      description: content.description,
+      url: content.url,
+      thumbnailUrl: content.thumbnailUrl,
+      publishedAt: content.publishedAt?.getTime(),
+      creator: creator ? {
+        id: creator.id,
+        name: creator.name,
+        handle: creator.handle,
+        avatarUrl: creator.avatarUrl,
+        verified: creator.verified || false
+      } : (content.creatorName ? {
+        id: content.creatorId || '',
+        name: content.creatorName,
+        handle: content.creatorHandle,
+        avatarUrl: content.creatorThumbnail,
+        verified: content.creatorVerified || false
+      } : (subscriptionCreatorName ? {
+        id: '',
+        name: subscriptionCreatorName,
+        avatarUrl: subscriptionCreatorThumbnail,
+        verified: false
+      } : null)),
+      videoMetadata: content.contentType === 'video' ? {
+        duration: content.durationSeconds,
+        viewCount: content.viewCount
+      } : undefined,
+      podcastMetadata: content.contentType === 'podcast' ? {
+        duration: content.durationSeconds,
+        episodeNumber: content.episodeNumber
+      } : undefined,
+      articleMetadata: content.contentType === 'article' ? {
+        readingTime: Math.ceil((content.durationSeconds || 0) / 60), // Convert seconds to minutes
+        wordCount: undefined // Not stored currently
+      } : undefined
+    }
+    
+    return c.json(response)
+  } catch (error) {
+    console.error('Error fetching content:', error)
+    return c.json({ error: 'Failed to fetch content' }, 500)
+  }
+})
+
+// Create bookmark from existing content endpoint
+app.post('/api/v1/bookmarks/from-content', authMiddleware, async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const body = await c.req.json()
+    
+    // Validate request body with Zod
+    const { CreateBookmarkFromContentSchema } = await import('@zine/shared')
+    const parseResult = CreateBookmarkFromContentSchema.safeParse(body)
+    if (!parseResult.success) {
+      return c.json({ 
+        error: 'Invalid request body', 
+        details: parseResult.error.errors 
+      }, 400)
+    }
+    const { contentId, notes, tags } = parseResult.data
+    
+    // Check if content exists
+    const { ContentRepository } = await import('./repositories/content-repository')
+    const contentRepository = new ContentRepository(c.env.DB)
+    const content = await contentRepository.findById(contentId)
+    
+    if (!content) {
+      return c.json({ error: 'Content not found' }, 404)
+    }
+    
+    // Check for existing bookmark
+    const d1Repository = new D1BookmarkRepository(c.env.DB)
+    
+    // Query to check if bookmark already exists
+    const existingBookmark = await c.env.DB.prepare(`
+      SELECT id, content_id 
+      FROM bookmarks 
+      WHERE user_id = ? AND content_id = ? AND status != 'deleted'
+      LIMIT 1
+    `).bind(auth.userId, contentId).first()
+    
+    if (existingBookmark) {
+      // Return existing bookmark with duplicate flag
+      const bookmarkResult = await d1Repository.getById(existingBookmark.id as string)
+      if (!bookmarkResult) {
+        // This should not happen, but handle it gracefully
+        console.error(`Bookmark ${existingBookmark.id} found in query but getById returned null`)
+        return c.json({ error: 'Bookmark not found' }, 404)
+      }
+      return c.json({
+        data: bookmarkResult,
+        duplicate: true,
+        existingBookmarkId: existingBookmark.id
+      })
+    }
+    
+    // Ensure user exists
+    await d1Repository.ensureUser({ id: auth.userId })
+    
+    // Create new bookmark
+    const bookmarkId = `${auth.userId}-${Date.now()}`
+    const now = new Date()
+    
+    await c.env.DB.prepare(`
+      INSERT INTO bookmarks (
+        id, user_id, content_id, notes, user_tags, status, bookmarked_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      bookmarkId,
+      auth.userId,
+      contentId,
+      notes || null,
+      tags ? JSON.stringify(tags) : null,
+      'active',
+      now.getTime()
+    ).run()
+    
+    // Fetch and return the created bookmark
+    const bookmark = await d1Repository.getById(bookmarkId)
+    
+    // Link bookmark to feed item if it exists
+    try {
+      const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
+      
+      // Find feed item by content ID
+      const feedItemResult = await c.env.DB.prepare(`
+        SELECT id FROM feed_items WHERE content_id = ? LIMIT 1
+      `).bind(contentId).first()
+      
+      if (feedItemResult) {
+        const feedItemId = feedItemResult.id as string
+        // Update user_feed_items to link this bookmark
+        await feedItemRepository.addBookmarkToFeedItem(auth.userId, feedItemId, bookmarkId)
+      }
+    } catch (linkError) {
+      console.error('Failed to link bookmark to feed item:', linkError)
+      // Don't fail the request if linking fails
+    }
+    
+    // Invalidate caches (if using Durable Objects for recent bookmarks)
+    try {
+      const doId = c.env.USER_RECENT_BOOKMARKS.idFromName(auth.userId)
+      const stub = c.env.USER_RECENT_BOOKMARKS.get(doId)
+      await stub.fetch(new Request('http://do/invalidate', { method: 'POST' }))
+    } catch (doError) {
+      console.error('Failed to invalidate recent bookmarks cache:', doError)
+      // Don't fail the request if cache invalidation fails
+    }
+    
+    return c.json({
+      data: bookmark,
+      duplicate: false
+    }, 201)
+  } catch (error) {
+    console.error('Error creating bookmark from content:', error)
+    return c.json({ error: 'Failed to create bookmark' }, 500)
   }
 })
 

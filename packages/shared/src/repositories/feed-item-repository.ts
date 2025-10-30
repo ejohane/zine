@@ -1,5 +1,6 @@
 export interface FeedItem {
   id: string
+  contentId?: string
   subscriptionId: string
   externalId: string
   title: string

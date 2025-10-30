@@ -38,6 +38,7 @@ interface FeedCardProps {
     id: string;
     feedItem: {
       id: string;
+      contentId?: string;
       title: string;
       thumbnailUrl?: string | null;
       publishedAt: string;
@@ -233,7 +234,7 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
             <FeedCard
               item={item}
               onPress={() => {
-                router.push(`/bookmark/${item.feedItem.id}`);
+                router.push(`/content/${item.feedItem.contentId}`);
               }}
             />
           </View>

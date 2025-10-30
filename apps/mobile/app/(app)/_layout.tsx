@@ -36,6 +36,13 @@ export default function AppLayout() {
         }}
       />
       <Stack.Screen
+        name="content/[id]"
+        options={{
+          headerShown: true,
+          headerBackButtonDisplayMode: 'minimal',
+        }}
+      />
+      <Stack.Screen
         name="recent-bookmarks"
         options={{
           headerShown: true,

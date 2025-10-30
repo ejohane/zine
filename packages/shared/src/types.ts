@@ -161,6 +161,47 @@ export type Source = z.infer<typeof SourceEnum>
 export type ContentType = z.infer<typeof ContentTypeEnum>
 export type BookmarkStatus = z.infer<typeof BookmarkStatusEnum>
 
+// ContentDetail type for preview (from database content table)
+// Note: Named "ContentDetail" to avoid conflict with existing Content interface in content-enrichment-service
+export const ContentDetailSchema = z.object({
+  id: z.string(),
+  externalId: z.string(),
+  provider: z.string(),
+  contentType: ContentTypeEnum.optional(),
+  title: z.string(),
+  description: z.string().optional(),
+  url: z.string(),
+  thumbnailUrl: z.string().optional(),
+  publishedAt: z.number().optional(),
+  creator: z.object({
+    id: z.string(),
+    name: z.string(),
+    handle: z.string().optional(),
+    avatarUrl: z.string().optional(),
+    verified: z.boolean().optional(),
+  }).nullable().optional(),
+  videoMetadata: VideoMetadataSchema.optional(),
+  podcastMetadata: PodcastMetadataSchema.optional(),
+  articleMetadata: ArticleMetadataSchema.optional(),
+})
+
+export type ContentDetail = z.infer<typeof ContentDetailSchema>
+
+// Request/response types for new endpoints
+export const CreateBookmarkFromContentSchema = z.object({
+  contentId: z.string(),
+  notes: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+})
+
+export type CreateBookmarkFromContent = z.infer<typeof CreateBookmarkFromContentSchema>
+
+export interface CreateBookmarkFromContentResponse {
+  data: Bookmark
+  duplicate: boolean
+  existingBookmarkId?: string
+}
+
 // API Response types
 export interface ApiResponse<T = any> {
   data?: T
@@ -170,3 +211,4 @@ export interface ApiResponse<T = any> {
 
 export interface BookmarksResponse extends ApiResponse<Bookmark[]> {}
 export interface BookmarkResponse extends ApiResponse<Bookmark> {}
+export interface ContentDetailResponse extends ApiResponse<ContentDetail> {}

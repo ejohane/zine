@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/auth';
 
 interface FeedItem {
   id: string;
+  contentId?: string;
   title: string;
   externalUrl: string;
   thumbnailUrl?: string | null;

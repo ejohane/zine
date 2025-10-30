@@ -3,10 +3,8 @@ import {
   View,
   Text,
   Alert,
-  Share,
   Linking,
   TouchableOpacity,
-  Image,
   StyleSheet,
   ActivityIndicator,
   Animated,
@@ -21,12 +19,11 @@ import { useBookmarkDetail } from '../../../hooks/useBookmarkDetail';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
 import { useAuth } from '../../../contexts/auth';
 import { useTheme } from '../../../contexts/theme';
-import { formatDistanceToNow } from '../../../lib/dateUtils';
 import { PlatformIcon } from '../../../lib/platformIcons';
 import { api } from '../../../lib/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { LinkifiedText } from '../../../components/LinkifiedText';
 import { trackBookmarkAccessedOptimistic } from '../../../lib/recentBookmarks';
+import { BookmarkContentDisplay } from '../../../components/content-display';
 
 export default function BookmarkDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +32,6 @@ export default function BookmarkDetailScreen() {
   const { colors } = useTheme();
   const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
   const archiveMutation = useArchiveBookmark();
   const {
@@ -43,7 +39,6 @@ export default function BookmarkDetailScreen() {
     isLoading,
     isFetching,
     error,
-    refetch,
   } = useBookmarkDetail(id, {
     enabled: isSignedIn && !!id,
   });
@@ -71,20 +66,6 @@ export default function BookmarkDetailScreen() {
       );
       
       await openUrl(bookmark.url);
-    }
-  };
-
-  const handleShare = async () => {
-    if (bookmark) {
-      try {
-        await Share.share({
-          title: bookmark.title,
-          message: `Check out this bookmark: ${bookmark.title}\n${bookmark.url}`,
-          url: bookmark.url,
-        });
-      } catch (error) {
-        Alert.alert('Error', 'Could not share bookmark');
-      }
     }
   };
 
@@ -250,31 +231,6 @@ export default function BookmarkDetailScreen() {
     }
   };
 
-  // Format duration
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return null;
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m ${secs}s`;
-  };
-
-  // Get platform color
-  const getPlatformColor = (source?: string) => {
-    switch (source) {
-      case 'youtube': return '#FF0000';
-      case 'spotify': return '#1DB954';
-      case 'twitter':
-      case 'x': return '#000000';
-      case 'substack': return '#FF6719';
-      default: return colors.primary;
-    }
-  };
-
   if (!isSignedIn) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -417,24 +373,6 @@ export default function BookmarkDetailScreen() {
     );
   }
 
-  const duration = bookmark.videoMetadata?.duration || bookmark.podcastMetadata?.duration;
-  const formattedDuration = formatDuration(duration);
-  const platformColor = getPlatformColor(bookmark.source);
-  const isMediaContent = bookmark.contentType === 'video' || bookmark.contentType === 'podcast';
-
-  const HEADER_HEIGHT = 300;
-  const imageTranslateY = scrollY.interpolate({
-    inputRange: [-HEADER_HEIGHT, 0, HEADER_HEIGHT],
-    outputRange: [-HEADER_HEIGHT / 2, 0, HEADER_HEIGHT * 0.75],
-    extrapolate: 'clamp',
-  });
-
-  const imageScale = scrollY.interpolate({
-    inputRange: [-HEADER_HEIGHT, 0],
-    outputRange: [2, 1],
-    extrapolate: 'clamp',
-  });
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen 
@@ -463,82 +401,13 @@ export default function BookmarkDetailScreen() {
         )}
         scrollEventThrottle={16}
       >
-        {/* Hero Image with Parallax */}
-        <Animated.View 
-          style={[
-            styles.heroSection, 
-            { 
-              transform: [
-                { translateY: imageTranslateY },
-                { scale: imageScale }
-              ] 
-            }
-          ]}
+        <BookmarkContentDisplay
+          data={bookmark}
+          scrollY={scrollY}
+          onCreatorPress={(creatorId) => router.push(`/creator/${creatorId}` as any)}
+          showNotes={true}
+          showTags={true}
         >
-            {bookmark.thumbnailUrl && !imageError ? (
-              <Image
-                source={{ uri: bookmark.thumbnailUrl }}
-                style={styles.heroImage}
-                resizeMode="cover"
-                onError={() => setImageError(true)}
-              />
-            ) : (
-              <View style={[styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
-                <Feather name="image" size={48} color={colors.mutedForeground} />
-              </View>
-            )}
-            {formattedDuration && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{formattedDuration}</Text>
-              </View>
-            )}
-        </Animated.View>
-
-        {/* Content Section with white background overlay */}
-        <View style={[styles.contentSection, { backgroundColor: colors.background }]}>
-          {/* Title */}
-          <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={3}>
-            {bookmark.title}
-          </Text>
-
-          {/* Creator and Date Row */}
-          <View style={styles.creatorDateRow}>
-            {/* Creator Info on the left */}
-            <TouchableOpacity 
-              style={styles.creatorInfo}
-              onPress={() => {
-                if (bookmark.creator?.id) {
-                  router.push(`/creator/${bookmark.creator.id}` as any)
-                }
-              }}
-              activeOpacity={0.7}
-              disabled={!bookmark.creator?.id}
-            >
-              {bookmark.creator?.avatarUrl ? (
-                <Image
-                  source={{ uri: bookmark.creator.avatarUrl }}
-                  style={styles.creatorAvatar}
-                  onError={() => {}}
-                />
-              ) : (
-                <View style={[styles.creatorAvatarPlaceholder, { backgroundColor: colors.secondary }]}>
-                  <Feather name="user" size={20} color={colors.mutedForeground} />
-                </View>
-              )}
-              <Text style={[styles.creatorName, { color: colors.foreground }]} numberOfLines={1}>
-                {bookmark.creator?.name || 'Unknown Creator'}
-              </Text>
-              {bookmark.creator?.verified && (
-                <Feather name="check-circle" size={14} color={colors.primary} style={styles.verifiedBadge} />
-              )}
-            </TouchableOpacity>
-            
-            {/* Publish date on the right */}
-            <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
-              {formatDistanceToNow(bookmark.publishedAt || bookmark.createdAt)}
-            </Text>
-          </View>
-
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <TouchableOpacity 
@@ -620,107 +489,7 @@ export default function BookmarkDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
-
-          {/* Metadata Cards */}
-          <View style={styles.metadataGrid}>
-            {/* Content Type */}
-            {bookmark.contentType && bookmark.contentType !== 'link' && (
-              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
-                <Feather 
-                  name={bookmark.contentType === 'video' ? 'play-circle' : 
-                        bookmark.contentType === 'podcast' ? 'headphones' :
-                        bookmark.contentType === 'article' ? 'file-text' : 'message-square'} 
-                  size={20} 
-                  color={platformColor} 
-                />
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Type</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  {bookmark.contentType.charAt(0).toUpperCase() + bookmark.contentType.slice(1)}
-                </Text>
-              </View>
-            )}
-
-            {/* View Count for Videos */}
-            {bookmark.videoMetadata?.viewCount && (
-              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
-                <Feather name="eye" size={20} color={colors.primary} />
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Views</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  {bookmark.videoMetadata.viewCount.toLocaleString('en')}
-                </Text>
-              </View>
-            )}
-
-            {/* Reading Time for Articles */}
-            {bookmark.articleMetadata?.readingTime && (
-              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
-                <Feather name="clock" size={20} color={colors.primary} />
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Read Time</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  {bookmark.articleMetadata.readingTime} min
-                </Text>
-              </View>
-            )}
-
-            {/* Episode Info for Podcasts */}
-            {bookmark.podcastMetadata?.episodeNumber && (
-              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
-                <Feather name="mic" size={20} color={colors.primary} />
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Episode</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  #{bookmark.podcastMetadata.episodeNumber}
-                </Text>
-              </View>
-            )}
-
-            {/* Published Date */}
-            {bookmark.publishedAt && (
-              <View style={[styles.metaCard, { backgroundColor: colors.secondary }]}>
-                <Feather name="calendar" size={20} color={colors.primary} />
-                <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>Published</Text>
-                <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                  {new Date(bookmark.publishedAt).toLocaleDateString('en', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: bookmark.publishedAt ? new Date(bookmark.publishedAt).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined : undefined
-                  })}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Tags */}
-          {bookmark.tags && bookmark.tags.length > 0 && (
-            <View style={styles.tagsSection}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
-              <View style={styles.tagsContainer}>
-                {bookmark.tags.map((tag, index) => (
-                  <View key={index} style={[styles.tag, { backgroundColor: colors.primary + '20' }]}>
-                    <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Notes */}
-          {bookmark.notes && (
-            <View style={styles.notesSection}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Notes</Text>
-              <View style={[styles.notesCard, { backgroundColor: colors.secondary }]}>
-                <Text style={[styles.notesText, { color: colors.foreground }]}>{bookmark.notes}</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Description */}
-          {bookmark.description && (
-            <LinkifiedText 
-              text={bookmark.description}
-              style={[styles.description, { color: colors.mutedForeground }]}
-            />
-          )}
-        </View>
+        </BookmarkContentDisplay>
       </Animated.ScrollView>
     </View>
   );
@@ -742,34 +511,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  headerButton: {
-    padding: 8,
-    marginRight: 8,
-  },
-  headerBackground: {
-    flex: 1,
-    width: '100%',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
   
-  // Hero Section
+  // Skeleton styles for loading state
   heroSection: {
     width: '100%',
     height: 300,
-    overflow: 'hidden',
   },
-  heroImage: {
-    width: '100%',
-    height: '100%',
+  contentSection: {
+    padding: 20,
+    paddingBottom: 32,
   },
-  heroPlaceholder: {
-    width: '100%',
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
+  skeletonHero: {
+    opacity: 0.3,
+  },
+  skeletonTitle: {
+    height: 28,
+    borderRadius: 8,
+    marginBottom: 8,
+    width: '90%',
+    opacity: 0.3,
+  },
+  skeletonTitleLine2: {
+    height: 28,
+    borderRadius: 8,
+    marginBottom: 12,
+    width: '60%',
+    opacity: 0.3,
   },
   creatorDateRow: {
     flexDirection: 'row',
@@ -784,106 +551,45 @@ const styles = StyleSheet.create({
     gap: 12,
     flex: 1,
   },
-  creatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 16,
+  skeletonIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    opacity: 0.3,
   },
-  creatorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  skeletonPlatformText: {
+    height: 18,
+    width: 100,
+    borderRadius: 6,
+    opacity: 0.3,
   },
-  creatorAvatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+  skeletonDate: {
+    height: 16,
+    width: 60,
+    borderRadius: 6,
+    opacity: 0.3,
   },
-  creatorName: {
-    fontSize: 16,
-    fontWeight: '600',
+  skeletonDescription: {
+    height: 20,
+    borderRadius: 6,
+    marginBottom: 8,
+    width: '100%',
+    opacity: 0.3,
   },
-  verifiedBadge: {
-    marginLeft: 4,
+  skeletonDescriptionLine2: {
+    height: 20,
+    borderRadius: 6,
+    marginBottom: 8,
+    width: '95%',
+    opacity: 0.3,
   },
-  mediaOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playIcon: {
-    marginLeft: 4,
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  durationText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  
-  // Content Section
-  contentSection: {
-    padding: 20,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '700',
-    marginTop: 0,
-    marginBottom: 12,
-    letterSpacing: -0.5,
-    lineHeight: 32,
-  },
-
-  platformInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  platformText: {
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  authorAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  dateText: {
-    fontSize: 14,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginTop: 0,
+  skeletonDescriptionLine3: {
+    height: 20,
+    borderRadius: 6,
     marginBottom: 20,
+    width: '75%',
+    opacity: 0.3,
   },
-  
-  // Metadata Grid
   metadataGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -899,21 +605,8 @@ const styles = StyleSheet.create({
     minWidth: 90,
     gap: 4,
   },
-  metaLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  metaValue: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  
-  // Sections
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-    letterSpacing: -0.3,
+  skeletonMetaCard: {
+    opacity: 0.3,
   },
   tagsSection: {
     marginBottom: 20,
@@ -923,25 +616,18 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  skeletonSectionTitle: {
+    height: 20,
+    width: 60,
+    borderRadius: 6,
+    marginBottom: 12,
+    opacity: 0.3,
+  },
+  skeletonTag: {
+    height: 36,
+    width: 80,
     borderRadius: 20,
-  },
-  tagText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  notesSection: {
-    marginBottom: 24,
-  },
-  notesCard: {
-    padding: 16,
-    borderRadius: 12,
-  },
-  notesText: {
-    fontSize: 15,
-    lineHeight: 22,
+    opacity: 0.3,
   },
   
   // Action Buttons
@@ -995,6 +681,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flex: 1,
   },
+  skeletonPrimaryButton: {
+    height: 52,
+    borderRadius: 14,
+    opacity: 0.3,
+  },
   
   // Error states
   errorTitle: {
@@ -1017,90 +708,6 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  
-  // Skeleton styles
-  skeletonButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-  },
-  skeletonHero: {
-    opacity: 0.3,
-  },
-  skeletonTitle: {
-    height: 28,
-    borderRadius: 8,
-    marginBottom: 8,
-    width: '90%',
-    opacity: 0.3,
-  },
-  skeletonTitleLine2: {
-    height: 28,
-    borderRadius: 8,
-    marginBottom: 12,
-    width: '60%',
-    opacity: 0.3,
-  },
-  skeletonIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    opacity: 0.3,
-  },
-  skeletonPlatformText: {
-    height: 18,
-    width: 100,
-    borderRadius: 6,
-    opacity: 0.3,
-  },
-  skeletonDate: {
-    height: 16,
-    width: 60,
-    borderRadius: 6,
-    opacity: 0.3,
-  },
-  skeletonDescription: {
-    height: 20,
-    borderRadius: 6,
-    marginBottom: 8,
-    width: '100%',
-    opacity: 0.3,
-  },
-  skeletonDescriptionLine2: {
-    height: 20,
-    borderRadius: 6,
-    marginBottom: 8,
-    width: '95%',
-    opacity: 0.3,
-  },
-  skeletonDescriptionLine3: {
-    height: 20,
-    borderRadius: 6,
-    marginBottom: 20,
-    width: '75%',
-    opacity: 0.3,
-  },
-  skeletonMetaCard: {
-    opacity: 0.3,
-  },
-  skeletonSectionTitle: {
-    height: 20,
-    width: 60,
-    borderRadius: 6,
-    marginBottom: 12,
-    opacity: 0.3,
-  },
-  skeletonTag: {
-    height: 36,
-    width: 80,
-    borderRadius: 20,
-    opacity: 0.3,
-  },
-  skeletonPrimaryButton: {
-    height: 52,
-    borderRadius: 14,
-    opacity: 0.3,
   },
 });
 
