@@ -362,6 +362,37 @@ export const feedsApi = {
 // Subscription API methods
 export const subscriptionsApi = {
   refresh: () => apiClient.post<{ message: string }>('/api/v1/subscriptions/refresh', {}),
+  
+  discover: async (provider: 'spotify' | 'youtube'): Promise<DiscoveryResult> => {
+    return apiClient.get<DiscoveryResult>(`/api/v1/subscriptions/discover/${provider}`);
+  },
+
+  update: async (
+    provider: 'spotify' | 'youtube', 
+    subscriptions: Array<{
+      externalId: string;
+      title: string;
+      creatorName: string;
+      description?: string;
+      thumbnailUrl?: string;
+      subscriptionUrl?: string;
+      selected: boolean;
+      totalEpisodes?: number;
+    }>
+  ): Promise<{ added: number; removed: number }> => {
+    return apiClient.post<{ added: number; removed: number }>(
+      `/api/v1/subscriptions/${provider}/update`,
+      { subscriptions }
+    );
+  },
+
+  list: async (provider?: 'spotify' | 'youtube'): Promise<UserSubscription[]> => {
+    const endpoint = provider 
+      ? `/api/v1/subscriptions?provider=${provider}`
+      : '/api/v1/subscriptions';
+    const response = await apiClient.get<{ subscriptions: UserSubscription[] }>(endpoint);
+    return response.subscriptions;
+  }
 };
 
 // Search API methods
@@ -393,6 +424,38 @@ export interface AccountsResponse {
 
 export interface OAuthConnectResponse {
   authUrl: string;
+}
+
+export interface DiscoveredSubscription {
+  externalId: string;
+  title: string;
+  creatorName: string;
+  description?: string;
+  thumbnailUrl?: string;
+  subscriptionUrl?: string;
+  provider: 'spotify' | 'youtube';
+  isUserSubscribed: boolean;
+  totalEpisodes?: number;
+}
+
+export interface DiscoveryResult {
+  provider: 'spotify' | 'youtube';
+  subscriptions: DiscoveredSubscription[];
+  totalFound: number;
+  errors?: string[];
+}
+
+export interface UserSubscription {
+  id: string;
+  externalId: string;
+  title: string;
+  creatorName: string;
+  description?: string;
+  thumbnailUrl?: string;
+  subscriptionUrl?: string;
+  provider: 'spotify' | 'youtube';
+  createdAt: string;
+  updatedAt: string;
 }
 
 // OAuth/Account API methods

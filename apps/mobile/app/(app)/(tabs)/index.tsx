@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../../contexts/auth';
 import { OptimizedRecentBookmarksSection } from '../../../components/OptimizedRecentBookmarksSection';
 import { RecentlyOpenedBookmarksSection } from '../../../components/RecentlyOpenedBookmarksSection';
+import { FeedSection } from '../../../components/FeedSection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { HomeHeader } from '../../../components/HomeHeader';
@@ -24,11 +25,18 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Trigger feed polling in the background
+      // Trigger feed polling in the background (may be rate limited)
       if (isSignedIn) {
-        await refreshFeed();
+        try {
+          await refreshFeed();
+        } catch (error: any) {
+          // Rate limiting is expected - don't show error since we'll still refresh local data
+          if (error?.status !== 429) {
+            console.error('Failed to refresh feed:', error);
+          }
+        }
       }
-      // Also invalidate local queries to refresh the UI
+      // Always invalidate local queries to refresh the UI with latest data from backend
       await queryClient.invalidateQueries();
     } finally {
       setRefreshing(false);
@@ -38,6 +46,10 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       queryClient.invalidateQueries({ queryKey: ['recently-opened-bookmarks'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['feed-items'],
+        refetchType: 'active'
+      });
     }, [queryClient])
   );
 
@@ -68,6 +80,16 @@ export default function HomeScreen() {
         {/* Recently Opened Bookmarks Section - Only show when authenticated and has 4+ opened */}
         {isLoaded && isSignedIn && (
           <RecentlyOpenedBookmarksSection />
+        )}
+
+        {/* Feed Section - Only show when authenticated and has new items */}
+        {isLoaded && isSignedIn && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>From your Feed</Text>
+            </View>
+            <FeedSection onRefresh={onRefresh} />
+          </View>
         )}
         
         {/* Recent Bookmarks Section - Only show when authenticated */}

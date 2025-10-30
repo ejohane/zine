@@ -923,7 +923,7 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
       subscriptions
     )
     
-    // If new subscriptions were added, populate initial feed with content from last 7 days
+    // If new subscriptions were added, populate initial feed with latest item only
     if (result.newSubscriptionIds.length > 0) {
       console.log(`[SubscriptionUpdate] Populating initial feed for ${result.newSubscriptionIds.length} new subscriptions`)
       
@@ -934,7 +934,7 @@ app.post('/api/v1/subscriptions/:provider/update', async (c) => {
         )
         
         const totalItemsAdded = populationResults.reduce((sum, r) => sum + r.itemsAdded, 0)
-        console.log(`[SubscriptionUpdate] Added ${totalItemsAdded} items to user's feed from last 7 days`)
+        console.log(`[SubscriptionUpdate] Added ${totalItemsAdded} latest items to user's feed`)
       } catch (error) {
         // Log error but don't fail the subscription update
         console.error('[SubscriptionUpdate] Error populating initial feed:', error)
