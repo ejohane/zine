@@ -337,15 +337,18 @@ export class SingleUserPollingService {
   ): Promise<typeof items> {
     if (items.length === 0) return []
 
-    // Get existing external IDs for this subscription
+    // Get existing content IDs (content.id = "{provider}-{external_id}")
+    // We need to check what content already exists via feed_items
     const externalIds = items.map(item => item.externalId)
     const placeholders = externalIds.map(() => '?').join(',')
     
+    // Query via content table joined with feed_items
     const existing = await this.db.prepare(`
-      SELECT external_id 
-      FROM feed_items 
-      WHERE subscription_id = ? 
-      AND external_id IN (${placeholders})
+      SELECT c.external_id 
+      FROM feed_items fi
+      JOIN content c ON fi.content_id = c.id
+      WHERE fi.subscription_id = ? 
+      AND c.external_id IN (${placeholders})
     `).bind(subscriptionId, ...externalIds).all()
 
     const existingIds = new Set(existing.results.map(row => row.external_id as string))
@@ -367,28 +370,57 @@ export class SingleUserPollingService {
   ): Promise<void> {
     const createdFeedItems: string[] = []
 
-    // Create feed items
+    // Get subscription to determine provider
+    const subscription = await this.db.prepare(`
+      SELECT provider_id FROM subscriptions WHERE id = ?
+    `).bind(subscriptionId).first<{ provider_id: string }>()
+
+    if (!subscription) {
+      throw new Error(`Subscription ${subscriptionId} not found`)
+    }
+
+    const provider = subscription.provider_id
+
+    // Create content entries and feed items
     for (const item of items) {
-      const id = crypto.randomUUID()
+      // 1. Create content entry (using unified content model)
+      const contentId = `${provider}-${item.externalId}`
+      
       await this.db.prepare(`
-        INSERT INTO feed_items (
-          id, subscription_id, external_id, title, description, 
-          thumbnail_url, published_at, duration_seconds, external_url, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR IGNORE INTO content (
+          id, external_id, provider, url, title, description, 
+          thumbnail_url, published_at, duration_seconds, 
+          content_type, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
-        id,
-        subscriptionId,
+        contentId,
         item.externalId,
+        provider,
+        item.externalUrl,
         item.title,
         item.description || '',
         item.thumbnailUrl || '',
-        item.publishedAt.toISOString(),
+        Math.floor(item.publishedAt.getTime() / 1000), // Convert to Unix timestamp
         item.durationSeconds,
-        item.externalUrl,
-        new Date().toISOString()
+        provider === 'spotify' ? 'podcast' : 'video',
+        Math.floor(Date.now() / 1000),
+        Math.floor(Date.now() / 1000)
       ).run()
 
-      createdFeedItems.push(id)
+      // 2. Create feed_item entry
+      const feedItemId = crypto.randomUUID()
+      await this.db.prepare(`
+        INSERT INTO feed_items (
+          id, subscription_id, content_id, added_to_feed_at
+        ) VALUES (?, ?, ?, ?)
+      `).bind(
+        feedItemId,
+        subscriptionId,
+        contentId,
+        Math.floor(Date.now() / 1000)
+      ).run()
+
+      createdFeedItems.push(feedItemId)
     }
 
     // Create user feed item for this user
@@ -403,7 +435,7 @@ export class SingleUserPollingService {
         this.userId,
         feedItemId,
         0,
-        new Date().toISOString()
+        Math.floor(Date.now() / 1000)
       ).run()
     }
 
