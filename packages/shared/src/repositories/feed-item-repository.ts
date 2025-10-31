@@ -71,6 +71,7 @@ export interface UserFeedItem {
   userId: string
   feedItemId: string
   isRead: boolean
+  isHidden?: boolean
   bookmarkId?: number
   readAt?: Date
   createdAt: Date
@@ -95,11 +96,14 @@ export interface FeedItemRepository {
     subscriptionIds?: string[]
     limit?: number
     offset?: number
+    includeHidden?: boolean
   }): Promise<FeedItemWithReadState[]>
   createUserFeedItem(userFeedItem: Omit<UserFeedItem, 'createdAt'>): Promise<UserFeedItem>
   createUserFeedItems(userFeedItems: Omit<UserFeedItem, 'createdAt'>[]): Promise<UserFeedItem[]>
   markAsRead(userId: string, feedItemId: string): Promise<UserFeedItem>
   markAsUnread(userId: string, feedItemId: string): Promise<UserFeedItem>
+  hideItem(userId: string, feedItemId: string): Promise<UserFeedItem>
+  unhideItem(userId: string, feedItemId: string): Promise<UserFeedItem>
   addBookmarkToFeedItem(userId: string, feedItemId: string, bookmarkId: number): Promise<UserFeedItem>
   
   // Bookmark checking

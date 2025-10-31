@@ -1185,6 +1185,84 @@ app.put('/api/v1/feed/:itemId/unread', async (c) => {
   }
 })
 
+app.put('/api/v1/feed/:itemId/hide', authMiddleware, async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const itemId = c.req.param('itemId')
+    
+    console.log(`Hide feed item request for itemId: ${itemId} by userId: ${auth.userId}`)
+    
+    const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    // Ensure user exists in database before hiding item
+    await subscriptionRepository.ensureUser({
+      id: auth.userId
+    })
+    
+    // Extract the actual feedItemId from the userFeedItemId if needed
+    // The itemId might be in format: userId-feedItemId-timestamp
+    let feedItemId = itemId
+    
+    // Check if this looks like a userFeedItemId (contains userId prefix)
+    if (itemId.startsWith(auth.userId + '-')) {
+      // Extract the feedItemId part (everything after userId- and before the last timestamp)
+      const parts = itemId.substring(auth.userId.length + 1).split('-')
+      if (parts.length >= 3) {
+        // Remove the last part (timestamp) and rejoin
+        parts.pop() // Remove timestamp
+        feedItemId = parts.join('-')
+        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+      }
+    }
+    
+    await feedItemRepository.hideItem(auth.userId, feedItemId)
+    
+    return c.json({ message: 'Item hidden from feed' })
+  } catch (error) {
+    console.error('Hide feed item error:', error)
+    return c.json({ error: 'Failed to hide feed item' }, 500)
+  }
+})
+
+app.put('/api/v1/feed/:itemId/unhide', authMiddleware, async (c) => {
+  try {
+    const auth = getAuthContext(c)
+    const itemId = c.req.param('itemId')
+    
+    console.log(`Unhide feed item request for itemId: ${itemId} by userId: ${auth.userId}`)
+    
+    const { feedItemRepository, subscriptionRepository } = await initializeServices(c.env.DB, c.env)
+    
+    // Ensure user exists in database before unhiding item
+    await subscriptionRepository.ensureUser({
+      id: auth.userId
+    })
+    
+    // Extract the actual feedItemId from the userFeedItemId if needed
+    // The itemId might be in format: userId-feedItemId-timestamp
+    let feedItemId = itemId
+    
+    // Check if this looks like a userFeedItemId (contains userId prefix)
+    if (itemId.startsWith(auth.userId + '-')) {
+      // Extract the feedItemId part (everything after userId- and before the last timestamp)
+      const parts = itemId.substring(auth.userId.length + 1).split('-')
+      if (parts.length >= 3) {
+        // Remove the last part (timestamp) and rejoin
+        parts.pop() // Remove timestamp
+        feedItemId = parts.join('-')
+        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+      }
+    }
+    
+    await feedItemRepository.unhideItem(auth.userId, feedItemId)
+    
+    return c.json({ message: 'Item unhidden from feed' })
+  } catch (error) {
+    console.error('Unhide feed item error:', error)
+    return c.json({ error: 'Failed to unhide feed item' }, 500)
+  }
+})
+
 app.get('/api/v1/feed/subscriptions', async (c) => {
   try {
     const auth = getAuthContext(c)

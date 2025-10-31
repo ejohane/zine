@@ -277,6 +277,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       subscriptionIds?: string[]
       limit?: number
       offset?: number
+      includeHidden?: boolean
     }
   ): Promise<FeedItemWithReadState[]> {
     let query = this.db
@@ -305,6 +306,16 @@ export class D1FeedItemRepository implements FeedItemRepository {
         // For unread, we need items that are either explicitly false or don't have a user feed item entry yet
         conditions.push(eq(schema.userFeedItems.isRead, false))
       }
+    }
+
+    // Filter out hidden items by default
+    if (!options?.includeHidden) {
+      conditions.push(
+        or(
+          eq(schema.userFeedItems.isHidden, false),
+          isNull(schema.userFeedItems.isHidden)
+        )
+      )
     }
 
     // Handle subscription IDs with chunking to avoid SQLite variable limit
@@ -620,6 +631,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: userFeedItem.userId,
       feedItemId: userFeedItem.feedItemId,
       isRead: userFeedItem.isRead,
+      isHidden: userFeedItem.isHidden ?? false,
       bookmarkId: userFeedItem.bookmarkId?.toString() || null,
       readAt: userFeedItem.readAt || null,
       createdAt: now
@@ -642,6 +654,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: userFeedItem.userId,
       feedItemId: userFeedItem.feedItemId,
       isRead: userFeedItem.isRead,
+      isHidden: userFeedItem.isHidden ?? false,
       bookmarkId: userFeedItem.bookmarkId?.toString() || null,
       readAt: userFeedItem.readAt || null,
       createdAt: now
@@ -739,6 +752,82 @@ export class D1FeedItemRepository implements FeedItemRepository {
         userId,
         feedItemId,
         isRead: false
+      })
+    }
+  }
+
+  async hideItem(userId: string, feedItemId: string): Promise<UserFeedItem> {
+    // First check if user feed item exists
+    const existing = await this.getUserFeedItem(userId, feedItemId)
+    
+    if (existing) {
+      await this.db
+        .update(schema.userFeedItems)
+        .set({
+          isHidden: true
+        })
+        .where(and(
+          eq(schema.userFeedItems.userId, userId),
+          eq(schema.userFeedItems.feedItemId, feedItemId)
+        ))
+      
+      return {
+        ...existing,
+        isHidden: true
+      }
+    } else {
+      // Verify that the feed item exists before creating user feed item
+      const feedItem = await this.getFeedItem(feedItemId)
+      if (!feedItem) {
+        throw new Error(`Feed item ${feedItemId} not found`)
+      }
+      
+      // Create new user feed item as hidden
+      const userFeedItemId = `${userId}-${feedItemId}-${Date.now()}`
+      return this.createUserFeedItem({
+        id: userFeedItemId,
+        userId,
+        feedItemId,
+        isRead: false,
+        isHidden: true
+      })
+    }
+  }
+
+  async unhideItem(userId: string, feedItemId: string): Promise<UserFeedItem> {
+    // First check if user feed item exists
+    const existing = await this.getUserFeedItem(userId, feedItemId)
+    
+    if (existing) {
+      await this.db
+        .update(schema.userFeedItems)
+        .set({
+          isHidden: false
+        })
+        .where(and(
+          eq(schema.userFeedItems.userId, userId),
+          eq(schema.userFeedItems.feedItemId, feedItemId)
+        ))
+      
+      return {
+        ...existing,
+        isHidden: false
+      }
+    } else {
+      // Verify that the feed item exists before creating user feed item
+      const feedItem = await this.getFeedItem(feedItemId)
+      if (!feedItem) {
+        throw new Error(`Feed item ${feedItemId} not found`)
+      }
+      
+      // Create new user feed item as not hidden
+      const userFeedItemId = `${userId}-${feedItemId}-${Date.now()}`
+      return this.createUserFeedItem({
+        id: userFeedItemId,
+        userId,
+        feedItemId,
+        isRead: false,
+        isHidden: false
       })
     }
   }
@@ -851,6 +940,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       userId: row.userId,
       feedItemId: row.feedItemId,
       isRead: Boolean(row.isRead),
+      isHidden: Boolean(row.isHidden),
       bookmarkId: row.bookmarkId ? parseInt(row.bookmarkId) : undefined,
       readAt: row.readAt ? new Date(row.readAt) : undefined,
       createdAt: new Date(row.createdAt)
