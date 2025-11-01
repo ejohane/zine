@@ -1199,20 +1199,21 @@ app.put('/api/v1/feed/:itemId/hide', authMiddleware, async (c) => {
       id: auth.userId
     })
     
-    // Extract the actual feedItemId from the userFeedItemId if needed
-    // The itemId might be in format: userId-feedItemId-timestamp
+    // The itemId could be either a feedItemId or a userFeedItemId
+    // Try to look it up as a userFeedItemId first
     let feedItemId = itemId
     
-    // Check if this looks like a userFeedItemId (contains userId prefix)
-    if (itemId.startsWith(auth.userId + '-')) {
-      // Extract the feedItemId part (everything after userId- and before the last timestamp)
-      const parts = itemId.substring(auth.userId.length + 1).split('-')
-      if (parts.length >= 3) {
-        // Remove the last part (timestamp) and rejoin
-        parts.pop() // Remove timestamp
-        feedItemId = parts.join('-')
-        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+    // Check if this is a userFeedItemId by looking it up in the database
+    const userFeedItem = await feedItemRepository.getUserFeedItemById(itemId)
+    if (userFeedItem) {
+      // Verify it belongs to the current user
+      if (userFeedItem.userId !== auth.userId) {
+        return c.json({ error: 'Unauthorized' }, 403)
       }
+      feedItemId = userFeedItem.feedItemId
+      console.log(`Found userFeedItem ${itemId}, extracted feedItemId: ${feedItemId}`)
+    } else {
+      console.log(`No userFeedItem found for ${itemId}, treating as feedItemId`)
     }
     
     await feedItemRepository.hideItem(auth.userId, feedItemId)
@@ -1238,20 +1239,21 @@ app.put('/api/v1/feed/:itemId/unhide', authMiddleware, async (c) => {
       id: auth.userId
     })
     
-    // Extract the actual feedItemId from the userFeedItemId if needed
-    // The itemId might be in format: userId-feedItemId-timestamp
+    // The itemId could be either a feedItemId or a userFeedItemId
+    // Try to look it up as a userFeedItemId first
     let feedItemId = itemId
     
-    // Check if this looks like a userFeedItemId (contains userId prefix)
-    if (itemId.startsWith(auth.userId + '-')) {
-      // Extract the feedItemId part (everything after userId- and before the last timestamp)
-      const parts = itemId.substring(auth.userId.length + 1).split('-')
-      if (parts.length >= 3) {
-        // Remove the last part (timestamp) and rejoin
-        parts.pop() // Remove timestamp
-        feedItemId = parts.join('-')
-        console.log(`Extracted feedItemId: ${feedItemId} from userFeedItemId: ${itemId}`)
+    // Check if this is a userFeedItemId by looking it up in the database
+    const userFeedItem = await feedItemRepository.getUserFeedItemById(itemId)
+    if (userFeedItem) {
+      // Verify it belongs to the current user
+      if (userFeedItem.userId !== auth.userId) {
+        return c.json({ error: 'Unauthorized' }, 403)
       }
+      feedItemId = userFeedItem.feedItemId
+      console.log(`Found userFeedItem ${itemId}, extracted feedItemId: ${feedItemId}`)
+    } else {
+      console.log(`No userFeedItem found for ${itemId}, treating as feedItemId`)
     }
     
     await feedItemRepository.unhideItem(auth.userId, feedItemId)

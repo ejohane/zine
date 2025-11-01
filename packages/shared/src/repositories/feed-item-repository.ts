@@ -91,6 +91,7 @@ export interface FeedItemRepository {
 
   // User feed item operations
   getUserFeedItem(userId: string, feedItemId: string): Promise<UserFeedItem | null>
+  getUserFeedItemById(id: string): Promise<UserFeedItem | null>
   getUserFeedItems(userId: string, options?: {
     isRead?: boolean
     subscriptionIds?: string[]

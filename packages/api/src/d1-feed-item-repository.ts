@@ -270,6 +270,16 @@ export class D1FeedItemRepository implements FeedItemRepository {
     return results.length > 0 ? this.mapUserFeedItem(results[0]) : null
   }
 
+  async getUserFeedItemById(id: string): Promise<UserFeedItem | null> {
+    const results = await this.db
+      .select()
+      .from(schema.userFeedItems)
+      .where(eq(schema.userFeedItems.id, id))
+      .limit(1)
+    
+    return results.length > 0 ? this.mapUserFeedItem(results[0]) : null
+  }
+
   async getUserFeedItems(
     userId: string,
     options?: {
@@ -368,7 +378,8 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
-        eq(schema.feedItems.subscriptionId, subscriptionId)
+        eq(schema.feedItems.subscriptionId, subscriptionId),
+        eq(schema.userFeedItems.isHidden, false)
       ))
       .$dynamic()
 
@@ -377,6 +388,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
         eq(schema.userFeedItems.userId, userId),
         eq(schema.feedItems.subscriptionId, subscriptionId),
         eq(schema.userFeedItems.isRead, false),
+        eq(schema.userFeedItems.isHidden, false),
         isNull(schema.userFeedItems.bookmarkId)
       ))
     }
@@ -448,6 +460,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .select({
         subscription: schema.subscriptions,
         unreadCount: schema.userFeedItems.isRead,
+        isHidden: schema.userFeedItems.isHidden,
         lastUpdated: schema.content.publishedAt
       })
       .from(schema.subscriptions)
@@ -476,7 +489,10 @@ export class D1FeedItemRepository implements FeedItemRepository {
       const subscription = subscriptionMap.get(subId)!
       
       // Count unread items (userFeedItem.isRead is false or null means unread)
-      if (row.unreadCount === false || row.unreadCount === null) {
+      // Exclude hidden items from the count
+      const isUnread = row.unreadCount === false || row.unreadCount === null
+      const isHidden = row.isHidden === true
+      if (isUnread && !isHidden) {
         subscription.unreadCount++
       }
       
@@ -551,13 +567,17 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
-      .where(eq(schema.userFeedItems.userId, userId))
+      .where(and(
+        eq(schema.userFeedItems.userId, userId),
+        eq(schema.userFeedItems.isHidden, false)
+      ))
       .$dynamic()
 
     if (unreadOnly) {
       query = query.where(and(
         eq(schema.userFeedItems.userId, userId),
         eq(schema.userFeedItems.isRead, false),
+        eq(schema.userFeedItems.isHidden, false),
         isNull(schema.userFeedItems.bookmarkId)
       ))
     }
