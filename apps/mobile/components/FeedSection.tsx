@@ -118,11 +118,17 @@ const FeedCard = React.memo<FeedCardProps>(({ item, onPress }) => {
         </Text>
         
         <View style={styles.meta}>
-          <Feather 
-            name={contentIcon.name as any} 
-            size={14} 
-            color={contentIcon.color} 
-          />
+          {feedItem.subscription.thumbnailUrl ? (
+            <Image
+              source={{ uri: feedItem.subscription.thumbnailUrl }}
+              style={styles.creatorAvatar}
+              onError={() => {}}
+            />
+          ) : (
+            <View style={[styles.creatorAvatarPlaceholder, { backgroundColor: colors.secondary }]}>
+              <Feather name="user" size={10} color={colors.mutedForeground} />
+            </View>
+          )}
           <Text style={[styles.creator, { color: colors.mutedForeground }]} numberOfLines={1}>
             {feedItem.subscription.creatorName}
           </Text>
@@ -302,6 +308,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
+  },
+  creatorAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  creatorAvatarPlaceholder: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   creator: {
     fontSize: 13,
