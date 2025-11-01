@@ -14,17 +14,19 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useContentDetail } from '../../../hooks/useContentDetail';
 import { useSaveBookmarkFromContent } from '../../../hooks/useSaveBookmarkFromContent';
+import { useHideFeedItem } from '../../../hooks/useHideFeedItem';
 import { useAuth } from '../../../contexts/auth';
 import { useTheme } from '../../../contexts/theme';
 import { BookmarkContentDisplay } from '../../../components/content-display';
-import { SaveBookmarkButton, OpenLinkButton } from '../../../components/action-buttons';
+import { SaveBookmarkButton, OpenLinkButton, HideFeedItemButton } from '../../../components/action-buttons';
 
 export default function ContentViewScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, feedItemId } = useLocalSearchParams<{ id: string; feedItemId?: string }>();
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const { colors } = useTheme();
   const scrollY = useRef(new Animated.Value(0)).current;
+  const isFeedItem = !!feedItemId;
 
   const {
     data: content,
@@ -54,6 +56,16 @@ export default function ContentViewScreen() {
     },
   });
 
+  const hideMutation = useHideFeedItem({
+    onSuccess: () => {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push('/(app)/(tabs)');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message || 'Failed to hide feed item');
+    },
+  });
+
   const openUrl = async (targetUrl: string) => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -72,6 +84,11 @@ export default function ContentViewScreen() {
     if (content?.url) {
       openUrl(content.url);
     }
+  };
+
+  const handleHide = () => {
+    if (!feedItemId) return;
+    hideMutation.mutate(feedItemId);
   };
 
   if (!isSignedIn) {
@@ -226,6 +243,13 @@ export default function ContentViewScreen() {
               onPress={handleSave}
               isLoading={saveMutation.isPending}
             />
+            {isFeedItem && (
+              <HideFeedItemButton
+                onPress={handleHide}
+                isLoading={hideMutation.isPending}
+                style={{ marginTop: 12 }}
+              />
+            )}
             <OpenLinkButton onPress={handleOpenLink} secondary />
           </View>
         </BookmarkContentDisplay>

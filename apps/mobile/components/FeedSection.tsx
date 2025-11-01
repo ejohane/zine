@@ -234,7 +234,7 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
             <FeedCard
               item={item}
               onPress={() => {
-                router.push(`/content/${item.feedItem.contentId}`);
+                router.push(`/content/${item.feedItem.contentId}?feedItemId=${item.id}`);
               }}
             />
           </View>

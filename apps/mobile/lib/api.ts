@@ -384,6 +384,8 @@ export const feedsApi = {
   subscribe: (feedUrl: string) => apiClient.post<any>('/api/v1/feeds/subscribe', { url: feedUrl }),
   unsubscribe: (feedId: string) => apiClient.delete<void>(`/api/v1/feeds/${feedId}`),
   getItems: (feedId: string) => apiClient.get<any[]>(`/api/v1/feeds/${feedId}/items`),
+  hideFeedItem: (itemId: string) => apiClient.put<void>(`/api/v1/feed/${itemId}/hide`),
+  unhideFeedItem: (itemId: string) => apiClient.put<void>(`/api/v1/feed/${itemId}/unhide`),
 };
 
 // Subscription API methods
