@@ -321,15 +321,20 @@ export class YouTubeBatchProcessor extends BaseBatchProcessor {
       // Extract channel information for creator metadata
       const channelStats = channel as ChannelWithStats
 
-      const newItems: FeedItem[] = videos.map(video => {
+      const newItems: FeedItem[] = videos
+        .filter(video => {
+          // Filter out YouTube Shorts (videos <= 180 seconds)
+          const durationSeconds = YouTubeAPI.parseDuration(video.contentDetails.duration)
+          return !durationSeconds || durationSeconds > 180
+        })
+        .map(video => {
         // Determine content type based on duration and live status
         const durationSeconds = YouTubeAPI.parseDuration(video.contentDetails.duration)
         let contentType: string = 'video'
         if (video.snippet.liveBroadcastContent === 'live') {
           contentType = 'live'
-        } else if (durationSeconds && durationSeconds <= 60) {
-          contentType = 'short'
         }
+        // Note: Shorts (<=180s) are already filtered out above
 
         // Calculate popularity score (0-100 normalized)
         let popularityScore: number | undefined
