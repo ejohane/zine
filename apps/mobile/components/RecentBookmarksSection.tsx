@@ -9,19 +9,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollShadow, Card, Button } from 'heroui-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { CompactBookmarkCard } from './CompactBookmarkCard';
+import { MediaRichBookmarkCard } from './MediaRichBookmarkCard';
 import { useRecentBookmarks } from '../hooks/useRecentBookmarks';
 import { useAuth } from '../contexts/auth';
 
 const SkeletonCard = React.memo(() => (
-  <Card className="w-[280px] h-[140px] p-4 mr-3 bg-gray-100">
+  <Card className="w-[300px] h-[240px] p-4 mr-3 bg-gray-100">
     <View className="space-y-3">
+      <View className="h-[169px] bg-gray-200 rounded-md w-full animate-pulse" />
       <View className="h-4 bg-gray-200 rounded-md w-3/4 animate-pulse" />
       <View className="h-3 bg-gray-200 rounded-md w-1/2 animate-pulse" />
-      <View className="flex-row space-x-2 mt-auto">
-        <View className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" />
-        <View className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" />
-      </View>
     </View>
   </Card>
 ));
@@ -152,7 +149,7 @@ export const RecentBookmarksSection = React.memo<RecentBookmarksSectionProps>(
               paddingHorizontal: 16,
               paddingVertical: 8,
             }}
-            snapToInterval={296} // Card width (280) + margin (16)
+            snapToInterval={312} // Card width (300) + margin (12)
             snapToAlignment="start"
             decelerationRate="fast"
           >
@@ -160,10 +157,10 @@ export const RecentBookmarksSection = React.memo<RecentBookmarksSectionProps>(
               <View
                 key={bookmark.id}
                 style={{
-                  marginRight: index === bookmarks.length - 1 ? 0 : 16,
+                  marginRight: index === bookmarks.length - 1 ? 0 : 12,
                 }}
               >
-                <CompactBookmarkCard
+                <MediaRichBookmarkCard
                   bookmark={bookmark}
                   onPress={() => router.push(`/bookmark/${bookmark.id}`)}
                 />

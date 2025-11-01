@@ -4,27 +4,26 @@ import {
   ScrollView,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
 } from 'react-native';
 import { Card } from 'heroui-native';
 import { useRouter } from 'expo-router';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useFeedItems } from '../hooks/useFeedItems';
 import { useAuth } from '../contexts/auth';
 import { useTheme } from '../contexts/theme';
-import { formatDistanceToNow } from '../lib/dateUtils';
+import { MediaRichBookmarkCard } from './MediaRichBookmarkCard';
+import { feedItemToBookmark } from '../lib/contentCardAdapters';
 
 const SkeletonCard = React.memo(() => {
   const { colors } = useTheme();
   return (
-    <Card className="w-[280px] h-[140px] p-4 mr-3" style={{ backgroundColor: colors.card }}>
-      <View className="space-y-3">
-        <View className="h-4 bg-gray-200 rounded-md w-3/4 animate-pulse" />
-        <View className="h-3 bg-gray-200 rounded-md w-1/2 animate-pulse" />
-        <View className="flex-row space-x-2 mt-auto">
-          <View className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" />
-          <View className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" />
+    <Card style={[styles.skeletonCard, { backgroundColor: colors.card }]}>
+      <View style={styles.skeletonContent}>
+        <View style={[styles.skeletonThumbnail, { backgroundColor: colors.secondary }]} />
+        <View style={styles.skeletonInfo}>
+          <View style={[styles.skeletonTitle, { backgroundColor: colors.secondary }]} />
+          <View style={[styles.skeletonMeta, { backgroundColor: colors.secondary }]} />
         </View>
       </View>
     </Card>
@@ -32,117 +31,6 @@ const SkeletonCard = React.memo(() => {
 });
 
 SkeletonCard.displayName = 'SkeletonCard';
-
-interface FeedCardProps {
-  item: {
-    id: string;
-    feedItem: {
-      id: string;
-      contentId?: string;
-      title: string;
-      thumbnailUrl?: string | null;
-      publishedAt: string;
-      contentType?: string;
-      durationSeconds?: number | null;
-      subscription: {
-        id: string;
-        providerId: string;
-        externalId: string;
-        title: string;
-        creatorName: string;
-        thumbnailUrl?: string | null;
-      };
-    };
-  };
-  onPress: () => void;
-}
-
-const FeedCard = React.memo<FeedCardProps>(({ item, onPress }) => {
-  const { colors } = useTheme();
-  const { feedItem } = item;
-
-  const formatDuration = (seconds?: number | null) => {
-    if (!seconds) return null;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes >= 60) {
-      const hours = Math.floor(minutes / 60);
-      const remainingMinutes = minutes % 60;
-      return `${hours}h ${remainingMinutes}m`;
-    }
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const getContentIcon = () => {
-    switch (feedItem.contentType) {
-      case 'video':
-        return { name: 'play-circle', color: '#FF0000' };
-      case 'podcast':
-        return { name: 'mic', color: '#1DB954' };
-      default:
-        return { name: 'file-text', color: colors.primary };
-    }
-  };
-
-  const contentIcon = getContentIcon();
-  const displayDuration = formatDuration(feedItem.durationSeconds);
-
-  return (
-    <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card }]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={styles.thumbnailContainer}>
-        {feedItem.thumbnailUrl ? (
-          <Image
-            source={{ uri: feedItem.thumbnailUrl, cache: 'force-cache' }}
-            style={styles.thumbnail}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.thumbnailPlaceholder, { backgroundColor: colors.secondary }]}>
-            <Feather name="image" size={24} color={colors.mutedForeground} />
-          </View>
-        )}
-        {displayDuration && (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{displayDuration}</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.cardContent}>
-        <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={2}>
-          {feedItem.title}
-        </Text>
-        
-        <View style={styles.meta}>
-          {feedItem.subscription.thumbnailUrl ? (
-            <Image
-              source={{ uri: feedItem.subscription.thumbnailUrl }}
-              style={styles.creatorAvatar}
-              onError={() => {}}
-            />
-          ) : (
-            <View style={[styles.creatorAvatarPlaceholder, { backgroundColor: colors.secondary }]}>
-              <Feather name="user" size={10} color={colors.mutedForeground} />
-            </View>
-          )}
-          <Text style={[styles.creator, { color: colors.mutedForeground }]} numberOfLines={1}>
-            {feedItem.subscription.creatorName}
-          </Text>
-        </View>
-
-        <Text style={[styles.date, { color: colors.mutedForeground }]}>
-          {formatDistanceToNow(feedItem.publishedAt)}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-});
-
-FeedCard.displayName = 'FeedCard';
 
 interface FeedSectionProps {
   onRefresh?: () => void;
@@ -230,7 +118,7 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
-          snapToInterval={296}
+          snapToInterval={312}
           snapToAlignment="start"
           decelerationRate="fast"
         >
@@ -238,11 +126,11 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
             <View
               key={item.id}
               style={{
-                marginRight: index === feedItems.length - 1 ? 0 : 16,
+                marginRight: index === feedItems.length - 1 ? 0 : 12,
               }}
             >
-              <FeedCard
-                item={item}
+              <MediaRichBookmarkCard
+                bookmark={feedItemToBookmark(item)}
                 onPress={() => {
                   router.push(`/content/${item.feedItem.contentId}?feedItemId=${item.id}`);
                 }}
@@ -279,73 +167,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  card: {
-    width: 280,
+  skeletonCard: {
+    width: 300,
+    height: 240,
     borderRadius: 12,
-    overflow: 'hidden',
-  },
-  thumbnailContainer: {
-    width: '100%',
-    height: 120,
-    position: 'relative',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  durationText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cardContent: {
     padding: 12,
+    marginRight: 12,
   },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  creatorAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  creatorAvatarPlaceholder: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  creator: {
-    fontSize: 13,
+  skeletonContent: {
     flex: 1,
   },
-  date: {
-    fontSize: 12,
+  skeletonThumbnail: {
+    width: '100%',
+    height: 169,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  skeletonInfo: {
+    flex: 1,
+  },
+  skeletonTitle: {
+    height: 16,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonMeta: {
+    height: 12,
+    borderRadius: 4,
+    width: '60%',
   },
   errorContainer: {
     marginHorizontal: 16,
