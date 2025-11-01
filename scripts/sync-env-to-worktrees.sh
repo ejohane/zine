@@ -117,6 +117,19 @@ echo "$WORKTREES" | while read -r worktree; do
         echo -e "  ${GREEN}✓${NC} Synced: .wrangler/state/"
     fi
     
+    # Update mobile .env.development with PORT_OFFSET from .env.worktree
+    if [ -f "$worktree/.env.worktree" ] && [ -f "$worktree/apps/mobile/.env.development" ]; then
+        PORT_OFFSET=$(grep "^PORT_OFFSET=" "$worktree/.env.worktree" | cut -d= -f2)
+        if [ -n "$PORT_OFFSET" ]; then
+            MOBILE_ENV="$worktree/apps/mobile/.env.development"
+            # Remove existing PORT_OFFSET line and add new one
+            grep -v "^EXPO_PUBLIC_PORT_OFFSET=" "$MOBILE_ENV" > "${MOBILE_ENV}.tmp" || true
+            echo "EXPO_PUBLIC_PORT_OFFSET=$PORT_OFFSET" >> "${MOBILE_ENV}.tmp"
+            mv "${MOBILE_ENV}.tmp" "$MOBILE_ENV"
+            echo -e "  ${GREEN}✓${NC} Updated mobile .env.development with PORT_OFFSET=$PORT_OFFSET"
+        fi
+    fi
+    
     echo -e "  Summary: ${GREEN}$files_synced files synced${NC}, ${YELLOW}$files_skipped skipped${NC}"
     echo ""
 done

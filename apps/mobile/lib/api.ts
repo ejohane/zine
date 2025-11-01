@@ -5,9 +5,13 @@ import Constants from 'expo-constants';
 
 // Get API port from environment or calculate from port offset
 function getApiPort(): number {
-  // Read port offset from environment (set by metro.config.js via .env.worktree)
-  const portOffset = process.env.PORT_OFFSET ? parseInt(process.env.PORT_OFFSET, 10) : 0;
-  return 8787 + portOffset;
+  // Read port offset from environment (EXPO_PUBLIC_ prefix makes it available in JS runtime)
+  const portOffset = process.env.EXPO_PUBLIC_PORT_OFFSET ? parseInt(process.env.EXPO_PUBLIC_PORT_OFFSET, 10) : 0;
+  const apiPort = 8787 + portOffset;
+  if (__DEV__) {
+    console.log(`📊 Port calculation: 8787 + ${portOffset} = ${apiPort}`);
+  }
+  return apiPort;
 }
 
 // Replace port in URL string
@@ -17,15 +21,32 @@ function replacePortInUrl(url: string, newPort: number): string {
   if (match) {
     const protocol = match[1]; // http://hostname or https://hostname
     const path = match[3] || ''; // path or empty
-    return `${protocol}:${newPort}${path}`;
+    const result = `${protocol}:${newPort}${path}`;
+    if (__DEV__) {
+      console.log(`🔄 Replaced port in ${url} → ${result}`);
+    }
+    return result;
+  }
+  if (__DEV__) {
+    console.warn(`⚠️ Failed to replace port in URL: ${url}`);
   }
   return url; // Return original if pattern doesn't match
 }
 
 // Determine the API URL based on the environment
 function getApiUrl(): string {
+  if (__DEV__) {
+    console.log('🔍 ENV DEBUG:');
+    console.log('  EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
+    console.log('  EXPO_PUBLIC_PORT_OFFSET:', process.env.EXPO_PUBLIC_PORT_OFFSET);
+    console.log('  EXPO_PUBLIC_TAILSCALE_API_URL:', process.env.EXPO_PUBLIC_TAILSCALE_API_URL);
+  }
+
   // If explicitly set in environment, use that
   if (process.env.EXPO_PUBLIC_API_URL) {
+    if (__DEV__) {
+      console.log('⚠️ Using explicit EXPO_PUBLIC_API_URL (this may be wrong!)');
+    }
     return process.env.EXPO_PUBLIC_API_URL;
   }
 
@@ -39,10 +60,20 @@ function getApiUrl(): string {
   // In development, check if we're on a simulator or physical device
   const isSimulator = Constants.isDevice === false;
   
+  if (__DEV__) {
+    console.log(`🔍 Device Detection: Constants.isDevice = ${Constants.isDevice}, isSimulator = ${isSimulator}`);
+  }
+  
   if (Platform.OS === 'ios') {
     // iOS Simulator can use localhost
     if (isSimulator) {
+      if (__DEV__) {
+        console.log(`✅ Using localhost for iOS Simulator`);
+      }
       return `http://localhost:${apiPort}`;
+    }
+    if (__DEV__) {
+      console.log(`📱 Physical iOS device detected, using network IP`);
     }
     // Physical iOS device needs your Mac's IP address
     // You can use either your local network IP or Tailscale IP
