@@ -52,4 +52,19 @@ echo -e "${YELLOW}Step 3: Syncing environment variables${NC}"
 "$SCRIPT_DIR/sync-env-to-worktrees.sh"
 echo ""
 
+echo -e "${YELLOW}Step 4: Updating mobile app environment with port offset${NC}"
+# Update .env.development with the correct PORT_OFFSET
+MOBILE_ENV="apps/mobile/.env.development"
+if [ -f "$MOBILE_ENV" ]; then
+  # Remove existing PORT_OFFSET line if present
+  grep -v "^EXPO_PUBLIC_PORT_OFFSET=" "$MOBILE_ENV" > "${MOBILE_ENV}.tmp" || true
+  # Add the new PORT_OFFSET
+  echo "EXPO_PUBLIC_PORT_OFFSET=$PORT_OFFSET" >> "${MOBILE_ENV}.tmp"
+  mv "${MOBILE_ENV}.tmp" "$MOBILE_ENV"
+  echo -e "${GREEN}✓ Updated mobile .env.development with PORT_OFFSET=$PORT_OFFSET${NC}"
+else
+  echo -e "${YELLOW}⚠ Mobile .env.development not found, skipping${NC}"
+fi
+echo ""
+
 echo -e "${GREEN}Worktree environment setup complete!${NC}"
