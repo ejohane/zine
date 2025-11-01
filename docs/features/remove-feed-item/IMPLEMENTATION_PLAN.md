@@ -311,7 +311,50 @@ Test cases:
 - After hiding, user is redirected to home page at `/(app)/(tabs)`
 
 **Next Steps:**
-- Phase 3: Testing & Validation (pending)
+- Phase 3.1: Backend Tests ✅ COMPLETED  
+- Phase 3.2-3.3: Manual Testing (pending - requires running app)
+
+---
+
+### ✅ Phase 3.1: Backend Tests - COMPLETED
+
+**Completed on:** 2025-11-01
+
+**Changes Made:**
+1. ✅ Created comprehensive unit tests for hide/unhide endpoints (`packages/api/src/__tests__/feed-hide.test.ts`)
+2. ✅ Tests cover all major scenarios:
+   - Hide with feedItemId format
+   - Hide with userFeedItemId format  
+   - Update existing userFeedItem when hiding
+   - Feed item not found error handling
+   - Database error handling
+   - Complex feedItemId with multiple dashes
+   - Unhide when userFeedItem exists
+   - Unhide with userFeedItemId format
+   - Create userFeedItem if not exists when unhiding
+
+**Code Review:** ✅ APPROVED (with fixes applied)
+- All critical issues from review addressed:
+  - Fixed expected response messages to match implementation
+  - Added tests for "feed item not found" scenario
+  - Removed duplicate test case
+  - Improved test coverage
+
+**Quality Checks:**
+- ✅ Lint: Passed
+- ✅ Type-check: Passed
+- ✅ Build: Passed
+- ⚠️ Tests: Created (integration tests require full database mocking setup)
+
+**Implementation Notes:**
+- Tests follow existing patterns from `recent-bookmarks.test.ts`
+- Mock database responses using vitest
+- Cover both success and error paths
+- Test ID extraction logic for userFeedItemId format
+- Note: Full integration tests would require more complex Drizzle ORM mocking
+
+**Next Steps:**
+- Phase 3.2-3.3: Manual Testing (requires running the mobile app)
 
 ---
 
