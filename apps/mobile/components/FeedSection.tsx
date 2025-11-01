@@ -221,31 +221,36 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
   }
 
   return (
-    <View style={styles.section}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        snapToInterval={296}
-        snapToAlignment="start"
-        decelerationRate="fast"
-      >
-        {feedItems.map((item, index) => (
-          <View
-            key={item.id}
-            style={{
-              marginRight: index === feedItems.length - 1 ? 0 : 16,
-            }}
-          >
-            <FeedCard
-              item={item}
-              onPress={() => {
-                router.push(`/content/${item.feedItem.contentId}?feedItemId=${item.id}`);
+    <View style={styles.sectionContainer}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>From your Feed</Text>
+      </View>
+      <View style={styles.section}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          snapToInterval={296}
+          snapToAlignment="start"
+          decelerationRate="fast"
+        >
+          {feedItems.map((item, index) => (
+            <View
+              key={item.id}
+              style={{
+                marginRight: index === feedItems.length - 1 ? 0 : 16,
               }}
-            />
-          </View>
-        ))}
-      </ScrollView>
+            >
+              <FeedCard
+                item={item}
+                onPress={() => {
+                  router.push(`/content/${item.feedItem.contentId}?feedItemId=${item.id}`);
+                }}
+              />
+            </View>
+          ))}
+        </ScrollView>
+      </View>
     </View>
   );
 });
@@ -253,6 +258,20 @@ export const FeedSection = React.memo<FeedSectionProps>(({ onRefresh }) => {
 FeedSection.displayName = 'FeedSection';
 
 const styles = StyleSheet.create({
+  sectionContainer: {
+    marginTop: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
   section: {
     paddingBottom: 16,
   },

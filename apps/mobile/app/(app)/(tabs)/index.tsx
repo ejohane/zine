@@ -84,12 +84,7 @@ export default function HomeScreen() {
 
         {/* Feed Section - Only show when authenticated and has new items */}
         {isLoaded && isSignedIn && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>From your Feed</Text>
-            </View>
-            <FeedSection onRefresh={onRefresh} />
-          </View>
+          <FeedSection onRefresh={onRefresh} />
         )}
         
         {/* Recent Bookmarks Section - Only show when authenticated */}
