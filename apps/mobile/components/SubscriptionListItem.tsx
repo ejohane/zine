@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { memo } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useTheme } from '../contexts/theme';
 import type { DiscoveredSubscription } from '../lib/api';
@@ -8,13 +9,14 @@ interface SubscriptionListItemProps {
   onToggle: (externalId: string) => void;
 }
 
-export function SubscriptionListItem({ subscription, onToggle }: SubscriptionListItemProps) {
+export const SubscriptionListItem = memo(function SubscriptionListItem({ subscription, onToggle }: SubscriptionListItemProps) {
   const { colors } = useTheme();
 
   return (
     <TouchableOpacity
       style={[styles.container, { borderBottomColor: colors.border }]}
       onPress={() => onToggle(subscription.externalId)}
+      activeOpacity={0.6}
     >
       <View style={[
         styles.checkbox, 
@@ -46,7 +48,11 @@ export function SubscriptionListItem({ subscription, onToggle }: SubscriptionLis
       </View>
     </TouchableOpacity>
   );
-}
+}, (prevProps, nextProps) => {
+  // Only re-render if the subscription state or externalId changed
+  return prevProps.subscription.externalId === nextProps.subscription.externalId &&
+         prevProps.subscription.isUserSubscribed === nextProps.subscription.isUserSubscribed;
+});
 
 const styles = StyleSheet.create({
   container: {

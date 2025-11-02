@@ -1,11 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/theme';
 import { useAccounts } from '../../../hooks/useAccounts';
-import { useDiscoverSubscriptions, useUpdateSubscriptions } from '../../../hooks/useSubscriptions';
+import { useDiscoverSubscriptions, useBatchedSubscriptionUpdates } from '../../../hooks/useSubscriptions';
 import { DiscoveredSubscription } from '../../../lib/api';
 import { ConnectionStatusCard } from '../../../components/ConnectionStatusCard';
 import { SubscriptionListItem } from '../../../components/SubscriptionListItem';
@@ -18,18 +18,25 @@ export default function SubscriptionManagementScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [localSubscriptions, setLocalSubscriptions] = useState<DiscoveredSubscription[]>([]);
-  const [hasChanges, setHasChanges] = useState(false);
   
   const isConnected = provider === 'spotify' ? isSpotifyConnected : isYouTubeConnected;
   const providerName = provider === 'spotify' ? 'Spotify' : 'YouTube';
   
-  const { data: discoveryData, refetch, isFetching: isDiscovering } = useDiscoverSubscriptions(provider);
-  const updateMutation = useUpdateSubscriptions(provider);
+  // Auto-fetch subscriptions when connected
+  const { data: discoveryData, isFetching: isDiscovering, isError } = useDiscoverSubscriptions(provider, isConnected);
+  const { scheduleBatchUpdate, isBatching, hasPendingUpdates } = useBatchedSubscriptionUpdates(
+    provider,
+    undefined, // onBatchStart
+    undefined, // onBatchComplete
+    useCallback((previousState: DiscoveredSubscription[]) => {
+      // Rollback to previous state on error
+      setLocalSubscriptions(previousState);
+    }, [])
+  );
   
   useMemo(() => {
     if (discoveryData?.subscriptions) {
       setLocalSubscriptions(discoveryData.subscriptions);
-      setHasChanges(false);
     }
   }, [discoveryData]);
   
@@ -43,49 +50,36 @@ export default function SubscriptionManagementScreen() {
     );
   }, [localSubscriptions, searchQuery]);
   
-  const handleDiscover = () => {
-    if (!isConnected) {
-      Alert.alert('Not Connected', `Please connect your ${providerName} account first.`);
-      return;
-    }
-    
-    try {
-      refetch();
-    } catch (error) {
-      console.error('Discovery error:', error);
-      Alert.alert('Error', 'Failed to discover subscriptions. Please try again.');
-    }
-  };
-  
-  const toggleSubscription = (externalId: string) => {
-    setLocalSubscriptions(prev => 
-      prev.map(sub => 
+  const toggleSubscription = useCallback((externalId: string) => {
+    // Optimistically update UI immediately - no delays
+    setLocalSubscriptions(prev => {
+      const updated = prev.map(sub => 
         sub.externalId === externalId 
           ? { ...sub, isUserSubscribed: !sub.isUserSubscribed }
           : sub
-      )
-    );
-    setHasChanges(true);
-  };
+      );
+      // Schedule batched API call asynchronously (doesn't block UI)
+      // Pass previous state for rollback on error
+      scheduleBatchUpdate(updated, prev);
+      return updated;
+    });
+  }, [scheduleBatchUpdate]);
   
-  const handleSelectAll = () => {
-    setLocalSubscriptions(prev => prev.map(sub => ({ ...sub, isUserSubscribed: true })));
-    setHasChanges(true);
-  };
+  const handleSelectAll = useCallback(() => {
+    setLocalSubscriptions(prev => {
+      const updated = prev.map(sub => ({ ...sub, isUserSubscribed: true }));
+      scheduleBatchUpdate(updated, prev);
+      return updated;
+    });
+  }, [scheduleBatchUpdate]);
   
-  const handleDeselectAll = () => {
-    setLocalSubscriptions(prev => prev.map(sub => ({ ...sub, isUserSubscribed: false })));
-    setHasChanges(true);
-  };
-  
-  const handleSave = async () => {
-    try {
-      await updateMutation.mutateAsync(localSubscriptions);
-      setHasChanges(false);
-    } catch (error) {
-      console.error('Save error:', error);
-    }
-  };
+  const handleDeselectAll = useCallback(() => {
+    setLocalSubscriptions(prev => {
+      const updated = prev.map(sub => ({ ...sub, isUserSubscribed: false }));
+      scheduleBatchUpdate(updated, prev);
+      return updated;
+    });
+  }, [scheduleBatchUpdate]);
   
   const handleConnect = () => {
     connect({ provider });
@@ -128,19 +122,6 @@ export default function SubscriptionManagementScreen() {
             {providerName} Subscriptions
           </Text>
         </View>
-        {hasChanges && (
-          <TouchableOpacity 
-            onPress={handleSave}
-            disabled={updateMutation.isPending}
-            style={styles.saveButton}
-          >
-            {updateMutation.isPending ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <FontAwesome name="check" size={20} color={colors.primary} />
-            )}
-          </TouchableOpacity>
-        )}
       </View>
       
       <ScrollView style={styles.scrollView}>
@@ -153,32 +134,14 @@ export default function SubscriptionManagementScreen() {
         
         {isConnected && (
           <>
-            <View style={[styles.actionSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TouchableOpacity 
-                style={[styles.discoverButton, { backgroundColor: colors.primary }]}
-                onPress={handleDiscover}
-                disabled={isDiscovering}
-              >
-                {isDiscovering ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <>
-                    <FontAwesome name="refresh" size={16} color="#ffffff" />
-                    <Text style={styles.discoverButtonText}>
-                      {localSubscriptions.length > 0 ? 'Refresh Subscriptions' : 'Discover Subscriptions'}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
-              
-              {localSubscriptions.length > 0 && (
-                <Text style={[styles.statsText, { color: colors.mutedForeground }]}>
-                  {subscribedCount} of {localSubscriptions.length} selected
+            {isDiscovering && localSubscriptions.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+                  Loading your {providerName} subscriptions...
                 </Text>
-              )}
-            </View>
-            
-            {localSubscriptions.length > 0 && (
+              </View>
+            ) : localSubscriptions.length > 0 ? (
               <>
                 <View style={[styles.searchSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={[styles.searchInputContainer, { backgroundColor: isDark ? colors.secondary : '#f5f5f5', borderColor: colors.border }]}>
@@ -232,9 +195,7 @@ export default function SubscriptionManagementScreen() {
                   )}
                 </View>
               </>
-            )}
-            
-            {localSubscriptions.length === 0 && !isDiscovering && (
+            ) : !isDiscovering && (
               <View style={styles.emptyState}>
                 <FontAwesome 
                   name={provider === 'spotify' ? 'spotify' : 'youtube-play'} 
@@ -242,10 +203,13 @@ export default function SubscriptionManagementScreen() {
                   color={colors.mutedForeground} 
                 />
                 <Text style={[styles.emptyStateTitle, { color: colors.foreground }]}>
-                  No Subscriptions Yet
+                  No Subscriptions Found
                 </Text>
                 <Text style={[styles.emptyStateText, { color: colors.mutedForeground }]}>
-                  Tap "Discover Subscriptions" to load your {providerName} subscriptions
+                  {isError 
+                    ? `Unable to load your ${providerName} subscriptions. Please try again later.`
+                    : `No ${providerName} subscriptions found in your account.`
+                  }
                 </Text>
               </View>
             )}
@@ -282,39 +246,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.5,
   },
-  saveButton: {
-    padding: 8,
-  },
   scrollView: {
     flex: 1,
   },
-  actionSection: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    marginBottom: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  discoverButton: {
-    flexDirection: 'row',
+  loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3b82f6',
-    paddingVertical: 14,
-    borderRadius: 8,
-    gap: 8,
+    paddingVertical: 64,
+    paddingHorizontal: 32,
   },
-  discoverButtonText: {
-    color: '#ffffff',
+  loadingText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  statsText: {
-    fontSize: 14,
+    marginTop: 16,
     textAlign: 'center',
-    marginTop: 12,
   },
   searchSection: {
     backgroundColor: '#ffffff',
