@@ -40,7 +40,7 @@ describe('GET /api/v1/bookmarks/recent', () => {
     mockDBAll.mockReset()
   })
 
-  it('returns recent bookmarks ordered by last_accessed_at DESC', async () => {
+  it('returns recent bookmarks ordered by bookmarked_at DESC', async () => {
     const mockBookmarks = [
       {
         id: 'bookmark-1',

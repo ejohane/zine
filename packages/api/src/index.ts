@@ -1542,8 +1542,7 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
       JOIN content c ON b.content_id = c.id
       WHERE b.user_id = ? 
         AND b.status = 'active'
-        AND b.last_accessed_at IS NOT NULL
-      ORDER BY b.last_accessed_at DESC
+      ORDER BY b.bookmarked_at DESC
       LIMIT ?
     `).bind(auth.userId, safeLimit).all()
     
