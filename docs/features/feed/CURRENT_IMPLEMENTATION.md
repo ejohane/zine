@@ -93,9 +93,11 @@ GET  /api/v1/auth/health                      - Check token health/expiration
 ### Feed Polling (Scheduled)
 
 ```
-GET  /api/v1/jobs/poll-feeds                  - Manual feed poll trigger
+POST /api/v1/subscriptions/refresh            - Manually trigger user feed refresh (rate-limited: 5 min)
 GET  /api/v1/health/feeds                     - Health check endpoint
 ```
+
+**Note**: All polling is now handled by Durable Objects via Cloudflare Workers cron triggers.
 
 ## Repository Pattern
 
@@ -123,22 +125,23 @@ Handles both D1 database AND Durable Objects:
 
 ## Polling Services
 
-Location: `packages/api/src/services/`
+Location: `packages/api/src/durable-objects/`
 
-### OptimizedFeedPollingService
+### SingleUserPollingService
 
-Batch processing for Spotify and YouTube with:
-- Deduplication cache (20K items, 2-hour TTL)
-- Smaller batch sizes (10 items) to avoid CPU timeout
-- Low concurrency (2) for stability
-- Uses `SpotifyBatchProcessor` and `YouTubeBatchProcessor`
+Per-user polling via Durable Objects with:
+- Direct API integration (Spotify, YouTube)
+- Provider-specific batch fetching with metadata enrichment
+- Duration-based filtering (excludes YouTube videos < 3 minutes to filter Shorts)
+- Subrequest limits (45 for safety, 50 Cloudflare max)
+- Token refresh handling before polling
 
 **Scheduled Execution:**
 - Cloudflare cron: `0 * * * *` (hourly)
 - Queries all active users with Durable Objects
 - Processes users in batches (5 per batch to prevent timeout)
-- Each Durable Object polls user's subscriptions
-- New items created in `feedItems` and `userFeedItems` tables
+- Each Durable Object calls `/poll` route which uses `SingleUserPollingService`
+- New items created in `content`, `feedItems`, and `userFeedItems` tables
 - Status tracked in `durableObjectStatus` for monitoring
 
 ### InitialFeedPopulationService
@@ -303,7 +306,8 @@ File: `apps/web/src/hooks/useFeed.ts`
 - Schema: `packages/api/src/schema.ts:142-296`
 - API Routes: `packages/api/src/index.ts:120-180`
 - Feed Repository: `packages/api/src/d1-feed-item-repository.ts`
-- Polling Service: `packages/api/src/services/optimized-feed-polling-service.ts`
+- Polling Service: `packages/api/src/durable-objects/single-user-polling-service.ts`
+- Durable Object Manager: `packages/api/src/durable-objects/user-subscription-manager.ts`
 - Initial Population: `packages/api/src/services/initial-feed-population-service.ts`
 
 ### Frontend

@@ -18,7 +18,6 @@ import { getOAuthProviders } from './oauth/oauth-config'
 import { OAuthService, encodeState, decodeState, getUserInfo } from './oauth/oauth-service'
 import { setupDatabase } from './setup-database'
 import { SubscriptionDiscoveryService } from './services/subscription-discovery-service'
-import { OptimizedFeedPollingService } from './services/optimized-feed-polling-service'
 import { TokenRefreshService } from './services/token-refresh-service'
 import { QueryOptimizer } from './repositories/query-optimizer'
 import { InitialFeedPopulationService } from './services/initial-feed-population-service'
@@ -70,7 +69,6 @@ let bookmarkSaveService: BookmarkSaveService
 let subscriptionRepository: DualModeSubscriptionRepository
 let feedItemRepository: D1FeedItemRepository
 let subscriptionDiscoveryService: SubscriptionDiscoveryService
-let feedPollingService: OptimizedFeedPollingService
 let tokenRefreshService: TokenRefreshService
 let queryOptimizer: QueryOptimizer
 let initialFeedPopulationService: InitialFeedPopulationService
@@ -88,7 +86,6 @@ async function initializeServices(db: D1Database, env: Bindings) {
     
     feedItemRepository = new D1FeedItemRepository(db)
     subscriptionDiscoveryService = new SubscriptionDiscoveryService(subscriptionRepository)
-    feedPollingService = new OptimizedFeedPollingService(subscriptionRepository, feedItemRepository, db)
     tokenRefreshService = new TokenRefreshService(subscriptionRepository)
     queryOptimizer = new QueryOptimizer(db)
     initialFeedPopulationService = new InitialFeedPopulationService(subscriptionRepository, feedItemRepository)
@@ -110,7 +107,6 @@ async function initializeServices(db: D1Database, env: Bindings) {
     subscriptionRepository, 
     feedItemRepository,
     subscriptionDiscoveryService,
-    feedPollingService,
     tokenRefreshService,
     initialFeedPopulationService
   }
@@ -1290,47 +1286,9 @@ app.get('/api/v1/feed/subscriptions', async (c) => {
   }
 })
 
-// Feed Polling endpoints
-app.get('/api/v1/jobs/poll-feeds', async (c) => {
-  try {
-    const { feedPollingService } = await initializeServices(c.env.DB, c.env)
-    
-    console.log('Manual feed polling triggered')
-    const results = await feedPollingService.pollAllActiveSubscriptions()
-    
-    return c.json({ 
-      message: 'Feed polling completed successfully',
-      results,
-      summary: {
-        timestamp: results.timestamp,
-        subscriptionsPolled: results.totalSubscriptionsPolled,
-        newItemsFound: results.totalNewItems,
-        usersNotified: results.totalUsersNotified,
-        errors: results.errors.length
-      }
-    })
-  } catch (error) {
-    console.error('Manual feed polling error:', error)
-    return c.json({ 
-      error: 'Failed to trigger feed polling',
-      details: error instanceof Error ? error.message : String(error)
-    }, 500)
-  }
-})
-
-app.post('/api/v1/jobs/schedule-polls', async (c) => {
-  try {
-    return c.json({ 
-      message: 'Scheduled polling is configured via Cloudflare Workers cron triggers',
-      timestamp: new Date().toISOString(),
-      schedule: 'Hourly (0 * * * *)',
-      status: 'active'
-    })
-  } catch (error) {
-    console.error('Schedule polling setup error:', error)
-    return c.json({ error: 'Failed to setup scheduled polling' }, 500)
-  }
-})
+// Feed Polling - All polling now handled by Durable Objects
+// Scheduled via cron triggers calling /poll on USER_SUBSCRIPTION_MANAGER
+// Manual refresh via /api/v1/subscriptions/refresh endpoint
 
 // Monitoring and health check endpoints
 app.get('/api/v1/health/feeds', async (c) => {
@@ -1354,9 +1312,18 @@ app.get('/api/v1/health/feeds', async (c) => {
         total: spotifySubscriptions.length + youtubeSubscriptions.length
       },
       polling: {
-        schedule: 'Hourly (0 * * * *)',
-        nextRun: 'At the top of every hour',
-        status: 'active'
+        scheduled: {
+          status: 'active',
+          schedule: 'Hourly (0 * * * *)',
+          mechanism: 'Cloudflare Workers cron triggers calling Durable Objects',
+          lastRun: 'See Cloudflare Workers logs',
+          nextRun: 'At the top of every hour'
+        },
+        manual: {
+          endpoint: '/api/v1/subscriptions/refresh',
+          method: 'POST',
+          description: 'Manually trigger feed refresh for authenticated user (rate limited)'
+        }
       },
       lastHour: {
         note: 'Detailed metrics would be added in production monitoring'
@@ -1379,15 +1346,16 @@ app.get('/api/v1/jobs/status', async (c) => {
         feedPolling: {
           enabled: true,
           schedule: 'Hourly (0 * * * *)',
+          mechanism: 'Cloudflare Workers cron triggers calling Durable Objects',
           lastRun: 'See Cloudflare Workers logs',
           nextRun: 'At the top of every hour'
         }
       },
       manual: {
-        pollFeeds: {
-          endpoint: '/api/v1/jobs/poll-feeds',
-          method: 'GET',
-          description: 'Manually trigger feed polling for all subscriptions'
+        refreshFeeds: {
+          endpoint: '/api/v1/subscriptions/refresh',
+          method: 'POST',
+          description: 'Manually trigger feed refresh for authenticated user (rate limited)'
         }
       },
       monitoring: {

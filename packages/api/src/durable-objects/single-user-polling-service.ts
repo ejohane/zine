@@ -286,16 +286,22 @@ export class SingleUserPollingService {
         const videoIds = searchResponse.items.map(v => v.id.videoId)
         const videoDetails = videoIds.length > 0 ? await youtubeAPI.getVideoDetails(videoIds) : []
 
+        // Filter out videos under 3 minutes (likely YouTube Shorts)
+        const MIN_VIDEO_DURATION = 180 // 3 minutes in seconds
+        const filteredVideos = videoDetails
+          .map(video => ({
+            externalId: video.id,
+            title: video.snippet.title,
+            description: video.snippet.description,
+            thumbnailUrl: video.snippet.thumbnails?.high?.url || '',
+            publishedAt: new Date(video.snippet.publishedAt),
+            durationSeconds: this.parseDuration(video.contentDetails?.duration || 'PT0S'),
+            externalUrl: `https://www.youtube.com/watch?v=${video.id}`
+          }))
+          .filter(video => video.durationSeconds >= MIN_VIDEO_DURATION)
+
         // Check for new videos
-        const newItems = await this.checkForNewItems(subscription.id, videoDetails.map(video => ({
-          externalId: video.id,
-          title: video.snippet.title,
-          description: video.snippet.description,
-          thumbnailUrl: video.snippet.thumbnails?.high?.url || '',
-          publishedAt: new Date(video.snippet.publishedAt),
-          durationSeconds: this.parseDuration(video.contentDetails?.duration || 'PT0S'),
-          externalUrl: `https://www.youtube.com/watch?v=${video.id}`
-        })))
+        const newItems = await this.checkForNewItems(subscription.id, filteredVideos)
 
         // Create feed items for new videos
         if (newItems.length > 0) {
