@@ -1510,7 +1510,8 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
       JOIN content c ON b.content_id = c.id
       WHERE b.user_id = ? 
         AND b.status = 'active'
-      ORDER BY b.bookmarked_at DESC
+        AND b.last_accessed_at IS NOT NULL
+      ORDER BY b.last_accessed_at DESC
       LIMIT ?
     `).bind(auth.userId, safeLimit).all()
     
@@ -2142,7 +2143,7 @@ app.post('/api/v1/bookmarks/from-content', authMiddleware, async (c) => {
       notes || null,
       tags ? JSON.stringify(tags) : null,
       'active',
-      now.getTime()
+      now.toISOString()
     ).run()
     
     // Fetch and return the created bookmark

@@ -141,7 +141,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
 
   async create(bookmark: CreateBookmark & { userId: string }): Promise<Bookmark> {
     try {
-      const now = Date.now()
+      const now = new Date().toISOString()
       
       // First, create or get content
       // Use btoa for base64 encoding (available in Cloudflare Workers)
@@ -576,9 +576,9 @@ export class D1BookmarkRepository implements BookmarkRepository {
     fullTextExtractedAt?: Date
     tags?: string[]
     notes?: string
-  }): Promise<Bookmark> {
+  }  ): Promise<Bookmark> {
     try {
-      const now = Date.now()
+      const now = new Date().toISOString()
       
       console.log('Creating bookmark with metadata for userId:', bookmarkData.userId)
       console.log('Bookmark data:', {
