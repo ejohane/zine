@@ -376,16 +376,48 @@ export class SingleUserPollingService {
   ): Promise<void> {
     const createdFeedItems: string[] = []
 
-    // Get subscription to determine provider
+    // Get subscription to determine provider and creator info
     const subscription = await this.db.prepare(`
-      SELECT provider_id FROM subscriptions WHERE id = ?
-    `).bind(subscriptionId).first<{ provider_id: string }>()
+      SELECT provider_id, external_id, creator_name, thumbnail_url, subscriber_count, is_verified FROM subscriptions WHERE id = ?
+    `).bind(subscriptionId).first<{ 
+      provider_id: string
+      external_id: string
+      creator_name: string
+      thumbnail_url: string | null
+      subscriber_count: number | null
+      is_verified: number | null
+    }>()
 
     if (!subscription) {
       throw new Error(`Subscription ${subscriptionId} not found`)
     }
 
     const provider = subscription.provider_id
+    
+    // Upsert creator into creators table
+    const creatorId = `${provider}:${subscription.external_id}`
+    const now = Math.floor(Date.now() / 1000)
+    
+    await this.db.prepare(`
+      INSERT INTO creators (
+        id, name, avatar_url, subscriber_count, verified, platform, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        avatar_url = excluded.avatar_url,
+        subscriber_count = excluded.subscriber_count,
+        verified = excluded.verified,
+        updated_at = excluded.updated_at
+    `).bind(
+      creatorId,
+      subscription.creator_name,
+      subscription.thumbnail_url,
+      subscription.subscriber_count,
+      subscription.is_verified,
+      provider,
+      now,
+      now
+    ).run()
 
     // Create content entries and feed items
     for (const item of items) {
@@ -396,8 +428,8 @@ export class SingleUserPollingService {
         INSERT OR IGNORE INTO content (
           id, external_id, provider, url, title, description, 
           thumbnail_url, published_at, duration_seconds, 
-          content_type, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          content_type, creator_id, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(
         contentId,
         item.externalId,
@@ -409,6 +441,7 @@ export class SingleUserPollingService {
         Math.floor(item.publishedAt.getTime() / 1000), // Convert to Unix timestamp
         item.durationSeconds,
         provider === 'spotify' ? 'podcast' : 'video',
+        creatorId,
         Math.floor(Date.now() / 1000),
         Math.floor(Date.now() / 1000)
       ).run()
