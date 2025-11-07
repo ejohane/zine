@@ -400,7 +400,7 @@ export class SingleUserPollingService {
     
     await this.db.prepare(`
       INSERT INTO creators (
-        id, name, avatar_url, subscriber_count, verified, platform, created_at, updated_at
+        id, name, avatar_url, subscriber_count, verified, platforms, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
@@ -414,7 +414,7 @@ export class SingleUserPollingService {
       subscription.thumbnail_url,
       subscription.subscriber_count,
       subscription.is_verified,
-      provider,
+      JSON.stringify([provider]),
       now,
       now
     ).run()
