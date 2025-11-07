@@ -875,7 +875,7 @@ app.post('/save-enriched', async (c) => {
       auth.userId,
       contentIdForBookmark,
       validatedData.notes || null,
-      new Date().toISOString(),
+      Date.now(),
       'active'
     ).run()
     

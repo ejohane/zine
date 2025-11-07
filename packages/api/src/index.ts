@@ -2130,7 +2130,7 @@ app.post('/api/v1/bookmarks/from-content', authMiddleware, async (c) => {
     
     // Create new bookmark
     const bookmarkId = `${auth.userId}-${Date.now()}`
-    const now = new Date()
+    const now = Date.now()
     
     await c.env.DB.prepare(`
       INSERT INTO bookmarks (
@@ -2143,7 +2143,7 @@ app.post('/api/v1/bookmarks/from-content', authMiddleware, async (c) => {
       notes || null,
       tags ? JSON.stringify(tags) : null,
       'active',
-      now.toISOString()
+      now
     ).run()
     
     // Fetch and return the created bookmark

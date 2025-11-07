@@ -141,14 +141,15 @@ export class D1BookmarkRepository implements BookmarkRepository {
 
   async create(bookmark: CreateBookmark & { userId: string }): Promise<Bookmark> {
     try {
-      const now = new Date().toISOString()
+      const nowTimestamp = Date.now()
+      const nowIso = new Date(nowTimestamp).toISOString()
       
       // First, create or get content
       // Use btoa for base64 encoding (available in Cloudflare Workers)
       const urlHash = btoa(bookmark.url || '').replace(/[^a-zA-Z0-9]/g, '').substring(0, 20)
       const contentId = `web-${urlHash}`
       
-      // Insert content if not exists
+      // Insert content if not exists (content timestamps use ISO strings)
       await this.db.prepare(`
         INSERT OR IGNORE INTO content (
           id, external_id, provider, url, canonical_url, title, description,
@@ -163,11 +164,11 @@ export class D1BookmarkRepository implements BookmarkRepository {
         bookmark.title,
         bookmark.description || null,
         'article', // default content type
-        now,
-        now
+        nowIso,
+        nowIso
       ).run()
       
-      // Insert the bookmark with generated ID
+      // Insert the bookmark with generated ID (bookmark timestamps use integers)
       const bookmarkId = crypto.randomUUID()
       const result = await this.db.prepare(`
         INSERT INTO bookmarks (
@@ -180,7 +181,7 @@ export class D1BookmarkRepository implements BookmarkRepository {
         contentId,
         bookmark.tags ? JSON.stringify(bookmark.tags) : null,
         'active',
-        now
+        nowTimestamp
       ).first()
 
       if (!result) {
