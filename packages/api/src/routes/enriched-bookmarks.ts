@@ -979,7 +979,7 @@ app.post('/save-enriched', async (c) => {
           apiUsed,
           version: savedContent.enrichmentVersion
         },
-        createdAt: fullBookmark.bookmarked_at ? new Date(fullBookmark.bookmarked_at as string) : new Date()
+        createdAt: fullBookmark.bookmarked_at ? new Date(fullBookmark.bookmarked_at as number) : new Date()
       },
       message: `Bookmark saved successfully${apiUsed ? ' with API enrichment' : ''}`,
       duplicate: Boolean(duplicateResolvedWith),
