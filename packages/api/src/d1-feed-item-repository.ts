@@ -105,11 +105,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
       
       // Map Phase 2 fields
       creatorId: feedItem.creatorId,
-      creatorName: feedItem.creatorName,
-      creatorThumbnail: feedItem.creatorThumbnail,
-      creatorVerified: feedItem.creatorVerified,
-      creatorSubscriberCount: feedItem.creatorSubscriberCount,
-      creatorFollowerCount: feedItem.creatorFollowerCount,
       seriesMetadata: feedItem.seriesMetadata,
       seriesId: feedItem.seriesId,
       seriesName: feedItem.seriesName,
@@ -220,11 +215,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: feedItem.category,
         tags: feedItem.tags,
         creatorId: feedItem.creatorId,
-        creatorName: feedItem.creatorName,
-        creatorThumbnail: feedItem.creatorThumbnail,
-        creatorVerified: feedItem.creatorVerified,
-        creatorSubscriberCount: feedItem.creatorSubscriberCount,
-        creatorFollowerCount: feedItem.creatorFollowerCount,
         seriesMetadata: feedItem.seriesMetadata,
         seriesId: feedItem.seriesId,
         seriesName: feedItem.seriesName,
