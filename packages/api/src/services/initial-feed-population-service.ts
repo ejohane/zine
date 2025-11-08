@@ -82,6 +82,13 @@ export class InitialFeedPopulationService {
         // Create feed items for the latest episode
         const feedItems = []
         for (const episode of episodes) {
+          // Generate creator ID from subscription
+          const provider = subscription.providerId
+          const creatorId = `${provider}:${subscription.externalId}`
+          
+          // For podcasts, use the show title as the creator name (not the publisher/hosts)
+          const creatorName = subscription.title
+          
           const feedItem = await this.feedItemRepository.findOrCreateFeedItem({
             subscriptionId: subscription.id,
             externalId: episode.id,
@@ -90,7 +97,11 @@ export class InitialFeedPopulationService {
             thumbnailUrl: episode.images?.[0]?.url,
             publishedAt: new Date(episode.release_date),
             durationSeconds: Math.round(episode.duration_ms / 1000),
-            externalUrl: episode.external_urls.spotify
+            externalUrl: episode.external_urls.spotify,
+            // Include creator information from subscription (use show title as creator)
+            creatorId: creatorId,
+            creatorName: creatorName,
+            creatorThumbnail: subscription.thumbnailUrl
           })
 
           // Check if this is actually new (created within last 5 seconds)
@@ -174,6 +185,13 @@ export class InitialFeedPopulationService {
         // Create feed items for the latest video
         const feedItems = []
         for (const video of videos) {
+          // Generate creator ID from subscription
+          const provider = subscription.providerId
+          const creatorId = `${provider}:${subscription.externalId}`
+          
+          // For YouTube, use the channel title as the creator name
+          const creatorName = subscription.title
+          
           const feedItem = await this.feedItemRepository.findOrCreateFeedItem({
             subscriptionId: subscription.id,
             externalId: video.id,
@@ -182,7 +200,11 @@ export class InitialFeedPopulationService {
             thumbnailUrl: video.snippet.thumbnails?.medium?.url || video.snippet.thumbnails?.default?.url,
             publishedAt: new Date(video.snippet.publishedAt),
             durationSeconds: YouTubeAPI.parseDuration(video.contentDetails.duration),
-            externalUrl: `https://youtube.com/watch?v=${video.id}`
+            externalUrl: `https://youtube.com/watch?v=${video.id}`,
+            // Include creator information from subscription (use channel title as creator)
+            creatorId: creatorId,
+            creatorName: creatorName,
+            creatorThumbnail: subscription.thumbnailUrl
           })
 
           // Check if this is actually new (created within last 5 seconds)

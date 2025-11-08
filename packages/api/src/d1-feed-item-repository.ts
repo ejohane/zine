@@ -414,6 +414,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
@@ -464,13 +465,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields
+        // Phase 2 fields - prefer creators table, fallback to content table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.content.creatorName || undefined,
-        creatorThumbnail: row.content.creatorThumbnail || undefined,
-        creatorVerified: row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || row.content.creatorName || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || row.content.creatorThumbnail || undefined,
+        creatorVerified: row.creators?.verified || row.content.creatorVerified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || row.content.creatorSubscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || row.content.creatorFollowerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {
@@ -478,7 +479,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           providerId: row.subscriptions.providerId,
           externalId: row.subscriptions.externalId,
           title: row.subscriptions.title,
-          creatorName: row.subscriptions.creatorName,
+          creatorName: row.creators?.name || row.subscriptions.title,
           description: row.subscriptions.description || undefined,
           thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
           subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,
@@ -601,10 +602,19 @@ export class D1FeedItemRepository implements FeedItemRepository {
           subscriptionUrl: schema.subscriptions.subscriptionUrl,
           totalEpisodes: schema.subscriptions.totalEpisodes,
         },
+        creators: {
+          id: schema.creators.id,
+          name: schema.creators.name,
+          avatarUrl: schema.creators.avatarUrl,
+          verified: schema.creators.verified,
+          subscriberCount: schema.creators.subscriberCount,
+          followerCount: schema.creators.followerCount,
+        },
       })
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
@@ -653,13 +663,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields
+        // Phase 2 fields - prefer creators table, fallback to content table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.content.creatorName || undefined,
-        creatorThumbnail: row.content.creatorThumbnail || undefined,
-        creatorVerified: row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || row.content.creatorName || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || row.content.creatorThumbnail || undefined,
+        creatorVerified: row.creators?.verified || row.content.creatorVerified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || row.content.creatorSubscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || row.content.creatorFollowerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {
@@ -667,7 +677,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           providerId: row.subscriptions.providerId,
           externalId: row.subscriptions.externalId,
           title: row.subscriptions.title,
-          creatorName: row.subscriptions.creatorName,
+          creatorName: row.creators?.name || row.subscriptions.title,
           description: row.subscriptions.description || undefined,
           thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
           subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,

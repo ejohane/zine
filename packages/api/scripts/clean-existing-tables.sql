@@ -33,10 +33,19 @@ DELETE FROM user_accounts;
 -- 9. Delete subscription providers
 DELETE FROM subscription_providers;
 
--- 10. Delete bookmarks (depends on users and creators)
+-- 10. Delete content matches (depends on bookmarks and content)
+DELETE FROM content_matches;
+
+-- 11. Delete bookmarks (depends on users and creators)
 DELETE FROM bookmarks;
 
--- 11. Delete creators (no dependencies)
+-- 12. Delete content (no dependencies)
+DELETE FROM content;
+
+-- 13. Delete creators (no dependencies)
 DELETE FROM creators;
+
+-- 14. Delete publishers (no dependencies)
+DELETE FROM publishers;
 
 -- Note: The users table is explicitly preserved as requested

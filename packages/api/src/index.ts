@@ -881,7 +881,7 @@ app.get('/api/v1/subscriptions', async (c) => {
           providerId: us.subscription.providerId,
           externalId: us.subscription.externalId,
           title: us.subscription.title,
-          creatorName: us.subscription.creatorName,
+          creatorName: us.subscription.title,
           description: us.subscription.description,
           thumbnailUrl: us.subscription.thumbnailUrl,
           subscriptionUrl: us.subscription.subscriptionUrl
@@ -1273,7 +1273,7 @@ app.get('/api/v1/feed/subscriptions', async (c) => {
       subscriptions: subscriptionsWithCounts.map(sub => ({
         id: sub.subscription.id,
         title: sub.subscription.title,
-        creatorName: sub.subscription.creatorName,
+        creatorName: sub.subscription.title,
         thumbnailUrl: sub.subscription.thumbnailUrl,
         providerId: sub.subscription.providerId,
         unreadCount: sub.unreadCount,

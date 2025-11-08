@@ -366,22 +366,25 @@ export class SingleUserPollingService {
     subscriptionId: string,
     items: Array<{
       externalId: string
-      title: string
-      description: string
-      thumbnailUrl: string
-      publishedAt: Date
-      durationSeconds: number
       externalUrl: string
+      title: string
+      description?: string
+      thumbnailUrl?: string
+      publishedAt: Date
+      durationSeconds?: number
     }>
   ): Promise<void> {
     const createdFeedItems: string[] = []
 
+    console.log(`[createFeedItems] Starting for subscription ${subscriptionId} with ${items.length} items`)
+
     // Get subscription to determine provider and creator info
     const subscription = await this.db.prepare(`
-      SELECT provider_id, external_id, creator_name, thumbnail_url, subscriber_count, is_verified FROM subscriptions WHERE id = ?
+      SELECT provider_id, external_id, title, creator_name, thumbnail_url, subscriber_count, is_verified FROM subscriptions WHERE id = ?
     `).bind(subscriptionId).first<{ 
       provider_id: string
       external_id: string
+      title: string
       creator_name: string
       thumbnail_url: string | null
       subscriber_count: number | null
@@ -392,13 +395,27 @@ export class SingleUserPollingService {
       throw new Error(`Subscription ${subscriptionId} not found`)
     }
 
+    console.log(`[createFeedItems] Subscription found:`, {
+      provider_id: subscription.provider_id,
+      external_id: subscription.external_id,
+      title: subscription.title,
+      creator_name: subscription.creator_name,
+      thumbnail_url: subscription.thumbnail_url,
+      subscriber_count: subscription.subscriber_count,
+      is_verified: subscription.is_verified
+    })
+
     const provider = subscription.provider_id
     
     // Upsert creator into creators table
+    // For podcasts/channels, use the show/channel title as the creator name
     const creatorId = `${provider}:${subscription.external_id}`
+    const creatorName = subscription.title
     const now = Math.floor(Date.now() / 1000)
     
-    await this.db.prepare(`
+    console.log(`[createFeedItems] Upserting creator with ID: ${creatorId}, name: ${creatorName}`)
+    
+    const creatorResult = await this.db.prepare(`
       INSERT INTO creators (
         id, name, avatar_url, subscriber_count, verified, platforms, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -410,7 +427,7 @@ export class SingleUserPollingService {
         updated_at = excluded.updated_at
     `).bind(
       creatorId,
-      subscription.creator_name,
+      creatorName,
       subscription.thumbnail_url,
       subscription.subscriber_count,
       subscription.is_verified,
@@ -419,12 +436,16 @@ export class SingleUserPollingService {
       now
     ).run()
 
+    console.log(`[createFeedItems] Creator upsert result:`, creatorResult.meta)
+
     // Create content entries and feed items
     for (const item of items) {
       // 1. Create content entry (using unified content model)
       const contentId = `${provider}-${item.externalId}`
       
-      await this.db.prepare(`
+      console.log(`[createFeedItems] Creating content ${contentId} with creator_id=${creatorId}`)
+      
+      const contentResult = await this.db.prepare(`
         INSERT OR IGNORE INTO content (
           id, external_id, provider, url, title, description, 
           thumbnail_url, published_at, duration_seconds, 
@@ -446,9 +467,13 @@ export class SingleUserPollingService {
         Math.floor(Date.now() / 1000)
       ).run()
 
+      console.log(`[createFeedItems] Content insert result:`, contentResult.meta)
+
       // 2. Create feed_item entry
       const feedItemId = crypto.randomUUID()
-      await this.db.prepare(`
+      console.log(`[createFeedItems] Creating feed_item ${feedItemId} for content ${contentId}`)
+      
+      const feedItemResult = await this.db.prepare(`
         INSERT INTO feed_items (
           id, subscription_id, content_id, added_to_feed_at
         ) VALUES (?, ?, ?, ?)
@@ -459,10 +484,13 @@ export class SingleUserPollingService {
         Math.floor(Date.now() / 1000)
       ).run()
 
+      console.log(`[createFeedItems] Feed item insert result:`, feedItemResult.meta)
+
       createdFeedItems.push(feedItemId)
     }
 
     // Create user feed item for this user
+    console.log(`[createFeedItems] Creating ${createdFeedItems.length} user_feed_items for user ${this.userId}`)
     for (const feedItemId of createdFeedItems) {
       const userFeedItemId = `${this.userId}-${feedItemId}`
       await this.db.prepare(`
@@ -478,7 +506,7 @@ export class SingleUserPollingService {
       ).run()
     }
 
-    console.log(`[SingleUserPolling] Created ${createdFeedItems.length} feed items for subscription ${subscriptionId}`)
+    console.log(`[createFeedItems] ✅ Successfully created ${createdFeedItems.length} feed items for subscription ${subscriptionId}`)
   }
 
   private async updateSubscriptionTotalEpisodes(subscriptionId: string, totalEpisodes: number): Promise<void> {
