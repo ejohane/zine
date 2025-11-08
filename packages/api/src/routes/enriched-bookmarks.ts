@@ -826,19 +826,20 @@ app.post('/save-enriched', async (c) => {
         c.content_type,
         c.published_at,
         c.creator_id,
-        c.creator_name,
-        c.creator_handle,
-        c.creator_thumbnail,
-        c.creator_verified,
-        c.creator_subscriber_count,
-        c.creator_follower_count,
+        cr.name as creator_name,
+        cr.handle as creator_handle,
+        cr.avatar_url as creator_thumbnail,
+        cr.verified as creator_verified,
+        cr.subscriber_count as creator_subscriber_count,
+        cr.follower_count as creator_follower_count,
         c.view_count,
         c.like_count,
         c.duration_seconds,
-        c.provider as creator_platform,
+        cr.platform as creator_platform,
         c.extended_metadata as content_extended_metadata
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.user_id = ? AND b.content_id = ?
       LIMIT 1`
     ).bind(auth.userId, contentIdForBookmark).first()
@@ -937,19 +938,20 @@ app.post('/save-enriched', async (c) => {
         c.content_type,
         c.published_at,
         c.creator_id,
-        c.creator_name,
-        c.creator_handle,
-        c.creator_thumbnail,
-        c.creator_verified,
-        c.creator_subscriber_count,
-        c.creator_follower_count,
+        cr.name as creator_name,
+        cr.handle as creator_handle,
+        cr.avatar_url as creator_thumbnail,
+        cr.verified as creator_verified,
+        cr.subscriber_count as creator_subscriber_count,
+        cr.follower_count as creator_follower_count,
         c.view_count,
         c.like_count,
         c.duration_seconds,
-        c.provider as creator_platform,
+        cr.platform as creator_platform,
         c.extended_metadata as content_extended_metadata
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.id = ?`
     ).bind(bookmarkId).first()
     
@@ -1138,7 +1140,7 @@ app.put('/:id/refresh-enriched', async (c) => {
         c.description,
         c.thumbnail_url,
         c.content_type,
-        c.creator_name,
+        cr.name as creator_name,
         c.view_count,
         c.like_count,
         c.duration_seconds,
@@ -1146,6 +1148,7 @@ app.put('/:id/refresh-enriched', async (c) => {
         c.enrichment_version
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.id = ?`
     ).bind(bookmarkId).first()
     

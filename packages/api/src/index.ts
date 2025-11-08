@@ -1501,9 +1501,10 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
         c.description,
         c.thumbnail_url,
         c.content_type,
-        c.creator_name
+        cr.name as creator_name
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.user_id = ? 
         AND b.status = 'active'
         AND b.last_accessed_at IS NOT NULL
@@ -1528,7 +1529,7 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
       bookmarkedAt: row.bookmarked_at,
       lastAccessedAt: row.last_accessed_at,
       status: row.status,
-      creatorName: row.creator_name
+      creatorName: row.creator_name || undefined
     }))
     
     return c.json({ data: bookmarks })
