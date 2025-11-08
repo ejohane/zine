@@ -200,13 +200,8 @@ export const content = sqliteTable('content', {
   trendingScore: integer('trending_score'), // 0-100
 
   // Creator/Publisher information (Phase 2 fields)
+  // Foreign key to creators table - this is the single source of truth for creator data
   creatorId: text('creator_id'),
-  creatorName: text('creator_name'),
-  creatorHandle: text('creator_handle'),
-  creatorThumbnail: text('creator_thumbnail'),
-  creatorVerified: integer('creator_verified', { mode: 'boolean' }).default(false),
-  creatorSubscriberCount: integer('creator_subscriber_count'),
-  creatorFollowerCount: integer('creator_follower_count'),
 
   // Series/Episode context (Phase 2 fields)
   seriesId: text('series_id'),

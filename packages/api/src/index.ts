@@ -336,11 +336,7 @@ app.get('/api/v1/search', async (c) => {
         description: contentItem.description || undefined,
         url: contentItem.url,
         thumbnailUrl: contentItem.thumbnailUrl || undefined,
-        creator: contentItem.creatorName ? {
-          id: contentItem.creatorId || '',
-          name: contentItem.creatorName,
-          avatarUrl: undefined
-        } : undefined,
+        creator: undefined, // Creator data can be fetched separately using creatorId
         contentType: contentItem.contentType || undefined,
         publishedAt: contentItem.publishedAt ? new Date(Number(contentItem.publishedAt) * 1000).toISOString() : undefined,
         relevanceScore: 0.8
@@ -881,7 +877,7 @@ app.get('/api/v1/subscriptions', async (c) => {
           providerId: us.subscription.providerId,
           externalId: us.subscription.externalId,
           title: us.subscription.title,
-          creatorName: us.subscription.creatorName,
+          creatorName: us.subscription.title,
           description: us.subscription.description,
           thumbnailUrl: us.subscription.thumbnailUrl,
           subscriptionUrl: us.subscription.subscriptionUrl
@@ -1273,7 +1269,7 @@ app.get('/api/v1/feed/subscriptions', async (c) => {
       subscriptions: subscriptionsWithCounts.map(sub => ({
         id: sub.subscription.id,
         title: sub.subscription.title,
-        creatorName: sub.subscription.creatorName,
+        creatorName: sub.subscription.title,
         thumbnailUrl: sub.subscription.thumbnailUrl,
         providerId: sub.subscription.providerId,
         unreadCount: sub.unreadCount,
@@ -1505,9 +1501,10 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
         c.description,
         c.thumbnail_url,
         c.content_type,
-        c.creator_name
+        cr.name as creator_name
       FROM bookmarks b
       JOIN content c ON b.content_id = c.id
+      LEFT JOIN creators cr ON c.creator_id = cr.id
       WHERE b.user_id = ? 
         AND b.status = 'active'
         AND b.last_accessed_at IS NOT NULL
@@ -1532,7 +1529,7 @@ app.get('/api/v1/bookmarks/recent', async (c) => {
       bookmarkedAt: row.bookmarked_at,
       lastAccessedAt: row.last_accessed_at,
       status: row.status,
-      creatorName: row.creator_name
+      creatorName: row.creator_name || undefined
     }))
     
     return c.json({ data: bookmarks })
@@ -2003,10 +2000,10 @@ app.get('/api/v1/content/:contentId', authMiddleware, async (c) => {
       creator = await creatorRepository.getCreator(content.creatorId)
     }
     
-    // If no creator info in content table, try to get it from feed item's subscription
+    // If no creator found, try to get it from feed item's subscription
     let subscriptionCreatorName = null
     let subscriptionCreatorThumbnail = null
-    if (!creator && !content.creatorName) {
+    if (!creator) {
       const feedItemResult = await c.env.DB.prepare(`
         SELECT 
           s.creator_name,
@@ -2040,18 +2037,12 @@ app.get('/api/v1/content/:contentId', authMiddleware, async (c) => {
         handle: creator.handle,
         avatarUrl: creator.avatarUrl,
         verified: creator.verified || false
-      } : (content.creatorName ? {
-        id: content.creatorId || '',
-        name: content.creatorName,
-        handle: content.creatorHandle,
-        avatarUrl: content.creatorThumbnail,
-        verified: content.creatorVerified || false
       } : (subscriptionCreatorName ? {
         id: '',
         name: subscriptionCreatorName,
         avatarUrl: subscriptionCreatorThumbnail,
         verified: false
-      } : null)),
+      } : null),
       videoMetadata: content.contentType === 'video' ? {
         duration: content.durationSeconds,
         viewCount: content.viewCount

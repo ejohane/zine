@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, or } from 'drizzle-orm'
-import { bookmarks, feedItems, content } from '../schema'
+import { bookmarks, feedItems, content, creators } from '../schema'
 import { normalizeUrl } from '@zine/shared'
 
 export interface ExistingMetadata {
@@ -51,10 +51,12 @@ export class MetadataRepository {
     const results = await this.db
       .select({
         bookmark: bookmarks,
-        content: content
+        content: content,
+        creator: creators
       })
       .from(bookmarks)
       .innerJoin(content, eq(bookmarks.contentId, content.id))
+      .leftJoin(creators, eq(content.creatorId, creators.id))
       .where(
         or(
           eq(content.url, url),
@@ -72,7 +74,7 @@ export class MetadataRepository {
     // Parse metadata for additional fields
     let duration = result.content.durationSeconds
     let viewCount = result.content.viewCount
-    let author = result.content.creatorName
+    let author = result.creator?.name
     
     // Try to get more data from metadata fields if available
     if (result.content.statisticsMetadata) {
@@ -96,7 +98,7 @@ export class MetadataRepository {
       description: result.content.description,
       imageUrl: result.content.thumbnailUrl,
       publishedAt: result.content.publishedAt,
-      author,
+      author: author || null,
       provider: result.content.provider,
       duration,
       viewCount,
@@ -115,10 +117,12 @@ export class MetadataRepository {
     const results = await this.db
       .select({
         feedItem: feedItems,
-        content: content
+        content: content,
+        creator: creators
       })
       .from(feedItems)
       .innerJoin(content, eq(feedItems.contentId, content.id))
+      .leftJoin(creators, eq(content.creatorId, creators.id))
       .where(
         or(
           eq(content.url, url),
@@ -136,7 +140,7 @@ export class MetadataRepository {
     // Parse metadata for additional fields
     let duration = result.content.durationSeconds
     let viewCount = result.content.viewCount
-    let author = result.content.creatorName
+    let author = result.creator?.name
     
     // Try to get more data from metadata fields if available
     if (result.content.statisticsMetadata) {
@@ -160,7 +164,7 @@ export class MetadataRepository {
       description: result.content.description,
       imageUrl: result.content.thumbnailUrl,
       publishedAt: result.content.publishedAt,
-      author,
+      author: author || null,
       provider: result.content.provider,
       duration,
       viewCount,

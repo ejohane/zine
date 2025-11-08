@@ -8,6 +8,7 @@ import {
   FeedItemWithReadState
 } from '@zine/shared'
 import { ContentRepository } from './repositories/content-repository'
+import { CreatorRepository } from './repositories/creator-repository'
 import type { Content } from './schema'
 
 // SQLite has a limit of 999 variables per query
@@ -17,38 +18,44 @@ const VARIABLES_PER_USER_FEED_ITEM = 10 // Number of columns in user_feed_items 
 export class D1FeedItemRepository implements FeedItemRepository {
   private db: ReturnType<typeof drizzle>
   private contentRepository: ContentRepository
+  private creatorRepository: CreatorRepository
 
   constructor(d1Database: D1Database) {
     this.db = drizzle(d1Database, { schema })
     this.contentRepository = new ContentRepository(d1Database)
+    this.creatorRepository = new CreatorRepository(d1Database)
   }
 
   async getFeedItem(id: string): Promise<FeedItem | null> {
     const results = await this.db
       .select({
         feedItem: schema.feedItems,
-        content: schema.content
+        content: schema.content,
+        creator: schema.creators
       })
       .from(schema.feedItems)
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .where(eq(schema.feedItems.id, id))
       .limit(1)
     
-    return results.length > 0 ? this.mapFeedItemWithContent(results[0].feedItem, results[0].content) : null
+    return results.length > 0 ? this.mapFeedItemWithContent(results[0].feedItem, results[0].content, results[0].creator) : null
   }
 
   async getFeedItemsBySubscription(subscriptionId: string): Promise<FeedItem[]> {
     const results = await this.db
       .select({
         feedItem: schema.feedItems,
-        content: schema.content
+        content: schema.content,
+        creator: schema.creators
       })
       .from(schema.feedItems)
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .where(eq(schema.feedItems.subscriptionId, subscriptionId))
       .orderBy(desc(schema.content.publishedAt))
     
-    return results.map(row => this.mapFeedItemWithContent(row.feedItem, row.content))
+    return results.map(row => this.mapFeedItemWithContent(row.feedItem, row.content, row.creator))
   }
 
   async createFeedItem(feedItem: Omit<FeedItem, 'createdAt'>): Promise<FeedItem> {
@@ -60,7 +67,20 @@ export class D1FeedItemRepository implements FeedItemRepository {
     // Create content ID
     const contentId = `${provider}-${feedItem.externalId}`
     
-    // First, upsert the content
+    // First, upsert creator data if present
+    if (feedItem.creatorId && feedItem.creatorName) {
+      await this.creatorRepository.upsertCreator({
+        id: feedItem.creatorId,
+        name: feedItem.creatorName,
+        avatarUrl: feedItem.creatorThumbnail,
+        platform: provider,
+        verified: feedItem.creatorVerified,
+        subscriberCount: feedItem.creatorSubscriberCount,
+        followerCount: feedItem.creatorFollowerCount
+      })
+    }
+    
+    // Then, upsert the content
     const contentData: Partial<Content> = {
       id: contentId,
       externalId: feedItem.externalId,
@@ -85,11 +105,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
       
       // Map Phase 2 fields
       creatorId: feedItem.creatorId,
-      creatorName: feedItem.creatorName,
-      creatorThumbnail: feedItem.creatorThumbnail,
-      creatorVerified: feedItem.creatorVerified,
-      creatorSubscriberCount: feedItem.creatorSubscriberCount,
-      creatorFollowerCount: feedItem.creatorFollowerCount,
       seriesMetadata: feedItem.seriesMetadata,
       seriesId: feedItem.seriesId,
       seriesName: feedItem.seriesName,
@@ -147,6 +162,31 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const contents: Partial<Content>[] = []
     const newFeedItems: any[] = []
     
+    // First, upsert all creators
+    const creatorsToUpsert = new Map<string, any>()
+    for (const feedItem of feedItems) {
+      if (feedItem.creatorId && feedItem.creatorName) {
+        const provider = feedItem.subscriptionId.split('-')[0] || 'unknown'
+        // Use Map to deduplicate creators by ID
+        if (!creatorsToUpsert.has(feedItem.creatorId)) {
+          creatorsToUpsert.set(feedItem.creatorId, {
+            id: feedItem.creatorId,
+            name: feedItem.creatorName,
+            avatarUrl: feedItem.creatorThumbnail,
+            platform: provider,
+            verified: feedItem.creatorVerified,
+            subscriberCount: feedItem.creatorSubscriberCount,
+            followerCount: feedItem.creatorFollowerCount
+          })
+        }
+      }
+    }
+    
+    // Upsert creators sequentially (they should be few)
+    for (const creatorData of creatorsToUpsert.values()) {
+      await this.creatorRepository.upsertCreator(creatorData)
+    }
+    
     for (const feedItem of feedItems) {
       // Extract provider from subscription ID
       const provider = feedItem.subscriptionId.split('-')[0] || 'unknown'
@@ -175,11 +215,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: feedItem.category,
         tags: feedItem.tags,
         creatorId: feedItem.creatorId,
-        creatorName: feedItem.creatorName,
-        creatorThumbnail: feedItem.creatorThumbnail,
-        creatorVerified: feedItem.creatorVerified,
-        creatorSubscriberCount: feedItem.creatorSubscriberCount,
-        creatorFollowerCount: feedItem.creatorFollowerCount,
         seriesMetadata: feedItem.seriesMetadata,
         seriesId: feedItem.seriesId,
         seriesName: feedItem.seriesName,
@@ -238,10 +273,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const existingItems = await this.db
       .select({
         feedItem: schema.feedItems,
-        content: schema.content
+        content: schema.content,
+        creator: schema.creators
       })
       .from(schema.feedItems)
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .where(and(
         eq(schema.feedItems.subscriptionId, feedItem.subscriptionId),
         eq(schema.feedItems.contentId, contentId)
@@ -249,7 +286,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .limit(1)
     
     if (existingItems.length > 0) {
-      return this.mapFeedItemWithContent(existingItems[0].feedItem, existingItems[0].content)
+      return this.mapFeedItemWithContent(existingItems[0].feedItem, existingItems[0].content, existingItems[0].creator)
     }
     
     // Create new feed item with deterministic ID
@@ -294,10 +331,12 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .select({
         feedItem: schema.feedItems,
         content: schema.content,
+        creator: schema.creators,
         userFeedItem: schema.userFeedItems
       })
       .from(schema.feedItems)
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .leftJoin(
         schema.userFeedItems,
         and(
@@ -364,7 +403,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     const results = await query
 
     return results.map(row => ({
-      ...this.mapFeedItemWithContent(row.feedItem, row.content),
+      ...this.mapFeedItemWithContent(row.feedItem, row.content, row.creator),
       userFeedItem: row.userFeedItem ? this.mapUserFeedItem(row.userFeedItem) : undefined
     }))
   }
@@ -375,6 +414,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
@@ -425,13 +465,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields
+        // Phase 2 fields - read from creators table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.content.creatorName || undefined,
-        creatorThumbnail: row.content.creatorThumbnail || undefined,
-        creatorVerified: row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || undefined,
+        creatorVerified: row.creators?.verified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {
@@ -439,7 +479,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           providerId: row.subscriptions.providerId,
           externalId: row.subscriptions.externalId,
           title: row.subscriptions.title,
-          creatorName: row.subscriptions.creatorName,
+          creatorName: row.creators?.name || row.subscriptions.title,
           description: row.subscriptions.description || undefined,
           thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
           subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,
@@ -543,11 +583,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
           category: schema.content.category,
           tags: schema.content.tags,
           creatorId: schema.content.creatorId,
-          creatorName: schema.content.creatorName,
-          creatorThumbnail: schema.content.creatorThumbnail,
-          creatorVerified: schema.content.creatorVerified,
-          creatorSubscriberCount: schema.content.creatorSubscriberCount,
-          creatorFollowerCount: schema.content.creatorFollowerCount,
           seriesMetadata: schema.content.seriesMetadata,
           createdAt: schema.content.createdAt,
         },
@@ -562,10 +597,19 @@ export class D1FeedItemRepository implements FeedItemRepository {
           subscriptionUrl: schema.subscriptions.subscriptionUrl,
           totalEpisodes: schema.subscriptions.totalEpisodes,
         },
+        creators: {
+          id: schema.creators.id,
+          name: schema.creators.name,
+          avatarUrl: schema.creators.avatarUrl,
+          verified: schema.creators.verified,
+          subscriberCount: schema.creators.subscriberCount,
+          followerCount: schema.creators.followerCount,
+        },
       })
       .from(schema.userFeedItems)
       .innerJoin(schema.feedItems, eq(schema.userFeedItems.feedItemId, schema.feedItems.id))
       .innerJoin(schema.content, eq(schema.feedItems.contentId, schema.content.id))
+      .leftJoin(schema.creators, eq(schema.content.creatorId, schema.creators.id))
       .innerJoin(schema.subscriptions, eq(schema.feedItems.subscriptionId, schema.subscriptions.id))
       .where(and(
         eq(schema.userFeedItems.userId, userId),
@@ -614,13 +658,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields
+        // Phase 2 fields - read from creators table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.content.creatorName || undefined,
-        creatorThumbnail: row.content.creatorThumbnail || undefined,
-        creatorVerified: row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || undefined,
+        creatorVerified: row.creators?.verified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {
@@ -628,7 +672,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
           providerId: row.subscriptions.providerId,
           externalId: row.subscriptions.externalId,
           title: row.subscriptions.title,
-          creatorName: row.subscriptions.creatorName,
+          creatorName: row.creators?.name || row.subscriptions.title,
           description: row.subscriptions.description || undefined,
           thumbnailUrl: row.subscriptions.thumbnailUrl || undefined,
           subscriptionUrl: row.subscriptions.subscriptionUrl || undefined,
@@ -893,7 +937,7 @@ export class D1FeedItemRepository implements FeedItemRepository {
     }
   }
 
-  private mapFeedItemWithContent(feedItemRow: any, contentRow: any): FeedItem {
+  private mapFeedItemWithContent(feedItemRow: any, contentRow: any, creatorRow?: any): FeedItem {
     return {
       id: feedItemRow.id,
       subscriptionId: feedItemRow.subscriptionId,
@@ -916,13 +960,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
       category: contentRow.category || undefined,
       tags: contentRow.tags || undefined,
       
-      // Phase 2 fields
+      // Phase 2 fields - read from creators table if available, fallback to content table
       creatorId: contentRow.creatorId || undefined,
-      creatorName: contentRow.creatorName || undefined,
-      creatorThumbnail: contentRow.creatorThumbnail || undefined,
-      creatorVerified: contentRow.creatorVerified || undefined,
-      creatorSubscriberCount: contentRow.creatorSubscriberCount || undefined,
-      creatorFollowerCount: contentRow.creatorFollowerCount || undefined,
+      creatorName: creatorRow?.name || contentRow.creatorName || undefined,
+      creatorThumbnail: creatorRow?.avatarUrl || contentRow.creatorThumbnail || undefined,
+      creatorVerified: creatorRow?.verified || contentRow.creatorVerified || undefined,
+      creatorSubscriberCount: creatorRow?.subscriberCount || contentRow.creatorSubscriberCount || undefined,
+      creatorFollowerCount: creatorRow?.followerCount || contentRow.creatorFollowerCount || undefined,
       seriesMetadata: contentRow.seriesMetadata || undefined,
       seriesId: contentRow.seriesId || undefined,
       seriesName: contentRow.seriesName || undefined,
