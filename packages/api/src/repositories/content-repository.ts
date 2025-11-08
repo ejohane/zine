@@ -260,13 +260,13 @@ export class ContentRepository {
     }
     
     // 2. Check by normalized title and creator (fuzzy match)
-    if (content.normalizedTitle && content.creatorName) {
+    if (content.normalizedTitle && content.creatorId) {
       const titleMatches = await this.db
         .select()
         .from(schema.content)
         .where(and(
           eq(schema.content.normalizedTitle, content.normalizedTitle),
-          eq(schema.content.creatorName, content.creatorName),
+          eq(schema.content.creatorId, content.creatorId),
           sql`${schema.content.id} != ${content.id}`
         ))
         .limit(10)
@@ -427,8 +427,7 @@ export class ContentRepository {
       if (!mergedData.description && duplicate.description) {
         mergedData.description = duplicate.description
       }
-      if (!mergedData.creatorName && duplicate.creatorName) {
-        mergedData.creatorName = duplicate.creatorName
+      if (!mergedData.creatorId && duplicate.creatorId) {
         mergedData.creatorId = duplicate.creatorId
       }
       
@@ -493,7 +492,6 @@ export class ContentRepository {
       .where(or(
         sql`LOWER(${schema.content.title}) LIKE ${searchPattern}`,
         sql`LOWER(${schema.content.description}) LIKE ${searchPattern}`,
-        sql`LOWER(${schema.content.creatorName}) LIKE ${searchPattern}`,
         like(schema.content.normalizedTitle, searchPattern)
       ))
       .orderBy(options.orderDirection === 'asc' ? orderColumn : desc(orderColumn))
@@ -592,7 +590,7 @@ export class ContentRepository {
     const creatorResult = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(schema.content)
-      .where(sql`${schema.content.creatorName} IS NOT NULL`)
+      .where(sql`${schema.content.creatorId} IS NOT NULL`)
     
     const withCreator = creatorResult[0]?.count || 0
     

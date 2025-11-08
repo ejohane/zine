@@ -465,13 +465,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields - prefer creators table, fallback to content table
+        // Phase 2 fields - read from creators table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.creators?.name || row.content.creatorName || undefined,
-        creatorThumbnail: row.creators?.avatarUrl || row.content.creatorThumbnail || undefined,
-        creatorVerified: row.creators?.verified || row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.creators?.subscriberCount || row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.creators?.followerCount || row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || undefined,
+        creatorVerified: row.creators?.verified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {
@@ -583,11 +583,6 @@ export class D1FeedItemRepository implements FeedItemRepository {
           category: schema.content.category,
           tags: schema.content.tags,
           creatorId: schema.content.creatorId,
-          creatorName: schema.content.creatorName,
-          creatorThumbnail: schema.content.creatorThumbnail,
-          creatorVerified: schema.content.creatorVerified,
-          creatorSubscriberCount: schema.content.creatorSubscriberCount,
-          creatorFollowerCount: schema.content.creatorFollowerCount,
           seriesMetadata: schema.content.seriesMetadata,
           createdAt: schema.content.createdAt,
         },
@@ -663,13 +658,13 @@ export class D1FeedItemRepository implements FeedItemRepository {
         category: row.content.category || undefined,
         tags: row.content.tags || undefined,
         
-        // Phase 2 fields - prefer creators table, fallback to content table
+        // Phase 2 fields - read from creators table
         creatorId: row.content.creatorId || undefined,
-        creatorName: row.creators?.name || row.content.creatorName || undefined,
-        creatorThumbnail: row.creators?.avatarUrl || row.content.creatorThumbnail || undefined,
-        creatorVerified: row.creators?.verified || row.content.creatorVerified || undefined,
-        creatorSubscriberCount: row.creators?.subscriberCount || row.content.creatorSubscriberCount || undefined,
-        creatorFollowerCount: row.creators?.followerCount || row.content.creatorFollowerCount || undefined,
+        creatorName: row.creators?.name || undefined,
+        creatorThumbnail: row.creators?.avatarUrl || undefined,
+        creatorVerified: row.creators?.verified || undefined,
+        creatorSubscriberCount: row.creators?.subscriberCount || undefined,
+        creatorFollowerCount: row.creators?.followerCount || undefined,
         seriesMetadata: row.content.seriesMetadata || undefined,
         
         subscription: {

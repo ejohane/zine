@@ -336,11 +336,7 @@ app.get('/api/v1/search', async (c) => {
         description: contentItem.description || undefined,
         url: contentItem.url,
         thumbnailUrl: contentItem.thumbnailUrl || undefined,
-        creator: contentItem.creatorName ? {
-          id: contentItem.creatorId || '',
-          name: contentItem.creatorName,
-          avatarUrl: undefined
-        } : undefined,
+        creator: undefined, // Creator data can be fetched separately using creatorId
         contentType: contentItem.contentType || undefined,
         publishedAt: contentItem.publishedAt ? new Date(Number(contentItem.publishedAt) * 1000).toISOString() : undefined,
         relevanceScore: 0.8
@@ -2003,10 +1999,10 @@ app.get('/api/v1/content/:contentId', authMiddleware, async (c) => {
       creator = await creatorRepository.getCreator(content.creatorId)
     }
     
-    // If no creator info in content table, try to get it from feed item's subscription
+    // If no creator found, try to get it from feed item's subscription
     let subscriptionCreatorName = null
     let subscriptionCreatorThumbnail = null
-    if (!creator && !content.creatorName) {
+    if (!creator) {
       const feedItemResult = await c.env.DB.prepare(`
         SELECT 
           s.creator_name,
@@ -2040,18 +2036,12 @@ app.get('/api/v1/content/:contentId', authMiddleware, async (c) => {
         handle: creator.handle,
         avatarUrl: creator.avatarUrl,
         verified: creator.verified || false
-      } : (content.creatorName ? {
-        id: content.creatorId || '',
-        name: content.creatorName,
-        handle: content.creatorHandle,
-        avatarUrl: content.creatorThumbnail,
-        verified: content.creatorVerified || false
       } : (subscriptionCreatorName ? {
         id: '',
         name: subscriptionCreatorName,
         avatarUrl: subscriptionCreatorThumbnail,
         verified: false
-      } : null)),
+      } : null),
       videoMetadata: content.contentType === 'video' ? {
         duration: content.durationSeconds,
         viewCount: content.viewCount

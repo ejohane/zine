@@ -15,6 +15,13 @@
       "when": 1758924213462,
       "tag": "0001_overrated_chamber",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1762566270169,
+      "tag": "0002_drop_redundant_creator_columns",
+      "breakpoints": true
     }
   ]
 }

@@ -255,8 +255,62 @@ function upsertCrossPlatformEntry(
   return [...existing, entry]
 }
 
-function resolvePublisherCanonicalId(provider: string, content: Content): string | undefined {
-  const candidateNames = [content.creatorName, content.seriesName]
+/**
+ * Extract creator data from enriched content and upsert to creators table
+ * Returns the creator name for use in other functions
+ */
+async function extractAndUpsertCreator(
+  enrichedData: any,
+  creatorRepo: CreatorRepository
+): Promise<string | undefined> {
+  const creatorId = enrichedData.creatorId
+  const creatorName = enrichedData.creatorName
+  
+  if (!creatorId || !creatorName) {
+    return undefined
+  }
+  
+  console.log('[extractAndUpsertCreator] Upserting creator:', creatorId, creatorName)
+  
+  await creatorRepo.upsertCreator({
+    id: creatorId,
+    name: creatorName,
+    handle: enrichedData.creatorHandle || undefined,
+    avatarUrl: enrichedData.creatorThumbnail || undefined,
+    platform: enrichedData.provider,
+    verified: enrichedData.creatorVerified === true || undefined,
+    subscriberCount: enrichedData.creatorSubscriberCount ? Number(enrichedData.creatorSubscriberCount) : undefined,
+    followerCount: enrichedData.creatorFollowerCount ? Number(enrichedData.creatorFollowerCount) : undefined,
+    url: enrichedData.provider === 'youtube' 
+      ? `https://youtube.com/channel/${creatorId.replace('youtube:', '')}`
+      : enrichedData.provider === 'spotify'
+      ? `https://open.spotify.com/show/${creatorId.replace('spotify:', '')}`
+      : undefined
+  })
+  
+  return creatorName
+}
+
+/**
+ * Strip creator detail fields from enriched data, keeping only creatorId
+ * This prepares the data for Content table which only stores creatorId foreign key
+ */
+function stripCreatorDetails(enrichedData: any): any {
+  const { 
+    creatorName, 
+    creatorHandle, 
+    creatorThumbnail, 
+    creatorVerified, 
+    creatorSubscriberCount, 
+    creatorFollowerCount,
+    ...contentData 
+  } = enrichedData
+  
+  return contentData
+}
+
+function resolvePublisherCanonicalId(provider: string, content: Content, creatorName?: string): string | undefined {
+  const candidateNames = [creatorName, content.seriesName]
     .filter((name): name is string => Boolean(name))
     .map((name) => name.trim().toLowerCase())
 
@@ -462,6 +516,8 @@ app.post('/save-enriched', async (c) => {
             technicalMetadata: null,
             enrichmentMetadata: null,
             extendedMetadata: null,
+            fullTextContent: null,
+            fullTextExtractedAt: null,
             createdAt: now,
             updatedAt: now,
             lastEnrichedAt: now,
@@ -597,6 +653,8 @@ app.post('/save-enriched', async (c) => {
           technicalMetadata: null,
           enrichmentMetadata: null,
           extendedMetadata: null,
+          fullTextContent: null,
+          fullTextExtractedAt: null,
           createdAt: now,
           updatedAt: now,
           lastEnrichedAt: now,
@@ -720,11 +778,23 @@ app.post('/save-enriched', async (c) => {
         contentIdForBookmark = primary.id
       } else {
         // Fallback to inserting as new content if primary reference could not be found
-        savedContent = await contentRepo.upsert(enrichedContent)
+        // Extract and upsert creator data first
+        const creatorRepo = new CreatorRepository(c.env.DB)
+        await extractAndUpsertCreator(enrichedContent, creatorRepo)
+        
+        // Strip creator details before upserting content
+        const contentData = stripCreatorDetails(enrichedContent)
+        savedContent = await contentRepo.upsert(contentData)
         contentIdForBookmark = savedContent.id
       }
     } else {
-      savedContent = await contentRepo.upsert(enrichedContent)
+      // Extract and upsert creator data first
+      const creatorRepo = new CreatorRepository(c.env.DB)
+      await extractAndUpsertCreator(enrichedContent, creatorRepo)
+      
+      // Strip creator details before upserting content
+      const contentData = stripCreatorDetails(enrichedContent)
+      savedContent = await contentRepo.upsert(contentData)
       contentIdForBookmark = savedContent.id
     }
 
@@ -837,34 +907,7 @@ app.post('/save-enriched', async (c) => {
       })
     }
 
-    // Upsert creator data if available
-    console.log('[EnrichedBookmark] ===== CREATOR DATA CHECK =====')
-    console.log('[EnrichedBookmark] Creator ID:', enrichedContent.creatorId || 'MISSING')
-    console.log('[EnrichedBookmark] Creator Name:', enrichedContent.creatorName || 'MISSING')
-    console.log('[EnrichedBookmark] Creator Thumbnail:', enrichedContent.creatorThumbnail || 'MISSING')
-    console.log('[EnrichedBookmark] Creator Handle:', enrichedContent.creatorHandle || 'MISSING')
-    
-    if (enrichedContent.creatorId && enrichedContent.creatorName) {
-      console.log('[EnrichedBookmark] ✅ Upserting creator to database...')
-      
-      const creatorRepo = new CreatorRepository(c.env.DB)
-      await creatorRepo.upsertCreator({
-        id: enrichedContent.creatorId,
-        name: enrichedContent.creatorName,
-        handle: enrichedContent.creatorHandle || undefined,
-        avatarUrl: enrichedContent.creatorThumbnail || undefined,
-        platform: enrichedContent.provider,
-        verified: enrichedContent.creatorVerified === true || undefined,
-        subscriberCount: enrichedContent.creatorSubscriberCount ? Number(enrichedContent.creatorSubscriberCount) : undefined,
-        followerCount: enrichedContent.creatorFollowerCount ? Number(enrichedContent.creatorFollowerCount) : undefined,
-        url: enrichedContent.provider === 'youtube' 
-          ? `https://youtube.com/channel/${enrichedContent.creatorId.replace('youtube:', '')}`
-          : enrichedContent.provider === 'spotify'
-          ? `https://open.spotify.com/show/${enrichedContent.creatorId.replace('spotify:', '')}`
-          : undefined
-      })
-    }
-    
+    // Creator data was already upserted before saving content
     // Create bookmark linking to the content
     const bookmarkId = `bookmark-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`
     await c.env.DB.prepare(
@@ -964,7 +1007,7 @@ app.post('/save-enriched', async (c) => {
       publishedAt: fullBookmark.published_at ? new Date((fullBookmark.published_at as number) * 1000).toISOString() : undefined,
       creator,
       creatorId: fullBookmark.creator_id || undefined,
-      creatorName: savedContent.creatorName, // Keep for backward compatibility
+      creatorName: creator?.name, // Keep for backward compatibility
       articleMetadata,
       status: fullBookmark.status || 'active',
       source: contentForLinks?.provider,
