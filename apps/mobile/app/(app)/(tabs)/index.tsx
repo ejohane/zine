@@ -9,13 +9,11 @@ import { FeedSection } from '../../../components/FeedSection';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 import { HomeHeader } from '../../../components/HomeHeader';
-import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
 import { useTheme } from '../../../contexts/theme';
 import { useRefreshFeed } from '../../../hooks/useRefreshFeed';
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const { isSignedIn, isLoaded } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -60,10 +58,6 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <HomeHeader />
-      <CategoryTabs
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-      />
       <ScrollView
         style={styles.scrollView} 
         contentContainerStyle={styles.content}
