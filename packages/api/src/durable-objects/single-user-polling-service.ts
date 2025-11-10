@@ -3,6 +3,8 @@ import { SpotifyAPI, SpotifyShow } from '../external/spotify-api'
 import { YouTubeAPI } from '../external/youtube-api'
 import { OAuthTokenData } from './user-subscription-manager'
 import type { Env } from '../types'
+import { CreatorReconciliationService } from '../services/creator-reconciliation-service'
+import { CreatorRepository } from '../repositories/creator-repository'
 
 export interface UserPollResult {
   provider: 'spotify' | 'youtube'
@@ -380,7 +382,7 @@ export class SingleUserPollingService {
 
     // Get subscription to determine provider and creator info
     const subscription = await this.db.prepare(`
-      SELECT provider_id, external_id, title, creator_name, thumbnail_url, subscriber_count, is_verified FROM subscriptions WHERE id = ?
+      SELECT provider_id, external_id, title, creator_name, thumbnail_url, subscriber_count, is_verified, subscription_url FROM subscriptions WHERE id = ?
     `).bind(subscriptionId).first<{ 
       provider_id: string
       external_id: string
@@ -389,6 +391,7 @@ export class SingleUserPollingService {
       thumbnail_url: string | null
       subscriber_count: number | null
       is_verified: number | null
+      subscription_url: string | null
     }>()
 
     if (!subscription) {
@@ -407,36 +410,86 @@ export class SingleUserPollingService {
 
     const provider = subscription.provider_id
     
-    // Upsert creator into creators table
-    // For podcasts/channels, use the show/channel title as the creator name
-    const creatorId = `${provider}:${subscription.external_id}`
-    const creatorName = subscription.title
-    const now = Math.floor(Date.now() / 1000)
+    // Use CreatorReconciliationService to find or create creator
+    // This applies fuzzy matching, handle matching, and cross-platform deduplication
+    const reconciliationService = new CreatorReconciliationService(this.db)
     
-    console.log(`[createFeedItems] Upserting creator with ID: ${creatorId}, name: ${creatorName}`)
+    const candidateCreator = {
+      id: `${provider}:${subscription.external_id}`,
+      name: subscription.creator_name || subscription.title,
+      avatarUrl: subscription.thumbnail_url || undefined,
+      url: subscription.subscription_url || undefined,
+      verified: subscription.is_verified === 1,
+      subscriberCount: subscription.subscriber_count || undefined
+    }
     
-    const creatorResult = await this.db.prepare(`
-      INSERT INTO creators (
-        id, name, avatar_url, subscriber_count, verified, platforms, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        name = excluded.name,
-        avatar_url = excluded.avatar_url,
-        subscriber_count = excluded.subscriber_count,
-        verified = excluded.verified,
-        updated_at = excluded.updated_at
-    `).bind(
-      creatorId,
-      creatorName,
-      subscription.thumbnail_url,
-      subscription.subscriber_count,
-      subscription.is_verified,
-      JSON.stringify([provider]),
-      now,
-      now
-    ).run()
+    console.log(`[createFeedItems] Reconciling creator:`, {
+      candidateId: candidateCreator.id,
+      name: candidateCreator.name,
+      url: candidateCreator.url
+    })
+    
+    let creatorId: string
+    
+    try {
+      const reconciliationResult = await reconciliationService.reconcileCreator(
+        candidateCreator,
+        {
+          platform: provider,
+          subscriptionUrl: subscription.subscription_url || undefined,
+          // TODO: Add YouTube API instance when available for handle extraction
+          // youtubeApi: this.youtubeApi
+        }
+      )
+      
+      // Use the reconciled creator ID (may be same as candidate or an existing match)
+      creatorId = reconciliationResult.creator?.id || candidateCreator.id
+      
+      if (reconciliationResult.matchMethod !== 'none' && reconciliationResult.matchMethod !== 'exact_id') {
+        console.log(`[createFeedItems] Creator matched via ${reconciliationResult.matchMethod}:`, {
+          candidateId: candidateCreator.id,
+          matchedId: creatorId,
+          similarity: reconciliationResult.similarity,
+          executionTimeMs: reconciliationResult.executionTimeMs
+        })
+      } else if (reconciliationResult.timedOut) {
+        console.warn(`[createFeedItems] Creator reconciliation timed out, using fallback ID:`, {
+          candidateId: candidateCreator.id,
+          executionTimeMs: reconciliationResult.executionTimeMs
+        })
+      }
+      
+      // Now upsert the creator data using the canonical ID
+      const creatorRepo = new CreatorRepository(this.db)
+      await creatorRepo.upsertCreator({
+        id: creatorId,
+        name: candidateCreator.name,
+        avatarUrl: candidateCreator.avatarUrl || undefined,
+        url: candidateCreator.url || undefined,
+        platform: provider,
+        verified: candidateCreator.verified,
+        subscriberCount: candidateCreator.subscriberCount || undefined
+      })
+      
+    } catch (error) {
+      console.error('[createFeedItems] Creator reconciliation failed, using fallback:', error)
+      // Fallback to simple ID if reconciliation fails
+      creatorId = candidateCreator.id
+      
+      // Still try to upsert the creator with basic data
+      const creatorRepo = new CreatorRepository(this.db)
+      await creatorRepo.upsertCreator({
+        id: creatorId,
+        name: candidateCreator.name,
+        avatarUrl: candidateCreator.avatarUrl || undefined,
+        url: candidateCreator.url || undefined,
+        platform: provider,
+        verified: candidateCreator.verified,
+        subscriberCount: candidateCreator.subscriberCount || undefined
+      })
+    }
 
-    console.log(`[createFeedItems] Creator upsert result:`, creatorResult.meta)
+    console.log(`[createFeedItems] Using creator ID: ${creatorId}`)
 
     // Create content entries and feed items
     for (const item of items) {
