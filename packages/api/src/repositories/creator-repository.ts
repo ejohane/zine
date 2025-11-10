@@ -200,6 +200,69 @@ export class CreatorRepository {
     }
   }
 
+  /**
+   * Find creator by handle (case-insensitive)
+   * Used for cross-platform matching when handles are consistent
+   */
+  async findByHandle(handle: string): Promise<Creator | null> {
+    try {
+      const normalizedHandle = handle.toLowerCase().trim()
+      const result = await this.db.prepare(`
+        SELECT * FROM creators 
+        WHERE LOWER(handle) = ?
+        LIMIT 1
+      `).bind(normalizedHandle).first()
+      
+      if (!result) {
+        return null
+      }
+      
+      return this.mapRowToCreator(result)
+    } catch (error) {
+      console.error('Error finding creator by handle:', error)
+      throw new Error('Failed to find creator by handle')
+    }
+  }
+
+  /**
+   * Find creators by domain pattern in URL
+   * Useful for matching creators across platforms by their website/channel URL
+   */
+  async findByDomainPattern(domain: string): Promise<Creator[]> {
+    try {
+      const pattern = `%${domain}%`
+      const result = await this.db.prepare(`
+        SELECT * FROM creators 
+        WHERE url LIKE ?
+        ORDER BY updated_at DESC
+      `).bind(pattern).all()
+      
+      return result.results.map(row => this.mapRowToCreator(row))
+    } catch (error) {
+      console.error('Error finding creators by domain pattern:', error)
+      throw new Error('Failed to find creators by domain pattern')
+    }
+  }
+
+  /**
+   * Find creators by platform
+   * Returns all creators that have content on the specified platform
+   */
+  async findByPlatform(platform: string): Promise<Creator[]> {
+    try {
+      const result = await this.db.prepare(`
+        SELECT * FROM creators 
+        WHERE platforms LIKE ?
+        ORDER BY updated_at DESC
+      `).bind(`%"${platform}"%`).all()
+      
+      return result.results.map(row => this.mapRowToCreator(row))
+    } catch (error) {
+      console.error('Error finding creators by platform:', error)
+      throw new Error('Failed to find creators by platform')
+    }
+  }
+
   private mapRowToCreator(row: any): Creator {
     return {
       id: row.id,
