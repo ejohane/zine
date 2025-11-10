@@ -117,19 +117,50 @@ export interface EnhancedMetadataExtractionResult {
 /**
  * Enhanced metadata extraction service with proper HTML parsing
  */
+// Type definition for the creator reconciliation service (to avoid circular dependency)
+// Note: Using any for creator data to allow both shared Creator type and API Creator type
+export interface CreatorReconciliationService {
+  reconcileCreator(
+    creatorData: any, // Partial<Creator> but allowing API's Creator type too
+    options?: {
+      platform?: string
+      subscriptionUrl?: string
+      youtubeApi?: any
+      timeoutMs?: number
+    }
+  ): Promise<{
+    creator: any | null // Creator | null but allowing API's Creator type too
+    matchMethod?: string
+    similarity?: number
+    timedOut: boolean
+    executionTimeMs: number
+  }>
+}
+
+export interface ExtractorOptions {
+  timeout?: number
+  reconciliationService?: CreatorReconciliationService
+}
+
 export class EnhancedMetadataExtractor {
   private timeout: number = 10000 // 10 seconds
+  private reconciliationService?: CreatorReconciliationService
 
-  constructor(options?: { timeout?: number }) {
+  constructor(options?: ExtractorOptions) {
     if (options?.timeout) {
       this.timeout = options.timeout
     }
+    this.reconciliationService = options?.reconciliationService
   }
 
   /**
    * Extract metadata from a URL with enhanced parsing
    */
-  async extractMetadata(url: string): Promise<EnhancedMetadataExtractionResult> {
+  async extractMetadata(url: string, options?: { reconciliationService?: CreatorReconciliationService }): Promise<EnhancedMetadataExtractionResult> {
+    // Allow per-call reconciliation service override and store for use in resolveCreator
+    const previousReconciliationService = this.reconciliationService
+    this.reconciliationService = options?.reconciliationService || this.reconciliationService
+    
     console.log('[EnhancedMetadataExtractor] Starting extraction for URL:', url)
     try {
       const normalized = normalizeUrl(url)
@@ -192,6 +223,9 @@ export class EnhancedMetadataExtractor {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error during metadata extraction'
       }
+    } finally {
+      // Restore previous reconciliation service
+      this.reconciliationService = previousReconciliationService
     }
   }
 
@@ -236,7 +270,10 @@ export class EnhancedMetadataExtractor {
   /**
    * Parse HTML with enhanced extraction including JSON-LD
    */
-  private async parseEnhancedHtmlMetadata(html: string, url: string): Promise<EnhancedExtractedMetadata> {
+  private async parseEnhancedHtmlMetadata(
+    html: string, 
+    url: string
+  ): Promise<EnhancedExtractedMetadata> {
     try {
       console.log('[EnhancedMetadataExtractor] Parsing HTML for:', url, `(${html.length} bytes)`)
       
@@ -306,7 +343,7 @@ export class EnhancedMetadataExtractor {
         language,
         source,
         contentType,
-        creator: this.resolveCreator(creator),
+        creator: await this.resolveCreator(creator),
         videoMetadata,
         podcastMetadata,
         articleMetadata,
@@ -1506,10 +1543,44 @@ export class EnhancedMetadataExtractor {
 
   /**
    * Resolve and normalize creator information
+   * Uses database-backed reconciliation when available (API context),
+   * falls back to in-memory creator-service.ts for shared package usage
    */
-  private resolveCreator(creator: Creator | undefined): Creator | undefined {
+  private async resolveCreator(
+    creator: Creator | undefined
+  ): Promise<Creator | undefined> {
     if (!creator) return undefined
     
+    // Use database-backed reconciliation if available (API context)
+    if (this.reconciliationService) {
+      try {
+        const result = await this.reconciliationService.reconcileCreator(creator, {
+          platform: creator.platforms?.[0],
+          timeoutMs: 200
+        })
+        
+        if (result.creator) {
+          console.log('[EnhancedMetadataExtractor] Creator reconciled via database:', {
+            originalId: creator.id,
+            reconciledId: result.creator.id,
+            matchMethod: result.matchMethod
+          })
+          
+          // If avatar is missing and we have a URL, try to enhance with avatar
+          if (!result.creator.avatarUrl && result.creator.url) {
+            this.enhanceCreatorWithAvatar(result.creator).catch(err => {
+              console.warn('[EnhancedMetadataExtractor] Failed to enhance creator avatar:', err)
+            })
+          }
+          
+          return result.creator
+        }
+      } catch (error) {
+        console.warn('[EnhancedMetadataExtractor] Database reconciliation failed, using fallback:', error)
+      }
+    }
+    
+    // Fall back to in-memory service (shared package context)
     const resolution = creatorService.resolveCreator(creator)
     const resolved = resolution.resolved
     
@@ -1685,7 +1756,7 @@ export class EnhancedMetadataExtractor {
         language: pageMetadata?.language,
         source: 'youtube',
         contentType: 'video',
-        creator: this.resolveCreator(creator),
+        creator: await this.resolveCreator(creator),
         videoMetadata
       }
 
@@ -1792,7 +1863,7 @@ export class EnhancedMetadataExtractor {
         language: undefined, // oEmbed doesn't provide language
         source: 'spotify',
         contentType,
-        creator: this.resolveCreator(creator),
+        creator: await this.resolveCreator(creator),
         podcastMetadata
       }
 
@@ -1884,7 +1955,7 @@ export class EnhancedMetadataExtractor {
       // Use the tweet content as description if available
       const description = postText || pageMetadata?.description
 
-      const resolvedCreator = this.resolveCreator(creator)
+      const resolvedCreator = await this.resolveCreator(creator)
 
       return {
         title: `Tweet by ${resolvedCreator?.name || 'Twitter User'}`,
@@ -1951,7 +2022,7 @@ export class EnhancedMetadataExtractor {
         ...baseMetadata,
         source: 'substack',
         contentType: 'article',
-        creator: this.resolveCreator(creator),
+        creator: await this.resolveCreator(creator),
         articleMetadata
       }
 

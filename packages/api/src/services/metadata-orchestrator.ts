@@ -1,8 +1,9 @@
 import type { Env } from '../types'
 import { SpotifyMetadataService } from '../external/spotify-metadata-service'
 import { YouTubeMetadataService } from '../external/youtube-metadata-service'
-import { enhancedMetadataExtractor } from '@zine/shared'
+import { EnhancedMetadataExtractor } from '@zine/shared'
 import { normalizeUrl, detectPlatform } from '@zine/shared'
+import type { CreatorReconciliationService } from './creator-reconciliation-service'
 
 export interface OrchestrationResult {
   metadata: any
@@ -24,6 +25,7 @@ interface RetryConfig {
 export class MetadataOrchestrator {
   private spotifyService: SpotifyMetadataService
   private youtubeService: YouTubeMetadataService
+  private metadataExtractor: EnhancedMetadataExtractor
   private retryConfig: RetryConfig = {
     maxAttempts: 3,
     baseDelay: 1000,
@@ -48,9 +50,12 @@ export class MetadataOrchestrator {
   
   private readonly STALE_WHILE_REVALIDATE = 300000 // 5 minutes
 
-  constructor(env: Env) {
+  constructor(env: Env, reconciliationService?: CreatorReconciliationService) {
     this.spotifyService = new SpotifyMetadataService(env)
     this.youtubeService = new YouTubeMetadataService(env)
+    this.metadataExtractor = new EnhancedMetadataExtractor({
+      reconciliationService
+    })
   }
 
   /**
@@ -239,7 +244,7 @@ export class MetadataOrchestrator {
       console.log('[MetadataOrchestrator] Attempting enhanced metadata extraction for:', url)
       const result = await this.withRetry(
         async () => {
-          const extraction = await enhancedMetadataExtractor.extractMetadata(url)
+          const extraction = await this.metadataExtractor.extractMetadata(url)
           console.log('[MetadataOrchestrator] Enhanced extraction result:', { success: extraction.success, hasMetadata: !!extraction.metadata, error: extraction.error })
           if (extraction.success && extraction.metadata) {
             return extraction.metadata

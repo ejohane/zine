@@ -6,6 +6,7 @@ import type { Context } from 'hono'
 import { MetadataRepository, type ExistingMetadata } from '../repositories/metadata-repository'
 import { normalizeUrl } from '@zine/shared'
 import { MetadataOrchestrator } from './metadata-orchestrator'
+import { CreatorReconciliationService } from './creator-reconciliation-service'
 
 export interface PreviewResponse {
   success: boolean
@@ -49,7 +50,11 @@ export class PreviewService {
   constructor(ctx: Context) {
     const db = ctx.env.DB
     this.metadataRepo = new MetadataRepository(db)
-    this.orchestrator = new MetadataOrchestrator(ctx.env)
+    
+    // Initialize CreatorReconciliationService for database-backed creator matching
+    const reconciliationService = new CreatorReconciliationService(db)
+    
+    this.orchestrator = new MetadataOrchestrator(ctx.env, reconciliationService)
   }
   
   /**
