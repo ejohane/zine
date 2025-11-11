@@ -12,6 +12,14 @@ export interface Creator {
   verified?: boolean
   subscriberCount?: number
   followerCount?: number
+  // Two-tier model fields
+  alternativeNames?: string[]
+  platformHandles?: Record<string, string>
+  contentSourceIds?: string[]
+  primaryPlatform?: string
+  totalSubscribers?: number
+  reconciliationConfidence?: number
+  manuallyVerified?: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -282,6 +290,196 @@ export class CreatorRepository {
     }
   }
 
+  /**
+   * Update creator with two-tier model fields
+   * Used for consolidating creators across platforms
+   */
+  async updateCreatorConsolidation(
+    creatorId: string,
+    updates: {
+      alternativeNames?: string[]
+      platformHandles?: Record<string, string>
+      contentSourceIds?: string[]
+      primaryPlatform?: string
+      totalSubscribers?: number
+      reconciliationConfidence?: number
+      platforms?: string[]
+    }
+  ): Promise<Creator> {
+    console.log('[CreatorRepository] Updating creator consolidation:', {
+      creatorId,
+      alternativeNames: updates.alternativeNames?.length,
+      contentSourceIds: updates.contentSourceIds?.length,
+      platforms: updates.platforms
+    })
+
+    try {
+      const now = new Date()
+      const setClauses: string[] = []
+      const values: any[] = []
+
+      if (updates.alternativeNames !== undefined) {
+        setClauses.push('alternative_names = ?')
+        values.push(JSON.stringify(updates.alternativeNames))
+      }
+
+      if (updates.platformHandles !== undefined) {
+        setClauses.push('platform_handles = ?')
+        values.push(JSON.stringify(updates.platformHandles))
+      }
+
+      if (updates.contentSourceIds !== undefined) {
+        setClauses.push('content_source_ids = ?')
+        values.push(JSON.stringify(updates.contentSourceIds))
+      }
+
+      if (updates.primaryPlatform !== undefined) {
+        setClauses.push('primary_platform = ?')
+        values.push(updates.primaryPlatform)
+      }
+
+      if (updates.totalSubscribers !== undefined) {
+        setClauses.push('total_subscribers = ?')
+        values.push(updates.totalSubscribers)
+      }
+
+      if (updates.reconciliationConfidence !== undefined) {
+        setClauses.push('reconciliation_confidence = ?')
+        values.push(updates.reconciliationConfidence)
+      }
+
+      if (updates.platforms !== undefined) {
+        setClauses.push('platforms = ?')
+        values.push(JSON.stringify(updates.platforms))
+      }
+
+      // Always update updated_at
+      setClauses.push('updated_at = ?')
+      values.push(now.toISOString())
+
+      // Add WHERE clause value
+      values.push(creatorId)
+
+      const result = await this.db.prepare(`
+        UPDATE creators
+        SET ${setClauses.join(', ')}
+        WHERE id = ?
+        RETURNING *
+      `).bind(...values).first()
+
+      if (!result) {
+        throw new Error('Creator not found')
+      }
+
+      console.log('[CreatorRepository] Creator consolidation updated successfully')
+
+      return this.mapRowToCreator(result)
+    } catch (error) {
+      console.error('Error updating creator consolidation:', error)
+      throw new Error('Failed to update creator consolidation')
+    }
+  }
+
+  /**
+   * Link a content source to a creator
+   * Adds content source ID to the creator's contentSourceIds array
+   */
+  async linkContentSource(creatorId: string, contentSourceId: string): Promise<Creator> {
+    console.log('[CreatorRepository] Linking content source to creator:', {
+      creatorId,
+      contentSourceId
+    })
+
+    try {
+      const creator = await this.getCreator(creatorId)
+      if (!creator) {
+        throw new Error('Creator not found')
+      }
+
+      const currentIds = creator.contentSourceIds || []
+      if (currentIds.includes(contentSourceId)) {
+        console.log('[CreatorRepository] Content source already linked')
+        return creator
+      }
+
+      const updatedIds = [...currentIds, contentSourceId]
+      return this.updateCreatorConsolidation(creatorId, {
+        contentSourceIds: updatedIds
+      })
+    } catch (error) {
+      console.error('Error linking content source:', error)
+      throw new Error('Failed to link content source to creator')
+    }
+  }
+
+  /**
+   * Add alternative name to creator
+   * Used during reconciliation when discovering new names for the same creator
+   */
+  async addAlternativeName(creatorId: string, alternativeName: string): Promise<Creator> {
+    console.log('[CreatorRepository] Adding alternative name:', {
+      creatorId,
+      alternativeName
+    })
+
+    try {
+      const creator = await this.getCreator(creatorId)
+      if (!creator) {
+        throw new Error('Creator not found')
+      }
+
+      const currentNames = creator.alternativeNames || []
+      // Normalize names for comparison
+      const normalizedNew = alternativeName.toLowerCase().trim()
+      const normalizedExisting = currentNames.map(n => n.toLowerCase().trim())
+      
+      if (normalizedExisting.includes(normalizedNew)) {
+        console.log('[CreatorRepository] Alternative name already exists')
+        return creator
+      }
+
+      const updatedNames = [...currentNames, alternativeName]
+      return this.updateCreatorConsolidation(creatorId, {
+        alternativeNames: updatedNames
+      })
+    } catch (error) {
+      console.error('Error adding alternative name:', error)
+      throw new Error('Failed to add alternative name to creator')
+    }
+  }
+
+  /**
+   * Set platform handle for creator
+   * Updates the platform_handles JSON object with a new or updated handle
+   */
+  async setPlatformHandle(creatorId: string, platform: string, handle: string): Promise<Creator> {
+    console.log('[CreatorRepository] Setting platform handle:', {
+      creatorId,
+      platform,
+      handle
+    })
+
+    try {
+      const creator = await this.getCreator(creatorId)
+      if (!creator) {
+        throw new Error('Creator not found')
+      }
+
+      const currentHandles = creator.platformHandles || {}
+      const updatedHandles = {
+        ...currentHandles,
+        [platform]: handle
+      }
+
+      return this.updateCreatorConsolidation(creatorId, {
+        platformHandles: updatedHandles
+      })
+    } catch (error) {
+      console.error('Error setting platform handle:', error)
+      throw new Error('Failed to set platform handle')
+    }
+  }
+
   private mapRowToCreator(row: any): Creator {
     return {
       id: row.id,
@@ -295,6 +493,14 @@ export class CreatorRepository {
       verified: row.verified === 1 || row.verified === true || undefined,
       subscriberCount: row.subscriber_count ? Number(row.subscriber_count) : undefined,
       followerCount: row.follower_count ? Number(row.follower_count) : undefined,
+      // Two-tier model fields
+      alternativeNames: row.alternative_names ? JSON.parse(row.alternative_names) : undefined,
+      platformHandles: row.platform_handles ? JSON.parse(row.platform_handles) : undefined,
+      contentSourceIds: row.content_source_ids ? JSON.parse(row.content_source_ids) : undefined,
+      primaryPlatform: row.primary_platform || undefined,
+      totalSubscribers: row.total_subscribers ? Number(row.total_subscribers) : undefined,
+      reconciliationConfidence: row.reconciliation_confidence ? Number(row.reconciliation_confidence) : undefined,
+      manuallyVerified: row.manually_verified === 1 || row.manually_verified === true || undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at)
     }

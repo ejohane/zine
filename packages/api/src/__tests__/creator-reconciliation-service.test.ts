@@ -27,6 +27,9 @@ describe('CreatorReconciliationService', () => {
     
     // Access the private repository property for mocking
     mockRepository = (service as any).repository
+    
+    // Mock getRecentCreators to prevent database access in Tier 5 matching
+    vi.spyOn(mockRepository, 'getRecentCreators').mockResolvedValue([])
   })
 
   describe('Tier 1: Exact ID match', () => {
@@ -303,6 +306,276 @@ describe('CreatorReconciliationService', () => {
 
       expect(result.creator).toBeNull()
       expect(result.executionTimeMs).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  describe('Two-Tier Model: Content Source Reconciliation', () => {
+    const mockContentSource = {
+      id: 'youtube:UCzQUP1qoWDoEbmsQxvdjxgQ',
+      externalId: 'UCzQUP1qoWDoEbmsQxvdjxgQ',
+      platform: 'youtube',
+      sourceType: 'channel',
+      title: 'PowerfulJRE',
+      description: 'The Joe Rogan Experience podcast',
+      url: 'https://youtube.com/@joerogan',
+      creatorName: 'Joe Rogan',
+      subscriberCount: 17500000,
+      isVerified: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    const mockExtractedCreator = {
+      name: 'Joe Rogan',
+      handle: '@joerogan',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      bio: 'Podcast host',
+      url: 'https://youtube.com/@joerogan',
+      platform: 'youtube',
+      platformId: 'UCzQUP1qoWDoEbmsQxvdjxgQ',
+      verified: true,
+      subscriberCount: 17500000,
+      alternativeNames: ['PowerfulJRE'],
+      extractionConfidence: 0.95,
+      extractionMethod: 'direct' as const
+    }
+
+    const mockCreator = {
+      id: 'creator:UCzQUP1qoWDoEbmsQxvdjxgQ',
+      name: 'Joe Rogan',
+      handle: '@joerogan',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      platforms: ['youtube'],
+      alternativeNames: ['PowerfulJRE'],
+      contentSourceIds: ['youtube:UCzQUP1qoWDoEbmsQxvdjxgQ'],
+      platformHandles: { youtube: '@joerogan' },
+      primaryPlatform: 'youtube',
+      totalSubscribers: 17500000,
+      reconciliationConfidence: 0.95,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    let mockContentSourceRepository: any
+    let mockExtractionService: any
+
+    beforeEach(() => {
+      mockContentSourceRepository = (service as any).contentSourceRepository
+      mockExtractionService = (service as any).extractionService
+    })
+
+    it('should reconcile content source to existing creator', async () => {
+      // Mock extraction
+      vi.spyOn(mockExtractionService, 'extractCreator').mockResolvedValue({
+        success: true,
+        creator: mockExtractedCreator
+      })
+
+      // Mock finding existing creator (returns null first, then the creator)
+      vi.spyOn(mockRepository, 'getCreator')
+        .mockResolvedValueOnce(null) // First call in reconcileCreator
+        .mockResolvedValueOnce(mockCreator) // Second call to check handle
+
+      // Mock handle-based finding
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(mockCreator)
+
+      // Mock content source update
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue(mockContentSource)
+
+      // Mock creator consolidation update
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(mockCreator)
+
+      const result = await service.reconcileContentSource(mockContentSource)
+
+      expect(result.creator).toEqual(mockCreator)
+      expect(result.isNew).toBe(false)
+      expect(result.matchMethod).toBe('handle')
+      expect(mockContentSourceRepository.updateContentSource).toHaveBeenCalledWith(
+        mockContentSource.id,
+        { creatorId: mockCreator.id }
+      )
+    })
+
+    it('should create new creator when no match found', async () => {
+      // Mock extraction
+      vi.spyOn(mockExtractionService, 'extractCreator').mockResolvedValue({
+        success: true,
+        creator: mockExtractedCreator
+      })
+
+      // Mock no existing creator found for reconciliation, then return created creator
+      const getCreatorSpy = vi.spyOn(mockRepository, 'getCreator')
+      getCreatorSpy.mockImplementation(async (...args: any[]) => {
+        const id = args[0] as string
+        // If asking for the new creator ID, return it, otherwise null
+        if (id === 'creator:UCzQUP1qoWDoEbmsQxvdjxgQ') {
+          return mockCreator
+        }
+        return null
+      })
+      
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(null)
+      vi.spyOn(mockRepository, 'findByDomainPattern').mockResolvedValue([])
+      vi.spyOn(mockRepository, 'findByPlatform').mockResolvedValue([])
+      vi.spyOn(mockRepository, 'getRecentCreators').mockResolvedValue([])
+
+      // Mock creator creation
+      vi.spyOn(mockRepository, 'upsertCreator').mockResolvedValue(mockCreator)
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(mockCreator)
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue(mockContentSource)
+
+      const result = await service.reconcileContentSource(mockContentSource)
+
+      expect(result.isNew).toBe(true)
+      expect(result.matchMethod).toBe('new_creator')
+      expect(mockRepository.upsertCreator).toHaveBeenCalled()
+    })
+
+    it('should update alternative names when linking content source', async () => {
+      const existingCreator = {
+        ...mockCreator,
+        alternativeNames: ['JRE'],
+        contentSourceIds: []
+      }
+
+      vi.spyOn(mockExtractionService, 'extractCreator').mockResolvedValue({
+        success: true,
+        creator: mockExtractedCreator
+      })
+
+      vi.spyOn(mockRepository, 'getCreator')
+        .mockResolvedValueOnce(null) // During reconciliation
+        .mockResolvedValueOnce(existingCreator) // Second call
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(existingCreator)
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue(mockContentSource)
+      
+      const updatedCreator = {
+        ...existingCreator,
+        alternativeNames: ['JRE', 'PowerfulJRE'],
+        contentSourceIds: [mockContentSource.id]
+      }
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(updatedCreator)
+
+      await service.reconcileContentSource(mockContentSource)
+
+      expect(mockRepository.updateCreatorConsolidation).toHaveBeenCalledWith(
+        existingCreator.id,
+        expect.objectContaining({
+          alternativeNames: expect.arrayContaining(['PowerfulJRE'])
+        })
+      )
+    })
+
+    it('should add platform to creator when linking content source', async () => {
+      const existingCreator = {
+        ...mockCreator,
+        platforms: ['spotify'],
+        contentSourceIds: ['spotify:abc']
+      }
+
+      vi.spyOn(mockExtractionService, 'extractCreator').mockResolvedValue({
+        success: true,
+        creator: mockExtractedCreator
+      })
+
+      vi.spyOn(mockRepository, 'getCreator')
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(existingCreator)
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(existingCreator)
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue(mockContentSource)
+      
+      const updatedCreator = {
+        ...existingCreator,
+        platforms: ['spotify', 'youtube']
+      }
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(updatedCreator)
+
+      await service.reconcileContentSource(mockContentSource)
+
+      expect(mockRepository.updateCreatorConsolidation).toHaveBeenCalledWith(
+        existingCreator.id,
+        expect.objectContaining({
+          platforms: ['spotify', 'youtube']
+        })
+      )
+    })
+
+    it('should handle extraction failure', async () => {
+      vi.spyOn(mockExtractionService, 'extractCreator').mockResolvedValue({
+        success: false,
+        error: 'Unsupported platform'
+      })
+
+      await expect(
+        service.reconcileContentSource(mockContentSource)
+      ).rejects.toThrow('Failed to extract creator from content source')
+    })
+
+    it('should batch reconcile multiple content sources', async () => {
+      const contentSource2 = {
+        ...mockContentSource,
+        id: 'spotify:4rOoJ6Egrf8K2IrywzwOMk',
+        externalId: '4rOoJ6Egrf8K2IrywzwOMk',
+        platform: 'spotify',
+        sourceType: 'show',
+        title: 'The Joe Rogan Experience'
+      }
+
+      vi.spyOn(mockExtractionService, 'extractCreator')
+        .mockResolvedValueOnce({
+          success: true,
+          creator: mockExtractedCreator
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          creator: { ...mockExtractedCreator, platform: 'spotify' }
+        })
+
+      vi.spyOn(mockRepository, 'getCreator').mockResolvedValue(null)
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(mockCreator)
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue({} as any)
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(mockCreator)
+
+      const results = await service.reconcileContentSources([
+        mockContentSource,
+        contentSource2
+      ])
+
+      expect(results.size).toBe(2)
+      expect(results.get(mockContentSource.id)?.creator).toEqual(mockCreator)
+      expect(results.get(contentSource2.id)?.creator).toEqual(mockCreator)
+    })
+
+    it('should continue batch reconciliation on individual failures', async () => {
+      const contentSource2 = {
+        ...mockContentSource,
+        id: 'spotify:4rOoJ6Egrf8K2IrywzwOMk',
+        platform: 'spotify'
+      }
+
+      vi.spyOn(mockExtractionService, 'extractCreator')
+        .mockResolvedValueOnce({
+          success: false,
+          error: 'Extraction failed'
+        })
+        .mockResolvedValueOnce({
+          success: true,
+          creator: mockExtractedCreator
+        })
+
+      vi.spyOn(mockRepository, 'getCreator').mockResolvedValue(null)
+      vi.spyOn(mockRepository, 'findByHandle').mockResolvedValue(mockCreator)
+      vi.spyOn(mockContentSourceRepository, 'updateContentSource').mockResolvedValue({} as any)
+      vi.spyOn(mockRepository, 'updateCreatorConsolidation').mockResolvedValue(mockCreator)
+
+      const results = await service.reconcileContentSources([
+        mockContentSource,
+        contentSource2
+      ])
+
+      // First source should fail, second should succeed
+      expect(results.size).toBe(1)
+      expect(results.get(contentSource2.id)?.creator).toEqual(mockCreator)
     })
   })
 })

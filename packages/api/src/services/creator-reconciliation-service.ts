@@ -1,5 +1,7 @@
 import { D1Database } from '@cloudflare/workers-types'
 import { CreatorRepository, type Creator } from '../repositories/creator-repository'
+import { ContentSourceRepository, type ContentSource } from '../repositories/content-source-repository'
+import { CreatorExtractionService, type ExtractedCreator } from './creator-extraction-service'
 import { calculateNameSimilarity, normalizeCreatorName, normalizeCreatorNameWithSuffixes } from '../utils/creator-matching'
 import { extractHandleFromSubscriptionUrl } from '../utils/handle-extraction'
 import type { YouTubeAPI } from '../external/youtube-api'
@@ -9,7 +11,7 @@ import type { YouTubeAPI } from '../external/youtube-api'
  */
 export interface ReconciliationResult {
   creator: Creator | null
-  matchMethod?: 'exact_id' | 'handle' | 'domain_fuzzy' | 'related_domain' | 'platform_fuzzy' | 'none'
+  matchMethod?: 'exact_id' | 'handle' | 'domain_fuzzy' | 'related_domain' | 'platform_fuzzy' | 'new_creator' | 'none'
   similarity?: number
   timedOut: boolean
   executionTimeMs: number
@@ -43,9 +45,13 @@ export interface ReconciliationOptions {
  */
 export class CreatorReconciliationService {
   private repository: CreatorRepository
+  private contentSourceRepository: ContentSourceRepository
+  private extractionService: CreatorExtractionService
 
   constructor(db: D1Database) {
     this.repository = new CreatorRepository(db)
+    this.contentSourceRepository = new ContentSourceRepository(db)
+    this.extractionService = new CreatorExtractionService()
   }
 
   /**
@@ -333,6 +339,291 @@ export class CreatorReconciliationService {
       creator: null,
       matchMethod: 'none'
     }
+  }
+
+  /**
+   * Reconcile a content source to a creator (Two-Tier Model)
+   * 
+   * This method implements the two-tier model reconciliation:
+   * 1. Extract creator info from the content source
+   * 2. Find existing creator match using extracted data
+   * 3. If match found, link content source to creator and update metadata
+   * 4. If no match, create new creator from extracted data
+   * 
+   * @param contentSource - Content source to reconcile
+   * @param options - Reconciliation options
+   * @returns The matched or created creator
+   */
+  async reconcileContentSource(
+    contentSource: ContentSource,
+    options: ReconciliationOptions = {}
+  ): Promise<{
+    creator: Creator
+    isNew: boolean
+    matchMethod: string
+    confidence: number
+  }> {
+    console.log('[CreatorReconciliation] Reconciling content source:', {
+      id: contentSource.id,
+      platform: contentSource.platform,
+      sourceType: contentSource.sourceType,
+      title: contentSource.title
+    })
+
+    // Step 1: Extract creator info from content source
+    const extractionResult = await this.extractionService.extractCreator(contentSource)
+
+    if (!extractionResult.success || !extractionResult.creator) {
+      throw new Error(`Failed to extract creator from content source: ${extractionResult.error}`)
+    }
+
+    const extractedCreator = extractionResult.creator
+
+    console.log('[CreatorReconciliation] Creator extracted:', {
+      name: extractedCreator.name,
+      handle: extractedCreator.handle,
+      platform: extractedCreator.platform,
+      confidence: extractedCreator.extractionConfidence
+    })
+
+    // Step 2: Try to find existing creator match
+    const reconciliationResult = await this.reconcileCreator(
+      {
+        name: extractedCreator.name,
+        handle: extractedCreator.handle,
+        url: extractedCreator.url
+      },
+      {
+        ...options,
+        platform: extractedCreator.platform
+      }
+    )
+
+    let creator: Creator
+    let isNew = false
+    let matchMethod = reconciliationResult.matchMethod || 'none'
+    let confidence = reconciliationResult.similarity || extractedCreator.extractionConfidence
+
+    if (reconciliationResult.creator) {
+      // Step 3a: Match found - link content source and update metadata
+      creator = reconciliationResult.creator
+
+      console.log('[CreatorReconciliation] Existing creator matched:', {
+        creatorId: creator.id,
+        matchMethod,
+        similarity: reconciliationResult.similarity
+      })
+
+      // Link content source to creator
+      await this.linkContentSourceToCreator(contentSource, creator, extractedCreator)
+
+    } else {
+      // Step 3b: No match - create new creator
+      console.log('[CreatorReconciliation] No match found, creating new creator')
+
+      creator = await this.createCreatorFromExtraction(extractedCreator, contentSource)
+      isNew = true
+      matchMethod = 'new_creator'
+    }
+
+    return {
+      creator,
+      isNew,
+      matchMethod,
+      confidence
+    }
+  }
+
+  /**
+   * Link a content source to a creator and update metadata
+   * Updates alternative names, platform handles, and content source IDs
+   */
+  private async linkContentSourceToCreator(
+    contentSource: ContentSource,
+    creator: Creator,
+    extractedCreator: ExtractedCreator
+  ): Promise<void> {
+    console.log('[CreatorReconciliation] Linking content source to creator:', {
+      contentSourceId: contentSource.id,
+      creatorId: creator.id
+    })
+
+    // Update content source with creator_id
+    await this.contentSourceRepository.updateContentSource(contentSource.id, {
+      creatorId: creator.id
+    })
+
+    // Update creator metadata
+    const updates: any = {}
+
+    // Add platform if not already present
+    const platforms = creator.platforms || []
+    if (!platforms.includes(extractedCreator.platform)) {
+      updates.platforms = [...platforms, extractedCreator.platform]
+    }
+
+    // Add content source ID
+    const contentSourceIds = creator.contentSourceIds || []
+    if (!contentSourceIds.includes(contentSource.id)) {
+      updates.contentSourceIds = [...contentSourceIds, contentSource.id]
+    }
+
+    // Add alternative names from extracted creator
+    const alternativeNames = creator.alternativeNames || []
+    const newAltNames = [
+      ...(extractedCreator.alternativeNames || []),
+      contentSource.title // Also add the content source title
+    ].filter(name => {
+      const normalized = name.toLowerCase().trim()
+      const creatorNameNormalized = creator.name.toLowerCase().trim()
+      // Don't add if it's the same as the creator name or already exists
+      return normalized !== creatorNameNormalized && 
+             !alternativeNames.some(existing => existing.toLowerCase().trim() === normalized)
+    })
+
+    if (newAltNames.length > 0) {
+      updates.alternativeNames = [...alternativeNames, ...newAltNames]
+    }
+
+    // Add platform handle
+    if (extractedCreator.handle) {
+      const platformHandles = creator.platformHandles || {}
+      if (!platformHandles[extractedCreator.platform]) {
+        updates.platformHandles = {
+          ...platformHandles,
+          [extractedCreator.platform]: extractedCreator.handle
+        }
+      }
+    }
+
+    // Update total subscribers
+    if (extractedCreator.subscriberCount) {
+      const currentTotal = creator.totalSubscribers || 0
+      updates.totalSubscribers = currentTotal + extractedCreator.subscriberCount
+    }
+
+    // Set primary platform if not set (first platform wins)
+    if (!creator.primaryPlatform && extractedCreator.platform) {
+      updates.primaryPlatform = extractedCreator.platform
+    }
+
+    // Update reconciliation confidence
+    // Use weighted average of existing confidence and new extraction confidence
+    const existingConfidence = creator.reconciliationConfidence || 1.0
+    const newConfidence = extractedCreator.extractionConfidence
+    updates.reconciliationConfidence = (existingConfidence + newConfidence) / 2
+
+    // Apply updates if any
+    if (Object.keys(updates).length > 0) {
+      await this.repository.updateCreatorConsolidation(creator.id, updates)
+      console.log('[CreatorReconciliation] Creator metadata updated:', {
+        creatorId: creator.id,
+        updates: Object.keys(updates)
+      })
+    }
+  }
+
+  /**
+   * Create a new creator from extracted data
+   */
+  private async createCreatorFromExtraction(
+    extractedCreator: ExtractedCreator,
+    contentSource: ContentSource
+  ): Promise<Creator> {
+    console.log('[CreatorReconciliation] Creating new creator:', {
+      name: extractedCreator.name,
+      platform: extractedCreator.platform
+    })
+
+    // Generate creator ID
+    const creatorId = `creator:${extractedCreator.platformId}`
+
+    // Create creator
+    await this.repository.upsertCreator({
+      id: creatorId,
+      name: extractedCreator.name,
+      handle: extractedCreator.handle,
+      avatarUrl: extractedCreator.avatarUrl,
+      bio: extractedCreator.bio,
+      url: extractedCreator.url,
+      platform: extractedCreator.platform,
+      verified: extractedCreator.verified,
+      subscriberCount: extractedCreator.subscriberCount,
+      followerCount: extractedCreator.followerCount
+    })
+
+    // Update with two-tier model fields
+    const alternativeNames = [
+      ...(extractedCreator.alternativeNames || []),
+      contentSource.title
+    ].filter(name => name.toLowerCase().trim() !== extractedCreator.name.toLowerCase().trim())
+
+    const platformHandles = extractedCreator.handle ? {
+      [extractedCreator.platform]: extractedCreator.handle
+    } : undefined
+
+    await this.repository.updateCreatorConsolidation(creatorId, {
+      alternativeNames: alternativeNames.length > 0 ? alternativeNames : undefined,
+      platformHandles,
+      contentSourceIds: [contentSource.id],
+      primaryPlatform: extractedCreator.platform,
+      totalSubscribers: extractedCreator.subscriberCount,
+      reconciliationConfidence: extractedCreator.extractionConfidence
+    })
+
+    // Link content source to creator
+    await this.contentSourceRepository.updateContentSource(contentSource.id, {
+      creatorId: creatorId
+    })
+
+    console.log('[CreatorReconciliation] New creator created:', {
+      creatorId,
+      contentSourceId: contentSource.id
+    })
+
+    // Fetch and return the updated creator
+    const updatedCreator = await this.repository.getCreator(creatorId)
+    if (!updatedCreator) {
+      throw new Error('Failed to fetch newly created creator')
+    }
+
+    return updatedCreator
+  }
+
+  /**
+   * Batch reconcile multiple content sources
+   * Useful for migrations or bulk operations
+   */
+  async reconcileContentSources(
+    contentSources: ContentSource[],
+    options: ReconciliationOptions = {}
+  ): Promise<Map<string, { creator: Creator; isNew: boolean; matchMethod: string }>> {
+    console.log('[CreatorReconciliation] Batch reconciling content sources:', {
+      count: contentSources.length
+    })
+
+    const results = new Map()
+
+    for (const contentSource of contentSources) {
+      try {
+        const result = await this.reconcileContentSource(contentSource, options)
+        results.set(contentSource.id, result)
+      } catch (error) {
+        console.error('[CreatorReconciliation] Failed to reconcile content source:', {
+          contentSourceId: contentSource.id,
+          error: error instanceof Error ? error.message : String(error)
+        })
+        // Continue with other sources
+      }
+    }
+
+    console.log('[CreatorReconciliation] Batch reconciliation completed:', {
+      total: contentSources.length,
+      successful: results.size,
+      failed: contentSources.length - results.size
+    })
+
+    return results
   }
 
   /**
