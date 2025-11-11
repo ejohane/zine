@@ -30,6 +30,41 @@ export const creators = sqliteTable('creators', {
   followerCount: integer('follower_count'),        // Alternative follower count
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+  
+  // Two-tier model enhancements (migration 0016)
+  alternativeNames: text('alternative_names'),     // JSON array of known aliases
+  platformHandles: text('platform_handles'),       // JSON object: {youtube: "@handle", spotify: "name"}
+  contentSourceIds: text('content_source_ids'),    // JSON array of content_source IDs
+})
+
+// Two-tier model: Content sources (what users subscribe to)
+export const contentSources = sqliteTable('content_sources', {
+  id: text('id').primaryKey(),                    // Format: {platform}:{external_id}
+  externalId: text('external_id').notNull(),      // Platform's ID
+  platform: text('platform').notNull(),           // 'youtube', 'spotify', 'rss'
+  sourceType: text('source_type').notNull(),      // 'channel', 'show', 'playlist', 'series'
+  
+  title: text('title').notNull(),
+  description: text('description'),
+  thumbnailUrl: text('thumbnail_url'),
+  url: text('url').notNull(),                     // Canonical URL
+  
+  creatorId: text('creator_id').references(() => creators.id),  // Links to creators table
+  creatorName: text('creator_name'),              // Display name from platform
+  
+  subscriberCount: integer('subscriber_count'),   // YouTube subscribers
+  totalEpisodes: integer('total_episodes'),       // Spotify episode count
+  videoCount: integer('video_count'),             // YouTube video count
+  isVerified: integer('is_verified', { mode: 'boolean' }).default(false),
+  
+  lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
+  etag: text('etag'),                             // For conditional requests
+  uploadsPlaylistId: text('uploads_playlist_id'), // YouTube specific
+  
+  metadata: text('metadata'),                     // JSON for platform-specific data
+  
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 })
 
 // Subscription providers (spotify, youtube)
@@ -321,6 +356,10 @@ export const selectUserSchema = createSelectSchema(users)
 export const insertCreatorSchema = createInsertSchema(creators)
 export const selectCreatorSchema = createSelectSchema(creators)
 
+// Content Source schemas (two-tier model)
+export const insertContentSourceSchema = createInsertSchema(contentSources)
+export const selectContentSourceSchema = createSelectSchema(contentSources)
+
 // Content schemas (new)
 export const insertContentSchema = createInsertSchema(content)
 export const selectContentSchema = createSelectSchema(content)
@@ -366,6 +405,10 @@ export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Creator = typeof creators.$inferSelect
 export type NewCreator = typeof creators.$inferInsert
+
+// Content Source types (two-tier model)
+export type ContentSource = typeof contentSources.$inferSelect
+export type NewContentSource = typeof contentSources.$inferInsert
 
 // Content types (new)
 export type Content = typeof content.$inferSelect
