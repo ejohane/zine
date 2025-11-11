@@ -20,6 +20,29 @@ export const creators = sqliteTable("creators", {
 	updatedAt: integer("updated_at").notNull(),
 });
 
+export const contentSources = sqliteTable("content_sources", {
+	id: text().primaryKey().notNull(),
+	externalId: text("external_id").notNull(),
+	platform: text().notNull(),
+	sourceType: text("source_type").notNull(),
+	title: text().notNull(),
+	description: text(),
+	thumbnailUrl: text("thumbnail_url"),
+	url: text().notNull(),
+	creatorId: text("creator_id").references(() => creators.id),
+	creatorName: text("creator_name"),
+	subscriberCount: integer("subscriber_count"),
+	totalEpisodes: integer("total_episodes"),
+	videoCount: integer("video_count"),
+	isVerified: integer("is_verified").default(0),
+	lastPolledAt: integer("last_polled_at"),
+	etag: text(),
+	uploadsPlaylistId: text("uploads_playlist_id"),
+	metadata: text(),
+	createdAt: integer("created_at").notNull(),
+	updatedAt: integer("updated_at").notNull(),
+});
+
 export const users = sqliteTable("users", {
 	id: text().primaryKey().notNull(),
 	email: text().notNull(),
