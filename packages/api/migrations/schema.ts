@@ -18,6 +18,14 @@ export const creators = sqliteTable("creators", {
 	externalLinks: text("external_links"),
 	createdAt: integer("created_at").notNull(),
 	updatedAt: integer("updated_at").notNull(),
+	// Two-tier model fields
+	alternativeNames: text("alternative_names"),
+	platformHandles: text("platform_handles"),
+	contentSourceIds: text("content_source_ids"),
+	primaryPlatform: text("primary_platform"),
+	totalSubscribers: integer("total_subscribers"),
+	reconciliationConfidence: numeric("reconciliation_confidence"),
+	manuallyVerified: integer("manually_verified").default(0),
 });
 
 export const contentSources = sqliteTable("content_sources", {
