@@ -511,12 +511,13 @@ export class SingleUserPollingService {
       
       const feedItemResult = await this.db.prepare(`
         INSERT INTO feed_items (
-          id, subscription_id, content_id, added_to_feed_at
-        ) VALUES (?, ?, ?, ?)
+          id, subscription_id, content_id, content_source_id, added_to_feed_at
+        ) VALUES (?, ?, ?, ?, ?)
       `).bind(
         feedItemId,
         subscriptionId,
         contentId,
+        contentSource.id,
         Math.floor(Date.now() / 1000)
       ).run()
 
