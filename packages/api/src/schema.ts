@@ -102,6 +102,9 @@ export const subscriptions = sqliteTable('subscriptions', {
   etag: text('etag'),                                      // For ETag caching
   lastPolledAt: integer('last_polled_at', { mode: 'timestamp' }),
   
+  // Two-tier model: Link to content source (migration 0018)
+  contentSourceId: text('content_source_id').references(() => contentSources.id),
+  
   // Phase 2: Richer channel/show data
   subscriberCount: integer('subscriber_count'),
   isVerified: integer('is_verified', { mode: 'boolean' }).default(false),
