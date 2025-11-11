@@ -4,7 +4,7 @@ import { YouTubeAPI } from '../external/youtube-api'
 import { OAuthTokenData } from './user-subscription-manager'
 import type { Env } from '../types'
 import { CreatorReconciliationService } from '../services/creator-reconciliation-service'
-import { CreatorRepository } from '../repositories/creator-repository'
+import { ContentSourceRepository } from '../repositories/content-source-repository'
 
 export interface UserPollResult {
   provider: 'spotify' | 'youtube'
@@ -410,83 +410,66 @@ export class SingleUserPollingService {
 
     const provider = subscription.provider_id
     
-    // Use CreatorReconciliationService to find or create creator
-    // This applies fuzzy matching, handle matching, and cross-platform deduplication
+    // Two-Tier Model: Create/update ContentSource then reconcile to Creator
     const reconciliationService = new CreatorReconciliationService(this.db)
+    const contentSourceRepo = new ContentSourceRepository(this.db)
     
-    const candidateCreator = {
-      id: `${provider}:${subscription.external_id}`,
-      name: subscription.creator_name || subscription.title,
-      avatarUrl: subscription.thumbnail_url || undefined,
-      url: subscription.subscription_url || undefined,
-      verified: subscription.is_verified === 1,
-      subscriberCount: subscription.subscriber_count || undefined
-    }
+    // Step 1: Upsert ContentSource (represents the subscription: YouTube channel or Spotify show)
+    const contentSourceId = `${provider}:${subscription.external_id}`
+    const sourceType = provider === 'youtube' ? 'channel' : 'show'
     
-    console.log(`[createFeedItems] Reconciling creator:`, {
-      candidateId: candidateCreator.id,
-      name: candidateCreator.name,
-      url: candidateCreator.url
+    console.log(`[createFeedItems] Upserting content source:`, {
+      id: contentSourceId,
+      platform: provider,
+      sourceType,
+      title: subscription.title
     })
     
+    const contentSource = await contentSourceRepo.upsertContentSource({
+      id: contentSourceId,
+      externalId: subscription.external_id,
+      platform: provider,
+      sourceType,
+      title: subscription.title,
+      description: undefined, // Not available in subscription data
+      thumbnailUrl: subscription.thumbnail_url || undefined,
+      url: subscription.subscription_url || `https://${provider}.com`,
+      creatorName: subscription.creator_name || subscription.title,
+      subscriberCount: subscription.subscriber_count || undefined,
+      isVerified: subscription.is_verified === 1
+    })
+    
+    console.log(`[createFeedItems] Content source upserted:`, {
+      id: contentSource.id,
+      creatorId: contentSource.creatorId
+    })
+    
+    // Step 2: Reconcile ContentSource to Creator (handles creation, matching, and linking)
     let creatorId: string
     
     try {
-      const reconciliationResult = await reconciliationService.reconcileCreator(
-        candidateCreator,
+      const reconciliationResult = await reconciliationService.reconcileContentSource(
+        contentSource,
         {
           platform: provider,
-          subscriptionUrl: subscription.subscription_url || undefined,
-          // TODO: Add YouTube API instance when available for handle extraction
-          // youtubeApi: this.youtubeApi
+          subscriptionUrl: subscription.subscription_url || undefined
         }
       )
       
-      // Use the reconciled creator ID (may be same as candidate or an existing match)
-      creatorId = reconciliationResult.creator?.id || candidateCreator.id
+      creatorId = reconciliationResult.creator.id
       
-      if (reconciliationResult.matchMethod !== 'none' && reconciliationResult.matchMethod !== 'exact_id') {
-        console.log(`[createFeedItems] Creator matched via ${reconciliationResult.matchMethod}:`, {
-          candidateId: candidateCreator.id,
-          matchedId: creatorId,
-          similarity: reconciliationResult.similarity,
-          executionTimeMs: reconciliationResult.executionTimeMs
-        })
-      } else if (reconciliationResult.timedOut) {
-        console.warn(`[createFeedItems] Creator reconciliation timed out, using fallback ID:`, {
-          candidateId: candidateCreator.id,
-          executionTimeMs: reconciliationResult.executionTimeMs
-        })
-      }
-      
-      // Now upsert the creator data using the canonical ID
-      const creatorRepo = new CreatorRepository(this.db)
-      await creatorRepo.upsertCreator({
-        id: creatorId,
-        name: candidateCreator.name,
-        avatarUrl: candidateCreator.avatarUrl || undefined,
-        url: candidateCreator.url || undefined,
-        platform: provider,
-        verified: candidateCreator.verified,
-        subscriberCount: candidateCreator.subscriberCount || undefined
+      console.log(`[createFeedItems] Content source reconciled to creator:`, {
+        contentSourceId: contentSource.id,
+        creatorId,
+        isNew: reconciliationResult.isNew,
+        matchMethod: reconciliationResult.matchMethod,
+        confidence: reconciliationResult.confidence
       })
       
     } catch (error) {
-      console.error('[createFeedItems] Creator reconciliation failed, using fallback:', error)
-      // Fallback to simple ID if reconciliation fails
-      creatorId = candidateCreator.id
-      
-      // Still try to upsert the creator with basic data
-      const creatorRepo = new CreatorRepository(this.db)
-      await creatorRepo.upsertCreator({
-        id: creatorId,
-        name: candidateCreator.name,
-        avatarUrl: candidateCreator.avatarUrl || undefined,
-        url: candidateCreator.url || undefined,
-        platform: provider,
-        verified: candidateCreator.verified,
-        subscriberCount: candidateCreator.subscriberCount || undefined
-      })
+      console.error('[createFeedItems] Content source reconciliation failed:', error)
+      // Fallback: use content source ID as creator ID (old behavior)
+      creatorId = contentSourceId
     }
 
     console.log(`[createFeedItems] Using creator ID: ${creatorId}`)
