@@ -24,6 +24,8 @@ import { InitialFeedPopulationService } from './services/initial-feed-population
 import { DualModeSubscriptionRepository } from './repositories/dual-mode-subscription-repository'
 import { userStateRoutes } from './routes/user-state'
 import { enrichedBookmarksRoutes } from './routes/enriched-bookmarks'
+import { contentSourceRoutes } from './routes/content-sources'
+import { creatorRoutes } from './routes/creators'
 
 export type Bindings = {
   DB: D1Database
@@ -1037,11 +1039,174 @@ app.get('/api/v1/feed', async (c) => {
     const auth = getAuthContext(c)
     const unreadOnly = c.req.query('unread') === 'true'
     const subscriptionId = c.req.query('subscription')
+    const creatorId = c.req.query('creator')
+    const groupBy = c.req.query('groupBy')
     const limit = parseInt(c.req.query('limit') || '50')
     const offset = parseInt(c.req.query('offset') || '0')
     
     const { feedItemRepository } = await initializeServices(c.env.DB, c.env)
     
+    // Handle groupBy=creator - group feed items by creator
+    if (groupBy === 'creator') {
+      const query = `
+        SELECT 
+          cr.id as creator_id,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url,
+          cr.verified as creator_verified,
+          cr.platforms as creator_platforms,
+          COUNT(DISTINCT ufi.id) as total_items,
+          SUM(CASE WHEN ufi.is_read = 0 THEN 1 ELSE 0 END) as unread_count,
+          MAX(c.published_at) as latest_published_at,
+          GROUP_CONCAT(DISTINCT cs.platform) as platforms
+        FROM user_feed_items ufi
+        INNER JOIN feed_items fi ON ufi.feed_item_id = fi.id
+        INNER JOIN content c ON fi.content_id = c.id
+        INNER JOIN creators cr ON c.creator_id = cr.id
+        LEFT JOIN content_sources cs ON cs.creator_id = cr.id
+        WHERE ufi.user_id = ?
+          AND ufi.is_hidden = 0
+          ${unreadOnly ? 'AND ufi.is_read = 0' : ''}
+        GROUP BY cr.id
+        ORDER BY latest_published_at DESC
+        LIMIT ? OFFSET ?
+      `
+      
+      const result = await c.env.DB.prepare(query)
+        .bind(auth.userId, limit, offset)
+        .all()
+      
+      // Get total count of creators
+      const countQuery = `
+        SELECT COUNT(DISTINCT cr.id) as total
+        FROM user_feed_items ufi
+        INNER JOIN feed_items fi ON ufi.feed_item_id = fi.id
+        INNER JOIN content c ON fi.content_id = c.id
+        INNER JOIN creators cr ON c.creator_id = cr.id
+        WHERE ufi.user_id = ?
+          AND ufi.is_hidden = 0
+          ${unreadOnly ? 'AND ufi.is_read = 0' : ''}
+      `
+      
+      const countResult = await c.env.DB.prepare(countQuery)
+        .bind(auth.userId)
+        .first()
+      
+      const totalCount = Number(countResult?.total || 0)
+      
+      const groupedFeed = result.results?.map((row: any) => ({
+        creatorId: row.creator_id,
+        creator: {
+          id: row.creator_id,
+          name: row.creator_name,
+          handle: row.creator_handle || undefined,
+          avatarUrl: row.creator_avatar_url || undefined,
+          verified: Boolean(row.creator_verified),
+          platforms: row.creator_platforms ? JSON.parse(row.creator_platforms) : []
+        },
+        totalItems: Number(row.total_items || 0),
+        unreadCount: Number(row.unread_count || 0),
+        latestPublishedAt: row.latest_published_at ? Number(row.latest_published_at) * 1000 : undefined,
+        platforms: row.platforms ? row.platforms.split(',') : []
+      })) || []
+      
+      return c.json({
+        groupedFeed,
+        groupBy: 'creator',
+        pagination: {
+          limit,
+          offset,
+          total: totalCount,
+          hasMore: offset + limit < totalCount
+        }
+      })
+    }
+    
+    // Handle creator filter - show only items from a specific creator
+    if (creatorId) {
+      const query = `
+        SELECT 
+          ufi.id,
+          ufi.user_id,
+          ufi.feed_item_id,
+          ufi.is_read,
+          ufi.read_at,
+          ufi.bookmark_id,
+          ufi.created_at,
+          fi.id as fi_id,
+          fi.content_id,
+          fi.subscription_id,
+          c.title as content_title,
+          c.description as content_description,
+          c.thumbnail_url as content_thumbnail_url,
+          c.published_at as content_published_at,
+          c.duration_seconds as content_duration_seconds,
+          c.url as content_url,
+          s.id as subscription_id,
+          s.title as subscription_title,
+          s.thumbnail_url as subscription_thumbnail_url,
+          s.provider_id as subscription_provider_id,
+          cr.id as creator_id,
+          cr.name as creator_name,
+          cr.handle as creator_handle,
+          cr.avatar_url as creator_avatar_url
+        FROM user_feed_items ufi
+        INNER JOIN feed_items fi ON ufi.feed_item_id = fi.id
+        INNER JOIN content c ON fi.content_id = c.id
+        INNER JOIN creators cr ON c.creator_id = cr.id
+        INNER JOIN subscriptions s ON fi.subscription_id = s.id
+        WHERE ufi.user_id = ?
+          AND ufi.is_hidden = 0
+          AND cr.id = ?
+          ${unreadOnly ? 'AND ufi.is_read = 0' : ''}
+        ORDER BY c.published_at DESC
+        LIMIT ? OFFSET ?
+      `
+      
+      const result = await c.env.DB.prepare(query)
+        .bind(auth.userId, creatorId, limit, offset)
+        .all()
+      
+      const feedItems = result.results?.map((row: any) => ({
+        id: row.id,
+        feedItem: {
+          id: row.fi_id,
+          contentId: row.content_id,
+          title: row.content_title,
+          description: row.content_description,
+          thumbnailUrl: row.content_thumbnail_url,
+          publishedAt: row.content_published_at ? Number(row.content_published_at) * 1000 : undefined,
+          durationSeconds: row.content_duration_seconds,
+          externalUrl: row.content_url,
+          subscription: {
+            id: row.subscription_id,
+            title: row.subscription_title,
+            creatorName: row.creator_name,
+            thumbnailUrl: row.subscription_thumbnail_url,
+            providerId: row.subscription_provider_id
+          }
+        },
+        isRead: Boolean(row.is_read),
+        readAt: row.read_at ? Number(row.read_at) * 1000 : undefined,
+        bookmarkId: row.bookmark_id || undefined,
+        createdAt: row.created_at ? Number(row.created_at) * 1000 : undefined
+      })) || []
+      
+      return c.json({
+        feedItems,
+        pagination: {
+          limit,
+          offset,
+          hasMore: feedItems.length === limit
+        },
+        filters: {
+          creatorId
+        }
+      })
+    }
+    
+    // Default behavior - get feed items (with optional subscription filter)
     let feedItems
     if (subscriptionId) {
       // Get feed items for specific subscription
@@ -2187,6 +2352,14 @@ app.route('/api/v1/user-state', userStateRoutes)
 
 // Mount enriched bookmarks routes
 app.route('/api/v1/enriched-bookmarks', enrichedBookmarksRoutes)
+
+// Mount content sources routes with authentication
+app.use('/api/v1/content-sources/*', authMiddleware)
+app.route('/api/v1/content-sources', contentSourceRoutes)
+
+// Mount creators routes with authentication
+app.use('/api/v1/creators/*', authMiddleware)
+app.route('/api/v1/creators', creatorRoutes)
 
 // Scheduled event handler for cron triggers
 export default {
