@@ -263,6 +263,25 @@ export class CreatorRepository {
     }
   }
 
+  /**
+   * Get recent creators (for cross-platform matching)
+   * Returns most recently updated creators, limited by count
+   */
+  async getRecentCreators(limit: number = 200): Promise<Creator[]> {
+    try {
+      const result = await this.db.prepare(`
+        SELECT * FROM creators 
+        ORDER BY updated_at DESC
+        LIMIT ?
+      `).bind(limit).all()
+      
+      return result.results.map(row => this.mapRowToCreator(row))
+    } catch (error) {
+      console.error('Error getting recent creators:', error)
+      throw new Error('Failed to get recent creators')
+    }
+  }
+
   private mapRowToCreator(row: any): Creator {
     return {
       id: row.id,

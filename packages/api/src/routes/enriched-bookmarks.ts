@@ -13,6 +13,7 @@ import { CreatorRepository } from '../repositories/creator-repository'
 import { ApiEnrichmentService, type SpotifyResourceType } from '../services/api-enrichment-service'
 import type { Content } from '../schema'
 import { ContentMatchingService, KNOWN_PUBLISHER_MAPPINGS } from '../services/content-matching-service'
+import { CreatorReconciliationService } from '../services/creator-reconciliation-service'
 
 type CrossPlatformMatchEntry = {
   platform: string
@@ -261,7 +262,8 @@ function upsertCrossPlatformEntry(
  */
 async function extractAndUpsertCreator(
   enrichedData: any,
-  creatorRepo: CreatorRepository
+  creatorRepo: CreatorRepository,
+  reconciliationService: CreatorReconciliationService
 ): Promise<string | undefined> {
   const creatorId = enrichedData.creatorId
   const creatorName = enrichedData.creatorName
@@ -270,7 +272,68 @@ async function extractAndUpsertCreator(
     return undefined
   }
   
-  console.log('[extractAndUpsertCreator] Upserting creator:', creatorId, creatorName)
+  console.log('[extractAndUpsertCreator] Reconciling creator:', creatorId, creatorName)
+  
+  // Build creator URL
+  const creatorUrl = enrichedData.provider === 'youtube' 
+    ? `https://youtube.com/channel/${creatorId.replace('youtube:', '')}`
+    : enrichedData.provider === 'spotify'
+    ? `https://open.spotify.com/show/${creatorId.replace('spotify:', '')}`
+    : undefined
+  
+  // Attempt to reconcile with existing creators
+  const reconciliationResult = await reconciliationService.reconcileCreator(
+    {
+      id: creatorId,
+      name: creatorName,
+      handle: enrichedData.creatorHandle || undefined,
+      avatarUrl: enrichedData.creatorThumbnail || undefined,
+      platforms: enrichedData.provider ? [enrichedData.provider] : undefined,
+      verified: enrichedData.creatorVerified === true || undefined,
+      subscriberCount: enrichedData.creatorSubscriberCount ? Number(enrichedData.creatorSubscriberCount) : undefined,
+      followerCount: enrichedData.creatorFollowerCount ? Number(enrichedData.creatorFollowerCount) : undefined,
+      url: creatorUrl
+    },
+    {
+      platform: enrichedData.provider,
+      subscriptionUrl: creatorUrl
+    }
+  )
+  
+  // If matched with existing creator, merge the data
+  if (reconciliationResult.creator && reconciliationResult.matchMethod !== 'none') {
+    console.log('[extractAndUpsertCreator] Matched existing creator:', {
+      originalId: creatorId,
+      matchedId: reconciliationResult.creator.id,
+      matchMethod: reconciliationResult.matchMethod,
+      similarity: reconciliationResult.similarity
+    })
+    
+    // Merge new data with existing creator, updating fields that are more complete
+    await creatorRepo.upsertCreator({
+      id: reconciliationResult.creator.id, // Use matched creator's ID
+      name: creatorName || reconciliationResult.creator.name,
+      handle: enrichedData.creatorHandle || reconciliationResult.creator.handle,
+      avatarUrl: enrichedData.creatorThumbnail || reconciliationResult.creator.avatarUrl,
+      platform: enrichedData.provider, // This will merge platforms in upsertCreator
+      verified: enrichedData.creatorVerified === true || reconciliationResult.creator.verified,
+      subscriberCount: enrichedData.creatorSubscriberCount 
+        ? Number(enrichedData.creatorSubscriberCount) 
+        : reconciliationResult.creator.subscriberCount,
+      followerCount: enrichedData.creatorFollowerCount 
+        ? Number(enrichedData.creatorFollowerCount) 
+        : reconciliationResult.creator.followerCount,
+      url: creatorUrl || reconciliationResult.creator.url
+    })
+    
+    // Update the enrichedData to use the matched creator ID
+    enrichedData.creatorId = reconciliationResult.creator.id
+    
+    return creatorName
+  }
+  
+  // No match found - create new creator with original ID
+  console.log('[extractAndUpsertCreator] No match found, creating new creator:', creatorId)
   
   await creatorRepo.upsertCreator({
     id: creatorId,
@@ -281,11 +344,7 @@ async function extractAndUpsertCreator(
     verified: enrichedData.creatorVerified === true || undefined,
     subscriberCount: enrichedData.creatorSubscriberCount ? Number(enrichedData.creatorSubscriberCount) : undefined,
     followerCount: enrichedData.creatorFollowerCount ? Number(enrichedData.creatorFollowerCount) : undefined,
-    url: enrichedData.provider === 'youtube' 
-      ? `https://youtube.com/channel/${creatorId.replace('youtube:', '')}`
-      : enrichedData.provider === 'spotify'
-      ? `https://open.spotify.com/show/${creatorId.replace('spotify:', '')}`
-      : undefined
+    url: creatorUrl
   })
   
   return creatorName
@@ -778,9 +837,10 @@ app.post('/save-enriched', async (c) => {
         contentIdForBookmark = primary.id
       } else {
         // Fallback to inserting as new content if primary reference could not be found
-        // Extract and upsert creator data first
+        // Extract and upsert creator data first with reconciliation
         const creatorRepo = new CreatorRepository(c.env.DB)
-        await extractAndUpsertCreator(enrichedContent, creatorRepo)
+        const reconciliationService = new CreatorReconciliationService(c.env.DB)
+        await extractAndUpsertCreator(enrichedContent, creatorRepo, reconciliationService)
         
         // Strip creator details before upserting content
         const contentData = stripCreatorDetails(enrichedContent)
@@ -788,9 +848,10 @@ app.post('/save-enriched', async (c) => {
         contentIdForBookmark = savedContent.id
       }
     } else {
-      // Extract and upsert creator data first
+      // Extract and upsert creator data first with reconciliation
       const creatorRepo = new CreatorRepository(c.env.DB)
-      await extractAndUpsertCreator(enrichedContent, creatorRepo)
+      const reconciliationService = new CreatorReconciliationService(c.env.DB)
+      await extractAndUpsertCreator(enrichedContent, creatorRepo, reconciliationService)
       
       // Strip creator details before upserting content
       const contentData = stripCreatorDetails(enrichedContent)

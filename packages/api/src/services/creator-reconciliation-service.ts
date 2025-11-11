@@ -1,6 +1,6 @@
 import { D1Database } from '@cloudflare/workers-types'
 import { CreatorRepository, type Creator } from '../repositories/creator-repository'
-import { calculateNameSimilarity, normalizeCreatorNameWithSuffixes } from '../utils/creator-matching'
+import { calculateNameSimilarity, normalizeCreatorName, normalizeCreatorNameWithSuffixes } from '../utils/creator-matching'
 import { extractHandleFromSubscriptionUrl } from '../utils/handle-extraction'
 import type { YouTubeAPI } from '../external/youtube-api'
 
@@ -230,7 +230,65 @@ export class CreatorReconciliationService {
       }
     }
 
-    // Tier 5: Platform fuzzy match (fallback)
+    // Tier 5: Cross-platform substring match (for content creators on multiple platforms)
+    // This handles cases like "All-In Podcast" (YouTube) matching "All-In with Chamath..." (Spotify)
+    if (creatorData.name && creatorData.name.length >= 5) {
+      // Get recent creators to search (limit scope for performance)
+      const allCreators = await this.repository.getRecentCreators(200)
+      
+      const name1Normalized = normalizeCreatorNameWithSuffixes(creatorData.name)
+      const name1Core = normalizeCreatorName(name1Normalized)
+      
+      // Extract meaningful words (skip common words)
+      const commonWords = new Set(['the', 'a', 'an', 'with', 'and', 'or', 'podcast', 'show', 'channel'])
+      const name1Words = name1Core.split(' ').filter((w: string) => w.length > 2 && !commonWords.has(w))
+      
+      let bestMatch: { creator: Creator; similarity: number } | null = null
+      
+      for (const candidate of allCreators) {
+        // Skip if same platform (Tier 6 will handle that)
+        if (candidate.platforms?.includes(options.platform || '')) {
+          continue
+        }
+        
+        const name2Normalized = normalizeCreatorNameWithSuffixes(candidate.name)
+        const name2Core = normalizeCreatorName(name2Normalized)
+        const name2Words = name2Core.split(' ').filter((w: string) => w.length > 2 && !commonWords.has(w))
+        
+        // Check for significant word overlap
+        const matchingWords = name1Words.filter((w: string) => name2Words.includes(w))
+        
+        if (matchingWords.length >= 2 || (matchingWords.length >= 1 && name1Words.length <= 2)) {
+          // Found significant word overlap - calculate more detailed similarity
+          const nameMatch = calculateNameSimilarity(name1Normalized, name2Normalized)
+          
+          // Boost similarity based on word overlap
+          const wordOverlapRatio = matchingWords.length / Math.max(name1Words.length, name2Words.length)
+          const boostedSimilarity = Math.min(1.0, nameMatch.similarity + (wordOverlapRatio * 0.3))
+          
+          // Lower threshold for cross-platform (0.5 instead of 0.85)
+          if (boostedSimilarity > 0.5 && (!bestMatch || boostedSimilarity > bestMatch.similarity)) {
+            bestMatch = { creator: candidate, similarity: boostedSimilarity }
+          }
+        }
+      }
+      
+      if (bestMatch) {
+        console.log('[CreatorReconciliation] Tier 5: Cross-platform substring match', {
+          candidateName: creatorData.name,
+          matchedName: bestMatch.creator.name,
+          matchedPlatforms: bestMatch.creator.platforms,
+          similarity: bestMatch.similarity
+        })
+        return {
+          creator: bestMatch.creator,
+          matchMethod: 'platform_fuzzy',
+          similarity: bestMatch.similarity
+        }
+      }
+    }
+    
+    // Tier 6: Same-platform fuzzy match (strictest fallback)
     if (options.platform && creatorData.name) {
       const platformCreators = await this.repository.findByPlatform(options.platform)
 
@@ -250,7 +308,7 @@ export class CreatorReconciliationService {
       }
 
       if (bestMatch) {
-        console.log('[CreatorReconciliation] Tier 5: Platform fuzzy match', {
+        console.log('[CreatorReconciliation] Tier 6: Same-platform fuzzy match', {
           platform: options.platform,
           name: creatorData.name,
           matchedName: bestMatch.name,

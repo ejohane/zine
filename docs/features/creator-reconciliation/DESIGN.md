@@ -1,5 +1,22 @@
 # Creator Reconciliation - Technical Design Document
 
+> ⚠️ **SUPERSEDED BY TWO-TIER MODEL**
+> 
+> This design has been superseded by the [Two-Tier Creator Model](./TWO_TIER_CREATOR_MODEL.md).
+> 
+> **Key Issue Identified**: This design treats YouTube channels and Spotify shows as equivalent "creators,"
+> but they are fundamentally different entity types:
+> - YouTube Channel = Creator's content hub (e.g., @PowerfulJRE)
+> - Spotify Show = Specific podcast series (e.g., "The Joe Rogan Experience")
+> 
+> The new two-tier model separates:
+> 1. **Content Sources** (what users subscribe to): Channels, Shows
+> 2. **Creators** (who creates content): Joe Rogan, MKBHD
+> 
+> See [SUMMARY.md](./SUMMARY.md) for quick overview or [TWO_TIER_CREATOR_MODEL.md](./TWO_TIER_CREATOR_MODEL.md) for full details.
+
+---
+
 ## Overview
 
 This document outlines the technical design for integrating creator reconciliation heuristics into the feed polling flow. Currently, sophisticated creator matching logic exists in `creator-service.ts` but is not applied to content sourced from subscription feeds (Spotify/YouTube), leading to duplicate creator entries and inconsistent data across platforms.
