@@ -3,6 +3,7 @@ import '../global.css';
 import { Stack } from 'expo-router';
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { HeroUINativeProvider } from 'heroui-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '../contexts/auth';
 import { ApiProvider } from '../contexts/api';
 import { QueryProvider } from '../contexts/query';
@@ -17,26 +18,28 @@ if (!publishableKey) {
 
 export default function RootLayout() {
   return (
-    <ClerkProvider 
-      publishableKey={publishableKey || ''} 
-      tokenCache={clerkTokenCache}
-    >
-      <ClerkLoaded>
-        <AuthProvider>
-          <ApiProvider>
-            <QueryProvider>
-              <HeroUINativeProvider>
-                <ThemeProvider>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(app)" />
-                  </Stack>
-                </ThemeProvider>
-              </HeroUINativeProvider>
-            </QueryProvider>
-          </ApiProvider>
-        </AuthProvider>
-      </ClerkLoaded>
-    </ClerkProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ClerkProvider 
+        publishableKey={publishableKey || ''} 
+        tokenCache={clerkTokenCache}
+      >
+        <ClerkLoaded>
+          <AuthProvider>
+            <ApiProvider>
+              <QueryProvider>
+                <HeroUINativeProvider>
+                  <ThemeProvider>
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen name="(auth)" />
+                      <Stack.Screen name="(app)" />
+                    </Stack>
+                  </ThemeProvider>
+                </HeroUINativeProvider>
+              </QueryProvider>
+            </ApiProvider>
+          </AuthProvider>
+        </ClerkLoaded>
+      </ClerkProvider>
+    </GestureHandlerRootView>
   );
 }
