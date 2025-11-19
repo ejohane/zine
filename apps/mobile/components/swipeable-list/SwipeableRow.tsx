@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Platform, Animated } from 'react-native';
+import { View, StyleSheet, Platform, Animated, Pressable } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import type { SwipeableRowProps } from './types';
@@ -197,6 +197,13 @@ export function SwipeableRow({
     }
   }, [primaryRightAction, enableHaptics]);
 
+  // Handle tap on row content - close if open
+  const handleContentPress = useCallback(() => {
+    if (isOpen.current) {
+      swipeableRef.current?.close();
+    }
+  }, []);
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -212,7 +219,9 @@ export function SwipeableRow({
       onSwipeableLeftOpen={handleOvershootLeft}
       onSwipeableRightOpen={handleOvershootRight}
     >
-      <View style={styles.foreground}>{children}</View>
+      <Pressable onPress={handleContentPress} style={styles.foreground}>
+        {children}
+      </Pressable>
     </Swipeable>
   );
 }
