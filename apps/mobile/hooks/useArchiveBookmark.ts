@@ -11,9 +11,9 @@ export function useArchiveBookmark() {
     },
     
     // Optimistic update - immediately remove from inbox
-    onMutate: async (bookmarkId) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['bookmarks', 'inbox'] });
+    onMutate: (bookmarkId) => {
+      // Cancel outgoing refetches (fire and forget - don't await)
+      queryClient.cancelQueries({ queryKey: ['bookmarks', 'inbox'] });
 
       // Snapshot previous value for rollback
       const previousBookmarks = queryClient.getQueryData<Bookmark[]>(['bookmarks', 'inbox']);

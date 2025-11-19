@@ -103,19 +103,16 @@ export default function InboxScreen() {
 
   // Archive handler with optimistic updates
   const handleArchive = useCallback((bookmarkId: string) => {
-    // Find bookmark title for toast
+    // Execute optimistic mutation FIRST (item will disappear immediately)
+    archiveMutation.mutate(bookmarkId);
+
+    // Then handle UI updates (toast, etc.) - these don't block the visual update
     const bookmark = bookmarks?.find(b => b.id === bookmarkId);
     const title = bookmark?.title || 'Bookmark';
-
-    // Store for undo
+    
     setArchivedBookmarkId(bookmarkId);
     setArchivedBookmarkTitle(title);
-
-    // Show toast immediately (before mutation)
     showToast(bookmarkId, title);
-
-    // Execute optimistic mutation (item will disappear immediately)
-    archiveMutation.mutate(bookmarkId);
   }, [bookmarks, archiveMutation, showToast]);
 
   // Undo handler - restore item to cache (optimistic rollback)
@@ -132,17 +129,22 @@ export default function InboxScreen() {
     hideToast();
   }, [archivedBookmarkId, unarchiveMutation, hideToast]);
 
+  // Memoize the archive icon
+  const archiveIcon = React.useMemo(() => (
+    <Feather name="archive" size={24} color="#ffffff" />
+  ), []);
+
   // Create archive action for SwipeableList
   const createArchiveAction = useCallback((bookmark: Bookmark): SwipeAction[] => [
     {
       key: 'archive',
       label: 'Archive',
       color: colors.primary,
-      icon: <Feather name="archive" size={24} color="#ffffff" />,
+      icon: archiveIcon,
       isPrimary: true, // Enable full-swipe-to-archive
       onPress: () => handleArchive(bookmark.id),
     },
-  ], [colors.primary, handleArchive]);
+  ], [colors.primary, archiveIcon, handleArchive]);
 
   // Render functions
   const renderItem = useCallback(
