@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, memo } from 'react';
 import { View, StyleSheet, Platform, Animated, Pressable } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '../../contexts/theme';
 import type { SwipeableRowProps } from './types';
 import { ACTION_WIDTH } from './gestureConstants';
 
@@ -16,6 +17,7 @@ export const SwipeableRow = memo(function SwipeableRow({
 }: SwipeableRowProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const isOpen = useRef(false);
+  const { colors } = useTheme();
   
   // Find primary actions for overshoot
   const primaryLeftAction = leftActions.find(action => action.isPrimary);
@@ -219,7 +221,7 @@ export const SwipeableRow = memo(function SwipeableRow({
       onSwipeableLeftOpen={handleOvershootLeft}
       onSwipeableRightOpen={handleOvershootRight}
     >
-      <Pressable onPress={handleContentPress} style={styles.foreground}>
+      <Pressable onPress={handleContentPress} style={[styles.foreground, { backgroundColor: colors.card }]}>
         {children}
       </Pressable>
     </Swipeable>
@@ -228,7 +230,7 @@ export const SwipeableRow = memo(function SwipeableRow({
 
 const styles = StyleSheet.create({
   foreground: {
-    backgroundColor: '#fff',
+    // backgroundColor is applied dynamically via theme
   },
   actionsContainer: {
     flexDirection: 'row',

@@ -9,12 +9,15 @@ export function useUnarchiveBookmark() {
     mutationFn: async (bookmarkId: string) => {
       return bookmarksApi.unarchive(bookmarkId);
     },
+    
+    // Invalidate queries to restore the item to the inbox
     onSuccess: (data: Bookmark, bookmarkId: string) => {
       // Invalidate all bookmark-related queries to refresh the list
       queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
       queryClient.invalidateQueries({ queryKey: ['bookmarks', bookmarkId] });
       queryClient.invalidateQueries({ queryKey: ['recent-bookmarks'] });
     },
+    
     onError: (error) => {
       console.error('Failed to unarchive bookmark:', error);
     },
