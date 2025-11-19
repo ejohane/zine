@@ -1,11 +1,11 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, memo } from 'react';
 import { View, StyleSheet, Platform, Animated, Pressable } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import type { SwipeableRowProps } from './types';
 import { ACTION_WIDTH } from './gestureConstants';
 
-export function SwipeableRow({
+export const SwipeableRow = memo(function SwipeableRow({
   children,
   leftActions = [],
   rightActions = [],
@@ -224,7 +224,7 @@ export function SwipeableRow({
       </Pressable>
     </Swipeable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   foreground: {
