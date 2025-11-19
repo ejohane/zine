@@ -25,37 +25,20 @@ export default function TestSwipeableListScreen() {
     {
       key: 'archive',
       label: 'Archive',
-      color: '#3b82f6',
+      color: '#FFD700',
       icon: <Feather name="archive" size={20} color="#fff" />,
+      isPrimary: true,
       onPress: () => {
         Alert.alert('Archive', `Archived: ${item.title}`);
-      },
-    },
-    {
-      key: 'pin',
-      label: 'Pin',
-      color: '#8b5cf6',
-      icon: <Feather name="star" size={20} color="#fff" />,
-      onPress: () => {
-        Alert.alert('Pin', `Pinned: ${item.title}`);
       },
     },
   ];
 
   const getRightActions = (item: TestItem): SwipeAction[] => [
     {
-      key: 'share',
-      label: 'Share',
-      color: '#10b981',
-      icon: <Feather name="share-2" size={20} color="#fff" />,
-      onPress: () => {
-        Alert.alert('Share', `Shared: ${item.title}`);
-      },
-    },
-    {
       key: 'delete',
       label: 'Delete',
-      color: '#ef4444',
+      color: '#00FF00',
       icon: <Feather name="trash-2" size={20} color="#fff" />,
       isPrimary: true,
       onPress: () => {
@@ -108,7 +91,7 @@ export default function TestSwipeableListScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#ffffff',
   },
   header: {
     padding: 16,

@@ -16,6 +16,10 @@ export function SwipeableRow({
 }: SwipeableRowProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const isOpen = useRef(false);
+  
+  // Find primary actions for overshoot
+  const primaryLeftAction = leftActions.find(action => action.isPrimary);
+  const primaryRightAction = rightActions.find(action => action.isPrimary);
 
   // Close row programmatically
   useEffect(() => {
@@ -25,15 +29,24 @@ export function SwipeableRow({
   }, [closeSignal]);
 
   const renderLeftActions = useCallback(
-    (progress: Animated.AnimatedInterpolation<number>, _dragX: Animated.AnimatedInterpolation<number>) => {
+    (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
       if (leftActions.length === 0) return null;
 
       return (
         <View style={styles.actionsContainer}>
           {leftActions.map((action, index) => {
-            const trans = progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-ACTION_WIDTH * (leftActions.length - index), 0],
+            // First action (index 0) should appear first when swiping right
+            const revealProgress = index / leftActions.length;
+            const opacity = progress.interpolate({
+              inputRange: [revealProgress, revealProgress + (1 / leftActions.length)],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
+            });
+
+            const scale = progress.interpolate({
+              inputRange: [revealProgress, revealProgress + (1 / leftActions.length)],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
             });
 
             return (
@@ -43,8 +56,6 @@ export function SwipeableRow({
                   styles.actionButton,
                   { 
                     width: ACTION_WIDTH,
-                    backgroundColor: action.color,
-                    transform: [{ translateX: trans }],
                   },
                 ]}
               >
@@ -58,9 +69,18 @@ export function SwipeableRow({
                     }
                   }}
                 >
-                  <View style={styles.actionContent}>
+                  <Animated.View 
+                    style={[
+                      styles.iconCircle, 
+                      { 
+                        backgroundColor: action.color,
+                        opacity,
+                        transform: [{ scale }],
+                      }
+                    ]}
+                  >
                     {action.icon}
-                  </View>
+                  </Animated.View>
                 </RectButton>
               </Animated.View>
             );
@@ -72,15 +92,25 @@ export function SwipeableRow({
   );
 
   const renderRightActions = useCallback(
-    (progress: Animated.AnimatedInterpolation<number>, _dragX: Animated.AnimatedInterpolation<number>) => {
+    (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
       if (rightActions.length === 0) return null;
 
       return (
         <View style={styles.actionsContainer}>
           {rightActions.map((action, index) => {
-            const trans = progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [ACTION_WIDTH * (index + 1), 0],
+            // Last action should appear first when swiping left
+            const reversedIndex = rightActions.length - 1 - index;
+            const revealProgress = reversedIndex / rightActions.length;
+            const opacity = progress.interpolate({
+              inputRange: [revealProgress, revealProgress + (1 / rightActions.length)],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
+            });
+
+            const scale = progress.interpolate({
+              inputRange: [revealProgress, revealProgress + (1 / rightActions.length)],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
             });
 
             return (
@@ -90,8 +120,6 @@ export function SwipeableRow({
                   styles.actionButton,
                   { 
                     width: ACTION_WIDTH,
-                    backgroundColor: action.color,
-                    transform: [{ translateX: trans }],
                   },
                 ]}
               >
@@ -105,9 +133,18 @@ export function SwipeableRow({
                     }
                   }}
                 >
-                  <View style={styles.actionContent}>
+                  <Animated.View 
+                    style={[
+                      styles.iconCircle, 
+                      { 
+                        backgroundColor: action.color,
+                        opacity,
+                        transform: [{ scale }],
+                      }
+                    ]}
+                  >
                     {action.icon}
-                  </View>
+                  </Animated.View>
                 </RectButton>
               </Animated.View>
             );
@@ -138,6 +175,28 @@ export function SwipeableRow({
     }
   }, [onClose]);
 
+  // Handle overshoot left (swiping right past threshold)
+  const handleOvershootLeft = useCallback(() => {
+    if (primaryLeftAction) {
+      if (enableHaptics && Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      primaryLeftAction.onPress();
+      swipeableRef.current?.close();
+    }
+  }, [primaryLeftAction, enableHaptics]);
+
+  // Handle overshoot right (swiping left past threshold)
+  const handleOvershootRight = useCallback(() => {
+    if (primaryRightAction) {
+      if (enableHaptics && Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      }
+      primaryRightAction.onPress();
+      swipeableRef.current?.close();
+    }
+  }, [primaryRightAction, enableHaptics]);
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -148,8 +207,10 @@ export function SwipeableRow({
       renderRightActions={renderRightActions}
       onSwipeableOpen={handleSwipeableOpen}
       onSwipeableClose={handleSwipeableClose}
-      overshootLeft={false}
-      overshootRight={false}
+      overshootLeft={!!primaryLeftAction}
+      overshootRight={!!primaryRightAction}
+      onSwipeableLeftOpen={handleOvershootLeft}
+      onSwipeableRightOpen={handleOvershootRight}
     >
       <View style={styles.foreground}>{children}</View>
     </Swipeable>
@@ -162,10 +223,12 @@ const styles = StyleSheet.create({
   },
   actionsContainer: {
     flexDirection: 'row',
+    height: '100%',
   },
   actionButton: {
     justifyContent: 'center',
     alignItems: 'center',
+    height: '100%',
   },
   actionButtonInner: {
     flex: 1,
@@ -176,5 +239,13 @@ const styles = StyleSheet.create({
   actionContent: {
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
 });

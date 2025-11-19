@@ -38,6 +38,7 @@ export function SwipeActions({
           key={action.key}
           action={action}
           index={index}
+          totalActions={actions.length}
           side={side}
           translateX={translateX}
           onPress={() => onActionPress(action)}
@@ -50,6 +51,7 @@ export function SwipeActions({
 interface SwipeActionButtonProps {
   action: SwipeAction;
   index: number;
+  totalActions: number;
   side: 'left' | 'right';
   translateX: SharedValue<number>;
   onPress: () => void;
@@ -58,14 +60,21 @@ interface SwipeActionButtonProps {
 function SwipeActionButton({
   action,
   index,
+  totalActions,
   side,
   translateX,
   onPress,
 }: SwipeActionButtonProps) {
   const animatedStyle = useAnimatedStyle(() => {
     const absTranslateX = Math.abs(translateX.value);
-    const startReveal = index * ACTION_WIDTH;
-    const endReveal = (index + 1) * ACTION_WIDTH;
+    
+    // When swiping right (positive translateX), reveal left actions:
+    // First action (index 0) should appear first
+    // When swiping left (negative translateX), reveal right actions:
+    // Last action should appear first
+    const animIndex = side === 'left' ? index : (totalActions - 1 - index);
+    const startReveal = animIndex * ACTION_WIDTH;
+    const endReveal = (animIndex + 1) * ACTION_WIDTH;
 
     // Opacity: fade in as action is revealed
     const opacity = interpolate(
@@ -75,11 +84,11 @@ function SwipeActionButton({
       Extrapolation.CLAMP
     );
 
-    // Scale: slightly scale up as action is revealed
+    // Scale: grow from 0 to full size as action is revealed
     const scale = interpolate(
       absTranslateX,
       [startReveal, endReveal],
-      [0.8, 1],
+      [0, 1],
       Extrapolation.CLAMP
     );
 
@@ -94,16 +103,15 @@ function SwipeActionButton({
       onPress={onPress}
       style={[
         styles.actionButton,
-        { backgroundColor: action.color },
         side === 'left'
           ? { left: index * ACTION_WIDTH }
           : { right: index * ACTION_WIDTH },
       ]}
     >
-      <Animated.View style={[styles.actionContent, animatedStyle]}>
+      <Animated.View style={[styles.iconCircle, { backgroundColor: action.color }, animatedStyle]}>
         {action.icon}
-        {action.label && <Text style={styles.actionLabel}>{action.label}</Text>}
       </Animated.View>
+      {action.label && <Text style={styles.actionLabel}>{action.label}</Text>}
     </Pressable>
   );
 }
@@ -128,6 +136,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 4,
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#000',
   },
   actionContent: {
     justifyContent: 'center',
@@ -135,7 +153,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionLabel: {
-    color: '#fff',
+    color: '#666',
     fontSize: 12,
     fontWeight: '600',
   },
