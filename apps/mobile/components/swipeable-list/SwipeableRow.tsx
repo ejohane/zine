@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, memo } from 'react';
-import { View, StyleSheet, Platform, Animated, Pressable } from 'react-native';
+import { View, StyleSheet, Platform, Animated } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../contexts/theme';
@@ -199,13 +199,6 @@ export const SwipeableRow = memo(function SwipeableRow({
     }
   }, [primaryRightAction, enableHaptics]);
 
-  // Handle tap on row content - close if open
-  const handleContentPress = useCallback(() => {
-    if (isOpen.current) {
-      swipeableRef.current?.close();
-    }
-  }, []);
-
   return (
     <Swipeable
       ref={swipeableRef}
@@ -221,9 +214,9 @@ export const SwipeableRow = memo(function SwipeableRow({
       onSwipeableLeftOpen={handleOvershootLeft}
       onSwipeableRightOpen={handleOvershootRight}
     >
-      <Pressable onPress={handleContentPress} style={[styles.foreground, { backgroundColor: colors.card }]}>
+      <View style={[styles.foreground, { backgroundColor: colors.card }]}>
         {children}
-      </Pressable>
+      </View>
     </Swipeable>
   );
 });
