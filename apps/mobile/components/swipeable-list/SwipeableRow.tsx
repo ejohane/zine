@@ -158,8 +158,13 @@ export const SwipeableRow = memo(function SwipeableRow({
     [rightActions, enableHaptics]
   );
 
-  const handleSwipeableWillOpen = useCallback(() => {
-    // Mark as swiping to prevent child press handlers
+  const handleSwipeableOpenStartDrag = useCallback(() => {
+    // Mark as swiping when drag starts (not just when it will open)
+    setIsSwiping(true);
+  }, []);
+
+  const handleSwipeableCloseStartDrag = useCallback(() => {
+    // Keep swiping true during close drag as well
     setIsSwiping(true);
   }, []);
 
@@ -229,7 +234,8 @@ export const SwipeableRow = memo(function SwipeableRow({
       rightThreshold={30}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
-      onSwipeableWillOpen={handleSwipeableWillOpen}
+      onSwipeableOpenStartDrag={handleSwipeableOpenStartDrag}
+      onSwipeableCloseStartDrag={handleSwipeableCloseStartDrag}
       onSwipeableOpen={handleSwipeableOpen}
       onSwipeableClose={handleSwipeableClose}
       overshootLeft={!!primaryLeftAction}
