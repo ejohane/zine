@@ -213,6 +213,8 @@ export const SwipeableRow = memo(function SwipeableRow({
       overshootRight={!!primaryRightAction}
       onSwipeableLeftOpen={handleOvershootLeft}
       onSwipeableRightOpen={handleOvershootRight}
+      activeOffsetX={[-10, 10]}
+      failOffsetY={[-5, 5]}
     >
       <View style={[styles.foreground, { backgroundColor: colors.card }]}>
         {children}
