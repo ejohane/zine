@@ -103,16 +103,15 @@ export default function InboxScreen() {
 
   // Archive handler with optimistic updates
   const handleArchive = useCallback((bookmarkId: string) => {
-    // Execute optimistic mutation FIRST (item will disappear immediately)
-    archiveMutation.mutate(bookmarkId);
-
-    // Then handle UI updates (toast, etc.) - these don't block the visual update
+    // Get bookmark data BEFORE mutation (will be removed from cache immediately)
     const bookmark = bookmarks?.find(b => b.id === bookmarkId);
     const title = bookmark?.title || 'Bookmark';
     
-    setArchivedBookmarkId(bookmarkId);
-    setArchivedBookmarkTitle(title);
+    // Show toast immediately (before mutation)
     showToast(bookmarkId, title);
+    
+    // Execute optimistic mutation (item will disappear immediately)
+    archiveMutation.mutate(bookmarkId);
   }, [bookmarks, archiveMutation, showToast]);
 
   // Undo handler - restore item to cache (optimistic rollback)

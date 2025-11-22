@@ -10,16 +10,41 @@ export function useUnarchiveBookmark() {
       return bookmarksApi.unarchive(bookmarkId);
     },
     
-    // Invalidate queries to restore the item to the inbox
-    onSuccess: (data: Bookmark, bookmarkId: string) => {
-      // Invalidate all bookmark-related queries to refresh the list
-      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
-      queryClient.invalidateQueries({ queryKey: ['bookmarks', bookmarkId] });
-      queryClient.invalidateQueries({ queryKey: ['recent-bookmarks'] });
+    // Optimistic update - immediately restore to inbox
+    onMutate: async (bookmarkId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['bookmarks', 'inbox'] });
+
+      // Snapshot previous value for rollback
+      const previousBookmarks = queryClient.getQueryData<Bookmark[]>(['bookmarks', 'inbox']);
+
+      // Fetch the bookmark data from archive or cache
+      const archivedBookmark = queryClient.getQueryData<Bookmark>(['bookmarks', bookmarkId]);
+
+      // Optimistically add back to inbox if we have the bookmark data
+      if (archivedBookmark) {
+        queryClient.setQueryData<Bookmark[]>(['bookmarks', 'inbox'], (old) => {
+          // Add at the beginning to make it visible
+          return [archivedBookmark, ...(old ?? [])];
+        });
+      }
+
+      // Return context for rollback
+      return { previousBookmarks, bookmarkId };
     },
-    
-    onError: (error) => {
+
+    // Rollback on error
+    onError: (error, bookmarkId, context) => {
       console.error('Failed to unarchive bookmark:', error);
+      if (context?.previousBookmarks) {
+        queryClient.setQueryData(['bookmarks', 'inbox'], context.previousBookmarks);
+      }
+    },
+
+    // Refetch on success to ensure data is in sync
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-bookmarks'] });
     },
   });
 }
