@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect, memo } from 'react';
+import { useRef, useState, useCallback, useEffect, memo } from 'react';
 import { View, StyleSheet, Platform, Animated } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +17,7 @@ export const SwipeableRow = memo(function SwipeableRow({
 }: SwipeableRowProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const isOpen = useRef(false);
+  const [isSwiping, setIsSwiping] = useState(false);
   const { colors } = useTheme();
   
   // Find primary actions for overshoot
@@ -157,6 +158,11 @@ export const SwipeableRow = memo(function SwipeableRow({
     [rightActions, enableHaptics]
   );
 
+  const handleSwipeableWillOpen = useCallback(() => {
+    // Mark as swiping to prevent child press handlers
+    setIsSwiping(true);
+  }, []);
+
   const handleSwipeableOpen = useCallback(
     (_direction: 'left' | 'right') => {
       if (!isOpen.current) {
@@ -166,6 +172,8 @@ export const SwipeableRow = memo(function SwipeableRow({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
       }
+      // Keep swiping true while open
+      setIsSwiping(true);
     },
     [onOpen, enableHaptics]
   );
@@ -175,6 +183,8 @@ export const SwipeableRow = memo(function SwipeableRow({
       isOpen.current = false;
       onClose?.();
     }
+    // Reset swiping state after close
+    setIsSwiping(false);
   }, [onClose]);
 
   // Handle overshoot left (swiping right past threshold)
@@ -199,6 +209,18 @@ export const SwipeableRow = memo(function SwipeableRow({
     }
   }, [primaryRightAction, enableHaptics]);
 
+  // Handle press on foreground - prevent if swiping
+  const handleForegroundPress = useCallback(() => {
+    // Prevent press if we're in the middle of a swipe
+    if (isSwiping) {
+      return;
+    }
+    // If row is open, close it
+    if (isOpen.current) {
+      swipeableRef.current?.close();
+    }
+  }, [isSwiping]);
+
   return (
     <Swipeable
       ref={swipeableRef}
@@ -207,6 +229,7 @@ export const SwipeableRow = memo(function SwipeableRow({
       rightThreshold={30}
       renderLeftActions={renderLeftActions}
       renderRightActions={renderRightActions}
+      onSwipeableWillOpen={handleSwipeableWillOpen}
       onSwipeableOpen={handleSwipeableOpen}
       onSwipeableClose={handleSwipeableClose}
       overshootLeft={!!primaryLeftAction}
@@ -216,7 +239,10 @@ export const SwipeableRow = memo(function SwipeableRow({
       activeOffsetX={[-10, 10]}
       failOffsetY={[-5, 5]}
     >
-      <View style={[styles.foreground, { backgroundColor: colors.card }]}>
+      <View 
+        style={[styles.foreground, { backgroundColor: colors.card }]}
+        pointerEvents={isSwiping ? 'none' : 'auto'}
+      >
         {children}
       </View>
     </Swipeable>
