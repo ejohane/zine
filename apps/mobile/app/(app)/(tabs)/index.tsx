@@ -114,6 +114,31 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Developer Test Section */}
+        {__DEV__ && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Developer Tests</Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.testCard, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/test-swipeable-list')}
+            >
+              <View style={styles.testCardContent}>
+                <Feather name="menu" size={24} color={colors.primary} />
+                <View style={styles.testCardText}>
+                  <Text style={[styles.testCardTitle, { color: colors.foreground }]}>
+                    Swipeable List Test
+                  </Text>
+                  <Text style={[styles.testCardDescription, { color: colors.mutedForeground }]}>
+                    Test iOS-style swipeable rows with gestures
+                  </Text>
+                </View>
+              </View>
+              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+        )}
 
       </ScrollView>
     </View>
@@ -191,5 +216,41 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  testCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  testCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  testCardText: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  testCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#171717',
+    marginBottom: 2,
+  },
+  testCardDescription: {
+    fontSize: 13,
+    color: '#737373',
   },
 });

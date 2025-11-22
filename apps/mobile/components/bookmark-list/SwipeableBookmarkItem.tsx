@@ -1,3 +1,15 @@
+/**
+ * @deprecated This component uses the old swipe gesture system.
+ * New screens should use SwipeableList from '../swipeable-list' instead.
+ * This component remains for backwards compatibility with screens not yet migrated.
+ * 
+ * Migration path:
+ * - Use SwipeableList from '../swipeable-list/SwipeableList'
+ * - Use BookmarkListItem directly (no wrapper needed)
+ * - Define actions via getRightActions callback
+ * 
+ * See apps/mobile/app/(app)/(tabs)/inbox.tsx for migration example.
+ */
 import { View, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { BookmarkListItem } from './BookmarkListItem';

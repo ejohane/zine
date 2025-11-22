@@ -2,8 +2,6 @@ import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
-  FlatList,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   Animated,
@@ -15,14 +13,15 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { CategoryTabs, CategoryType } from '../../../components/CategoryTabs';
-import { SwipeableBookmarkItem } from '../../../components/bookmark-list/SwipeableBookmarkItem';
+import { BookmarkListItem } from '../../../components/bookmark-list/BookmarkListItem';
 import { BookmarkListSkeleton } from '../../../components/bookmark-list/BookmarkListSkeleton';
+import { SwipeableList } from '../../../components/swipeable-list';
 import { useInboxBookmarks } from '../../../hooks/useInboxBookmarks';
 import { useArchiveBookmark } from '../../../hooks/useArchiveBookmark';
 import { useUnarchiveBookmark } from '../../../hooks/useUnarchiveBookmark';
 import { useTheme } from '../../../contexts/theme';
 import type { Bookmark } from '@zine/shared';
-import type { SwipeAction } from '../../../components/bookmark-list/types';
+import type { SwipeAction } from '../../../components/swipeable-list/types';
 
 export default function InboxScreen() {
   const { isSignedIn } = useAuth();
@@ -35,7 +34,7 @@ export default function InboxScreen() {
   const [archivedBookmarkTitle, setArchivedBookmarkTitle] = useState<string>('');
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = React.useRef(new Animated.Value(0)).current;
-  const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const toastTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Data fetching
   const { data: bookmarks, isLoading, refetch } = useInboxBookmarks({
@@ -102,59 +101,54 @@ export default function InboxScreen() {
     });
   }, [toastOpacity]);
 
-  // Archive handler
-  const handleArchive = useCallback(async (bookmarkId: string) => {
-    try {
-      // Find bookmark title for toast
-      const bookmark = bookmarks?.find(b => b.id === bookmarkId);
-      const title = bookmark?.title || 'Bookmark';
-
-      // Archive the bookmark
-      await archiveMutation.mutateAsync(bookmarkId);
-
-      // Show success toast
-      showToast(bookmarkId, title);
-    } catch (error) {
-      console.error('Failed to archive bookmark:', error);
-      // Could show error toast here
-    }
+  // Archive handler with optimistic updates
+  const handleArchive = useCallback((bookmarkId: string) => {
+    // Get bookmark data BEFORE mutation (will be removed from cache immediately)
+    const bookmark = bookmarks?.find(b => b.id === bookmarkId);
+    const title = bookmark?.title || 'Bookmark';
+    
+    // Show toast immediately (before mutation)
+    showToast(bookmarkId, title);
+    
+    // Execute optimistic mutation (item will disappear immediately)
+    archiveMutation.mutate(bookmarkId);
   }, [bookmarks, archiveMutation, showToast]);
 
-  // Undo handler
-  const handleUndo = useCallback(async () => {
+  // Undo handler - restore item to cache (optimistic rollback)
+  const handleUndo = useCallback(() => {
     if (!archivedBookmarkId) return;
 
     // Light haptic feedback on undo
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    try {
-      // Unarchive the bookmark
-      await unarchiveMutation.mutateAsync(archivedBookmarkId);
+    // Unarchive the bookmark (will restore to cache optimistically)
+    unarchiveMutation.mutate(archivedBookmarkId);
 
-      // Hide the toast immediately
-      hideToast();
-    } catch (error) {
-      console.error('Failed to unarchive bookmark:', error);
-      // Could show error toast here
-    }
+    // Hide the toast immediately
+    hideToast();
   }, [archivedBookmarkId, unarchiveMutation, hideToast]);
 
-  // Swipe actions configuration
-  const swipeActions: SwipeAction[] = useCallback(() => [
+  // Memoize the archive icon
+  const archiveIcon = React.useMemo(() => (
+    <Feather name="archive" size={24} color="#ffffff" />
+  ), []);
+
+  // Create archive action for SwipeableList
+  const createArchiveAction = useCallback((bookmark: Bookmark): SwipeAction[] => [
     {
-      id: 'archive',
-      icon: 'archive',
-      iconColor: '#ffffff',
-      backgroundColor: colors.primary,
-      onPress: handleArchive,
+      key: 'archive',
       label: 'Archive',
+      color: colors.primary,
+      icon: archiveIcon,
+      isPrimary: true, // Enable full-swipe-to-archive
+      onPress: () => handleArchive(bookmark.id),
     },
-  ], [colors.primary, handleArchive])();
+  ], [colors.primary, archiveIcon, handleArchive]);
 
   // Render functions
   const renderItem = useCallback(
     ({ item }: { item: Bookmark }) => (
-      <SwipeableBookmarkItem
+      <BookmarkListItem
         bookmark={item}
         variant="compact"
         onPress={handleBookmarkPress}
@@ -163,11 +157,9 @@ export default function InboxScreen() {
         showPublishDate={true}
         showPlatformIcon={true}
         enableHaptics={true}
-        rightActions={swipeActions}
-        enableHapticFeedback={true}
       />
     ),
-    [handleBookmarkPress, swipeActions]
+    [handleBookmarkPress]
   );
 
   const renderEmpty = useCallback(() => {
@@ -220,15 +212,6 @@ export default function InboxScreen() {
   }, [selectedCategory, colors]);
 
   const keyExtractor = useCallback((item: Bookmark) => item.id, []);
-
-  const getItemLayout = useCallback(
-    (_data: Bookmark[] | null | undefined, index: number) => ({
-      length: 84,
-      offset: 84 * index,
-      index,
-    }),
-    []
-  );
 
   if (!isSignedIn) {
     return (
@@ -283,29 +266,15 @@ export default function InboxScreen() {
       {isLoading && !bookmarks ? (
         <BookmarkListSkeleton variant="compact" layout="vertical" count={8} />
       ) : (
-        <FlatList
+        <SwipeableList
           data={bookmarks ?? []}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
-          getItemLayout={getItemLayout}
+          getRightActions={createArchiveAction}
+          enableHaptics={true}
+          refreshing={isLoading && bookmarks !== undefined}
+          onRefresh={handleRefresh}
           ListEmptyComponent={renderEmpty}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading && bookmarks !== undefined}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          contentContainerStyle={
-            !bookmarks || bookmarks.length === 0
-              ? styles.emptyContainer
-              : styles.listContent
-          }
-          windowSize={10}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          removeClippedSubviews={true}
         />
       )}
 
