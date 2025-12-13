@@ -14,11 +14,6 @@ export default defineWorkersConfig({
         wrangler: {
           configPath: './wrangler.toml',
         },
-        miniflare: {
-          durableObjects: {
-            USER_DO: 'UserDO',
-          },
-        },
       },
     },
   },
