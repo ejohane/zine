@@ -10,6 +10,8 @@ import type { Context } from 'hono';
 export interface Bindings {
   /** User Durable Object namespace for per-user state */
   USER_DO: DurableObjectNamespace;
+  /** KV namespace for webhook idempotency */
+  WEBHOOK_IDEMPOTENCY: KVNamespace;
   /** Current environment (development, staging, production) */
   ENVIRONMENT: string;
   /** Clerk publishable key */
@@ -18,6 +20,8 @@ export interface Bindings {
   CLERK_SECRET_KEY?: string;
   /** Clerk JWKS URL for token verification */
   CLERK_JWKS_URL?: string;
+  /** Clerk webhook signing secret for Svix verification */
+  CLERK_WEBHOOK_SECRET?: string;
 }
 
 /**

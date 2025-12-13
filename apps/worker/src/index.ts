@@ -7,14 +7,15 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
-import { DurableObject } from 'cloudflare:workers';
 import { ZINE_VERSION } from '@zine/shared';
-import type { Env, Bindings } from './types';
+import type { Env } from './types';
 import { authMiddleware } from './middleware/auth';
 import syncRoutes from './routes/sync';
 import authRoutes from './routes/auth';
 import sourcesRoutes from './routes/sources';
-import { runMigrations } from './lib/db';
+
+// Re-export UserDO from the durable-objects module
+export { UserDO } from './durable-objects/user-do';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -74,15 +75,18 @@ app.get('/health', (c) => {
 });
 
 // ---------------------------------------------------------------------------
-// API Routes (authenticated)
+// API Routes
 // ---------------------------------------------------------------------------
 
-// Apply auth middleware to all /api/* routes
-app.use('/api/*', authMiddleware());
-
-// Mount route groups
-app.route('/api/replicache', syncRoutes);
+// Mount auth routes first (webhook endpoint handles its own auth via Svix)
 app.route('/api/auth', authRoutes);
+
+// Apply auth middleware to protected routes
+app.use('/api/replicache/*', authMiddleware());
+app.use('/api/sources/*', authMiddleware());
+
+// Mount protected route groups
+app.route('/api/replicache', syncRoutes);
 app.route('/api/sources', sourcesRoutes);
 
 // ---------------------------------------------------------------------------
@@ -118,61 +122,6 @@ app.onError((err, c) => {
     500
   );
 });
-
-// ---------------------------------------------------------------------------
-// User Durable Object
-// ---------------------------------------------------------------------------
-
-/**
- * UserDO - Per-user Durable Object with SQLite storage
- *
- * Each user gets their own DO instance keyed by their Clerk user ID.
- * The DO handles:
- * - Replicache push/pull operations
- * - User-specific data storage
- * - Ingestion state management
- *
- * TODO: Full implementation in zine-hcb epic
- */
-export class UserDO extends DurableObject<Bindings> {
-  private initialized = false;
-
-  /**
-   * Initialize the Durable Object
-   * Runs migrations on first access
-   */
-  private async initialize(): Promise<void> {
-    if (this.initialized) return;
-
-    await runMigrations(this.ctx.storage.sql);
-    this.initialized = true;
-  }
-
-  /**
-   * Handle incoming requests to the Durable Object
-   *
-   * @param request - The incoming request
-   * @returns Response from the DO
-   */
-  async fetch(request: Request): Promise<Response> {
-    await this.initialize();
-
-    const url = new URL(request.url);
-
-    // TODO: Implement push/pull handlers in zine-hcb
-    // Route requests to appropriate handlers based on path
-
-    return new Response(
-      JSON.stringify({
-        message: 'UserDO stub - implement in zine-hcb',
-        path: url.pathname,
-      }),
-      {
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Export
