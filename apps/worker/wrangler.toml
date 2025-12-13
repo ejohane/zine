@@ -1,0 +1,29 @@
+name = "zine-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# Durable Object bindings
+[[durable_objects.bindings]]
+name = "USER_DO"
+class_name = "UserDO"
+
+# SQLite storage for Durable Objects
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["UserDO"]
+
+# Development environment vars
+[vars]
+ENVIRONMENT = "development"
+
+# Staging environment
+[env.staging]
+name = "zine-worker-staging"
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+# Production environment
+[env.production]
+name = "zine-worker-production"
+[env.production.vars]
+ENVIRONMENT = "production"

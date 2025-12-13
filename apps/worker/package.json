@@ -9,14 +9,22 @@
     "dev": "wrangler dev",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "deploy": "wrangler deploy"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy --env production"
   },
   "dependencies": {
-    "@zine/shared": "workspace:*"
+    "@zine/shared": "workspace:*",
+    "hono": "^4.6.14",
+    "jose": "^5.9.6"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.5.33",
     "@cloudflare/workers-types": "^4.20241205.0",
     "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
     "wrangler": "^3.95.0"
   }
 }
