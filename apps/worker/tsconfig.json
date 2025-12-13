@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["@cloudflare/workers-types"],
+    "paths": {
+      "@zine/shared": ["../../packages/shared/src"],
+      "@zine/shared/*": ["../../packages/shared/src/*"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".wrangler"]
+}

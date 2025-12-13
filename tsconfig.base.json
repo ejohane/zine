@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "declaration": true,
+    "declarationMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@zine/shared": ["packages/shared/src"],
+      "@zine/shared/*": ["packages/shared/src/*"],
+      "@zine/mobile": ["apps/mobile/src"],
+      "@zine/mobile/*": ["apps/mobile/src/*"],
+      "@zine/worker": ["apps/worker/src"],
+      "@zine/worker/*": ["apps/worker/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", ".turbo"]
+}
