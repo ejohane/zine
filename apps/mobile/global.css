@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+@import 'uniwind';
+
+/* Include shared package components if they contain className usage */
+@source '../../packages/shared';
+
+/* Custom theme variables */
+:root {
+  --color-zine-50: #f0f9ff;
+  --color-zine-100: #e0f2fe;
+  --color-zine-200: #bae6fd;
+  --color-zine-300: #7dd3fc;
+  --color-zine-400: #38bdf8;
+  --color-zine-500: #0ea5e9;
+  --color-zine-600: #0284c7;
+  --color-zine-700: #0369a1;
+  --color-zine-800: #075985;
+  --color-zine-900: #0c4a6e;
+  --color-zine-950: #082f49;
+}
