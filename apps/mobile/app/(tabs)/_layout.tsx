@@ -11,13 +11,46 @@ import {
   BookmarkIcon as BookmarkIconSolid,
 } from 'react-native-heroicons/solid';
 
+/**
+ * Tab Navigator Layout
+ *
+ * Primary navigation shell for the Zine mobile app with three main tabs:
+ * - Home: Re-entry and discovery surface
+ * - Inbox: Decision queue for content triage
+ * - Library: Long-term bookmark storage
+ *
+ * Auth Gating Strategy:
+ * ---------------------
+ * Authentication is handled at the root layout level via ClerkProvider.
+ * The tab screens themselves do not implement auth gating - instead:
+ * 1. ClerkLoaded in _layout.tsx ensures auth state is resolved before rendering
+ * 2. Individual screens can use useAuth() from @clerk/clerk-expo to check auth status
+ * 3. For protected data, Replicache subscriptions will return empty results if not authenticated
+ * 4. Future: Add a dedicated auth flow (sign-in screen) that redirects unauthenticated users
+ *
+ * Deep Link Compatibility:
+ * ------------------------
+ * The tab navigator is configured as a group (tabs) in the file-based routing.
+ * Deep links to item/[id] work because:
+ * 1. Root Stack in _layout.tsx includes both (tabs) and item/[id] screens
+ * 2. item/[id] is a sibling route, not nested in tabs, allowing direct navigation
+ * 3. Navigation from tabs to item detail uses router.push('/item/[id]')
+ */
 export default function TabLayout() {
+  // Brand colors for tab bar
+  const colors = {
+    primary: '#0ea5e9', // sky-500 - active tab color
+    gray: {
+      400: '#9ca3af', // gray-400 - inactive tab color
+    },
+  };
+
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#0ea5e9', // zine-500
-        tabBarInactiveTintColor: '#64748b', // slate-500
-        headerShown: true,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.gray[400],
+        headerShown: false,
         tabBarStyle: Platform.select({
           ios: {
             // Use a transparent background on iOS to show the blur effect
