@@ -162,7 +162,7 @@ export const sourcesRouter = router({
    *
    * Returns all active sources (excludes soft-deleted)
    */
-  list: protectedProcedure.query(({ ctx }) => {
+  list: protectedProcedure.query(({ ctx: _ctx }) => {
     // TODO: Replace with D1 query
     // const sources = await ctx.db.query.sources.findMany({
     //   where: and(
@@ -266,7 +266,7 @@ export const sourcesRouter = router({
    * Input: source ID
    * Returns success status
    */
-  remove: protectedProcedure.input(RemoveSourceInputSchema).mutation(({ ctx, input }) => {
+  remove: protectedProcedure.input(RemoveSourceInputSchema).mutation(({ ctx: _ctx, input }) => {
     // TODO: Replace with D1 query
     // const source = await ctx.db.query.sources.findFirst({
     //   where: and(
