@@ -56,20 +56,23 @@ export interface Item {
   /** Type of content */
   contentType: ContentType;
 
+  /** Content provider (required for D1 schema) */
+  provider: Provider;
+
   /** Provider-specific ID (e.g., YouTube video ID) */
-  providerId?: string;
+  providerId: string;
 
   /** Canonical URL to the content */
-  canonicalUrl?: string;
+  canonicalUrl: string;
 
   /** Title of the content */
-  title?: string;
+  title: string;
 
   /** Summary or description */
   summary?: string;
 
-  /** Author/creator name */
-  author?: string;
+  /** Creator/author name (renamed from author to match D1 schema) */
+  creator: string;
 
   /** Publisher/channel name */
   publisher?: string;
@@ -98,6 +101,9 @@ export interface UserItem {
   /** Unique identifier for this user-item relationship */
   id: string;
 
+  /** User ID (required for D1 multi-tenant queries) */
+  userId: string;
+
   /** Reference to the Item */
   itemId: string;
 
@@ -112,6 +118,21 @@ export interface UserItem {
 
   /** When the item was archived (if ever) */
   archivedAt?: string;
+
+  /** Current playback/reading position in seconds */
+  progressPosition?: number;
+
+  /** Total duration in seconds */
+  progressDuration?: number;
+
+  /** When progress was last updated */
+  progressUpdatedAt?: string;
+
+  /** When this UserItem record was created */
+  createdAt: string;
+
+  /** When this UserItem record was last updated */
+  updatedAt: string;
 }
 
 /**
@@ -122,11 +143,17 @@ export interface Source {
   /** Unique identifier */
   id: string;
 
+  /** User ID (required for D1 multi-tenant queries) */
+  userId: string;
+
   /** The provider type */
   provider: Provider;
 
-  /** Provider-specific identifier (e.g., channel ID, feed URL) */
+  /** Provider-specific identifier (e.g., channel ID) */
   providerId: string;
+
+  /** Feed/channel URL (different from providerId) */
+  feedUrl: string;
 
   /** Display name for the source */
   name: string;
@@ -136,6 +163,12 @@ export interface Source {
 
   /** When this source was created */
   createdAt: string;
+
+  /** When this source was last updated */
+  updatedAt: string;
+
+  /** Soft delete timestamp (for unsubscribe without data loss) */
+  deletedAt?: string;
 }
 
 // ============================================================================
