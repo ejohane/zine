@@ -18,6 +18,31 @@ vi.mock('svix', () => ({
   })),
 }));
 
+// Mock drizzle-orm for testing
+const mockInsert = vi.fn().mockReturnValue({
+  values: vi.fn().mockReturnValue({
+    onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+  }),
+});
+
+const mockDelete = vi.fn().mockReturnValue({
+  where: vi.fn().mockResolvedValue(undefined),
+});
+
+const mockFindFirst = vi.fn();
+
+vi.mock('../db', () => ({
+  createDb: vi.fn(() => ({
+    insert: mockInsert,
+    delete: mockDelete,
+    query: {
+      users: {
+        findFirst: mockFindFirst,
+      },
+    },
+  })),
+}));
+
 // Import after mocking
 import authRoutes from './auth';
 
@@ -33,6 +58,11 @@ interface JsonResponse {
   eventType?: string;
   userId?: string;
   profile?: Record<string, unknown>;
+  id?: string;
+  email?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  requestId?: string;
 }
 
 function createTestApp() {
@@ -50,12 +80,9 @@ function createTestApp() {
 
 function createMockEnv(): Env['Bindings'] {
   return {
-    USER_DO: {
-      idFromName: vi.fn().mockReturnValue({ toString: () => 'mock-do-id' }),
-      get: vi.fn().mockReturnValue({
-        fetch: vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }))),
-      }),
-    } as unknown as DurableObjectNamespace,
+    DB: {
+      // Mock D1Database - not used directly since we mock createDb
+    } as unknown as D1Database,
     WEBHOOK_IDEMPOTENCY: {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),
@@ -180,8 +207,8 @@ describe('POST /api/auth/webhook', () => {
       { expirationTtl: 7 * 24 * 60 * 60 }
     );
 
-    // Verify DO was called
-    expect(mockEnv.USER_DO.idFromName).toHaveBeenCalledWith('user_123');
+    // Verify D1 insert was called
+    expect(mockInsert).toHaveBeenCalled();
   });
 
   it('processes user.deleted event successfully', async () => {
@@ -289,20 +316,12 @@ describe('GET /api/auth/me', () => {
     });
     authApp.route('/api/auth', authRoutes);
 
-    // Mock DO to return profile
-    mockEnv.USER_DO.get = vi.fn().mockReturnValue({
-      fetch: vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            profile: {
-              id: 'user_authenticated',
-              email: 'user@example.com',
-              firstName: 'Test',
-              lastName: 'User',
-            },
-          })
-        )
-      ),
+    // Mock D1 query to return user profile
+    mockFindFirst.mockResolvedValue({
+      id: 'user_authenticated',
+      email: 'user@example.com',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
     });
 
     const req = new Request('http://localhost/api/auth/me', {
@@ -313,8 +332,8 @@ describe('GET /api/auth/me', () => {
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as JsonResponse;
-    expect(body.userId).toBe('user_authenticated');
-    expect(body.profile).toBeDefined();
+    expect(body.id).toBe('user_authenticated');
+    expect(body.email).toBe('user@example.com');
   });
 });
 

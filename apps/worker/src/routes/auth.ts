@@ -4,12 +4,17 @@
  * Handles Clerk webhooks and auth-related endpoints.
  * Implements Svix signature verification for webhook security.
  *
+ * Uses D1 (Drizzle ORM) for user data persistence.
+ *
  * @see https://clerk.com/docs/webhooks/overview
  */
 
 import { Hono } from 'hono';
 import { Webhook } from 'svix';
+import { eq } from 'drizzle-orm';
 import type { Env, Bindings } from '../types';
+import { createDb } from '../db';
+import { users, userItems, sources, providerItemsSeen } from '../db/schema';
 
 const auth = new Hono<Env>();
 
@@ -198,7 +203,7 @@ auth.post('/webhook', async (c) => {
 /**
  * Handle user.created event
  *
- * Initializes the user's Durable Object when they sign up.
+ * Creates the user record in D1 when they sign up.
  */
 async function handleUserCreated(
   env: Bindings,
@@ -207,39 +212,28 @@ async function handleUserCreated(
 ): Promise<void> {
   console.log(`[webhook] user.created: ${user.id}`);
 
-  // Get or create user's Durable Object
-  const doId = env.USER_DO.idFromName(user.id);
-  const stub = env.USER_DO.get(doId);
+  const db = createDb(env.DB);
+  const now = new Date().toISOString();
 
-  // Initialize the DO with user data
-  const response = await stub.fetch(
-    new Request('http://do/init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: user.id,
-        email: user.email_addresses[0]?.email_address,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        imageUrl: user.image_url,
-        createdAt: new Date(user.created_at).toISOString(),
-      }),
+  // Insert user into D1 database
+  await db
+    .insert(users)
+    .values({
+      id: user.id,
+      email: user.email_addresses[0]?.email_address ?? null,
+      createdAt: now,
+      updatedAt: now,
     })
-  );
+    .onConflictDoNothing();
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`DO init failed: ${error}`);
-  }
-
-  console.log(`[webhook] User DO initialized for ${user.id} [${requestId}]`);
+  console.log(`[webhook] User created in D1 for ${user.id} [${requestId}]`);
 }
 
 /**
  * Handle user.deleted event
  *
- * Cleans up user data when they delete their account.
- * Note: Durable Objects can't be deleted, but we can clear their data.
+ * Cleans up user data when they delete their account (GDPR compliance).
+ * Deletes all user-related data from D1 in the correct order to respect foreign keys.
  */
 async function handleUserDeleted(
   env: Bindings,
@@ -248,25 +242,20 @@ async function handleUserDeleted(
 ): Promise<void> {
   console.log(`[webhook] user.deleted: ${user.id}`);
 
-  // Get user's Durable Object
-  const doId = env.USER_DO.idFromName(user.id);
-  const stub = env.USER_DO.get(doId);
+  const db = createDb(env.DB);
 
-  // Request the DO to clear all user data
-  const response = await stub.fetch(
-    new Request('http://do/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.id }),
-    })
-  );
+  // Delete user data in order respecting foreign key constraints:
+  // 1. Delete provider items seen (references user)
+  // 2. Delete user items (references user)
+  // 3. Delete sources (references user)
+  // 4. Delete user record
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`DO delete failed: ${error}`);
-  }
+  await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, user.id));
+  await db.delete(userItems).where(eq(userItems.userId, user.id));
+  await db.delete(sources).where(eq(sources.userId, user.id));
+  await db.delete(users).where(eq(users.id, user.id));
 
-  console.log(`[webhook] User data cleared for ${user.id} [${requestId}]`);
+  console.log(`[webhook] User data deleted from D1 for ${user.id} [${requestId}]`);
 }
 
 // ============================================================================
@@ -287,29 +276,22 @@ auth.get('/me', async (c) => {
     return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
-  // Get user's Durable Object
-  const doId = c.env.USER_DO.idFromName(userId);
-  const stub = c.env.USER_DO.get(doId);
+  const db = createDb(c.env.DB);
 
-  // Fetch user profile from DO
-  const response = await stub.fetch(
-    new Request('http://do/profile', {
-      method: 'GET',
-    })
-  );
+  // Fetch user profile from D1
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
 
-  if (!response.ok) {
-    return c.json(
-      { error: 'Failed to fetch profile', code: 'PROFILE_FETCH_ERROR', requestId },
-      500
-    );
+  if (!user) {
+    return c.json({ error: 'User not found', code: 'USER_NOT_FOUND', requestId }, 404);
   }
 
-  const profile = (await response.json()) as Record<string, unknown>;
-
   return c.json({
-    ...profile,
-    userId,
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     requestId,
   });
 });
@@ -317,7 +299,7 @@ auth.get('/me', async (c) => {
 /**
  * DELETE /api/auth/account
  *
- * Deletes the user's account and all associated data.
+ * Deletes the user's account and all associated data (GDPR compliance).
  * Requires authentication.
  *
  * Note: This endpoint clears data in our system. The user should also
@@ -331,22 +313,18 @@ auth.delete('/account', async (c) => {
     return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
-  // Get user's Durable Object
-  const doId = c.env.USER_DO.idFromName(userId);
-  const stub = c.env.USER_DO.get(doId);
+  const db = createDb(c.env.DB);
 
-  // Request the DO to clear all user data
-  const response = await stub.fetch(
-    new Request('http://do/delete', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId }),
-    })
-  );
+  // Delete user data in order respecting foreign key constraints:
+  // 1. Delete provider items seen (references user)
+  // 2. Delete user items (references user)
+  // 3. Delete sources (references user)
+  // 4. Delete user record
 
-  if (!response.ok) {
-    return c.json({ error: 'Failed to delete account', code: 'DELETE_ERROR', requestId }, 500);
-  }
+  await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
+  await db.delete(userItems).where(eq(userItems.userId, userId));
+  await db.delete(sources).where(eq(sources.userId, userId));
+  await db.delete(users).where(eq(users.id, userId));
 
   return c.json({
     message: 'Account data deleted successfully',
