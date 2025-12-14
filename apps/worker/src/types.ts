@@ -8,8 +8,8 @@ import type { Context } from 'hono';
  * Environment bindings available to the Worker
  */
 export interface Bindings {
-  /** User Durable Object namespace for per-user state */
-  USER_DO: DurableObjectNamespace;
+  /** D1 database for persistent storage */
+  DB: D1Database;
   /** KV namespace for webhook idempotency */
   WEBHOOK_IDEMPOTENCY: KVNamespace;
   /** Current environment (development, staging, production) */
