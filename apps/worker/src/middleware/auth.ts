@@ -23,11 +23,7 @@ interface AuthErrorResponse {
 /**
  * Create a structured auth error response
  */
-function createAuthError(
-  message: string,
-  code: string,
-  requestId: string
-): AuthErrorResponse {
+function createAuthError(message: string, code: string, requestId: string): AuthErrorResponse {
   return {
     error: message,
     code,
@@ -45,11 +41,20 @@ function createAuthError(
  * Returns 401 Unauthorized if no token is provided.
  * Returns 403 Forbidden if the token is invalid or expired.
  *
+ * The userId is set on the Hono context via `c.set('userId', ...)` and can be
+ * accessed in route handlers or tRPC context via `c.get('userId')`.
+ *
  * @example
  * ```typescript
+ * // Apply to protected routes
  * import { authMiddleware } from './middleware/auth';
- *
  * app.use('/api/*', authMiddleware());
+ *
+ * // Access userId in tRPC context
+ * export async function createContext(c: Context): Promise<TRPCContext> {
+ *   const userId = c.get('userId'); // Set by auth middleware
+ *   return { userId, db };
+ * }
  * ```
  */
 export function authMiddleware(): MiddlewareHandler<Env> {
@@ -80,10 +85,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
     const token = authHeader.slice(7); // Remove "Bearer " prefix
 
     if (!token) {
-      return c.json(
-        createAuthError('Bearer token is empty', 'EMPTY_TOKEN', requestId),
-        401
-      );
+      return c.json(createAuthError('Bearer token is empty', 'EMPTY_TOKEN', requestId), 401);
     }
 
     // Get JWKS URL from environment or use default
@@ -94,9 +96,8 @@ export function authMiddleware(): MiddlewareHandler<Env> {
 
     if (!result.success) {
       // Map error codes to HTTP status codes
-      const statusCode = result.code === 'EXPIRED_TOKEN' || result.code === 'INVALID_TOKEN'
-        ? 403
-        : 401;
+      const statusCode =
+        result.code === 'EXPIRED_TOKEN' || result.code === 'INVALID_TOKEN' ? 403 : 401;
 
       return c.json(createAuthError(result.error, result.code, requestId), statusCode);
     }
