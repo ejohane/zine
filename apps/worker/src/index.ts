@@ -7,15 +7,14 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Env } from './types';
 import { authMiddleware } from './middleware/auth';
-import syncRoutes from './routes/sync';
 import authRoutes from './routes/auth';
 import sourcesRoutes from './routes/sources';
-
-// Re-export UserDO from the durable-objects module
-export { UserDO } from './durable-objects/user-do';
+import { appRouter } from './trpc/router';
+import { createContext } from './trpc/context';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -81,12 +80,30 @@ app.get('/health', (c) => {
 // Mount auth routes first (webhook endpoint handles its own auth via Svix)
 app.route('/api/auth', authRoutes);
 
+// ---------------------------------------------------------------------------
+// tRPC Routes
+// ---------------------------------------------------------------------------
+
+// Apply auth middleware to tRPC routes (required for protected procedures)
+app.use('/trpc/*', authMiddleware());
+
+// Mount tRPC server
+app.use(
+  '/trpc/*',
+  trpcServer({
+    router: appRouter,
+    createContext: (_opts, c) => createContext(c),
+  })
+);
+
+// ---------------------------------------------------------------------------
+// Legacy REST Routes (sources)
+// ---------------------------------------------------------------------------
+
 // Apply auth middleware to protected routes
-app.use('/api/replicache/*', authMiddleware());
 app.use('/api/sources/*', authMiddleware());
 
 // Mount protected route groups
-app.route('/api/replicache', syncRoutes);
 app.route('/api/sources', sourcesRoutes);
 
 // ---------------------------------------------------------------------------
