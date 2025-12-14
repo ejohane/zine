@@ -2,24 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
     "paths": {
-      "@zine/shared": ["../../packages/shared/src"],
-      "@zine/shared/*": ["../../packages/shared/src/*"],
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@zine/worker/*": ["../worker/src/*"]
     }
   },
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "uniwind-types.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".expo",
-    "coverage"
-  ]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
 }

@@ -1,65 +1,41 @@
-import '../global.css';
-
-import { useEffect } from 'react';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
-import Constants from 'expo-constants';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { HeroUINativeProvider } from 'heroui-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import 'react-native-reanimated';
 
-import { tokenCache } from '@/lib/auth';
-import { ReplicacheProvider } from '@/hooks/useReplicache';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { TRPCProvider } from '@/providers/trpc-provider';
+import '../global.css';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-// Get Clerk publishable key from Expo config
-const clerkPublishableKey = Constants.expoConfig?.extra?.clerkPublishableKey as string | undefined;
-
-if (!clerkPublishableKey) {
-  console.warn('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Authentication will not work.');
-}
+export const unstable_settings = {
+  anchor: '(tabs)',
+};
 
 export default function RootLayout() {
-  useEffect(() => {
-    // Hide splash screen once the app is ready
-    SplashScreen.hideAsync();
-  }, []);
+  const colorScheme = useColorScheme();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <ClerkProvider publishableKey={clerkPublishableKey || ''} tokenCache={tokenCache}>
-          <ClerkLoaded>
-            <ReplicacheProvider>
-              <HeroUINativeProvider>
-                <Stack>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen
-                    name="(dev)/components"
-                    options={{
-                      presentation: 'modal',
-                      headerTitle: 'Components',
-                    }}
-                  />
-                  <Stack.Screen
-                    name="item/[id]"
-                    options={{
-                      presentation: 'card',
-                      headerTitle: 'Item Details',
-                    }}
-                  />
-                  <Stack.Screen name="+not-found" />
-                </Stack>
-                <StatusBar style="auto" />
-              </HeroUINativeProvider>
-            </ReplicacheProvider>
-          </ClerkLoaded>
-        </ClerkProvider>
-      </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <TRPCProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <HeroUINativeProvider>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            </Stack>
+            <StatusBar style="auto" />
+          </HeroUINativeProvider>
+        </ThemeProvider>
+      </TRPCProvider>
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

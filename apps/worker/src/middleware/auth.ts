@@ -60,6 +60,14 @@ function createAuthError(message: string, code: string, requestId: string): Auth
 export function authMiddleware(): MiddlewareHandler<Env> {
   return async (c, next) => {
     const requestId = c.get('requestId') || 'unknown';
+
+    // Development bypass: use mock user ID when no auth is configured
+    if (c.env.ENVIRONMENT === 'development' || !c.env.CLERK_JWKS_URL) {
+      c.set('userId', 'dev-user-001');
+      await next();
+      return;
+    }
+
     const authHeader = c.req.header('Authorization');
 
     // Check for Authorization header

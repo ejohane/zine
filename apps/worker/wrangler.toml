@@ -8,15 +8,12 @@ compatibility_flags = ["nodejs_compat"]
 binding = "WEBHOOK_IDEMPOTENCY"
 id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
-# Durable Object bindings
-[[durable_objects.bindings]]
-name = "USER_DO"
-class_name = "UserDO"
-
-# SQLite storage for Durable Objects
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["UserDO"]
+# D1 Database binding (development)
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-db-dev"
+database_id = "REPLACE_WITH_DEV_D1_DATABASE_ID"
+migrations_dir = "src/db/migrations"
 
 # Development environment vars
 [vars]
@@ -27,6 +24,11 @@ ENVIRONMENT = "development"
 # Staging environment
 [env.staging]
 name = "zine-worker-staging"
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "zine-db-staging"
+database_id = "bc9e61b1-94b2-4f3c-b19b-b3a50936b811"
+migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
@@ -34,6 +36,11 @@ ENVIRONMENT = "staging"
 # Production environment
 [env.production]
 name = "zine-worker-production"
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "zine-db-production"
+database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
+migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
@@ -45,6 +52,13 @@ ENVIRONMENT = "production"
 #
 # Required KV Namespace (create via `wrangler kv:namespace create WEBHOOK_IDEMPOTENCY`)
 # - WEBHOOK_IDEMPOTENCY: KV for webhook idempotency tracking
+#
+# Required D1 Database (create via `wrangler d1 create <database_name>`)
+# - DB: D1 database for user data and sync state
+#   Dev:     wrangler d1 create zine-db-dev
+#   Staging: wrangler d1 create zine-db-staging
+#   Prod:    wrangler d1 create zine-db-prod
+#   Then update the database_id values above with the returned IDs.
 #
 # Optional Variables:
 # - CLERK_JWKS_URL: Override default JWKS URL for token verification
