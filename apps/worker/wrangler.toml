@@ -15,6 +15,10 @@ database_name = "zine-db-dev"
 database_id = "REPLACE_WITH_DEV_D1_DATABASE_ID"
 migrations_dir = "src/db/migrations"
 
+# Cron triggers for scheduled ingestion
+[triggers]
+crons = ["0 * * * *"]  # Run every hour
+
 # Development environment vars
 [vars]
 ENVIRONMENT = "development"
@@ -24,6 +28,9 @@ ENVIRONMENT = "development"
 # Staging environment
 [env.staging]
 name = "zine-worker-staging"
+[[env.staging.kv_namespaces]]
+binding = "WEBHOOK_IDEMPOTENCY"
+id = "abb1a04762cb4a129218d8c9651adf7c"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "zine-db-staging"
@@ -36,6 +43,18 @@ ENVIRONMENT = "staging"
 # Production environment
 [env.production]
 name = "zine-worker-production"
+routes = [
+  { pattern = "api.myzine.app", zone_name = "myzine.app" }
+]
+[[env.production.kv_namespaces]]
+binding = "WEBHOOK_IDEMPOTENCY"
+id = "9937928f2eb54074bda5e035dac09c14"
+
+# Durable Object migration: Delete UserDO class that was previously deployed
+[[env.production.migrations]]
+tag = "v1-delete-user-do"
+deleted_classes = ["UserDO"]
+
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "zine-db-production"
