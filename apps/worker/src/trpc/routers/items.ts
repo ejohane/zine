@@ -1,8 +1,11 @@
 // apps/worker/src/trpc/routers/items.ts
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { eq, and, desc, or, lt, isNotNull } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
-import { ContentType, Provider, UserItemState } from '@zine/shared';
+import { ContentType, type Provider, UserItemState } from '@zine/shared';
+import { userItems, items } from '../../db/schema';
+import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 
 // ============================================================================
 // Types
@@ -12,7 +15,7 @@ import { ContentType, Provider, UserItemState } from '@zine/shared';
  * Combined view of Item + UserItem for API responses.
  * This flattens the joined data for easier consumption by the mobile client.
  */
-type ItemView = {
+export type ItemView = {
   // Identifiers
   id: string; // UserItem ID (for mutations)
   itemId: string; // Canonical Item ID
@@ -49,198 +52,45 @@ type ItemView = {
 };
 
 // ============================================================================
-// Mock Data
+// Helper Functions
 // ============================================================================
 
 /**
- * Mock items for development.
- * TODO: Replace with D1 queries when database is ready.
+ * Transform a joined DB row (userItems + items) into an ItemView
  */
-const MOCK_ITEMS: ItemView[] = [
-  {
-    id: 'ui-001',
-    itemId: 'item-001',
-    title: 'How to Build a Second Brain',
-    thumbnailUrl: 'https://picsum.photos/seed/item1/400/225',
-    canonicalUrl: 'https://youtube.com/watch?v=abc123',
-    contentType: ContentType.VIDEO,
-    provider: Provider.YOUTUBE,
-    creator: 'Tiago Forte',
-    publisher: null,
-    summary: 'A comprehensive guide to building a personal knowledge management system.',
-    duration: 3720, // 1h 2m
-    publishedAt: '2024-01-15T10:00:00Z',
-    state: UserItemState.INBOX,
-    ingestedAt: '2024-12-10T08:30:00Z',
-    bookmarkedAt: null,
-    progress: null,
-  },
-  {
-    id: 'ui-002',
-    itemId: 'item-002',
-    title: 'The Tim Ferriss Show: Naval Ravikant',
-    thumbnailUrl: 'https://picsum.photos/seed/item2/400/225',
-    canonicalUrl: 'https://open.spotify.com/episode/xyz789',
-    contentType: ContentType.PODCAST,
-    provider: Provider.SPOTIFY,
-    creator: 'Tim Ferriss',
-    publisher: 'The Tim Ferriss Show',
-    summary: 'Naval shares his mental models for wealth and happiness.',
-    duration: 7200, // 2h
-    publishedAt: '2024-01-10T06:00:00Z',
-    state: UserItemState.BOOKMARKED,
-    ingestedAt: '2024-12-08T14:00:00Z',
-    bookmarkedAt: '2024-12-09T09:15:00Z',
-    progress: {
-      position: 2400,
-      duration: 7200,
-      percent: 33,
-    },
-  },
-  {
-    id: 'ui-003',
-    itemId: 'item-003',
-    title: 'Local-First Software: You Own Your Data',
-    thumbnailUrl: 'https://picsum.photos/seed/item3/400/225',
-    canonicalUrl: 'https://inkandswitch.com/local-first',
-    contentType: ContentType.ARTICLE,
-    provider: Provider.RSS,
-    creator: 'Martin Kleppmann',
-    publisher: 'Ink & Switch',
-    summary: 'An exploration of the local-first software movement and data ownership.',
-    duration: null,
-    publishedAt: '2024-01-05T12:00:00Z',
-    state: UserItemState.BOOKMARKED,
-    ingestedAt: '2024-12-05T10:00:00Z',
-    bookmarkedAt: '2024-12-06T11:30:00Z',
-    progress: null,
-  },
-  {
-    id: 'ui-004',
-    itemId: 'item-004',
-    title: 'Building Offline-First Apps with Replicache',
-    thumbnailUrl: 'https://picsum.photos/seed/item4/400/225',
-    canonicalUrl: 'https://youtube.com/watch?v=def456',
-    contentType: ContentType.VIDEO,
-    provider: Provider.YOUTUBE,
-    creator: 'Aaron Boodman',
-    publisher: 'Rocicorp',
-    summary: 'Deep dive into building responsive offline-first applications.',
-    duration: 2700, // 45m
-    publishedAt: '2024-01-08T14:00:00Z',
-    state: UserItemState.INBOX,
-    ingestedAt: '2024-12-09T16:00:00Z',
-    bookmarkedAt: null,
-    progress: null,
-  },
-  {
-    id: 'ui-005',
-    itemId: 'item-005',
-    title: 'The Knowledge Project: James Clear',
-    thumbnailUrl: 'https://picsum.photos/seed/item5/400/225',
-    canonicalUrl: 'https://open.spotify.com/episode/ghi789',
-    contentType: ContentType.PODCAST,
-    provider: Provider.SPOTIFY,
-    creator: 'Shane Parrish',
-    publisher: 'Farnam Street',
-    summary: 'James Clear discusses atomic habits and building better systems.',
-    duration: 5400, // 1h 30m
-    publishedAt: '2024-01-12T08:00:00Z',
-    state: UserItemState.BOOKMARKED,
-    ingestedAt: '2024-12-07T09:00:00Z',
-    bookmarkedAt: '2024-12-08T10:00:00Z',
-    progress: {
-      position: 1800,
-      duration: 5400,
-      percent: 33,
-    },
-  },
-  {
-    id: 'ui-006',
-    itemId: 'item-006',
-    title: 'Why SQLite Is Perfect for the Edge',
-    thumbnailUrl: 'https://picsum.photos/seed/item6/400/225',
-    canonicalUrl: 'https://blog.cloudflare.com/sqlite-edge',
-    contentType: ContentType.ARTICLE,
-    provider: Provider.RSS,
-    creator: 'Cloudflare Team',
-    publisher: 'Cloudflare Blog',
-    summary: 'How SQLite became the database of choice for edge computing.',
-    duration: null,
-    publishedAt: '2024-01-03T16:00:00Z',
-    state: UserItemState.INBOX,
-    ingestedAt: '2024-12-04T08:00:00Z',
-    bookmarkedAt: null,
-    progress: null,
-  },
-  {
-    id: 'ui-007',
-    itemId: 'item-007',
-    title: 'React Native Performance Tips',
-    thumbnailUrl: 'https://picsum.photos/seed/item7/400/225',
-    canonicalUrl: 'https://youtube.com/watch?v=jkl012',
-    contentType: ContentType.VIDEO,
-    provider: Provider.YOUTUBE,
-    creator: 'William Candillon',
-    publisher: 'Can It Be Done in React Native',
-    summary: 'Advanced optimization techniques for React Native apps.',
-    duration: 1800, // 30m
-    publishedAt: '2024-01-14T10:00:00Z',
-    state: UserItemState.BOOKMARKED,
-    ingestedAt: '2024-12-11T12:00:00Z',
-    bookmarkedAt: '2024-12-12T09:00:00Z',
-    progress: {
-      position: 600,
-      duration: 1800,
-      percent: 33,
-    },
-  },
-  {
-    id: 'ui-008',
-    itemId: 'item-008',
-    title: 'The Art of Doing Science and Engineering',
-    thumbnailUrl: 'https://picsum.photos/seed/item8/400/225',
-    canonicalUrl: 'https://example.substack.com/p/hamming-notes',
-    contentType: ContentType.ARTICLE,
-    provider: Provider.SUBSTACK,
-    creator: 'Richard Hamming',
-    publisher: 'Tech Classics',
-    summary: "Notes and reflections on Hamming's famous lecture series.",
-    duration: null,
-    publishedAt: '2024-01-02T09:00:00Z',
-    state: UserItemState.ARCHIVED,
-    ingestedAt: '2024-12-01T10:00:00Z',
-    bookmarkedAt: '2024-12-02T11:00:00Z',
-    progress: null,
-  },
-];
+function toItemView(row: {
+  user_items: typeof userItems.$inferSelect;
+  items: typeof items.$inferSelect;
+}): ItemView {
+  const userItem = row.user_items;
+  const item = row.items;
 
-// ============================================================================
-// Mock Data Helpers
-// ============================================================================
-
-function getMockInboxItems(): ItemView[] {
-  return MOCK_ITEMS.filter((item) => item.state === UserItemState.INBOX).sort((a, b) =>
-    b.ingestedAt.localeCompare(a.ingestedAt)
-  );
-}
-
-function getMockLibraryItems(): ItemView[] {
-  return MOCK_ITEMS.filter((item) => item.state === UserItemState.BOOKMARKED).sort((a, b) =>
-    (b.bookmarkedAt ?? '').localeCompare(a.bookmarkedAt ?? '')
-  );
-}
-
-function getMockHomeData() {
-  const bookmarked = getMockLibraryItems();
   return {
-    recentBookmarks: bookmarked.slice(0, 5),
-    jumpBackIn: bookmarked.filter((item) => item.progress !== null).slice(0, 5),
-    byContentType: {
-      videos: bookmarked.filter((item) => item.contentType === ContentType.VIDEO).slice(0, 5),
-      podcasts: bookmarked.filter((item) => item.contentType === ContentType.PODCAST).slice(0, 5),
-      articles: bookmarked.filter((item) => item.contentType === ContentType.ARTICLE).slice(0, 5),
-    },
+    id: userItem.id,
+    itemId: item.id,
+    title: item.title,
+    thumbnailUrl: item.thumbnailUrl,
+    canonicalUrl: item.canonicalUrl,
+    contentType: item.contentType as ContentType,
+    provider: item.provider as Provider,
+    creator: item.creator,
+    publisher: item.publisher,
+    summary: item.summary,
+    duration: item.duration,
+    publishedAt: item.publishedAt,
+    state: userItem.state as UserItemState,
+    ingestedAt: userItem.ingestedAt,
+    bookmarkedAt: userItem.bookmarkedAt,
+    progress:
+      userItem.progressPosition !== null && userItem.progressDuration !== null
+        ? {
+            position: userItem.progressPosition,
+            duration: userItem.progressDuration,
+            percent: Math.round(
+              (userItem.progressPosition / (userItem.progressDuration || 1)) * 100
+            ),
+          }
+        : null,
   };
 }
 
@@ -262,7 +112,7 @@ const FilterSchema = z
 const PaginationSchema = z.object({
   filter: FilterSchema,
   cursor: z.string().optional(),
-  limit: z.number().min(1).max(50).default(20),
+  limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 
 // ============================================================================
@@ -273,94 +123,311 @@ export const itemsRouter = router({
   /**
    * Get items in the triage queue (INBOX state).
    * Supports filtering by provider and content type.
+   * Uses cursor-based pagination sorted by ingestedAt DESC.
    */
-  inbox: protectedProcedure.input(PaginationSchema.optional()).query(({ input }) => {
-    // TODO: Replace with D1 query
-    let items = getMockInboxItems();
+  inbox: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
+    const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
+    const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
 
+    // Build WHERE conditions
+    const conditions = [eq(userItems.userId, ctx.userId), eq(userItems.state, UserItemState.INBOX)];
+
+    // Apply cursor-based pagination (fetch items older than cursor)
+    if (cursor) {
+      conditions.push(
+        or(
+          lt(userItems.ingestedAt, cursor.sortValue),
+          and(eq(userItems.ingestedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+        )!
+      );
+    }
+
+    // Apply filters
     if (input?.filter?.provider) {
-      items = items.filter((item) => item.provider === input.filter!.provider);
+      conditions.push(eq(items.provider, input.filter.provider));
     }
     if (input?.filter?.contentType) {
-      items = items.filter((item) => item.contentType === input.filter!.contentType);
+      conditions.push(eq(items.contentType, input.filter.contentType));
     }
 
-    // TODO: Implement cursor-based pagination
-    const limit = input?.limit ?? 20;
-    const paginatedItems = items.slice(0, limit);
+    // Execute query with join
+    const results = await ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...conditions))
+      .orderBy(desc(userItems.ingestedAt), desc(userItems.id))
+      .limit(limit + 1); // Fetch one extra to check for more
+
+    // Check if there are more results
+    const hasMore = results.length > limit;
+    const pageResults = hasMore ? results.slice(0, limit) : results;
+
+    // Transform to ItemView
+    const itemViews = pageResults.map(toItemView);
+
+    // Generate next cursor
+    let nextCursor: string | null = null;
+    if (hasMore && pageResults.length > 0) {
+      const lastResult = pageResults[pageResults.length - 1];
+      nextCursor = encodeCursor({
+        sortValue: lastResult.user_items.ingestedAt,
+        id: lastResult.user_items.id,
+      });
+    }
 
     return {
-      items: paginatedItems,
-      nextCursor: paginatedItems.length === limit ? 'mock-cursor' : undefined,
+      items: itemViews,
+      nextCursor,
     };
   }),
 
   /**
    * Get bookmarked items (BOOKMARKED state).
    * Supports filtering by provider and content type.
+   * Uses cursor-based pagination sorted by bookmarkedAt DESC.
    */
-  library: protectedProcedure.input(PaginationSchema.optional()).query(({ input }) => {
-    // TODO: Replace with D1 query
-    let items = getMockLibraryItems();
+  library: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
+    const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
+    const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
 
+    // Build WHERE conditions
+    const conditions = [
+      eq(userItems.userId, ctx.userId),
+      eq(userItems.state, UserItemState.BOOKMARKED),
+    ];
+
+    // Apply cursor-based pagination (fetch items bookmarked before cursor)
+    if (cursor) {
+      conditions.push(
+        or(
+          lt(userItems.bookmarkedAt, cursor.sortValue),
+          and(eq(userItems.bookmarkedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+        )!
+      );
+    }
+
+    // Apply filters
     if (input?.filter?.provider) {
-      items = items.filter((item) => item.provider === input.filter!.provider);
+      conditions.push(eq(items.provider, input.filter.provider));
     }
     if (input?.filter?.contentType) {
-      items = items.filter((item) => item.contentType === input.filter!.contentType);
+      conditions.push(eq(items.contentType, input.filter.contentType));
     }
 
-    // TODO: Implement cursor-based pagination
-    const limit = input?.limit ?? 20;
-    const paginatedItems = items.slice(0, limit);
+    // Execute query with join
+    const results = await ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...conditions))
+      .orderBy(desc(userItems.bookmarkedAt), desc(userItems.id))
+      .limit(limit + 1);
+
+    // Check if there are more results
+    const hasMore = results.length > limit;
+    const pageResults = hasMore ? results.slice(0, limit) : results;
+
+    // Transform to ItemView
+    const itemViews = pageResults.map(toItemView);
+
+    // Generate next cursor
+    let nextCursor: string | null = null;
+    if (hasMore && pageResults.length > 0) {
+      const lastResult = pageResults[pageResults.length - 1];
+      nextCursor = encodeCursor({
+        sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
+        id: lastResult.user_items.id,
+      });
+    }
 
     return {
-      items: paginatedItems,
-      nextCursor: paginatedItems.length === limit ? 'mock-cursor' : undefined,
+      items: itemViews,
+      nextCursor,
     };
   }),
 
   /**
    * Get curated home sections.
-   * Returns recent bookmarks, items with progress, and items by content type.
+   * Returns recent bookmarks, items with progress ("Jump Back In"), and items by content type.
    */
-  home: protectedProcedure.query(() => {
-    // TODO: Replace with D1 query
-    return getMockHomeData();
+  home: protectedProcedure.query(async ({ ctx }) => {
+    const SECTION_LIMIT = 5;
+
+    // Base query for bookmarked items
+    const baseConditions = [
+      eq(userItems.userId, ctx.userId),
+      eq(userItems.state, UserItemState.BOOKMARKED),
+    ];
+
+    // Fetch recent bookmarks
+    const recentBookmarksQuery = ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...baseConditions))
+      .orderBy(desc(userItems.bookmarkedAt))
+      .limit(SECTION_LIMIT);
+
+    // Fetch items with progress ("Jump Back In")
+    const jumpBackInQuery = ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(
+        and(
+          ...baseConditions,
+          // Has progress but not finished
+          isNotNull(userItems.progressPosition)
+        )
+      )
+      .orderBy(desc(userItems.progressUpdatedAt))
+      .limit(SECTION_LIMIT);
+
+    // Fetch videos
+    const videosQuery = ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...baseConditions, eq(items.contentType, ContentType.VIDEO)))
+      .orderBy(desc(userItems.bookmarkedAt))
+      .limit(SECTION_LIMIT);
+
+    // Fetch podcasts
+    const podcastsQuery = ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...baseConditions, eq(items.contentType, ContentType.PODCAST)))
+      .orderBy(desc(userItems.bookmarkedAt))
+      .limit(SECTION_LIMIT);
+
+    // Fetch articles
+    const articlesQuery = ctx.db
+      .select()
+      .from(userItems)
+      .innerJoin(items, eq(userItems.itemId, items.id))
+      .where(and(...baseConditions, eq(items.contentType, ContentType.ARTICLE)))
+      .orderBy(desc(userItems.bookmarkedAt))
+      .limit(SECTION_LIMIT);
+
+    // Execute all queries in parallel
+    const [recentBookmarks, jumpBackIn, videos, podcasts, articles] = await Promise.all([
+      recentBookmarksQuery,
+      jumpBackInQuery,
+      videosQuery,
+      podcastsQuery,
+      articlesQuery,
+    ]);
+
+    // Filter jumpBackIn to only include items with actual progress
+    const jumpBackInFiltered = jumpBackIn.filter(
+      (row) => row.user_items.progressPosition !== null && row.user_items.progressPosition > 0
+    );
+
+    return {
+      recentBookmarks: recentBookmarks.map(toItemView),
+      jumpBackIn: jumpBackInFiltered.map(toItemView),
+      byContentType: {
+        videos: videos.map(toItemView),
+        podcasts: podcasts.map(toItemView),
+        articles: articles.map(toItemView),
+      },
+    };
   }),
 
   /**
    * Get a single item by UserItem ID.
    */
-  get: protectedProcedure.input(z.object({ id: z.string().min(1) })).query(({ input }) => {
-    // TODO: Replace with D1 query
-    const item = MOCK_ITEMS.find((item) => item.id === input.id);
-    if (!item) {
-      throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: `Item ${input.id} not found`,
-      });
-    }
-    return item;
-  }),
+  get: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const result = await ctx.db
+        .select()
+        .from(userItems)
+        .innerJoin(items, eq(userItems.itemId, items.id))
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (result.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      return toItemView(result[0]);
+    }),
 
   /**
    * Move an item to BOOKMARKED state.
    */
-  bookmark: protectedProcedure.input(z.object({ id: z.string().min(1) })).mutation(({ input }) => {
-    // TODO: Implement with D1
-    console.log(`[MOCK] Bookmarking item ${input.id}`);
-    return { success: true as const };
-  }),
+  bookmark: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      // Verify the item exists and belongs to the user
+      const existing = await ctx.db
+        .select({ id: userItems.id })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      // Update the item state
+      await ctx.db
+        .update(userItems)
+        .set({
+          state: UserItemState.BOOKMARKED,
+          bookmarkedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return { success: true as const };
+    }),
 
   /**
    * Move an item to ARCHIVED state.
    */
-  archive: protectedProcedure.input(z.object({ id: z.string().min(1) })).mutation(({ input }) => {
-    // TODO: Implement with D1
-    console.log(`[MOCK] Archiving item ${input.id}`);
-    return { success: true as const };
-  }),
+  archive: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      // Verify the item exists and belongs to the user
+      const existing = await ctx.db
+        .select({ id: userItems.id })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      // Update the item state
+      await ctx.db
+        .update(userItems)
+        .set({
+          state: UserItemState.ARCHIVED,
+          archivedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return { success: true as const };
+    }),
 
   /**
    * Update playback/reading progress for an item.
@@ -373,9 +440,34 @@ export const itemsRouter = router({
         duration: z.number().min(0),
       })
     )
-    .mutation(({ input }) => {
-      // TODO: Implement with D1
-      console.log(`[MOCK] Updating progress for ${input.id}: ${input.position}/${input.duration}`);
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      // Verify the item exists and belongs to the user
+      const existing = await ctx.db
+        .select({ id: userItems.id })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      // Update progress
+      await ctx.db
+        .update(userItems)
+        .set({
+          progressPosition: input.position,
+          progressDuration: input.duration,
+          progressUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
       return { success: true as const };
     }),
 });

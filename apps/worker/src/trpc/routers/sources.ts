@@ -2,87 +2,32 @@
  * Sources tRPC Router
  *
  * Handles content source subscription management (YouTube, Spotify, RSS, Substack).
- * Currently uses mock data - will be replaced with D1 queries.
+ * Implements D1 queries via Drizzle ORM.
  */
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { Provider } from '@zine/shared';
+import { sources } from '../../db/schema';
 
 // ============================================================================
-// Mock Data
+// Types
 // ============================================================================
 
-interface MockSource {
+/**
+ * Source response type for API
+ */
+export type SourceView = {
   id: string;
-  userId: string;
   provider: Provider;
   providerId: string;
   feedUrl: string;
   name: string;
   createdAt: string;
   updatedAt: string;
-  deletedAt: string | null;
-}
-
-const MOCK_SOURCES: MockSource[] = [
-  {
-    id: 'src-1',
-    userId: 'user-1',
-    provider: Provider.YOUTUBE,
-    providerId: 'UC2KfmYEM4KCuA1ZurravgYw',
-    feedUrl: 'https://www.youtube.com/@Fireship',
-    name: 'Fireship',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    deletedAt: null,
-  },
-  {
-    id: 'src-2',
-    userId: 'user-1',
-    provider: Provider.SPOTIFY,
-    providerId: '2MAi0BvDc6GTFvKFPXnkCL',
-    feedUrl: 'https://open.spotify.com/show/2MAi0BvDc6GTFvKFPXnkCL',
-    name: 'Lex Fridman Podcast',
-    createdAt: '2024-01-02T00:00:00Z',
-    updatedAt: '2024-01-02T00:00:00Z',
-    deletedAt: null,
-  },
-  {
-    id: 'src-3',
-    userId: 'user-1',
-    provider: Provider.SUBSTACK,
-    providerId: 'stratechery',
-    feedUrl: 'https://stratechery.com/feed/',
-    name: 'Stratechery',
-    createdAt: '2024-01-03T00:00:00Z',
-    updatedAt: '2024-01-03T00:00:00Z',
-    deletedAt: null,
-  },
-  {
-    id: 'src-4',
-    userId: 'user-1',
-    provider: Provider.RSS,
-    providerId: 'hacker-news',
-    feedUrl: 'https://news.ycombinator.com/rss',
-    name: 'Hacker News',
-    createdAt: '2024-01-04T00:00:00Z',
-    updatedAt: '2024-01-04T00:00:00Z',
-    deletedAt: null,
-  },
-  {
-    id: 'src-5',
-    userId: 'user-1',
-    provider: Provider.YOUTUBE,
-    providerId: 'UCsBjURrPoezykLs9EqgamOA',
-    feedUrl: 'https://www.youtube.com/@Fireship-deleted',
-    name: 'Deleted Channel',
-    createdAt: '2024-01-05T00:00:00Z',
-    updatedAt: '2024-01-05T00:00:00Z',
-    deletedAt: '2024-06-01T00:00:00Z', // Soft-deleted
-  },
-];
+};
 
 // ============================================================================
 // Zod Schemas
@@ -120,6 +65,9 @@ function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
         if (url.pathname.startsWith('/@')) {
           return url.pathname.slice(2); // Remove '/@'
         }
+        if (url.pathname.startsWith('/channel/')) {
+          return `YouTube Channel`;
+        }
         return url.hostname;
 
       case Provider.SPOTIFY:
@@ -146,10 +94,62 @@ function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
 }
 
 /**
- * Generate a simple unique ID for mock data
+ * Extract provider ID from URL based on provider type
  */
-function generateId(): string {
-  return `src-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+function extractProviderId(feedUrl: string, provider: Provider): string {
+  try {
+    const url = new URL(feedUrl);
+
+    switch (provider) {
+      case Provider.YOUTUBE:
+        // Try to extract channel ID from various YouTube URL formats
+        if (url.pathname.startsWith('/@')) {
+          return url.pathname.slice(2);
+        }
+        if (url.pathname.startsWith('/channel/')) {
+          return url.pathname.slice(9).split('/')[0];
+        }
+        // For playlist or other URLs, use the full path
+        return url.pathname.slice(1);
+
+      case Provider.SPOTIFY: {
+        // Extract show ID from Spotify URL (e.g., /show/{id})
+        const spotifyMatch = url.pathname.match(/\/show\/([a-zA-Z0-9]+)/);
+        return spotifyMatch ? spotifyMatch[1] : url.pathname;
+      }
+
+      case Provider.SUBSTACK:
+        // Use subdomain or path as ID
+        if (url.hostname.endsWith('.substack.com')) {
+          return url.hostname.replace('.substack.com', '');
+        }
+        return url.hostname;
+
+      case Provider.RSS:
+        // Use hostname + path as unique ID
+        return `${url.hostname}${url.pathname}`;
+
+      default:
+        return feedUrl;
+    }
+  } catch {
+    return feedUrl;
+  }
+}
+
+/**
+ * Transform a DB row to SourceView
+ */
+function toSourceView(row: typeof sources.$inferSelect): SourceView {
+  return {
+    id: row.id,
+    provider: row.provider as Provider,
+    providerId: row.providerId,
+    feedUrl: row.feedUrl,
+    name: row.name,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 // ============================================================================
@@ -162,32 +162,14 @@ export const sourcesRouter = router({
    *
    * Returns all active sources (excludes soft-deleted)
    */
-  list: protectedProcedure.query(({ ctx: _ctx }) => {
-    // TODO: Replace with D1 query
-    // const sources = await ctx.db.query.sources.findMany({
-    //   where: and(
-    //     eq(sources.userId, ctx.userId),
-    //     isNull(sources.deletedAt)
-    //   ),
-    //   orderBy: desc(sources.createdAt)
-    // });
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const results = await ctx.db
+      .select()
+      .from(sources)
+      .where(and(eq(sources.userId, ctx.userId), isNull(sources.deletedAt)))
+      .orderBy(desc(sources.createdAt));
 
-    // Filter to active sources (not soft-deleted) for the current user
-    const activeSources = MOCK_SOURCES.filter(
-      (source) => source.deletedAt === null
-      // In real implementation: && source.userId === ctx.userId
-    );
-
-    // Return sources without internal fields
-    return activeSources.map((source) => ({
-      id: source.id,
-      provider: source.provider,
-      providerId: source.providerId,
-      feedUrl: source.feedUrl,
-      name: source.name,
-      createdAt: source.createdAt,
-      updatedAt: source.updatedAt,
-    }));
+    return results.map(toSourceView);
   }),
 
   /**
@@ -196,30 +178,22 @@ export const sourcesRouter = router({
    * Input: provider, feedUrl, optional name (auto-derived if not provided)
    * Returns the created source
    */
-  add: protectedProcedure.input(AddSourceInputSchema).mutation(({ ctx, input }) => {
-    // TODO: Replace with D1 query
+  add: protectedProcedure.input(AddSourceInputSchema).mutation(async ({ ctx, input }) => {
     // Check for duplicate subscription
-    // const existing = await ctx.db.query.sources.findFirst({
-    //   where: and(
-    //     eq(sources.userId, ctx.userId),
-    //     eq(sources.provider, input.provider),
-    //     eq(sources.feedUrl, input.feedUrl),
-    //     isNull(sources.deletedAt)
-    //   )
-    // });
-    // if (existing) {
-    //   throw new TRPCError({ code: 'CONFLICT', message: 'Already subscribed to this source' });
-    // }
+    const existing = await ctx.db
+      .select({ id: sources.id })
+      .from(sources)
+      .where(
+        and(
+          eq(sources.userId, ctx.userId),
+          eq(sources.provider, input.provider),
+          eq(sources.feedUrl, input.feedUrl),
+          isNull(sources.deletedAt)
+        )
+      )
+      .limit(1);
 
-    // Check for duplicate in mock data
-    const existingSource = MOCK_SOURCES.find(
-      (source) =>
-        source.feedUrl === input.feedUrl &&
-        source.provider === input.provider &&
-        source.deletedAt === null
-    );
-
-    if (existingSource) {
+    if (existing.length > 0) {
       throw new TRPCError({
         code: 'CONFLICT',
         message: 'Already subscribed to this source',
@@ -229,13 +203,16 @@ export const sourcesRouter = router({
     // Derive name if not provided
     const name = input.name || deriveNameFromUrl(input.feedUrl, input.provider as Provider);
 
+    // Extract provider ID from URL
+    const providerId = extractProviderId(input.feedUrl, input.provider as Provider);
+
     // Create new source
     const now = new Date().toISOString();
-    const newSource: MockSource = {
-      id: generateId(),
+    const newSource = {
+      id: crypto.randomUUID(),
       userId: ctx.userId,
-      provider: input.provider as Provider,
-      providerId: generateId(), // In real impl, extract from URL or API
+      provider: input.provider,
+      providerId,
       feedUrl: input.feedUrl,
       name,
       createdAt: now,
@@ -243,21 +220,9 @@ export const sourcesRouter = router({
       deletedAt: null,
     };
 
-    // TODO: In real implementation, insert into D1
-    // await ctx.db.insert(sources).values(newSource);
+    await ctx.db.insert(sources).values(newSource);
 
-    console.log(`[MOCK] Adding source: ${newSource.name} (${newSource.provider})`);
-
-    // Return the created source
-    return {
-      id: newSource.id,
-      provider: newSource.provider,
-      providerId: newSource.providerId,
-      feedUrl: newSource.feedUrl,
-      name: newSource.name,
-      createdAt: newSource.createdAt,
-      updatedAt: newSource.updatedAt,
-    };
+    return toSourceView(newSource);
   }),
 
   /**
@@ -266,39 +231,32 @@ export const sourcesRouter = router({
    * Input: source ID
    * Returns success status
    */
-  remove: protectedProcedure.input(RemoveSourceInputSchema).mutation(({ ctx: _ctx, input }) => {
-    // TODO: Replace with D1 query
-    // const source = await ctx.db.query.sources.findFirst({
-    //   where: and(
-    //     eq(sources.id, input.id),
-    //     eq(sources.userId, ctx.userId),
-    //     isNull(sources.deletedAt)
-    //   )
-    // });
-    // if (!source) {
-    //   throw new TRPCError({ code: 'NOT_FOUND', message: 'Source not found' });
-    // }
-    // await ctx.db.update(sources)
-    //   .set({ deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-    //   .where(eq(sources.id, input.id));
+  remove: protectedProcedure.input(RemoveSourceInputSchema).mutation(async ({ ctx, input }) => {
+    // Check that the source exists and belongs to the user
+    const existing = await ctx.db
+      .select({ id: sources.id })
+      .from(sources)
+      .where(
+        and(eq(sources.id, input.id), eq(sources.userId, ctx.userId), isNull(sources.deletedAt))
+      )
+      .limit(1);
 
-    // Find source in mock data
-    const source = MOCK_SOURCES.find(
-      (s) => s.id === input.id && s.deletedAt === null
-      // In real impl: && s.userId === ctx.userId
-    );
-
-    if (!source) {
+    if (existing.length === 0) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: `Source ${input.id} not found`,
       });
     }
 
-    console.log(`[MOCK] Removing source: ${source.name} (${source.id})`);
-
-    // TODO: In real implementation, soft delete in D1
-    // For mock, we just log the action
+    // Soft delete the source
+    const now = new Date().toISOString();
+    await ctx.db
+      .update(sources)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(sources.id, input.id));
 
     return { success: true as const };
   }),

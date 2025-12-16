@@ -21,10 +21,7 @@ sources.get('/', async (c) => {
   const requestId = c.get('requestId');
 
   if (!userId) {
-    return c.json(
-      { error: 'Authentication required', code: 'UNAUTHORIZED', requestId },
-      401
-    );
+    return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
   // TODO: Implement source listing
@@ -52,10 +49,7 @@ sources.post('/', async (c) => {
   const requestId = c.get('requestId');
 
   if (!userId) {
-    return c.json(
-      { error: 'Authentication required', code: 'UNAUTHORIZED', requestId },
-      401
-    );
+    return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
   // TODO: Implement source creation
@@ -83,10 +77,7 @@ sources.get('/:id', async (c) => {
   const sourceId = c.req.param('id');
 
   if (!userId) {
-    return c.json(
-      { error: 'Authentication required', code: 'UNAUTHORIZED', requestId },
-      401
-    );
+    return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
   // TODO: Implement source details
@@ -113,10 +104,7 @@ sources.delete('/:id', async (c) => {
   const sourceId = c.req.param('id');
 
   if (!userId) {
-    return c.json(
-      { error: 'Authentication required', code: 'UNAUTHORIZED', requestId },
-      401
-    );
+    return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
   // TODO: Implement source deletion
@@ -143,10 +131,7 @@ sources.post('/:id/refresh', async (c) => {
   const sourceId = c.req.param('id');
 
   if (!userId) {
-    return c.json(
-      { error: 'Authentication required', code: 'UNAUTHORIZED', requestId },
-      401
-    );
+    return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
   // TODO: Implement source refresh
