@@ -11,6 +11,7 @@ It builds on the established domain model and D1 persistence layer to describe:
 - How ingestion stays simple while remaining extensible
 
 Primary goals:
+
 - Fast iteration
 - Safe retries and replays
 - Minimal coupling between ingestion and domain logic
@@ -46,10 +47,12 @@ Source Trigger (cron or manual)
 ## Unit of Ingestion
 
 ### Fetch Unit
+
 - Providers are fetched in **batches**
 - Matches provider APIs and rate limits
 
 ### Processing Unit
+
 - Each item is processed **independently**
 - Enables:
   - Item-level retries
@@ -67,6 +70,7 @@ Source Trigger (cron or manual)
 - UI may show partial or stale data briefly
 
 This aligns with:
+
 - Hourly background sync
 - On-demand refresh
 - Cloudflare Worker execution limits
@@ -124,6 +128,7 @@ For each raw provider item:
 5. Continue ingestion
 
 This guarantees:
+
 - Safe retries
 - Replayable ingestion
 - No duplicate user_items
@@ -142,6 +147,7 @@ This guarantees:
 ### Failure Handling
 
 If canonical resolution fails:
+
 - Still create a minimal canonical item
 - Still surface item in Inbox
 - Enrichment can fix metadata later
@@ -167,6 +173,7 @@ This favors **resilience over strictness**.
   - One `(user_id, canonical_item_id)` row
 
 Inbox flooding is avoided by:
+
 - Provider idempotency
 - No historical backfill by default
 
@@ -189,6 +196,7 @@ Inbox flooding is avoided by:
 - Language detection
 
 Failures:
+
 - Logged
 - Retryable
 - Never block ingestion or Inbox visibility
@@ -203,6 +211,7 @@ Failures:
 - No automatic historical backfill
 
 Benefits:
+
 - Predictable Inbox size
 - Fast initial sync
 - Avoids user overwhelm
@@ -214,15 +223,18 @@ Historical import can be added later as an explicit action.
 ## Failure Isolation
 
 Failures are scoped to:
+
 - Individual items
 - Individual enrichment steps
 
 Never:
+
 - Entire source
 - Entire ingestion run
 - User-facing workflows
 
 Optional `ingestion_runs` table can be used for:
+
 - Observability
 - Debugging
 - Manual replay
@@ -251,6 +263,7 @@ Optional `ingestion_runs` table can be used for:
 ## Next Topic
 
 **Sync & local-first strategy**
+
 - Client caching
 - Refresh semantics
 - Offline behavior

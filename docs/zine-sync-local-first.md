@@ -16,8 +16,8 @@ This document defines the **sync and local‑first architecture** for Zine, base
 
 Client (Mobile)
 └─ Replicache
-   └─ Local KV Store
-      └─ UI reads (instant, offline)
+└─ Local KV Store
+└─ UI reads (instant, offline)
 
 ⇅ push / pull
 
@@ -49,15 +49,19 @@ Client data is denormalized and optimized for UI reads.
 ## Index Strategy
 
 Primary list:
+
 - idx/list/{state}/{timeKey}/{id}
 
 Provider filter:
+
 - idx/provider/{state}/{provider}/{timeKey}/{id}
 
 ContentType filter:
+
 - idx/type/{state}/{contentType}/{timeKey}/{id}
 
 Search:
+
 - s/{state}/title/{token}/{id}
 - s/{state}/publisher/{token}/{id}
 
@@ -66,9 +70,11 @@ Search:
 ## Sorting Rules
 
 Inbox:
+
 - Sorted by ingestedAt
 
 Bookmarks (future screen):
+
 - Sorted by bookmarkedAt
 
 ---

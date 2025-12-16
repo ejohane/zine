@@ -24,6 +24,7 @@ Zine is a **content capture and curation tool**.
 - Zine does **not** try to consume or play content itself
 
 Zine optimizes for:
+
 - Intentional saving
 - Clear inbox triage
 - Long-term reference and rediscovery
@@ -37,13 +38,16 @@ Zine intentionally has **only three first-class domain objects** at the core.
 ### Bookmark
 
 **What it is**
+
 - A deliberate, user-created reference to a piece of content
 - Always links out to the original content
 
 **Solves**
+
 - Saving links for later reference or consumption
 
 **Does NOT**
+
 - Play or embed content
 - Act as a feed
 - Automatically ingest content
@@ -53,18 +57,22 @@ Zine intentionally has **only three first-class domain objects** at the core.
 ### Inbox
 
 **What it is**
+
 - A queue of content **automatically ingested** from Sources
 
 **Solves**
+
 - Triage: decide what is worth bookmarking
 - Separates passive intake from intentional saving
 
 **Does NOT**
+
 - Store bookmarks
 - Accept manually saved URLs
 - Act as a long-term content store
 
 **Lifecycle**
+
 - New → Archived (default action)
 - Bookmarking removes it from Inbox but keeps the canonical item
 
@@ -73,15 +81,18 @@ Zine intentionally has **only three first-class domain objects** at the core.
 ### Source
 
 **What it is**
+
 - A subscription to a specific content-producing entity inside a provider
 
 Examples:
+
 - YouTube channel
 - Spotify podcast
 - RSS feed URL
 - Newsletter feed
 
 **Does NOT**
+
 - Define the domain model
 - Perform deduplication
 - Decide what becomes a Bookmark
@@ -92,7 +103,7 @@ Examples:
 
 ### Canonical Item
 
-A **canonical item** represents *one piece of content* across the system.
+A **canonical item** represents _one piece of content_ across the system.
 
 - Inbox items and Bookmarks both reference the same canonical item
 - The same content arriving from multiple Sources resolves to one canonical item
@@ -134,14 +145,17 @@ A **canonical item** represents *one piece of content* across the system.
 ## Ingestion Architecture
 
 ### Principle
+
 **Sources fetch raw data. Ingestion owns normalization.**
 
 ### Source Fetch Layer
+
 - Fetch provider-shaped data
 - Emit raw envelopes
 - No domain logic
 
 ### Ingestion Layer
+
 - Deduplication
 - Canonical resolution
 - Inbox creation
