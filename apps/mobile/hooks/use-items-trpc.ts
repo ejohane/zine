@@ -248,6 +248,7 @@ export function useBookmarkItem() {
       // Refetch after mutation completes (success or error)
       utils.items.inbox.invalidate();
       utils.items.library.invalidate();
+      utils.items.home.invalidate();
     },
   });
 }
@@ -317,6 +318,7 @@ export function useArchiveItem() {
       // Refetch after mutation completes (success or error)
       utils.items.inbox.invalidate();
       utils.items.library.invalidate();
+      utils.items.home.invalidate();
     },
   });
 }

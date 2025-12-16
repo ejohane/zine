@@ -21,6 +21,7 @@ import {
   formatDuration,
   mapContentType,
 } from '@/hooks/use-items-trpc';
+import type { ContentType } from '@zine/shared';
 
 // Inbox arrow icon
 function InboxArrowIcon({ size = 64, color = '#6366F1' }: { size?: number; color?: string }) {
@@ -92,7 +93,7 @@ function InboxItemCard({
   isBookmarking: boolean;
   isArchiving: boolean;
 }) {
-  const contentType = mapContentType(item.contentType as 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST');
+  const contentType = mapContentType(item.contentType as ContentType);
   const contentColor = ContentColors[contentType];
 
   return (

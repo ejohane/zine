@@ -1,6 +1,14 @@
 import { Image } from 'expo-image';
 import { Surface } from 'heroui-native';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -15,6 +23,12 @@ import {
   ProviderColors,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  useLibraryItems,
+  mapContentType,
+  mapProvider,
+  formatDuration,
+} from '@/hooks/use-items-trpc';
 
 // =============================================================================
 // Icons
@@ -65,11 +79,11 @@ function FilterIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: s
 }
 
 // =============================================================================
-// Types & Mock Data
+// Types
 // =============================================================================
 
-type ContentType = 'podcast' | 'video' | 'article';
-type Provider = 'youtube' | 'spotify' | 'substack' | 'pocket';
+type ContentType = 'podcast' | 'video' | 'article' | 'post';
+type Provider = 'youtube' | 'spotify' | 'substack' | 'rss';
 
 interface LibraryItem {
   id: string;
@@ -77,90 +91,10 @@ interface LibraryItem {
   source: string;
   provider: Provider;
   type: ContentType;
-  thumbnailUrl: string;
+  thumbnailUrl: string | null;
   bookmarkedAt: string;
   duration?: string;
 }
-
-const libraryItems: LibraryItem[] = [
-  {
-    id: 'lib-1',
-    title: 'Local-First Software: You Own Your Data',
-    source: 'Ink & Switch',
-    provider: 'substack',
-    type: 'article',
-    thumbnailUrl: 'https://picsum.photos/seed/local1/400/300',
-    bookmarkedAt: '2 hours ago',
-  },
-  {
-    id: 'lib-2',
-    title: 'The Future of React with Dan Abramov',
-    source: 'Syntax.fm',
-    provider: 'spotify',
-    type: 'podcast',
-    thumbnailUrl: 'https://picsum.photos/seed/syntax1/400/400',
-    bookmarkedAt: '5 hours ago',
-    duration: '1:24:00',
-  },
-  {
-    id: 'lib-3',
-    title: 'Building Production-Ready AI Applications',
-    source: 'Fireship',
-    provider: 'youtube',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/fire1/400/225',
-    bookmarkedAt: 'Yesterday',
-    duration: '12:34',
-  },
-  {
-    id: 'lib-4',
-    title: 'The Expanding Dark Forest and Generative AI',
-    source: 'Maggie Appleton',
-    provider: 'substack',
-    type: 'article',
-    thumbnailUrl: 'https://picsum.photos/seed/dark1/400/300',
-    bookmarkedAt: 'Yesterday',
-  },
-  {
-    id: 'lib-5',
-    title: 'How Notion Built Their Backend',
-    source: 'ByteByteGo',
-    provider: 'youtube',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/notion1/400/225',
-    bookmarkedAt: '2 days ago',
-    duration: '18:42',
-  },
-  {
-    id: 'lib-6',
-    title: "Lenny's Podcast: Product Excellence",
-    source: 'Lenny Rachitsky',
-    provider: 'spotify',
-    type: 'podcast',
-    thumbnailUrl: 'https://picsum.photos/seed/lenny1/400/400',
-    bookmarkedAt: '3 days ago',
-    duration: '1:45:00',
-  },
-  {
-    id: 'lib-7',
-    title: 'Why TypeScript is Taking Over',
-    source: 'Matt Pocock',
-    provider: 'youtube',
-    type: 'video',
-    thumbnailUrl: 'https://picsum.photos/seed/ts1/400/225',
-    bookmarkedAt: '4 days ago',
-    duration: '22:15',
-  },
-  {
-    id: 'lib-8',
-    title: 'Designing APIs That Developers Love',
-    source: 'Stripe Press',
-    provider: 'substack',
-    type: 'article',
-    thumbnailUrl: 'https://picsum.photos/seed/stripe1/400/300',
-    bookmarkedAt: '1 week ago',
-  },
-];
 
 const filterOptions = [
   { id: 'all', label: 'All', icon: null },
@@ -185,7 +119,13 @@ function getContentIcon(type: ContentType, size = 14, color = '#fff') {
 }
 
 function getProviderColor(provider: Provider): string {
-  return ProviderColors[provider] || '#6366F1';
+  const providerColorMap: Record<Provider, string> = {
+    youtube: ProviderColors.youtube,
+    spotify: ProviderColors.spotify,
+    substack: ProviderColors.substack,
+    rss: '#6366F1', // Default color for RSS
+  };
+  return providerColorMap[provider] || '#6366F1';
 }
 
 interface FilterChipProps {
@@ -246,12 +186,16 @@ function LibraryCard({ item, colors, index }: LibraryCardProps) {
         ]}
       >
         <View style={[styles.cardThumbnail, { aspectRatio }]}>
-          <Image
-            source={{ uri: item.thumbnailUrl }}
-            style={styles.cardImage}
-            contentFit="cover"
-            transition={200}
-          />
+          {item.thumbnailUrl ? (
+            <Image
+              source={{ uri: item.thumbnailUrl }}
+              style={styles.cardImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={[styles.cardImage, { backgroundColor: colors.backgroundTertiary }]} />
+          )}
           {/* Type indicator */}
           <View style={[styles.typeIndicator, { backgroundColor: ContentColors[item.type] }]}>
             {getContentIcon(item.type, 12, '#fff')}
@@ -285,12 +229,79 @@ function LibraryCard({ item, colors, index }: LibraryCardProps) {
 }
 
 // =============================================================================
+// Loading & Error States
+// =============================================================================
+
+function LoadingState({ colors }: { colors: (typeof Colors)['light'] }) {
+  return (
+    <View style={styles.loadingState}>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+}
+
+function ErrorState({ colors, message }: { colors: (typeof Colors)['light']; message: string }) {
+  return (
+    <View style={styles.errorState}>
+      <Text style={[styles.errorText, { color: colors.error }]}>{message}</Text>
+    </View>
+  );
+}
+
+function EmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
+  return (
+    <View style={styles.emptyState}>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>No bookmarked items</Text>
+      <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
+        Bookmark content from your inbox to save it here for later.
+      </Text>
+    </View>
+  );
+}
+
+// =============================================================================
+// Transform function - API response to UI format
+// =============================================================================
+
+function formatRelativeTime(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30)
+    return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) === 1 ? '' : 's'} ago`;
+  return date.toLocaleDateString();
+}
+
+// =============================================================================
 // Main Screen
 // =============================================================================
 
 export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+
+  // Fetch library items from tRPC
+  const { data, isLoading, error } = useLibraryItems();
+
+  // Transform API response to UI format
+  const libraryItems: LibraryItem[] = (data?.items ?? []).map((item) => ({
+    id: item.id,
+    title: item.title,
+    source: item.creator,
+    provider: mapProvider(item.provider) as Provider,
+    type: mapContentType(item.contentType) as ContentType,
+    thumbnailUrl: item.thumbnailUrl ?? null,
+    bookmarkedAt: formatRelativeTime(item.bookmarkedAt),
+    duration: formatDuration(item.duration ?? null),
+  }));
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
@@ -299,7 +310,9 @@ export default function LibraryScreen() {
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            {libraryItems.length} saved items
+            {isLoading
+              ? 'Loading...'
+              : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
           </Text>
         </View>
 
@@ -358,17 +371,25 @@ export default function LibraryScreen() {
           </ScrollView>
         </Animated.View>
 
-        {/* Library List */}
-        <ScrollView
-          style={styles.listContainer}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {libraryItems.map((item, index) => (
-            <LibraryCard key={item.id} item={item} colors={colors} index={index} />
-          ))}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
+        {/* Content */}
+        {isLoading ? (
+          <LoadingState colors={colors} />
+        ) : error ? (
+          <ErrorState colors={colors} message={error.message} />
+        ) : libraryItems.length === 0 ? (
+          <EmptyState colors={colors} />
+        ) : (
+          <ScrollView
+            style={styles.listContainer}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {libraryItems.map((item, index) => (
+              <LibraryCard key={item.id} item={item} colors={colors} index={index} />
+            ))}
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        )}
       </SafeAreaView>
     </Surface>
   );
@@ -528,5 +549,43 @@ const styles = StyleSheet.create({
   // Bottom spacer
   bottomSpacer: {
     height: 40,
+  },
+
+  // Loading state
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Error state
+  errorState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing['3xl'],
+  },
+  errorText: {
+    ...Typography.bodyMedium,
+    textAlign: 'center',
+  },
+
+  // Empty state
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing['3xl'],
+    paddingBottom: 100,
+  },
+  emptyTitle: {
+    ...Typography.headlineSmall,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+  },
+  emptyDescription: {
+    ...Typography.bodyMedium,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

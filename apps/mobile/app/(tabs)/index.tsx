@@ -30,6 +30,7 @@ import {
   formatDuration,
   type ItemWithUserState,
 } from '@/hooks/use-items';
+import type { ContentType as ContentTypeEnum } from '@zine/shared';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH * 0.42;
@@ -135,24 +136,28 @@ const providerMap: Record<string, Provider> = {
  * Transform domain ItemWithUserState to UI ContentItem
  */
 function transformToContentItem({ item, userItem }: ItemWithUserState): ContentItem {
-  // Extract provider from providerId (e.g., "spotify:episode:abc" -> "spotify")
-  const providerKey = item.providerId?.split(':')[0]?.toLowerCase() ?? '';
+  // Extract provider from canonicalUrl if available
+  const urlLower = item.canonicalUrl?.toLowerCase() ?? '';
+  let providerKey = 'substack';
+  if (urlLower.includes('youtube')) providerKey = 'youtube';
+  else if (urlLower.includes('spotify')) providerKey = 'spotify';
+  else if (urlLower.includes('substack')) providerKey = 'substack';
 
   return {
     id: userItem.id, // Use userItem.id for mutation handlers
     title: item.title ?? 'Untitled',
-    source: item.publisher ?? item.author ?? 'Unknown',
+    source: item.publisher ?? item.creator ?? 'Unknown',
     provider: providerMap[providerKey] ?? 'substack',
-    type: mapContentType(item.contentType) as ContentType,
-    thumbnailUrl: item.thumbnailUrl,
-    duration: formatDuration(item.duration),
+    type: mapContentType((item.contentType ?? 'ARTICLE') as ContentTypeEnum) as ContentType,
+    thumbnailUrl: item.thumbnailUrl ?? undefined,
+    duration: formatDuration(item.duration ?? undefined),
     progress: 0, // Progress tracking not implemented yet
-    publishedAt: item.publishedAt,
+    publishedAt: item.publishedAt ?? undefined,
   };
 }
 
 // =============================================================================
-// Static Mock Data (kept for non-Replicache sections)
+// Static Mock Data (kept for non-tRPC sections)
 // =============================================================================
 
 // Realistic mock data with actual content
@@ -166,7 +171,7 @@ const featuredContent: ContentItem = {
   gradient: ['#6366F1', '#8B5CF6'],
 };
 
-// Note: recentBookmarks removed - now using recentInbox from Replicache hooks
+// Note: recentBookmarks removed - now using recentInbox from tRPC hooks
 
 const podcasts: ContentItem[] = [
   {
@@ -595,7 +600,7 @@ export default function HomeScreen() {
             <FeaturedCard item={featuredContent} colors={colors} />
           </View>
 
-          {/* Jump Back In - Live Replicache Data (Bookmarked Items) */}
+          {/* Jump Back In - Live tRPC Data (Bookmarked Items) */}
           <View style={styles.section}>
             <SectionHeader
               title="Jump Back In"
@@ -621,7 +626,7 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Recent Inbox - Live Replicache Data */}
+          {/* Recent Inbox - Live tRPC Data */}
           <View style={styles.section}>
             <SectionHeader
               title="Recent Inbox"

@@ -1,5 +1,5 @@
 /**
- * Replicache-style data hooks for Items
+ * Data hooks for Items
  *
  * Wraps tRPC hooks to provide a simpler interface for UI components.
  * Returns arrays directly instead of React Query result objects.
@@ -19,31 +19,27 @@ export { mapContentType, formatDuration, UIContentType, UIProvider } from './use
 
 /**
  * Represents an item joined with its user state
- * This mirrors what Replicache would return with joined data
+ * This mirrors what the old architecture would return with joined data
  */
 export interface ItemWithUserState {
   item: {
     id: string;
     title: string | null;
-    description?: string | null;
-    author?: string | null;
+    summary?: string | null;
+    creator?: string | null;
     publisher?: string | null;
     thumbnailUrl?: string | null;
-    contentUrl?: string | null;
-    providerId?: string | null;
+    canonicalUrl?: string | null;
     contentType?: string;
     duration?: number | null;
     publishedAt?: string | null;
-    createdAt?: string;
   };
   userItem: {
     id: string;
     itemId: string;
-    userId: string;
     state: string;
-    position?: number | null;
-    createdAt?: string;
-    updatedAt?: string;
+    ingestedAt?: string | null;
+    bookmarkedAt?: string | null;
   };
 }
 
@@ -72,25 +68,21 @@ export function useBookmarkedItems(): ItemWithUserState[] {
     item: {
       id: item.itemId,
       title: item.title,
-      description: item.description,
-      author: item.author,
+      summary: item.summary,
+      creator: item.creator,
       publisher: item.publisher,
       thumbnailUrl: item.thumbnailUrl,
-      contentUrl: item.contentUrl,
-      providerId: item.providerId,
+      canonicalUrl: item.canonicalUrl,
       contentType: item.contentType,
       duration: item.duration,
       publishedAt: item.publishedAt,
-      createdAt: item.createdAt,
     },
     userItem: {
       id: item.id,
       itemId: item.itemId,
-      userId: item.userId,
       state: item.state,
-      position: item.position,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+      ingestedAt: item.ingestedAt,
+      bookmarkedAt: item.bookmarkedAt,
     },
   }));
 }
@@ -116,25 +108,21 @@ export function useInboxItems(): ItemWithUserState[] {
     item: {
       id: item.itemId,
       title: item.title,
-      description: item.description,
-      author: item.author,
+      summary: item.summary,
+      creator: item.creator,
       publisher: item.publisher,
       thumbnailUrl: item.thumbnailUrl,
-      contentUrl: item.contentUrl,
-      providerId: item.providerId,
+      canonicalUrl: item.canonicalUrl,
       contentType: item.contentType,
       duration: item.duration,
       publishedAt: item.publishedAt,
-      createdAt: item.createdAt,
     },
     userItem: {
       id: item.id,
       itemId: item.itemId,
-      userId: item.userId,
       state: item.state,
-      position: item.position,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
+      ingestedAt: item.ingestedAt,
+      bookmarkedAt: item.bookmarkedAt,
     },
   }));
 }
