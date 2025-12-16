@@ -5,14 +5,12 @@
  * type-safe API calls with automatic caching and auth integration.
  */
 
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
+import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
-
-// TODO: Uncomment when @clerk/clerk-expo is added
-// import { useAuth } from '@clerk/clerk-expo';
 
 // ============================================================================
 // Provider Component
@@ -36,8 +34,11 @@ interface TRPCProviderProps {
  * ```
  */
 export function TRPCProvider({ children }: TRPCProviderProps) {
-  // TODO: Integrate with Clerk auth when @clerk/clerk-expo is added
-  // const { getToken } = useAuth();
+  const { getToken } = useAuth();
+
+  // Store getToken in a ref to avoid recreating the tRPC client when auth changes
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   // ---------------------------------------------------------------------------
   // QueryClient Configuration
@@ -70,11 +71,17 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
         httpBatchLink({
           url,
           transformer: superjson, // Required for Date serialization - must match server
-          // TODO: Add auth headers when Clerk is integrated
-          // headers: async () => {
-          //   const token = await getToken();
-          //   return token ? { Authorization: `Bearer ${token}` } : {};
-          // },
+          headers: async () => {
+            try {
+              const token = await getTokenRef.current();
+              if (token) {
+                return { Authorization: `Bearer ${token}` };
+              }
+            } catch (error) {
+              console.warn('[tRPC] Failed to get auth token:', error);
+            }
+            return {};
+          },
         }),
       ],
     });
