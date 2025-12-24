@@ -30,7 +30,7 @@ import {
   type YouTubeClient,
 } from '../providers/youtube';
 import { getSpotifyClientForConnection, getShowEpisodes } from '../providers/spotify';
-import { ingestItem } from '../ingestion';
+import { ingestItem } from '../ingestion/processor';
 import { transformYouTubeVideo, transformSpotifyEpisode } from '../ingestion/transformers';
 import type { Bindings } from '../types';
 import type { ProviderConnection } from '../lib/token-refresh';
@@ -490,7 +490,7 @@ async function pollSingleSpotifySubscription(
         rawEpisode,
         Provider.SPOTIFY,
         db as unknown as DrizzleD1Database,
-        (raw) => transformSpotifyEpisode(raw, sub.name)
+        (raw: typeof rawEpisode) => transformSpotifyEpisode(raw, sub.name)
       );
       if (result.created) {
         newItemsCount++;

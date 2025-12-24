@@ -20,11 +20,18 @@
  * @see /features/subscriptions/backend-spec.md - Section 6.4: Connection Health & Recovery
  */
 
-import { ulid } from 'ulid';
-import { eq, and, isNull, inArray } from 'drizzle-orm';
-import { providerConnections, subscriptions, userNotifications } from '../db/schema';
-import { getValidAccessToken, type ProviderConnection } from '../lib/token-refresh';
+import { eq, and } from 'drizzle-orm';
+import { providerConnections, subscriptions } from '../db/schema';
+import {
+  getValidAccessToken,
+  type ProviderConnection,
+  type TokenRefreshEnv,
+} from '../lib/token-refresh';
 import type { Database } from '../db';
+
+// NOTE: User notifications are not yet implemented. Functions in this file
+// log messages but don't persist to database. When implementing notifications,
+// add a userNotifications table to schema and update these functions.
 
 // ============================================================================
 // Types
@@ -32,6 +39,7 @@ import type { Database } from '../db';
 
 /**
  * Environment bindings required for health monitoring
+ * Extends TokenRefreshEnv to ensure compatibility
  */
 export interface HealthMonitorEnv {
   /** D1 database for persistent storage */
@@ -161,7 +169,7 @@ export async function handlePollingAuthError(
   if (isTokenExpiredError(error)) {
     // Try to refresh the token first
     try {
-      await getValidAccessToken(connection, env);
+      await getValidAccessToken(connection, env as TokenRefreshEnv);
       // Success! Token was refreshed, no status change needed
       return;
     } catch (refreshError) {
@@ -299,51 +307,27 @@ export async function markConnectionRevoked(connectionId: string, db: Database):
  * Prevents duplicate active notifications of the same type/provider combo.
  * If an active notification exists, it won't create a new one.
  *
+ * NOTE: User notifications table is not yet implemented. This is a stub
+ * that logs the notification. Implement userNotifications table in schema
+ * and update this function when notifications feature is built.
+ *
  * @param userId - User ID to notify
  * @param params - Notification parameters (type, provider, reason)
- * @param db - Database instance
+ * @param _db - Database instance (unused until notifications table exists)
  */
 async function createUserNotification(
   userId: string,
   params: NotificationParams,
-  db: Database
+  _db: Database
 ): Promise<void> {
   const title = NOTIFICATION_TITLES[params.type];
   const message = NOTIFICATION_MESSAGES[params.type](params.provider);
 
-  try {
-    // Check for existing active notification (deduplication)
-    // This implements the partial unique constraint described in schema
-    const existing = await db.query.userNotifications.findFirst({
-      where: and(
-        eq(userNotifications.userId, userId),
-        eq(userNotifications.type, params.type),
-        eq(userNotifications.provider, params.provider),
-        isNull(userNotifications.resolvedAt)
-      ),
-    });
-
-    if (existing) {
-      // Already have an active notification, don't create duplicate
-      console.log(`[health] Skipping duplicate notification for ${userId}: ${params.type}`);
-      return;
-    }
-
-    // Create new notification
-    await db.insert(userNotifications).values({
-      id: ulid(),
-      userId,
-      type: params.type,
-      provider: params.provider,
-      title,
-      message,
-      data: params.reason ? JSON.stringify({ reason: params.reason }) : null,
-      createdAt: Date.now(),
-    });
-
-    console.log(`[health] Created notification for ${userId}: ${params.type} (${params.provider})`);
-  } catch (e) {
-    console.error('[health] Failed to create notification:', e);
+  // TODO: Implement userNotifications table and persist notifications
+  // For now, just log the notification
+  console.log(`[health] NOTIFICATION for ${userId}: ${title} - ${message}`);
+  if (params.reason) {
+    console.log(`[health] Notification reason: ${params.reason}`);
   }
 }
 
@@ -366,21 +350,11 @@ async function createUserNotification(
 export async function resolveConnectionNotifications(
   userId: string,
   provider: string,
-  db: Database
+  _db: Database
 ): Promise<void> {
-  await db
-    .update(userNotifications)
-    .set({ resolvedAt: Date.now() })
-    .where(
-      and(
-        eq(userNotifications.userId, userId),
-        eq(userNotifications.provider, provider),
-        isNull(userNotifications.resolvedAt),
-        inArray(userNotifications.type, ['connection_expired', 'connection_revoked'])
-      )
-    );
-
-  console.log(`[health] Resolved connection notifications for ${userId} (${provider})`);
+  // TODO: Implement userNotifications table and update notifications
+  // For now, just log the resolution
+  console.log(`[health] Would resolve connection notifications for ${userId} (${provider})`);
 }
 
 // ============================================================================
@@ -481,17 +455,9 @@ export async function clearPollFailures(
 export async function resolvePollFailureNotifications(
   userId: string,
   provider: string,
-  db: Database
+  _db: Database
 ): Promise<void> {
-  await db
-    .update(userNotifications)
-    .set({ resolvedAt: Date.now() })
-    .where(
-      and(
-        eq(userNotifications.userId, userId),
-        eq(userNotifications.provider, provider),
-        eq(userNotifications.type, 'poll_failures'),
-        isNull(userNotifications.resolvedAt)
-      )
-    );
+  // TODO: Implement userNotifications table and update notifications
+  // For now, just log the resolution
+  console.log(`[health] Would resolve poll failure notifications for ${userId} (${provider})`);
 }

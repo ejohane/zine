@@ -212,7 +212,7 @@ export async function maybeUpdatePollInterval(
     return;
   }
 
-  const currentInterval = subscription.pollIntervalSeconds;
+  const currentInterval = subscription.pollIntervalSeconds ?? INTERVAL_ACTIVE;
 
   // Calculate relative change
   const change = Math.abs(optimalInterval - currentInterval) / currentInterval;
