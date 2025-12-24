@@ -5,12 +5,13 @@
  * type-safe API calls with automatic caching and auth integration.
  */
 
-import { useState, useRef, type ReactNode } from 'react';
+import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
+import { setTokenGetter } from '@/lib/oauth';
 
 // ============================================================================
 // Provider Component
@@ -39,6 +40,15 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
   // Store getToken in a ref to avoid recreating the tRPC client when auth changes
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+
+  // ---------------------------------------------------------------------------
+  // Initialize OAuth Token Getter
+  // ---------------------------------------------------------------------------
+  // The vanilla tRPC client in oauth.ts needs access to auth tokens for
+  // imperative OAuth operations like connectProvider(). This hooks it up.
+  useEffect(() => {
+    setTokenGetter(() => getTokenRef.current());
+  }, []);
 
   // ---------------------------------------------------------------------------
   // QueryClient Configuration

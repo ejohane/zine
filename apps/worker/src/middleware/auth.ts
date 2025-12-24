@@ -5,11 +5,24 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types';
 import { verifyClerkToken } from '../lib/auth';
+import { createDb } from '../db';
+import { users } from '../db/schema';
 
 /**
  * Default JWKS URL for Clerk (can be overridden via environment)
  */
 const DEFAULT_CLERK_JWKS_URL = 'https://clerk.zine.app/.well-known/jwks.json';
+
+/**
+ * Development user ID used when auth is bypassed
+ */
+const DEV_USER_ID = 'dev-user-001';
+
+/**
+ * Flag to track if we've already ensured the dev user exists
+ * (avoids unnecessary DB queries on every request)
+ */
+let devUserEnsured = false;
 
 /**
  * Error response structure for auth failures
@@ -63,7 +76,27 @@ export function authMiddleware(): MiddlewareHandler<Env> {
 
     // Development bypass: use mock user ID when no auth is configured
     if (c.env.ENVIRONMENT === 'development' || !c.env.CLERK_JWKS_URL) {
-      c.set('userId', 'dev-user-001');
+      // Ensure dev user exists in database (only once per process)
+      if (!devUserEnsured) {
+        try {
+          const db = createDb(c.env.DB);
+          const now = new Date().toISOString();
+          await db
+            .insert(users)
+            .values({
+              id: DEV_USER_ID,
+              email: 'dev@example.com',
+              createdAt: now,
+              updatedAt: now,
+            })
+            .onConflictDoNothing();
+          devUserEnsured = true;
+        } catch (error) {
+          console.warn('[auth] Failed to ensure dev user exists:', error);
+          // Continue anyway - user might already exist
+        }
+      }
+      c.set('userId', DEV_USER_ID);
       await next();
       return;
     }

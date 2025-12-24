@@ -35,7 +35,7 @@ Core principles:
 
 - One primary job per screen
 - Decisions first, organization later
-- Local-first, instant interactions
+- Fast, responsive interactions
 - Optional structure, never mandatory
 
 ---
@@ -165,7 +165,6 @@ Library is the **authoritative store of saved content**.
 
 - Lives primarily in Library
 - Screen-scoped
-- Local-first and offline-capable
 - Used to recall known content
 
 ### Explicit Non-Goals
@@ -230,7 +229,7 @@ Cross-provider equivalence (e.g., YouTube + Spotify podcast episodes) is **out o
 - Calm Library browsing
 - Home stays lightweight and useful
 - No surface tries to do too much
-- Strong alignment with local-first architecture
+- Optimistic updates provide instant feedback
 
 ---
 

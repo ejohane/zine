@@ -65,3 +65,6 @@ bun.lockb
 # Misc
 *.log
 *.local
+
+# bv (beads viewer) local config and caches
+.bv/

@@ -1,17 +1,25 @@
 # Zine Subscriptions & Source Management Spec
 
+> **Note**: This spec was written during initial planning. The implementation is complete and uses the D1 + tRPC architecture. For the actual implementation, see:
+>
+> - `apps/worker/src/trpc/routers/connections.ts` - OAuth connection management
+> - `apps/worker/src/trpc/routers/subscriptions.ts` - Subscription management
+> - `apps/worker/src/providers/` - YouTube and Spotify API clients
+> - `apps/worker/src/polling/` - Ingestion scheduler
+> - `docs/zine-provider-connections.md` - Comprehensive implementation docs
+
 ## Executive Summary
 
 This specification defines the architecture for **source management** (YouTube & Spotify subscriptions) and the **onboarding experience** for connecting these sources. It covers OAuth token storage, batch ingestion, data normalization, and future extensibility for bookmark URL enrichment.
 
 ### Architecture Context
 
-Zine uses a **per-user Durable Object architecture** where each user has an isolated SQLite database within their Durable Object. This spec builds on that foundation:
+Zine uses **Cloudflare D1** (managed SQLite) with **tRPC** for type-safe API communication:
 
-- **No D1 database** - All user data lives in DO SQLite storage
-- **No `user_id` columns needed** - User isolation is implicit at the DO level
-- **Hono routes** - Current codebase uses Hono, not tRPC
-- **Replicache sync** - Sources and items sync to mobile via Replicache
+- **D1 database** - All user data stored in Cloudflare D1
+- **Drizzle ORM** - Type-safe database queries
+- **tRPC** - Type-safe API layer with React Query integration
+- **Hono** - Worker routing and middleware
 
 ---
 
@@ -26,10 +34,9 @@ Zine uses a **per-user Durable Object architecture** where each user has an isol
 7. [Data Normalization](#data-normalization)
 8. [Client Libraries](#client-libraries)
 9. [API Design](#api-design)
-10. [Replicache Sync Integration](#replicache-sync-integration)
-11. [Bookmark URL Enrichment](#bookmark-url-enrichment)
-12. [Security Considerations](#security-considerations)
-13. [Implementation Phases](#implementation-phases)
+10. [Bookmark URL Enrichment](#bookmark-url-enrichment)
+11. [Security Considerations](#security-considerations)
+12. [Implementation Phases](#implementation-phases)
 
 **Appendices**
 
@@ -161,7 +168,7 @@ Tokens must be stored **server-side** and never exposed to the client. The mobil
    status only            new content
 ```
 
-**Note**: Tokens are stored in each user's Durable Object SQLite database, NOT in a global D1 database. This maintains the per-user isolation pattern used throughout Zine.
+**Note**: Tokens are stored encrypted (AES-256-GCM) in the D1 database.
 
 ### Token Encryption
 
@@ -218,17 +225,17 @@ interface StoredProviderToken {
 
 ### Architecture Note
 
-All tables live in **per-user Durable Object SQLite storage**, not a global D1 database. Since each user has their own isolated DO, `user_id` columns are unnecessary - user isolation is implicit.
+All tables are defined using **Drizzle ORM** and stored in **Cloudflare D1**. See `apps/worker/src/db/schema.ts` for the full schema definition.
 
-### New Tables (Added to DO Migration)
+### Key Tables
 
 ```sql
 -- ============================================================================
 -- Provider Connections (OAuth tokens per provider)
--- Lives in each user's DO SQLite - no user_id column needed
 -- ============================================================================
 CREATE TABLE provider_connections (
   id TEXT PRIMARY KEY,                    -- ULID
+  user_id TEXT NOT NULL,                  -- Clerk user ID
   provider TEXT NOT NULL,                 -- 'YOUTUBE' | 'SPOTIFY'
 
   -- Encrypted OAuth tokens (JSON-serialized EncryptedToken)
@@ -428,52 +435,33 @@ await env.OAUTH_STATE_KV.put(
 
 ### Scheduled Ingestion Architecture
 
-Ingestion runs **inside each user's Durable Object** using DO Alarms, not global cron triggers. This maintains user isolation and allows per-user scheduling.
+Ingestion runs via **Cloudflare Workers cron triggers** defined in `wrangler.toml`. This provides reliable, scheduled execution with automatic scaling.
 
-```typescript
-// wrangler.toml - DO class with alarms enabled
-[[durable_objects.bindings]];
-name = 'USER_DO';
-class_name = 'UserDO';
-
-// Alarm-based scheduling per user
-// Each DO schedules its own ingestion alarm after first source is added
+```toml
+# wrangler.toml
+[triggers]
+crons = ["0 * * * *"]  # Run every hour
 ```
 
-### Why DO Alarms Instead of Global Cron
-
-| Approach    | Global Cron                      | DO Alarms                       |
-| ----------- | -------------------------------- | ------------------------------- |
-| Scaling     | Must iterate all users           | Per-user, naturally distributed |
-| Isolation   | Risk of one user blocking others | Fully isolated                  |
-| Scheduling  | Fixed intervals                  | Per-user customization possible |
-| Cold starts | Fan-out to all DOs at once       | Staggered naturally             |
-
-### Alarm-Based Ingestion Flow
+### Cron-Based Ingestion Flow
 
 ```typescript
-// apps/worker/src/durable-objects/user-do.ts
+// apps/worker/src/index.ts
 
-export class UserDO implements DurableObject {
-  async alarm() {
-    // This runs on a schedule set by the DO itself
-    await this.runIngestion();
-
-    // Schedule next alarm (hourly)
-    const nextRun = Date.now() + 60 * 60 * 1000; // 1 hour
-    this.ctx.storage.setAlarm(nextRun);
-  }
-
-  async onSourceAdded() {
-    // When first source is added, start the alarm cycle
-    const existingAlarm = await this.ctx.storage.getAlarm();
-    if (!existingAlarm) {
-      // First ingestion in 5 minutes, then hourly
-      this.ctx.storage.setAlarm(Date.now() + 5 * 60 * 1000);
-    }
-  }
-}
+export default {
+  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+    // Process all due subscriptions in batches
+    ctx.waitUntil(runIngestionBatch(env));
+  },
+};
 ```
+
+The scheduler:
+
+1. Queries subscriptions due for polling (based on `lastPolledAt` + `pollIntervalSeconds`)
+2. Groups by provider to share OAuth connections
+3. Processes in parallel with quota awareness
+4. Uses adaptive polling intervals based on source activity
 
 ### Ingestion Flow
 
@@ -1122,77 +1110,6 @@ export const mutators = {
 
 ---
 
-## Replicache Sync Integration
-
-### Source Sync to Mobile
-
-Sources are synced to the mobile app via the existing Replicache pull mechanism. The pull handler needs to include sources:
-
-```typescript
-// apps/worker/src/durable-objects/handlers/pull.ts
-
-export async function handlePull(sql: SqlStorage, request: PullRequest): Promise<PullResponse> {
-  const version = getVersion(sql);
-
-  // Include sources in the pull response
-  const sources = sql
-    .exec(
-      `
-    SELECT * FROM sources WHERE deleted_at IS NULL
-  `
-    )
-    .toArray();
-
-  const patch: PatchOperation[] = [
-    { op: 'clear' },
-    // ... existing items and user_items ...
-    ...sources.map((source) => ({
-      op: 'put' as const,
-      key: sourceKey(source.id),
-      value: mapSourceToClient(source),
-    })),
-  ];
-
-  return {
-    cookie: { version, schemaVersion: SCHEMA_VERSION },
-    patch,
-    lastMutationIDChanges: {},
-  };
-}
-```
-
-### Provider Connection Status
-
-Provider connection status (YouTube connected, Spotify needs reauth, etc.) is **not synced via Replicache**. Instead, the mobile app fetches this on-demand:
-
-```typescript
-// apps/mobile/hooks/use-provider-connections.ts
-
-export function useProviderConnections() {
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ['provider-connections'],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/oauth/status`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  return { connections: data, isLoading, refetch };
-}
-```
-
-### Why Not Sync Tokens via Replicache?
-
-1. **Security**: Tokens should never reach the client
-2. **Size**: Encrypted tokens add unnecessary sync payload
-3. **Sensitivity**: Connection status is enough for UI decisions
-4. **Staleness**: Token validity can change server-side without user action
-
----
-
 ## Bookmark URL Enrichment
 
 ### Use Case
@@ -1304,15 +1221,14 @@ OAUTH_STATE_SECRET = "..."     # For signing state tokens
 
 **Goal**: Establish secure OAuth flows and token storage
 
-- [ ] Add `provider_connections` table to DO migration
-- [ ] Implement token encryption/decryption utilities (AES-256-GCM)
-- [ ] Add KV namespace for OAuth state storage
-- [ ] Build OAuth Hono routes (`/api/oauth/*`)
-- [ ] Add OAuth handlers to UserDO
-- [ ] Implement token refresh logic
-- [ ] Add YouTube OAuth integration
-- [ ] Add Spotify OAuth integration
-- [ ] Create mobile OAuth deep link handling (Expo AuthSession)
+- [x] Add `provider_connections` table (D1/Drizzle)
+- [x] Implement token encryption/decryption utilities (AES-256-GCM)
+- [x] Add KV namespace for OAuth state storage
+- [x] Build tRPC connections router
+- [x] Implement token refresh logic with distributed locking
+- [x] Add YouTube OAuth integration
+- [x] Add Spotify OAuth integration
+- [x] Create mobile OAuth deep link handling (Expo WebBrowser)
 
 **Deliverable**: Users can connect/disconnect YouTube and Spotify accounts
 
@@ -1320,31 +1236,27 @@ OAUTH_STATE_SECRET = "..."     # For signing state tokens
 
 **Goal**: Import user subscriptions as sources
 
-- [ ] Add new columns to `sources` table via DO migration
-- [ ] Build Workers-compatible YouTube API client
-- [ ] Build Workers-compatible Spotify API client
-- [ ] Implement YouTube subscription fetching
-- [ ] Implement Spotify saved shows fetching
-- [ ] Add `/api/oauth/:provider/subscriptions` endpoint
-- [ ] Add `sources/confirm` endpoint
-- [ ] Handle large subscription lists (pagination)
-- [ ] Build subscription selection UI (mobile)
-- [ ] Update shared Source type with new fields
+- [x] Add `subscriptions` table (D1/Drizzle)
+- [x] Build Workers-compatible YouTube API client
+- [x] Build Workers-compatible Spotify API client
+- [x] Implement YouTube subscription fetching
+- [x] Implement Spotify saved shows fetching
+- [x] Add tRPC subscriptions router
+- [x] Handle large subscription lists (pagination)
+- [x] Build subscription selection UI (mobile)
 
 **Deliverable**: Users can select which subscriptions to sync
 
-### Phase 3: Alarm-Based Ingestion (Week 3-4)
+### Phase 3: Cron-Based Ingestion (Week 3-4)
 
 **Goal**: Automated content fetching
 
-- [ ] Implement DO alarm scheduling
-- [ ] Add alarm handler to UserDO
-- [ ] Implement YouTube video ingestion
-- [ ] Implement Spotify episode ingestion
-- [ ] Use existing `provider_items_seen` for idempotency
-- [ ] Implement error handling and retry logic
-- [ ] Add source status tracking
-- [ ] Update Replicache pull to include sources
+- [x] Implement cron-based polling scheduler
+- [x] Implement YouTube video ingestion
+- [x] Implement Spotify episode ingestion
+- [x] Use `provider_items_seen` for idempotency
+- [x] Implement error handling and retry logic
+- [x] Add adaptive polling intervals
 
 **Deliverable**: New content automatically appears in inbox
 

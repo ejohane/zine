@@ -165,8 +165,9 @@ A **canonical item** represents _one piece of content_ across the system.
 
 ## Sync Model
 
-- Hourly background sync
-- On-demand refresh
+- Hourly background polling (cron-triggered)
+- On-demand refresh via pull-to-refresh
+- Adaptive polling intervals based on source activity
 - No real-time guarantees
 
 ---
@@ -182,8 +183,6 @@ A **canonical item** represents _one piece of content_ across the system.
 
 ## Open Design Areas
 
-1. Data model & persistence
-2. Ingestion mechanics
-3. Sync & local-first
-4. Search & filtering
-5. Failure modes
+1. Search & filtering (full-text search)
+2. Failure modes & retry strategies
+3. Offline caching (future enhancement)

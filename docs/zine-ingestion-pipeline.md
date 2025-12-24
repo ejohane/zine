@@ -260,11 +260,8 @@ Optional `ingestion_runs` table can be used for:
 
 ---
 
-## Next Topic
+## Related Documentation
 
-**Sync & local-first strategy**
-
-- Client caching
-- Refresh semantics
-- Offline behavior
-- Eventual consistency UX
+- `zine-architecture.md` - Core domain model
+- `zine-tech-stack.md` - Technical implementation details
+- `zine-provider-connections.md` - OAuth and provider integration

@@ -42,10 +42,12 @@ zine/
 │   │   │   ├── library/           # Library-specific components
 │   │   │   └── home/              # Home-specific components
 │   │   ├── hooks/                 # Custom React hooks
-│   │   │   ├── useReplicache.ts   # Replicache instance hook
-│   │   │   └── useSubscribe.ts    # Replicache subscription hook
+│   │   │   ├── use-items.ts       # Item data hooks
+│   │   │   ├── use-items-trpc.ts  # tRPC-based item queries
+│   │   │   └── use-connections.ts # Provider connection hooks
 │   │   ├── lib/                   # Client utilities
-│   │   │   ├── replicache.ts      # Replicache client setup
+│   │   │   ├── trpc.ts            # tRPC client setup
+│   │   │   ├── oauth.ts           # OAuth PKCE flow
 │   │   │   └── auth.ts            # Clerk auth helpers
 │   │   ├── assets/                # Static assets (images, fonts)
 │   │   ├── app.json               # Expo configuration
@@ -57,25 +59,38 @@ zine/
 │       ├── src/
 │       │   ├── index.ts           # Hono app entry point
 │       │   ├── routes/            # API route handlers
-│       │   │   ├── sync.ts        # Replicache push/pull endpoints
 │       │   │   ├── auth.ts        # Clerk webhook handlers
 │       │   │   └── sources.ts     # Source management endpoints
-│       │   ├── durable-objects/   # Durable Object classes
-│       │   │   └── user-do.ts     # Per-user state & SQLite storage
+│       │   ├── trpc/              # tRPC API layer
+│       │   │   ├── router.ts      # Root router
+│       │   │   ├── context.ts     # Request context
+│       │   │   └── routers/       # Domain routers
+│       │   │       ├── items.ts
+│       │   │       ├── connections.ts
+│       │   │       └── subscriptions.ts
+│       │   ├── db/                # Database layer
+│       │   │   ├── schema.ts      # Drizzle schema definitions
+│       │   │   ├── index.ts       # DB client setup
+│       │   │   └── migrations/    # D1 migrations
 │       │   ├── ingestion/         # Ingestion pipeline
-│       │   │   ├── pipeline.ts    # Core ingestion orchestration
-│       │   │   ├── providers/     # Provider-specific fetchers
-│       │   │   │   ├── youtube.ts
-│       │   │   │   ├── spotify.ts
-│       │   │   │   ├── rss.ts
-│       │   │   │   └── substack.ts
-│       │   │   └── enrichment.ts  # Async metadata enrichment
+│       │   │   ├── index.ts       # Batch ingestion orchestration
+│       │   │   ├── processor.ts   # Item processing
+│       │   │   └── transformers.ts # Provider data transformers
+│       │   ├── providers/         # Provider API clients
+│       │   │   ├── youtube.ts     # YouTube Data API
+│       │   │   ├── youtube-quota.ts # Quota tracking
+│       │   │   └── spotify.ts     # Spotify Web API
+│       │   ├── polling/           # Background sync
+│       │   │   ├── scheduler.ts   # Cron-based polling
+│       │   │   └── adaptive.ts    # Adaptive poll intervals
 │       │   ├── lib/               # Server utilities
 │       │   │   ├── auth.ts        # Clerk token validation
-│       │   │   └── db.ts          # SQLite helpers for DO
+│       │   │   ├── crypto.ts      # Token encryption (AES-256-GCM)
+│       │   │   └── locks.ts       # Distributed locking
 │       │   └── middleware/        # Hono middleware
 │       │       └── auth.ts        # Authentication middleware
 │       ├── wrangler.toml          # Cloudflare Workers configuration
+│       ├── drizzle.config.ts      # Drizzle ORM configuration
 │       ├── tsconfig.json
 │       └── package.json
 │
@@ -84,10 +99,7 @@ zine/
 │       ├── src/
 │       │   ├── types/             # TypeScript type definitions
 │       │   │   ├── domain.ts      # Domain models (Item, Source, etc.)
-│       │   │   ├── api.ts         # API request/response types
-│       │   │   └── sync.ts        # Replicache sync types
-│       │   ├── mutators/          # Replicache mutator definitions
-│       │   │   └── index.ts       # Shared mutators (client + server)
+│       │   │   └── index.ts       # Type exports
 │       │   ├── schemas/           # Zod validation schemas
 │       │   │   └── index.ts
 │       │   └── constants/         # Shared constants
@@ -183,7 +195,7 @@ app/
 │   └── library.tsx      # Library – long-term bookmark storage
 ├── item/
 │   └── [id].tsx         # Item detail (bookmark or inbox item)
-├── _layout.tsx          # Root layout (Clerk provider, Replicache, theme)
+├── _layout.tsx          # Root layout (Clerk provider, tRPC, theme)
 └── +not-found.tsx       # 404 fallback
 ```
 
@@ -191,24 +203,32 @@ app/
 
 ## Backend
 
-| Tool                           | Purpose                                          |
-| ------------------------------ | ------------------------------------------------ |
-| **Cloudflare Workers**         | API endpoints, ingestion pipeline, cron triggers |
-| **Cloudflare Durable Objects** | Per-user state, SQLite storage                   |
-| **Hono**                       | Worker routing and middleware                    |
-| **Zod**                        | Request/response validation                      |
+| Tool                   | Purpose                                          |
+| ---------------------- | ------------------------------------------------ |
+| **Cloudflare Workers** | API endpoints, ingestion pipeline, cron triggers |
+| **Cloudflare D1**      | SQLite database (managed)                        |
+| **Hono**               | Worker routing and middleware                    |
+| **tRPC**               | Type-safe API layer                              |
+| **Drizzle ORM**        | TypeScript-first ORM for D1                      |
+| **Zod**                | Request/response validation                      |
 
-### Cloudflare Durable Objects Notes
+### Cloudflare D1 Notes
 
-Durable Objects now GA with SQLite storage (moved from beta):
+D1 is Cloudflare's managed SQLite database:
 
-- **SQLite Storage API**: Use `sql.exec` for queries (now generally available)
-- **Free Plan**: SQLite-backed DOs available on Workers Free plan
-- **WebSocket Hibernation**: Manage connections at scale efficiently
-- **Alarms**: Schedule future compute at customizable intervals
-- **In-memory State**: Coordinate connections among multiple clients
+- **SQL at the Edge**: SQLite database accessible from Workers
+- **Automatic Replication**: Global read replicas for low-latency reads
+- **Drizzle Integration**: First-class TypeScript ORM support
+- **Migrations**: Schema migrations via Drizzle Kit
 
-Configure SQLite storage in `wrangler.toml` for new DO classes.
+### tRPC Notes
+
+tRPC provides end-to-end type safety between client and server:
+
+- **Type Inference**: Client types derived from server router
+- **React Query Integration**: Built-in hooks with caching
+- **Optimistic Updates**: Easy rollback on mutation failure
+- **Batching**: Automatic request batching via `httpBatchLink`
 
 ### Hono Framework Notes
 
@@ -224,35 +244,63 @@ Used in production by: Cloudflare D1, Cloudflare Workers KV, cdnjs, Clerk, Unkey
 
 ### Backend Responsibilities
 
-- Replicache push/pull endpoints
-- OAuth callbacks for content providers
+- tRPC API endpoints (items, subscriptions, connections)
+- OAuth callbacks for content providers (YouTube, Spotify)
 - Clerk auth webhooks
 - Ingestion pipeline (cron-triggered)
 - Provider API proxying
 
 ---
 
-## Sync & Data
+## Data & State Management
 
-| Tool                            | Purpose                        |
-| ------------------------------- | ------------------------------ |
-| **Replicache**                  | Local-first sync protocol      |
-| **SQLite** (in Durable Objects) | Authoritative per-user storage |
+| Tool              | Purpose                       |
+| ----------------- | ----------------------------- |
+| **Cloudflare D1** | Authoritative SQLite storage  |
+| **Drizzle ORM**   | Type-safe database queries    |
+| **React Query**   | Client-side caching and state |
+| **tRPC React**    | Type-safe API hooks           |
 
-### Replicache Key Concepts
+### Data Flow
 
-- **Mutators**: Define data transformations that run optimistically on client
-- **Subscriptions**: Reactive queries that update UI automatically
-- **Push/Pull**: Sync protocol for server communication
-- **Rollback**: Automatic rollback of optimistic UI when server rejects mutations
+```
+Mobile App (React Query cache)
+    ↓ tRPC queries/mutations
+Cloudflare Worker (Hono + tRPC)
+    ↓ Drizzle ORM
+Cloudflare D1 (SQLite)
+```
 
-### Sync Model
+### Client Data Strategy
 
-- Client reads from local Replicache KV store (instant, offline-capable)
-- Mutations pushed to Durable Object
-- Durable Object is authoritative
-- Client pulls changes via Replicache pull
-- Conflict resolution: last-write-wins
+- **React Query**: Handles caching, refetching, and background updates
+- **Optimistic Updates**: Mutations update cache immediately, rollback on error
+- **Stale-While-Revalidate**: Show cached data while fetching fresh data
+- **Cache Invalidation**: Automatic invalidation after mutations
+
+### Key Patterns
+
+```typescript
+// Optimistic update example
+const bookmark = trpc.items.bookmark.useMutation({
+  onMutate: async ({ id }) => {
+    await utils.items.inbox.cancel();
+    const previous = utils.items.inbox.getData();
+    utils.items.inbox.setData(undefined, (old) => ({
+      ...old,
+      items: old?.items.filter((item) => item.id !== id) ?? [],
+    }));
+    return { previous };
+  },
+  onError: (err, vars, context) => {
+    utils.items.inbox.setData(undefined, context?.previous);
+  },
+  onSettled: () => {
+    utils.items.inbox.invalidate();
+    utils.items.library.invalidate();
+  },
+});
+```
 
 ---
 
@@ -274,9 +322,9 @@ Used in production by: Cloudflare D1, Cloudflare Workers KV, cdnjs, Clerk, Unkey
 ### Auth Flow
 
 - Clerk handles sign-up, sign-in, social providers
-- Per-user Durable Object instance keyed by Clerk user ID
-- Session tokens validated on Worker
-- `auth()` helper for route protection
+- User ID from Clerk used to scope all data in D1
+- Session tokens validated on Worker via JWKS
+- `authMiddleware()` for route protection
 
 ---
 
@@ -304,22 +352,24 @@ Used in production by: Cloudflare D1, Cloudflare Workers KV, cdnjs, Clerk, Unkey
 | **@cloudflare/vitest-pool-workers** | Cloudflare Workers test environment                    |
 | **Miniflare**                       | Local Workers/DO simulation for integration tests      |
 
-#### Hono Route Tests
+#### tRPC Route Tests
 
-Test API routes in isolation using Vitest with the Workers pool:
+Test tRPC procedures using Vitest with the Workers pool:
 
 ```typescript
-// apps/worker/src/routes/sync.test.ts
+// apps/worker/src/trpc/routers/items.test.ts
 import { env, createExecutionContext } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import app from '../index';
 
-describe('Replicache sync routes', () => {
-  it('POST /api/replicache/push returns 200', async () => {
-    const req = new Request('http://localhost/api/replicache/push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mutations: [], clientGroupID: 'test' }),
+describe('items router', () => {
+  it('GET /trpc/items.inbox returns items', async () => {
+    const req = new Request('http://localhost/trpc/items.inbox', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${mockAuthToken('user-123')}`,
+      },
     });
     const ctx = createExecutionContext();
     const res = await app.fetch(req, env, ctx);
@@ -328,98 +378,88 @@ describe('Replicache sync routes', () => {
 });
 ```
 
-#### Durable Object Integration Tests
+#### D1 Database Integration Tests
 
-Test DO behavior using Miniflare's isolated storage:
+Test database operations using Miniflare's D1 bindings:
 
 ```typescript
-// apps/worker/src/durable-objects/user-do.test.ts
+// apps/worker/src/db/schema.test.ts
 import { describe, it, expect, beforeEach } from 'vitest';
 import { env } from 'cloudflare:test';
+import { drizzle } from 'drizzle-orm/d1';
+import { users, items, userItems } from './schema';
 
-describe('UserDO', () => {
-  it('stores and retrieves user data via SQLite', async () => {
-    const id = env.USER_DO.idFromName('test-user-123');
-    const stub = env.USER_DO.get(id);
+describe('Database schema', () => {
+  it('creates and queries items', async () => {
+    const db = drizzle(env.DB);
 
-    // Test push mutation
-    const pushRes = await stub.fetch('http://do/push', {
-      method: 'POST',
-      body: JSON.stringify({ mutations: [{ id: 1, name: 'createItem', args: { title: 'Test' } }] }),
+    // Insert test user
+    await db.insert(users).values({
+      id: 'user-123',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
-    expect(pushRes.status).toBe(200);
 
-    // Test pull reflects mutation
-    const pullRes = await stub.fetch('http://do/pull', {
-      method: 'POST',
-      body: JSON.stringify({ cookie: null }),
+    // Insert item
+    await db.insert(items).values({
+      id: 'item-1',
+      contentType: 'VIDEO',
+      provider: 'YOUTUBE',
+      providerId: 'abc123',
+      canonicalUrl: 'https://youtube.com/watch?v=abc123',
+      title: 'Test Video',
+      creator: 'Test Channel',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
-    const data = await pullRes.json();
-    expect(data.patch).toContainEqual(
-      expect.objectContaining({ key: expect.stringContaining('item/') })
-    );
+
+    // Query items
+    const result = await db.select().from(items);
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe('Test Video');
   });
 });
 ```
 
-#### Replicache Push/Pull Integration Tests
+#### tRPC Integration Tests
 
-End-to-end sync tests validating the full Replicache protocol:
+End-to-end tests validating the full tRPC flow:
 
 ```typescript
-// apps/worker/src/integration/replicache-sync.test.ts
+// apps/worker/src/integration/trpc.test.ts
 import { describe, it, expect } from 'vitest';
 import { env } from 'cloudflare:test';
 import app from '../index';
 
-describe('Replicache sync integration', () => {
-  it('push mutation reflects in subsequent pull', async () => {
-    const clientGroupID = 'test-client-group';
+describe('tRPC integration', () => {
+  it('bookmark mutation moves item to library', async () => {
     const userID = 'user-123';
 
-    // Push a mutation
-    const pushReq = new Request('http://localhost/api/replicache/push', {
+    // Bookmark an item
+    const bookmarkReq = new Request('http://localhost/trpc/items.bookmark', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${mockAuthToken(userID)}`,
       },
-      body: JSON.stringify({
-        clientGroupID,
-        mutations: [
-          {
-            id: 1,
-            name: 'createItem',
-            args: { id: 'item-1', title: 'Test Item' },
-            timestamp: Date.now(),
-          },
-        ],
-      }),
+      body: JSON.stringify({ id: 'item-1' }),
     });
-    const pushRes = await app.fetch(pushReq, env);
-    expect(pushRes.status).toBe(200);
+    const bookmarkRes = await app.fetch(bookmarkReq, env);
+    expect(bookmarkRes.status).toBe(200);
 
-    // Pull should return the new item
-    const pullReq = new Request('http://localhost/api/replicache/pull', {
-      method: 'POST',
+    // Verify item is in library
+    const libraryReq = new Request('http://localhost/trpc/items.library', {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${mockAuthToken(userID)}`,
       },
-      body: JSON.stringify({
-        clientGroupID,
-        cookie: null,
-      }),
     });
-    const pullRes = await app.fetch(pullReq, env);
-    const pullData = await pullRes.json();
+    const libraryRes = await app.fetch(libraryReq, env);
+    const libraryData = await libraryRes.json();
 
-    expect(pullData.patch).toContainEqual(
-      expect.objectContaining({
-        op: 'put',
-        key: 'item/item-1',
-      })
-    );
+    expect(libraryData.result.data.items).toContainEqual(expect.objectContaining({ id: 'item-1' }));
   });
 });
 ```
@@ -436,9 +476,8 @@ export default defineWorkersConfig({
       workers: {
         wrangler: { configPath: './wrangler.toml' },
         miniflare: {
-          durableObjects: {
-            USER_DO: 'UserDO',
-          },
+          d1Databases: ['DB'],
+          kvNamespaces: ['OAUTH_STATE_KV', 'WEBHOOK_IDEMPOTENCY'],
         },
       },
     },
@@ -449,10 +488,10 @@ export default defineWorkersConfig({
 #### Worker Testing Considerations
 
 - Use `@cloudflare/vitest-pool-workers` for accurate Workers runtime behavior
-- Miniflare provides isolated SQLite storage per test for DO testing
+- Miniflare provides isolated D1 database per test
 - Mock Clerk auth tokens for authenticated route tests
-- Test DO alarm scheduling and execution
-- Consider snapshot testing for complex pull responses
+- Test cron-triggered ingestion flows
+- Consider snapshot testing for complex tRPC responses
 
 ---
 
@@ -536,12 +575,12 @@ name = "zine-worker-production"
 - `CLOUDFLARE_API_TOKEN` - API token with Workers edit permissions
 - `CLOUDFLARE_ACCOUNT_ID` - Your Cloudflare account ID
 
-#### Durable Object Migration Considerations
+#### D1 Migration Considerations
 
-- DO schema migrations require careful handling
+- D1 migrations managed via Drizzle Kit
 - Test migrations in staging before production
-- Use versioned migration scripts in `apps/worker/migrations/`
-- Consider zero-downtime migration patterns for production
+- Migrations stored in `apps/worker/src/db/migrations/`
+- Use `wrangler d1 migrations apply` for deployment
 
 ### EAS Workflows Notes (Oct 2025+)
 
@@ -619,7 +658,8 @@ For stability, pin these critical dependencies:
 
 - **Clerk**: Keep SDKs updated for security patches
 - **Expo**: Recent React Server Components vulnerability patches (Dec 2025) - stay current
-- **Durable Objects**: Use SQLite parameterized queries to prevent injection
+- **D1/Drizzle**: Use parameterized queries (Drizzle handles this automatically)
+- **OAuth Tokens**: Encrypted with AES-256-GCM before storage
 - **API Keys**: If using Clerk API Keys, implement proper scope validation
 
 ---
@@ -631,8 +671,9 @@ For stability, pin these critical dependencies:
 - [Expo Changelog](https://expo.dev/changelog)
 - [HeroUI Native](https://github.com/heroui-inc/heroui-native)
 - [Uniwind Docs](https://docs.uniwind.dev/)
-- [Replicache Docs](https://doc.replicache.dev/)
-- [Cloudflare Durable Objects](https://developers.cloudflare.com/durable-objects/)
+- [Cloudflare D1](https://developers.cloudflare.com/d1/)
+- [Drizzle ORM](https://orm.drizzle.team/)
+- [tRPC Docs](https://trpc.io/docs)
 - [Hono Docs](https://hono.dev/)
 - [Clerk Docs](https://clerk.com/docs)
 - [Clerk Changelog](https://clerk.com/changelog)

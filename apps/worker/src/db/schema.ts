@@ -122,6 +122,110 @@ export const sources = sqliteTable(
 );
 
 // ============================================================================
+// Provider Connections (OAuth tokens per provider)
+// ============================================================================
+// Stores encrypted OAuth credentials for connected providers (YouTube, Spotify)
+export const providerConnections = sqliteTable(
+  'provider_connections',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
+    providerUserId: text('provider_user_id'), // Provider's user ID
+
+    // Encrypted OAuth tokens (AES-256-GCM encrypted)
+    accessToken: text('access_token').notNull(),
+    refreshToken: text('refresh_token').notNull(),
+    tokenExpiresAt: integer('token_expires_at').notNull(), // Unix ms
+
+    // Connection metadata
+    scopes: text('scopes'), // Comma-separated granted scopes
+    status: text('status').notNull().default('ACTIVE'), // ACTIVE | EXPIRED | REVOKED
+    connectedAt: integer('connected_at').notNull(), // Unix ms
+    lastRefreshedAt: integer('last_refreshed_at'), // Unix ms
+  },
+  (table) => [
+    // One connection per provider per user
+    uniqueIndex('provider_connections_user_provider_idx').on(table.userId, table.provider),
+    index('provider_connections_status_idx').on(table.status),
+  ]
+);
+
+// ============================================================================
+// Subscriptions (User subscriptions to specific channels/shows)
+// ============================================================================
+export const subscriptions = sqliteTable(
+  'subscriptions',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
+    providerChannelId: text('provider_channel_id').notNull(), // YouTube channel ID or Spotify show ID
+
+    // Display info
+    name: text('name').notNull(), // Channel/show name
+    description: text('description'),
+    imageUrl: text('image_url'),
+    externalUrl: text('external_url'), // Link to channel/show on provider
+
+    // Polling metadata
+    totalItems: integer('total_items').default(0), // Total videos/episodes (cached)
+    lastPublishedAt: integer('last_published_at'), // Timestamp of newest item
+    lastPolledAt: integer('last_polled_at'), // Last successful poll
+    pollIntervalSeconds: integer('poll_interval_seconds').default(3600), // Polling frequency
+
+    // Status
+    status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | DISCONNECTED | UNSUBSCRIBED
+
+    // Timestamps (Unix ms)
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    // Prevent duplicate subscriptions
+    uniqueIndex('subscriptions_user_provider_channel_idx').on(
+      table.userId,
+      table.provider,
+      table.providerChannelId
+    ),
+    // Fast polling queries
+    index('subscriptions_poll_idx').on(table.status, table.lastPolledAt),
+    index('subscriptions_user_idx').on(table.userId, table.status),
+  ]
+);
+
+// ============================================================================
+// Subscription Items (Track which items came from which subscription)
+// ============================================================================
+export const subscriptionItems = sqliteTable(
+  'subscription_items',
+  {
+    id: text('id').primaryKey(), // ULID
+    subscriptionId: text('subscription_id')
+      .notNull()
+      .references(() => subscriptions.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    providerItemId: text('provider_item_id').notNull(), // YouTube video ID or Spotify episode ID
+    publishedAt: integer('published_at'), // When item was published (Unix ms)
+    fetchedAt: integer('fetched_at').notNull(), // When we fetched it (Unix ms)
+  },
+  (table) => [
+    // Prevent duplicate tracking
+    uniqueIndex('subscription_items_sub_provider_item_idx').on(
+      table.subscriptionId,
+      table.providerItemId
+    ),
+    index('subscription_items_item_idx').on(table.itemId),
+  ]
+);
+
+// ============================================================================
 // Provider Items Seen (Ingestion Idempotency)
 // ============================================================================
 // This table is CRITICAL for preventing duplicate inbox items during ingestion.

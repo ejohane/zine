@@ -1,0 +1,341 @@
+/**
+ * YouTube API Client Factory and Helpers
+ *
+ * Integrates the googleapis package for YouTube Data API v3 access.
+ * Uses OAuth2 authentication with tokens stored in provider_connections.
+ *
+ * Required OAuth Scope: https://www.googleapis.com/auth/youtube.readonly
+ *
+ * See: features/subscriptions/backend-spec.md Section 2.3
+ */
+
+import type { youtube_v3 } from 'googleapis';
+import { google } from 'googleapis';
+import type { ProviderConnection } from '../lib/token-refresh';
+import { getValidAccessToken } from '../lib/token-refresh';
+import { decrypt } from '../lib/crypto';
+
+// The OAuth2Client type comes from google.auth.OAuth2 instance
+type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * YouTube client wrapper containing the API client and OAuth2 client
+ */
+export interface YouTubeClient {
+  /** YouTube Data API v3 client */
+  api: youtube_v3.Youtube;
+  /** OAuth2 client for token management */
+  oauth2Client: OAuth2Client;
+}
+
+/**
+ * Environment bindings required for YouTube API access
+ */
+interface YouTubeEnv {
+  /** D1 database for token storage */
+  DB: D1Database;
+  /** KV namespace for OAuth state and locking */
+  OAUTH_STATE_KV: KVNamespace;
+  /** AES-256 encryption key for token decryption */
+  ENCRYPTION_KEY: string;
+  /** Google OAuth client ID (for YouTube) */
+  GOOGLE_CLIENT_ID: string;
+  /** Google OAuth client secret (for YouTube) - optional for PKCE flows */
+  GOOGLE_CLIENT_SECRET?: string;
+  /** OAuth redirect URI */
+  OAUTH_REDIRECT_URI?: string;
+  /** Spotify credentials (required by token-refresh) */
+  SPOTIFY_CLIENT_ID: string;
+  SPOTIFY_CLIENT_SECRET: string;
+}
+
+// ============================================================================
+// Client Factory
+// ============================================================================
+
+/**
+ * Create a YouTube API client with the provided OAuth tokens
+ *
+ * @param accessToken - Decrypted OAuth access token
+ * @param refreshToken - Decrypted OAuth refresh token
+ * @param env - Environment bindings with YouTube OAuth credentials
+ * @returns YouTubeClient with authenticated API access
+ *
+ * @example
+ * ```typescript
+ * const client = createYouTubeClient(accessToken, refreshToken, env);
+ * const response = await client.api.channels.list({
+ *   part: ['snippet'],
+ *   mine: true,
+ * });
+ * ```
+ */
+export function createYouTubeClient(
+  accessToken: string,
+  refreshToken: string,
+  env: YouTubeEnv
+): YouTubeClient {
+  const oauth2Client = new google.auth.OAuth2(
+    env.GOOGLE_CLIENT_ID,
+    env.GOOGLE_CLIENT_SECRET,
+    env.OAUTH_REDIRECT_URI
+  );
+
+  oauth2Client.setCredentials({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  const api = google.youtube({ version: 'v3', auth: oauth2Client });
+
+  return { api, oauth2Client };
+}
+
+/**
+ * Get a YouTube client for an existing provider connection
+ *
+ * Handles token refresh automatically if the access token is expired.
+ * This is the preferred method for getting a client in polling/ingestion code.
+ *
+ * @param connection - Provider connection from database
+ * @param env - Environment bindings with credentials
+ * @returns YouTubeClient ready for API calls
+ * @throws TokenRefreshError if token refresh fails
+ *
+ * @example
+ * ```typescript
+ * const connection = await db.query.providerConnections.findFirst({
+ *   where: and(
+ *     eq(providerConnections.userId, userId),
+ *     eq(providerConnections.provider, 'YOUTUBE')
+ *   )
+ * });
+ *
+ * const client = await getYouTubeClientForConnection(connection, env);
+ * const videos = await fetchRecentVideos(client, uploadsPlaylistId);
+ * ```
+ */
+export async function getYouTubeClientForConnection(
+  connection: ProviderConnection,
+  env: YouTubeEnv
+): Promise<YouTubeClient> {
+  // Get valid access token (refreshes if needed)
+  const accessToken = await getValidAccessToken(connection, env);
+
+  // Decrypt the refresh token for the client
+  const refreshToken = await decrypt(connection.refreshToken, env.ENCRYPTION_KEY);
+
+  return createYouTubeClient(accessToken, refreshToken, env);
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Get the uploads playlist ID for a YouTube channel
+ *
+ * Every YouTube channel has a hidden "uploads" playlist containing all their videos.
+ * This playlist ID is needed to fetch the channel's videos efficiently.
+ *
+ * YouTube API Cost: 1 quota unit
+ *
+ * @param client - Authenticated YouTube client
+ * @param channelId - YouTube channel ID (starts with UC)
+ * @returns Uploads playlist ID (starts with UU)
+ * @throws Error if channel not found or has no uploads playlist
+ *
+ * @example
+ * ```typescript
+ * const playlistId = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
+ * // Returns 'UUxxxxxx' (same suffix as channel ID)
+ * ```
+ */
+export async function getChannelUploadsPlaylistId(
+  client: YouTubeClient,
+  channelId: string
+): Promise<string> {
+  const response = await client.api.channels.list({
+    part: ['contentDetails'],
+    id: [channelId],
+  });
+
+  const playlist = response.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+
+  if (!playlist) {
+    throw new Error(`Could not find uploads playlist for channel ${channelId}`);
+  }
+
+  return playlist;
+}
+
+/**
+ * Fetch recent videos from a YouTube uploads playlist
+ *
+ * Returns videos in upload order (newest first). Use this for polling
+ * to check for new content from a channel.
+ *
+ * YouTube API Cost: 1 quota unit
+ *
+ * @param client - Authenticated YouTube client
+ * @param uploadsPlaylistId - The channel's uploads playlist ID
+ * @param maxResults - Maximum number of videos to fetch (default: 10, max: 50)
+ * @returns Array of playlist items with video details
+ *
+ * @example
+ * ```typescript
+ * const videos = await fetchRecentVideos(client, 'UUxxxxxx', 10);
+ * for (const video of videos) {
+ *   console.log(video.snippet?.title, video.contentDetails?.videoId);
+ * }
+ * ```
+ */
+export async function fetchRecentVideos(
+  client: YouTubeClient,
+  uploadsPlaylistId: string,
+  maxResults: number = 10
+): Promise<youtube_v3.Schema$PlaylistItem[]> {
+  const response = await client.api.playlistItems.list({
+    part: ['snippet', 'contentDetails'],
+    playlistId: uploadsPlaylistId,
+    maxResults: Math.min(maxResults, 50), // YouTube API max is 50
+  });
+
+  return response.data.items || [];
+}
+
+/**
+ * Get the authenticated user's YouTube subscriptions
+ *
+ * Returns channels the user has subscribed to on YouTube.
+ * Useful for the "discover available" feature in the app.
+ *
+ * YouTube API Cost: 1 quota unit per page
+ *
+ * @param client - Authenticated YouTube client
+ * @param maxResults - Maximum subscriptions to fetch (default: 50, max: 50)
+ * @returns Array of subscription objects with channel details
+ *
+ * @example
+ * ```typescript
+ * const subs = await getUserSubscriptions(client, 50);
+ * for (const sub of subs) {
+ *   console.log(sub.snippet?.title, sub.snippet?.resourceId?.channelId);
+ * }
+ * ```
+ */
+export async function getUserSubscriptions(
+  client: YouTubeClient,
+  maxResults: number = 50
+): Promise<youtube_v3.Schema$Subscription[]> {
+  const response = await client.api.subscriptions.list({
+    part: ['snippet'],
+    mine: true,
+    maxResults: Math.min(maxResults, 50), // YouTube API max is 50
+  });
+
+  return response.data.items || [];
+}
+
+/**
+ * Get channel details by channel ID
+ *
+ * Fetches metadata for a specific channel including name, description,
+ * thumbnail, and statistics.
+ *
+ * YouTube API Cost: 1 quota unit
+ *
+ * @param client - Authenticated YouTube client
+ * @param channelId - YouTube channel ID
+ * @returns Channel object with details, or null if not found
+ *
+ * @example
+ * ```typescript
+ * const channel = await getChannelDetails(client, 'UCxxxxxx');
+ * console.log(channel?.snippet?.title, channel?.statistics?.subscriberCount);
+ * ```
+ */
+export async function getChannelDetails(
+  client: YouTubeClient,
+  channelId: string
+): Promise<youtube_v3.Schema$Channel | null> {
+  const response = await client.api.channels.list({
+    part: ['snippet', 'statistics', 'contentDetails'],
+    id: [channelId],
+  });
+
+  return response.data.items?.[0] ?? null;
+}
+
+/**
+ * Search for YouTube channels by query
+ *
+ * WARNING: This costs 100 quota units per call! Use sparingly.
+ * Consider caching results or using alternative discovery methods.
+ *
+ * YouTube API Cost: 100 quota units
+ *
+ * @param client - Authenticated YouTube client
+ * @param query - Search query string
+ * @param maxResults - Maximum results (default: 10, max: 50)
+ * @returns Array of search results (channels only)
+ *
+ * @example
+ * ```typescript
+ * // Use sparingly due to high quota cost!
+ * const results = await searchChannels(client, 'coding tutorials', 10);
+ * ```
+ */
+export async function searchChannels(
+  client: YouTubeClient,
+  query: string,
+  maxResults: number = 10
+): Promise<youtube_v3.Schema$SearchResult[]> {
+  const response = await client.api.search.list({
+    part: ['snippet'],
+    q: query,
+    type: ['channel'],
+    maxResults: Math.min(maxResults, 50),
+  });
+
+  return response.data.items || [];
+}
+
+/**
+ * Extract video information from a playlist item
+ *
+ * Utility to safely extract common video fields from a playlist item response.
+ *
+ * @param item - Playlist item from YouTube API
+ * @returns Normalized video info object
+ */
+export function extractVideoInfo(item: youtube_v3.Schema$PlaylistItem): {
+  videoId: string | null;
+  title: string;
+  description: string;
+  channelId: string | null;
+  channelTitle: string;
+  publishedAt: string | null;
+  thumbnailUrl: string | null;
+} {
+  const snippet = item.snippet;
+  const contentDetails = item.contentDetails;
+
+  return {
+    videoId: contentDetails?.videoId ?? null,
+    title: snippet?.title ?? '',
+    description: snippet?.description ?? '',
+    channelId: snippet?.channelId ?? null,
+    channelTitle: snippet?.channelTitle ?? '',
+    publishedAt: snippet?.publishedAt ?? contentDetails?.videoPublishedAt ?? null,
+    thumbnailUrl:
+      snippet?.thumbnails?.high?.url ??
+      snippet?.thumbnails?.medium?.url ??
+      snippet?.thumbnails?.default?.url ??
+      null,
+  };
+}

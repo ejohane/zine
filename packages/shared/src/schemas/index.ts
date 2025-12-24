@@ -5,7 +5,13 @@
  */
 
 import { z } from 'zod';
-import { ContentType, Provider, UserItemState } from '../types/domain';
+import {
+  ContentType,
+  Provider,
+  UserItemState,
+  SubscriptionStatus,
+  ProviderConnectionStatus,
+} from '../types/domain';
 
 // ============================================================================
 // Enum Schemas
@@ -16,6 +22,10 @@ export const ContentTypeSchema = z.nativeEnum(ContentType);
 export const ProviderSchema = z.nativeEnum(Provider);
 
 export const UserItemStateSchema = z.nativeEnum(UserItemState);
+
+export const SubscriptionStatusSchema = z.nativeEnum(SubscriptionStatus);
+
+export const ProviderConnectionStatusSchema = z.nativeEnum(ProviderConnectionStatus);
 
 // ============================================================================
 // Domain Model Schemas

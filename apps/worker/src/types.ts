@@ -12,6 +12,8 @@ export interface Bindings {
   DB: D1Database;
   /** KV namespace for webhook idempotency */
   WEBHOOK_IDEMPOTENCY: KVNamespace;
+  /** KV namespace for OAuth state storage */
+  OAUTH_STATE_KV: KVNamespace;
   /** Current environment (development, staging, production) */
   ENVIRONMENT: string;
   /** Clerk publishable key */
@@ -22,6 +24,18 @@ export interface Bindings {
   CLERK_JWKS_URL?: string;
   /** Clerk webhook signing secret for Svix verification */
   CLERK_WEBHOOK_SECRET?: string;
+  /** AES-256 encryption key for OAuth tokens (hex string) */
+  ENCRYPTION_KEY?: string;
+  /** Google OAuth client ID for YouTube */
+  GOOGLE_CLIENT_ID?: string;
+  /** Google OAuth client secret for YouTube */
+  GOOGLE_CLIENT_SECRET?: string;
+  /** Spotify OAuth client ID */
+  SPOTIFY_CLIENT_ID?: string;
+  /** Spotify OAuth client secret */
+  SPOTIFY_CLIENT_SECRET?: string;
+  /** OAuth redirect URI */
+  OAUTH_REDIRECT_URI?: string;
 }
 
 /**

@@ -40,6 +40,32 @@ export enum UserItemState {
   ARCHIVED = 'ARCHIVED',
 }
 
+/**
+ * Status for OAuth-based subscriptions
+ */
+export enum SubscriptionStatus {
+  /** Subscription is active and being polled */
+  ACTIVE = 'ACTIVE',
+  /** Subscription is paused by user */
+  PAUSED = 'PAUSED',
+  /** Provider connection was disconnected */
+  DISCONNECTED = 'DISCONNECTED',
+  /** User unsubscribed (soft delete) */
+  UNSUBSCRIBED = 'UNSUBSCRIBED',
+}
+
+/**
+ * Status for OAuth provider connections
+ */
+export enum ProviderConnectionStatus {
+  /** Connection is active with valid tokens */
+  ACTIVE = 'ACTIVE',
+  /** Tokens have expired and need refresh */
+  EXPIRED = 'EXPIRED',
+  /** User revoked access at provider */
+  REVOKED = 'REVOKED',
+}
+
 // ============================================================================
 // Domain Models
 // ============================================================================
@@ -194,4 +220,18 @@ export function isProvider(value: unknown): value is Provider {
  */
 export function isUserItemState(value: unknown): value is UserItemState {
   return Object.values(UserItemState).includes(value as UserItemState);
+}
+
+/**
+ * Type guard to check if a value is a valid SubscriptionStatus
+ */
+export function isSubscriptionStatus(value: unknown): value is SubscriptionStatus {
+  return Object.values(SubscriptionStatus).includes(value as SubscriptionStatus);
+}
+
+/**
+ * Type guard to check if a value is a valid ProviderConnectionStatus
+ */
+export function isProviderConnectionStatus(value: unknown): value is ProviderConnectionStatus {
+  return Object.values(ProviderConnectionStatus).includes(value as ProviderConnectionStatus);
 }

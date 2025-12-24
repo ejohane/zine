@@ -1,0 +1,563 @@
+/**
+ * Offline Action Queue with AsyncStorage Persistence
+ *
+ * Queues subscription-related mutations when offline and executes them
+ * when connectivity returns. Implements smart retry logic with error
+ * classification to handle different failure modes appropriately.
+ *
+ * @see Frontend Spec Section 9.3 for detailed requirements
+ *
+ * Features:
+ * - ULID-based action ordering for deterministic replay
+ * - AsyncStorage persistence survives app restarts
+ * - Smart retry logic based on error type
+ * - NetInfo integration for automatic queue processing on reconnect
+ * - Subscriber pattern for UI updates (SyncStatusIndicator)
+ *
+ * Error Handling Strategy:
+ * - NETWORK/SERVER/UNKNOWN: Retry with MAX_RETRIES (3)
+ * - AUTH (401): Refresh token, retry once
+ * - CONFLICT (409): Treat as success (already done)
+ * - CLIENT (4xx): Don't retry, permanent failure
+ */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
+import { ulid } from 'ulid';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const QUEUE_KEY = 'zine:offline_action_queue';
+const MAX_RETRIES = 3;
+const AUTH_RETRY_LIMIT = 1; // Only retry auth errors once after token refresh
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Types of offline actions that can be queued.
+ * Maps to tRPC mutation endpoints.
+ */
+export type OfflineActionType =
+  | 'SUBSCRIBE'
+  | 'UNSUBSCRIBE'
+  | 'PAUSE_SUBSCRIPTION'
+  | 'RESUME_SUBSCRIPTION';
+
+/**
+ * Error classification for determining retry behavior.
+ *
+ * @property NETWORK - Temporary network failure (fetch timeout, connection refused)
+ * @property AUTH - 401 Unauthorized (token expired or invalid)
+ * @property CONFLICT - 409 Conflict (subscription already exists/removed)
+ * @property CLIENT - 4xx errors except 401/409 (bad input, validation errors)
+ * @property SERVER - 5xx errors (server-side failures)
+ * @property UNKNOWN - Unclassified errors (treat as retryable)
+ */
+export type ErrorClassification = 'NETWORK' | 'AUTH' | 'CONFLICT' | 'CLIENT' | 'SERVER' | 'UNKNOWN';
+
+/**
+ * A queued offline action with metadata for retry handling.
+ */
+export interface OfflineAction {
+  /** ULID for ordering (lexicographically sortable by creation time) */
+  id: string;
+  /** The type of mutation to perform */
+  type: OfflineActionType;
+  /** Mutation payload (specific to action type) */
+  payload: Record<string, unknown>;
+  /** Timestamp when the action was created */
+  createdAt: number;
+  /** Number of retry attempts for network/server errors */
+  retryCount: number;
+  /** Number of retry attempts after auth token refresh */
+  authRetryCount: number;
+  /** Last error message for debugging */
+  lastError?: string;
+  /** Last error classification for UI display */
+  lastErrorType?: ErrorClassification;
+}
+
+/**
+ * Callback type for queue change listeners.
+ */
+type QueueListener = () => void;
+
+// ============================================================================
+// Error Classification
+// ============================================================================
+
+/**
+ * Classify an error to determine retry behavior.
+ *
+ * Classification priority:
+ * 1. Network-level failures (TypeError from fetch)
+ * 2. HTTP status codes from tRPC error responses
+ * 3. Error message pattern matching
+ * 4. Unknown (default, treated as retryable)
+ *
+ * @param error - The error thrown during action execution
+ * @returns Error classification for retry logic
+ */
+function classifyError(error: unknown): ErrorClassification {
+  // Network errors from fetch (connection refused, timeout, etc.)
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    return 'NETWORK';
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    // Network-related error messages
+    if (
+      message.includes('network') ||
+      message.includes('timeout') ||
+      message.includes('aborted') ||
+      message.includes('connection')
+    ) {
+      return 'NETWORK';
+    }
+  }
+
+  // tRPC/HTTP errors with status codes
+  if (typeof error === 'object' && error !== null) {
+    const errorObj = error as Record<string, unknown>;
+
+    // Extract HTTP status from tRPC error structure
+    // tRPC wraps errors as: { data: { httpStatus, code }, message }
+    const data = errorObj.data as Record<string, unknown> | undefined;
+    const httpStatus = data?.httpStatus ?? errorObj.status ?? errorObj.statusCode;
+    const code = data?.code ?? errorObj.code;
+
+    // 401 Unauthorized - auth token expired or invalid
+    if (httpStatus === 401 || code === 'UNAUTHORIZED') {
+      return 'AUTH';
+    }
+
+    // 409 Conflict - resource already exists (e.g., already subscribed)
+    if (httpStatus === 409 || code === 'CONFLICT') {
+      return 'CONFLICT';
+    }
+
+    // 4xx Client errors (except 401, 409) - permanent failures
+    if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 500) {
+      return 'CLIENT';
+    }
+
+    // 5xx Server errors - temporary failures, should retry
+    if (typeof httpStatus === 'number' && httpStatus >= 500) {
+      return 'SERVER';
+    }
+  }
+
+  return 'UNKNOWN';
+}
+
+/**
+ * Determine if an error should trigger a retry based on type and retry counts.
+ *
+ * @param errorType - The classified error type
+ * @param action - The action being processed (for retry count checks)
+ * @returns Whether the action should be retried
+ */
+function isRetryableError(errorType: ErrorClassification, action: OfflineAction): boolean {
+  switch (errorType) {
+    case 'NETWORK':
+    case 'SERVER':
+    case 'UNKNOWN':
+      // Retry if under the general retry limit
+      return action.retryCount < MAX_RETRIES;
+
+    case 'AUTH':
+      // Auth errors get one retry after token refresh
+      return action.authRetryCount < AUTH_RETRY_LIMIT;
+
+    case 'CONFLICT':
+      // Conflict means the action's intent was already fulfilled
+      // (e.g., user is already subscribed) - don't retry
+      return false;
+
+    case 'CLIENT':
+      // Client errors (4xx except 401, 409) are permanent - don't retry
+      return false;
+
+    default:
+      return false;
+  }
+}
+
+// ============================================================================
+// Offline Action Queue
+// ============================================================================
+
+/**
+ * Singleton queue for managing offline subscription mutations.
+ *
+ * Usage:
+ * ```typescript
+ * // Queue an action
+ * const actionId = await offlineQueue.enqueue({
+ *   type: 'SUBSCRIBE',
+ *   payload: { provider: 'YOUTUBE', providerChannelId: 'UC...' }
+ * });
+ *
+ * // Check pending count
+ * const count = await offlineQueue.getPendingCount();
+ *
+ * // Subscribe to changes (for UI indicators)
+ * const unsubscribe = offlineQueue.subscribe(() => {
+ *   console.log('Queue changed');
+ * });
+ * ```
+ */
+class OfflineActionQueue {
+  /** Flag to prevent concurrent queue processing */
+  private isProcessing = false;
+
+  /** Set of listeners notified on queue changes */
+  private listeners: Set<QueueListener> = new Set();
+
+  /**
+   * Add an action to the queue.
+   *
+   * Actions are assigned a ULID for deterministic ordering and persisted
+   * immediately to AsyncStorage. Queue processing is triggered if online.
+   *
+   * @param action - The action type and payload to queue
+   * @returns The generated action ID (ULID)
+   */
+  async enqueue(action: {
+    type: OfflineActionType;
+    payload: Record<string, unknown>;
+  }): Promise<string> {
+    const queue = await this.getQueue();
+
+    const queuedAction: OfflineAction = {
+      id: ulid(),
+      type: action.type,
+      payload: action.payload,
+      createdAt: Date.now(),
+      retryCount: 0,
+      authRetryCount: 0,
+    };
+
+    queue.push(queuedAction);
+    await this.saveQueue(queue);
+    this.notifyListeners();
+
+    // Attempt to process immediately if online
+    this.processQueue();
+
+    return queuedAction.id;
+  }
+
+  /**
+   * Get all pending actions in the queue.
+   *
+   * @returns Array of pending actions, ordered by creation time (ULID order)
+   */
+  async getQueue(): Promise<OfflineAction[]> {
+    try {
+      const data = await AsyncStorage.getItem(QUEUE_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('[OfflineQueue] Failed to read queue:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get the number of pending actions.
+   *
+   * @returns Number of actions in the queue
+   */
+  async getPendingCount(): Promise<number> {
+    const queue = await this.getQueue();
+    return queue.length;
+  }
+
+  /**
+   * Process all queued actions if online.
+   *
+   * Actions are processed in order (ULID order = creation order).
+   * Failed actions are either retried (network/server errors) or
+   * removed (client errors, conflicts, or retry limit exceeded).
+   *
+   * After processing, React Query caches are invalidated via the
+   * registered callback from TRPCProvider.
+   */
+  async processQueue(): Promise<void> {
+    // Prevent concurrent processing
+    if (this.isProcessing) return;
+
+    // Check connectivity before processing
+    const state = await NetInfo.fetch();
+    if (!state.isConnected || state.isInternetReachable === false) {
+      return;
+    }
+
+    this.isProcessing = true;
+
+    try {
+      const queue = await this.getQueue();
+      const remainingActions: OfflineAction[] = [];
+      let anySucceeded = false;
+
+      for (const action of queue) {
+        try {
+          await this.executeAction(action);
+          anySucceeded = true;
+          // Action succeeded - don't add to remaining
+        } catch (error) {
+          const errorType = classifyError(error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+          // Handle based on error type
+          if (errorType === 'CONFLICT') {
+            // 409 Conflict: The action's intent is already fulfilled
+            // This is actually a success case - log and remove from queue
+            console.log(
+              `[OfflineQueue] Action ${action.id} (${action.type}) resolved as conflict - already done`
+            );
+            anySucceeded = true; // Treat as success for cache invalidation
+            continue;
+          }
+
+          if (errorType === 'AUTH') {
+            // 401 Unauthorized: Try to refresh auth token and retry once
+            if (action.authRetryCount < AUTH_RETRY_LIMIT) {
+              try {
+                await this.refreshAuth();
+                // Retry the action immediately after auth refresh
+                await this.executeAction(action);
+                anySucceeded = true;
+                // Success after auth refresh - don't add to remaining
+                continue;
+              } catch (retryError) {
+                // Auth refresh failed or retry failed
+                const retryErrorType = classifyError(retryError);
+                const updatedAction: OfflineAction = {
+                  ...action,
+                  authRetryCount: action.authRetryCount + 1,
+                  lastError: retryError instanceof Error ? retryError.message : 'Auth retry failed',
+                  lastErrorType: retryErrorType,
+                };
+
+                if (isRetryableError(retryErrorType, updatedAction)) {
+                  remainingActions.push(updatedAction);
+                } else {
+                  console.error(
+                    `[OfflineQueue] Action ${action.id} failed permanently after auth retry:`,
+                    retryError
+                  );
+                }
+              }
+            } else {
+              // Exceeded auth retry limit - permanent failure
+              console.error(
+                `[OfflineQueue] Action ${action.id} exceeded auth retry limit: ${errorMessage}`
+              );
+            }
+            continue;
+          }
+
+          if (errorType === 'CLIENT') {
+            // 4xx Client errors (except 401, 409): Permanent failure
+            // Don't retry - these indicate bad input or invalid state
+            console.error(
+              `[OfflineQueue] Action ${action.id} (${action.type}) failed permanently: ${errorMessage}`
+            );
+            continue;
+          }
+
+          // NETWORK, SERVER, UNKNOWN errors: Retry with backoff
+          const updatedAction: OfflineAction = {
+            ...action,
+            retryCount: action.retryCount + 1,
+            lastError: errorMessage,
+            lastErrorType: errorType,
+          };
+
+          if (isRetryableError(errorType, updatedAction)) {
+            remainingActions.push(updatedAction);
+          } else {
+            // Exceeded retry limit
+            console.error(
+              `[OfflineQueue] Action ${action.id} (${action.type}) exceeded retry limit: ${errorMessage}`
+            );
+          }
+        }
+      }
+
+      await this.saveQueue(remainingActions);
+      this.notifyListeners();
+
+      // Notify React Query to invalidate caches after queue processing
+      // This ensures the UI reflects the server state after offline mutations complete
+      if (anySucceeded) {
+        const { notifyQueueProcessed } = await import('./trpc-offline-client');
+        notifyQueueProcessed();
+      }
+    } finally {
+      this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Subscribe to queue changes.
+   *
+   * Listeners are called when actions are added, removed, or modified.
+   * Use this to update UI indicators (e.g., pending action count).
+   *
+   * @param listener - Callback function to invoke on queue changes
+   * @returns Unsubscribe function
+   */
+  subscribe(listener: QueueListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * Clear all pending actions from the queue.
+   *
+   * Use with caution - this discards all queued mutations.
+   * Intended for debugging or user-initiated "cancel all pending changes".
+   */
+  async clear(): Promise<void> {
+    await AsyncStorage.removeItem(QUEUE_KEY);
+    this.notifyListeners();
+  }
+
+  // ==========================================================================
+  // Private Methods
+  // ==========================================================================
+
+  /**
+   * Persist the queue to AsyncStorage.
+   */
+  private async saveQueue(queue: OfflineAction[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    } catch (error) {
+      console.error('[OfflineQueue] Failed to save queue:', error);
+    }
+  }
+
+  /**
+   * Notify all listeners of a queue change.
+   */
+  private notifyListeners(): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('[OfflineQueue] Listener error:', error);
+      }
+    });
+  }
+
+  /**
+   * Attempt to refresh the authentication token.
+   *
+   * Called when a 401 Unauthorized error is encountered.
+   * Uses Clerk's token refresh mechanism via the auth module.
+   *
+   * @throws Error if auth refresh fails
+   */
+  private async refreshAuth(): Promise<void> {
+    // TODO: Implement token refresh when Clerk integration is complete
+    // For now, we'll import and call refreshAuthToken when available
+    // const { refreshAuthToken } = await import('./auth');
+    // await refreshAuthToken();
+
+    // Placeholder: throw to indicate refresh not available
+    console.warn('[OfflineQueue] Auth refresh not yet implemented');
+    throw new Error('Auth refresh not available');
+  }
+
+  /**
+   * Execute a single queued action using the offline tRPC client.
+   *
+   * Uses getOfflineTRPCClient() to ensure:
+   * 1. Same client instance across all queue operations
+   * 2. Proper auth header injection
+   * 3. Ability to notify React Query after successful execution
+   *
+   * @param action - The action to execute
+   * @throws Error if the mutation fails
+   */
+  private async executeAction(action: OfflineAction): Promise<void> {
+    const { getOfflineTRPCClient } = await import('./trpc-offline-client');
+    const client = getOfflineTRPCClient();
+
+    // Map action types to tRPC mutations
+    // Note: Current router uses 'sources' not 'subscriptions'
+    // The action payload structure should match the mutation input
+    switch (action.type) {
+      case 'SUBSCRIBE':
+        // payload: { provider, feedUrl, name? }
+        await client.sources.add.mutate(
+          action.payload as Parameters<typeof client.sources.add.mutate>[0]
+        );
+        break;
+
+      case 'UNSUBSCRIBE':
+        // payload: { id }
+        await client.sources.remove.mutate(
+          action.payload as Parameters<typeof client.sources.remove.mutate>[0]
+        );
+        break;
+
+      case 'PAUSE_SUBSCRIPTION':
+        // TODO: Implement when pause mutation is added to router
+        console.warn('[OfflineQueue] PAUSE_SUBSCRIPTION not yet implemented in router');
+        throw new Error('PAUSE_SUBSCRIPTION not implemented');
+
+      case 'RESUME_SUBSCRIPTION':
+        // TODO: Implement when resume mutation is added to router
+        console.warn('[OfflineQueue] RESUME_SUBSCRIPTION not yet implemented in router');
+        throw new Error('RESUME_SUBSCRIPTION not implemented');
+
+      default:
+        throw new Error(`Unknown action type: ${action.type}`);
+    }
+  }
+}
+
+// ============================================================================
+// Singleton Export
+// ============================================================================
+
+/**
+ * Singleton instance of the offline action queue.
+ *
+ * Import this to enqueue actions or subscribe to changes:
+ * ```typescript
+ * import { offlineQueue } from './offline-queue';
+ *
+ * await offlineQueue.enqueue({
+ *   type: 'SUBSCRIBE',
+ *   payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@channel' }
+ * });
+ * ```
+ */
+export const offlineQueue = new OfflineActionQueue();
+
+// ============================================================================
+// NetInfo Integration
+// ============================================================================
+
+/**
+ * Auto-process queue when app comes online.
+ *
+ * This listener is registered at module load time, so the queue
+ * will automatically attempt to process whenever connectivity is restored.
+ */
+NetInfo.addEventListener((state) => {
+  if (state.isConnected && state.isInternetReachable !== false) {
+    offlineQueue.processQueue();
+  }
+});

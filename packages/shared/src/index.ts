@@ -7,12 +7,16 @@ export {
   ContentType,
   Provider,
   UserItemState,
+  SubscriptionStatus,
+  ProviderConnectionStatus,
   type Item,
   type UserItem,
   type Source,
   isContentType,
   isProvider,
   isUserItemState,
+  isSubscriptionStatus,
+  isProviderConnectionStatus,
 } from './types/domain';
 
 // Constants
@@ -23,6 +27,8 @@ export {
   ContentTypeSchema,
   ProviderSchema,
   UserItemStateSchema,
+  SubscriptionStatusSchema,
+  ProviderConnectionStatusSchema,
   ItemSchema,
   UserItemSchema,
   SourceSchema,

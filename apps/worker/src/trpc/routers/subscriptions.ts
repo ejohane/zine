@@ -1,0 +1,649 @@
+/**
+ * Subscriptions tRPC Router
+ *
+ * Handles OAuth-based channel/show subscriptions (YouTube, Spotify).
+ * Supports add, remove, and list operations with pagination.
+ *
+ * Key behaviors:
+ * - add: Validates active connection, creates/reactivates subscription
+ * - remove: Soft deletes subscription, cleans up INBOX items (preserves SAVED)
+ * - list: Returns paginated subscriptions with optional filters
+ *
+ * See: features/subscriptions/backend-spec.md
+ */
+
+import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { ulid } from 'ulid';
+import { and, eq, gt, asc, inArray, ne } from 'drizzle-orm';
+import { router, protectedProcedure } from '../trpc';
+import { ProviderSchema, SubscriptionStatusSchema, Provider } from '@zine/shared';
+import { subscriptions, userItems, subscriptionItems, providerConnections } from '../../db/schema';
+import {
+  getYouTubeClientForConnection,
+  getUserSubscriptions as getYouTubeSubscriptions,
+  searchChannels,
+} from '../../providers/youtube';
+import {
+  getSpotifyClientForConnection,
+  getAllUserSavedShows,
+  searchShows,
+} from '../../providers/spotify';
+import type { ProviderConnection } from '../../lib/token-refresh';
+import type { Database } from '../../db';
+import { triggerInitialFetch, type InitialFetchEnv } from '../../subscriptions/initial-fetch';
+
+// ============================================================================
+// Zod Schemas
+// ============================================================================
+
+/**
+ * Input schema for listing subscriptions with optional filters
+ */
+const ListSubscriptionsInputSchema = z.object({
+  provider: ProviderSchema.optional(),
+  status: SubscriptionStatusSchema.optional(),
+  limit: z.number().min(1).max(100).default(50),
+  cursor: z.string().optional(),
+});
+
+/**
+ * Input schema for adding a subscription
+ */
+const AddSubscriptionInputSchema = z.object({
+  provider: ProviderSchema,
+  providerChannelId: z.string().min(1),
+  name: z.string().optional(),
+  imageUrl: z.string().url().optional(),
+});
+
+/**
+ * Input schema for removing a subscription
+ */
+const RemoveSubscriptionInputSchema = z.object({
+  subscriptionId: z.string().min(1),
+});
+
+/**
+ * Input schema for pause/resume operations
+ */
+const PauseResumeInputSchema = z.object({
+  subscriptionId: z.string().min(1),
+});
+
+/**
+ * Input schema for manual sync
+ */
+const SyncNowInputSchema = z.object({
+  subscriptionId: z.string().min(1),
+});
+
+/**
+ * Input schema for discovering available subscriptions from provider
+ */
+const DiscoverAvailableInputSchema = z.object({
+  provider: ProviderSchema,
+});
+
+/**
+ * Input schema for searching channels/shows on a provider
+ */
+const SearchInputSchema = z.object({
+  provider: ProviderSchema,
+  query: z.string().min(2).max(100),
+  limit: z.number().min(1).max(20).default(10),
+});
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Get an active provider connection for a user
+ *
+ * @param userId - The user's ID
+ * @param provider - The provider to check
+ * @param db - Drizzle database instance
+ * @returns The active connection or null if not connected
+ */
+async function getActiveConnection(
+  userId: string,
+  provider: Provider,
+  db: Database
+): Promise<ProviderConnection | null> {
+  const connection = await db.query.providerConnections.findFirst({
+    where: and(
+      eq(providerConnections.userId, userId),
+      eq(providerConnections.provider, provider),
+      eq(providerConnections.status, 'ACTIVE')
+    ),
+  });
+
+  return connection as ProviderConnection | null;
+}
+
+// ============================================================================
+// Router
+// ============================================================================
+
+export const subscriptionsRouter = router({
+  /**
+   * List user's subscriptions (paginated)
+   *
+   * Supports filtering by provider and status.
+   * Uses cursor-based pagination sorted by subscription ID (ULID, chronological).
+   *
+   * @returns Paginated list of subscriptions with nextCursor and hasMore flags
+   */
+  list: protectedProcedure
+    .input(ListSubscriptionsInputSchema.optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 50;
+      const conditions = [eq(subscriptions.userId, ctx.userId)];
+
+      // Apply optional filters
+      if (input?.provider) {
+        conditions.push(eq(subscriptions.provider, input.provider));
+      }
+      if (input?.status) {
+        conditions.push(eq(subscriptions.status, input.status));
+      }
+
+      // Apply cursor-based pagination (ULID sorting is chronological)
+      if (input?.cursor) {
+        conditions.push(gt(subscriptions.id, input.cursor));
+      }
+
+      const results = await ctx.db.query.subscriptions.findMany({
+        where: and(...conditions),
+        orderBy: [asc(subscriptions.id)],
+        limit: limit + 1, // Fetch one extra to check for more
+      });
+
+      const hasMore = results.length > limit;
+      const items = hasMore ? results.slice(0, -1) : results;
+
+      return {
+        items,
+        nextCursor: hasMore && items.length > 0 ? items[items.length - 1].id : null,
+        hasMore,
+      };
+    }),
+
+  /**
+   * Add a subscription to a YouTube channel or Spotify show
+   *
+   * Requirements:
+   * 1. User must have an active connection to the provider
+   * 2. Creates new subscription or reactivates existing one (upsert behavior)
+   *
+   * The initial fetch of content is handled asynchronously (zine-teq.18).
+   *
+   * @throws PRECONDITION_FAILED if user is not connected to the provider
+   */
+  add: protectedProcedure.input(AddSubscriptionInputSchema).mutation(async ({ ctx, input }) => {
+    // 1. Verify user has active connection to this provider
+    const connection = await ctx.db.query.providerConnections.findFirst({
+      where: and(
+        eq(providerConnections.userId, ctx.userId),
+        eq(providerConnections.provider, input.provider),
+        eq(providerConnections.status, 'ACTIVE')
+      ),
+    });
+
+    if (!connection) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: `Not connected to ${input.provider}. Please connect your ${input.provider} account first.`,
+      });
+    }
+
+    // 2. Create subscription (upsert: reactivate if previously unsubscribed)
+    const now = Date.now();
+    const subscriptionId = ulid();
+
+    await ctx.db
+      .insert(subscriptions)
+      .values({
+        id: subscriptionId,
+        userId: ctx.userId,
+        provider: input.provider,
+        providerChannelId: input.providerChannelId,
+        name: input.name || input.providerChannelId,
+        imageUrl: input.imageUrl ?? null,
+        status: 'ACTIVE',
+        pollIntervalSeconds: 3600, // 1 hour default
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [subscriptions.userId, subscriptions.provider, subscriptions.providerChannelId],
+        set: {
+          status: 'ACTIVE',
+          name: input.name || input.providerChannelId,
+          imageUrl: input.imageUrl ?? null,
+          updatedAt: now,
+        },
+      });
+
+    // 3. Get the subscription ID (might be existing one if upsert)
+    const sub = await ctx.db.query.subscriptions.findFirst({
+      where: and(
+        eq(subscriptions.userId, ctx.userId),
+        eq(subscriptions.provider, input.provider),
+        eq(subscriptions.providerChannelId, input.providerChannelId)
+      ),
+      columns: { id: true, name: true, imageUrl: true },
+    });
+
+    // 4. Trigger initial fetch (await to ensure it completes before response)
+    // Note: triggerInitialFetch catches its own errors internally and won't fail subscription creation
+    try {
+      await triggerInitialFetch(
+        ctx.userId,
+        sub!.id,
+        connection as ProviderConnection,
+        input.provider,
+        input.providerChannelId,
+        ctx.db,
+        ctx.env as InitialFetchEnv
+      );
+    } catch (error) {
+      // Extra safety: log but don't fail subscription creation
+      console.error('[subscriptions.add] Initial fetch failed:', error);
+    }
+
+    return {
+      subscriptionId: sub!.id,
+      name: sub!.name,
+      imageUrl: sub!.imageUrl,
+    };
+  }),
+
+  /**
+   * Remove (unsubscribe from) a subscription
+   *
+   * Behavior:
+   * 1. Soft delete subscription (status → UNSUBSCRIBED)
+   * 2. Delete user_items in INBOX state (user hasn't committed to these)
+   * 3. Hard delete subscription_items tracking records
+   * 4. Preserve provider_items_seen (prevents re-ingestion on re-subscribe)
+   *
+   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
+   */
+  remove: protectedProcedure
+    .input(RemoveSubscriptionInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      // 1. Verify ownership
+      const sub = await ctx.db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.id, input.subscriptionId),
+          eq(subscriptions.userId, ctx.userId)
+        ),
+      });
+
+      if (!sub) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Subscription not found',
+        });
+      }
+
+      // 2. Soft delete subscription (preserves metadata for potential re-subscribe)
+      await ctx.db
+        .update(subscriptions)
+        .set({
+          status: 'UNSUBSCRIBED',
+          updatedAt: Date.now(),
+        })
+        .where(eq(subscriptions.id, input.subscriptionId));
+
+      // 3. Get item IDs from subscription_items for cleanup
+      const subItems = await ctx.db.query.subscriptionItems.findMany({
+        where: eq(subscriptionItems.subscriptionId, input.subscriptionId),
+        columns: { itemId: true },
+      });
+      const itemIds = subItems.map((si) => si.itemId);
+
+      // 4. Delete INBOX items only (user hasn't committed to these)
+      // BOOKMARKED/ARCHIVED items are preserved as user has explicitly saved them
+      if (itemIds.length > 0) {
+        await ctx.db
+          .delete(userItems)
+          .where(
+            and(
+              eq(userItems.userId, ctx.userId),
+              inArray(userItems.itemId, itemIds),
+              eq(userItems.state, 'INBOX')
+            )
+          );
+      }
+
+      // 5. Hard delete subscription_items tracking records
+      // These have no value after unsubscribe
+      await ctx.db
+        .delete(subscriptionItems)
+        .where(eq(subscriptionItems.subscriptionId, input.subscriptionId));
+
+      // Note: provider_items_seen is preserved to prevent re-ingestion
+      // if user re-subscribes to the same channel/show
+
+      return { success: true as const };
+    }),
+
+  /**
+   * Pause a subscription (stops polling)
+   *
+   * Changes subscription status from ACTIVE to PAUSED.
+   * Only active subscriptions can be paused.
+   *
+   * @throws NOT_FOUND if subscription doesn't exist, doesn't belong to user, or is not active
+   */
+  pause: protectedProcedure.input(PauseResumeInputSchema).mutation(async ({ ctx, input }) => {
+    const result = await ctx.db
+      .update(subscriptions)
+      .set({
+        status: 'PAUSED',
+        updatedAt: Date.now(),
+      })
+      .where(
+        and(
+          eq(subscriptions.id, input.subscriptionId),
+          eq(subscriptions.userId, ctx.userId),
+          eq(subscriptions.status, 'ACTIVE')
+        )
+      )
+      .returning({ id: subscriptions.id });
+
+    if (result.length === 0) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Subscription not found or not active',
+      });
+    }
+
+    return { success: true as const };
+  }),
+
+  /**
+   * Resume a paused subscription
+   *
+   * Changes subscription status from PAUSED to ACTIVE.
+   * Validates that the provider connection is still active before resuming.
+   *
+   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
+   * @throws BAD_REQUEST if subscription is not in PAUSED status
+   * @throws PRECONDITION_FAILED if provider connection is not active
+   */
+  resume: protectedProcedure.input(PauseResumeInputSchema).mutation(async ({ ctx, input }) => {
+    // 1. Verify ownership and get subscription details
+    const sub = await ctx.db.query.subscriptions.findFirst({
+      where: and(eq(subscriptions.id, input.subscriptionId), eq(subscriptions.userId, ctx.userId)),
+    });
+
+    if (!sub) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Subscription not found',
+      });
+    }
+
+    // 2. Validate subscription is paused
+    if (sub.status !== 'PAUSED') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Cannot resume subscription with status ${sub.status}`,
+      });
+    }
+
+    // 3. Check if connection is active
+    const connection = await ctx.db.query.providerConnections.findFirst({
+      where: and(
+        eq(providerConnections.userId, ctx.userId),
+        eq(providerConnections.provider, sub.provider),
+        eq(providerConnections.status, 'ACTIVE')
+      ),
+    });
+
+    if (!connection) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Provider connection is not active. Please reconnect.',
+      });
+    }
+
+    // 4. Resume subscription
+    await ctx.db
+      .update(subscriptions)
+      .set({
+        status: 'ACTIVE',
+        updatedAt: Date.now(),
+      })
+      .where(eq(subscriptions.id, input.subscriptionId));
+
+    return { success: true as const };
+  }),
+
+  /**
+   * Manually trigger a sync for a subscription (rate limited)
+   *
+   * Rate limit: 1 sync per 5 minutes per subscription.
+   * Only active subscriptions can be synced.
+   * Validates that the provider connection is active.
+   *
+   * Note: The actual polling logic will be implemented in zine-teq.19.
+   * For now, this validates permissions and returns a placeholder result.
+   *
+   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
+   * @throws BAD_REQUEST if subscription is not active
+   * @throws PRECONDITION_FAILED if provider connection is not active
+   * @throws TOO_MANY_REQUESTS if rate limit is exceeded
+   */
+  syncNow: protectedProcedure.input(SyncNowInputSchema).mutation(async ({ ctx, input }) => {
+    // 1. Verify ownership and get subscription details
+    const sub = await ctx.db.query.subscriptions.findFirst({
+      where: and(eq(subscriptions.id, input.subscriptionId), eq(subscriptions.userId, ctx.userId)),
+    });
+
+    if (!sub) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Subscription not found',
+      });
+    }
+
+    // 2. Validate subscription is active
+    if (sub.status !== 'ACTIVE') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot sync non-active subscription',
+      });
+    }
+
+    // 3. Check rate limit (1 per 5 minutes per subscription)
+    const rateLimitKey = `manual-sync:${input.subscriptionId}`;
+    const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
+    if (lastSync && Date.now() - parseInt(lastSync, 10) < 5 * 60 * 1000) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Please wait 5 minutes between manual syncs',
+      });
+    }
+
+    // 4. Check if connection is active
+    const connection = await ctx.db.query.providerConnections.findFirst({
+      where: and(
+        eq(providerConnections.userId, ctx.userId),
+        eq(providerConnections.provider, sub.provider),
+        eq(providerConnections.status, 'ACTIVE')
+      ),
+    });
+
+    if (!connection) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Provider connection is not active',
+      });
+    }
+
+    // 5. Update rate limit (store current timestamp with 5 min TTL)
+    await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 300 });
+
+    // 6. TODO: Call polling function directly (will be implemented in zine-teq.19)
+    // const result = await pollSingleSubscription(sub, connection, ctx.env);
+    // return { success: true, itemsFound: result.itemsFound };
+
+    // For now, return placeholder result
+    return { success: true as const, itemsFound: 0 };
+  }),
+
+  /**
+   * Discovery endpoints for browsing available channels/shows to subscribe to
+   *
+   * Use cases:
+   * 1. available: Show channels/podcasts the user follows on provider but hasn't subscribed to in Zine
+   * 2. search: Search for channels/podcasts by name
+   */
+  discover: router({
+    /**
+     * Get user's provider subscriptions not yet in Zine
+     *
+     * Fetches the user's YouTube subscriptions or Spotify saved shows,
+     * then filters out any they've already subscribed to in Zine.
+     *
+     * @returns List of available items with isSubscribed flag (always false for this endpoint)
+     *          and connectionRequired flag if user hasn't connected the provider
+     */
+    available: protectedProcedure
+      .input(DiscoverAvailableInputSchema)
+      .query(async ({ ctx, input }) => {
+        // 1. Get active provider connection
+        const connection = await getActiveConnection(ctx.userId, input.provider, ctx.db);
+        if (!connection) {
+          return { items: [], connectionRequired: true };
+        }
+
+        // 2. Fetch user's subscriptions from provider
+        let providerSubs: { id: string; name: string; imageUrl?: string }[];
+
+        if (input.provider === Provider.YOUTUBE) {
+          const client = await getYouTubeClientForConnection(
+            connection,
+            ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+          );
+          const subs = await getYouTubeSubscriptions(client);
+          providerSubs = subs
+            .map((s) => ({
+              id: s.snippet?.resourceId?.channelId || '',
+              name: s.snippet?.title || '',
+              imageUrl: s.snippet?.thumbnails?.default?.url || undefined,
+            }))
+            .filter((s) => s.id);
+        } else {
+          const client = await getSpotifyClientForConnection(
+            connection,
+            ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+          );
+          const shows = await getAllUserSavedShows(client);
+          providerSubs = shows.map((s) => ({
+            id: s.id,
+            name: s.name,
+            imageUrl: s.images?.[0]?.url,
+          }));
+        }
+
+        // 3. Get existing Zine subscriptions for this provider (not unsubscribed)
+        const existingIds = await ctx.db.query.subscriptions.findMany({
+          where: and(
+            eq(subscriptions.userId, ctx.userId),
+            eq(subscriptions.provider, input.provider),
+            ne(subscriptions.status, 'UNSUBSCRIBED')
+          ),
+          columns: { providerChannelId: true },
+        });
+
+        const existingSet = new Set(existingIds.map((s) => s.providerChannelId));
+
+        // 4. Filter to unsubscribed items
+        const available = providerSubs
+          .filter((s) => !existingSet.has(s.id))
+          .map((s) => ({
+            ...s,
+            isSubscribed: false,
+          }));
+
+        return { items: available, connectionRequired: false };
+      }),
+
+    /**
+     * Search for channels/shows on provider
+     *
+     * WARNING: YouTube search costs 100 quota units per call! Use sparingly.
+     *
+     * @returns List of matching channels/shows with isSubscribed flag indicating
+     *          if the user has already subscribed in Zine
+     */
+    search: protectedProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
+      // 1. Get active provider connection
+      const connection = await getActiveConnection(ctx.userId, input.provider, ctx.db);
+      if (!connection) {
+        return { items: [], connectionRequired: true };
+      }
+
+      // 2. Search provider for matching channels/shows
+      let results: { id: string; name: string; description?: string; imageUrl?: string }[];
+
+      if (input.provider === Provider.YOUTUBE) {
+        // WARNING: YouTube search costs 100 quota units!
+        const client = await getYouTubeClientForConnection(
+          connection,
+          ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+        );
+        const searchResults = await searchChannels(client, input.query, input.limit);
+        results = searchResults
+          .map((ch) => ({
+            id: ch.id?.channelId || '',
+            name: ch.snippet?.channelTitle || '',
+            description: ch.snippet?.description || undefined,
+            imageUrl: ch.snippet?.thumbnails?.default?.url || undefined,
+          }))
+          .filter((r) => r.id);
+      } else {
+        const client = await getSpotifyClientForConnection(
+          connection,
+          ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+        );
+        const shows = await searchShows(client, input.query, input.limit);
+        results = shows.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          imageUrl: s.images?.[0]?.url,
+        }));
+      }
+
+      // 3. Check which are already subscribed in Zine
+      const existingIds = await ctx.db.query.subscriptions.findMany({
+        where: and(
+          eq(subscriptions.userId, ctx.userId),
+          eq(subscriptions.provider, input.provider),
+          ne(subscriptions.status, 'UNSUBSCRIBED')
+        ),
+        columns: { providerChannelId: true },
+      });
+      const existingSet = new Set(existingIds.map((s) => s.providerChannelId));
+
+      // 4. Return results with isSubscribed flag
+      return {
+        items: results.map((r) => ({
+          ...r,
+          isSubscribed: existingSet.has(r.id),
+        })),
+        connectionRequired: false,
+      };
+    }),
+  }),
+});
+
+// Export type for client usage
+export type SubscriptionsRouter = typeof subscriptionsRouter;
