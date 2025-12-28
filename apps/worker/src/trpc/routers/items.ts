@@ -49,6 +49,10 @@ export type ItemView = {
     duration: number;
     percent: number;
   } | null;
+
+  // Consumption tracking
+  isFinished: boolean;
+  finishedAt: string | null;
 };
 
 // ============================================================================
@@ -91,6 +95,8 @@ function toItemView(row: {
             ),
           }
         : null,
+    isFinished: userItem.isFinished,
+    finishedAt: userItem.finishedAt,
   };
 }
 
@@ -427,6 +433,94 @@ export const itemsRouter = router({
         .where(eq(userItems.id, input.id));
 
       return { success: true as const };
+    }),
+
+  /**
+   * Move an item from BOOKMARKED back to INBOX state.
+   * Use case: User changes their mind, wants to re-triage.
+   */
+  unbookmark: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      // Find the user item
+      const existing = await ctx.db
+        .select({ id: userItems.id, state: userItems.state })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Item not found',
+        });
+      }
+
+      // Verify bookmarked state
+      if (existing[0].state !== UserItemState.BOOKMARKED) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Item is not bookmarked',
+        });
+      }
+
+      // Update to INBOX state
+      await ctx.db
+        .update(userItems)
+        .set({
+          state: UserItemState.INBOX,
+          bookmarkedAt: null,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return { success: true as const };
+    }),
+
+  /**
+   * Toggle the isFinished state of an item.
+   * Works in any state (INBOX, BOOKMARKED, ARCHIVED).
+   */
+  toggleFinished: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      // Find the user item
+      const existing = await ctx.db
+        .select({ id: userItems.id, isFinished: userItems.isFinished })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Item not found',
+        });
+      }
+
+      // Calculate new state
+      const newIsFinished = !existing[0].isFinished;
+      const newFinishedAt = newIsFinished ? now : null;
+
+      // Update
+      await ctx.db
+        .update(userItems)
+        .set({
+          isFinished: newIsFinished,
+          finishedAt: newFinishedAt,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return {
+        success: true as const,
+        isFinished: newIsFinished,
+        finishedAt: newFinishedAt,
+      };
     }),
 
   /**

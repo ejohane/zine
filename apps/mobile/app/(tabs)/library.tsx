@@ -1,34 +1,15 @@
-import { Image } from 'expo-image';
 import { Surface } from 'heroui-native';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  TextInput,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  Shadows,
-  ContentColors,
-  ProviderColors,
-} from '@/constants/theme';
+import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
+import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import {
-  useLibraryItems,
-  mapContentType,
-  mapProvider,
-  formatDuration,
-} from '@/hooks/use-items-trpc';
+import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import type { ContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -79,22 +60,8 @@ function FilterIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: s
 }
 
 // =============================================================================
-// Types
+// Filter Options
 // =============================================================================
-
-type ContentType = 'podcast' | 'video' | 'article' | 'post';
-type Provider = 'youtube' | 'spotify' | 'substack' | 'rss';
-
-interface LibraryItem {
-  id: string;
-  title: string;
-  source: string;
-  provider: Provider;
-  type: ContentType;
-  thumbnailUrl: string | null;
-  bookmarkedAt: string;
-  duration?: string;
-}
 
 const filterOptions = [
   { id: 'all', label: 'All', icon: null },
@@ -106,27 +73,6 @@ const filterOptions = [
 // =============================================================================
 // Components
 // =============================================================================
-
-function getContentIcon(type: ContentType, size = 14, color = '#fff') {
-  switch (type) {
-    case 'podcast':
-      return <HeadphonesIcon size={size} color={color} />;
-    case 'video':
-      return <VideoIcon size={size} color={color} />;
-    default:
-      return <ArticleIcon size={size} color={color} />;
-  }
-}
-
-function getProviderColor(provider: Provider): string {
-  const providerColorMap: Record<Provider, string> = {
-    youtube: ProviderColors.youtube,
-    spotify: ProviderColors.spotify,
-    substack: ProviderColors.substack,
-    rss: '#6366F1', // Default color for RSS
-  };
-  return providerColorMap[provider] || '#6366F1';
-}
 
 interface FilterChipProps {
   label: string;
@@ -164,122 +110,6 @@ function FilterChip({
   );
 }
 
-interface LibraryCardProps {
-  item: LibraryItem;
-  colors: typeof Colors.light;
-  index: number;
-}
-
-function LibraryCard({ item, colors, index }: LibraryCardProps) {
-  const isSquare = item.type === 'podcast';
-  const aspectRatio = isSquare ? 1 : item.type === 'video' ? 16 / 9 : 16 / 10;
-
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
-      <Pressable
-        style={[
-          styles.libraryCard,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.borderLight,
-          },
-        ]}
-      >
-        <View style={[styles.cardThumbnail, { aspectRatio }]}>
-          {item.thumbnailUrl ? (
-            <Image
-              source={{ uri: item.thumbnailUrl }}
-              style={styles.cardImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            <View style={[styles.cardImage, { backgroundColor: colors.backgroundTertiary }]} />
-          )}
-          {/* Type indicator */}
-          <View style={[styles.typeIndicator, { backgroundColor: ContentColors[item.type] }]}>
-            {getContentIcon(item.type, 12, '#fff')}
-          </View>
-          {/* Duration badge */}
-          {item.duration && (
-            <View style={styles.durationBadge}>
-              <Text style={styles.durationText}>{item.duration}</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.cardContent}>
-          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-          <View style={styles.cardMeta}>
-            <View
-              style={[styles.providerDot, { backgroundColor: getProviderColor(item.provider) }]}
-            />
-            <Text style={[styles.cardSource, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.source}
-            </Text>
-            <Text style={[styles.cardTime, { color: colors.textTertiary }]}>
-              · {item.bookmarkedAt}
-            </Text>
-          </View>
-        </View>
-      </Pressable>
-    </Animated.View>
-  );
-}
-
-// =============================================================================
-// Loading & Error States
-// =============================================================================
-
-function LoadingState({ colors }: { colors: (typeof Colors)['light'] }) {
-  return (
-    <View style={styles.loadingState}>
-      <ActivityIndicator size="large" color={colors.primary} />
-    </View>
-  );
-}
-
-function ErrorState({ colors, message }: { colors: (typeof Colors)['light']; message: string }) {
-  return (
-    <View style={styles.errorState}>
-      <Text style={[styles.errorText, { color: colors.error }]}>{message}</Text>
-    </View>
-  );
-}
-
-function EmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
-  return (
-    <View style={styles.emptyState}>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No bookmarked items</Text>
-      <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
-        Bookmark content from your inbox to save it here for later.
-      </Text>
-    </View>
-  );
-}
-
-// =============================================================================
-// Transform function - API response to UI format
-// =============================================================================
-
-function formatRelativeTime(dateString: string | null | undefined): string {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-  if (diffHours < 1) return 'Just now';
-  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30)
-    return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) === 1 ? '' : 's'} ago`;
-  return date.toLocaleDateString();
-}
-
 // =============================================================================
 // Main Screen
 // =============================================================================
@@ -291,16 +121,17 @@ export default function LibraryScreen() {
   // Fetch library items from tRPC
   const { data, isLoading, error } = useLibraryItems();
 
-  // Transform API response to UI format
-  const libraryItems: LibraryItem[] = (data?.items ?? []).map((item) => ({
+  // Transform API response to ItemCardData format
+  const libraryItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
     id: item.id,
     title: item.title,
-    source: item.creator,
-    provider: mapProvider(item.provider) as Provider,
-    type: mapContentType(item.contentType) as ContentType,
+    creator: item.creator,
     thumbnailUrl: item.thumbnailUrl ?? null,
-    bookmarkedAt: formatRelativeTime(item.bookmarkedAt),
-    duration: formatDuration(item.duration ?? null),
+    contentType: mapContentType(item.contentType) as ContentType,
+    provider: mapProvider(item.provider) as Provider,
+    duration: item.duration ?? null,
+    bookmarkedAt: item.bookmarkedAt ?? null,
+    publishedAt: item.publishedAt ?? null,
   }));
 
   return (
@@ -373,11 +204,14 @@ export default function LibraryScreen() {
 
         {/* Content */}
         {isLoading ? (
-          <LoadingState colors={colors} />
+          <LoadingState />
         ) : error ? (
-          <ErrorState colors={colors} message={error.message} />
+          <ErrorState message={error.message} />
         ) : libraryItems.length === 0 ? (
-          <EmptyState colors={colors} />
+          <EmptyState
+            title="No bookmarked items"
+            message="Bookmark content from your inbox to save it here for later."
+          />
         ) : (
           <ScrollView
             style={styles.listContainer}
@@ -385,7 +219,7 @@ export default function LibraryScreen() {
             showsVerticalScrollIndicator={false}
           >
             {libraryItems.map((item, index) => (
-              <LibraryCard key={item.id} item={item} colors={colors} index={index} />
+              <ItemCard key={item.id} item={item} variant="compact" index={index} />
             ))}
             <View style={styles.bottomSpacer} />
           </ScrollView>
@@ -478,114 +312,8 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
 
-  // Card
-  libraryCard: {
-    flexDirection: 'row',
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    ...Shadows.sm,
-  },
-  cardThumbnail: {
-    width: 100,
-    position: 'relative',
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  typeIndicator: {
-    position: 'absolute',
-    top: Spacing.xs,
-    left: Spacing.xs,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: Spacing.xs,
-    right: Spacing.xs,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.xs,
-  },
-  durationText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
-  },
-  cardContent: {
-    flex: 1,
-    padding: Spacing.md,
-    justifyContent: 'center',
-  },
-  cardTitle: {
-    ...Typography.titleSmall,
-    marginBottom: Spacing.xs,
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  providerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: Spacing.xs,
-  },
-  cardSource: {
-    ...Typography.bodySmall,
-    flex: 1,
-  },
-  cardTime: {
-    ...Typography.bodySmall,
-  },
-
   // Bottom spacer
   bottomSpacer: {
     height: 40,
-  },
-
-  // Loading state
-  loadingState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Error state
-  errorState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing['3xl'],
-  },
-  errorText: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
-  },
-
-  // Empty state
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing['3xl'],
-    paddingBottom: 100,
-  },
-  emptyTitle: {
-    ...Typography.headlineSmall,
-    textAlign: 'center',
-    marginBottom: Spacing.md,
-  },
-  emptyDescription: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
-    lineHeight: 22,
   },
 });
