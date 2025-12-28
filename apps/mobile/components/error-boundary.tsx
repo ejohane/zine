@@ -2,11 +2,20 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { Component } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { logger } from '@/lib/logger';
+
+/** Props passed to fallbackRender function */
+export interface FallbackRenderProps {
+  error: Error;
+  resetError: () => void;
+}
 
 interface Props {
   children: ReactNode;
   /** Custom fallback UI to display when an error occurs */
   fallback?: ReactNode;
+  /** Render function for custom fallback UI with access to error and reset */
+  fallbackRender?: (props: FallbackRenderProps) => ReactNode;
   /** Callback fired when an error is caught */
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   /** Reset error state when any of these values change */
@@ -26,7 +35,7 @@ interface State {
  * Must be a class component - functional components cannot be error boundaries.
  *
  * Features:
- * - Custom fallback support via props.fallback
+ * - Custom fallback support via props.fallback (static) or props.fallbackRender (dynamic)
  * - onError callback for logging/analytics
  * - resetKeys - auto-reset error state when specified props change
  * - Manual reset via "Try Again" button
@@ -39,8 +48,17 @@ interface State {
  *   <MyComponent />
  * </ErrorBoundary>
  *
- * // With custom fallback
+ * // With static fallback
  * <ErrorBoundary fallback={<Text>Something went wrong</Text>}>
+ *   <MyComponent />
+ * </ErrorBoundary>
+ *
+ * // With dynamic fallback (access to error and reset function)
+ * <ErrorBoundary
+ *   fallbackRender={({ error, resetError }) => (
+ *     <CustomErrorUI error={error} onRetry={resetError} />
+ *   )}
+ * >
  *   <MyComponent />
  * </ErrorBoundary>
  *
@@ -69,7 +87,10 @@ export class ErrorBoundary extends Component<Props, State> {
    * Used for logging and invoking the onError callback.
    */
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[ErrorBoundary]', error, errorInfo);
+    logger.error('ErrorBoundary caught error', {
+      error,
+      componentStack: errorInfo.componentStack,
+    });
     this.props.onError?.(error, errorInfo);
   }
 
@@ -94,8 +115,16 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    if (this.state.hasError) {
-      // Use custom fallback if provided
+    if (this.state.hasError && this.state.error) {
+      // Use fallbackRender if provided (gets error and reset function)
+      if (this.props.fallbackRender) {
+        return this.props.fallbackRender({
+          error: this.state.error,
+          resetError: this.handleReset,
+        });
+      }
+
+      // Use static fallback if provided
       if (this.props.fallback) {
         return this.props.fallback;
       }

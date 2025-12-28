@@ -22,6 +22,7 @@ import type { youtube_v3 } from 'googleapis';
 import * as schema from '../db/schema';
 import { subscriptions, providerConnections } from '../db/schema';
 import { tryAcquireLock, releaseLock } from '../lib/locks';
+import { pollLogger } from '../lib/logger';
 import { isRateLimited } from '../lib/rate-limiter';
 import {
   getYouTubeClientForConnection,
@@ -88,6 +89,25 @@ type Subscription = typeof subscriptions.$inferSelect;
  */
 type DrizzleDB = DrizzleD1Database<typeof schema>;
 
+/**
+ * Provider batch configuration for the generic batch processor.
+ * Encapsulates provider-specific behavior for client creation and polling.
+ */
+interface ProviderBatchConfig<TClient> {
+  /** Provider identifier for logging and rate limiting */
+  provider: 'YOUTUBE' | 'SPOTIFY';
+  /** Create an API client from a provider connection */
+  getClient: (connection: ProviderConnection, env: Bindings) => Promise<TClient>;
+  /** Poll a single subscription and return new item count */
+  pollSingle: (
+    sub: Subscription,
+    client: TClient,
+    userId: string,
+    env: Bindings,
+    db: DrizzleDB
+  ) => Promise<{ newItems: number }>;
+}
+
 // ============================================================================
 // Main Polling Function
 // ============================================================================
@@ -109,7 +129,7 @@ export async function pollSubscriptions(
   // 1. Try to acquire distributed lock
   const lockAcquired = await tryAcquireLock(env.OAUTH_STATE_KV, POLL_LOCK_KEY, POLL_LOCK_TTL);
   if (!lockAcquired) {
-    console.log('[poll] Skipped: lock held by another worker');
+    pollLogger.info('Skipped: lock held by another worker');
     return { skipped: true, reason: 'lock_held' };
   }
 
@@ -136,17 +156,20 @@ export async function pollSubscriptions(
     });
 
     if (dueSubscriptions.length === 0) {
-      console.log('[poll] No subscriptions due for polling');
+      pollLogger.info('No subscriptions due for polling');
       return { skipped: false, processed: 0, reason: 'no_due_subscriptions' };
     }
 
-    console.log(`[poll] Found ${dueSubscriptions.length} due subscriptions`);
+    pollLogger.info('Found due subscriptions', { count: dueSubscriptions.length });
 
     // 3. Group by provider
     const youtube = dueSubscriptions.filter((s) => s.provider === 'YOUTUBE');
     const spotify = dueSubscriptions.filter((s) => s.provider === 'SPOTIFY');
 
-    console.log(`[poll] YouTube: ${youtube.length}, Spotify: ${spotify.length}`);
+    pollLogger.info('Subscriptions by provider', {
+      youtube: youtube.length,
+      spotify: spotify.length,
+    });
 
     // 4. Process each provider's batch in parallel
     const [ytResult, spResult] = await Promise.all([
@@ -157,7 +180,7 @@ export async function pollSubscriptions(
     const totalProcessed = ytResult.processed + spResult.processed;
     const totalNewItems = ytResult.newItems + spResult.newItems;
 
-    console.log(`[poll] Complete: processed ${totalProcessed}, new items ${totalNewItems}`);
+    pollLogger.info('Polling complete', { processed: totalProcessed, newItems: totalNewItems });
 
     return {
       skipped: false,
@@ -171,16 +194,28 @@ export async function pollSubscriptions(
 }
 
 // ============================================================================
-// YouTube Batch Processing
+// Generic Provider Batch Processing
 // ============================================================================
 
 /**
- * Process a batch of YouTube subscriptions.
+ * Process a batch of subscriptions for any provider.
  *
- * Groups subscriptions by user to share API connections and respect rate limits.
+ * This generic function encapsulates the shared batch processing logic:
+ * 1. Group subscriptions by user to share API connections
+ * 2. Check rate limits per user
+ * 3. Get active provider connection from DB
+ * 4. Create provider client and process each subscription
+ * 5. Handle auth errors by marking connections/subscriptions disconnected
+ *
+ * @param subs - Subscriptions to process
+ * @param config - Provider-specific configuration (client creation, polling logic)
+ * @param env - Cloudflare Worker bindings
+ * @param db - Database instance
+ * @returns BatchResult with processed count and new items count
  */
-async function processYouTubeBatch(
+async function processProviderBatch<TClient>(
   subs: Subscription[],
+  config: ProviderBatchConfig<TClient>,
   env: Bindings,
   db: DrizzleDB
 ): Promise<BatchResult> {
@@ -191,16 +226,19 @@ async function processYouTubeBatch(
     return { processed, newItems };
   }
 
+  const providerLower = config.provider.toLowerCase();
+
   // Group by user to share connection
   const byUser = groupBy(subs, 'userId');
 
   for (const [userId, userSubs] of Object.entries(byUser)) {
     // Check rate limit before processing
-    const rateCheck = await isRateLimited('YOUTUBE', userId, env.OAUTH_STATE_KV);
+    const rateCheck = await isRateLimited(config.provider, userId, env.OAUTH_STATE_KV);
     if (rateCheck.limited) {
-      console.log(
-        `[poll:youtube] Skipping user ${userId}: rate limited for ${rateCheck.retryInMs}ms`
-      );
+      pollLogger.child(providerLower).info('Skipping user: rate limited', {
+        userId,
+        retryInMs: rateCheck.retryInMs,
+      });
       continue;
     }
 
@@ -208,15 +246,17 @@ async function processYouTubeBatch(
     const connection = await db.query.providerConnections.findFirst({
       where: and(
         eq(providerConnections.userId, userId),
-        eq(providerConnections.provider, 'YOUTUBE'),
+        eq(providerConnections.provider, config.provider),
         eq(providerConnections.status, 'ACTIVE')
       ),
     });
 
     if (!connection) {
-      console.log(
-        `[poll:youtube] No active connection for user ${userId}, marking subscriptions disconnected`
-      );
+      pollLogger
+        .child(providerLower)
+        .info('No active connection for user, marking subscriptions disconnected', {
+          userId,
+        });
       await markSubscriptionsDisconnected(
         userSubs.map((s) => s.id),
         db
@@ -225,20 +265,20 @@ async function processYouTubeBatch(
     }
 
     try {
-      // Create YouTube client with valid token
-      const client = await getYouTubeClientForConnection(
-        connection as ProviderConnection,
-        env as Parameters<typeof getYouTubeClientForConnection>[1]
-      );
+      // Create provider client with valid token
+      const client = await config.getClient(connection as ProviderConnection, env);
 
       // Process each subscription for this user
       for (const sub of userSubs) {
         try {
-          const result = await pollSingleYouTubeSubscription(sub, client, userId, env, db);
+          const result = await config.pollSingle(sub, client, userId, env, db);
           processed++;
           newItems += result.newItems;
         } catch (subError) {
-          console.error(`[poll:youtube] Error polling subscription ${sub.id}:`, subError);
+          pollLogger.child(providerLower).error('Error polling subscription', {
+            subscriptionId: sub.id,
+            error: subError,
+          });
           // Update lastPolledAt even on error to prevent infinite retry
           await updateSubscriptionPolled(sub.id, db);
           processed++;
@@ -247,19 +287,51 @@ async function processYouTubeBatch(
     } catch (error: unknown) {
       // Handle auth errors at the user level
       if (isAuthError(error)) {
-        console.log(`[poll:youtube] Auth error for user ${userId}, marking connection expired`);
+        pollLogger.child(providerLower).info('Auth error for user, marking connection expired', {
+          userId,
+        });
         await markConnectionExpired(connection.id, db);
         await markSubscriptionsDisconnected(
           userSubs.map((s) => s.id),
           db
         );
       } else {
-        console.error(`[poll:youtube] Batch error for user ${userId}:`, error);
+        pollLogger.child(providerLower).error('Batch error for user', { userId, error });
       }
     }
   }
 
   return { processed, newItems };
+}
+
+// ============================================================================
+// YouTube Batch Processing
+// ============================================================================
+
+/**
+ * Process a batch of YouTube subscriptions.
+ *
+ * Uses the generic batch processor with YouTube-specific configuration.
+ */
+async function processYouTubeBatch(
+  subs: Subscription[],
+  env: Bindings,
+  db: DrizzleDB
+): Promise<BatchResult> {
+  return processProviderBatch(
+    subs,
+    {
+      provider: 'YOUTUBE',
+      getClient: (connection, env) =>
+        getYouTubeClientForConnection(
+          connection,
+          env as Parameters<typeof getYouTubeClientForConnection>[1]
+        ),
+      pollSingle: pollSingleYouTubeSubscription,
+    },
+    env,
+    db
+  );
 }
 
 /**
@@ -272,7 +344,8 @@ async function pollSingleYouTubeSubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<{ newItems: number }> {
-  console.log(`[poll:youtube] Polling subscription ${sub.id} (${sub.name})`);
+  const ytLogger = pollLogger.child('youtube');
+  ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
 
   // Get the channel's uploads playlist
   const uploadsPlaylistId = await getChannelUploadsPlaylistId(client, sub.providerChannelId);
@@ -281,7 +354,7 @@ async function pollSingleYouTubeSubscription(
   const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
 
   if (videos.length === 0) {
-    console.log(`[poll:youtube] No videos found for ${sub.name}`);
+    ytLogger.info('No videos found', { name: sub.name });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -294,9 +367,7 @@ async function pollSingleYouTubeSubscription(
       })
     : videos.slice(0, 1); // First poll: only latest video
 
-  console.log(
-    `[poll:youtube] Found ${videos.length} videos, ${newVideos.length} are new for ${sub.name}`
-  );
+  ytLogger.info('Found videos', { total: videos.length, new: newVideos.length, name: sub.name });
 
   // Ingest new items
   let newItemsCount = 0;
@@ -317,7 +388,7 @@ async function pollSingleYouTubeSubscription(
         newItemsCount++;
       }
     } catch (ingestError) {
-      console.error(`[poll:youtube] Failed to ingest video:`, ingestError);
+      ytLogger.error('Failed to ingest video', { error: ingestError });
     }
   }
 
@@ -351,89 +422,27 @@ async function pollSingleYouTubeSubscription(
 /**
  * Process a batch of Spotify subscriptions.
  *
- * Groups subscriptions by user to share API connections and respect rate limits.
+ * Uses the generic batch processor with Spotify-specific configuration.
  */
 async function processSpotifyBatch(
   subs: Subscription[],
   env: Bindings,
   db: DrizzleDB
 ): Promise<BatchResult> {
-  let processed = 0;
-  let newItems = 0;
-
-  if (subs.length === 0) {
-    return { processed, newItems };
-  }
-
-  // Group by user to share connection
-  const byUser = groupBy(subs, 'userId');
-
-  for (const [userId, userSubs] of Object.entries(byUser)) {
-    // Check rate limit before processing
-    const rateCheck = await isRateLimited('SPOTIFY', userId, env.OAUTH_STATE_KV);
-    if (rateCheck.limited) {
-      console.log(
-        `[poll:spotify] Skipping user ${userId}: rate limited for ${rateCheck.retryInMs}ms`
-      );
-      continue;
-    }
-
-    // Get connection for this user
-    const connection = await db.query.providerConnections.findFirst({
-      where: and(
-        eq(providerConnections.userId, userId),
-        eq(providerConnections.provider, 'SPOTIFY'),
-        eq(providerConnections.status, 'ACTIVE')
-      ),
-    });
-
-    if (!connection) {
-      console.log(
-        `[poll:spotify] No active connection for user ${userId}, marking subscriptions disconnected`
-      );
-      await markSubscriptionsDisconnected(
-        userSubs.map((s) => s.id),
-        db
-      );
-      continue;
-    }
-
-    try {
-      // Create Spotify client with valid token
-      const client = await getSpotifyClientForConnection(
-        connection as ProviderConnection,
-        env as Parameters<typeof getSpotifyClientForConnection>[1]
-      );
-
-      // Process each subscription for this user
-      for (const sub of userSubs) {
-        try {
-          const result = await pollSingleSpotifySubscription(sub, client, userId, env, db);
-          processed++;
-          newItems += result.newItems;
-        } catch (subError) {
-          console.error(`[poll:spotify] Error polling subscription ${sub.id}:`, subError);
-          // Update lastPolledAt even on error to prevent infinite retry
-          await updateSubscriptionPolled(sub.id, db);
-          processed++;
-        }
-      }
-    } catch (error: unknown) {
-      // Handle auth errors at the user level
-      if (isAuthError(error)) {
-        console.log(`[poll:spotify] Auth error for user ${userId}, marking connection expired`);
-        await markConnectionExpired(connection.id, db);
-        await markSubscriptionsDisconnected(
-          userSubs.map((s) => s.id),
-          db
-        );
-      } else {
-        console.error(`[poll:spotify] Batch error for user ${userId}:`, error);
-      }
-    }
-  }
-
-  return { processed, newItems };
+  return processProviderBatch(
+    subs,
+    {
+      provider: 'SPOTIFY',
+      getClient: (connection, env) =>
+        getSpotifyClientForConnection(
+          connection,
+          env as Parameters<typeof getSpotifyClientForConnection>[1]
+        ),
+      pollSingle: pollSingleSpotifySubscription,
+    },
+    env,
+    db
+  );
 }
 
 /**
@@ -446,13 +455,14 @@ async function pollSingleSpotifySubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<{ newItems: number }> {
-  console.log(`[poll:spotify] Polling subscription ${sub.id} (${sub.name})`);
+  const spotifyLogger = pollLogger.child('spotify');
+  spotifyLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
 
   // Fetch recent episodes from the show
   const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
 
   if (episodes.length === 0) {
-    console.log(`[poll:spotify] No episodes found for ${sub.name}`);
+    spotifyLogger.info('No episodes found', { name: sub.name });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -465,9 +475,11 @@ async function pollSingleSpotifySubscription(
       })
     : episodes.slice(0, 1); // First poll: only latest episode
 
-  console.log(
-    `[poll:spotify] Found ${episodes.length} episodes, ${newEpisodes.length} are new for ${sub.name}`
-  );
+  spotifyLogger.info('Found episodes', {
+    total: episodes.length,
+    new: newEpisodes.length,
+    name: sub.name,
+  });
 
   // Ingest new items
   let newItemsCount = 0;
@@ -496,7 +508,7 @@ async function pollSingleSpotifySubscription(
         newItemsCount++;
       }
     } catch (ingestError) {
-      console.error(`[poll:spotify] Failed to ingest episode:`, ingestError);
+      spotifyLogger.error('Failed to ingest episode', { error: ingestError });
     }
   }
 

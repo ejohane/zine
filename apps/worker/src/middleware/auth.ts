@@ -5,6 +5,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types';
 import { verifyClerkToken } from '../lib/auth';
+import { authLogger } from '../lib/logger';
 import { createDb } from '../db';
 import { users } from '../db/schema';
 
@@ -92,7 +93,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
             .onConflictDoNothing();
           devUserEnsured = true;
         } catch (error) {
-          console.warn('[auth] Failed to ensure dev user exists:', error);
+          authLogger.warn('Failed to ensure dev user exists', { error });
           // Continue anyway - user might already exist
         }
       }

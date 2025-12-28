@@ -20,6 +20,7 @@ import { AppState } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { offlineQueue } from '../lib/offline-queue';
 import { trpc } from '../lib/trpc';
+import { syncLogger } from '../lib/logger';
 
 /** Debounce interval in milliseconds (30 seconds) */
 const SYNC_DEBOUNCE_MS = 30_000;
@@ -106,7 +107,7 @@ export function useSyncRecovery() {
         await Promise.all([utils.sources.list.invalidate(), utils.items.inbox.invalidate()]);
       } catch (error) {
         // Log but don't throw - sync recovery is best-effort
-        console.error('[SyncRecovery] Recovery failed:', error);
+        syncLogger.error('Sync recovery failed', { error });
       }
     },
     [canSync, utils]

@@ -20,6 +20,7 @@ import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
+import { oauthLogger } from './logger';
 
 // CRITICAL: Call at module level to handle auth session completion
 // This is required for expo-web-browser to properly complete the OAuth flow
@@ -282,19 +283,19 @@ function getStateKey(provider: OAuthProvider): string {
  * ```
  */
 export async function connectProvider(provider: OAuthProvider): Promise<void> {
-  console.log(`[OAuth] Starting ${provider} connection flow`);
+  oauthLogger.info('Starting connection flow', { provider });
   const config = OAUTH_CONFIG[provider];
 
   // Validate client ID is configured
   if (!config.clientId) {
     const error = `${provider} client ID not configured. Check EXPO_PUBLIC_${provider}_CLIENT_ID.`;
-    console.error(`[OAuth] ${error}`);
+    oauthLogger.error('Client ID not configured', { provider });
     throw new Error(error);
   }
 
   // STEP 1: Generate PKCE (CLIENT-SIDE - security requirement)
   // The verifier is a cryptographically random string, the challenge is its SHA-256 hash
-  console.log('[OAuth] Generating PKCE challenge');
+  oauthLogger.debug('Generating PKCE challenge');
   const { verifier, challenge } = await generatePKCE();
 
   // Store verifier securely - needed for token exchange after redirect
@@ -313,16 +314,16 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   // Note: Using type assertion because the subscriptions.connections router
   // is not yet integrated into AppRouter. This will be fixed when the
   // backend router is updated to include: subscriptions: { connections: connectionsRouter }
-  console.log('[OAuth] Registering state with server');
+  oauthLogger.debug('Registering state with server');
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (vanillaClient as any).subscriptions.connections.registerState.mutate({
       provider,
       state,
     });
-    console.log('[OAuth] State registered successfully');
+    oauthLogger.debug('State registered successfully');
   } catch (error) {
-    console.error('[OAuth] Failed to register state:', error);
+    oauthLogger.error('Failed to register state', { error });
     throw error;
   }
 
@@ -331,7 +332,7 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
 
   // STEP 4: Build auth URL (CLIENT-SIDE)
   const redirectUri = getRedirectUri();
-  console.log('[OAuth] Using redirect URI:', redirectUri);
+  oauthLogger.debug('Using redirect URI', { redirectUri });
   const authUrl = new URL(config.authUrl);
   authUrl.searchParams.set('client_id', config.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -350,9 +351,9 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
 
   // STEP 5: Open browser for user authorization
   // openAuthSessionAsync handles the browser session and waits for redirect
-  console.log('[OAuth] Opening browser for authorization');
+  oauthLogger.debug('Opening browser for authorization');
   const result = await WebBrowser.openAuthSessionAsync(authUrl.toString(), redirectUri);
-  console.log('[OAuth] Browser result:', result.type);
+  oauthLogger.debug('Browser result', { type: result.type });
 
   if (result.type !== 'success') {
     // Clean up stored values on cancellation/failure
@@ -399,7 +400,7 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   // STEP 7: Send code + verifier to server for token exchange
   // Server will exchange the code using the verifier and store encrypted tokens
   // NOTE: redirectUri must be sent to server because it must match the one used in auth request
-  console.log('[OAuth] Exchanging code for tokens');
+  oauthLogger.debug('Exchanging code for tokens');
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (vanillaClient as any).subscriptions.connections.callback.mutate({
@@ -409,9 +410,9 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
       codeVerifier: storedVerifier,
       redirectUri,
     });
-    console.log('[OAuth] Token exchange successful');
+    oauthLogger.info('Token exchange successful', { provider });
   } catch (error) {
-    console.error('[OAuth] Token exchange failed:', error);
+    oauthLogger.error('Token exchange failed', { error });
     throw error;
   }
 

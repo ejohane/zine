@@ -38,6 +38,9 @@ const QUOTA_KEY_PREFIX = 'youtube:quota:';
 /** TTL for quota records (2 days to handle timezone edge cases) */
 const QUOTA_TTL_SECONDS = 2 * 24 * 3600;
 
+// Import logger
+import { quotaLogger } from '../lib/logger';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -325,21 +328,21 @@ export async function canUseQuota(
 export async function logQuotaMetrics(kv: KVNamespace): Promise<void> {
   const status = await getQuotaStatus(kv);
 
-  console.log(
-    `YouTube Quota: ${status.used}/${DAILY_QUOTA} (${status.percentUsed.toFixed(1)}%) | ` +
-      `Remaining: ${status.remaining}`
-  );
+  quotaLogger.info('YouTube Quota status', {
+    used: status.used,
+    limit: DAILY_QUOTA,
+    percentUsed: status.percentUsed.toFixed(1),
+    remaining: status.remaining,
+  });
 
   if (status.isCritical) {
-    console.error(
-      `[CRITICAL] YouTube quota at ${status.percentUsed.toFixed(1)}%! ` +
-        `Only essential operations allowed. Quota resets at midnight Pacific.`
-    );
+    quotaLogger.error('Quota critical! Only essential operations allowed', {
+      percentUsed: status.percentUsed.toFixed(1),
+    });
   } else if (status.isWarning) {
-    console.warn(
-      `[WARNING] YouTube quota at ${status.percentUsed.toFixed(1)}%. ` +
-        `Consider reducing polling frequency.`
-    );
+    quotaLogger.warn('Quota warning - consider reducing polling frequency', {
+      percentUsed: status.percentUsed.toFixed(1),
+    });
   }
 }
 

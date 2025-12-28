@@ -38,6 +38,8 @@ import {
   getProviderLabel,
   getProviderColor,
 } from '@/lib/content-utils';
+import { logger } from '@/lib/logger';
+import { validateItemId } from '@/lib/route-validation';
 import {
   ChevronRightIcon,
   CheckOutlineIcon,
@@ -113,6 +115,27 @@ function NotFoundState({ colors }: { colors: typeof Colors.light }) {
 }
 
 // ============================================================================
+// Invalid Parameter State
+// ============================================================================
+
+function InvalidParamState({ colors, message }: { colors: typeof Colors.light; message: string }) {
+  const router = useRouter();
+
+  return (
+    <View style={styles.centerContainer}>
+      <Text style={[styles.errorTitle, { color: colors.text }]}>Invalid Link</Text>
+      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
+      <Pressable
+        onPress={() => router.back()}
+        style={[styles.retryButton, { backgroundColor: colors.primary }]}
+      >
+        <Text style={styles.retryButtonText}>Go Back</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -121,8 +144,33 @@ export default function ItemDetailScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  // Fetch item data
-  const { data: item, isLoading, error, refetch } = useItem(id || '');
+  // Validate the id parameter early
+  const idValidation = validateItemId(id);
+
+  // Fetch item data - only if id is valid
+  const {
+    data: item,
+    isLoading,
+    error,
+    refetch,
+  } = useItem(idValidation.success ? idValidation.data : '');
+
+  // Render invalid param state if id is invalid
+  if (!idValidation.success) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Stack.Screen
+          options={{
+            title: 'Invalid Link',
+            headerBackButtonDisplayMode: 'minimal',
+          }}
+        />
+        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+          <InvalidParamState colors={colors} message={idValidation.message} />
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   // Handle open in browser/app
   const handleOpenLink = async () => {
@@ -134,7 +182,7 @@ export default function ItemDetailScreen() {
         await Linking.openURL(item.canonicalUrl);
       }
     } catch (err) {
-      console.error('Failed to open URL:', err);
+      logger.error('Failed to open URL', { error: err });
     }
   };
 
@@ -149,26 +197,26 @@ export default function ItemDetailScreen() {
         message: `Check out "${item.title}"`,
       });
     } catch (err) {
-      console.error('Failed to share:', err);
+      logger.error('Failed to share', { error: err });
     }
   };
 
   // Handle mark as finished toggle
   // TODO: Implement when items.toggleFinished endpoint is available
   const handleToggleFinished = () => {
-    console.log('Toggle finished - not yet implemented');
+    logger.debug('Toggle finished - not yet implemented');
   };
 
   // Handle bookmark toggle
   // TODO: Implement when items.unbookmark endpoint is available
   const handleToggleBookmark = () => {
-    console.log('Toggle bookmark - not yet implemented');
+    logger.debug('Toggle bookmark - not yet implemented');
   };
 
   // Handle add to collection (placeholder)
   const handleAddToCollection = () => {
     // No-op placeholder for future functionality
-    console.log('Add to collection - placeholder');
+    logger.debug('Add to collection - placeholder');
   };
 
   // Render loading state
@@ -178,7 +226,7 @@ export default function ItemDetailScreen() {
         <Stack.Screen
           options={{
             title: 'Loading...',
-            headerBackTitle: '',
+            headerBackButtonDisplayMode: 'minimal',
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -195,7 +243,7 @@ export default function ItemDetailScreen() {
         <Stack.Screen
           options={{
             title: 'Error',
-            headerBackTitle: '',
+            headerBackButtonDisplayMode: 'minimal',
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -212,7 +260,7 @@ export default function ItemDetailScreen() {
         <Stack.Screen
           options={{
             title: 'Not Found',
-            headerBackTitle: '',
+            headerBackButtonDisplayMode: 'minimal',
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -232,7 +280,7 @@ export default function ItemDetailScreen() {
       <Stack.Screen
         options={{
           title: '',
-          headerBackTitle: '',
+          headerBackButtonDisplayMode: 'minimal',
           headerTransparent: true,
           headerTintColor: colors.text,
         }}

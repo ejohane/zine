@@ -34,6 +34,7 @@ import { Colors, Spacing, Radius, Typography, ProviderColors } from '@/constants
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
+import { validateAndConvertProvider } from '@/lib/route-validation';
 
 // ============================================================================
 // Types
@@ -252,8 +253,12 @@ export default function ProviderDiscoverScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const params = useLocalSearchParams<{ provider: string }>();
 
-  // Normalize provider to uppercase
-  const provider = (params.provider?.toUpperCase() ?? 'YOUTUBE') as Provider;
+  // Validate and normalize provider to uppercase
+  const providerValidation = validateAndConvertProvider(params.provider);
+
+  // Use validated provider or default to YOUTUBE for hook consistency
+  // (hooks must be called unconditionally)
+  const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
   const providerDisplayName = getProviderDisplayName(provider);
 
   // Search state
@@ -272,7 +277,7 @@ export default function ProviderDiscoverScreen() {
     { provider },
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
-      enabled: !!provider,
+      enabled: providerValidation.success && !!provider,
     }
   ) ?? {
     data: undefined,
@@ -285,7 +290,7 @@ export default function ProviderDiscoverScreen() {
 
   const sourcesQuery = (trpc as any).sources?.list?.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
-    enabled: !discoverQuery.data && !!provider,
+    enabled: providerValidation.success && !discoverQuery.data && !!provider,
   }) ?? {
     data: undefined,
     isLoading: false,
@@ -409,6 +414,22 @@ export default function ProviderDiscoverScreen() {
 
   // Header subtitle showing selection status
   const selectedCount = subscriptions.filter((s) => s.provider === provider).length;
+
+  // If provider is invalid, show error state with helpful message
+  // (checked after all hooks to follow Rules of Hooks)
+  if (!providerValidation.success) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Invalid Provider' }} />
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: colors.background }]}
+          edges={['bottom']}
+        >
+          <ErrorState colors={colors} message={providerValidation.message} />
+        </SafeAreaView>
+      </>
+    );
+  }
 
   return (
     <>

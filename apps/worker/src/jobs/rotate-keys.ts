@@ -27,6 +27,9 @@ import {
 } from '../lib/crypto';
 import { providerConnections } from '../db/schema';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import { logger } from '../lib/logger';
+
+const rotateLogger = logger.child('rotate-keys');
 
 /**
  * Result of a key rotation job run
@@ -181,7 +184,7 @@ export async function migrateEncryptionKeys(
       result.errors.push(errorInfo);
 
       // Log the error for monitoring
-      console.error(`[rotate-keys] Failed to migrate connection ${connection.id}:`, errorInfo);
+      rotateLogger.error('Failed to migrate connection', errorInfo);
 
       if (!continueOnError) {
         throw error;

@@ -16,6 +16,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { completeOAuthFlow, type OAuthProvider } from '../lib/oauth';
+import { oauthLogger } from '../lib/logger';
 
 // ============================================================================
 // Types
@@ -79,13 +80,13 @@ function parseOAuthCallback(url: string): ParsedOAuthCallback | null {
     // Extract provider from state (format: "PROVIDER:uuid")
     const [provider] = state.split(':') as [OAuthProvider, string];
     if (!['YOUTUBE', 'SPOTIFY'].includes(provider)) {
-      console.error('[OAuth] Invalid provider in state:', provider);
+      oauthLogger.error('Invalid provider in state', { provider });
       return null;
     }
 
     return { code, state, provider };
   } catch (e) {
-    console.error('[OAuth] Failed to parse callback URL:', e);
+    oauthLogger.error('Failed to parse callback URL', { error: e });
     return null;
   }
 }

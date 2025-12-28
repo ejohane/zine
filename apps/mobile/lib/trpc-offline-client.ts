@@ -16,6 +16,7 @@ import superjson from 'superjson';
 import * as SecureStore from 'expo-secure-store';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
+import { trpcLogger } from './logger';
 
 // ============================================================================
 // Callback Registration for Cache Invalidation
@@ -74,7 +75,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
       return { Authorization: `Bearer ${token}` };
     }
   } catch (error) {
-    console.warn('[tRPC Offline] Failed to get auth token from SecureStore:', error);
+    trpcLogger.warn('Failed to get auth token from SecureStore', { error });
   }
   return {};
 }

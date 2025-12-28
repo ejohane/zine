@@ -26,13 +26,16 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useToast } from 'heroui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { Colors, Spacing, Radius, Typography, ProviderColors, Shadows } from '@/constants/theme';
+import { showSuccess, showError } from '@/lib/toast-utils';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions, type SubscribePayload } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
+import { validateAndConvertProvider } from '@/lib/route-validation';
 
 // ============================================================================
 // Types
@@ -239,8 +242,12 @@ export default function SelectChannelsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ provider: string }>();
 
-  // Normalize provider to uppercase
-  const provider = (params.provider?.toUpperCase() ?? 'YOUTUBE') as Provider;
+  // Validate and normalize provider to uppercase
+  const providerValidation = validateAndConvertProvider(params.provider);
+
+  // Use validated provider or default to YOUTUBE for hook consistency
+  // (hooks must be called unconditionally)
+  const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
   const providerDisplayName = getProviderDisplayName(provider);
   const providerColor = provider === 'YOUTUBE' ? ProviderColors.youtube : ProviderColors.spotify;
 
@@ -255,6 +262,9 @@ export default function SelectChannelsScreen() {
 
   // Get subscribe function from useSubscriptions
   const { subscribe } = useSubscriptions();
+
+  // Toast for user feedback
+  const { toast } = useToast();
 
   // Fetch channels from provider using sources.list
   // Note: We filter by provider client-side since sources.list returns all sources
@@ -330,16 +340,24 @@ export default function SelectChannelsScreen() {
         subscribe(payload);
       }
 
+      // Show success toast
+      const count = selectedChannelObjects.length;
+      showSuccess(
+        toast,
+        `Subscribed to ${count} channel${count !== 1 ? 's' : ''}`,
+        'New content will appear in your inbox'
+      );
+
       // Navigate to tabs after a short delay to allow subscriptions to process
       setTimeout(() => {
         router.replace('/(tabs)');
       }, 500);
     } catch (err) {
-      console.error('[SelectChannels] Subscribe error:', err);
+      showError(toast, err, 'Failed to subscribe', 'SelectChannels');
     } finally {
       setIsSubscribing(false);
     }
-  }, [selectedChannels, channels, subscribe, router]);
+  }, [selectedChannels, channels, subscribe, router, toast]);
 
   // Skip and go to tabs without subscribing
   const handleSkip = useCallback(() => {
@@ -367,6 +385,13 @@ export default function SelectChannelsScreen() {
   const selectedCount = selectedChannels.size;
   const totalCount = filteredChannels.length;
   const allSelected = selectedCount === totalCount && totalCount > 0;
+
+  // If provider is invalid, redirect to onboarding connect screen
+  // (checked after all hooks to follow Rules of Hooks)
+  if (!providerValidation.success) {
+    router.replace('/onboarding/connect');
+    return null;
+  }
 
   return (
     <>

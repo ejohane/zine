@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
+import { authLogger } from '@/lib/logger';
 
 // ============================================================================
 // Component
@@ -61,11 +62,11 @@ export default function SignInScreen() {
         router.replace('/(tabs)');
       } else {
         // Handle additional steps if needed (e.g., 2FA)
-        console.log('[SignIn] Additional steps required:', result.status);
+        authLogger.info('Additional steps required', { status: result.status });
         setError('Additional verification required. Please check your email.');
       }
     } catch (err: unknown) {
-      console.error('[SignIn] Error:', err);
+      authLogger.error('Sign in error', { error: err });
       const clerkError = err as { errors?: { message: string }[] };
       setError(clerkError.errors?.[0]?.message ?? 'Sign in failed. Please try again.');
     } finally {
@@ -94,7 +95,7 @@ export default function SignInScreen() {
           router.replace('/(tabs)');
         }
       } catch (err: unknown) {
-        console.error('[SignIn] OAuth error:', err);
+        authLogger.error('OAuth sign in error', { error: err });
         const clerkError = err as { errors?: { message: string }[] };
         setError(clerkError.errors?.[0]?.message ?? 'OAuth sign in failed.');
       } finally {

@@ -6,11 +6,12 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
+import { logger as honoLogger } from 'hono/logger';
 import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
 import { runIngestionBatch } from './ingestion';
+import { logger } from './lib/logger';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
 import sourcesRoutes from './routes/sources';
@@ -38,7 +39,7 @@ app.use('*', async (c, next) => {
 /**
  * Logger middleware - logs requests to console
  */
-app.use('*', logger());
+app.use('*', honoLogger());
 
 /**
  * CORS middleware - allow cross-origin requests
@@ -141,7 +142,7 @@ app.notFound((c) => {
 // ---------------------------------------------------------------------------
 
 app.onError((err, c) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error', { error: err, path: c.req.path });
 
   return c.json(
     {

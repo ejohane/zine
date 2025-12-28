@@ -15,6 +15,7 @@ import { eq } from 'drizzle-orm';
 import type { Env, Bindings } from '../types';
 import { createDb } from '../db';
 import { users, userItems, sources, providerItemsSeen } from '../db/schema';
+import { webhookLogger } from '../lib/logger';
 
 const auth = new Hono<Env>();
 
@@ -76,7 +77,7 @@ auth.post('/webhook', async (c) => {
 
   // Validate webhook secret is configured
   if (!webhookSecret) {
-    console.error('[webhook] CLERK_WEBHOOK_SECRET not configured');
+    webhookLogger.error('CLERK_WEBHOOK_SECRET not configured');
     return c.json(
       {
         error: 'Webhook not configured',
@@ -108,7 +109,7 @@ auth.post('/webhook', async (c) => {
   const existingEvent = await c.env.WEBHOOK_IDEMPOTENCY.get(idempotencyKey);
 
   if (existingEvent) {
-    console.log(`[webhook] Duplicate event detected: ${svixId}`);
+    webhookLogger.info('Duplicate event detected', { svixId });
     return c.json({
       message: 'Event already processed',
       svixId,
@@ -130,7 +131,7 @@ auth.post('/webhook', async (c) => {
       'svix-signature': svixSignature,
     }) as ClerkWebhookEvent;
   } catch (err) {
-    console.error('[webhook] Signature verification failed:', err);
+    webhookLogger.error('Signature verification failed', { error: err });
     return c.json(
       {
         error: 'Invalid signature',
@@ -167,11 +168,11 @@ auth.post('/webhook', async (c) => {
 
       case 'user.updated':
         // Log but don't process - we sync on-demand
-        console.log(`[webhook] user.updated for ${event.data.id} - no action needed`);
+        webhookLogger.info('user.updated - no action needed', { userId: event.data.id });
         break;
 
       default:
-        console.log(`[webhook] Unhandled event type: ${event.type}`);
+        webhookLogger.info('Unhandled event type', { eventType: event.type });
     }
 
     return c.json({
@@ -184,7 +185,7 @@ auth.post('/webhook', async (c) => {
     // If processing fails, remove idempotency key to allow retry
     await c.env.WEBHOOK_IDEMPOTENCY.delete(idempotencyKey);
 
-    console.error(`[webhook] Error processing ${event.type}:`, err);
+    webhookLogger.error('Error processing webhook', { eventType: event.type, error: err });
     return c.json(
       {
         error: 'Webhook processing failed',
@@ -210,7 +211,7 @@ async function handleUserCreated(
   user: ClerkUserData,
   requestId: string
 ): Promise<void> {
-  console.log(`[webhook] user.created: ${user.id}`);
+  webhookLogger.info('user.created', { userId: user.id });
 
   const db = createDb(env.DB);
   const now = new Date().toISOString();
@@ -226,7 +227,7 @@ async function handleUserCreated(
     })
     .onConflictDoNothing();
 
-  console.log(`[webhook] User created in D1 for ${user.id} [${requestId}]`);
+  webhookLogger.info('User created in D1', { userId: user.id, requestId });
 }
 
 /**
@@ -240,7 +241,7 @@ async function handleUserDeleted(
   user: ClerkUserData,
   requestId: string
 ): Promise<void> {
-  console.log(`[webhook] user.deleted: ${user.id}`);
+  webhookLogger.info('user.deleted', { userId: user.id });
 
   const db = createDb(env.DB);
 
@@ -255,7 +256,7 @@ async function handleUserDeleted(
   await db.delete(sources).where(eq(sources.userId, user.id));
   await db.delete(users).where(eq(users.id, user.id));
 
-  console.log(`[webhook] User data deleted from D1 for ${user.id} [${requestId}]`);
+  webhookLogger.info('User data deleted from D1', { userId: user.id, requestId });
 }
 
 // ============================================================================

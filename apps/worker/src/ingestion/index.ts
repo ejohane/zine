@@ -13,6 +13,7 @@ import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { isNull } from 'drizzle-orm';
 import type { Bindings } from '../types';
 import { sources } from '../db/schema';
+import { ingestionLogger } from '../lib/logger';
 
 /**
  * Run a batch ingestion for all active sources across all users.
@@ -29,13 +30,13 @@ import { sources } from '../db/schema';
 export async function runIngestionBatch(env: Bindings): Promise<void> {
   const db = drizzle(env.DB);
 
-  console.log('[ingestion] Starting batch ingestion run');
+  ingestionLogger.info('Starting batch ingestion run');
   const startTime = Date.now();
 
   // Get all active sources (not soft-deleted)
   const activeSources = await db.select().from(sources).where(isNull(sources.deletedAt));
 
-  console.log(`[ingestion] Found ${activeSources.length} active sources`);
+  ingestionLogger.info('Found active sources', { count: activeSources.length });
 
   let successCount = 0;
   let errorCount = 0;
@@ -49,15 +50,21 @@ export async function runIngestionBatch(env: Bindings): Promise<void> {
       successCount++;
     } catch (error) {
       errorCount++;
-      console.error(`[ingestion] Failed for source ${source.id} (${source.provider}):`, error);
+      ingestionLogger.error('Failed for source', {
+        sourceId: source.id,
+        provider: source.provider,
+        error,
+      });
       // Individual failures don't block other sources
     }
   }
 
   const duration = Date.now() - startTime;
-  console.log(
-    `[ingestion] Batch complete: ${successCount} succeeded, ${errorCount} failed, took ${duration}ms`
-  );
+  ingestionLogger.info('Batch complete', {
+    succeeded: successCount,
+    failed: errorCount,
+    durationMs: duration,
+  });
 }
 
 /**
@@ -81,10 +88,13 @@ async function ingestSource(
   source: typeof sources.$inferSelect
 ): Promise<void> {
   // Stub implementation - actual provider fetching to be implemented later
-  console.log(`[ingestion] Would ingest from source: ${source.id} (${source.provider})`);
-  console.log(`[ingestion]   - Provider ID: ${source.providerId}`);
-  console.log(`[ingestion]   - Feed URL: ${source.feedUrl}`);
-  console.log(`[ingestion]   - User ID: ${source.userId}`);
+  ingestionLogger.debug('Would ingest from source', {
+    sourceId: source.id,
+    provider: source.provider,
+    providerId: source.providerId,
+    feedUrl: source.feedUrl,
+    userId: source.userId,
+  });
 
   // Future: Call provider-specific fetcher based on source.provider
   // switch (source.provider) {

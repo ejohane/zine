@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
+import { authLogger } from '@/lib/logger';
 
 // ============================================================================
 // Component
@@ -62,7 +63,7 @@ export default function SignUpScreen() {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setPendingVerification(true);
     } catch (err: unknown) {
-      console.error('[SignUp] Error:', err);
+      authLogger.error('Sign up error', { error: err });
       const clerkError = err as { errors?: { message: string }[] };
       setError(clerkError.errors?.[0]?.message ?? 'Sign up failed. Please try again.');
     } finally {
@@ -89,11 +90,11 @@ export default function SignUpScreen() {
         await setActive({ session: result.createdSessionId });
         router.replace('/(tabs)');
       } else {
-        console.log('[SignUp] Verification incomplete:', result.status);
+        authLogger.warn('Verification incomplete', { status: result.status });
         setError('Verification incomplete. Please try again.');
       }
     } catch (err: unknown) {
-      console.error('[SignUp] Verification error:', err);
+      authLogger.error('Verification error', { error: err });
       const clerkError = err as { errors?: { message: string }[] };
       setError(clerkError.errors?.[0]?.message ?? 'Verification failed. Please try again.');
     } finally {
@@ -122,7 +123,7 @@ export default function SignUpScreen() {
           router.replace('/(tabs)');
         }
       } catch (err: unknown) {
-        console.error('[SignUp] OAuth error:', err);
+        authLogger.error('OAuth sign up error', { error: err });
         const clerkError = err as { errors?: { message: string }[] };
         setError(clerkError.errors?.[0]?.message ?? 'OAuth sign up failed.');
       } finally {

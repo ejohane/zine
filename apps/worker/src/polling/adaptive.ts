@@ -18,6 +18,9 @@ import { desc, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type * as schema from '../db/schema';
 import { subscriptions, subscriptionItems } from '../db/schema';
+import { pollLogger } from '../lib/logger';
+
+const adaptiveLogger = pollLogger.child('adaptive');
 
 /**
  * Database type with full schema inference
@@ -227,9 +230,12 @@ export async function maybeUpdatePollInterval(
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    console.log(
-      `[adaptive-polling] Adjusted interval for ${subscriptionId}: ${currentInterval}s -> ${optimalInterval}s (${(change * 100).toFixed(0)}% change)`
-    );
+    adaptiveLogger.info('Adjusted interval', {
+      subscriptionId,
+      previousInterval: currentInterval,
+      newInterval: optimalInterval,
+      changePercent: Math.round(change * 100),
+    });
   }
 }
 

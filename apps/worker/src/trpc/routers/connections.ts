@@ -15,6 +15,7 @@ import { exchangeCodeForTokens, getProviderUserInfo } from '../../lib/auth';
 import { encrypt, decrypt } from '../../lib/crypto';
 import { providerConnections, subscriptions } from '../../db/schema';
 import type { Bindings } from '../../types';
+import { authLogger } from '../../lib/logger';
 
 // ============================================================================
 // Zod Schemas
@@ -253,7 +254,10 @@ export const connectionsRouter = router({
         await revokeProviderToken(input.provider, connection.accessToken, ctx.env);
       } catch (e) {
         // Log but don't fail - token revocation is best effort
-        console.warn('Failed to revoke token with provider:', e);
+        authLogger.warn('Failed to revoke token with provider', {
+          provider: input.provider,
+          error: e,
+        });
       }
 
       // 2. Delete connection from database

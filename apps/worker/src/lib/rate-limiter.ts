@@ -10,6 +10,10 @@
  * - Spotify: Rolling 30-second window (~100-180 requests), returns 429 with Retry-After
  */
 
+import { logger } from './logger';
+
+const rateLimitLogger = logger.child('rate-limiter');
+
 /**
  * State tracked per provider/user combination
  */
@@ -115,7 +119,7 @@ export class RateLimitedFetcher {
       // 5. Exponential backoff on other errors
       const newState = await this.incrementFailures(key);
       const backoffMs = this.calculateBackoff(newState.consecutiveFailures);
-      console.warn(`Request failed, backing off ${backoffMs}ms:`, error);
+      rateLimitLogger.warn('Request failed, backing off', { backoffMs, error });
 
       throw error;
     }

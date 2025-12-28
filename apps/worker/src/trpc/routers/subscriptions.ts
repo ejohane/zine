@@ -19,6 +19,7 @@ import { and, eq, gt, asc, inArray, ne } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { ProviderSchema, SubscriptionStatusSchema, Provider } from '@zine/shared';
 import { subscriptions, userItems, subscriptionItems, providerConnections } from '../../db/schema';
+import { logger } from '../../lib/logger';
 import {
   getYouTubeClientForConnection,
   getUserSubscriptions as getYouTubeSubscriptions,
@@ -250,7 +251,7 @@ export const subscriptionsRouter = router({
       );
     } catch (error) {
       // Extra safety: log but don't fail subscription creation
-      console.error('[subscriptions.add] Initial fetch failed:', error);
+      logger.child('subscriptions').error('Initial fetch failed', { error });
     }
 
     return {
