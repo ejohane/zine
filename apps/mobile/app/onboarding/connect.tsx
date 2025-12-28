@@ -217,7 +217,7 @@ export default function OnboardingConnectScreen() {
         {hasAnyConnection && (
           <View style={styles.statusHint}>
             <Text style={[styles.statusHintText, { color: colors.success }]}>
-              You're all set! Tap Continue to start browsing.
+              You&apos;re all set! Tap Continue to start browsing.
             </Text>
           </View>
         )}

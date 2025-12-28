@@ -35,6 +35,10 @@ export type ItemView = {
   ingestedAt: string;
   bookmarkedAt: string | null;
   progress: { position: number; duration: number; percent: number } | null;
+  /** Whether user has finished/consumed this item */
+  isFinished: boolean;
+  /** ISO8601 timestamp when marked finished, null otherwise */
+  finishedAt: string | null;
 };
 
 // ============================================================================
@@ -63,6 +67,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-12-10T08:30:00Z',
     bookmarkedAt: null,
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-002',
@@ -82,6 +88,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-12-12T09:00:00Z',
     bookmarkedAt: null,
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-003',
@@ -101,6 +109,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-12-11T14:00:00Z',
     bookmarkedAt: null,
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-004',
@@ -120,6 +130,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-12-12T18:00:00Z',
     bookmarkedAt: null,
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
 
   // =========================================================================
@@ -147,6 +159,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 7200,
       percent: 33,
     },
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-006',
@@ -170,6 +184,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 2700,
       percent: 44,
     },
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-007',
@@ -189,6 +205,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-10-21T12:00:00Z',
     bookmarkedAt: '2024-10-22T15:00:00Z',
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-008',
@@ -212,6 +230,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 5400,
       percent: 83,
     },
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-009',
@@ -231,6 +251,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-11-02T07:00:00Z',
     bookmarkedAt: '2024-11-03T11:00:00Z',
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-010',
@@ -254,6 +276,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 14400,
       percent: 50,
     },
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-011',
@@ -273,6 +297,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-12-02T08:00:00Z',
     bookmarkedAt: '2024-12-03T10:00:00Z',
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
   {
     id: 'ui-012',
@@ -292,6 +318,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-11-26T09:00:00Z',
     bookmarkedAt: '2024-11-27T14:00:00Z',
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
 
   // =========================================================================
@@ -319,6 +347,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 1200,
       percent: 100,
     },
+    isFinished: true,
+    finishedAt: '2024-06-04T10:00:00Z',
   },
   {
     id: 'ui-014',
@@ -342,6 +372,8 @@ export const MOCK_ITEMS: ItemView[] = [
       duration: 3600,
       percent: 100,
     },
+    isFinished: true,
+    finishedAt: '2024-07-23T09:00:00Z',
   },
   {
     id: 'ui-015',
@@ -361,6 +393,8 @@ export const MOCK_ITEMS: ItemView[] = [
     ingestedAt: '2024-05-16T12:00:00Z',
     bookmarkedAt: '2024-05-17T10:00:00Z',
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   },
 ];
 

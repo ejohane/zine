@@ -258,7 +258,7 @@ export default function SelectChannelsScreen() {
 
   // Fetch channels from provider using sources.list
   // Note: We filter by provider client-side since sources.list returns all sources
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const sourcesQuery = (trpc as any).sources?.list?.useQuery(undefined, {
     staleTime: 5 * 60 * 1000, // 5 minutes
   }) ?? {

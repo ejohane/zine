@@ -324,6 +324,168 @@ export function useArchiveItem() {
 }
 
 /**
+ * Hook for unbookmarking an item with optimistic updates
+ *
+ * Moves an item from BOOKMARKED back to INBOX state.
+ * Use case: User changes their mind, wants to re-triage.
+ * Optimistically updates the library cache immediately.
+ *
+ * @returns tRPC mutation with mutate/mutateAsync functions
+ *
+ * @example
+ * function ItemDetailScreen({ item }) {
+ *   const unbookmark = useUnbookmarkItem();
+ *
+ *   return (
+ *     <Button onPress={() => unbookmark.mutate({ id: item.id })}>
+ *       Remove bookmark
+ *     </Button>
+ *   );
+ * }
+ */
+export function useUnbookmarkItem() {
+  const utils = trpc.useUtils();
+
+  return trpc.items.unbookmark.useMutation({
+    onMutate: async ({ id }) => {
+      // Cancel outgoing queries to prevent race conditions
+      await utils.items.library.cancel();
+
+      // Snapshot previous value for rollback
+      const previousLibrary = utils.items.library.getData();
+
+      // Optimistically remove item from library
+      utils.items.library.setData(undefined, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items.filter((item) => item.id !== id),
+        };
+      });
+
+      return { previousLibrary };
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on error
+      if (context?.previousLibrary) {
+        utils.items.library.setData(undefined, context.previousLibrary);
+      }
+    },
+    onSettled: () => {
+      // Refetch after mutation completes
+      utils.items.inbox.invalidate();
+      utils.items.library.invalidate();
+      utils.items.home.invalidate();
+    },
+  });
+}
+
+/**
+ * Hook for toggling finished state with optimistic updates
+ *
+ * Toggles the isFinished boolean on an item.
+ * Works in any state (INBOX, BOOKMARKED, ARCHIVED).
+ * Optimistically updates the item in all caches immediately.
+ *
+ * @returns tRPC mutation with mutate/mutateAsync functions
+ *
+ * @example
+ * function ItemDetailScreen({ item }) {
+ *   const toggleFinished = useToggleFinished();
+ *
+ *   return (
+ *     <Button onPress={() => toggleFinished.mutate({ id: item.id })}>
+ *       {item.isFinished ? 'Mark unfinished' : 'Mark finished'}
+ *     </Button>
+ *   );
+ * }
+ */
+export function useToggleFinished() {
+  const utils = trpc.useUtils();
+
+  return trpc.items.toggleFinished.useMutation({
+    onMutate: async ({ id }) => {
+      // Cancel outgoing queries to prevent race conditions
+      await Promise.all([
+        utils.items.inbox.cancel(),
+        utils.items.library.cancel(),
+        utils.items.get.cancel({ id }),
+      ]);
+
+      // Snapshot previous values for rollback
+      const previousInbox = utils.items.inbox.getData();
+      const previousLibrary = utils.items.library.getData();
+      const previousItem = utils.items.get.getData({ id });
+
+      const now = new Date().toISOString();
+
+      // Helper to toggle finished state on an item
+      const toggleItemFinished = <
+        T extends { id: string; isFinished: boolean; finishedAt: string | null },
+      >(
+        item: T
+      ): T => {
+        if (item.id !== id) return item;
+        return {
+          ...item,
+          isFinished: !item.isFinished,
+          finishedAt: item.isFinished ? null : now,
+        };
+      };
+
+      // Optimistically update inbox
+      utils.items.inbox.setData(undefined, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items.map(toggleItemFinished),
+        };
+      });
+
+      // Optimistically update library
+      utils.items.library.setData(undefined, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          items: old.items.map(toggleItemFinished),
+        };
+      });
+
+      // Optimistically update single item cache
+      utils.items.get.setData({ id }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          isFinished: !old.isFinished,
+          finishedAt: old.isFinished ? null : now,
+        };
+      });
+
+      return { previousInbox, previousLibrary, previousItem };
+    },
+    onError: (_err, vars, context) => {
+      // Rollback on error
+      if (context?.previousInbox) {
+        utils.items.inbox.setData(undefined, context.previousInbox);
+      }
+      if (context?.previousLibrary) {
+        utils.items.library.setData(undefined, context.previousLibrary);
+      }
+      if (context?.previousItem) {
+        utils.items.get.setData({ id: vars.id }, context.previousItem);
+      }
+    },
+    onSettled: (_data, _err, vars) => {
+      // Refetch after mutation completes
+      utils.items.inbox.invalidate();
+      utils.items.library.invalidate();
+      utils.items.home.invalidate();
+      utils.items.get.invalidate({ id: vars.id });
+    },
+  });
+}
+
+/**
  * Hook for updating playback/reading progress
  *
  * Updates the progress position for video/podcast/article consumption.

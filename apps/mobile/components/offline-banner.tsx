@@ -96,7 +96,7 @@ export function OfflineBanner() {
     >
       <View style={styles.content}>
         <Text style={styles.icon}>📡</Text>
-        <Text style={styles.text}>You're offline. Changes will sync when you reconnect.</Text>
+        <Text style={styles.text}>You&apos;re offline. Changes will sync when you reconnect.</Text>
       </View>
     </Animated.View>
   );

@@ -14,23 +14,17 @@ import Animated, {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  Shadows,
-  ContentColors,
-  ProviderColors,
-} from '@/constants/theme';
+import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { Colors, Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   useBookmarkedItems,
   useInboxItems,
   mapContentType,
-  formatDuration,
   type ItemWithUserState,
 } from '@/hooks/use-items';
+
+import type { ContentType as UIContentType, Provider as UIProvider } from '@/lib/content-utils';
 import type { ContentType as ContentTypeEnum } from '@zine/shared';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -109,16 +103,16 @@ function SparklesIcon({ size = 24, color = '#fff' }: { size?: number; color?: st
 // Types & Mock Data
 // =============================================================================
 
-type ContentType = 'podcast' | 'video' | 'article' | 'post';
-type Provider = 'youtube' | 'spotify' | 'substack' | 'twitter' | 'pocket';
+type LocalContentType = 'podcast' | 'video' | 'article' | 'post';
+type LocalProvider = 'youtube' | 'spotify' | 'substack' | 'twitter' | 'pocket';
 
 interface ContentItem {
   id: string;
   title: string;
   subtitle?: string;
   source: string;
-  provider: Provider;
-  type: ContentType;
+  provider: LocalProvider;
+  type: LocalContentType;
   thumbnailUrl?: string;
   duration?: string;
   progress?: number;
@@ -131,37 +125,28 @@ interface ContentItem {
 // =============================================================================
 
 /**
- * Map domain provider to UI provider
- * Handles providers that may not be directly represented in UI
+ * Transform domain ItemWithUserState to ItemCardData (for shared ItemCard component)
  */
-const providerMap: Record<string, Provider> = {
-  youtube: 'youtube',
-  spotify: 'spotify',
-  substack: 'substack',
-  rss: 'substack', // fallback for RSS feeds
-};
-
-/**
- * Transform domain ItemWithUserState to UI ContentItem
- */
-function transformToContentItem({ item, userItem }: ItemWithUserState): ContentItem {
-  // Extract provider from canonicalUrl if available
+function transformToItemCardData({ item, userItem }: ItemWithUserState): ItemCardData {
+  // Infer provider from canonicalUrl
   const urlLower = item.canonicalUrl?.toLowerCase() ?? '';
-  let providerKey = 'substack';
-  if (urlLower.includes('youtube')) providerKey = 'youtube';
-  else if (urlLower.includes('spotify')) providerKey = 'spotify';
-  else if (urlLower.includes('substack')) providerKey = 'substack';
+  let inferredProvider = 'rss' as UIProvider;
+  if (urlLower.includes('youtube')) inferredProvider = 'youtube' as UIProvider;
+  else if (urlLower.includes('spotify')) inferredProvider = 'spotify' as UIProvider;
+  else if (urlLower.includes('substack')) inferredProvider = 'substack' as UIProvider;
 
   return {
-    id: userItem.id, // Use userItem.id for mutation handlers
+    id: userItem.id,
     title: item.title ?? 'Untitled',
-    source: item.publisher ?? item.creator ?? 'Unknown',
-    provider: providerMap[providerKey] ?? 'substack',
-    type: mapContentType((item.contentType ?? 'ARTICLE') as ContentTypeEnum) as ContentType,
-    thumbnailUrl: item.thumbnailUrl ?? undefined,
-    duration: formatDuration(item.duration ?? undefined),
-    progress: 0, // Progress tracking not implemented yet
-    publishedAt: item.publishedAt ?? undefined,
+    creator: item.publisher ?? item.creator ?? 'Unknown',
+    thumbnailUrl: item.thumbnailUrl ?? null,
+    contentType: mapContentType(
+      (item.contentType ?? 'ARTICLE') as ContentTypeEnum
+    ) as UIContentType,
+    provider: inferredProvider,
+    duration: item.duration ?? null,
+    bookmarkedAt: userItem.bookmarkedAt ?? null,
+    publishedAt: item.publishedAt ?? null,
   };
 }
 
@@ -275,7 +260,7 @@ function formatDate(): string {
   });
 }
 
-function getContentIcon(type: ContentType, size = 16, color = '#fff') {
+function getContentIcon(type: LocalContentType, size = 16, color = '#fff') {
   switch (type) {
     case 'podcast':
       return <HeadphonesIcon size={size} color={color} />;
@@ -286,10 +271,6 @@ function getContentIcon(type: ContentType, size = 16, color = '#fff') {
     default:
       return <BookmarkIcon size={size} color={color} />;
   }
-}
-
-function getProviderColor(provider: Provider): string {
-  return ProviderColors[provider] || '#6366F1';
 }
 
 // =============================================================================
@@ -408,91 +389,26 @@ function FeaturedCard({ item, colors }: FeaturedCardProps) {
   );
 }
 
-// Jump Back In Card (larger, with progress)
-interface JumpBackInCardProps {
-  item: ContentItem;
-  colors: typeof Colors.light;
-  index: number;
-}
-
-function JumpBackInCard({ item, colors, index }: JumpBackInCardProps) {
-  const isVideo = item.type === 'video';
-  const aspectRatio = isVideo ? 16 / 9 : 1;
-
-  return (
-    <PressableScale delay={index * 50} style={styles.jumpBackInCard}>
-      <View
-        style={[
-          styles.jumpBackInThumbnail,
-          {
-            aspectRatio,
-            backgroundColor: colors.backgroundTertiary,
-          },
-        ]}
-      >
-        <Image
-          source={{ uri: item.thumbnailUrl }}
-          style={styles.thumbnailImage}
-          contentFit="cover"
-          transition={300}
-        />
-        {/* Play overlay */}
-        <View style={styles.playOverlay}>
-          <View style={styles.playButton}>
-            <PlayIcon size={20} color="#fff" />
-          </View>
-        </View>
-        {/* Duration badge */}
-        {item.duration && (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{item.duration}</Text>
-          </View>
-        )}
-        {/* Progress indicator */}
-        {item.progress !== undefined && (
-          <View style={styles.cardProgressContainer}>
-            <View style={[styles.cardProgressFill, { width: `${item.progress}%` }]} />
-          </View>
-        )}
-      </View>
-      <View style={styles.jumpBackInInfo}>
-        <Text style={[styles.jumpBackInTitle, { color: colors.text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <View style={styles.jumpBackInMeta}>
-          <View
-            style={[styles.providerDot, { backgroundColor: getProviderColor(item.provider) }]}
-          />
-          <Text style={[styles.jumpBackInSource, { color: colors.textSecondary }]}>
-            {item.source}
-          </Text>
-          {item.progress !== undefined && (
-            <Text style={[styles.progressText, { color: colors.textTertiary }]}>
-              {' '}
-              · {item.progress}% done
-            </Text>
-          )}
-        </View>
-      </View>
-    </PressableScale>
-  );
-}
-
 // Compact Content Card
 interface ContentCardProps {
   item: ContentItem;
   colors: typeof Colors.light;
   index: number;
   variant?: 'default' | 'square' | 'wide';
+  onPress?: () => void;
 }
 
-function ContentCard({ item, colors, index, variant = 'default' }: ContentCardProps) {
+function ContentCard({ item, colors, index, variant = 'default', onPress }: ContentCardProps) {
   const isSquare = variant === 'square' || item.type === 'podcast';
   const cardWidth = variant === 'wide' ? CARD_WIDTH * 1.3 : CARD_WIDTH;
   const aspectRatio = isSquare ? 1 : 16 / 10;
 
   return (
-    <PressableScale delay={index * 50} style={[styles.contentCard, { width: cardWidth }]}>
+    <PressableScale
+      delay={index * 50}
+      style={[styles.contentCard, { width: cardWidth }]}
+      onPress={onPress}
+    >
       <View
         style={[
           styles.contentThumbnail,
@@ -579,13 +495,16 @@ export default function HomeScreen() {
   const bookmarkedItemsData = useBookmarkedItems();
   const inboxItemsData = useInboxItems();
 
-  // Transform domain types to UI types
-  const jumpBackIn = useMemo(
-    () => bookmarkedItemsData.map(transformToContentItem),
+  // Transform to ItemCardData for shared ItemCard component (live data sections)
+  const jumpBackInCards = useMemo(
+    () => bookmarkedItemsData.map(transformToItemCardData),
     [bookmarkedItemsData]
   );
 
-  const recentInbox = useMemo(() => inboxItemsData.map(transformToContentItem), [inboxItemsData]);
+  const recentInboxCards = useMemo(
+    () => inboxItemsData.map(transformToItemCardData),
+    [inboxItemsData]
+  );
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
@@ -642,14 +561,14 @@ export default function HomeScreen() {
               icon={<PlayIcon size={20} color={colors.primary} />}
               colors={colors}
             />
-            {jumpBackIn.length > 0 ? (
+            {jumpBackInCards.length > 0 ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScrollContent}
               >
-                {jumpBackIn.map((item, index) => (
-                  <JumpBackInCard key={item.id} item={item} colors={colors} index={index} />
+                {jumpBackInCards.map((item, index) => (
+                  <ItemCard key={item.id} item={item} variant="large" index={index} />
                 ))}
               </ScrollView>
             ) : (
@@ -668,14 +587,16 @@ export default function HomeScreen() {
               icon={<BookmarkIcon size={20} color={ContentColors.article} />}
               colors={colors}
             />
-            {recentInbox.length > 0 ? (
+            {recentInboxCards.length > 0 ? (
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalScrollContent}
               >
-                {recentInbox.map((item, index) => (
-                  <ContentCard key={item.id} item={item} colors={colors} index={index} />
+                {recentInboxCards.map((item, index) => (
+                  <View key={item.id} style={{ width: CARD_WIDTH }}>
+                    <ItemCard item={item} variant="compact" index={index} />
+                  </View>
                 ))}
               </ScrollView>
             ) : (
@@ -706,6 +627,7 @@ export default function HomeScreen() {
                   colors={colors}
                   index={index}
                   variant="square"
+                  onPress={() => router.push(`/item/${item.id}` as any)}
                 />
               ))}
             </ScrollView>
@@ -730,6 +652,7 @@ export default function HomeScreen() {
                   colors={colors}
                   index={index}
                   variant="wide"
+                  onPress={() => router.push(`/item/${item.id}` as any)}
                 />
               ))}
             </ScrollView>

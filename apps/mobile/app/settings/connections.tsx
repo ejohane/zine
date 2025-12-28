@@ -192,11 +192,11 @@ export default function ConnectionsScreen() {
 
   // Get the tRPC utils for cache invalidation
   // Using type assertion until subscriptions router types are properly exported
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const utils = trpc.useUtils() as any;
 
   // Disconnect mutation - using type assertion until router types are updated
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const disconnectMutation = (trpc as any).subscriptions.connections.disconnect.useMutation({
     onSuccess: () => {
       // Invalidate connections query to refresh the list

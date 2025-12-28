@@ -267,7 +267,7 @@ export default function ProviderDiscoverScreen() {
 
   // Fetch discoverable channels from provider
   // Using type assertion since the router types may not be fully updated
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const discoverQuery = (trpc as any).subscriptions?.discover?.available?.useQuery(
     { provider },
     {
@@ -282,7 +282,7 @@ export default function ProviderDiscoverScreen() {
   };
 
   // If the discover endpoint doesn't exist, fall back to sources.list
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   const sourcesQuery = (trpc as any).sources?.list?.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
     enabled: !discoverQuery.data && !!provider,
@@ -303,7 +303,7 @@ export default function ProviderDiscoverScreen() {
     if (discoverQuery.data) {
       // Backend returns { items: [...], connectionRequired: boolean }
       const data = discoverQuery.data as {
-        items?: Array<{ id: string; name: string; imageUrl?: string; isSubscribed: boolean }>;
+        items?: { id: string; name: string; imageUrl?: string; isSubscribed: boolean }[];
         connectionRequired?: boolean;
       };
       if (data.items) {
@@ -321,7 +321,6 @@ export default function ProviderDiscoverScreen() {
 
     // Transform sources data if discover endpoint not available
     if (sourcesQuery.data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (sourcesQuery.data as any[])
         .filter((source) => source.provider === provider)
         .map((source) => ({

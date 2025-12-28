@@ -45,6 +45,8 @@ function createMockItemView(overrides: Partial<ItemView> = {}): ItemView {
     ingestedAt: '2024-12-01T10:00:00Z',
     bookmarkedAt: null,
     progress: null,
+    isFinished: false,
+    finishedAt: null,
   };
 
   return { ...defaults, ...overrides };
@@ -675,6 +677,8 @@ describe('ItemView Type', () => {
       ingestedAt: '2024-12-01T00:00:00Z',
       bookmarkedAt: null,
       progress: null,
+      isFinished: false,
+      finishedAt: null,
     };
 
     expect(itemView.id).toBe('ui-001');
@@ -705,6 +709,8 @@ describe('ItemView Type', () => {
         duration: 7200,
         percent: 25,
       },
+      isFinished: false,
+      finishedAt: null,
     };
 
     expect(itemWithProgress.progress).not.toBeNull();

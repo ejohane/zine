@@ -74,6 +74,10 @@ export const userItems = sqliteTable(
     progressDuration: integer('progress_duration'), // Seconds
     progressUpdatedAt: text('progress_updated_at'),
 
+    // Consumption tracking
+    isFinished: integer('is_finished', { mode: 'boolean' }).notNull().default(false),
+    finishedAt: text('finished_at'), // ISO8601, null when not finished
+
     // System
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
