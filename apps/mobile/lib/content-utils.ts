@@ -238,45 +238,38 @@ export function getProviderLabel(provider: Provider | UIProvider): string {
 /**
  * Get the appropriate aspect ratio for cover images based on content type
  *
- * - Podcasts: 1:1 (square album art style)
- * - Videos: 16:9 (widescreen)
- * - Articles/Posts: 16:10 (slightly taller for reading content)
+ * All content types use a consistent 16:10 aspect ratio for uniform card sizing.
+ * Square content (podcasts) will be zoomed/cropped to fill via contentFit="cover".
  *
  * @param type - Content type (accepts both API and UI types)
  * @returns Aspect ratio as a number (width / height)
  *
  * @example
- * getContentAspectRatio('PODCAST') // 1
- * getContentAspectRatio('video')   // 1.777... (16/9)
+ * getContentAspectRatio('PODCAST') // 1.6 (16/10)
+ * getContentAspectRatio('video')   // 1.6 (16/10)
  * getContentAspectRatio('article') // 1.6 (16/10)
  */
-export function getContentAspectRatio(type: ContentType | UIContentType): number {
-  const normalized = normalizeContentType(type);
-
-  switch (normalized) {
-    case 'podcast':
-      return 1; // Square (album art)
-    case 'video':
-      return 16 / 9; // Widescreen
-    case 'article':
-    case 'post':
-    default:
-      return 16 / 10; // Reading content
-  }
+export function getContentAspectRatio(_type: ContentType | UIContentType): number {
+  // Use consistent 16:10 aspect ratio for all content types
+  return 16 / 10;
 }
 
 /**
  * Check if content type should display as square (podcast)
  *
+ * Note: Currently returns false for all types as we use consistent 16:10 aspect ratio.
+ * Square podcast images are zoomed/cropped to fill via contentFit="cover".
+ *
  * @param type - Content type (accepts both API and UI types)
- * @returns true if content should be square
+ * @returns true if content should be square (currently always false)
  *
  * @example
- * isSquareContent('PODCAST') // true
+ * isSquareContent('PODCAST') // false
  * isSquareContent('video')   // false
  */
-export function isSquareContent(type: ContentType | UIContentType): boolean {
-  return normalizeContentType(type) === 'podcast';
+export function isSquareContent(_type: ContentType | UIContentType): boolean {
+  // All content uses consistent 16:10 aspect ratio
+  return false;
 }
 
 /**
