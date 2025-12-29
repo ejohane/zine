@@ -63,9 +63,9 @@ export function ContentCard({
   variant = 'default',
   onPress,
 }: ContentCardProps) {
-  const isSquare = variant === 'square' || item.type === 'podcast';
   const cardWidth = variant === 'wide' ? CARD_WIDTH * 1.3 : CARD_WIDTH;
-  const aspectRatio = isSquare ? 1 : 16 / 10;
+  // Use consistent 16:10 aspect ratio for all content types
+  const aspectRatio = 16 / 10;
 
   return (
     <PressableScale
@@ -79,13 +79,13 @@ export function ContentCard({
           {
             aspectRatio,
             backgroundColor: colors.backgroundTertiary,
-            borderRadius: isSquare ? Radius.md : Radius.lg,
+            borderRadius: Radius.lg,
           },
         ]}
       >
         <Image
           source={{ uri: item.thumbnailUrl }}
-          style={[styles.thumbnailImage, { borderRadius: isSquare ? Radius.md : Radius.lg }]}
+          style={[styles.thumbnailImage, { borderRadius: Radius.lg }]}
           contentFit="cover"
           transition={300}
         />
