@@ -30,6 +30,9 @@ import { transformYouTubeVideo, transformSpotifyEpisode } from '../ingestion/tra
 import { subscriptions } from '../db/schema';
 import type { ProviderConnection } from '../lib/token-refresh';
 import type { Database } from '../db';
+import { logger } from '../lib/logger';
+
+const fetchLogger = logger.child('initial-fetch');
 
 // ============================================================================
 // Types
@@ -132,7 +135,7 @@ export async function triggerInitialFetch(
   db: Database,
   env: InitialFetchEnv
 ): Promise<InitialFetchResult> {
-  console.log(`[initial-fetch] Starting for ${provider} channel ${providerChannelId}`);
+  fetchLogger.info('Starting', { provider, providerChannelId });
   try {
     let itemIngested = false;
 
@@ -165,14 +168,12 @@ export async function triggerInitialFetch(
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    console.log(
-      `[initial-fetch] Completed for ${provider} channel ${providerChannelId}, itemIngested: ${itemIngested}`
-    );
+    fetchLogger.info('Completed', { provider, providerChannelId, itemIngested });
     return { itemIngested };
   } catch (error) {
     // Log but don't fail subscription creation
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[initial-fetch] Failed for subscription ${subscriptionId}:`, errorMessage);
+    fetchLogger.error('Failed', { subscriptionId, error: errorMessage });
     return { itemIngested: false, error: errorMessage };
   }
 }
@@ -196,7 +197,7 @@ async function fetchInitialYouTubeItem(
   const video = await fetchLatestYouTubeVideo(client, channelId);
 
   if (!video) {
-    console.log(`[initial-fetch] No eligible videos found for channel ${channelId}`);
+    fetchLogger.info('No eligible videos found', { channelId });
     return false;
   }
 
@@ -319,22 +320,22 @@ async function fetchInitialSpotifyItem(
   db: Database,
   env: InitialFetchEnv
 ): Promise<boolean> {
-  console.log(`[initial-fetch] Fetching Spotify client for show ${showId}`);
+  fetchLogger.debug('Fetching Spotify client', { showId });
   const client = await getSpotifyClientForConnection(connection, env);
 
   // Get the latest episode
-  console.log(`[initial-fetch] Getting latest episode for show ${showId}`);
+  fetchLogger.debug('Getting latest episode', { showId });
   const episode = await getLatestEpisode(client, showId);
 
   if (!episode) {
-    console.log(`[initial-fetch] No episodes found for show ${showId}`);
+    fetchLogger.info('No episodes found for show', { showId });
     return false;
   }
 
   // Check if episode is already released (not scheduled)
   const releaseDate = parseSpotifyReleaseDate(episode.releaseDate);
   if (releaseDate > Date.now()) {
-    console.log(`[initial-fetch] Latest episode is scheduled, skipping`);
+    fetchLogger.info('Latest episode is scheduled, skipping', { showId });
     return false;
   }
 

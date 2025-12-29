@@ -7,6 +7,7 @@
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import { type ReactNode } from 'react';
 import { tokenCache, CLERK_PUBLISHABLE_KEY, validateClerkConfig } from '@/lib/auth';
+import { authLogger } from '@/lib/logger';
 
 // ============================================================================
 // Provider Component
@@ -39,8 +40,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // This allows the app to run in development without Clerk configured
   if (!CLERK_PUBLISHABLE_KEY) {
     if (__DEV__) {
-      console.warn(
-        '[AuthProvider] Running without Clerk authentication. Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to enable auth.'
+      authLogger.warn(
+        'Running without Clerk authentication. Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to enable auth.'
       );
     }
     return <>{children}</>;

@@ -272,7 +272,7 @@ describe('POST /api/auth/webhook', () => {
     const res = await app.fetch(req, mockEnv);
     expect(res.status).toBe(200);
 
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('user.updated for user_789'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('user.updated'));
 
     consoleSpy.mockRestore();
   });

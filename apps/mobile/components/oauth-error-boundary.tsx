@@ -1,9 +1,24 @@
+/**
+ * OAuthErrorBoundary - Error boundary specifically for OAuth connection flows.
+ *
+ * Features:
+ * - Catches React errors during OAuth flows
+ * - Classifies errors using parseOAuthError for specialized UI
+ * - Shows different emoji/title based on error type
+ * - Provides provider-specific error messages
+ * - Offers retry callback for recoverable errors
+ *
+ * @see frontend-spec.md Section 8.2
+ */
+
 import type { ErrorInfo, ReactNode } from 'react';
-import { Component } from 'react';
+import { useCallback, useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { ErrorBoundary, type FallbackRenderProps } from './error-boundary';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { parseOAuthError, getOAuthErrorDisplay, type OAuthError } from '@/lib/oauth-errors';
+import { oauthLogger } from '@/lib/logger';
 
 interface OAuthErrorFallbackProps {
   provider: 'YOUTUBE' | 'SPOTIFY';
@@ -64,24 +79,13 @@ interface OAuthErrorBoundaryProps {
   error?: Error | string | null;
 }
 
-interface OAuthErrorBoundaryState {
-  hasError: boolean;
-  parsedError: OAuthError | null;
-}
-
 /**
  * Error boundary specifically for OAuth connection flows.
  *
- * Features:
- * - Catches React errors during OAuth flows
- * - Classifies errors using parseOAuthError for specialized UI
- * - Shows different emoji/title based on error type:
- *   - USER_CANCELLED: 🚫 Connection Cancelled
- *   - USER_DENIED: 🔒 Access Denied
- *   - NETWORK_ERROR: 📡 Connection Problem
- *   - STATE_MISMATCH: 🔐 Security Check Failed
- * - Provides provider-specific error messages
- * - Offers retry callback for recoverable errors
+ * Uses the base ErrorBoundary with a specialized fallbackRender that:
+ * - Parses OAuth errors to determine type (USER_CANCELLED, NETWORK_ERROR, etc.)
+ * - Shows provider-specific error messages
+ * - Provides appropriate recovery actions
  *
  * @example
  * ```tsx
@@ -99,74 +103,63 @@ interface OAuthErrorBoundaryState {
  * </OAuthErrorBoundary>
  * ```
  */
-export class OAuthErrorBoundary extends Component<
-  OAuthErrorBoundaryProps,
-  OAuthErrorBoundaryState
-> {
-  state: OAuthErrorBoundaryState = {
-    hasError: false,
-    parsedError: null,
-  };
+export function OAuthErrorBoundary({
+  children,
+  provider,
+  onRetry,
+  error: externalError,
+}: OAuthErrorBoundaryProps) {
+  // Track reset trigger for external errors
+  const [resetTrigger, setResetTrigger] = useState(0);
 
-  static getDerivedStateFromError(error: Error): Partial<OAuthErrorBoundaryState> {
-    const parsedError = parseOAuthError(error);
-    return { hasError: true, parsedError };
-  }
+  // Handle error logging
+  const handleError = useCallback(
+    (error: Error, errorInfo: ErrorInfo) => {
+      const parsedError = parseOAuthError(error);
+      oauthLogger.error('OAuth error boundary caught error', {
+        provider,
+        errorMessage: error.message,
+        errorCode: parsedError.code,
+        componentStack: errorInfo.componentStack,
+      });
+    },
+    [provider]
+  );
 
-  static getDerivedStateFromProps(
-    props: OAuthErrorBoundaryProps,
-    state: OAuthErrorBoundaryState
-  ): Partial<OAuthErrorBoundaryState> | null {
-    // Handle externally passed errors (e.g., from OAuth callback)
-    if (props.error && !state.hasError) {
-      const parsedError = parseOAuthError(props.error);
-      return { hasError: true, parsedError };
-    }
-    // Clear error state if external error is cleared
-    if (!props.error && state.hasError && state.parsedError) {
-      return { hasError: false, parsedError: null };
-    }
-    return null;
-  }
+  // Handle retry - reset both internal and external error state
+  const handleRetry = useCallback(() => {
+    setResetTrigger((prev) => prev + 1);
+    onRetry?.();
+  }, [onRetry]);
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    const { provider } = this.props;
-    console.error(`[OAuthError:${provider}]`, error.message, {
-      errorInfo: errorInfo.componentStack,
-      errorCode: this.state.parsedError?.code,
-    });
-  }
-
-  handleRetry = () => {
-    this.setState({ hasError: false, parsedError: null });
-    this.props.onRetry?.();
-  };
-
-  render() {
-    const { children, provider } = this.props;
-    const { hasError, parsedError } = this.state;
-
-    if (hasError && parsedError) {
+  // Render fallback with parsed OAuth error
+  const renderFallback = useCallback(
+    ({ error, resetError }: FallbackRenderProps) => {
+      const parsedError = parseOAuthError(error);
+      const handleFallbackRetry = () => {
+        resetError();
+        onRetry?.();
+      };
       return (
-        <OAuthErrorFallbackWrapper
-          provider={provider}
-          error={parsedError}
-          onRetry={this.handleRetry}
-        />
+        <OAuthErrorFallback provider={provider} error={parsedError} onRetry={handleFallbackRetry} />
       );
-    }
+    },
+    [provider, onRetry]
+  );
 
-    return children;
+  // Handle external errors (from navigation params, etc.)
+  if (externalError) {
+    const parsedExternalError = parseOAuthError(externalError);
+    return (
+      <OAuthErrorFallback provider={provider} error={parsedExternalError} onRetry={handleRetry} />
+    );
   }
-}
 
-/**
- * Wrapper component to use hooks in the fallback UI.
- * Since OAuthErrorBoundary is a class component, we need this wrapper
- * to access the useColorScheme hook.
- */
-function OAuthErrorFallbackWrapper(props: OAuthErrorFallbackProps) {
-  return <OAuthErrorFallback {...props} />;
+  return (
+    <ErrorBoundary fallbackRender={renderFallback} onError={handleError} resetKeys={[resetTrigger]}>
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({

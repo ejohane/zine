@@ -64,7 +64,7 @@ vi.mock('../providers/spotify', () => ({
 // Mock ingestion
 const mockIngestItem = vi.fn();
 
-vi.mock('../ingestion', () => ({
+vi.mock('../ingestion/processor', () => ({
   ingestItem: (...args: unknown[]) => mockIngestItem(...args),
 }));
 

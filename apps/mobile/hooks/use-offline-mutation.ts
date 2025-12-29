@@ -17,6 +17,7 @@
 import { useState, useCallback } from 'react';
 import { useNetworkStatus } from './use-network-status';
 import { offlineQueue, type OfflineActionType } from '../lib/offline-queue';
+import { offlineLogger } from '../lib/logger';
 
 /**
  * Options for configuring the offline-capable mutation hook.
@@ -176,7 +177,7 @@ export function useOfflineMutation<TPayload extends Record<string, unknown>>({
           // The queue will notify React Query to invalidate when it eventually succeeds
         } catch (error) {
           // Queuing failed (e.g., AsyncStorage error) - this is rare
-          console.error('[useOfflineMutation] Failed to queue action:', error);
+          offlineLogger.error('Failed to queue action', { error, actionType });
           onRollback?.(payload);
         } finally {
           setIsPending(false);

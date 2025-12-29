@@ -22,6 +22,7 @@
 
 import { eq, and } from 'drizzle-orm';
 import { providerConnections, subscriptions } from '../db/schema';
+import { healthLogger } from '../lib/logger';
 import {
   getValidAccessToken,
   type ProviderConnection,
@@ -241,9 +242,12 @@ export async function markConnectionExpired(
     db
   );
 
-  console.log(
-    `[health] Connection ${connectionId} marked as EXPIRED for user ${conn.userId} (${conn.provider}): ${reason}`
-  );
+  healthLogger.info('Connection marked as EXPIRED', {
+    connectionId,
+    userId: conn.userId,
+    provider: conn.provider,
+    reason,
+  });
 }
 
 /**
@@ -292,9 +296,11 @@ export async function markConnectionRevoked(connectionId: string, db: Database):
     db
   );
 
-  console.log(
-    `[health] Connection ${connectionId} marked as REVOKED for user ${conn.userId} (${conn.provider})`
-  );
+  healthLogger.info('Connection marked as REVOKED', {
+    connectionId,
+    userId: conn.userId,
+    provider: conn.provider,
+  });
 }
 
 // ============================================================================
@@ -325,10 +331,12 @@ async function createUserNotification(
 
   // TODO: Implement userNotifications table and persist notifications
   // For now, just log the notification
-  console.log(`[health] NOTIFICATION for ${userId}: ${title} - ${message}`);
-  if (params.reason) {
-    console.log(`[health] Notification reason: ${params.reason}`);
-  }
+  healthLogger.info('NOTIFICATION created', {
+    userId,
+    title,
+    message,
+    reason: params.reason,
+  });
 }
 
 /**
@@ -354,7 +362,7 @@ export async function resolveConnectionNotifications(
 ): Promise<void> {
   // TODO: Implement userNotifications table and update notifications
   // For now, just log the resolution
-  console.log(`[health] Would resolve connection notifications for ${userId} (${provider})`);
+  healthLogger.info('Would resolve connection notifications', { userId, provider });
 }
 
 // ============================================================================
@@ -397,9 +405,11 @@ export async function trackPollFailure(
   // Store with 24-hour expiration (failures auto-reset)
   await env.OAUTH_STATE_KV.put(key, String(newCount), { expirationTtl: 24 * 3600 });
 
-  console.log(
-    `[health] Poll failure #${newCount} for subscription ${subscriptionId}: ${error.message}`
-  );
+  healthLogger.warn('Poll failure', {
+    failureCount: newCount,
+    subscriptionId,
+    error: error.message,
+  });
 
   // Notify user after threshold is reached
   if (newCount === FAILURE_THRESHOLD) {
@@ -459,5 +469,5 @@ export async function resolvePollFailureNotifications(
 ): Promise<void> {
   // TODO: Implement userNotifications table and update notifications
   // For now, just log the resolution
-  console.log(`[health] Would resolve poll failure notifications for ${userId} (${provider})`);
+  healthLogger.info('Would resolve poll failure notifications', { userId, provider });
 }

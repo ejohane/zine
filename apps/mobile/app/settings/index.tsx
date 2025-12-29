@@ -20,6 +20,7 @@ import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
+import { settingsLogger } from '@/lib/logger';
 
 // ============================================================================
 // Types
@@ -114,7 +115,7 @@ export default function SettingsScreen() {
       await signOut();
       router.replace('/(auth)/sign-in');
     } catch (error) {
-      console.error('[Settings] Sign out failed:', error);
+      settingsLogger.error('Sign out failed', { error });
     }
   };
 

@@ -4,6 +4,7 @@
 
 import * as jose from 'jose';
 import type { Bindings } from '../types';
+import { authLogger } from './logger';
 
 /**
  * Clerk JWT payload structure
@@ -229,7 +230,7 @@ export async function exchangeCodeForTokens(
   }
 
   const tokens = (await response.json()) as OAuthTokens;
-  console.log('[OAuth] Token exchange response:', JSON.stringify(tokens, null, 2));
+  authLogger.debug('Token exchange response', { provider, hasAccessToken: !!tokens.access_token });
 
   if (!tokens.access_token) {
     throw new Error('No access token in response');
@@ -238,7 +239,7 @@ export async function exchangeCodeForTokens(
   // Spotify doesn't always return refresh_token on PKCE flow if already granted
   // For now, use access_token as refresh_token placeholder if missing
   if (!tokens.refresh_token) {
-    console.warn(`[OAuth] ${provider} did not return refresh_token`);
+    authLogger.warn('Provider did not return refresh_token', { provider });
     tokens.refresh_token = tokens.access_token;
   }
 

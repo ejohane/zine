@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { ErrorBoundary } from './error-boundary';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { logger } from '@/lib/logger';
 
 /**
  * Check if an error is OAuth/authentication related.
@@ -158,12 +159,12 @@ export function SubscriptionErrorBoundary({
 }: SubscriptionErrorBoundaryProps) {
   const handleError = (error: Error, errorInfo: ErrorInfo) => {
     const isAuth = isAuthError(error);
-    console.error('[SubscriptionError]', {
+    logger.error('Subscription error', {
       subscriptionId,
       provider,
       isAuthError: isAuth,
-      error: error.message,
-      stack: errorInfo.componentStack,
+      errorMessage: error.message,
+      componentStack: errorInfo.componentStack,
     });
   };
 

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { useToast } from 'heroui-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
@@ -15,6 +16,7 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
+import { showSuccess, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
@@ -69,17 +71,38 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
 export default function InboxScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { toast } = useToast();
 
   const { data, isLoading, error } = useInboxItems();
   const bookmarkMutation = useBookmarkItem();
   const archiveMutation = useArchiveItem();
 
   const handleBookmark = (id: string) => {
-    bookmarkMutation.mutate({ id });
+    bookmarkMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          showSuccess(toast, 'Saved to library');
+        },
+        onError: (err) => {
+          showError(toast, err, 'Failed to save item', 'bookmark');
+        },
+      }
+    );
   };
 
   const handleArchive = (id: string) => {
-    archiveMutation.mutate({ id });
+    archiveMutation.mutate(
+      { id },
+      {
+        onSuccess: () => {
+          showSuccess(toast, 'Archived');
+        },
+        onError: (err) => {
+          showError(toast, err, 'Failed to archive item', 'archive');
+        },
+      }
+    );
   };
 
   // Transform API response to ItemCardData format

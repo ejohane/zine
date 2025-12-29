@@ -7,6 +7,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import type { TokenCache } from '@clerk/clerk-expo';
+import { authLogger } from './logger';
 
 // ============================================================================
 // Token Cache Implementation
@@ -24,11 +25,11 @@ function createTokenCache(): TokenCache {
       try {
         const item = await SecureStore.getItemAsync(key);
         if (item) {
-          console.log(`[Auth] Token retrieved for key: ${key.substring(0, 20)}...`);
+          authLogger.debug('Token retrieved', { key: key.substring(0, 20) + '...' });
         }
         return item;
       } catch (error) {
-        console.error('[Auth] SecureStore getToken error:', error);
+        authLogger.error('SecureStore getToken error', { error });
         await SecureStore.deleteItemAsync(key);
         return null;
       }
@@ -37,18 +38,18 @@ function createTokenCache(): TokenCache {
     async saveToken(key: string, value: string): Promise<void> {
       try {
         await SecureStore.setItemAsync(key, value);
-        console.log(`[Auth] Token saved for key: ${key.substring(0, 20)}...`);
+        authLogger.debug('Token saved', { key: key.substring(0, 20) + '...' });
       } catch (error) {
-        console.error('[Auth] SecureStore saveToken error:', error);
+        authLogger.error('SecureStore saveToken error', { error });
       }
     },
 
     async clearToken(key: string): Promise<void> {
       try {
         await SecureStore.deleteItemAsync(key);
-        console.log(`[Auth] Token cleared for key: ${key.substring(0, 20)}...`);
+        authLogger.debug('Token cleared', { key: key.substring(0, 20) + '...' });
       } catch (error) {
-        console.error('[Auth] SecureStore clearToken error:', error);
+        authLogger.error('SecureStore clearToken error', { error });
       }
     },
   };

@@ -12,6 +12,7 @@ import superjson from 'superjson';
 import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
+import { trpcLogger } from '@/lib/logger';
 
 // ============================================================================
 // Provider Component
@@ -74,7 +75,7 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
 
   const [trpcClient] = useState(() => {
     const url = `${API_URL}/trpc`;
-    console.log('[tRPC] Connecting to:', url);
+    trpcLogger.info('Connecting to tRPC server', { url });
 
     return trpc.createClient({
       links: [
@@ -88,7 +89,7 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
                 return { Authorization: `Bearer ${token}` };
               }
             } catch (error) {
-              console.warn('[tRPC] Failed to get auth token:', error);
+              trpcLogger.warn('Failed to get auth token', { error });
             }
             return {};
           },

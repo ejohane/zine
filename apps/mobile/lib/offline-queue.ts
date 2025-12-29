@@ -24,6 +24,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ulid } from 'ulid';
+import { offlineLogger } from './logger';
 
 // ============================================================================
 // Constants
@@ -85,6 +86,19 @@ export interface OfflineAction {
  * Callback type for queue change listeners.
  */
 type QueueListener = () => void;
+
+/**
+ * Result of processing a single action.
+ * Used to determine whether to keep or remove action from queue.
+ */
+interface ActionProcessingResult {
+  /** Whether the action should be removed from the queue */
+  shouldRemove: boolean;
+  /** Whether this counts as a success (for cache invalidation) */
+  succeeded: boolean;
+  /** Updated action to keep in queue (if shouldRemove is false) */
+  updatedAction?: OfflineAction;
+}
 
 // ============================================================================
 // Error Classification
@@ -264,7 +278,7 @@ class OfflineActionQueue {
       const data = await AsyncStorage.getItem(QUEUE_KEY);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('[OfflineQueue] Failed to read queue:', error);
+      offlineLogger.error('Failed to read queue', { error });
       return [];
     }
   }
@@ -307,88 +321,12 @@ class OfflineActionQueue {
       let anySucceeded = false;
 
       for (const action of queue) {
-        try {
-          await this.executeAction(action);
+        const result = await this.processAction(action);
+        if (result.succeeded) {
           anySucceeded = true;
-          // Action succeeded - don't add to remaining
-        } catch (error) {
-          const errorType = classifyError(error);
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-          // Handle based on error type
-          if (errorType === 'CONFLICT') {
-            // 409 Conflict: The action's intent is already fulfilled
-            // This is actually a success case - log and remove from queue
-            console.log(
-              `[OfflineQueue] Action ${action.id} (${action.type}) resolved as conflict - already done`
-            );
-            anySucceeded = true; // Treat as success for cache invalidation
-            continue;
-          }
-
-          if (errorType === 'AUTH') {
-            // 401 Unauthorized: Try to refresh auth token and retry once
-            if (action.authRetryCount < AUTH_RETRY_LIMIT) {
-              try {
-                await this.refreshAuth();
-                // Retry the action immediately after auth refresh
-                await this.executeAction(action);
-                anySucceeded = true;
-                // Success after auth refresh - don't add to remaining
-                continue;
-              } catch (retryError) {
-                // Auth refresh failed or retry failed
-                const retryErrorType = classifyError(retryError);
-                const updatedAction: OfflineAction = {
-                  ...action,
-                  authRetryCount: action.authRetryCount + 1,
-                  lastError: retryError instanceof Error ? retryError.message : 'Auth retry failed',
-                  lastErrorType: retryErrorType,
-                };
-
-                if (isRetryableError(retryErrorType, updatedAction)) {
-                  remainingActions.push(updatedAction);
-                } else {
-                  console.error(
-                    `[OfflineQueue] Action ${action.id} failed permanently after auth retry:`,
-                    retryError
-                  );
-                }
-              }
-            } else {
-              // Exceeded auth retry limit - permanent failure
-              console.error(
-                `[OfflineQueue] Action ${action.id} exceeded auth retry limit: ${errorMessage}`
-              );
-            }
-            continue;
-          }
-
-          if (errorType === 'CLIENT') {
-            // 4xx Client errors (except 401, 409): Permanent failure
-            // Don't retry - these indicate bad input or invalid state
-            console.error(
-              `[OfflineQueue] Action ${action.id} (${action.type}) failed permanently: ${errorMessage}`
-            );
-            continue;
-          }
-
-          // NETWORK, SERVER, UNKNOWN errors: Retry with backoff
-          const updatedAction: OfflineAction = {
-            ...action,
-            retryCount: action.retryCount + 1,
-            lastError: errorMessage,
-            lastErrorType: errorType,
-          };
-
-          if (isRetryableError(errorType, updatedAction)) {
-            remainingActions.push(updatedAction);
-          } else {
-            // Exceeded retry limit
-            console.error(
-              `[OfflineQueue] Action ${action.id} (${action.type}) exceeded retry limit: ${errorMessage}`
-            );
-          }
+        }
+        if (!result.shouldRemove && result.updatedAction) {
+          remainingActions.push(result.updatedAction);
         }
       }
 
@@ -396,7 +334,6 @@ class OfflineActionQueue {
       this.notifyListeners();
 
       // Notify React Query to invalidate caches after queue processing
-      // This ensures the UI reflects the server state after offline mutations complete
       if (anySucceeded) {
         const { notifyQueueProcessed } = await import('./trpc-offline-client');
         notifyQueueProcessed();
@@ -404,6 +341,139 @@ class OfflineActionQueue {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  /**
+   * Process a single action from the queue.
+   *
+   * Handles execution, error classification, and retry logic.
+   *
+   * @param action - The action to process
+   * @returns Result indicating success/failure and whether to keep in queue
+   */
+  private async processAction(action: OfflineAction): Promise<ActionProcessingResult> {
+    try {
+      await this.executeAction(action);
+      return { shouldRemove: true, succeeded: true };
+    } catch (error) {
+      return this.handleActionError(action, error);
+    }
+  }
+
+  /**
+   * Handle an error from action execution.
+   *
+   * Classifies the error and determines appropriate handling:
+   * - CONFLICT: Treat as success (already done)
+   * - AUTH: Try token refresh and retry once
+   * - CLIENT: Permanent failure, remove from queue
+   * - NETWORK/SERVER/UNKNOWN: Retry with backoff
+   *
+   * @param action - The action that failed
+   * @param error - The error that occurred
+   * @returns Result indicating how to handle the action
+   */
+  private async handleActionError(
+    action: OfflineAction,
+    error: unknown
+  ): Promise<ActionProcessingResult> {
+    const errorType = classifyError(error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // CONFLICT: The action's intent is already fulfilled
+    if (errorType === 'CONFLICT') {
+      offlineLogger.info('Action resolved as conflict - already done', {
+        actionId: action.id,
+        type: action.type,
+      });
+      return { shouldRemove: true, succeeded: true };
+    }
+
+    // AUTH: Try to refresh token and retry
+    if (errorType === 'AUTH') {
+      return this.handleAuthError(action, errorMessage);
+    }
+
+    // CLIENT: Permanent failure (4xx except 401, 409)
+    if (errorType === 'CLIENT') {
+      offlineLogger.error('Action failed permanently', {
+        actionId: action.id,
+        type: action.type,
+        error: errorMessage,
+      });
+      return { shouldRemove: true, succeeded: false };
+    }
+
+    // NETWORK, SERVER, UNKNOWN: Retry with backoff
+    return this.handleRetryableError(action, errorType, errorMessage);
+  }
+
+  /**
+   * Handle authentication errors with token refresh and retry.
+   */
+  private async handleAuthError(
+    action: OfflineAction,
+    originalErrorMessage: string
+  ): Promise<ActionProcessingResult> {
+    if (action.authRetryCount < AUTH_RETRY_LIMIT) {
+      try {
+        await this.refreshAuth();
+        await this.executeAction(action);
+        return { shouldRemove: true, succeeded: true };
+      } catch (retryError) {
+        const retryErrorType = classifyError(retryError);
+        const updatedAction: OfflineAction = {
+          ...action,
+          authRetryCount: action.authRetryCount + 1,
+          lastError: retryError instanceof Error ? retryError.message : 'Auth retry failed',
+          lastErrorType: retryErrorType,
+        };
+
+        if (isRetryableError(retryErrorType, updatedAction)) {
+          return { shouldRemove: false, succeeded: false, updatedAction };
+        }
+        offlineLogger.error('Action failed permanently after auth retry', {
+          actionId: action.id,
+          error: retryError,
+        });
+        return { shouldRemove: true, succeeded: false };
+      }
+    }
+
+    // Exceeded auth retry limit
+    offlineLogger.error('Action exceeded auth retry limit', {
+      actionId: action.id,
+      error: originalErrorMessage,
+    });
+    return { shouldRemove: true, succeeded: false };
+  }
+
+  /**
+   * Handle retryable errors (NETWORK, SERVER, UNKNOWN) with retry counting.
+   */
+  private handleRetryableError(
+    action: OfflineAction,
+    errorType: ErrorClassification,
+    errorMessage: string
+  ): ActionProcessingResult {
+    const updatedAction: OfflineAction = {
+      ...action,
+      retryCount: action.retryCount + 1,
+      lastError: errorMessage,
+      lastErrorType: errorType,
+    };
+
+    if (isRetryableError(errorType, updatedAction)) {
+      return { shouldRemove: false, succeeded: false, updatedAction };
+    }
+
+    // Exceeded retry limit
+    offlineLogger.error('Action exceeded retry limit', {
+      actionId: action.id,
+      type: action.type,
+      error: errorMessage,
+    });
+    return { shouldRemove: true, succeeded: false };
   }
 
   /**
@@ -442,7 +512,7 @@ class OfflineActionQueue {
     try {
       await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
     } catch (error) {
-      console.error('[OfflineQueue] Failed to save queue:', error);
+      offlineLogger.error('Failed to save queue', { error });
     }
   }
 
@@ -454,7 +524,7 @@ class OfflineActionQueue {
       try {
         listener();
       } catch (error) {
-        console.error('[OfflineQueue] Listener error:', error);
+        offlineLogger.error('Listener error', { error });
       }
     });
   }
@@ -474,7 +544,7 @@ class OfflineActionQueue {
     // await refreshAuthToken();
 
     // Placeholder: throw to indicate refresh not available
-    console.warn('[OfflineQueue] Auth refresh not yet implemented');
+    offlineLogger.warn('Auth refresh not yet implemented');
     throw new Error('Auth refresh not available');
   }
 
@@ -513,12 +583,12 @@ class OfflineActionQueue {
 
       case 'PAUSE_SUBSCRIPTION':
         // TODO: Implement when pause mutation is added to router
-        console.warn('[OfflineQueue] PAUSE_SUBSCRIPTION not yet implemented in router');
+        offlineLogger.warn('PAUSE_SUBSCRIPTION not yet implemented in router');
         throw new Error('PAUSE_SUBSCRIPTION not implemented');
 
       case 'RESUME_SUBSCRIPTION':
         // TODO: Implement when resume mutation is added to router
-        console.warn('[OfflineQueue] RESUME_SUBSCRIPTION not yet implemented in router');
+        offlineLogger.warn('RESUME_SUBSCRIPTION not yet implemented in router');
         throw new Error('RESUME_SUBSCRIPTION not implemented');
 
       default:
