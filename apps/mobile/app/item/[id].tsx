@@ -161,8 +161,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: 'Invalid Link',
+            title: '',
             headerBackButtonDisplayMode: 'minimal',
+            headerTransparent: true,
+            headerTintColor: colors.text,
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -225,8 +227,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: 'Loading...',
+            title: '',
             headerBackButtonDisplayMode: 'minimal',
+            headerTransparent: true,
+            headerTintColor: colors.text,
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -242,8 +246,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: 'Error',
+            title: '',
             headerBackButtonDisplayMode: 'minimal',
+            headerTransparent: true,
+            headerTintColor: colors.text,
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -259,8 +265,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: 'Not Found',
+            title: '',
             headerBackButtonDisplayMode: 'minimal',
+            headerTransparent: true,
+            headerTintColor: colors.text,
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
