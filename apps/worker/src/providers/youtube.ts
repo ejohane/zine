@@ -14,6 +14,10 @@ import { google } from 'googleapis';
 import type { ProviderConnection } from '../lib/token-refresh';
 import { getValidAccessToken } from '../lib/token-refresh';
 import { decrypt } from '../lib/crypto';
+import { parseISO8601Duration } from '../lib/duration';
+
+// Re-export for external consumers
+export { parseISO8601Duration } from '../lib/duration';
 
 // The OAuth2Client type comes from google.auth.OAuth2 instance
 type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
@@ -338,4 +342,53 @@ export function extractVideoInfo(item: youtube_v3.Schema$PlaylistItem): {
       snippet?.thumbnails?.default?.url ??
       null,
   };
+}
+
+// Note: parseISO8601Duration has been moved to ../lib/duration.ts
+// and is re-exported from this file for backward compatibility
+
+/**
+ * Fetch video details (specifically duration) for a list of video IDs.
+ * Uses videos.list API with part=contentDetails.
+ * Returns a Map of videoId -> durationInSeconds.
+ *
+ * YouTube API Cost: 1 quota unit (regardless of video count, up to 50)
+ *
+ * @param client - YouTube API client
+ * @param videoIds - Array of video IDs to fetch (max 50 per API call)
+ * @returns Map of videoId to duration in seconds. Empty map on error (graceful degradation).
+ *
+ * @example
+ * ```typescript
+ * const durations = await fetchVideoDetails(client, ['abc123', 'def456']);
+ * const duration = durations.get('abc123'); // e.g., 90 (seconds)
+ * ```
+ */
+export async function fetchVideoDetails(
+  client: YouTubeClient,
+  videoIds: string[]
+): Promise<Map<string, number>> {
+  // Early return if no videos to fetch
+  if (videoIds.length === 0) {
+    return new Map();
+  }
+
+  try {
+    const response = await client.api.videos.list({
+      part: ['contentDetails'],
+      id: videoIds.slice(0, 50), // API max is 50
+    });
+
+    const durations = new Map<string, number>();
+    for (const video of response.data.items || []) {
+      if (video.id && video.contentDetails?.duration) {
+        durations.set(video.id, parseISO8601Duration(video.contentDetails.duration));
+      }
+    }
+    return durations;
+  } catch (error) {
+    // Log warning but don't throw - graceful degradation
+    console.warn('Failed to fetch video details for duration:', error);
+    return new Map();
+  }
 }

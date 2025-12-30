@@ -71,6 +71,12 @@ interface YouTubePlaylistItem {
       default?: { url?: string };
     };
   };
+  /**
+   * Duration in seconds, enriched by polling layer after fetching via videos.list API.
+   * This is NOT from the playlistItems API directly - we add it before transformation.
+   * undefined = duration unknown (API error or not fetched)
+   */
+  durationSeconds?: number;
 }
 
 /**
@@ -106,6 +112,7 @@ export function transformYouTubeVideo(playlistItem: YouTubePlaylistItem): NewIte
     creator: snippet.channelTitle || 'Unknown',
     creatorId: snippet.channelId,
     imageUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
+    durationSeconds: playlistItem.durationSeconds,
     publishedAt: snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : now,
     createdAt: now,
   };
