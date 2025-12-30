@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "drizzle": {
+      "type": "local",
+      "command": ["npx", "-y", "github:defrex/drizzle-mcp", "./apps/worker/drizzle.config.ts"],
+      "enabled": true,
+      "environment": {
+        "CLOUDFLARE_ACCOUNT_ID": "{env:CLOUDFLARE_ACCOUNT_ID}",
+        "D1_DATABASE_ID": "{env:D1_DATABASE_ID}",
+        "CLOUDFLARE_API_TOKEN": "{env:CLOUDFLARE_API_TOKEN}"
+      }
+    }
+  }
+}
