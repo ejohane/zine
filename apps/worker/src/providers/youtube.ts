@@ -348,26 +348,41 @@ export function extractVideoInfo(item: youtube_v3.Schema$PlaylistItem): {
 // and is re-exported from this file for backward compatibility
 
 /**
- * Fetch video details (specifically duration) for a list of video IDs.
- * Uses videos.list API with part=contentDetails.
- * Returns a Map of videoId -> durationInSeconds.
+ * Video details returned from fetchVideoDetails.
+ * Contains duration and full description (not truncated).
+ */
+export interface VideoDetails {
+  /** Duration in seconds */
+  durationSeconds: number;
+  /** Full video description (from videos.list, not truncated like playlistItems) */
+  description: string;
+}
+
+/**
+ * Fetch video details (duration and full description) for a list of video IDs.
+ * Uses videos.list API with part=contentDetails,snippet.
+ *
+ * IMPORTANT: The playlistItems.list API truncates descriptions to ~160 chars.
+ * This function fetches the FULL description via videos.list API.
  *
  * YouTube API Cost: 1 quota unit (regardless of video count, up to 50)
  *
  * @param client - YouTube API client
  * @param videoIds - Array of video IDs to fetch (max 50 per API call)
- * @returns Map of videoId to duration in seconds. Empty map on error (graceful degradation).
+ * @returns Map of videoId to VideoDetails. Empty map on error (graceful degradation).
  *
  * @example
  * ```typescript
- * const durations = await fetchVideoDetails(client, ['abc123', 'def456']);
- * const duration = durations.get('abc123'); // e.g., 90 (seconds)
+ * const details = await fetchVideoDetails(client, ['abc123', 'def456']);
+ * const video = details.get('abc123');
+ * console.log(video?.durationSeconds); // e.g., 90
+ * console.log(video?.description); // Full description text
  * ```
  */
 export async function fetchVideoDetails(
   client: YouTubeClient,
   videoIds: string[]
-): Promise<Map<string, number>> {
+): Promise<Map<string, VideoDetails>> {
   // Early return if no videos to fetch
   if (videoIds.length === 0) {
     return new Map();
@@ -375,20 +390,23 @@ export async function fetchVideoDetails(
 
   try {
     const response = await client.api.videos.list({
-      part: ['contentDetails'],
+      part: ['contentDetails', 'snippet'],
       id: videoIds.slice(0, 50), // API max is 50
     });
 
-    const durations = new Map<string, number>();
+    const details = new Map<string, VideoDetails>();
     for (const video of response.data.items || []) {
       if (video.id && video.contentDetails?.duration) {
-        durations.set(video.id, parseISO8601Duration(video.contentDetails.duration));
+        details.set(video.id, {
+          durationSeconds: parseISO8601Duration(video.contentDetails.duration),
+          description: video.snippet?.description ?? '',
+        });
       }
     }
-    return durations;
+    return details;
   } catch (error) {
     // Log warning but don't throw - graceful degradation
-    console.warn('Failed to fetch video details for duration:', error);
+    console.warn('Failed to fetch video details:', error);
     return new Map();
   }
 }

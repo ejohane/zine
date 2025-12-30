@@ -363,17 +363,26 @@ async function pollSingleYouTubeSubscription(
     return { newItems: 0 };
   }
 
-  // Extract video IDs for duration lookup
+  // Extract video IDs for details lookup (duration + full description)
   const videoIds = videos.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
 
-  // Fetch durations for all videos in one batched call (1 quota unit)
-  const durations = await fetchVideoDetails(client, videoIds);
+  // Fetch video details (duration + full description) in one batched call (1 quota unit)
+  // Note: playlistItems.list truncates descriptions to ~160 chars, videos.list gives full description
+  const videoDetails = await fetchVideoDetails(client, videoIds);
 
-  // Enrich videos with duration data
-  const enrichedVideos = videos.map((v) => ({
-    ...v,
-    durationSeconds: durations.get(v.contentDetails?.videoId || ''),
-  }));
+  // Enrich videos with duration and full description from videos.list API
+  const enrichedVideos = videos.map((v) => {
+    const details = videoDetails.get(v.contentDetails?.videoId || '');
+    return {
+      ...v,
+      durationSeconds: details?.durationSeconds,
+      // Override truncated description with full description from videos.list
+      snippet: {
+        ...v.snippet,
+        description: details?.description ?? v.snippet?.description,
+      },
+    };
+  });
 
   // Filter out Shorts before processing
   // Videos with undefined duration (API error) are NOT filtered - fail-safe behavior

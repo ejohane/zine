@@ -683,16 +683,16 @@ describe('Polling Scheduler', () => {
       ];
 
       // video1 is 5 min (NOT a Short), short1 is 2 min (IS a Short - ≤180s)
-      const durations = new Map([
-        ['video1', 300], // 5 min - NOT a Short (>180s)
-        ['short1', 120], // 2 min - IS a Short (≤180s)
+      const videoDetails = new Map([
+        ['video1', { durationSeconds: 300, description: 'Long video description' }], // 5 min - NOT a Short (>180s)
+        ['short1', { durationSeconds: 120, description: 'Short description' }], // 2 min - IS a Short (≤180s)
       ]);
 
       mockTryAcquireLock.mockResolvedValue(true);
       mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
       mockDbQueryConnections.findFirst.mockResolvedValue(connection);
       mockFetchRecentVideos.mockResolvedValue(videos);
-      mockFetchVideoDetails.mockResolvedValue(durations);
+      mockFetchVideoDetails.mockResolvedValue(videoDetails);
       mockIngestItem.mockResolvedValue({ created: true });
 
       const env = createMockEnv();
@@ -724,16 +724,16 @@ describe('Polling Scheduler', () => {
         },
       ];
 
-      const durations = new Map([
-        ['short1', 60], // 1 min - IS a Short (≤180s)
-        ['short2', 150], // 2.5 min - IS a Short (≤180s)
+      const videoDetails = new Map([
+        ['short1', { durationSeconds: 60, description: 'Short 1 desc' }], // 1 min - IS a Short (≤180s)
+        ['short2', { durationSeconds: 150, description: 'Short 2 desc' }], // 2.5 min - IS a Short (≤180s)
       ]);
 
       mockTryAcquireLock.mockResolvedValue(true);
       mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
       mockDbQueryConnections.findFirst.mockResolvedValue(connection);
       mockFetchRecentVideos.mockResolvedValue(videos);
-      mockFetchVideoDetails.mockResolvedValue(durations);
+      mockFetchVideoDetails.mockResolvedValue(videoDetails);
 
       const env = createMockEnv();
       const ctx = createMockExecutionContext();
@@ -796,16 +796,16 @@ describe('Polling Scheduler', () => {
         },
       ];
 
-      const durations = new Map([
-        ['video180', 180], // IS a Short (≤180)
-        ['video181', 181], // NOT a Short (>180)
+      const videoDetails = new Map([
+        ['video180', { durationSeconds: 180, description: '180s video desc' }], // IS a Short (≤180)
+        ['video181', { durationSeconds: 181, description: '181s video desc' }], // NOT a Short (>180)
       ]);
 
       mockTryAcquireLock.mockResolvedValue(true);
       mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
       mockDbQueryConnections.findFirst.mockResolvedValue(connection);
       mockFetchRecentVideos.mockResolvedValue(videos);
-      mockFetchVideoDetails.mockResolvedValue(durations);
+      mockFetchVideoDetails.mockResolvedValue(videoDetails);
       mockIngestItem.mockResolvedValue({ created: true });
 
       const env = createMockEnv();

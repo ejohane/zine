@@ -266,19 +266,21 @@ async function fetchLatestYouTubeVideo(
     return null;
   }
 
-  // Fetch durations to filter out Shorts
+  // Fetch video details (duration + full description) to filter out Shorts
+  // Note: playlistItems.list truncates descriptions to ~160 chars, videos.list gives full description
   const videoIds = eligibleVideos
     .map((v) => v.contentDetails?.videoId)
     .filter((id): id is string => !!id);
 
-  const durations = await fetchVideoDetails(client, videoIds);
+  const videoDetails = await fetchVideoDetails(client, videoIds);
 
   // Find the first non-Short video (newest by upload order)
   for (const video of eligibleVideos) {
     const videoId = video.contentDetails?.videoId;
     if (!videoId) continue;
 
-    const duration = durations.get(videoId);
+    const details = videoDetails.get(videoId);
+    const duration = details?.durationSeconds;
 
     // If duration fetch failed, include the video (graceful degradation)
     // Otherwise, only include if it's longer than the Shorts threshold
@@ -288,7 +290,8 @@ async function fetchLatestYouTubeVideo(
         duration,
         title: video.snippet?.title,
       });
-      return convertToYouTubePlaylistItem(video);
+      // Pass the full description from videos.list API
+      return convertToYouTubePlaylistItem(video, details?.description);
     }
 
     fetchLogger.debug('Skipping Short', {
@@ -306,8 +309,14 @@ async function fetchLatestYouTubeVideo(
 /**
  * Convert googleapis Schema$PlaylistItem to our simplified YouTubePlaylistItem type
  * This handles the null vs undefined type differences between googleapis and our internal types
+ *
+ * @param item - The playlist item from YouTube API
+ * @param fullDescription - Optional full description from videos.list API (playlistItems truncates to ~160 chars)
  */
-function convertToYouTubePlaylistItem(item: youtube_v3.Schema$PlaylistItem): YouTubePlaylistItem {
+function convertToYouTubePlaylistItem(
+  item: youtube_v3.Schema$PlaylistItem,
+  fullDescription?: string
+): YouTubePlaylistItem {
   return {
     contentDetails: item.contentDetails
       ? {
@@ -317,7 +326,8 @@ function convertToYouTubePlaylistItem(item: youtube_v3.Schema$PlaylistItem): You
     snippet: item.snippet
       ? {
           title: item.snippet.title ?? undefined,
-          description: item.snippet.description ?? undefined,
+          // Use full description from videos.list if provided, otherwise fall back to truncated one
+          description: fullDescription ?? item.snippet.description ?? undefined,
           channelTitle: item.snippet.channelTitle ?? undefined,
           channelId: item.snippet.channelId ?? undefined,
           publishedAt: item.snippet.publishedAt ?? undefined,
