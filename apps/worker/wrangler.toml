@@ -6,18 +6,18 @@ compatibility_flags = ["nodejs_compat"]
 # KV namespace for webhook idempotency
 [[kv_namespaces]]
 binding = "WEBHOOK_IDEMPOTENCY"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "9b2d9ef82c02438ba13184bfc68c2d43"
 
 # KV namespace for OAuth state (CSRF protection)
 [[kv_namespaces]]
 binding = "OAUTH_STATE_KV"
-id = "REPLACE_WITH_OAUTH_STATE_KV_ID"
+id = "2101381b080942f9a7799583ccb2e096"
 
 # D1 Database binding (development)
 [[d1_databases]]
 binding = "DB"
 database_name = "zine-db-dev"
-database_id = "REPLACE_WITH_DEV_D1_DATABASE_ID"
+database_id = "2ce5331a-233c-48ec-9265-d04ecb539599"
 migrations_dir = "src/db/migrations"
 
 # Cron triggers for scheduled ingestion
@@ -36,6 +36,9 @@ name = "zine-worker-staging"
 [[env.staging.kv_namespaces]]
 binding = "WEBHOOK_IDEMPOTENCY"
 id = "abb1a04762cb4a129218d8c9651adf7c"
+[[env.staging.kv_namespaces]]
+binding = "OAUTH_STATE_KV"
+id = "acb7c409523d4ddeb7941ec2783ace9d"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "zine-db-staging"
@@ -49,11 +52,14 @@ ENVIRONMENT = "staging"
 [env.production]
 name = "zine-worker-production"
 routes = [
-  { pattern = "api.myzine.app", zone_name = "myzine.app" }
+  { pattern = "api.myzine.app/*", zone_name = "myzine.app" }
 ]
 [[env.production.kv_namespaces]]
 binding = "WEBHOOK_IDEMPOTENCY"
 id = "9937928f2eb54074bda5e035dac09c14"
+[[env.production.kv_namespaces]]
+binding = "OAUTH_STATE_KV"
+id = "c58624987cd94f3285ca7f62e5c2fe16"
 
 [[env.production.d1_databases]]
 binding = "DB"

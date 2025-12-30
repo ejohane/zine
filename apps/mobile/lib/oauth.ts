@@ -110,25 +110,26 @@ export type OAuthProvider = keyof typeof OAUTH_CONFIG;
 
 /**
  * Custom scheme redirect URI for OAuth callbacks.
- * Used in production builds.
+ * Used for Spotify in production builds.
  */
 export const REDIRECT_URI = 'zine://oauth/callback';
 
 /**
- * Returns the appropriate redirect URI based on environment.
+ * Returns the appropriate redirect URI based on provider.
  *
- * For Google OAuth with Expo Go, we need to use the reversed client ID scheme
- * that Google provides for iOS apps. This is the only way to get OAuth working
- * in Expo Go without a custom development build.
+ * For Google/YouTube OAuth on iOS, we MUST use the reversed client ID scheme
+ * that Google provides. This is required for both development and production.
+ * Format: com.googleusercontent.apps.{CLIENT_ID_PREFIX}:/oauth2redirect
  *
+ * For Spotify, we use our custom scheme: zine://oauth/callback
+ *
+ * @param provider - The OAuth provider ('YOUTUBE' or 'SPOTIFY')
  * @returns The redirect URI to use for OAuth flows
  */
-export function getRedirectUri(): string {
-  if (__DEV__) {
-    // For Expo Go development, we need to use a scheme that Google accepts.
-    // The iOS client ID from Google comes with a reversed client ID scheme
-    // Format: com.googleusercontent.apps.CLIENT_ID_PREFIX
-    // You can find this in Google Cloud Console under your iOS OAuth client
+export function getRedirectUri(provider?: OAuthProvider): string {
+  // For Google/YouTube, always use the reversed client ID scheme
+  // This is required by Google for iOS apps (both dev and production)
+  if (provider === 'YOUTUBE') {
     const clientId = process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '';
     if (clientId) {
       // Extract the part before .apps.googleusercontent.com and reverse it
@@ -139,8 +140,13 @@ export function getRedirectUri(): string {
         return `${reversedClientId}:/oauth2redirect`;
       }
     }
-    // Fallback to custom scheme
-    return AuthSession.makeRedirectUri({ scheme: 'zine' });
+  }
+
+  // For Spotify and fallback, use our custom scheme
+  if (__DEV__) {
+    const uri = AuthSession.makeRedirectUri({ scheme: 'zine' });
+    console.log('[OAuth] Dev redirect URI:', uri);
+    return uri;
   }
   return REDIRECT_URI;
 }
@@ -331,8 +337,8 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   await SecureStore.setItemAsync(getStateKey(provider), state);
 
   // STEP 4: Build auth URL (CLIENT-SIDE)
-  const redirectUri = getRedirectUri();
-  oauthLogger.debug('Using redirect URI', { redirectUri });
+  const redirectUri = getRedirectUri(provider);
+  oauthLogger.debug('Using redirect URI', { redirectUri, provider });
   const authUrl = new URL(config.authUrl);
   authUrl.searchParams.set('client_id', config.clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);

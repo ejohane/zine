@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "dev": "expo start -c",
+    "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c",
     "start": "expo start -c",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android -c",

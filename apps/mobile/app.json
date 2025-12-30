@@ -12,7 +12,14 @@
       "supportsTablet": true,
       "bundleIdentifier": "app.zine.mobile",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.973421703522-43taa7aemrl1l5kjo6bp5pddj0e58tsd"
+            ]
+          }
+        ]
       }
     },
     "android": {
