@@ -55,15 +55,10 @@ routes = [
 binding = "WEBHOOK_IDEMPOTENCY"
 id = "9937928f2eb54074bda5e035dac09c14"
 
-# Durable Object migration: Delete UserDO class that was previously deployed
-[[env.production.migrations]]
-tag = "v1-delete-user-do"
-deleted_classes = ["UserDO"]
-
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "zine-db-production"
-database_id = "9020d4fb-d780-4feb-bb6f-7c5a424f2835"
+database_id = "82911dea-5a6b-411b-ab4b-4145cb0c191d"
 migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"

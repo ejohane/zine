@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "build:ios": "bun run --cwd apps/mobile build:ios",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

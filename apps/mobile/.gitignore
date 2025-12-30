@@ -32,6 +32,16 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env.production
+.env.preview
+
+# build output
+/build
+
+# local credentials
+credentials.json
+/certs
+/credentials
 
 # typescript
 *.tsbuildinfo

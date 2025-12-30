@@ -17,6 +17,8 @@
       }
     },
     "production": {
+      "distribution": "internal",
+      "credentialsSource": "local",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.myzine.app"
       }
