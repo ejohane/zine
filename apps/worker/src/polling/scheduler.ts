@@ -28,6 +28,7 @@ import {
   getYouTubeClientForConnection,
   getChannelUploadsPlaylistId,
   fetchRecentVideos,
+  fetchVideoDetails,
   type YouTubeClient,
 } from '../providers/youtube';
 import { getSpotifyClientForConnection, getShowEpisodes } from '../providers/spotify';
@@ -52,6 +53,9 @@ const BATCH_SIZE = 50;
 
 /** Maximum videos/episodes to fetch per subscription poll */
 const MAX_ITEMS_PER_POLL = 10;
+
+/** YouTube Shorts are videos ≤ 3 minutes (180 seconds) as of 2024 */
+const SHORTS_DURATION_THRESHOLD = 180;
 
 // ============================================================================
 // Types
@@ -359,15 +363,58 @@ async function pollSingleYouTubeSubscription(
     return { newItems: 0 };
   }
 
+  // Extract video IDs for duration lookup
+  const videoIds = videos.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
+
+  // Fetch durations for all videos in one batched call (1 quota unit)
+  const durations = await fetchVideoDetails(client, videoIds);
+
+  // Enrich videos with duration data
+  const enrichedVideos = videos.map((v) => ({
+    ...v,
+    durationSeconds: durations.get(v.contentDetails?.videoId || ''),
+  }));
+
+  // Filter out Shorts before processing
+  // Videos with undefined duration (API error) are NOT filtered - fail-safe behavior
+  const nonShortVideos = enrichedVideos.filter((v) => {
+    if (v.durationSeconds === undefined) {
+      return true; // Graceful degradation - don't lose content
+    }
+    return v.durationSeconds > SHORTS_DURATION_THRESHOLD;
+  });
+
+  // Log filtering stats
+  const filteredCount = enrichedVideos.length - nonShortVideos.length;
+  if (filteredCount > 0) {
+    ytLogger.info('Filtered Shorts', {
+      filtered: filteredCount,
+      remaining: nonShortVideos.length,
+      name: sub.name,
+    });
+  }
+
+  // If all videos were Shorts, we're done
+  if (nonShortVideos.length === 0) {
+    ytLogger.info('All videos were Shorts, nothing to ingest', { name: sub.name });
+    await updateSubscriptionPolled(sub.id, db);
+    return { newItems: 0 };
+  }
+
   // Filter to new videos based on lastPolledAt
   const newVideos = sub.lastPolledAt
-    ? videos.filter((v) => {
+    ? nonShortVideos.filter((v) => {
         const publishedAt = v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0;
         return publishedAt > sub.lastPolledAt!;
       })
-    : videos.slice(0, 1); // First poll: only latest video
+    : nonShortVideos.slice(0, 1); // First poll: only latest video
 
-  ytLogger.info('Found videos', { total: videos.length, new: newVideos.length, name: sub.name });
+  ytLogger.info('Found videos', {
+    total: videos.length,
+    afterShortsFilter: nonShortVideos.length,
+    new: newVideos.length,
+    name: sub.name,
+  });
 
   // Ingest new items
   let newItemsCount = 0;

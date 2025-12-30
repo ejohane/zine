@@ -22,6 +22,7 @@ import { Provider } from '@zine/shared';
 import {
   getYouTubeClientForConnection,
   getChannelUploadsPlaylistId,
+  fetchVideoDetails,
   type YouTubeClient,
 } from '../providers/youtube';
 import { getSpotifyClientForConnection, getLatestEpisode, getShow } from '../providers/spotify';
@@ -33,6 +34,9 @@ import type { Database } from '../db';
 import { logger } from '../lib/logger';
 
 const fetchLogger = logger.child('initial-fetch');
+
+/** YouTube Shorts are videos ≤ 3 minutes (180 seconds) as of 2024 */
+const SHORTS_DURATION_THRESHOLD = 180;
 
 // ============================================================================
 // Types
@@ -217,8 +221,9 @@ async function fetchInitialYouTubeItem(
 /**
  * Fetch the single latest eligible YouTube video from a channel
  *
- * "Latest" is defined as the first public, already-published video in the
- * uploads playlist. We fetch a few items in case some are private/scheduled.
+ * "Latest" is defined as the first public, already-published, non-Short video
+ * in the uploads playlist. We fetch several items in case some are private,
+ * scheduled, or Shorts.
  *
  * @param client - Authenticated YouTube client
  * @param channelId - YouTube channel ID (starts with UC)
@@ -231,11 +236,11 @@ async function fetchLatestYouTubeVideo(
   // Get the uploads playlist ID for this channel
   const uploadsPlaylistId = await getChannelUploadsPlaylistId(client, channelId);
 
-  // Fetch a few recent videos (in case some are private/scheduled)
+  // Fetch more recent videos to account for private/scheduled/Shorts filtering
   const response = await client.api.playlistItems.list({
     part: ['snippet', 'contentDetails', 'status'],
     playlistId: uploadsPlaylistId,
-    maxResults: 5, // Fetch a few in case some are private/scheduled
+    maxResults: 10, // Fetch more to find a non-Short
   });
 
   const now = Date.now();
@@ -257,14 +262,45 @@ async function fetchLatestYouTubeVideo(
       return publishedAt <= now;
     }) || [];
 
-  // Return the first eligible video (newest by upload order), converting to our type
-  const video = eligibleVideos[0];
-  if (!video) {
+  if (eligibleVideos.length === 0) {
     return null;
   }
 
-  // Convert googleapis type to our simplified type (handles null vs undefined)
-  return convertToYouTubePlaylistItem(video);
+  // Fetch durations to filter out Shorts
+  const videoIds = eligibleVideos
+    .map((v) => v.contentDetails?.videoId)
+    .filter((id): id is string => !!id);
+
+  const durations = await fetchVideoDetails(client, videoIds);
+
+  // Find the first non-Short video (newest by upload order)
+  for (const video of eligibleVideos) {
+    const videoId = video.contentDetails?.videoId;
+    if (!videoId) continue;
+
+    const duration = durations.get(videoId);
+
+    // If duration fetch failed, include the video (graceful degradation)
+    // Otherwise, only include if it's longer than the Shorts threshold
+    if (duration === undefined || duration > SHORTS_DURATION_THRESHOLD) {
+      fetchLogger.debug('Selected non-Short video', {
+        videoId,
+        duration,
+        title: video.snippet?.title,
+      });
+      return convertToYouTubePlaylistItem(video);
+    }
+
+    fetchLogger.debug('Skipping Short', {
+      videoId,
+      duration,
+      title: video.snippet?.title,
+    });
+  }
+
+  // All videos were Shorts
+  fetchLogger.info('All eligible videos were Shorts', { channelId, count: eligibleVideos.length });
+  return null;
 }
 
 /**

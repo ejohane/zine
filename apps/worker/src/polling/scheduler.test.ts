@@ -45,11 +45,13 @@ vi.mock('../lib/rate-limiter', () => ({
 const mockGetYouTubeClientForConnection = vi.fn();
 const mockGetChannelUploadsPlaylistId = vi.fn();
 const mockFetchRecentVideos = vi.fn();
+const mockFetchVideoDetails = vi.fn();
 
 vi.mock('../providers/youtube', () => ({
   getYouTubeClientForConnection: (...args: unknown[]) => mockGetYouTubeClientForConnection(...args),
   getChannelUploadsPlaylistId: (...args: unknown[]) => mockGetChannelUploadsPlaylistId(...args),
   fetchRecentVideos: (...args: unknown[]) => mockFetchRecentVideos(...args),
+  fetchVideoDetails: (...args: unknown[]) => mockFetchVideoDetails(...args),
 }));
 
 // Mock Spotify provider
@@ -205,6 +207,7 @@ describe('Polling Scheduler', () => {
     mockGetYouTubeClientForConnection.mockResolvedValue({});
     mockGetChannelUploadsPlaylistId.mockResolvedValue('UUtest123');
     mockFetchRecentVideos.mockResolvedValue([]);
+    mockFetchVideoDetails.mockResolvedValue(new Map());
     mockGetSpotifyClientForConnection.mockResolvedValue({});
     mockGetShowEpisodes.mockResolvedValue([]);
     mockIngestItem.mockResolvedValue({ created: false });
@@ -652,6 +655,168 @@ describe('Polling Scheduler', () => {
 
       // lastPolledAt should be updated
       expect(mockDbUpdate).toHaveBeenCalled();
+    });
+  });
+
+  // ==========================================================================
+  // Shorts Filtering Tests
+  // ==========================================================================
+
+  describe('Shorts Filtering', () => {
+    it('should filter Shorts from mixed content', async () => {
+      // Setup: Mix of regular videos and Shorts with durations
+      const subscription = createMockSubscription({
+        provider: 'YOUTUBE',
+        lastPolledAt: null,
+      });
+      const connection = createMockConnection({ provider: 'YOUTUBE' });
+
+      const videos = [
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Long Video' },
+          contentDetails: { videoId: 'video1' },
+        },
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Short 1' },
+          contentDetails: { videoId: 'short1' },
+        },
+      ];
+
+      // video1 is 5 min (NOT a Short), short1 is 2 min (IS a Short - ≤180s)
+      const durations = new Map([
+        ['video1', 300], // 5 min - NOT a Short (>180s)
+        ['short1', 120], // 2 min - IS a Short (≤180s)
+      ]);
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue(videos);
+      mockFetchVideoDetails.mockResolvedValue(durations);
+      mockIngestItem.mockResolvedValue({ created: true });
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // First poll only ingests latest non-Short
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      expect(result.newItems).toBe(1);
+    });
+
+    it('should handle channel with only Shorts', async () => {
+      const subscription = createMockSubscription({
+        provider: 'YOUTUBE',
+        lastPolledAt: Date.now() - 86400000,
+      });
+      const connection = createMockConnection({ provider: 'YOUTUBE' });
+
+      const videos = [
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Short 1' },
+          contentDetails: { videoId: 'short1' },
+        },
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Short 2' },
+          contentDetails: { videoId: 'short2' },
+        },
+      ];
+
+      const durations = new Map([
+        ['short1', 60], // 1 min - IS a Short (≤180s)
+        ['short2', 150], // 2.5 min - IS a Short (≤180s)
+      ]);
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue(videos);
+      mockFetchVideoDetails.mockResolvedValue(durations);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // No items ingested since all were filtered
+      expect(mockIngestItem).not.toHaveBeenCalled();
+      expect(result.newItems).toBe(0);
+    });
+
+    it('should ingest all videos when duration fetch fails (graceful degradation)', async () => {
+      const subscription = createMockSubscription({
+        provider: 'YOUTUBE',
+        lastPolledAt: null,
+      });
+      const connection = createMockConnection({ provider: 'YOUTUBE' });
+
+      const videos = [
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Unknown Duration' },
+          contentDetails: { videoId: 'video1' },
+        },
+      ];
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue(videos);
+      mockFetchVideoDetails.mockResolvedValue(new Map()); // API failure
+      mockIngestItem.mockResolvedValue({ created: true });
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // Video should be ingested despite unknown duration (fail-safe)
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      expect(result.newItems).toBe(1);
+    });
+
+    it('should filter videos at exactly 180 seconds (3 min threshold)', async () => {
+      const subscription = createMockSubscription({
+        provider: 'YOUTUBE',
+        lastPolledAt: Date.now() - 86400000,
+      });
+      const connection = createMockConnection({ provider: 'YOUTUBE' });
+
+      const videos = [
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: 'Exactly 180s' },
+          contentDetails: { videoId: 'video180' },
+        },
+        {
+          snippet: { publishedAt: new Date().toISOString(), title: '181 seconds' },
+          contentDetails: { videoId: 'video181' },
+        },
+      ];
+
+      const durations = new Map([
+        ['video180', 180], // IS a Short (≤180)
+        ['video181', 181], // NOT a Short (>180)
+      ]);
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue(videos);
+      mockFetchVideoDetails.mockResolvedValue(durations);
+      mockIngestItem.mockResolvedValue({ created: true });
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // Only video181 should be ingested (>180s)
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      expect(result.newItems).toBe(1);
     });
   });
 
