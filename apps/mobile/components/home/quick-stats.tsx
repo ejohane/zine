@@ -11,17 +11,33 @@ import { BookmarkIcon, PlayIcon, SparklesIcon } from '@/components/icons';
 import type { Colors } from '@/constants/theme';
 import { Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 
-export interface QuickStatsProps {
-  colors: typeof Colors.light;
+export interface QuickStatsData {
+  savedCount: number;
+  inProgressCount: number;
+  thisWeekCount: number;
 }
 
-export function QuickStats({ colors }: QuickStatsProps) {
-  const stats = [
-    { label: 'Saved', value: '47', icon: <BookmarkIcon size={18} color={colors.primary} /> },
-    { label: 'In Progress', value: '8', icon: <PlayIcon size={18} color={ContentColors.video} /> },
+export interface QuickStatsProps {
+  colors: typeof Colors.light;
+  stats?: QuickStatsData;
+  isLoading?: boolean;
+}
+
+export function QuickStats({ colors, stats, isLoading = false }: QuickStatsProps) {
+  const displayStats = [
+    {
+      label: 'Saved',
+      value: isLoading ? '-' : String(stats?.savedCount ?? 0),
+      icon: <BookmarkIcon size={18} color={colors.primary} />,
+    },
+    {
+      label: 'In Progress',
+      value: isLoading ? '-' : String(stats?.inProgressCount ?? 0),
+      icon: <PlayIcon size={18} color={ContentColors.video} />,
+    },
     {
       label: 'This Week',
-      value: '12',
+      value: isLoading ? '-' : String(stats?.thisWeekCount ?? 0),
       icon: <SparklesIcon size={18} color={ContentColors.podcast} />,
     },
   ];
@@ -31,7 +47,7 @@ export function QuickStats({ colors }: QuickStatsProps) {
       entering={FadeInDown.delay(200).duration(400)}
       style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}
     >
-      {stats.map((stat) => (
+      {displayStats.map((stat) => (
         <View key={stat.label} style={styles.statItem}>
           <View style={[styles.statIcon, { backgroundColor: colors.background }]}>{stat.icon}</View>
           <View style={styles.statText}>

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
-import { Provider } from '@zine/shared';
+import { Provider, ProviderSchema } from '@zine/shared';
 import { sources } from '../../db/schema';
 
 // ============================================================================
@@ -32,9 +32,6 @@ export type SourceView = {
 // ============================================================================
 // Zod Schemas
 // ============================================================================
-
-// Provider enum schema (UPPERCASE values as per domain types)
-const ProviderSchema = z.enum(['YOUTUBE', 'SPOTIFY', 'SUBSTACK', 'RSS']);
 
 // Input schema for adding a source
 const AddSourceInputSchema = z.object({

@@ -18,7 +18,7 @@
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { youtube_v3 } from 'googleapis';
-import { Provider } from '@zine/shared';
+import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import {
   getYouTubeClientForConnection,
   getChannelUploadsPlaylistId,
@@ -32,11 +32,9 @@ import { subscriptions } from '../db/schema';
 import type { ProviderConnection } from '../lib/token-refresh';
 import type { Database } from '../db';
 import { logger } from '../lib/logger';
+import { parseSpotifyDate } from '../lib/timestamps';
 
 const fetchLogger = logger.child('initial-fetch');
-
-/** YouTube Shorts are videos ≤ 3 minutes (180 seconds) as of 2024 */
-const SHORTS_DURATION_THRESHOLD = 180;
 
 // ============================================================================
 // Types
@@ -284,7 +282,7 @@ async function fetchLatestYouTubeVideo(
 
     // If duration fetch failed, include the video (graceful degradation)
     // Otherwise, only include if it's longer than the Shorts threshold
-    if (duration === undefined || duration > SHORTS_DURATION_THRESHOLD) {
+    if (duration === undefined || duration > YOUTUBE_SHORTS_MAX_DURATION_SECONDS) {
       fetchLogger.debug('Selected non-Short video', {
         videoId,
         duration,
@@ -379,7 +377,7 @@ async function fetchInitialSpotifyItem(
   }
 
   // Check if episode is already released (not scheduled)
-  const releaseDate = parseSpotifyReleaseDate(episode.releaseDate);
+  const releaseDate = parseSpotifyDate(episode.releaseDate);
   if (releaseDate > Date.now()) {
     fetchLogger.info('Latest episode is scheduled, skipping', { showId });
     return false;
@@ -410,28 +408,4 @@ async function fetchInitialSpotifyItem(
   );
 
   return result.created;
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Parse Spotify's variable date format into Unix milliseconds
- *
- * Spotify release_date can be:
- * - YYYY (just year) → normalizes to YYYY-01-01
- * - YYYY-MM (year-month) → normalizes to YYYY-MM-01
- * - YYYY-MM-DD (full date) → used as-is
- */
-function parseSpotifyReleaseDate(dateStr: string): number {
-  // Normalize to YYYY-MM-DD format
-  const normalized =
-    dateStr.length === 4
-      ? `${dateStr}-01-01` // YYYY → YYYY-01-01
-      : dateStr.length === 7
-        ? `${dateStr}-01` // YYYY-MM → YYYY-MM-01
-        : dateStr; // YYYY-MM-DD → unchanged
-
-  return new Date(`${normalized}T00:00:00Z`).getTime();
 }

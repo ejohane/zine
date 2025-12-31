@@ -221,6 +221,49 @@ D1 is Cloudflare's managed SQLite database:
 - **Drizzle Integration**: First-class TypeScript ORM support
 - **Migrations**: Schema migrations via Drizzle Kit
 
+### Timestamp Format Standard
+
+**Standard: Unix Milliseconds (INTEGER)**
+
+All new database columns storing timestamps should use Unix milliseconds as INTEGER.
+
+```sql
+-- SQL default
+createdAt INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)
+```
+
+```typescript
+// TypeScript
+const timestamp = Date.now(); // Returns Unix milliseconds
+```
+
+**Why Unix milliseconds:**
+
+- Modern standard for APIs
+- JavaScript `Date.now()` returns milliseconds natively
+- D1/SQLite handles INTEGER efficiently (8 bytes, indexed well)
+- No timezone ambiguity
+
+**Legacy Tables (ISO8601 TEXT)**
+
+Some older tables use ISO8601 TEXT format and will be migrated in a future update:
+
+- `users.createdAt`, `users.updatedAt`
+- `items.createdAt`, `items.updatedAt`, `items.publishedAt`
+- `user_items.createdAt`, `user_items.updatedAt`, `user_items.ingestedAt`, etc.
+- `sources.createdAt`, `sources.updatedAt`, `sources.deletedAt`
+- `provider_items_seen.firstSeenAt`
+
+**Conversion Helpers**
+
+```typescript
+// ISO8601 to Unix ms
+const unixMs = new Date(isoString).getTime();
+
+// Unix ms to ISO8601
+const isoString = new Date(unixMs).toISOString();
+```
+
 ### tRPC Notes
 
 tRPC provides end-to-end type safety between client and server:

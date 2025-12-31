@@ -3,7 +3,13 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, desc, or, lt, isNotNull } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
-import { ContentType, type Provider, UserItemState } from '@zine/shared';
+import {
+  ContentType,
+  type Provider,
+  UserItemState,
+  ProviderSchema,
+  ContentTypeSchema,
+} from '@zine/shared';
 import { userItems, items } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 
@@ -103,10 +109,6 @@ function toItemView(row: {
 // ============================================================================
 // Zod Schemas
 // ============================================================================
-
-// Use UPPERCASE enum values to match @zine/shared enums
-const ProviderSchema = z.enum(['YOUTUBE', 'SPOTIFY', 'SUBSTACK', 'RSS']);
-const ContentTypeSchema = z.enum(['VIDEO', 'PODCAST', 'ARTICLE', 'POST']);
 
 const FilterSchema = z
   .object({

@@ -3,16 +3,20 @@ import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqli
 // ============================================================================
 // Users
 // ============================================================================
+// NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
+// See docs/zine-tech-stack.md for timestamp standard.
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(), // Clerk user ID
   email: text('email'),
-  createdAt: text('created_at').notNull(), // ISO8601
-  updatedAt: text('updated_at').notNull(),
+  createdAt: text('created_at').notNull(), // ISO8601 (legacy)
+  updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
 });
 
 // ============================================================================
 // Items (Canonical Content)
 // ============================================================================
+// NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
+// See docs/zine-tech-stack.md for timestamp standard.
 export const items = sqliteTable(
   'items',
   {
@@ -35,11 +39,11 @@ export const items = sqliteTable(
     // Metadata
     summary: text('summary'),
     duration: integer('duration'), // Seconds
-    publishedAt: text('published_at'), // ISO8601
+    publishedAt: text('published_at'), // ISO8601 (legacy)
 
     // System
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
+    createdAt: text('created_at').notNull(), // ISO8601 (legacy)
+    updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
   },
   (table) => [
     // Prevent duplicate content from same provider
@@ -50,6 +54,8 @@ export const items = sqliteTable(
 // ============================================================================
 // User Items (User's relationship to content)
 // ============================================================================
+// NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
+// See docs/zine-tech-stack.md for timestamp standard.
 export const userItems = sqliteTable(
   'user_items',
   {
@@ -64,23 +70,23 @@ export const userItems = sqliteTable(
     // State - stored as UPPERCASE to match UserItemState enum
     state: text('state').notNull(), // INBOX | BOOKMARKED | ARCHIVED
 
-    // Timestamps
-    ingestedAt: text('ingested_at').notNull(), // ISO8601
-    bookmarkedAt: text('bookmarked_at'),
-    archivedAt: text('archived_at'),
+    // Timestamps (ISO8601 legacy format)
+    ingestedAt: text('ingested_at').notNull(), // ISO8601 (legacy)
+    bookmarkedAt: text('bookmarked_at'), // ISO8601 (legacy)
+    archivedAt: text('archived_at'), // ISO8601 (legacy)
 
     // Progress tracking
     progressPosition: integer('progress_position'), // Seconds
     progressDuration: integer('progress_duration'), // Seconds
-    progressUpdatedAt: text('progress_updated_at'),
+    progressUpdatedAt: text('progress_updated_at'), // ISO8601 (legacy)
 
     // Consumption tracking
     isFinished: integer('is_finished', { mode: 'boolean' }).notNull().default(false),
-    finishedAt: text('finished_at'), // ISO8601, null when not finished
+    finishedAt: text('finished_at'), // ISO8601 (legacy), null when not finished
 
     // System
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
+    createdAt: text('created_at').notNull(), // ISO8601 (legacy)
+    updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
   },
   (table) => [
     // Prevent duplicate user-item relationships
@@ -97,6 +103,8 @@ export const userItems = sqliteTable(
 // ============================================================================
 // Sources (User subscriptions)
 // ============================================================================
+// NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
+// See docs/zine-tech-stack.md for timestamp standard.
 export const sources = sqliteTable(
   'sources',
   {
@@ -111,10 +119,10 @@ export const sources = sqliteTable(
     feedUrl: text('feed_url').notNull(), // Actual subscription URL
     name: text('name').notNull(),
 
-    // System
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    deletedAt: text('deleted_at'), // Soft delete
+    // System (ISO8601 legacy format)
+    createdAt: text('created_at').notNull(), // ISO8601 (legacy)
+    updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
+    deletedAt: text('deleted_at'), // ISO8601 (legacy), soft delete
   },
   (table) => [
     // Prevent duplicate subscriptions (same user, same provider, same feed)
@@ -129,6 +137,7 @@ export const sources = sqliteTable(
 // Provider Connections (OAuth tokens per provider)
 // ============================================================================
 // Stores encrypted OAuth credentials for connected providers (YouTube, Spotify)
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const providerConnections = sqliteTable(
   'provider_connections',
   {
@@ -160,6 +169,7 @@ export const providerConnections = sqliteTable(
 // ============================================================================
 // Subscriptions (User subscriptions to specific channels/shows)
 // ============================================================================
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const subscriptions = sqliteTable(
   'subscriptions',
   {
@@ -178,16 +188,16 @@ export const subscriptions = sqliteTable(
 
     // Polling metadata
     totalItems: integer('total_items').default(0), // Total videos/episodes (cached)
-    lastPublishedAt: integer('last_published_at'), // Timestamp of newest item
-    lastPolledAt: integer('last_polled_at'), // Last successful poll
+    lastPublishedAt: integer('last_published_at'), // Unix ms
+    lastPolledAt: integer('last_polled_at'), // Unix ms
     pollIntervalSeconds: integer('poll_interval_seconds').default(3600), // Polling frequency
 
     // Status
     status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | DISCONNECTED | UNSUBSCRIBED
 
-    // Timestamps (Unix ms)
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
+    // Timestamps
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
   },
   (table) => [
     // Prevent duplicate subscriptions
@@ -205,6 +215,7 @@ export const subscriptions = sqliteTable(
 // ============================================================================
 // Subscription Items (Track which items came from which subscription)
 // ============================================================================
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const subscriptionItems = sqliteTable(
   'subscription_items',
   {
@@ -216,8 +227,8 @@ export const subscriptionItems = sqliteTable(
       .notNull()
       .references(() => items.id),
     providerItemId: text('provider_item_id').notNull(), // YouTube video ID or Spotify episode ID
-    publishedAt: integer('published_at'), // When item was published (Unix ms)
-    fetchedAt: integer('fetched_at').notNull(), // When we fetched it (Unix ms)
+    publishedAt: integer('published_at'), // Unix ms
+    fetchedAt: integer('fetched_at').notNull(), // Unix ms
   },
   (table) => [
     // Prevent duplicate tracking
@@ -234,6 +245,8 @@ export const subscriptionItems = sqliteTable(
 // ============================================================================
 // This table is CRITICAL for preventing duplicate inbox items during ingestion.
 // See: docs/zine-ingestion-pipeline.md
+// NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
+// See docs/zine-tech-stack.md for timestamp standard.
 export const providerItemsSeen = sqliteTable(
   'provider_items_seen',
   {
@@ -244,7 +257,7 @@ export const providerItemsSeen = sqliteTable(
     provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | SUBSTACK | RSS
     providerItemId: text('provider_item_id').notNull(), // External item ID
     sourceId: text('source_id').references(() => sources.id), // Which source ingested this
-    firstSeenAt: text('first_seen_at').notNull(), // ISO8601
+    firstSeenAt: text('first_seen_at').notNull(), // ISO8601 (legacy)
   },
   (table) => [
     // Idempotency key - prevents re-ingesting the same item for a user

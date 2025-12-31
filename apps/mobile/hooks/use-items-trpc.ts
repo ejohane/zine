@@ -23,6 +23,141 @@ export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
 export type UIProvider = 'youtube' | 'spotify' | 'rss' | 'substack';
 
 // ============================================================================
+// Optimistic Update Types
+// ============================================================================
+
+/** Type alias for tRPC utils */
+type TrpcUtils = ReturnType<typeof trpc.useUtils>;
+
+/** Inbox/Library query data type */
+type ListQueryData = ReturnType<TrpcUtils['items']['inbox']['getData']>;
+
+/** Single item query data type */
+type ItemQueryData = ReturnType<TrpcUtils['items']['get']['getData']>;
+
+/** Extract item type from list query */
+type ListItem = NonNullable<ListQueryData>['items'][number];
+
+/** Context type for optimistic mutation rollback */
+type OptimisticContext = {
+  previousInbox?: ListQueryData;
+  previousLibrary?: ListQueryData;
+  previousItem?: ItemQueryData;
+};
+
+// ============================================================================
+// Optimistic Update Factory
+// ============================================================================
+
+/**
+ * Factory function to create optimistic mutation config
+ *
+ * Reduces boilerplate for mutations that need:
+ * - Cancel queries before mutation
+ * - Snapshot previous data for rollback
+ * - Optimistically update cache
+ * - Rollback on error
+ * - Invalidate queries on completion
+ *
+ * @param utils - tRPC utils from useUtils()
+ * @param options - Configuration for the optimistic update
+ * @returns Mutation config object with onMutate, onError, and onSettled handlers
+ *
+ * @example
+ * const bookmarkMutation = trpc.items.bookmark.useMutation(
+ *   createOptimisticConfig(utils, {
+ *     updateInbox: (items, input) => items.filter(item => item.id !== input.id),
+ *     updateSingleItem: (item) => ({
+ *       ...item,
+ *       state: UserItemState.BOOKMARKED,
+ *       bookmarkedAt: new Date().toISOString(),
+ *     }),
+ *   })
+ * );
+ */
+function createOptimisticConfig<TInput extends { id: string }>(
+  utils: TrpcUtils,
+  options: {
+    /** Transform inbox items (return filtered/mapped items) */
+    updateInbox?: (items: ListItem[], input: TInput) => ListItem[];
+    /** Transform library items (return filtered/mapped items) */
+    updateLibrary?: (items: ListItem[], input: TInput) => ListItem[];
+    /** Transform single item cache */
+    updateSingleItem?: (
+      item: NonNullable<ItemQueryData>,
+      input: TInput
+    ) => NonNullable<ItemQueryData>;
+  }
+) {
+  return {
+    onMutate: async (input: TInput): Promise<OptimisticContext> => {
+      // Cancel outgoing queries to prevent race conditions
+      const cancellations: Promise<void>[] = [utils.items.home.cancel()];
+      if (options.updateInbox) cancellations.push(utils.items.inbox.cancel());
+      if (options.updateLibrary) cancellations.push(utils.items.library.cancel());
+      if (options.updateSingleItem) cancellations.push(utils.items.get.cancel({ id: input.id }));
+      await Promise.all(cancellations);
+
+      // Snapshot previous values for rollback
+      const context: OptimisticContext = {};
+
+      if (options.updateInbox) {
+        context.previousInbox = utils.items.inbox.getData();
+        utils.items.inbox.setData(undefined, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: options.updateInbox!(old.items, input),
+          };
+        });
+      }
+
+      if (options.updateLibrary) {
+        context.previousLibrary = utils.items.library.getData();
+        utils.items.library.setData(undefined, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: options.updateLibrary!(old.items, input),
+          };
+        });
+      }
+
+      if (options.updateSingleItem) {
+        context.previousItem = utils.items.get.getData({ id: input.id });
+        utils.items.get.setData({ id: input.id }, (old) => {
+          if (!old) return old;
+          return options.updateSingleItem!(old, input);
+        });
+      }
+
+      return context;
+    },
+    onError: (_err: unknown, vars: TInput, context: OptimisticContext | undefined) => {
+      // Rollback on error
+      if (context?.previousInbox) {
+        utils.items.inbox.setData(undefined, context.previousInbox);
+      }
+      if (context?.previousLibrary) {
+        utils.items.library.setData(undefined, context.previousLibrary);
+      }
+      if (context?.previousItem) {
+        utils.items.get.setData({ id: vars.id }, context.previousItem);
+      }
+    },
+    onSettled: (_data: unknown, _err: unknown, vars: TInput) => {
+      // Refetch after mutation completes (success or error)
+      utils.items.inbox.invalidate();
+      utils.items.library.invalidate();
+      utils.items.home.invalidate();
+      if (options.updateSingleItem) {
+        utils.items.get.invalidate({ id: vars.id });
+      }
+    },
+  };
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -219,53 +354,16 @@ export function useItem(id: string) {
 export function useBookmarkItem() {
   const utils = trpc.useUtils();
 
-  return trpc.items.bookmark.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel outgoing queries to prevent race conditions
-      await Promise.all([utils.items.inbox.cancel(), utils.items.get.cancel({ id })]);
-
-      // Snapshot previous values for rollback
-      const previousInbox = utils.items.inbox.getData();
-      const previousItem = utils.items.get.getData({ id });
-
-      // Optimistically remove item from inbox
-      utils.items.inbox.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.filter((item) => item.id !== id),
-        };
-      });
-
-      // Optimistically update single item cache to show bookmarked state
-      utils.items.get.setData({ id }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          state: UserItemState.BOOKMARKED,
-          bookmarkedAt: new Date().toISOString(),
-        };
-      });
-
-      return { previousInbox, previousItem };
-    },
-    onError: (_err, vars, context) => {
-      // Rollback on error
-      if (context?.previousInbox) {
-        utils.items.inbox.setData(undefined, context.previousInbox);
-      }
-      if (context?.previousItem) {
-        utils.items.get.setData({ id: vars.id }, context.previousItem);
-      }
-    },
-    onSettled: (_data, _err, vars) => {
-      // Refetch after mutation completes (success or error)
-      utils.items.inbox.invalidate();
-      utils.items.library.invalidate();
-      utils.items.home.invalidate();
-      utils.items.get.invalidate({ id: vars.id });
-    },
-  });
+  return trpc.items.bookmark.useMutation(
+    createOptimisticConfig(utils, {
+      updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
+      updateSingleItem: (item) => ({
+        ...item,
+        state: UserItemState.BOOKMARKED,
+        bookmarkedAt: new Date().toISOString(),
+      }),
+    })
+  );
 }
 
 /**
@@ -291,51 +389,12 @@ export function useBookmarkItem() {
 export function useArchiveItem() {
   const utils = trpc.useUtils();
 
-  return trpc.items.archive.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel outgoing queries to prevent race conditions
-      await Promise.all([utils.items.inbox.cancel(), utils.items.library.cancel()]);
-
-      // Snapshot previous values for rollback
-      const previousInbox = utils.items.inbox.getData();
-      const previousLibrary = utils.items.library.getData();
-
-      // Optimistically remove item from inbox
-      utils.items.inbox.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.filter((item) => item.id !== id),
-        };
-      });
-
-      // Optimistically remove item from library
-      utils.items.library.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.filter((item) => item.id !== id),
-        };
-      });
-
-      return { previousInbox, previousLibrary };
-    },
-    onError: (_err, _vars, context) => {
-      // Rollback on error
-      if (context?.previousInbox) {
-        utils.items.inbox.setData(undefined, context.previousInbox);
-      }
-      if (context?.previousLibrary) {
-        utils.items.library.setData(undefined, context.previousLibrary);
-      }
-    },
-    onSettled: () => {
-      // Refetch after mutation completes (success or error)
-      utils.items.inbox.invalidate();
-      utils.items.library.invalidate();
-      utils.items.home.invalidate();
-    },
-  });
+  return trpc.items.archive.useMutation(
+    createOptimisticConfig(utils, {
+      updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
+      updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
+    })
+  );
 }
 
 /**
@@ -361,53 +420,16 @@ export function useArchiveItem() {
 export function useUnbookmarkItem() {
   const utils = trpc.useUtils();
 
-  return trpc.items.unbookmark.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel outgoing queries to prevent race conditions
-      await Promise.all([utils.items.library.cancel(), utils.items.get.cancel({ id })]);
-
-      // Snapshot previous values for rollback
-      const previousLibrary = utils.items.library.getData();
-      const previousItem = utils.items.get.getData({ id });
-
-      // Optimistically remove item from library
-      utils.items.library.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.filter((item) => item.id !== id),
-        };
-      });
-
-      // Optimistically update single item cache to show inbox state
-      utils.items.get.setData({ id }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          state: UserItemState.INBOX,
-          bookmarkedAt: null,
-        };
-      });
-
-      return { previousLibrary, previousItem };
-    },
-    onError: (_err, vars, context) => {
-      // Rollback on error
-      if (context?.previousLibrary) {
-        utils.items.library.setData(undefined, context.previousLibrary);
-      }
-      if (context?.previousItem) {
-        utils.items.get.setData({ id: vars.id }, context.previousItem);
-      }
-    },
-    onSettled: (_data, _err, vars) => {
-      // Refetch after mutation completes
-      utils.items.inbox.invalidate();
-      utils.items.library.invalidate();
-      utils.items.home.invalidate();
-      utils.items.get.invalidate({ id: vars.id });
-    },
-  });
+  return trpc.items.unbookmark.useMutation(
+    createOptimisticConfig(utils, {
+      updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
+      updateSingleItem: (item) => ({
+        ...item,
+        state: UserItemState.INBOX,
+        bookmarkedAt: null,
+      }),
+    })
+  );
 }
 
 /**
@@ -433,86 +455,27 @@ export function useUnbookmarkItem() {
 export function useToggleFinished() {
   const utils = trpc.useUtils();
 
-  return trpc.items.toggleFinished.useMutation({
-    onMutate: async ({ id }) => {
-      // Cancel outgoing queries to prevent race conditions
-      await Promise.all([
-        utils.items.inbox.cancel(),
-        utils.items.library.cancel(),
-        utils.items.get.cancel({ id }),
-      ]);
+  // Helper to toggle finished state on an item
+  const toggleFinished = <T extends { id: string; isFinished: boolean; finishedAt: string | null }>(
+    item: T,
+    targetId: string
+  ): T => {
+    if (item.id !== targetId) return item;
+    const now = new Date().toISOString();
+    return {
+      ...item,
+      isFinished: !item.isFinished,
+      finishedAt: item.isFinished ? null : now,
+    };
+  };
 
-      // Snapshot previous values for rollback
-      const previousInbox = utils.items.inbox.getData();
-      const previousLibrary = utils.items.library.getData();
-      const previousItem = utils.items.get.getData({ id });
-
-      const now = new Date().toISOString();
-
-      // Helper to toggle finished state on an item
-      const toggleItemFinished = <
-        T extends { id: string; isFinished: boolean; finishedAt: string | null },
-      >(
-        item: T
-      ): T => {
-        if (item.id !== id) return item;
-        return {
-          ...item,
-          isFinished: !item.isFinished,
-          finishedAt: item.isFinished ? null : now,
-        };
-      };
-
-      // Optimistically update inbox
-      utils.items.inbox.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.map(toggleItemFinished),
-        };
-      });
-
-      // Optimistically update library
-      utils.items.library.setData(undefined, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          items: old.items.map(toggleItemFinished),
-        };
-      });
-
-      // Optimistically update single item cache
-      utils.items.get.setData({ id }, (old) => {
-        if (!old) return old;
-        return {
-          ...old,
-          isFinished: !old.isFinished,
-          finishedAt: old.isFinished ? null : now,
-        };
-      });
-
-      return { previousInbox, previousLibrary, previousItem };
-    },
-    onError: (_err, vars, context) => {
-      // Rollback on error
-      if (context?.previousInbox) {
-        utils.items.inbox.setData(undefined, context.previousInbox);
-      }
-      if (context?.previousLibrary) {
-        utils.items.library.setData(undefined, context.previousLibrary);
-      }
-      if (context?.previousItem) {
-        utils.items.get.setData({ id: vars.id }, context.previousItem);
-      }
-    },
-    onSettled: (_data, _err, vars) => {
-      // Refetch after mutation completes
-      utils.items.inbox.invalidate();
-      utils.items.library.invalidate();
-      utils.items.home.invalidate();
-      utils.items.get.invalidate({ id: vars.id });
-    },
-  });
+  return trpc.items.toggleFinished.useMutation(
+    createOptimisticConfig(utils, {
+      updateInbox: (items, { id }) => items.map((item) => toggleFinished(item, id)),
+      updateLibrary: (items, { id }) => items.map((item) => toggleFinished(item, id)),
+      updateSingleItem: (item, { id }) => toggleFinished(item, id),
+    })
+  );
 }
 
 /**

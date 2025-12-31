@@ -6,6 +6,9 @@ export { ArticleIcon } from './article-icon';
 export { HeadphonesIcon } from './headphones-icon';
 export { VideoIcon } from './video-icon';
 
+// Selection icons
+export { CheckboxIcon } from './checkbox-icon';
+
 // Navigation icons
 export { ChevronRightIcon } from './chevron-right-icon';
 

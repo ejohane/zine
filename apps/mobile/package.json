@@ -5,11 +5,12 @@
   "scripts": {
     "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c",
     "start": "expo start -c",
-    "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android -c",
     "ios": "expo start --ios -c",
     "web": "expo start --web -c",
     "lint": "expo lint",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
     "build:ios:preview": "dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive"
   },
   "dependencies": {
@@ -61,12 +62,16 @@
   },
   "devDependencies": {
     "@testing-library/react-hooks": "^8.0.1",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "jest": "^30.2.0",
+    "jest-environment-jsdom": "^30.2.0",
     "react-test-renderer": "19.0.0",
+    "ts-jest": "^29.4.6",
     "typescript": "~5.9.2"
   },
   "private": true

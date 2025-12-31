@@ -6,7 +6,7 @@
 
 export { PressableScale, type PressableScaleProps } from './pressable-scale';
 export { SectionHeader, type SectionHeaderProps } from './section-header';
-export { QuickStats, type QuickStatsProps } from './quick-stats';
+export { QuickStats, type QuickStatsProps, type QuickStatsData } from './quick-stats';
 export { FeaturedCard, type FeaturedCardProps, type FeaturedContentItem } from './featured-card';
 export {
   ContentCard,

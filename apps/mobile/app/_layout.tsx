@@ -35,7 +35,6 @@ export default function RootLayout() {
                     name="item/[id]"
                     options={{ headerShown: true, headerBackTitle: '' }}
                   />
-                  <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
                 </Stack>
                 <StatusBar style="auto" />
               </ToastProvider>

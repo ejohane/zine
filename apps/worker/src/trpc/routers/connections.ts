@@ -16,16 +16,12 @@ import { encrypt, decrypt } from '../../lib/crypto';
 import { providerConnections, subscriptions } from '../../db/schema';
 import type { Bindings } from '../../types';
 import { authLogger } from '../../lib/logger';
+import type { Provider } from '@zine/shared';
+import { ProviderSchema } from '@zine/shared';
 
 // ============================================================================
 // Zod Schemas
 // ============================================================================
-
-/**
- * Supported OAuth providers
- */
-export const ProviderSchema = z.enum(['YOUTUBE', 'SPOTIFY']);
-export type Provider = z.infer<typeof ProviderSchema>;
 
 /**
  * Input schema for registering OAuth state
