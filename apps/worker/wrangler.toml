@@ -24,6 +24,14 @@ migrations_dir = "src/db/migrations"
 [triggers]
 crons = ["0 * * * *"]  # Run every hour
 
+# Observability settings
+[observability]
+[observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
 # Development environment vars
 [vars]
 ENVIRONMENT = "development"
@@ -47,6 +55,14 @@ migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
+[env.staging.triggers]
+crons = ["0 * * * *"]  # Run every hour
+[env.staging.observability]
+[env.staging.observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
 
 # Production environment
 [env.production]
@@ -69,6 +85,14 @@ migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
+[env.production.triggers]
+crons = ["0 * * * *"]  # Run every hour
+[env.production.observability]
+[env.production.observability.logs]
+enabled = false
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
 
 # ============================================================================
 # Required Secrets (set via `wrangler secret put <NAME>`)

@@ -5,6 +5,7 @@ import { useQueryErrorResetBoundary } from '@tanstack/react-query';
 import { ErrorBoundary } from './error-boundary';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { isNetworkError, getErrorMessage } from '@/lib/error-utils';
 
 interface QueryErrorBoundaryProps {
   children: ReactNode;
@@ -12,59 +13,6 @@ interface QueryErrorBoundaryProps {
   queryKey?: unknown[];
   /** Custom fallback message for errors */
   fallbackMessage?: string;
-}
-
-/**
- * Detects if an error is network-related
- */
-function isNetworkError(error: Error): boolean {
-  const networkErrorMessages = [
-    'network request failed',
-    'failed to fetch',
-    'network error',
-    'net::err',
-    'timeout',
-    'econnrefused',
-    'enotfound',
-    'unable to resolve host',
-    'no internet connection',
-    'offline',
-  ];
-
-  const message = error.message?.toLowerCase() ?? '';
-  const name = error.name?.toLowerCase() ?? '';
-
-  // Check error message
-  if (networkErrorMessages.some((pattern) => message.includes(pattern))) {
-    return true;
-  }
-
-  // Check error name
-  if (name === 'typeerror' && message.includes('fetch')) {
-    return true;
-  }
-
-  // Check for AbortError (request timeout)
-  if (name === 'aborterror') {
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Get user-friendly error message based on error type
- */
-function getErrorMessage(error: Error | null, fallbackMessage?: string): string {
-  if (!error) {
-    return fallbackMessage ?? 'An unexpected error occurred';
-  }
-
-  if (isNetworkError(error)) {
-    return 'Unable to connect. Please check your internet connection and try again.';
-  }
-
-  return fallbackMessage ?? error.message ?? 'An unexpected error occurred';
 }
 
 /**

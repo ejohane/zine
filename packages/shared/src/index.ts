@@ -3,36 +3,10 @@
  */
 
 // Domain types and enums
-export {
-  ContentType,
-  Provider,
-  UserItemState,
-  SubscriptionStatus,
-  ProviderConnectionStatus,
-  type Item,
-  type UserItem,
-  type Source,
-  isContentType,
-  isProvider,
-  isUserItemState,
-  isSubscriptionStatus,
-  isProviderConnectionStatus,
-} from './types/domain';
+export { ContentType, Provider, UserItemState } from './types/domain';
 
 // Constants
-export { ZINE_VERSION } from './constants';
+export { ZINE_VERSION, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from './constants';
 
-// Schemas
-export {
-  ContentTypeSchema,
-  ProviderSchema,
-  UserItemStateSchema,
-  SubscriptionStatusSchema,
-  ProviderConnectionStatusSchema,
-  ItemSchema,
-  UserItemSchema,
-  SourceSchema,
-  type ItemInput,
-  type UserItemInput,
-  type SourceInput,
-} from './schemas';
+// Schemas (Zod validation for tRPC input)
+export { ContentTypeSchema, ProviderSchema, SubscriptionStatusSchema } from './schemas';

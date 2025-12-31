@@ -15,28 +15,22 @@
  */
 
 import { and, eq, or, asc, isNull, inArray, sql } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { Provider } from '@zine/shared';
 import { drizzle } from 'drizzle-orm/d1';
-import type { youtube_v3 } from 'googleapis';
 import * as schema from '../db/schema';
 import { subscriptions, providerConnections } from '../db/schema';
 import { tryAcquireLock, releaseLock } from '../lib/locks';
 import { pollLogger } from '../lib/logger';
 import { isRateLimited } from '../lib/rate-limiter';
-import {
-  getYouTubeClientForConnection,
-  getChannelUploadsPlaylistId,
-  fetchRecentVideos,
-  fetchVideoDetails,
-  type YouTubeClient,
-} from '../providers/youtube';
-import { getSpotifyClientForConnection, getShowEpisodes } from '../providers/spotify';
-import { ingestItem } from '../ingestion/processor';
-import { transformYouTubeVideo, transformSpotifyEpisode } from '../ingestion/transformers';
 import type { Bindings } from '../types';
-import type { ProviderConnection } from '../lib/token-refresh';
-import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
+import type {
+  Subscription,
+  DrizzleDB,
+  BatchResult,
+  ProviderBatchConfig,
+  ProviderConnectionRow,
+} from './types';
+import { youtubeProviderConfig } from './youtube-poller';
+import { spotifyProviderConfig } from './spotify-poller';
 
 // ============================================================================
 // Constants
@@ -50,12 +44,6 @@ const POLL_LOCK_TTL = 900;
 
 /** Maximum subscriptions to process per cron run */
 const BATCH_SIZE = 50;
-
-/** Maximum videos/episodes to fetch per subscription poll */
-const MAX_ITEMS_PER_POLL = 10;
-
-/** YouTube Shorts are videos ≤ 3 minutes (180 seconds) as of 2024 */
-const SHORTS_DURATION_THRESHOLD = 180;
 
 // ============================================================================
 // Types
@@ -73,43 +61,6 @@ export interface PollResult {
   processed?: number;
   /** Number of new items ingested */
   newItems?: number;
-}
-
-/**
- * Result of processing a provider batch
- */
-interface BatchResult {
-  processed: number;
-  newItems: number;
-}
-
-/**
- * Subscription row from database
- */
-type Subscription = typeof subscriptions.$inferSelect;
-
-/**
- * Database type with schema
- */
-type DrizzleDB = DrizzleD1Database<typeof schema>;
-
-/**
- * Provider batch configuration for the generic batch processor.
- * Encapsulates provider-specific behavior for client creation and polling.
- */
-interface ProviderBatchConfig<TClient> {
-  /** Provider identifier for logging and rate limiting */
-  provider: 'YOUTUBE' | 'SPOTIFY';
-  /** Create an API client from a provider connection */
-  getClient: (connection: ProviderConnection, env: Bindings) => Promise<TClient>;
-  /** Poll a single subscription and return new item count */
-  pollSingle: (
-    sub: Subscription,
-    client: TClient,
-    userId: string,
-    env: Bindings,
-    db: DrizzleDB
-  ) => Promise<{ newItems: number }>;
 }
 
 // ============================================================================
@@ -177,8 +128,8 @@ export async function pollSubscriptions(
 
     // 4. Process each provider's batch in parallel
     const [ytResult, spResult] = await Promise.all([
-      processYouTubeBatch(youtube, env, db),
-      processSpotifyBatch(spotify, env, db),
+      processProviderBatch(youtube, youtubeProviderConfig, env, db),
+      processProviderBatch(spotify, spotifyProviderConfig, env, db),
     ]);
 
     const totalProcessed = ytResult.processed + spResult.processed;
@@ -270,7 +221,7 @@ async function processProviderBatch<TClient>(
 
     try {
       // Create provider client with valid token
-      const client = await config.getClient(connection as ProviderConnection, env);
+      const client = await config.getClient(connection as ProviderConnectionRow, env);
 
       // Process each subscription for this user
       for (const sub of userSubs) {
@@ -306,285 +257,6 @@ async function processProviderBatch<TClient>(
   }
 
   return { processed, newItems };
-}
-
-// ============================================================================
-// YouTube Batch Processing
-// ============================================================================
-
-/**
- * Process a batch of YouTube subscriptions.
- *
- * Uses the generic batch processor with YouTube-specific configuration.
- */
-async function processYouTubeBatch(
-  subs: Subscription[],
-  env: Bindings,
-  db: DrizzleDB
-): Promise<BatchResult> {
-  return processProviderBatch(
-    subs,
-    {
-      provider: 'YOUTUBE',
-      getClient: (connection, env) =>
-        getYouTubeClientForConnection(
-          connection,
-          env as Parameters<typeof getYouTubeClientForConnection>[1]
-        ),
-      pollSingle: pollSingleYouTubeSubscription,
-    },
-    env,
-    db
-  );
-}
-
-/**
- * Poll a single YouTube subscription for new videos.
- */
-async function pollSingleYouTubeSubscription(
-  sub: Subscription,
-  client: YouTubeClient,
-  userId: string,
-  env: Bindings,
-  db: DrizzleDB
-): Promise<{ newItems: number }> {
-  const ytLogger = pollLogger.child('youtube');
-  ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
-
-  // Get the channel's uploads playlist
-  const uploadsPlaylistId = await getChannelUploadsPlaylistId(client, sub.providerChannelId);
-
-  // Fetch recent videos
-  const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
-
-  if (videos.length === 0) {
-    ytLogger.info('No videos found', { name: sub.name });
-    await updateSubscriptionPolled(sub.id, db);
-    return { newItems: 0 };
-  }
-
-  // Extract video IDs for details lookup (duration + full description)
-  const videoIds = videos.map((v) => v.contentDetails?.videoId).filter((id): id is string => !!id);
-
-  // Fetch video details (duration + full description) in one batched call (1 quota unit)
-  // Note: playlistItems.list truncates descriptions to ~160 chars, videos.list gives full description
-  const videoDetails = await fetchVideoDetails(client, videoIds);
-
-  // Enrich videos with duration and full description from videos.list API
-  const enrichedVideos = videos.map((v) => {
-    const details = videoDetails.get(v.contentDetails?.videoId || '');
-    return {
-      ...v,
-      durationSeconds: details?.durationSeconds,
-      // Override truncated description with full description from videos.list
-      snippet: {
-        ...v.snippet,
-        description: details?.description ?? v.snippet?.description,
-      },
-    };
-  });
-
-  // Filter out Shorts before processing
-  // Videos with undefined duration (API error) are NOT filtered - fail-safe behavior
-  const nonShortVideos = enrichedVideos.filter((v) => {
-    if (v.durationSeconds === undefined) {
-      return true; // Graceful degradation - don't lose content
-    }
-    return v.durationSeconds > SHORTS_DURATION_THRESHOLD;
-  });
-
-  // Log filtering stats
-  const filteredCount = enrichedVideos.length - nonShortVideos.length;
-  if (filteredCount > 0) {
-    ytLogger.info('Filtered Shorts', {
-      filtered: filteredCount,
-      remaining: nonShortVideos.length,
-      name: sub.name,
-    });
-  }
-
-  // If all videos were Shorts, we're done
-  if (nonShortVideos.length === 0) {
-    ytLogger.info('All videos were Shorts, nothing to ingest', { name: sub.name });
-    await updateSubscriptionPolled(sub.id, db);
-    return { newItems: 0 };
-  }
-
-  // Filter to new videos based on lastPolledAt
-  const newVideos = sub.lastPolledAt
-    ? nonShortVideos.filter((v) => {
-        const publishedAt = v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0;
-        return publishedAt > sub.lastPolledAt!;
-      })
-    : nonShortVideos.slice(0, 1); // First poll: only latest video
-
-  ytLogger.info('Found videos', {
-    total: videos.length,
-    afterShortsFilter: nonShortVideos.length,
-    new: newVideos.length,
-    name: sub.name,
-  });
-
-  // Ingest new items
-  let newItemsCount = 0;
-  for (const video of newVideos) {
-    try {
-      // Cast to the expected type - the transformer handles null checks
-      const result = await ingestItem(
-        userId,
-        sub.id,
-        video as youtube_v3.Schema$PlaylistItem,
-        Provider.YOUTUBE,
-        db as unknown as DrizzleD1Database,
-        transformYouTubeVideo as (
-          raw: youtube_v3.Schema$PlaylistItem
-        ) => ReturnType<typeof transformYouTubeVideo>
-      );
-      if (result.created) {
-        newItemsCount++;
-      }
-    } catch (ingestError) {
-      ytLogger.error('Failed to ingest video', { error: ingestError });
-    }
-  }
-
-  // Calculate newest published timestamp from all videos
-  const newestPublishedAt =
-    videos.length > 0
-      ? Math.max(
-          ...videos
-            .map((v) => (v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0))
-            .filter((t) => t > 0)
-        )
-      : sub.lastPublishedAt;
-
-  // Update subscription with poll results
-  await db
-    .update(subscriptions)
-    .set({
-      lastPolledAt: Date.now(),
-      lastPublishedAt: newestPublishedAt || undefined,
-      updatedAt: Date.now(),
-    })
-    .where(eq(subscriptions.id, sub.id));
-
-  return { newItems: newItemsCount };
-}
-
-// ============================================================================
-// Spotify Batch Processing
-// ============================================================================
-
-/**
- * Process a batch of Spotify subscriptions.
- *
- * Uses the generic batch processor with Spotify-specific configuration.
- */
-async function processSpotifyBatch(
-  subs: Subscription[],
-  env: Bindings,
-  db: DrizzleDB
-): Promise<BatchResult> {
-  return processProviderBatch(
-    subs,
-    {
-      provider: 'SPOTIFY',
-      getClient: (connection, env) =>
-        getSpotifyClientForConnection(
-          connection,
-          env as Parameters<typeof getSpotifyClientForConnection>[1]
-        ),
-      pollSingle: pollSingleSpotifySubscription,
-    },
-    env,
-    db
-  );
-}
-
-/**
- * Poll a single Spotify subscription for new episodes.
- */
-async function pollSingleSpotifySubscription(
-  sub: Subscription,
-  client: SpotifyApi,
-  userId: string,
-  env: Bindings,
-  db: DrizzleDB
-): Promise<{ newItems: number }> {
-  const spotifyLogger = pollLogger.child('spotify');
-  spotifyLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
-
-  // Fetch recent episodes from the show
-  const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
-
-  if (episodes.length === 0) {
-    spotifyLogger.info('No episodes found', { name: sub.name });
-    await updateSubscriptionPolled(sub.id, db);
-    return { newItems: 0 };
-  }
-
-  // Filter to new episodes based on lastPolledAt
-  const newEpisodes = sub.lastPolledAt
-    ? episodes.filter((e) => {
-        const releaseDate = parseSpotifyDate(e.releaseDate);
-        return releaseDate > sub.lastPolledAt!;
-      })
-    : episodes.slice(0, 1); // First poll: only latest episode
-
-  spotifyLogger.info('Found episodes', {
-    total: episodes.length,
-    new: newEpisodes.length,
-    name: sub.name,
-  });
-
-  // Ingest new items
-  let newItemsCount = 0;
-  for (const episode of newEpisodes) {
-    try {
-      // Transform SpotifyEpisode to the format expected by transformSpotifyEpisode
-      const rawEpisode = {
-        id: episode.id,
-        name: episode.name,
-        description: episode.description,
-        release_date: episode.releaseDate,
-        duration_ms: episode.durationMs,
-        external_urls: { spotify: episode.externalUrl },
-        images: episode.images,
-      };
-
-      const result = await ingestItem(
-        userId,
-        sub.id,
-        rawEpisode,
-        Provider.SPOTIFY,
-        db as unknown as DrizzleD1Database,
-        (raw: typeof rawEpisode) => transformSpotifyEpisode(raw, sub.name)
-      );
-      if (result.created) {
-        newItemsCount++;
-      }
-    } catch (ingestError) {
-      spotifyLogger.error('Failed to ingest episode', { error: ingestError });
-    }
-  }
-
-  // Calculate newest published timestamp from all episodes
-  const newestPublishedAt =
-    episodes.length > 0
-      ? Math.max(...episodes.map((e) => parseSpotifyDate(e.releaseDate)).filter((t) => t > 0))
-      : sub.lastPublishedAt;
-
-  // Update subscription with poll results
-  await db
-    .update(subscriptions)
-    .set({
-      lastPolledAt: Date.now(),
-      lastPublishedAt: newestPublishedAt || undefined,
-      updatedAt: Date.now(),
-    })
-    .where(eq(subscriptions.id, sub.id));
-
-  return { newItems: newItemsCount };
 }
 
 // ============================================================================
@@ -671,19 +343,4 @@ function groupBy<T, K extends keyof T>(items: T[], key: K): Record<string, T[]> 
     },
     {} as Record<string, T[]>
   );
-}
-
-/**
- * Parse Spotify's variable date format into Unix milliseconds.
- *
- * Spotify release_date can be:
- * - YYYY (just year)
- * - YYYY-MM (year-month)
- * - YYYY-MM-DD (full date)
- */
-function parseSpotifyDate(dateStr: string): number {
-  const normalized =
-    dateStr.length === 4 ? `${dateStr}-01-01` : dateStr.length === 7 ? `${dateStr}-01` : dateStr;
-
-  return new Date(`${normalized}T00:00:00Z`).getTime();
 }

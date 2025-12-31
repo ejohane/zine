@@ -10,11 +10,10 @@ import { logger as honoLogger } from 'hono/logger';
 import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
-import { runIngestionBatch } from './ingestion';
+import { pollSubscriptions } from './polling/scheduler';
 import { logger } from './lib/logger';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
-import sourcesRoutes from './routes/sources';
 import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
 
@@ -112,16 +111,6 @@ app.use(
 );
 
 // ---------------------------------------------------------------------------
-// Legacy REST Routes (sources)
-// ---------------------------------------------------------------------------
-
-// Apply auth middleware to protected routes
-app.use('/api/sources/*', authMiddleware());
-
-// Mount protected route groups
-app.route('/api/sources', sourcesRoutes);
-
-// ---------------------------------------------------------------------------
 // 404 Handler
 // ---------------------------------------------------------------------------
 
@@ -166,16 +155,16 @@ export default {
   fetch: app.fetch,
 
   /**
-   * Scheduled handler for cron-triggered content ingestion.
+   * Scheduled handler for cron-triggered content polling.
    *
    * Configured in wrangler.toml with `[triggers]` section.
-   * Runs hourly to fetch new content from all active user sources.
+   * Runs hourly to poll active subscriptions for new content.
    *
-   * @see /features/rearch/analysis.md - Gap: Ingestion Pipeline
+   * @see /features/subscriptions/backend-spec.md - Section 3: Polling Architecture
    */
   async scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
-    // Use waitUntil to ensure the ingestion batch completes even if the
+    // Use waitUntil to ensure the polling completes even if the
     // scheduled handler returns early
-    ctx.waitUntil(runIngestionBatch(env));
+    ctx.waitUntil(pollSubscriptions(env, ctx));
   },
 };

@@ -184,12 +184,7 @@ describe('OfflineActionQueue', () => {
     });
 
     it('supports all action types', async () => {
-      const actionTypes: OfflineActionType[] = [
-        'SUBSCRIBE',
-        'UNSUBSCRIBE',
-        'PAUSE_SUBSCRIPTION',
-        'RESUME_SUBSCRIPTION',
-      ];
+      const actionTypes: OfflineActionType[] = ['SUBSCRIBE', 'UNSUBSCRIBE'];
 
       for (const type of actionTypes) {
         await resetQueue();
@@ -645,32 +640,6 @@ describe('Queue Processing', () => {
         expect(savedQueue).toHaveLength(1);
         expect(savedQueue[0].retryCount).toBe(1);
         expect(savedQueue[0].lastErrorType).toBe('UNKNOWN');
-      });
-    });
-
-    describe('unimplemented actions', () => {
-      it('fails PAUSE_SUBSCRIPTION with not implemented error', async () => {
-        const action = createTestAction({ type: 'PAUSE_SUBSCRIPTION' });
-        mockQueueContents([action]);
-
-        await offlineQueue.processQueue();
-
-        // Should retry as UNKNOWN error
-        const savedQueue = getSavedQueue();
-        expect(savedQueue).toHaveLength(1);
-        expect(savedQueue[0].retryCount).toBe(1);
-      });
-
-      it('fails RESUME_SUBSCRIPTION with not implemented error', async () => {
-        const action = createTestAction({ type: 'RESUME_SUBSCRIPTION' });
-        mockQueueContents([action]);
-
-        await offlineQueue.processQueue();
-
-        // Should retry as UNKNOWN error
-        const savedQueue = getSavedQueue();
-        expect(savedQueue).toHaveLength(1);
-        expect(savedQueue[0].retryCount).toBe(1);
       });
     });
   });

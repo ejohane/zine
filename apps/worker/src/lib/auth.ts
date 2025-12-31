@@ -5,6 +5,7 @@
 import * as jose from 'jose';
 import type { Bindings } from '../types';
 import { authLogger } from './logger';
+import { Provider } from '@zine/shared';
 
 /**
  * Clerk JWT payload structure
@@ -165,6 +166,18 @@ const OAUTH_CONFIG = {
 } as const;
 
 /**
+ * OAuth-enabled providers (subset of all providers)
+ */
+type OAuthProvider = Provider.YOUTUBE | Provider.SPOTIFY;
+
+/**
+ * Check if a provider supports OAuth
+ */
+function isOAuthProvider(provider: Provider): provider is OAuthProvider {
+  return provider === Provider.YOUTUBE || provider === Provider.SPOTIFY;
+}
+
+/**
  * Exchange OAuth authorization code for tokens using PKCE
  *
  * @param provider - The OAuth provider (YOUTUBE or SPOTIFY)
@@ -175,12 +188,15 @@ const OAUTH_CONFIG = {
  * @returns OAuth tokens (access_token, refresh_token, expires_in)
  */
 export async function exchangeCodeForTokens(
-  provider: 'YOUTUBE' | 'SPOTIFY',
+  provider: Provider,
   code: string,
   codeVerifier: string,
   env: Bindings,
   overrideRedirectUri?: string
 ): Promise<OAuthTokens> {
+  if (!isOAuthProvider(provider)) {
+    throw new Error(`Provider ${provider} does not support OAuth`);
+  }
   const config = OAUTH_CONFIG[provider];
 
   // Get client credentials from environment
@@ -254,9 +270,12 @@ export async function exchangeCodeForTokens(
  * @returns Provider user info (id, email, name)
  */
 export async function getProviderUserInfo(
-  provider: 'YOUTUBE' | 'SPOTIFY',
+  provider: Provider,
   accessToken: string
 ): Promise<ProviderUserInfo> {
+  if (!isOAuthProvider(provider)) {
+    throw new Error(`Provider ${provider} does not support OAuth`);
+  }
   const config = OAUTH_CONFIG[provider];
 
   const response = await fetch(config.userInfoUrl, {

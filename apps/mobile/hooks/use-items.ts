@@ -18,6 +18,27 @@ export { mapContentType, formatDuration, UIContentType, UIProvider } from './use
 // ============================================================================
 
 /**
+ * API item shape from tRPC response
+ * This represents the flattened item returned from tRPC queries
+ */
+interface ApiItem {
+  id: string;
+  itemId: string;
+  title: string | null;
+  summary?: string | null;
+  creator?: string | null;
+  publisher?: string | null;
+  thumbnailUrl?: string | null;
+  canonicalUrl?: string | null;
+  contentType?: string;
+  duration?: number | null;
+  publishedAt?: string | null;
+  state: string;
+  ingestedAt?: string | null;
+  bookmarkedAt?: string | null;
+}
+
+/**
  * Represents an item joined with its user state
  * This mirrors what the old architecture would return with joined data
  */
@@ -44,6 +65,43 @@ export interface ItemWithUserState {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Transform API item to UI-friendly ItemWithUserState format
+ *
+ * Converts the flat tRPC response item into the nested structure
+ * expected by UI components.
+ *
+ * @param item - The flat API item from tRPC response
+ * @returns The nested ItemWithUserState structure
+ */
+function transformItem(item: ApiItem): ItemWithUserState {
+  return {
+    item: {
+      id: item.itemId,
+      title: item.title,
+      summary: item.summary,
+      creator: item.creator,
+      publisher: item.publisher,
+      thumbnailUrl: item.thumbnailUrl,
+      canonicalUrl: item.canonicalUrl,
+      contentType: item.contentType,
+      duration: item.duration,
+      publishedAt: item.publishedAt,
+    },
+    userItem: {
+      id: item.id,
+      itemId: item.itemId,
+      state: item.state,
+      ingestedAt: item.ingestedAt,
+      bookmarkedAt: item.bookmarkedAt,
+    },
+  };
+}
+
+// ============================================================================
 // Hooks
 // ============================================================================
 
@@ -63,28 +121,7 @@ export function useBookmarkedItems(): ItemWithUserState[] {
 
   if (!data?.items) return [];
 
-  // Transform tRPC response to ItemWithUserState format
-  return data.items.map((item) => ({
-    item: {
-      id: item.itemId,
-      title: item.title,
-      summary: item.summary,
-      creator: item.creator,
-      publisher: item.publisher,
-      thumbnailUrl: item.thumbnailUrl,
-      canonicalUrl: item.canonicalUrl,
-      contentType: item.contentType,
-      duration: item.duration,
-      publishedAt: item.publishedAt,
-    },
-    userItem: {
-      id: item.id,
-      itemId: item.itemId,
-      state: item.state,
-      ingestedAt: item.ingestedAt,
-      bookmarkedAt: item.bookmarkedAt,
-    },
-  }));
+  return data.items.map(transformItem);
 }
 
 /**
@@ -103,26 +140,5 @@ export function useInboxItems(): ItemWithUserState[] {
 
   if (!data?.items) return [];
 
-  // Transform tRPC response to ItemWithUserState format
-  return data.items.map((item) => ({
-    item: {
-      id: item.itemId,
-      title: item.title,
-      summary: item.summary,
-      creator: item.creator,
-      publisher: item.publisher,
-      thumbnailUrl: item.thumbnailUrl,
-      canonicalUrl: item.canonicalUrl,
-      contentType: item.contentType,
-      duration: item.duration,
-      publishedAt: item.publishedAt,
-    },
-    userItem: {
-      id: item.id,
-      itemId: item.itemId,
-      state: item.state,
-      ingestedAt: item.ingestedAt,
-      bookmarkedAt: item.bookmarkedAt,
-    },
-  }));
+  return data.items.map(transformItem);
 }

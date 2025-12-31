@@ -25,6 +25,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ulid } from 'ulid';
 import { offlineLogger } from './logger';
+import { classifyErrorLegacy, type ErrorClassification } from './error-utils';
+
+// Re-export for backward compatibility
+export type { ErrorClassification } from './error-utils';
 
 // ============================================================================
 // Constants
@@ -42,23 +46,7 @@ const AUTH_RETRY_LIMIT = 1; // Only retry auth errors once after token refresh
  * Types of offline actions that can be queued.
  * Maps to tRPC mutation endpoints.
  */
-export type OfflineActionType =
-  | 'SUBSCRIBE'
-  | 'UNSUBSCRIBE'
-  | 'PAUSE_SUBSCRIPTION'
-  | 'RESUME_SUBSCRIPTION';
-
-/**
- * Error classification for determining retry behavior.
- *
- * @property NETWORK - Temporary network failure (fetch timeout, connection refused)
- * @property AUTH - 401 Unauthorized (token expired or invalid)
- * @property CONFLICT - 409 Conflict (subscription already exists/removed)
- * @property CLIENT - 4xx errors except 401/409 (bad input, validation errors)
- * @property SERVER - 5xx errors (server-side failures)
- * @property UNKNOWN - Unclassified errors (treat as retryable)
- */
-export type ErrorClassification = 'NETWORK' | 'AUTH' | 'CONFLICT' | 'CLIENT' | 'SERVER' | 'UNKNOWN';
+export type OfflineActionType = 'SUBSCRIBE' | 'UNSUBSCRIBE';
 
 /**
  * A queued offline action with metadata for retry handling.
@@ -98,76 +86,6 @@ interface ActionProcessingResult {
   succeeded: boolean;
   /** Updated action to keep in queue (if shouldRemove is false) */
   updatedAction?: OfflineAction;
-}
-
-// ============================================================================
-// Error Classification
-// ============================================================================
-
-/**
- * Classify an error to determine retry behavior.
- *
- * Classification priority:
- * 1. Network-level failures (TypeError from fetch)
- * 2. HTTP status codes from tRPC error responses
- * 3. Error message pattern matching
- * 4. Unknown (default, treated as retryable)
- *
- * @param error - The error thrown during action execution
- * @returns Error classification for retry logic
- */
-function classifyError(error: unknown): ErrorClassification {
-  // Network errors from fetch (connection refused, timeout, etc.)
-  if (error instanceof TypeError && error.message.includes('fetch')) {
-    return 'NETWORK';
-  }
-
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-
-    // Network-related error messages
-    if (
-      message.includes('network') ||
-      message.includes('timeout') ||
-      message.includes('aborted') ||
-      message.includes('connection')
-    ) {
-      return 'NETWORK';
-    }
-  }
-
-  // tRPC/HTTP errors with status codes
-  if (typeof error === 'object' && error !== null) {
-    const errorObj = error as Record<string, unknown>;
-
-    // Extract HTTP status from tRPC error structure
-    // tRPC wraps errors as: { data: { httpStatus, code }, message }
-    const data = errorObj.data as Record<string, unknown> | undefined;
-    const httpStatus = data?.httpStatus ?? errorObj.status ?? errorObj.statusCode;
-    const code = data?.code ?? errorObj.code;
-
-    // 401 Unauthorized - auth token expired or invalid
-    if (httpStatus === 401 || code === 'UNAUTHORIZED') {
-      return 'AUTH';
-    }
-
-    // 409 Conflict - resource already exists (e.g., already subscribed)
-    if (httpStatus === 409 || code === 'CONFLICT') {
-      return 'CONFLICT';
-    }
-
-    // 4xx Client errors (except 401, 409) - permanent failures
-    if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 500) {
-      return 'CLIENT';
-    }
-
-    // 5xx Server errors - temporary failures, should retry
-    if (typeof httpStatus === 'number' && httpStatus >= 500) {
-      return 'SERVER';
-    }
-  }
-
-  return 'UNKNOWN';
 }
 
 /**
@@ -377,7 +295,7 @@ class OfflineActionQueue {
     action: OfflineAction,
     error: unknown
   ): Promise<ActionProcessingResult> {
-    const errorType = classifyError(error);
+    const errorType = classifyErrorLegacy(error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     // CONFLICT: The action's intent is already fulfilled
@@ -421,7 +339,7 @@ class OfflineActionQueue {
         await this.executeAction(action);
         return { shouldRemove: true, succeeded: true };
       } catch (retryError) {
-        const retryErrorType = classifyError(retryError);
+        const retryErrorType = classifyErrorLegacy(retryError);
         const updatedAction: OfflineAction = {
           ...action,
           authRetryCount: action.authRetryCount + 1,
@@ -580,19 +498,6 @@ class OfflineActionQueue {
           action.payload as Parameters<typeof client.sources.remove.mutate>[0]
         );
         break;
-
-      case 'PAUSE_SUBSCRIPTION':
-        // TODO: Implement when pause mutation is added to router
-        offlineLogger.warn('PAUSE_SUBSCRIPTION not yet implemented in router');
-        throw new Error('PAUSE_SUBSCRIPTION not implemented');
-
-      case 'RESUME_SUBSCRIPTION':
-        // TODO: Implement when resume mutation is added to router
-        offlineLogger.warn('RESUME_SUBSCRIPTION not yet implemented in router');
-        throw new Error('RESUME_SUBSCRIPTION not implemented');
-
-      default:
-        throw new Error(`Unknown action type: ${action.type}`);
     }
   }
 }

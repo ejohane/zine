@@ -10,6 +10,7 @@
 
 import { ContentType, Provider } from '@zine/shared';
 import { ulid } from 'ulid';
+import { parseSpotifyDate } from '../lib/timestamps';
 
 // ============================================================================
 // Types
@@ -179,33 +180,4 @@ export function transformSpotifyEpisode(episode: SpotifyEpisode, showName: strin
     publishedAt,
     createdAt: now,
   };
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-/**
- * Parse Spotify's variable date format into Unix milliseconds.
- *
- * Spotify release_date can be one of three formats:
- * - YYYY (just year) → normalizes to YYYY-01-01
- * - YYYY-MM (year-month) → normalizes to YYYY-MM-01
- * - YYYY-MM-DD (full date) → used as-is
- *
- * All dates are interpreted as UTC midnight.
- *
- * @param dateStr - Spotify date string (YYYY, YYYY-MM, or YYYY-MM-DD)
- * @returns Unix timestamp in milliseconds
- */
-function parseSpotifyDate(dateStr: string): number {
-  // Normalize to YYYY-MM-DD format
-  const normalized =
-    dateStr.length === 4
-      ? `${dateStr}-01-01` // YYYY → YYYY-01-01
-      : dateStr.length === 7
-        ? `${dateStr}-01` // YYYY-MM → YYYY-MM-01
-        : dateStr; // YYYY-MM-DD → unchanged
-
-  return new Date(`${normalized}T00:00:00Z`).getTime();
 }
