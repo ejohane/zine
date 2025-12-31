@@ -30,7 +30,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useItem } from '@/hooks/use-items-trpc';
+import { useItem, useBookmarkItem, useUnbookmarkItem } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
 import {
   getContentIcon,
@@ -155,6 +155,10 @@ export default function ItemDetailScreen() {
     refetch,
   } = useItem(idValidation.success ? idValidation.data : '');
 
+  // Bookmark mutations
+  const bookmarkMutation = useBookmarkItem();
+  const unbookmarkMutation = useUnbookmarkItem();
+
   // Render invalid param state if id is invalid
   if (!idValidation.success) {
     return (
@@ -210,9 +214,16 @@ export default function ItemDetailScreen() {
   };
 
   // Handle bookmark toggle
-  // TODO: Implement when items.unbookmark endpoint is available
   const handleToggleBookmark = () => {
-    logger.debug('Toggle bookmark - not yet implemented');
+    if (!item) return;
+
+    if (item.state === 'BOOKMARKED') {
+      // Unbookmark: move back to INBOX
+      unbookmarkMutation.mutate({ id: item.id });
+    } else {
+      // Bookmark: move to BOOKMARKED (Library)
+      bookmarkMutation.mutate({ id: item.id });
+    }
   };
 
   // Handle add to collection (placeholder)
@@ -377,10 +388,12 @@ export default function ItemDetailScreen() {
             {/* Bookmark */}
             <Pressable
               onPress={handleToggleBookmark}
+              disabled={bookmarkMutation.isPending || unbookmarkMutation.isPending}
               style={({ pressed }) => [
                 styles.actionButton,
                 { backgroundColor: colors.backgroundSecondary },
                 pressed && { opacity: 0.7 },
+                (bookmarkMutation.isPending || unbookmarkMutation.isPending) && { opacity: 0.5 },
               ]}
             >
               {item.state === 'BOOKMARKED' ? (

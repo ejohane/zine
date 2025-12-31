@@ -222,10 +222,11 @@ export function useBookmarkItem() {
   return trpc.items.bookmark.useMutation({
     onMutate: async ({ id }) => {
       // Cancel outgoing queries to prevent race conditions
-      await utils.items.inbox.cancel();
+      await Promise.all([utils.items.inbox.cancel(), utils.items.get.cancel({ id })]);
 
-      // Snapshot previous value for rollback
+      // Snapshot previous values for rollback
       const previousInbox = utils.items.inbox.getData();
+      const previousItem = utils.items.get.getData({ id });
 
       // Optimistically remove item from inbox
       utils.items.inbox.setData(undefined, (old) => {
@@ -236,19 +237,33 @@ export function useBookmarkItem() {
         };
       });
 
-      return { previousInbox };
+      // Optimistically update single item cache to show bookmarked state
+      utils.items.get.setData({ id }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          state: UserItemState.BOOKMARKED,
+          bookmarkedAt: new Date().toISOString(),
+        };
+      });
+
+      return { previousInbox, previousItem };
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, vars, context) => {
       // Rollback on error
       if (context?.previousInbox) {
         utils.items.inbox.setData(undefined, context.previousInbox);
       }
+      if (context?.previousItem) {
+        utils.items.get.setData({ id: vars.id }, context.previousItem);
+      }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, vars) => {
       // Refetch after mutation completes (success or error)
       utils.items.inbox.invalidate();
       utils.items.library.invalidate();
       utils.items.home.invalidate();
+      utils.items.get.invalidate({ id: vars.id });
     },
   });
 }
@@ -349,10 +364,11 @@ export function useUnbookmarkItem() {
   return trpc.items.unbookmark.useMutation({
     onMutate: async ({ id }) => {
       // Cancel outgoing queries to prevent race conditions
-      await utils.items.library.cancel();
+      await Promise.all([utils.items.library.cancel(), utils.items.get.cancel({ id })]);
 
-      // Snapshot previous value for rollback
+      // Snapshot previous values for rollback
       const previousLibrary = utils.items.library.getData();
+      const previousItem = utils.items.get.getData({ id });
 
       // Optimistically remove item from library
       utils.items.library.setData(undefined, (old) => {
@@ -363,19 +379,33 @@ export function useUnbookmarkItem() {
         };
       });
 
-      return { previousLibrary };
+      // Optimistically update single item cache to show inbox state
+      utils.items.get.setData({ id }, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          state: UserItemState.INBOX,
+          bookmarkedAt: null,
+        };
+      });
+
+      return { previousLibrary, previousItem };
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, vars, context) => {
       // Rollback on error
       if (context?.previousLibrary) {
         utils.items.library.setData(undefined, context.previousLibrary);
       }
+      if (context?.previousItem) {
+        utils.items.get.setData({ id: vars.id }, context.previousItem);
+      }
     },
-    onSettled: () => {
+    onSettled: (_data, _err, vars) => {
       // Refetch after mutation completes
       utils.items.inbox.invalidate();
       utils.items.library.invalidate();
       utils.items.home.invalidate();
+      utils.items.get.invalidate({ id: vars.id });
     },
   });
 }
