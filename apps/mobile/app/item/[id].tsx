@@ -13,6 +13,7 @@
  * - Loading, error, and not found states
  */
 
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -30,7 +31,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useItem, useBookmarkItem, useUnbookmarkItem } from '@/hooks/use-items-trpc';
+import {
+  useItem,
+  useBookmarkItem,
+  useUnbookmarkItem,
+  useToggleFinished,
+} from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
 import {
   getContentIcon,
@@ -42,6 +48,7 @@ import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
 import {
   ChevronRightIcon,
+  CheckIcon,
   CheckOutlineIcon,
   BookmarkIcon,
   BookmarkOutlineIcon,
@@ -158,6 +165,7 @@ export default function ItemDetailScreen() {
   // Bookmark mutations
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
+  const toggleFinishedMutation = useToggleFinished();
 
   // Render invalid param state if id is invalid
   if (!idValidation.success) {
@@ -208,9 +216,10 @@ export default function ItemDetailScreen() {
   };
 
   // Handle mark as finished toggle
-  // TODO: Implement when items.toggleFinished endpoint is available
   const handleToggleFinished = () => {
-    logger.debug('Toggle finished - not yet implemented');
+    if (!item) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    toggleFinishedMutation.mutate({ id: item.id });
   };
 
   // Handle bookmark toggle
@@ -376,13 +385,19 @@ export default function ItemDetailScreen() {
             {/* Mark as Finished */}
             <Pressable
               onPress={handleToggleFinished}
+              disabled={toggleFinishedMutation.isPending}
               style={({ pressed }) => [
                 styles.actionButton,
                 { backgroundColor: colors.backgroundSecondary },
                 pressed && { opacity: 0.7 },
+                toggleFinishedMutation.isPending && { opacity: 0.5 },
               ]}
             >
-              <CheckOutlineIcon size={24} color={colors.textSecondary} />
+              {item.isFinished ? (
+                <CheckIcon size={24} color={colors.success} />
+              ) : (
+                <CheckOutlineIcon size={24} color={colors.textSecondary} />
+              )}
             </Pressable>
 
             {/* Bookmark */}

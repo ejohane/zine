@@ -145,6 +145,12 @@ export interface UserItem {
   /** When the item was archived (if ever) */
   archivedAt?: string;
 
+  /** Whether the user has finished/consumed this content */
+  isFinished: boolean;
+
+  /** Timestamp when marked finished (ISO8601), null if not finished */
+  finishedAt?: string;
+
   /** Current playback/reading position in seconds */
   progressPosition?: number;
 

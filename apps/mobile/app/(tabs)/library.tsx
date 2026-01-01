@@ -132,6 +132,7 @@ export default function LibraryScreen() {
     duration: item.duration ?? null,
     bookmarkedAt: item.bookmarkedAt ?? null,
     publishedAt: item.publishedAt ?? null,
+    isFinished: item.isFinished,
   }));
 
   return (

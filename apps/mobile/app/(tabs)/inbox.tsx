@@ -116,6 +116,7 @@ export default function InboxScreen() {
     duration: item.duration ?? null,
     bookmarkedAt: null,
     publishedAt: item.publishedAt ?? null,
+    isFinished: item.isFinished,
   }));
 
   const renderItem = ({ item, index }: { item: ItemCardData; index: number }) => (

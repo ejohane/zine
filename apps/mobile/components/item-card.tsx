@@ -31,7 +31,7 @@ import {
   type ContentType,
   type Provider,
 } from '@/lib/content-utils';
-import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
+import { ArchiveIcon, BookmarkIcon, CheckIcon } from '@/components/icons';
 
 // ============================================================================
 // Types
@@ -55,6 +55,7 @@ export interface ItemCardData {
   duration?: number | null;
   bookmarkedAt?: string | null;
   publishedAt?: string | null;
+  isFinished?: boolean;
 }
 
 /**
@@ -172,6 +173,12 @@ export function ItemCard({
             {durationText && (
               <View style={styles.durationBadge}>
                 <Text style={styles.durationText}>{durationText}</Text>
+              </View>
+            )}
+            {/* Completed badge */}
+            {item.isFinished && (
+              <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
+                <CheckIcon size={12} color="#fff" />
               </View>
             )}
           </View>
@@ -505,6 +512,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  completedBadge: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.sm,
   },
   typeBadge: {
     position: 'absolute',
