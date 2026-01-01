@@ -138,7 +138,11 @@ export const itemsRouter = router({
     const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
 
     // Build WHERE conditions
-    const conditions = [eq(userItems.userId, ctx.userId), eq(userItems.state, UserItemState.INBOX)];
+    const conditions = [
+      eq(userItems.userId, ctx.userId),
+      eq(userItems.state, UserItemState.INBOX),
+      eq(userItems.isFinished, false),
+    ];
 
     // Apply cursor-based pagination (fetch items older than cursor)
     if (cursor) {
@@ -266,6 +270,7 @@ export const itemsRouter = router({
     const baseConditions = [
       eq(userItems.userId, ctx.userId),
       eq(userItems.state, UserItemState.BOOKMARKED),
+      eq(userItems.isFinished, false),
     ];
 
     // Fetch recent bookmarks
