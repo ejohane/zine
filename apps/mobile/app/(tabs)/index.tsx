@@ -33,12 +33,7 @@ import {
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import {
-  useBookmarkedItems,
-  useInboxItems,
-  mapContentType,
-  type ItemWithUserState,
-} from '@/hooks/use-items';
+import { useInboxItems, mapContentType, type ItemWithUserState } from '@/hooks/use-items';
 import {
   useHomeData,
   formatDuration,
@@ -157,6 +152,34 @@ function transformToContentItem(item: {
   };
 }
 
+/**
+ * Transform ItemView from tRPC home data to ItemCardData for ItemCard component
+ */
+function transformItemViewToCardData(item: {
+  id: string;
+  title: string;
+  thumbnailUrl: string | null;
+  creator: string;
+  publisher: string | null;
+  provider: string;
+  contentType: string;
+  duration: number | null;
+  bookmarkedAt: string | null;
+  publishedAt: string | null;
+}): ItemCardData {
+  return {
+    id: item.id,
+    title: item.title,
+    creator: item.publisher ?? item.creator,
+    thumbnailUrl: item.thumbnailUrl,
+    contentType: item.contentType.toLowerCase() as UIContentType,
+    provider: item.provider as Provider,
+    duration: item.duration,
+    bookmarkedAt: item.bookmarkedAt,
+    publishedAt: item.publishedAt,
+  };
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -165,10 +188,9 @@ export default function HomeScreen() {
   const dateStr = useMemo(() => formatDate(), []);
 
   // Data hooks for live data
-  const bookmarkedItemsData = useBookmarkedItems();
   const inboxItemsData = useInboxItems();
 
-  // Home data hook for curated sections (podcasts, videos, etc.)
+  // Home data hook for curated sections (Jump Back In, podcasts, videos, etc.)
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
 
   // Library data with loading state for stats
@@ -202,9 +224,10 @@ export default function HomeScreen() {
   }, [libraryData?.items]);
 
   // Transform to ItemCardData for shared ItemCard component (live data sections)
+  // Use homeData.recentBookmarks which filters out finished items
   const jumpBackInCards = useMemo(
-    () => bookmarkedItemsData.map(transformToItemCardData),
-    [bookmarkedItemsData]
+    () => (homeData?.recentBookmarks ?? []).map(transformItemViewToCardData),
+    [homeData?.recentBookmarks]
   );
 
   const recentInboxCards = useMemo(
