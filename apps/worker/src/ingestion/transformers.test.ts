@@ -66,13 +66,16 @@ function createSpotifyEpisode(overrides: Record<string, unknown> = {}) {
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
+// Store original Date.now for restoration
+const originalDateNow = Date.now;
+
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(MOCK_NOW);
+  // Mock Date.now directly (vi.setSystemTime not available in Workers pool)
+  Date.now = vi.fn(() => MOCK_NOW);
 });
 
 afterEach(() => {
-  vi.useRealTimers();
+  Date.now = originalDateNow;
 });
 
 // ============================================================================

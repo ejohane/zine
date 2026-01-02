@@ -246,6 +246,51 @@ export async function getUserSubscriptions(
 }
 
 /**
+ * Get ALL user subscriptions with automatic pagination.
+ *
+ * YouTube API Cost: 1 quota unit per page (50 items per page)
+ *
+ * @param client - Authenticated YouTube client
+ * @param maxSubscriptions - Maximum subscriptions to fetch (default: 500)
+ * @returns Array of all subscriptions up to maxSubscriptions
+ *
+ * @example
+ * ```typescript
+ * const allSubs = await getAllUserSubscriptions(client, 200);
+ * console.log(`Found ${allSubs.length} subscriptions`);
+ * ```
+ */
+export async function getAllUserSubscriptions(
+  client: YouTubeClient,
+  maxSubscriptions: number = 500
+): Promise<youtube_v3.Schema$Subscription[]> {
+  const subscriptions: youtube_v3.Schema$Subscription[] = [];
+  let pageToken: string | undefined;
+  const pageSize = 50;
+
+  while (subscriptions.length < maxSubscriptions) {
+    const response = await client.api.subscriptions.list({
+      part: ['snippet'],
+      mine: true,
+      maxResults: pageSize,
+      pageToken,
+    });
+
+    const items = response.data.items || [];
+    subscriptions.push(...items);
+
+    if (items.length < pageSize || !response.data.nextPageToken) {
+      // No more pages
+      break;
+    }
+
+    pageToken = response.data.nextPageToken;
+  }
+
+  return subscriptions.slice(0, maxSubscriptions);
+}
+
+/**
  * Get channel details by channel ID
  *
  * Fetches metadata for a specific channel including name, description,

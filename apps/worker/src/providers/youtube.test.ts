@@ -11,7 +11,7 @@
  * - Error handling (401, 403, 404, quota exceeded)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { youtube_v3 } from 'googleapis';
 import type { YouTubeClient } from './youtube';
 import {
@@ -22,6 +22,7 @@ import {
   fetchRecentVideos,
   fetchVideoDetails,
   getUserSubscriptions,
+  getAllUserSubscriptions,
   searchChannels,
   extractVideoInfo,
   parseISO8601Duration,
@@ -217,10 +218,7 @@ function createYouTubeApiError(status: number, message: string) {
 // ============================================================================
 
 beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-afterEach(() => {
+  // Reset all mocks before each test to clear any queued mockResolvedValueOnce calls
   vi.resetAllMocks();
 });
 
@@ -652,6 +650,204 @@ describe('getUserSubscriptions', () => {
     const result = await getUserSubscriptions(client);
 
     expect(result).toEqual([]);
+  });
+});
+
+// ============================================================================
+// getAllUserSubscriptions Tests
+// ============================================================================
+
+/**
+ * Helper function to create multiple mock subscriptions
+ */
+function createMockSubscriptions(count: number): youtube_v3.Schema$Subscription[] {
+  return Array.from({ length: count }, (_, i) =>
+    createMockSubscription({
+      id: `sub${i}`,
+      snippet: {
+        title: `Subscribed Channel ${i}`,
+        description: `Description for channel ${i}`,
+        resourceId: {
+          channelId: `UCsubscribed${i}`,
+        },
+        thumbnails: {
+          default: { url: `https://example.com/sub-thumb-${i}.jpg` },
+        },
+      },
+    })
+  );
+}
+
+describe('getAllUserSubscriptions', () => {
+  beforeEach(() => {
+    // Reset the mock between tests to clear any unconsumed mockResolvedValueOnce calls
+    mockSubscriptionsList.mockReset();
+  });
+
+  it('should fetch all subscriptions across multiple pages (3 pages, 150 total)', async () => {
+    const client = createMockYouTubeClient();
+    const page1 = createMockSubscriptions(50);
+    const page2 = createMockSubscriptions(50);
+    const page3 = createMockSubscriptions(50);
+
+    mockSubscriptionsList
+      .mockResolvedValueOnce({
+        data: { items: page1, nextPageToken: 'token1' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page2, nextPageToken: 'token2' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page3 },
+      });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result.length).toBe(150);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(3);
+    // Verify pageToken is passed correctly
+    expect(mockSubscriptionsList).toHaveBeenNthCalledWith(1, {
+      part: ['snippet'],
+      mine: true,
+      maxResults: 50,
+      pageToken: undefined,
+    });
+    expect(mockSubscriptionsList).toHaveBeenNthCalledWith(2, {
+      part: ['snippet'],
+      mine: true,
+      maxResults: 50,
+      pageToken: 'token1',
+    });
+    expect(mockSubscriptionsList).toHaveBeenNthCalledWith(3, {
+      part: ['snippet'],
+      mine: true,
+      maxResults: 50,
+      pageToken: 'token2',
+    });
+  });
+
+  it('should respect maxSubscriptions limit and stop early', async () => {
+    const client = createMockYouTubeClient();
+    const page1 = createMockSubscriptions(50);
+    const page2 = createMockSubscriptions(50);
+    const page3 = createMockSubscriptions(50);
+
+    mockSubscriptionsList
+      .mockResolvedValueOnce({
+        data: { items: page1, nextPageToken: 'token1' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page2, nextPageToken: 'token2' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page3 },
+      });
+
+    const result = await getAllUserSubscriptions(client, 75);
+
+    expect(result.length).toBe(75);
+    // Should make 2 API calls (50 + 50 = 100, then slice to 75)
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle empty response', async () => {
+    const client = createMockYouTubeClient();
+    mockSubscriptionsList.mockResolvedValueOnce({
+      data: { items: [] },
+    });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result).toEqual([]);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle partial last page (120 total: 50+50+20)', async () => {
+    const client = createMockYouTubeClient();
+    const page1 = createMockSubscriptions(50);
+    const page2 = createMockSubscriptions(50);
+    const page3 = createMockSubscriptions(20);
+
+    mockSubscriptionsList
+      .mockResolvedValueOnce({
+        data: { items: page1, nextPageToken: 'token1' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page2, nextPageToken: 'token2' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: page3 },
+      });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result.length).toBe(120);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(3);
+  });
+
+  it('should handle exactly 50 subscriptions with nextPageToken then empty second page', async () => {
+    const client = createMockYouTubeClient();
+    const page1 = createMockSubscriptions(50);
+
+    mockSubscriptionsList
+      .mockResolvedValueOnce({
+        data: { items: page1, nextPageToken: 'token1' },
+      })
+      .mockResolvedValueOnce({
+        data: { items: [] },
+      });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result.length).toBe(50);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(2);
+  });
+
+  it('should handle single page with less than 50 subscriptions', async () => {
+    const client = createMockYouTubeClient();
+    const page1 = createMockSubscriptions(35);
+
+    mockSubscriptionsList.mockResolvedValueOnce({
+      data: { items: page1 },
+    });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result.length).toBe(35);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(1);
+  });
+
+  it('should use default maxSubscriptions of 500', async () => {
+    const client = createMockYouTubeClient();
+
+    // Create 11 pages of 50 = 550 total, but should stop at 500
+    for (let i = 0; i < 10; i++) {
+      mockSubscriptionsList.mockResolvedValueOnce({
+        data: { items: createMockSubscriptions(50), nextPageToken: `token${i + 1}` },
+      });
+    }
+    // 11th page won't be fetched because we hit 500 after 10 pages
+    mockSubscriptionsList.mockResolvedValueOnce({
+      data: { items: createMockSubscriptions(50) },
+    });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result.length).toBe(500);
+    // Should stop at 10 pages (500 items)
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(10);
+  });
+
+  it('should handle response with undefined items gracefully', async () => {
+    const client = createMockYouTubeClient();
+    mockSubscriptionsList.mockResolvedValueOnce({
+      data: { items: undefined },
+    });
+
+    const result = await getAllUserSubscriptions(client);
+
+    expect(result).toEqual([]);
+    expect(mockSubscriptionsList).toHaveBeenCalledTimes(1);
   });
 });
 

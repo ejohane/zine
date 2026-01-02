@@ -22,7 +22,7 @@ import { subscriptions, userItems, subscriptionItems, providerConnections } from
 import { logger } from '../../lib/logger';
 import {
   getYouTubeClientForConnection,
-  getUserSubscriptions as getYouTubeSubscriptions,
+  getAllUserSubscriptions,
   searchChannels,
 } from '../../providers/youtube';
 import {
@@ -532,7 +532,7 @@ export const subscriptionsRouter = router({
             connection,
             ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
           );
-          const subs = await getYouTubeSubscriptions(client);
+          const subs = await getAllUserSubscriptions(client, 500);
           providerSubs = subs
             .map((s) => ({
               id: s.snippet?.resourceId?.channelId || '',
