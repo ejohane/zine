@@ -16,6 +16,7 @@ import type { youtube_v3 } from 'googleapis';
 import type { YouTubeClient } from './youtube';
 import {
   getChannelDetails,
+  getUploadsPlaylistId,
   getChannelUploadsPlaylistId,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getYouTubeClientForConnection,
@@ -331,11 +332,43 @@ describe('getChannelDetails', () => {
 });
 
 // ============================================================================
-// getChannelUploadsPlaylistId Tests
+// getUploadsPlaylistId Tests (New deterministic function - no API call)
 // ============================================================================
 
-describe('getChannelUploadsPlaylistId', () => {
-  it('should return uploads playlist ID', async () => {
+describe('getUploadsPlaylistId', () => {
+  it('should convert UC prefix to UU prefix', () => {
+    expect(getUploadsPlaylistId('UCxxxxxx')).toBe('UUxxxxxx');
+  });
+
+  it('should handle full channel IDs', () => {
+    expect(getUploadsPlaylistId('UCef29bYGgUSoJjVkqhcAPkw')).toBe('UUef29bYGgUSoJjVkqhcAPkw');
+  });
+
+  it('should throw for invalid channel ID without UC prefix', () => {
+    expect(() => getUploadsPlaylistId('invalid123')).toThrow(
+      'Invalid YouTube channel ID: invalid123. Expected UC prefix.'
+    );
+  });
+
+  it('should throw for UU prefix (already playlist ID)', () => {
+    expect(() => getUploadsPlaylistId('UUxxxxxx')).toThrow(
+      'Invalid YouTube channel ID: UUxxxxxx. Expected UC prefix.'
+    );
+  });
+
+  it('should throw for empty string', () => {
+    expect(() => getUploadsPlaylistId('')).toThrow(
+      'Invalid YouTube channel ID: . Expected UC prefix.'
+    );
+  });
+});
+
+// ============================================================================
+// getChannelUploadsPlaylistId Tests (Deprecated API-based function)
+// ============================================================================
+
+describe('getChannelUploadsPlaylistId (deprecated)', () => {
+  it('should return uploads playlist ID via API', async () => {
     const client = createMockYouTubeClient();
     const mockChannel = createMockChannel();
     mockChannelsList.mockResolvedValue({

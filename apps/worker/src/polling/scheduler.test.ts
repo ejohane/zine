@@ -43,13 +43,14 @@ vi.mock('../lib/rate-limiter', () => ({
 
 // Mock YouTube provider
 const mockGetYouTubeClientForConnection = vi.fn();
-const mockGetChannelUploadsPlaylistId = vi.fn();
 const mockFetchRecentVideos = vi.fn();
 const mockFetchVideoDetails = vi.fn();
 
 vi.mock('../providers/youtube', () => ({
   getYouTubeClientForConnection: (...args: unknown[]) => mockGetYouTubeClientForConnection(...args),
-  getChannelUploadsPlaylistId: (...args: unknown[]) => mockGetChannelUploadsPlaylistId(...args),
+  // getUploadsPlaylistId is now synchronous and deterministic (UC -> UU prefix swap)
+  // No need to mock it - use the real implementation
+  getUploadsPlaylistId: (channelId: string) => 'UU' + channelId.slice(2),
   fetchRecentVideos: (...args: unknown[]) => mockFetchRecentVideos(...args),
   fetchVideoDetails: (...args: unknown[]) => mockFetchVideoDetails(...args),
 }));
@@ -207,7 +208,7 @@ describe('Polling Scheduler', () => {
     mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
     mockDbQueryConnections.findFirst.mockResolvedValue(null);
     mockGetYouTubeClientForConnection.mockResolvedValue({});
-    mockGetChannelUploadsPlaylistId.mockResolvedValue('UUtest123');
+    // getUploadsPlaylistId is now synchronous and deterministic - no mock needed
     mockFetchRecentVideos.mockResolvedValue([]);
     mockFetchVideoDetails.mockResolvedValue(new Map());
     mockGetSpotifyClientForConnection.mockResolvedValue({});

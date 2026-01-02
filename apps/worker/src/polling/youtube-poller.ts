@@ -21,7 +21,7 @@ import { subscriptions } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import {
   getYouTubeClientForConnection,
-  getChannelUploadsPlaylistId,
+  getUploadsPlaylistId,
   fetchRecentVideos,
   fetchVideoDetails,
   type YouTubeClient,
@@ -95,8 +95,8 @@ export async function pollSingleYouTubeSubscription(
 ): Promise<PollingResult> {
   ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
 
-  // Get the channel's uploads playlist
-  const uploadsPlaylistId = await getChannelUploadsPlaylistId(client, sub.providerChannelId);
+  // Get the channel's uploads playlist (deterministic, no API call needed)
+  const uploadsPlaylistId = getUploadsPlaylistId(sub.providerChannelId);
 
   // Fetch recent videos
   const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);

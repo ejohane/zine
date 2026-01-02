@@ -21,7 +21,7 @@ import type { youtube_v3 } from 'googleapis';
 import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import {
   getYouTubeClientForConnection,
-  getChannelUploadsPlaylistId,
+  getUploadsPlaylistId,
   fetchVideoDetails,
   type YouTubeClient,
 } from '../providers/youtube';
@@ -231,8 +231,8 @@ async function fetchLatestYouTubeVideo(
   client: YouTubeClient,
   channelId: string
 ): Promise<YouTubePlaylistItem | null> {
-  // Get the uploads playlist ID for this channel
-  const uploadsPlaylistId = await getChannelUploadsPlaylistId(client, channelId);
+  // Get the uploads playlist ID for this channel (deterministic, no API call)
+  const uploadsPlaylistId = getUploadsPlaylistId(channelId);
 
   // Fetch more recent videos to account for private/scheduled/Shorts filtering
   const response = await client.api.playlistItems.list({

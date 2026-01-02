@@ -39,6 +39,33 @@ import type { Bindings } from '../../types';
 import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maximum YouTube subscriptions to sync per request.
+ *
+ * Cloudflare Workers have a 50 subrequest limit per invocation.
+ * Each YouTube subscription poll requires 2 API calls:
+ *   1. playlistItems.list (fetch videos from uploads playlist)
+ *   2. videos.list (fetch video details/duration for filtering Shorts)
+ *
+ * 20 subs × 2 calls = 40 subrequests, leaving headroom for:
+ *   - Spotify API calls
+ *   - Database operations
+ *   - Token refresh if needed
+ *
+ * If user has more than this, remaining subs will be synced on next request.
+ */
+const MAX_YOUTUBE_SUBS_PER_SYNC = 20;
+
+/**
+ * Maximum Spotify subscriptions to sync per request.
+ * Spotify uses 1 API call per subscription (episodes.list).
+ */
+const MAX_SPOTIFY_SUBS_PER_SYNC = 30;
+
+// ============================================================================
 // Zod Schemas
 // ============================================================================
 
@@ -588,11 +615,45 @@ export const subscriptionsRouter = router({
       errors: [] as string[],
     };
 
-    // 5. Group by provider
-    const byProvider = {
-      YOUTUBE: activeSubs.filter((s) => s.provider === 'YOUTUBE'),
-      SPOTIFY: activeSubs.filter((s) => s.provider === 'SPOTIFY'),
+    // 5. Group by provider and sort by lastPolledAt (oldest first, null = never polled = highest priority)
+    const sortByOldestPoll = (
+      a: { lastPolledAt: number | null },
+      b: { lastPolledAt: number | null }
+    ) => {
+      // Null (never polled) comes first
+      if (a.lastPolledAt === null && b.lastPolledAt === null) return 0;
+      if (a.lastPolledAt === null) return -1;
+      if (b.lastPolledAt === null) return 1;
+      return a.lastPolledAt - b.lastPolledAt;
     };
+
+    const byProvider = {
+      YOUTUBE: activeSubs
+        .filter((s) => s.provider === 'YOUTUBE')
+        .sort(sortByOldestPoll)
+        .slice(0, MAX_YOUTUBE_SUBS_PER_SYNC),
+      SPOTIFY: activeSubs
+        .filter((s) => s.provider === 'SPOTIFY')
+        .sort(sortByOldestPoll)
+        .slice(0, MAX_SPOTIFY_SUBS_PER_SYNC),
+    };
+
+    // Track total counts for logging
+    const totalYouTube = activeSubs.filter((s) => s.provider === 'YOUTUBE').length;
+    const totalSpotify = activeSubs.filter((s) => s.provider === 'SPOTIFY').length;
+    const skippedYouTube = totalYouTube - byProvider.YOUTUBE.length;
+    const skippedSpotify = totalSpotify - byProvider.SPOTIFY.length;
+
+    if (skippedYouTube > 0 || skippedSpotify > 0) {
+      logger.info('syncAll: limiting subscriptions due to subrequest budget', {
+        totalYouTube,
+        syncingYouTube: byProvider.YOUTUBE.length,
+        skippedYouTube,
+        totalSpotify,
+        syncingSpotify: byProvider.SPOTIFY.length,
+        skippedSpotify,
+      });
+    }
 
     // 6. Process YouTube subscriptions
     if (byProvider.YOUTUBE.length > 0) {
@@ -688,11 +749,17 @@ export const subscriptionsRouter = router({
       }
     }
 
+    // Calculate if there are remaining subscriptions that weren't synced
+    const hasMoreToSync = skippedYouTube > 0 || skippedSpotify > 0;
+
     logger.info('syncAll completed', {
       userId: ctx.userId,
       synced: results.synced,
       itemsFound: results.itemsFound,
       errorCount: results.errors.length,
+      hasMoreToSync,
+      skippedYouTube,
+      skippedSpotify,
     });
 
     return {
@@ -700,6 +767,9 @@ export const subscriptionsRouter = router({
       synced: results.synced,
       itemsFound: results.itemsFound,
       errors: results.errors,
+      // Let client know if they should sync again to get remaining subs
+      hasMoreToSync,
+      remaining: skippedYouTube + skippedSpotify,
     };
   }),
 

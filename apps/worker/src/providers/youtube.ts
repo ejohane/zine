@@ -141,10 +141,36 @@ export async function getYouTubeClientForConnection(
 // ============================================================================
 
 /**
- * Get the uploads playlist ID for a YouTube channel
+ * Get the uploads playlist ID for a YouTube channel (deterministic, no API call)
  *
  * Every YouTube channel has a hidden "uploads" playlist containing all their videos.
- * This playlist ID is needed to fetch the channel's videos efficiently.
+ * The playlist ID follows a deterministic pattern: replace "UC" prefix with "UU".
+ *
+ * YouTube API Cost: 0 quota units (no API call needed!)
+ *
+ * @param channelId - YouTube channel ID (starts with UC)
+ * @returns Uploads playlist ID (starts with UU)
+ * @throws Error if channelId doesn't start with UC
+ *
+ * @example
+ * ```typescript
+ * const playlistId = getUploadsPlaylistId('UCxxxxxx');
+ * // Returns 'UUxxxxxx'
+ * ```
+ */
+export function getUploadsPlaylistId(channelId: string): string {
+  if (!channelId.startsWith('UC')) {
+    throw new Error(`Invalid YouTube channel ID: ${channelId}. Expected UC prefix.`);
+  }
+  return 'UU' + channelId.slice(2);
+}
+
+/**
+ * Get the uploads playlist ID for a YouTube channel via API call
+ *
+ * @deprecated Use getUploadsPlaylistId() instead - it's deterministic and requires no API call.
+ * This function is kept for backwards compatibility and edge cases where the channel ID
+ * format might differ.
  *
  * YouTube API Cost: 1 quota unit
  *
@@ -152,12 +178,6 @@ export async function getYouTubeClientForConnection(
  * @param channelId - YouTube channel ID (starts with UC)
  * @returns Uploads playlist ID (starts with UU)
  * @throws Error if channel not found or has no uploads playlist
- *
- * @example
- * ```typescript
- * const playlistId = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
- * // Returns 'UUxxxxxx' (same suffix as channel ID)
- * ```
  */
 export async function getChannelUploadsPlaylistId(
   client: YouTubeClient,
