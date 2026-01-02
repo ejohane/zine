@@ -192,10 +192,12 @@ interface MockConnection {
 
 describe('Polling Scheduler', () => {
   const MOCK_NOW = 1705320000000;
+  // Store original Date.now for restoration
+  const originalDateNow = Date.now;
 
   beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(MOCK_NOW);
+    // Mock Date.now directly (vi.setSystemTime not available in Workers pool)
+    Date.now = vi.fn(() => MOCK_NOW);
     vi.clearAllMocks();
 
     // Default mock implementations
@@ -214,7 +216,7 @@ describe('Polling Scheduler', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    Date.now = originalDateNow;
   });
 
   // ==========================================================================

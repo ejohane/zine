@@ -128,9 +128,11 @@ function createSuccessfulTokenResponse(overrides?: { refresh_token?: string }) {
 // Test Setup
 // ============================================================================
 
+const originalDateNow = Date.now;
+
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(MOCK_NOW);
+  // Mock Date.now directly (vi.setSystemTime not available in Workers pool)
+  Date.now = vi.fn(() => MOCK_NOW);
   vi.clearAllMocks();
 
   // Reset default mock behaviors
@@ -141,7 +143,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.useRealTimers();
+  Date.now = originalDateNow;
 });
 
 // ============================================================================
