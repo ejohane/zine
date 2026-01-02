@@ -631,30 +631,55 @@ export async function fetchRecentVideos(
   return (response.data.items ?? []).filter((item) => item.status?.privacyStatus === 'public');
 }
 
-// Get user's subscriptions (for discovery)
+/**
+ * Get the authenticated user's YouTube subscriptions (single page).
+ * For fetching ALL subscriptions, use getAllUserSubscriptions().
+ *
+ * YouTube API Cost: 1 quota unit
+ *
+ * @param client - Authenticated YouTube client
+ * @param maxResults - Maximum subscriptions to fetch (default: 50, max: 50)
+ * @returns Array of subscription objects with channel details
+ */
 export async function getUserSubscriptions(
   client: YouTubeClient,
-  pageToken?: string
-): Promise<{ items: Subscription[]; nextPageToken?: string }> {
-  const response = await client.api.subscriptions.list({
-    part: ['snippet'],
-    mine: true,
-    maxResults: 50,
-    pageToken,
-  });
+  maxResults: number = 50
+): Promise<youtube_v3.Schema$Subscription[]>;
 
-  return {
-    items:
-      response.data.items?.map((item) => ({
-        channelId: item.snippet?.resourceId?.channelId!,
-        title: item.snippet?.title!,
-        description: item.snippet?.description!,
-        thumbnailUrl: item.snippet?.thumbnails?.high?.url!,
-      })) ?? [],
-    nextPageToken: response.data.nextPageToken ?? undefined,
-  };
-}
+/**
+ * Get ALL user subscriptions with automatic pagination.
+ *
+ * Fetches all pages of subscriptions for users with many subscriptions.
+ * Use this when you need complete subscription data (e.g., discovery UI).
+ *
+ * YouTube API Cost: 1 quota unit per page (50 items per page)
+ *
+ * @param client - Authenticated YouTube client
+ * @param maxSubscriptions - Maximum subscriptions to fetch (default: 500)
+ * @returns Array of all subscriptions up to maxSubscriptions
+ *
+ * @example
+ * // Fetch all subscriptions (up to 500)
+ * const allSubs = await getAllUserSubscriptions(client);
+ *
+ * // Fetch up to 100 subscriptions
+ * const subs = await getAllUserSubscriptions(client, 100);
+ */
+export async function getAllUserSubscriptions(
+  client: YouTubeClient,
+  maxSubscriptions: number = 500
+): Promise<youtube_v3.Schema$Subscription[]>;
 ```
+
+### When to Use Which Function
+
+| Function                  | Use Case                        | Quota Cost |
+| ------------------------- | ------------------------------- | ---------- |
+| `getUserSubscriptions`    | Quick check, single page needed | 1 unit     |
+| `getAllUserSubscriptions` | Discovery UI, complete list     | 1-10 units |
+
+For the discovery UI (`discover.available` endpoint), always use
+`getAllUserSubscriptions` to ensure users see all their subscriptions.
 
 ### YouTube Quota Management
 
