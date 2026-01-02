@@ -27,7 +27,7 @@ crons = ["0 * * * *"]  # Run every hour
 # Observability settings
 [observability]
 [observability.logs]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 invocation_logs = true
 persist = true
@@ -59,7 +59,7 @@ ENVIRONMENT = "staging"
 crons = ["0 * * * *"]  # Run every hour
 [env.staging.observability]
 [env.staging.observability.logs]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 invocation_logs = true
 persist = true
@@ -89,7 +89,7 @@ ENVIRONMENT = "production"
 crons = ["0 * * * *"]  # Run every hour
 [env.production.observability]
 [env.production.observability.logs]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 invocation_logs = true
 persist = true
