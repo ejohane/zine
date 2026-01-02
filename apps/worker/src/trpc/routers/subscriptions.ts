@@ -33,6 +33,10 @@ import {
 import type { ProviderConnection } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 import { triggerInitialFetch, type InitialFetchEnv } from '../../subscriptions/initial-fetch';
+import { pollSingleYouTubeSubscription } from '../../polling/youtube-poller';
+import { pollSingleSpotifySubscription } from '../../polling/spotify-poller';
+import type { Bindings } from '../../types';
+import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
 
 // ============================================================================
 // Zod Schemas
@@ -490,12 +494,213 @@ export const subscriptionsRouter = router({
     // 5. Update rate limit (store current timestamp with 5 min TTL)
     await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 300 });
 
-    // 6. TODO: Call polling function directly (will be implemented in zine-teq.19)
-    // const result = await pollSingleSubscription(sub, connection, ctx.env);
-    // return { success: true, itemsFound: result.itemsFound };
+    // 6. Call appropriate polling function based on provider
+    let result: { newItems: number };
 
-    // For now, return placeholder result
-    return { success: true as const, itemsFound: 0 };
+    try {
+      if (sub.provider === 'YOUTUBE') {
+        const client = await getYouTubeClientForConnection(
+          connection as ProviderConnection,
+          ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+        );
+        result = await pollSingleYouTubeSubscription(
+          sub as PollingSubscription,
+          client,
+          ctx.userId,
+          ctx.env as Bindings,
+          ctx.db as unknown as DrizzleDB
+        );
+      } else if (sub.provider === 'SPOTIFY') {
+        const client = await getSpotifyClientForConnection(
+          connection as ProviderConnection,
+          ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+        );
+        result = await pollSingleSpotifySubscription(
+          sub as PollingSubscription,
+          client,
+          ctx.userId,
+          ctx.env as Bindings,
+          ctx.db as unknown as DrizzleDB
+        );
+      } else {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Unsupported provider: ${sub.provider}`,
+        });
+      }
+    } catch (err) {
+      // Log the error but wrap in TRPCError for consistent client handling
+      logger.error('syncNow polling failed', {
+        subscriptionId: input.subscriptionId,
+        provider: sub.provider,
+        error: err,
+      });
+
+      // Re-throw TRPCErrors as-is, wrap others
+      if (err instanceof TRPCError) {
+        throw err;
+      }
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to sync subscription',
+        cause: err,
+      });
+    }
+
+    return { success: true as const, itemsFound: result.newItems };
+  }),
+
+  /**
+   * Sync all active subscriptions for the current user (rate limited)
+   *
+   * Rate limit: 1 sync-all per 2 minutes per user
+   *
+   * @throws TOO_MANY_REQUESTS if user rate limit exceeded
+   * @returns Summary of sync results
+   */
+  syncAll: protectedProcedure.mutation(async ({ ctx }) => {
+    // 1. Check user-level rate limit (2 minutes between sync-all)
+    const rateLimitKey = `sync-all:${ctx.userId}`;
+    const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
+    if (lastSync && Date.now() - parseInt(lastSync, 10) < 2 * 60 * 1000) {
+      throw new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Please wait 2 minutes between full syncs',
+      });
+    }
+
+    // 2. Get all active subscriptions for user
+    const activeSubs = await ctx.db.query.subscriptions.findMany({
+      where: and(eq(subscriptions.userId, ctx.userId), eq(subscriptions.status, 'ACTIVE')),
+    });
+
+    if (activeSubs.length === 0) {
+      return { success: true as const, synced: 0, itemsFound: 0, errors: [] as string[] };
+    }
+
+    // 3. Update rate limit immediately (before processing)
+    await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 120 });
+
+    // 4. Initialize results
+    const results = {
+      synced: 0,
+      itemsFound: 0,
+      errors: [] as string[],
+    };
+
+    // 5. Group by provider
+    const byProvider = {
+      YOUTUBE: activeSubs.filter((s) => s.provider === 'YOUTUBE'),
+      SPOTIFY: activeSubs.filter((s) => s.provider === 'SPOTIFY'),
+    };
+
+    // 6. Process YouTube subscriptions
+    if (byProvider.YOUTUBE.length > 0) {
+      const ytConnection = await ctx.db.query.providerConnections.findFirst({
+        where: and(
+          eq(providerConnections.userId, ctx.userId),
+          eq(providerConnections.provider, 'YOUTUBE'),
+          eq(providerConnections.status, 'ACTIVE')
+        ),
+      });
+
+      if (ytConnection) {
+        try {
+          const client = await getYouTubeClientForConnection(
+            ytConnection as ProviderConnection,
+            ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+          );
+
+          for (const sub of byProvider.YOUTUBE) {
+            try {
+              const result = await pollSingleYouTubeSubscription(
+                sub as PollingSubscription,
+                client,
+                ctx.userId,
+                ctx.env as Bindings,
+                ctx.db as unknown as DrizzleDB
+              );
+              results.synced++;
+              results.itemsFound += result.newItems;
+            } catch (err) {
+              logger.error('syncAll: YouTube sub failed', {
+                subId: sub.id,
+                name: sub.name,
+                error: err,
+              });
+              results.errors.push(`YouTube: ${sub.name}`);
+            }
+          }
+        } catch (err) {
+          logger.error('syncAll: YouTube client creation failed', { error: err });
+          results.errors.push('YouTube connection error');
+        }
+      } else {
+        logger.warn('syncAll: YouTube subscriptions exist but no active connection');
+        results.errors.push('YouTube not connected');
+      }
+    }
+
+    // 7. Process Spotify subscriptions
+    if (byProvider.SPOTIFY.length > 0) {
+      const spConnection = await ctx.db.query.providerConnections.findFirst({
+        where: and(
+          eq(providerConnections.userId, ctx.userId),
+          eq(providerConnections.provider, 'SPOTIFY'),
+          eq(providerConnections.status, 'ACTIVE')
+        ),
+      });
+
+      if (spConnection) {
+        try {
+          const client = await getSpotifyClientForConnection(
+            spConnection as ProviderConnection,
+            ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+          );
+
+          for (const sub of byProvider.SPOTIFY) {
+            try {
+              const result = await pollSingleSpotifySubscription(
+                sub as PollingSubscription,
+                client,
+                ctx.userId,
+                ctx.env as Bindings,
+                ctx.db as unknown as DrizzleDB
+              );
+              results.synced++;
+              results.itemsFound += result.newItems;
+            } catch (err) {
+              logger.error('syncAll: Spotify sub failed', {
+                subId: sub.id,
+                name: sub.name,
+                error: err,
+              });
+              results.errors.push(`Spotify: ${sub.name}`);
+            }
+          }
+        } catch (err) {
+          logger.error('syncAll: Spotify client creation failed', { error: err });
+          results.errors.push('Spotify connection error');
+        }
+      } else {
+        logger.warn('syncAll: Spotify subscriptions exist but no active connection');
+        results.errors.push('Spotify not connected');
+      }
+    }
+
+    logger.info('syncAll completed', {
+      userId: ctx.userId,
+      synced: results.synced,
+      itemsFound: results.itemsFound,
+      errorCount: results.errors.length,
+    });
+
+    return {
+      success: true as const,
+      synced: results.synced,
+      itemsFound: results.itemsFound,
+      errors: results.errors,
+    };
   }),
 
   /**
