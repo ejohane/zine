@@ -47,6 +47,7 @@ export const appRouter = router({
     pause: subscriptionsRouter.pause,
     resume: subscriptionsRouter.resume,
     syncNow: subscriptionsRouter.syncNow,
+    syncAll: subscriptionsRouter.syncAll,
     discover: subscriptionsRouter.discover,
   }),
 });

@@ -1,5 +1,5 @@
 import { Surface, useToast } from 'heroui-native';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -92,16 +92,20 @@ export default function InboxScreen() {
     syncAll();
   }, [syncAll, isOffline, toast]);
 
-  // Toast for sync results
+  // Toast for sync results - use ref to prevent duplicate toasts
+  const lastToastResultRef = useRef<typeof lastResult>(null);
   useEffect(() => {
     if (!lastResult) return;
+    // Skip if we've already shown a toast for this exact result
+    if (lastResult === lastToastResultRef.current) return;
+    lastToastResultRef.current = lastResult;
 
     if (lastResult.success && lastResult.itemsFound > 0) {
       showSuccess(toast, lastResult.message);
     } else if (lastResult.success && lastResult.synced > 0 && lastResult.itemsFound === 0) {
       showSuccess(toast, lastResult.message); // "All caught up!"
     } else if (!lastResult.success) {
-      showError(toast, new Error(lastResult.message), 'Sync failed', 'sync');
+      showError(toast, new Error(lastResult.message || 'Sync failed'), 'Sync failed', 'sync');
     }
     // Don't show toast for "No subscriptions to sync"
   }, [lastResult, toast]);

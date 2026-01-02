@@ -42,10 +42,8 @@ export function useSyncAll(): UseSyncAllReturn {
   const [lastResult, setLastResult] = useState<SyncAllResult | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // NOTE: Using type assertion since syncAll mutation is added in zine-6m2.4
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mutation = (trpc as any).subscriptions.syncAll.useMutation({
-    onSuccess: (data: { synced: number; itemsFound: number; errors: string[] }) => {
+  const mutation = trpc.subscriptions.syncAll.useMutation({
+    onSuccess: (data) => {
       // Format user-friendly message
       let message: string;
       if (data.itemsFound > 0) {
@@ -71,10 +69,9 @@ export function useSyncAll(): UseSyncAllReturn {
       setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
 
       // Invalidate inbox cache to show new items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).items.inbox.invalidate();
+      utils.items.inbox.invalidate();
     },
-    onError: (error: { data?: { code?: string }; message?: string }) => {
+    onError: (error) => {
       if (error.data?.code === 'TOO_MANY_REQUESTS') {
         const match = error.message?.match(/(\d+)\s*(minutes?|seconds?)/i);
         let seconds = DEFAULT_COOLDOWN_SECONDS;
@@ -92,12 +89,13 @@ export function useSyncAll(): UseSyncAllReturn {
           message: `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
         });
       } else {
+        const errorMessage = error.message ?? 'Sync failed';
         setLastResult({
           success: false,
           synced: 0,
           itemsFound: 0,
-          errors: [error.message || 'Unknown error'],
-          message: error.message || 'Sync failed',
+          errors: [errorMessage],
+          message: errorMessage,
         });
       }
     },
