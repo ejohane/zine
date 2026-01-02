@@ -927,6 +927,335 @@ describe('Subscriptions Router', () => {
       );
     });
   });
+
+  // ==========================================================================
+  // subscriptions.syncAll Tests
+  // ==========================================================================
+
+  describe('subscriptions.syncAll', () => {
+    /**
+     * Mock caller for syncAll mutation
+     */
+    function createMockSyncAllCaller(ctx: ReturnType<typeof createMockContext>) {
+      return {
+        syncAll: async () => {
+          if (!ctx.userId) {
+            throw new TRPCError({ code: 'UNAUTHORIZED' });
+          }
+
+          // Check user-level rate limit (2 minutes between sync-all)
+          const rateLimitKey = `sync-all:${ctx.userId}`;
+          const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
+          if (lastSync && Date.now() - parseInt(lastSync, 10) < 2 * 60 * 1000) {
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message: 'Please wait 2 minutes between full syncs',
+            });
+          }
+
+          // Get all active subscriptions for user
+          const activeSubs = await ctx.db.query.subscriptions.findMany();
+          const filteredSubs = activeSubs.filter(
+            (s: { userId: string; status: string }) =>
+              s.userId === ctx.userId && s.status === 'ACTIVE'
+          );
+
+          if (filteredSubs.length === 0) {
+            return { success: true as const, synced: 0, itemsFound: 0, errors: [] as string[] };
+          }
+
+          // Update rate limit immediately (before processing)
+          await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), {
+            expirationTtl: 120,
+          });
+
+          // Simulate sync results - for testing we'll mock based on connection availability
+          const results = {
+            synced: 0,
+            itemsFound: 0,
+            errors: [] as string[],
+          };
+
+          // Group by provider
+          const byProvider = {
+            YOUTUBE: filteredSubs.filter((s: { provider: string }) => s.provider === 'YOUTUBE'),
+            SPOTIFY: filteredSubs.filter((s: { provider: string }) => s.provider === 'SPOTIFY'),
+          };
+
+          // Process YouTube subscriptions
+          if (byProvider.YOUTUBE.length > 0) {
+            const ytConnection = await ctx.db.query.providerConnections.findFirst();
+            if (ytConnection && ytConnection.status === 'ACTIVE') {
+              results.synced += byProvider.YOUTUBE.length;
+            } else {
+              results.errors.push('YouTube not connected');
+            }
+          }
+
+          // Process Spotify subscriptions
+          if (byProvider.SPOTIFY.length > 0) {
+            const spConnection = await ctx.db.query.providerConnections.findFirst();
+            if (spConnection && spConnection.status === 'ACTIVE') {
+              results.synced += byProvider.SPOTIFY.length;
+            } else {
+              results.errors.push('Spotify not connected');
+            }
+          }
+
+          return {
+            success: true as const,
+            synced: results.synced,
+            itemsFound: results.itemsFound,
+            errors: results.errors,
+          };
+        },
+      };
+    }
+
+    describe('authentication', () => {
+      it('should reject unauthenticated requests', async () => {
+        const ctx = createMockContext(null);
+        const caller = createMockSyncAllCaller(ctx);
+
+        await expect(caller.syncAll()).rejects.toThrow(TRPCError);
+        await expect(caller.syncAll()).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+        });
+      });
+    });
+
+    describe('rate limiting', () => {
+      it('should enforce 2-minute cooldown between calls', async () => {
+        const subscription = mockDbResults.subscription({ status: 'ACTIVE' });
+        const connection = mockDbResults.providerConnection({ status: 'ACTIVE' });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        // First call should succeed
+        const result1 = await caller.syncAll();
+        expect(result1.success).toBe(true);
+
+        // Second call within 2 minutes should fail
+        await expect(caller.syncAll()).rejects.toThrow(TRPCError);
+        await expect(caller.syncAll()).rejects.toMatchObject({
+          code: 'TOO_MANY_REQUESTS',
+          message: 'Please wait 2 minutes between full syncs',
+        });
+      });
+
+      it('should allow sync after 2-minute cooldown expires', async () => {
+        const subscription = mockDbResults.subscription({ status: 'ACTIVE' });
+        const connection = mockDbResults.providerConnection({ status: 'ACTIVE' });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        // First call should succeed
+        const result1 = await caller.syncAll();
+        expect(result1.success).toBe(true);
+
+        // Advance time past 2 minutes
+        vi.advanceTimersByTime(2 * 60 * 1000 + 1000);
+
+        // Second call should now succeed
+        const result2 = await caller.syncAll();
+        expect(result2.success).toBe(true);
+      });
+
+      it('should update rate limit timestamp after successful sync', async () => {
+        const subscription = mockDbResults.subscription({ status: 'ACTIVE' });
+        const connection = mockDbResults.providerConnection({ status: 'ACTIVE' });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        await caller.syncAll();
+
+        // Verify KV was updated with rate limit timestamp
+        expect(ctx.env.OAUTH_STATE_KV.put).toHaveBeenCalledWith(
+          `sync-all:${TEST_USER_ID}`,
+          String(MOCK_NOW),
+          { expirationTtl: 120 }
+        );
+      });
+    });
+
+    describe('subscription processing', () => {
+      it('should return synced: 0 when user has no subscriptions', async () => {
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.synced).toBe(0);
+        expect(result.itemsFound).toBe(0);
+        expect(result.errors).toEqual([]);
+      });
+
+      it('should return synced: 0 when user has no active subscriptions', async () => {
+        const pausedSubscription = mockDbResults.subscription({ status: 'PAUSED' });
+        const unsubscribedSubscription = mockDbResults.subscription({
+          id: 'sub_unsub_123',
+          status: 'UNSUBSCRIBED',
+        });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([
+          pausedSubscription,
+          unsubscribedSubscription,
+        ]);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.synced).toBe(0);
+        expect(result.itemsFound).toBe(0);
+        expect(result.errors).toEqual([]);
+      });
+
+      it('should count synced subscriptions correctly', async () => {
+        const youtubeSubscription1 = mockDbResults.subscription({
+          id: 'sub_yt_1',
+          provider: 'YOUTUBE',
+          status: 'ACTIVE',
+        });
+        const youtubeSubscription2 = mockDbResults.subscription({
+          id: 'sub_yt_2',
+          provider: 'YOUTUBE',
+          providerChannelId: 'UCtest456',
+          status: 'ACTIVE',
+        });
+
+        const connection = mockDbResults.providerConnection({
+          provider: 'YOUTUBE',
+          status: 'ACTIVE',
+        });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([
+          youtubeSubscription1,
+          youtubeSubscription2,
+        ]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.synced).toBe(2);
+        expect(result.success).toBe(true);
+      });
+
+      it('should report error when YouTube connection is missing', async () => {
+        const youtubeSubscription = mockDbResults.subscription({
+          provider: 'YOUTUBE',
+          status: 'ACTIVE',
+        });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([youtubeSubscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(null);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.synced).toBe(0);
+        expect(result.errors).toContain('YouTube not connected');
+      });
+
+      it('should report error when Spotify connection is missing', async () => {
+        const spotifySubscription = mockDbResults.subscription({
+          id: 'sub_spotify_123',
+          provider: 'SPOTIFY',
+          providerChannelId: '0testshow123456789012',
+          status: 'ACTIVE',
+        });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([spotifySubscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(null);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.synced).toBe(0);
+        expect(result.errors).toContain('Spotify not connected');
+      });
+
+      it('should not update rate limit when no active subscriptions', async () => {
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        await caller.syncAll();
+
+        // Should not have called put for rate limit
+        expect(ctx.env.OAUTH_STATE_KV.put).not.toHaveBeenCalledWith(
+          expect.stringContaining('sync-all:'),
+          expect.anything(),
+          expect.anything()
+        );
+      });
+    });
+
+    describe('result structure', () => {
+      it('should return correct structure on success', async () => {
+        const subscription = mockDbResults.subscription({ status: 'ACTIVE' });
+        const connection = mockDbResults.providerConnection({ status: 'ACTIVE' });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result).toHaveProperty('success', true);
+        expect(result).toHaveProperty('synced');
+        expect(result).toHaveProperty('itemsFound');
+        expect(result).toHaveProperty('errors');
+        expect(Array.isArray(result.errors)).toBe(true);
+      });
+
+      it('should return success with errors array when some subscriptions fail', async () => {
+        // Test with a subscription that has no connection (will fail)
+        const spotifySubscription = mockDbResults.subscription({
+          provider: 'SPOTIFY',
+          providerChannelId: '0testshow123456789012',
+          status: 'ACTIVE',
+        });
+
+        mockDbQuerySubscriptions.findMany.mockResolvedValue([spotifySubscription]);
+        mockDbQueryConnections.findFirst.mockResolvedValue(null);
+
+        const ctx = createMockContext();
+        const caller = createMockSyncAllCaller(ctx);
+
+        const result = await caller.syncAll();
+
+        expect(result.success).toBe(true);
+        expect(result.synced).toBe(0);
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+    });
+  });
 });
 
 // ============================================================================

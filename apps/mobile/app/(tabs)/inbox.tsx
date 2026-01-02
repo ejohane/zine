@@ -1,9 +1,9 @@
-import { Surface } from 'heroui-native';
+import { Surface, useToast } from 'heroui-native';
+import { useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { useToast } from 'heroui-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
@@ -16,6 +16,8 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
+import { useSyncAll } from '@/hooks/use-sync-all';
+import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
@@ -76,6 +78,33 @@ export default function InboxScreen() {
   const { data, isLoading, error } = useInboxItems();
   const bookmarkMutation = useBookmarkItem();
   const archiveMutation = useArchiveItem();
+
+  // Sync hooks
+  const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
+  const { isConnected, isInternetReachable } = useNetworkStatus();
+  const isOffline = !isConnected || isInternetReachable === false;
+
+  const handleRefresh = useCallback(() => {
+    if (isOffline) {
+      showError(toast, new Error('No internet connection'), 'Cannot sync while offline', 'sync');
+      return;
+    }
+    syncAll();
+  }, [syncAll, isOffline, toast]);
+
+  // Toast for sync results
+  useEffect(() => {
+    if (!lastResult) return;
+
+    if (lastResult.success && lastResult.itemsFound > 0) {
+      showSuccess(toast, lastResult.message);
+    } else if (lastResult.success && lastResult.synced > 0 && lastResult.itemsFound === 0) {
+      showSuccess(toast, lastResult.message); // "All caught up!"
+    } else if (!lastResult.success) {
+      showError(toast, new Error(lastResult.message), 'Sync failed', 'sync');
+    }
+    // Don't show toast for "No subscriptions to sync"
+  }, [lastResult, toast]);
 
   const handleBookmark = (id: string) => {
     bookmarkMutation.mutate(
@@ -150,15 +179,19 @@ export default function InboxScreen() {
           <LoadingState />
         ) : error ? (
           <ErrorState message={error.message} />
-        ) : inboxItems.length === 0 ? (
-          <InboxEmptyState colors={colors} />
         ) : (
           <FlatList
             data={inboxItems}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+            contentContainerStyle={[
+              styles.listContent,
+              inboxItems.length === 0 && styles.emptyListContent,
+            ]}
             showsVerticalScrollIndicator={false}
+            onRefresh={handleRefresh}
+            refreshing={isSyncing}
+            ListEmptyComponent={<InboxEmptyState colors={colors} />}
           />
         )}
       </SafeAreaView>
@@ -193,6 +226,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing['3xl'],
+  },
+  emptyListContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   // Empty state (custom for inbox)
   emptyState: {
