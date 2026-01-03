@@ -31,6 +31,7 @@ import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oe
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
 import { logger } from './logger';
+import { parseISO8601Duration } from './duration';
 
 // ============================================================================
 // Types
@@ -84,25 +85,117 @@ const previewLogger = logger.child('link-preview');
 // ============================================================================
 
 /**
+ * YouTube Data API video response shape (partial, just what we need)
+ */
+interface YouTubeVideoResponse {
+  items?: Array<{
+    id?: string;
+    snippet?: {
+      title?: string;
+      description?: string;
+      channelTitle?: string;
+      thumbnails?: {
+        maxres?: { url?: string };
+        high?: { url?: string };
+        medium?: { url?: string };
+        default?: { url?: string };
+      };
+    };
+    contentDetails?: {
+      duration?: string;
+    };
+  }>;
+}
+
+/**
  * Fetch YouTube video metadata via YouTube Data API
  *
- * NOTE: The YouTube Data API requires a full client with OAuth2 setup,
- * which is heavyweight for a simple video lookup. For now, we fall back
- * to oEmbed for YouTube even when we have a token, as oEmbed provides
- * sufficient metadata for preview purposes (title, author, thumbnail).
+ * Uses the videos.list endpoint to get full video details including:
+ * - Full description (not truncated like oEmbed)
+ * - Duration
+ * - High-quality thumbnails
  *
- * TODO: Consider implementing a lightweight YouTube API call for duration
- * if oEmbed metadata is insufficient.
+ * YouTube API Cost: 1 quota unit
  */
 async function fetchYouTubeViaAPI(
-  _videoId: string,
-  _accessToken: string
+  videoId: string,
+  accessToken: string
 ): Promise<LinkPreviewResult | null> {
-  // YouTube Data API requires full OAuth2 client setup which is heavyweight
-  // for a simple video lookup. oEmbed provides sufficient metadata for previews.
-  // Return null to fall back to oEmbed.
-  previewLogger.debug('YouTube API fetch not implemented, falling back to oEmbed');
-  return null;
+  try {
+    previewLogger.debug('Fetching YouTube video via Data API', { videoId });
+
+    const url = new URL('https://www.googleapis.com/youtube/v3/videos');
+    url.searchParams.set('part', 'snippet,contentDetails');
+    url.searchParams.set('id', videoId);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      previewLogger.warn('YouTube API request failed', {
+        videoId,
+        status: response.status,
+        statusText: response.statusText,
+      });
+      return null;
+    }
+
+    const data = (await response.json()) as YouTubeVideoResponse;
+    const video = data.items?.[0];
+
+    if (!video?.snippet) {
+      previewLogger.warn('YouTube API returned no video data', { videoId });
+      return null;
+    }
+
+    // Get best available thumbnail
+    const thumbnails = video.snippet.thumbnails;
+    const thumbnailUrl =
+      thumbnails?.maxres?.url ??
+      thumbnails?.high?.url ??
+      thumbnails?.medium?.url ??
+      thumbnails?.default?.url ??
+      null;
+
+    // Parse duration from ISO8601 format (e.g., "PT4M13S")
+    let duration: number | null = null;
+    if (video.contentDetails?.duration) {
+      try {
+        duration = parseISO8601Duration(video.contentDetails.duration);
+      } catch {
+        previewLogger.warn('Failed to parse YouTube duration', {
+          videoId,
+          duration: video.contentDetails.duration,
+        });
+      }
+    }
+
+    previewLogger.debug('YouTube API fetch successful', {
+      videoId,
+      hasDescription: !!video.snippet.description,
+      hasDuration: duration !== null,
+    });
+
+    return {
+      provider: Provider.YOUTUBE,
+      contentType: ContentType.VIDEO,
+      providerId: videoId,
+      title: video.snippet.title ?? 'Untitled Video',
+      creator: video.snippet.channelTitle ?? 'Unknown',
+      thumbnailUrl,
+      duration,
+      canonicalUrl: `https://www.youtube.com/watch?v=${videoId}`,
+      description: video.snippet.description ?? undefined,
+      source: 'provider_api',
+    };
+  } catch (error) {
+    previewLogger.error('YouTube API fetch error', { error, videoId });
+    return null;
+  }
 }
 
 /**
