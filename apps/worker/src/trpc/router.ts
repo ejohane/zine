@@ -4,6 +4,7 @@ import { itemsRouter } from './routers/items';
 import { sourcesRouter } from './routers/sources';
 import { subscriptionsRouter } from './routers/subscriptions';
 import { connectionsRouter } from './routers/connections';
+import { bookmarksRouter } from './routers/bookmarks';
 
 /**
  * Root tRPC router
@@ -11,6 +12,7 @@ import { connectionsRouter } from './routers/connections';
  * Combines all sub-routers:
  * - items: User item operations (inbox, library, bookmark, archive, etc.)
  * - sources: User subscription operations (list, add, remove) [legacy]
+ * - bookmarks: Manual link saving (preview, save)
  * - subscriptions: OAuth-based subscriptions (YouTube, Spotify)
  *   - subscriptions.connections: OAuth provider connection management
  *   - subscriptions.list/add/remove: Subscription CRUD
@@ -25,18 +27,21 @@ import { connectionsRouter } from './routers/connections';
  * trpc.items.inbox.useQuery()
  * trpc.items.library.useQuery()
  * trpc.sources.list.useQuery()
+ * trpc.bookmarks.preview.useQuery({ url })
  * trpc.subscriptions.list.useQuery()
  * trpc.subscriptions.connections.list.useQuery()
  *
  * // Mutations
  * trpc.items.bookmark.useMutation()
  * trpc.sources.add.useMutation()
+ * trpc.bookmarks.save.useMutation()
  * trpc.subscriptions.connections.registerState.useMutation()
  * ```
  */
 export const appRouter = router({
   items: itemsRouter,
   sources: sourcesRouter,
+  bookmarks: bookmarksRouter,
   subscriptions: router({
     // OAuth connection management
     connections: connectionsRouter,
