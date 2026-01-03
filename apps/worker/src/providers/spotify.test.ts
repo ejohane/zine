@@ -16,6 +16,7 @@ import {
   getAllUserSavedShows,
   getShowEpisodes,
   getLatestEpisode,
+  getEpisode,
   getShow,
   searchShows,
   checkSavedShows,
@@ -461,6 +462,151 @@ describe('getLatestEpisode', () => {
     const episode = await getLatestEpisode(client, 'show-id');
 
     expect(episode).toBeNull();
+  });
+});
+
+// ============================================================================
+// getEpisode Tests
+// ============================================================================
+
+describe('getEpisode', () => {
+  const mockFetch = vi.fn();
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = mockFetch;
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('should fetch episode by ID', async () => {
+    const mockEpisodeResponse = createMockSDKEpisode({ id: 'episode-123' });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockEpisodeResponse),
+    });
+
+    const episode = await getEpisode('test-access-token', 'episode-123');
+
+    expect(mockFetch).toHaveBeenCalledWith('https://api.spotify.com/v1/episodes/episode-123', {
+      headers: {
+        Authorization: 'Bearer test-access-token',
+      },
+    });
+    expect(episode).not.toBeNull();
+    expect(episode?.id).toBe('episode-123');
+  });
+
+  it('should return null when episode not found (404)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
+
+    const episode = await getEpisode('test-access-token', 'nonexistent-episode');
+
+    expect(episode).toBeNull();
+  });
+
+  it('should throw error on other API errors', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () => Promise.resolve('Invalid access token'),
+    });
+
+    await expect(getEpisode('invalid-token', 'episode-123')).rejects.toThrow(
+      'Spotify API error: 401 Unauthorized - Invalid access token'
+    );
+  });
+
+  it('should throw error on rate limit', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      text: () => Promise.resolve('Rate limit exceeded'),
+    });
+
+    await expect(getEpisode('test-token', 'episode-123')).rejects.toThrow(
+      'Spotify API error: 429 Too Many Requests - Rate limit exceeded'
+    );
+  });
+
+  it('should transform episode correctly', async () => {
+    const mockEpisodeResponse = createMockSDKEpisode({
+      id: 'ep-transform-test',
+      name: 'Episode Title',
+      description: 'Episode Description',
+      release_date: '2024-01-10',
+      duration_ms: 1800000,
+      external_urls: { spotify: 'https://spotify.com/episode/ep-transform-test' },
+      images: [{ url: 'https://image.jpg', height: 300, width: 300 }],
+      is_playable: true,
+    });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockEpisodeResponse),
+    });
+
+    const episode = await getEpisode('test-token', 'ep-transform-test');
+
+    expect(episode).toEqual({
+      id: 'ep-transform-test',
+      name: 'Episode Title',
+      description: 'Episode Description',
+      releaseDate: '2024-01-10',
+      durationMs: 1800000,
+      externalUrl: 'https://spotify.com/episode/ep-transform-test',
+      images: [{ url: 'https://image.jpg', height: 300, width: 300 }],
+      isPlayable: true,
+    });
+  });
+
+  it('should handle episode with empty description', async () => {
+    const mockEpisodeResponse = createMockSDKEpisode({ description: '' });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockEpisodeResponse),
+    });
+
+    const episode = await getEpisode('test-token', 'episode-123');
+
+    expect(episode?.description).toBe('');
+  });
+
+  it('should handle episode that is not playable', async () => {
+    const mockEpisodeResponse = createMockSDKEpisode({ is_playable: false });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockEpisodeResponse),
+    });
+
+    const episode = await getEpisode('test-token', 'episode-123');
+
+    expect(episode?.isPlayable).toBe(false);
+  });
+
+  it('should handle server error (500)', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      text: () => Promise.resolve('Something went wrong'),
+    });
+
+    await expect(getEpisode('test-token', 'episode-123')).rejects.toThrow(
+      'Spotify API error: 500 Internal Server Error - Something went wrong'
+    );
   });
 });
 

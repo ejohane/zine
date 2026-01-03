@@ -1,0 +1,446 @@
+/**
+ * Link Preview Orchestration Module
+ *
+ * Orchestrates metadata fetching from multiple sources with a priority-based
+ * fallback system for the Manual Link Saving feature.
+ *
+ * Priority order:
+ * 1. Provider APIs (best quality) - When user has OAuth connection
+ *    - YouTube: YouTube Data API
+ *    - Spotify: Spotify API via getEpisode()
+ * 2. oEmbed APIs (good quality) - Fallback, no auth required
+ * 3. Open Graph scraping (fallback) - For generic URLs
+ *
+ * @example
+ * ```typescript
+ * import { fetchLinkPreview } from './lib/link-preview';
+ *
+ * // With OAuth tokens (best quality)
+ * const preview = await fetchLinkPreview('https://youtube.com/watch?v=abc123', {
+ *   accessTokens: { youtube: userYouTubeToken }
+ * });
+ *
+ * // Without tokens (falls back to oEmbed/OG)
+ * const preview = await fetchLinkPreview('https://example.com/article');
+ * ```
+ */
+
+import { ContentType, Provider } from '@zine/shared';
+import { parseLink, type ParsedLink } from './link-parser';
+import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
+import { scrapeOpenGraph } from './opengraph';
+import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
+import { logger } from './logger';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Result of fetching link preview metadata
+ */
+export interface LinkPreviewResult {
+  /** The detected provider */
+  provider: ParsedLink['provider'];
+  /** The content type for this provider */
+  contentType: ParsedLink['contentType'];
+  /** Provider-specific identifier */
+  providerId: string;
+  /** Title of the content */
+  title: string;
+  /** Creator/author name */
+  creator: string;
+  /** URL to thumbnail image */
+  thumbnailUrl: string | null;
+  /** Duration in seconds (for video/podcast content) */
+  duration: number | null;
+  /** Canonical URL to the content */
+  canonicalUrl: string;
+  /** Description/summary of the content */
+  description?: string;
+  /** Source that provided the metadata */
+  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback';
+}
+
+/**
+ * Context for fetching link previews
+ */
+export interface PreviewContext {
+  /** User's valid access tokens for each provider */
+  accessTokens?: {
+    youtube?: string;
+    spotify?: string;
+  };
+}
+
+// ============================================================================
+// Logger
+// ============================================================================
+
+const previewLogger = logger.child('link-preview');
+
+// ============================================================================
+// Provider API Fetchers
+// ============================================================================
+
+/**
+ * Fetch YouTube video metadata via YouTube Data API
+ *
+ * NOTE: The YouTube Data API requires a full client with OAuth2 setup,
+ * which is heavyweight for a simple video lookup. For now, we fall back
+ * to oEmbed for YouTube even when we have a token, as oEmbed provides
+ * sufficient metadata for preview purposes (title, author, thumbnail).
+ *
+ * TODO: Consider implementing a lightweight YouTube API call for duration
+ * if oEmbed metadata is insufficient.
+ */
+async function fetchYouTubeViaAPI(
+  _videoId: string,
+  _accessToken: string
+): Promise<LinkPreviewResult | null> {
+  // YouTube Data API requires full OAuth2 client setup which is heavyweight
+  // for a simple video lookup. oEmbed provides sufficient metadata for previews.
+  // Return null to fall back to oEmbed.
+  previewLogger.debug('YouTube API fetch not implemented, falling back to oEmbed');
+  return null;
+}
+
+/**
+ * Fetch Spotify episode metadata via Spotify API
+ */
+async function fetchSpotifyViaAPI(
+  episodeId: string,
+  accessToken: string,
+  canonicalUrl: string
+): Promise<LinkPreviewResult | null> {
+  try {
+    const episode = await getEpisode(accessToken, episodeId);
+
+    if (!episode) {
+      previewLogger.warn('Spotify episode not found via API', { episodeId });
+      return null;
+    }
+
+    return transformSpotifyEpisode(episode, canonicalUrl);
+  } catch (error) {
+    previewLogger.error('Spotify API fetch failed', { error, episodeId });
+    return null;
+  }
+}
+
+/**
+ * Transform Spotify episode to LinkPreviewResult
+ */
+function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string): LinkPreviewResult {
+  // Get the best available thumbnail
+  const thumbnail = episode.images[0]?.url ?? null;
+
+  return {
+    provider: Provider.SPOTIFY,
+    contentType: ContentType.PODCAST,
+    providerId: episode.id,
+    title: episode.name,
+    creator: 'Spotify', // Episodes don't have direct author, show name would be better but requires extra fetch
+    thumbnailUrl: thumbnail,
+    duration: Math.round(episode.durationMs / 1000), // Convert ms to seconds
+    canonicalUrl,
+    description: episode.description,
+    source: 'provider_api',
+  };
+}
+
+// ============================================================================
+// oEmbed Fetchers
+// ============================================================================
+
+/**
+ * Fetch YouTube metadata via oEmbed
+ */
+async function fetchYouTubeViaOEmbed(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  const oembed = await fetchYouTubeOEmbed(parsedLink.canonicalUrl);
+
+  if (!oembed) {
+    return null;
+  }
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title: oembed.title,
+    creator: oembed.author_name,
+    thumbnailUrl: oembed.thumbnail_url ?? null,
+    duration: null, // oEmbed doesn't provide duration
+    canonicalUrl: parsedLink.canonicalUrl,
+    source: 'oembed',
+  };
+}
+
+/**
+ * Fetch Spotify metadata via oEmbed
+ */
+async function fetchSpotifyViaOEmbed(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  const oembed = await fetchSpotifyOEmbed(parsedLink.canonicalUrl);
+
+  if (!oembed) {
+    return null;
+  }
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title: oembed.title,
+    creator: oembed.author_name,
+    thumbnailUrl: oembed.thumbnail_url ?? null,
+    duration: null, // oEmbed doesn't provide duration
+    canonicalUrl: parsedLink.canonicalUrl,
+    source: 'oembed',
+  };
+}
+
+/**
+ * Fetch Twitter/X metadata via oEmbed
+ */
+async function fetchTwitterViaOEmbed(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  const oembed = await fetchTwitterOEmbed(parsedLink.canonicalUrl);
+
+  if (!oembed) {
+    return null;
+  }
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title: oembed.title,
+    creator: oembed.author_name,
+    thumbnailUrl: null, // Twitter oEmbed doesn't provide thumbnails
+    duration: null,
+    canonicalUrl: parsedLink.canonicalUrl,
+    source: 'oembed',
+  };
+}
+
+// ============================================================================
+// Open Graph Scraper
+// ============================================================================
+
+/**
+ * Fetch metadata via Open Graph scraping
+ */
+async function fetchViaOpenGraph(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  const ogData = await scrapeOpenGraph(parsedLink.canonicalUrl);
+
+  // Must have at least a title to be useful
+  if (!ogData.title) {
+    return null;
+  }
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title: ogData.title,
+    creator: ogData.author ?? ogData.siteName ?? 'Unknown',
+    thumbnailUrl: ogData.image,
+    duration: null,
+    canonicalUrl: ogData.url ?? parsedLink.canonicalUrl,
+    description: ogData.description ?? undefined,
+    source: 'opengraph',
+  };
+}
+
+// ============================================================================
+// Fallback Result
+// ============================================================================
+
+/**
+ * Create a minimal fallback result when all other methods fail
+ */
+function createFallbackResult(parsedLink: ParsedLink): LinkPreviewResult {
+  // Extract a title from the URL as a last resort
+  const url = new URL(parsedLink.canonicalUrl);
+  const pathSegments = url.pathname.split('/').filter(Boolean);
+  const lastSegment = pathSegments[pathSegments.length - 1] ?? url.hostname;
+
+  // Clean up the segment for display (replace dashes/underscores with spaces)
+  const title =
+    lastSegment
+      .replace(/[-_]/g, ' ')
+      .replace(/\.(html?|php|aspx?)$/i, '')
+      .trim() || url.hostname;
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title,
+    creator: url.hostname,
+    thumbnailUrl: null,
+    duration: null,
+    canonicalUrl: parsedLink.canonicalUrl,
+    source: 'fallback',
+  };
+}
+
+// ============================================================================
+// Main Orchestrator
+// ============================================================================
+
+/**
+ * Fetch link preview metadata using a priority-based fallback system.
+ *
+ * Priority order:
+ * 1. Provider API (if user has OAuth token for that provider)
+ * 2. oEmbed API (no auth required)
+ * 3. Open Graph scraping (for generic URLs)
+ * 4. Fallback (minimal result from URL parsing)
+ *
+ * @param url - URL to fetch preview for
+ * @param context - Optional context with user's OAuth tokens
+ * @returns LinkPreviewResult with metadata, or null if URL is invalid
+ *
+ * @example
+ * ```typescript
+ * // With OAuth tokens
+ * const preview = await fetchLinkPreview('https://open.spotify.com/episode/abc123', {
+ *   accessTokens: { spotify: userSpotifyToken }
+ * });
+ *
+ * // Without tokens
+ * const preview = await fetchLinkPreview('https://youtube.com/watch?v=xyz789');
+ *
+ * // Generic URL
+ * const preview = await fetchLinkPreview('https://example.com/article');
+ * ```
+ */
+export async function fetchLinkPreview(
+  url: string,
+  context?: PreviewContext
+): Promise<LinkPreviewResult | null> {
+  // Parse the URL to detect provider
+  const parsedLink = parseLink(url);
+
+  if (!parsedLink) {
+    previewLogger.warn('Invalid URL provided', { url });
+    return null;
+  }
+
+  previewLogger.debug('Fetching link preview', {
+    url,
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    hasYouTubeToken: !!context?.accessTokens?.youtube,
+    hasSpotifyToken: !!context?.accessTokens?.spotify,
+  });
+
+  let result: LinkPreviewResult | null = null;
+
+  // Strategy based on provider
+  switch (parsedLink.provider) {
+    case Provider.YOUTUBE:
+      result = await fetchYouTubePreview(parsedLink, context);
+      break;
+
+    case Provider.SPOTIFY:
+      result = await fetchSpotifyPreview(parsedLink, context);
+      break;
+
+    case Provider.RSS:
+      // RSS provider is used for Twitter/X and generic URLs
+      result = await fetchRssProviderPreview(parsedLink);
+      break;
+
+    case Provider.SUBSTACK:
+      // Substack uses Open Graph
+      result = await fetchViaOpenGraph(parsedLink);
+      break;
+
+    default:
+      // Fallback to Open Graph for unknown providers
+      result = await fetchViaOpenGraph(parsedLink);
+  }
+
+  // If all methods failed, create a minimal fallback
+  if (!result) {
+    previewLogger.debug('All fetch methods failed, using fallback', {
+      url,
+      provider: parsedLink.provider,
+    });
+    result = createFallbackResult(parsedLink);
+  }
+
+  previewLogger.debug('Link preview fetched', {
+    url,
+    source: result.source,
+    hasTitle: !!result.title,
+    hasThumbnail: !!result.thumbnailUrl,
+  });
+
+  return result;
+}
+
+/**
+ * Fetch YouTube preview with fallback chain
+ */
+async function fetchYouTubePreview(
+  parsedLink: ParsedLink,
+  context?: PreviewContext
+): Promise<LinkPreviewResult | null> {
+  // Try Provider API if we have a token
+  if (context?.accessTokens?.youtube) {
+    const apiResult = await fetchYouTubeViaAPI(parsedLink.providerId, context.accessTokens.youtube);
+    if (apiResult) return apiResult;
+  }
+
+  // Fall back to oEmbed
+  const oembedResult = await fetchYouTubeViaOEmbed(parsedLink);
+  if (oembedResult) return oembedResult;
+
+  // Fall back to Open Graph (unlikely to help for YouTube)
+  return fetchViaOpenGraph(parsedLink);
+}
+
+/**
+ * Fetch Spotify preview with fallback chain
+ */
+async function fetchSpotifyPreview(
+  parsedLink: ParsedLink,
+  context?: PreviewContext
+): Promise<LinkPreviewResult | null> {
+  // Try Provider API if we have a token
+  if (context?.accessTokens?.spotify) {
+    const apiResult = await fetchSpotifyViaAPI(
+      parsedLink.providerId,
+      context.accessTokens.spotify,
+      parsedLink.canonicalUrl
+    );
+    if (apiResult) return apiResult;
+  }
+
+  // Fall back to oEmbed
+  const oembedResult = await fetchSpotifyViaOEmbed(parsedLink);
+  if (oembedResult) return oembedResult;
+
+  // Fall back to Open Graph
+  return fetchViaOpenGraph(parsedLink);
+}
+
+/**
+ * Fetch RSS provider preview (Twitter/X and generic URLs)
+ */
+async function fetchRssProviderPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  // Check if this is a Twitter/X URL
+  const isTwitter =
+    parsedLink.canonicalUrl.includes('twitter.com') || parsedLink.canonicalUrl.includes('x.com');
+
+  if (isTwitter) {
+    // Try Twitter oEmbed first
+    const oembedResult = await fetchTwitterViaOEmbed(parsedLink);
+    if (oembedResult) return oembedResult;
+  }
+
+  // Fall back to Open Graph for all RSS provider URLs
+  return fetchViaOpenGraph(parsedLink);
+}

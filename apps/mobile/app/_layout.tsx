@@ -35,6 +35,14 @@ export default function RootLayout() {
                     name="item/[id]"
                     options={{ headerShown: true, headerBackTitle: '' }}
                   />
+                  <Stack.Screen
+                    name="add-link"
+                    options={{
+                      presentation: 'modal',
+                      headerShown: true,
+                      title: 'Add Link',
+                    }}
+                  />
                 </Stack>
                 <StatusBar style="auto" />
               </ToastProvider>

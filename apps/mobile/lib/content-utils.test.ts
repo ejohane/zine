@@ -188,12 +188,12 @@ describe('getProviderLabel', () => {
 // ============================================================================
 
 describe('getContentAspectRatio', () => {
-  it('returns 1 (square) for podcast', () => {
-    expect(getContentAspectRatio('podcast')).toBe(1);
+  it('returns 16/10 for podcast (consistent aspect ratio)', () => {
+    expect(getContentAspectRatio('podcast')).toBeCloseTo(16 / 10);
   });
 
-  it('returns 16/9 for video', () => {
-    expect(getContentAspectRatio('video')).toBeCloseTo(16 / 9);
+  it('returns 16/10 for video (consistent aspect ratio)', () => {
+    expect(getContentAspectRatio('video')).toBeCloseTo(16 / 10);
   });
 
   it('returns 16/10 for article', () => {
@@ -205,17 +205,17 @@ describe('getContentAspectRatio', () => {
   });
 
   it('handles uppercase input', () => {
-    expect(getContentAspectRatio(ContentType.PODCAST)).toBe(1);
+    expect(getContentAspectRatio(ContentType.PODCAST)).toBeCloseTo(16 / 10);
   });
 });
 
 describe('isSquareContent', () => {
-  it('returns true for podcast', () => {
-    expect(isSquareContent('podcast')).toBe(true);
+  it('returns false for podcast (now uses consistent 16:10 aspect ratio)', () => {
+    expect(isSquareContent('podcast')).toBe(false);
   });
 
-  it('returns true for PODCAST', () => {
-    expect(isSquareContent(ContentType.PODCAST)).toBe(true);
+  it('returns false for PODCAST (now uses consistent 16:10 aspect ratio)', () => {
+    expect(isSquareContent(ContentType.PODCAST)).toBe(false);
   });
 
   it('returns false for video', () => {

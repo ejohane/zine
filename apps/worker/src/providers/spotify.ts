@@ -14,7 +14,13 @@
  */
 
 import { SpotifyApi } from '@spotify/web-api-ts-sdk';
-import type { SimplifiedShow, SimplifiedEpisode, Show, AccessToken } from '@spotify/web-api-ts-sdk';
+import type {
+  SimplifiedShow,
+  SimplifiedEpisode,
+  Show,
+  Episode,
+  AccessToken,
+} from '@spotify/web-api-ts-sdk';
 import {
   getValidAccessToken,
   type ProviderConnection,
@@ -243,6 +249,47 @@ export async function getLatestEpisode(
 }
 
 /**
+ * Get a single episode by ID.
+ *
+ * @param accessToken - Decrypted user access token
+ * @param episodeId - Spotify episode ID (22 alphanumeric characters)
+ * @returns Episode details, or null if episode not found
+ *
+ * @example
+ * ```typescript
+ * const accessToken = await getValidAccessToken(connection, env);
+ * const episode = await getEpisode(accessToken, '512ojhOuo1ktJprKbVcKyQ');
+ * if (episode) {
+ *   console.log(episode.name);
+ * }
+ * ```
+ */
+export async function getEpisode(
+  accessToken: string,
+  episodeId: string
+): Promise<SpotifyEpisode | null> {
+  // Use fetch directly since we need to handle 404 gracefully
+  // and the SDK doesn't expose episode.get() directly
+  const response = await fetch(`https://api.spotify.com/v1/episodes/${episodeId}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Spotify API error: ${response.status} ${response.statusText} - ${errorBody}`);
+  }
+
+  const episode = (await response.json()) as Episode;
+  return transformFullEpisode(episode);
+}
+
+/**
  * Get show details by ID.
  *
  * @param client - Authenticated SpotifyApi client
@@ -320,6 +367,27 @@ function transformShow(show: SimplifiedShow | Show): SpotifyShow {
  * Transform SDK's SimplifiedEpisode to our SpotifyEpisode type
  */
 function transformEpisode(episode: SimplifiedEpisode): SpotifyEpisode {
+  return {
+    id: episode.id,
+    name: episode.name,
+    description: episode.description,
+    releaseDate: episode.release_date,
+    durationMs: episode.duration_ms,
+    externalUrl: episode.external_urls.spotify,
+    images: episode.images.map((img) => ({
+      url: img.url,
+      height: img.height,
+      width: img.width,
+    })),
+    isPlayable: episode.is_playable,
+  };
+}
+
+/**
+ * Transform SDK's full Episode to our SpotifyEpisode type
+ * The full Episode type is returned from GET /episodes/{id}
+ */
+function transformFullEpisode(episode: Episode): SpotifyEpisode {
   return {
     id: episode.id,
     name: episode.name,

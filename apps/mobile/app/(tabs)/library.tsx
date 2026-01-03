@@ -1,9 +1,11 @@
 import { Surface } from 'heroui-native';
+import { useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { PlusIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
@@ -117,6 +119,7 @@ function FilterChip({
 export default function LibraryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
 
   // Fetch library items from tRPC
   const { data, isLoading, error } = useLibraryItems();
@@ -140,12 +143,24 @@ export default function LibraryScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            {isLoading
-              ? 'Loading...'
-              : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
-          </Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                {isLoading
+                  ? 'Loading...'
+                  : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => router.push('/add-link')}
+              style={[styles.addButton, { backgroundColor: colors.primary }]}
+              accessibilityLabel="Add link"
+              accessibilityRole="button"
+            >
+              <PlusIcon size={20} color="#fff" />
+            </Pressable>
+          </View>
         </View>
 
         {/* Search Bar */}
@@ -246,12 +261,24 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.lg,
   },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   headerTitle: {
     ...Typography.displayMedium,
     marginBottom: Spacing.xs,
   },
   headerSubtitle: {
     ...Typography.bodyMedium,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Search

@@ -242,8 +242,8 @@ export function formatDuration(seconds?: number | null): string | undefined {
  */
 export function useInboxItems(options?: {
   filter?: {
-    provider?: 'YOUTUBE' | 'SPOTIFY' | 'SUBSTACK' | 'RSS';
-    contentType?: 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST';
+    provider?: Provider;
+    contentType?: ContentType;
   };
   limit?: number;
 }) {
@@ -272,8 +272,8 @@ export function useInboxItems(options?: {
  */
 export function useLibraryItems(options?: {
   filter?: {
-    provider?: 'YOUTUBE' | 'SPOTIFY' | 'SUBSTACK' | 'RSS';
-    contentType?: 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST';
+    provider?: Provider;
+    contentType?: ContentType;
   };
   limit?: number;
 }) {
