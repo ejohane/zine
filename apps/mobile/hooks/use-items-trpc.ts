@@ -254,9 +254,15 @@ export function useInboxItems(options?: {
  * Hook for fetching library/bookmarked items (BOOKMARKED state)
  *
  * Returns items that have been saved for later consumption.
- * Supports filtering by provider and content type.
+ * Supports filtering by provider, content type, and completion status.
  *
  * @param options - Optional filter and pagination options
+ * @param options.filter.provider - Filter by content provider (YOUTUBE, SPOTIFY, etc.)
+ * @param options.filter.contentType - Filter by content type (VIDEO, PODCAST, ARTICLE, POST)
+ * @param options.filter.isFinished - Filter by completion status
+ *   - undefined/false: show only unfinished items (default)
+ *   - true: show only finished items
+ * @param options.limit - Maximum number of items to return
  * @returns tRPC query result with items array and pagination cursor
  *
  * @example
@@ -269,11 +275,21 @@ export function useInboxItems(options?: {
  *     <ItemCard key={item.id} item={item} />
  *   ));
  * }
+ *
+ * @example
+ * // Show only finished items
+ * function FinishedScreen() {
+ *   const { data } = useLibraryItems({
+ *     filter: { isFinished: true }
+ *   });
+ *   // ...
+ * }
  */
 export function useLibraryItems(options?: {
   filter?: {
     provider?: Provider;
     contentType?: ContentType;
+    isFinished?: boolean;
   };
   limit?: number;
 }) {
@@ -439,6 +455,11 @@ export function useUnbookmarkItem() {
  * Works in any state (INBOX, BOOKMARKED, ARCHIVED).
  * Optimistically updates the item in all caches immediately.
  *
+ * This hook uses filter-aware optimistic updates for the library query:
+ * - When marking an item finished from the unfinished view, it's immediately removed
+ * - When marking an item unfinished from the finished view, it's immediately removed
+ * - The item is added to the opposite filtered query for consistency
+ *
  * @returns tRPC mutation with mutate/mutateAsync functions
  *
  * @example
@@ -455,27 +476,129 @@ export function useUnbookmarkItem() {
 export function useToggleFinished() {
   const utils = trpc.useUtils();
 
-  // Helper to toggle finished state on an item
-  const toggleFinished = <T extends { id: string; isFinished: boolean; finishedAt: string | null }>(
-    item: T,
-    targetId: string
-  ): T => {
-    if (item.id !== targetId) return item;
-    const now = new Date().toISOString();
-    return {
-      ...item,
-      isFinished: !item.isFinished,
-      finishedAt: item.isFinished ? null : now,
-    };
+  /** Context type for filter-aware rollback */
+  type ToggleFinishedContext = {
+    previousUnfinished?: ListQueryData;
+    previousFinished?: ListQueryData;
+    previousUnfiltered?: ListQueryData;
+    previousInbox?: ListQueryData;
+    previousItem?: ItemQueryData;
   };
 
-  return trpc.items.toggleFinished.useMutation(
-    createOptimisticConfig(utils, {
-      updateInbox: (items, { id }) => items.map((item) => toggleFinished(item, id)),
-      updateLibrary: (items, { id }) => items.map((item) => toggleFinished(item, id)),
-      updateSingleItem: (item, { id }) => toggleFinished(item, id),
-    })
-  );
+  return trpc.items.toggleFinished.useMutation({
+    onMutate: async ({ id }): Promise<ToggleFinishedContext> => {
+      // Cancel all potentially affected queries
+      await Promise.all([
+        utils.items.library.cancel({ filter: { isFinished: false } }),
+        utils.items.library.cancel({ filter: { isFinished: true } }),
+        utils.items.library.cancel(),
+        utils.items.inbox.cancel(),
+        utils.items.home.cancel(),
+        utils.items.get.cancel({ id }),
+      ]);
+
+      // Snapshot for rollback
+      const previousUnfinished = utils.items.library.getData({ filter: { isFinished: false } });
+      const previousFinished = utils.items.library.getData({ filter: { isFinished: true } });
+      const previousUnfiltered = utils.items.library.getData();
+      const previousInbox = utils.items.inbox.getData();
+      const previousItem = utils.items.get.getData({ id });
+
+      // Find the item to determine its current state
+      const allItems = [
+        ...(previousUnfinished?.items ?? []),
+        ...(previousFinished?.items ?? []),
+        ...(previousUnfiltered?.items ?? []),
+        ...(previousInbox?.items ?? []),
+      ];
+      const targetItem = allItems.find((item) => item.id === id);
+
+      if (targetItem) {
+        const nowFinished = !targetItem.isFinished;
+        const now = new Date().toISOString();
+        const updatedItem = {
+          ...targetItem,
+          isFinished: nowFinished,
+          finishedAt: nowFinished ? now : null,
+        };
+
+        if (nowFinished) {
+          // Remove from unfinished, add to finished
+          utils.items.library.setData({ filter: { isFinished: false } }, (old) =>
+            old ? { ...old, items: old.items.filter((i) => i.id !== id) } : old
+          );
+          utils.items.library.setData({ filter: { isFinished: true } }, (old) =>
+            old ? { ...old, items: [updatedItem, ...old.items] } : old
+          );
+        } else {
+          // Remove from finished, add to unfinished
+          utils.items.library.setData({ filter: { isFinished: true } }, (old) =>
+            old ? { ...old, items: old.items.filter((i) => i.id !== id) } : old
+          );
+          utils.items.library.setData({ filter: { isFinished: false } }, (old) =>
+            old ? { ...old, items: [updatedItem, ...old.items] } : old
+          );
+        }
+
+        // Update unfiltered library cache (toggle in place)
+        utils.items.library.setData(undefined, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item) => (item.id === id ? updatedItem : item)),
+          };
+        });
+
+        // Update inbox cache (toggle in place)
+        utils.items.inbox.setData(undefined, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item) => (item.id === id ? updatedItem : item)),
+          };
+        });
+
+        // Update single item cache
+        utils.items.get.setData({ id }, (old) => {
+          if (!old) return old;
+          return updatedItem;
+        });
+      }
+
+      return {
+        previousUnfinished,
+        previousFinished,
+        previousUnfiltered,
+        previousInbox,
+        previousItem,
+      };
+    },
+    onError: (_err, { id }, context) => {
+      // Rollback all caches
+      if (context?.previousUnfinished) {
+        utils.items.library.setData({ filter: { isFinished: false } }, context.previousUnfinished);
+      }
+      if (context?.previousFinished) {
+        utils.items.library.setData({ filter: { isFinished: true } }, context.previousFinished);
+      }
+      if (context?.previousUnfiltered) {
+        utils.items.library.setData(undefined, context.previousUnfiltered);
+      }
+      if (context?.previousInbox) {
+        utils.items.inbox.setData(undefined, context.previousInbox);
+      }
+      if (context?.previousItem) {
+        utils.items.get.setData({ id }, context.previousItem);
+      }
+    },
+    onSettled: (_data, _err, { id }) => {
+      // Refetch after mutation completes (success or error)
+      utils.items.library.invalidate();
+      utils.items.inbox.invalidate();
+      utils.items.home.invalidate();
+      utils.items.get.invalidate({ id });
+    },
+  });
 }
 
 /**

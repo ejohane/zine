@@ -1,9 +1,12 @@
+import { useState, useMemo } from 'react';
+
 import { Surface } from 'heroui-native';
 import { useRouter } from 'expo-router';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Switch } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { ContentType } from '@zine/shared';
 
 import { PlusIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
@@ -11,7 +14,7 @@ import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import type { ContentType, Provider } from '@/lib/content-utils';
+import type { ContentType as UIContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -66,10 +69,28 @@ function FilterIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: s
 // =============================================================================
 
 const filterOptions = [
-  { id: 'all', label: 'All', icon: null },
-  { id: 'article', label: 'Articles', icon: ArticleIcon, color: ContentColors.article },
-  { id: 'podcast', label: 'Podcasts', icon: HeadphonesIcon, color: ContentColors.podcast },
-  { id: 'video', label: 'Videos', icon: VideoIcon, color: ContentColors.video },
+  { id: 'all', label: 'All', icon: null, contentType: null },
+  {
+    id: 'article',
+    label: 'Articles',
+    icon: ArticleIcon,
+    color: ContentColors.article,
+    contentType: ContentType.ARTICLE,
+  },
+  {
+    id: 'podcast',
+    label: 'Podcasts',
+    icon: HeadphonesIcon,
+    color: ContentColors.podcast,
+    contentType: ContentType.PODCAST,
+  },
+  {
+    id: 'video',
+    label: 'Videos',
+    icon: VideoIcon,
+    color: ContentColors.video,
+    contentType: ContentType.VIDEO,
+  },
 ];
 
 // =============================================================================
@@ -121,8 +142,21 @@ export default function LibraryScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
 
-  // Fetch library items from tRPC
-  const { data, isLoading, error } = useLibraryItems();
+  // Filter state
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+
+  // Memoize filter to prevent unnecessary query key changes
+  const filter = useMemo(
+    () => ({
+      contentType: contentTypeFilter ?? undefined,
+      isFinished: showCompleted,
+    }),
+    [contentTypeFilter, showCompleted]
+  );
+
+  // Fetch library items from tRPC with memoized filter
+  const { data, isLoading, error } = useLibraryItems({ filter });
 
   // Transform API response to ItemCardData format
   const libraryItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
@@ -130,7 +164,7 @@ export default function LibraryScreen() {
     title: item.title,
     creator: item.creator,
     thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType) as ContentType,
+    contentType: mapContentType(item.contentType) as UIContentType,
     provider: mapProvider(item.provider) as Provider,
     duration: item.duration ?? null,
     bookmarkedAt: item.bookmarkedAt ?? null,
@@ -149,7 +183,9 @@ export default function LibraryScreen() {
               <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                 {isLoading
                   ? 'Loading...'
-                  : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
+                  : showCompleted
+                    ? `${libraryItems.length} completed item${libraryItems.length === 1 ? '' : 's'}`
+                    : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
               </Text>
             </View>
             <Pressable
@@ -161,6 +197,23 @@ export default function LibraryScreen() {
               <PlusIcon size={20} color="#fff" />
             </Pressable>
           </View>
+        </View>
+
+        {/* Show Completed Toggle */}
+        <View style={[styles.toggleRow, { borderColor: colors.border }]}>
+          <Text style={[styles.toggleLabel, { color: colors.textSecondary }]}>Show completed</Text>
+          <Switch
+            value={showCompleted}
+            onValueChange={setShowCompleted}
+            trackColor={{
+              false: colors.backgroundSecondary,
+              true: colors.primary,
+            }}
+            thumbColor="#fff"
+            ios_backgroundColor={colors.backgroundSecondary}
+            accessibilityLabel="Show completed items"
+            accessibilityHint="When enabled, shows only items marked as finished"
+          />
         </View>
 
         {/* Search Bar */}
@@ -204,12 +257,12 @@ export default function LibraryScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterContainer}
           >
-            {filterOptions.map((filter, index) => (
+            {filterOptions.map((filter) => (
               <FilterChip
                 key={filter.id}
                 label={filter.label}
-                isSelected={index === 0}
-                onPress={() => {}}
+                isSelected={contentTypeFilter === filter.contentType}
+                onPress={() => setContentTypeFilter(filter.contentType)}
                 icon={filter.icon ?? undefined}
                 iconColor={filter.color}
                 colors={colors}
@@ -225,8 +278,12 @@ export default function LibraryScreen() {
           <ErrorState message={error.message} />
         ) : libraryItems.length === 0 ? (
           <EmptyState
-            title="No bookmarked items"
-            message="Bookmark content from your inbox to save it here for later."
+            title={showCompleted ? 'No completed items' : 'No bookmarked items'}
+            message={
+              showCompleted
+                ? "Mark items as finished and they'll appear here."
+                : 'Bookmark content from your inbox to save it here for later.'
+            }
           />
         ) : (
           <ScrollView
@@ -271,6 +328,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   headerSubtitle: {
+    ...Typography.bodyMedium,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  toggleLabel: {
     ...Typography.bodyMedium,
   },
   addButton: {

@@ -97,7 +97,7 @@ function createMockItemsCaller(options: {
     },
 
     library: async (input?: {
-      filter?: { provider?: string; contentType?: string };
+      filter?: { provider?: string; contentType?: string; isFinished?: boolean };
       cursor?: string;
       limit?: number;
     }) => {
@@ -106,7 +106,11 @@ function createMockItemsCaller(options: {
       }
       let items = [...libraryItems];
 
-      // Apply filters
+      // Apply isFinished filter (default: exclude finished items)
+      const showFinished = input?.filter?.isFinished ?? false;
+      items = items.filter((item) => item.isFinished === showFinished);
+
+      // Apply other filters
       if (input?.filter?.provider) {
         items = items.filter((item) => item.provider === input.filter!.provider);
       }
@@ -115,12 +119,13 @@ function createMockItemsCaller(options: {
       }
 
       const limit = input?.limit ?? 20;
-      const hasMore = items.length > limit;
-      const pageItems = hasMore ? items.slice(0, limit) : items;
+      const startIndex = input?.cursor ? parseInt(input.cursor, 10) : 0;
+      const paginatedItems = items.slice(startIndex, startIndex + limit);
+      const hasMore = startIndex + limit < items.length;
 
       return {
-        items: pageItems,
-        nextCursor: hasMore ? 'next-cursor' : null,
+        items: paginatedItems,
+        nextCursor: hasMore ? String(startIndex + limit) : null,
       };
     },
 
@@ -429,6 +434,335 @@ describe('Items Router', () => {
         bookmarkedAt: '2024-12-05T15:00:00Z',
         contentType: ContentType.ARTICLE,
         provider: Provider.SUBSTACK,
+      });
+    });
+
+    // ========================================================================
+    // isFinished Filter Tests
+    // ========================================================================
+
+    describe('isFinished filter', () => {
+      it('should exclude finished items by default (no filter provided)', async () => {
+        const unfinishedItem = createMockItemView({
+          id: 'ui-unfinished',
+          title: 'Unfinished Item',
+          state: UserItemState.BOOKMARKED,
+          isFinished: false,
+          finishedAt: null,
+        });
+        const finishedItem = createMockItemView({
+          id: 'ui-finished',
+          title: 'Finished Item',
+          state: UserItemState.BOOKMARKED,
+          isFinished: true,
+          finishedAt: '2024-12-10T12:00:00Z',
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedItem, finishedItem],
+        });
+        const result = await caller.library();
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-unfinished');
+        expect(result.items[0].isFinished).toBe(false);
+      });
+
+      it('should exclude finished items when isFinished: false is explicitly set', async () => {
+        const unfinishedItem = createMockItemView({
+          id: 'ui-unfinished',
+          title: 'Unfinished Item',
+          state: UserItemState.BOOKMARKED,
+          isFinished: false,
+          finishedAt: null,
+        });
+        const finishedItem = createMockItemView({
+          id: 'ui-finished',
+          title: 'Finished Item',
+          state: UserItemState.BOOKMARKED,
+          isFinished: true,
+          finishedAt: '2024-12-10T12:00:00Z',
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedItem, finishedItem],
+        });
+        const result = await caller.library({ filter: { isFinished: false } });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-unfinished');
+        expect(result.items[0].isFinished).toBe(false);
+      });
+
+      it('should show only finished items when isFinished: true', async () => {
+        const unfinishedItem = createMockItemView({
+          id: 'ui-unfinished',
+          title: 'Unfinished Item',
+          state: UserItemState.BOOKMARKED,
+          isFinished: false,
+          finishedAt: null,
+        });
+        const finishedItem1 = createMockItemView({
+          id: 'ui-finished-1',
+          title: 'Finished Item 1',
+          state: UserItemState.BOOKMARKED,
+          isFinished: true,
+          finishedAt: '2024-12-10T12:00:00Z',
+        });
+        const finishedItem2 = createMockItemView({
+          id: 'ui-finished-2',
+          title: 'Finished Item 2',
+          state: UserItemState.BOOKMARKED,
+          isFinished: true,
+          finishedAt: '2024-12-11T14:00:00Z',
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedItem, finishedItem1, finishedItem2],
+        });
+        const result = await caller.library({ filter: { isFinished: true } });
+
+        expect(result.items).toHaveLength(2);
+        expect(result.items.every((item) => item.isFinished === true)).toBe(true);
+        expect(result.items.map((i) => i.id)).toContain('ui-finished-1');
+        expect(result.items.map((i) => i.id)).toContain('ui-finished-2');
+      });
+
+      it('should combine isFinished filter with contentType filter', async () => {
+        const unfinishedVideo = createMockItemView({
+          id: 'ui-unfinished-video',
+          title: 'Unfinished Video',
+          state: UserItemState.BOOKMARKED,
+          contentType: ContentType.VIDEO,
+          isFinished: false,
+        });
+        const finishedVideo = createMockItemView({
+          id: 'ui-finished-video',
+          title: 'Finished Video',
+          state: UserItemState.BOOKMARKED,
+          contentType: ContentType.VIDEO,
+          isFinished: true,
+          finishedAt: '2024-12-10T12:00:00Z',
+        });
+        const finishedPodcast = createMockItemView({
+          id: 'ui-finished-podcast',
+          title: 'Finished Podcast',
+          state: UserItemState.BOOKMARKED,
+          contentType: ContentType.PODCAST,
+          isFinished: true,
+          finishedAt: '2024-12-11T12:00:00Z',
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedVideo, finishedVideo, finishedPodcast],
+        });
+
+        // Get finished videos only
+        const result = await caller.library({
+          filter: { isFinished: true, contentType: ContentType.VIDEO },
+        });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-finished-video');
+        expect(result.items[0].contentType).toBe(ContentType.VIDEO);
+        expect(result.items[0].isFinished).toBe(true);
+      });
+
+      it('should combine isFinished filter with provider filter', async () => {
+        const unfinishedYoutube = createMockItemView({
+          id: 'ui-unfinished-youtube',
+          title: 'Unfinished YouTube Video',
+          state: UserItemState.BOOKMARKED,
+          provider: Provider.YOUTUBE,
+          isFinished: false,
+        });
+        const finishedYoutube = createMockItemView({
+          id: 'ui-finished-youtube',
+          title: 'Finished YouTube Video',
+          state: UserItemState.BOOKMARKED,
+          provider: Provider.YOUTUBE,
+          isFinished: true,
+          finishedAt: '2024-12-10T12:00:00Z',
+        });
+        const finishedSpotify = createMockItemView({
+          id: 'ui-finished-spotify',
+          title: 'Finished Spotify Podcast',
+          state: UserItemState.BOOKMARKED,
+          provider: Provider.SPOTIFY,
+          isFinished: true,
+          finishedAt: '2024-12-11T12:00:00Z',
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedYoutube, finishedYoutube, finishedSpotify],
+        });
+
+        // Get finished YouTube items only
+        const result = await caller.library({
+          filter: { isFinished: true, provider: Provider.YOUTUBE },
+        });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-finished-youtube');
+        expect(result.items[0].provider).toBe(Provider.YOUTUBE);
+        expect(result.items[0].isFinished).toBe(true);
+      });
+
+      it('should return empty array when no items match the isFinished filter', async () => {
+        // Only unfinished items in library
+        const unfinishedItem1 = createMockItemView({
+          id: 'ui-unfinished-1',
+          title: 'Unfinished Item 1',
+          state: UserItemState.BOOKMARKED,
+          isFinished: false,
+        });
+        const unfinishedItem2 = createMockItemView({
+          id: 'ui-unfinished-2',
+          title: 'Unfinished Item 2',
+          state: UserItemState.BOOKMARKED,
+          isFinished: false,
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [unfinishedItem1, unfinishedItem2],
+        });
+
+        // Request finished items, but none exist
+        const result = await caller.library({ filter: { isFinished: true } });
+
+        expect(result.items).toEqual([]);
+        expect(result.nextCursor).toBeNull();
+      });
+
+      it('should paginate correctly with isFinished filter', async () => {
+        // Create multiple finished items for pagination testing
+        const finishedItems = Array.from({ length: 5 }, (_, i) =>
+          createMockItemView({
+            id: `ui-finished-${i + 1}`,
+            title: `Finished Item ${i + 1}`,
+            state: UserItemState.BOOKMARKED,
+            isFinished: true,
+            finishedAt: `2024-12-${10 + i}T12:00:00Z`,
+          })
+        );
+
+        // Add some unfinished items to verify they're filtered out
+        const unfinishedItems = Array.from({ length: 3 }, (_, i) =>
+          createMockItemView({
+            id: `ui-unfinished-${i + 1}`,
+            title: `Unfinished Item ${i + 1}`,
+            state: UserItemState.BOOKMARKED,
+            isFinished: false,
+          })
+        );
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [...finishedItems, ...unfinishedItems],
+        });
+
+        // First page - get 2 finished items
+        const page1 = await caller.library({
+          filter: { isFinished: true },
+          limit: 2,
+        });
+
+        expect(page1.items).toHaveLength(2);
+        expect(page1.items.every((item) => item.isFinished === true)).toBe(true);
+        expect(page1.nextCursor).not.toBeNull();
+
+        // Second page - get next 2 finished items
+        const page2 = await caller.library({
+          filter: { isFinished: true },
+          cursor: page1.nextCursor!,
+          limit: 2,
+        });
+
+        expect(page2.items).toHaveLength(2);
+        expect(page2.items.every((item) => item.isFinished === true)).toBe(true);
+        expect(page2.nextCursor).not.toBeNull();
+
+        // Third page - get last finished item
+        const page3 = await caller.library({
+          filter: { isFinished: true },
+          cursor: page2.nextCursor!,
+          limit: 2,
+        });
+
+        expect(page3.items).toHaveLength(1);
+        expect(page3.items[0].isFinished).toBe(true);
+        expect(page3.nextCursor).toBeNull();
+
+        // Verify all 5 finished items were returned across pages
+        const allIds = [...page1.items, ...page2.items, ...page3.items].map((i) => i.id);
+        expect(allIds).toHaveLength(5);
+        expect(new Set(allIds).size).toBe(5); // All unique
+      });
+
+      it('should correctly handle all filters combined (isFinished + contentType + provider)', async () => {
+        const items = [
+          createMockItemView({
+            id: 'ui-1',
+            title: 'Finished YouTube Video',
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.VIDEO,
+            provider: Provider.YOUTUBE,
+            isFinished: true,
+            finishedAt: '2024-12-10T12:00:00Z',
+          }),
+          createMockItemView({
+            id: 'ui-2',
+            title: 'Unfinished YouTube Video',
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.VIDEO,
+            provider: Provider.YOUTUBE,
+            isFinished: false,
+          }),
+          createMockItemView({
+            id: 'ui-3',
+            title: 'Finished Spotify Podcast',
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.PODCAST,
+            provider: Provider.SPOTIFY,
+            isFinished: true,
+            finishedAt: '2024-12-11T12:00:00Z',
+          }),
+          createMockItemView({
+            id: 'ui-4',
+            title: 'Finished YouTube Podcast (rare)',
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.PODCAST,
+            provider: Provider.YOUTUBE,
+            isFinished: true,
+            finishedAt: '2024-12-12T12:00:00Z',
+          }),
+        ];
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: items,
+        });
+
+        // Get finished YouTube videos
+        const result = await caller.library({
+          filter: {
+            isFinished: true,
+            contentType: ContentType.VIDEO,
+            provider: Provider.YOUTUBE,
+          },
+        });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-1');
+        expect(result.items[0].isFinished).toBe(true);
+        expect(result.items[0].contentType).toBe(ContentType.VIDEO);
+        expect(result.items[0].provider).toBe(Provider.YOUTUBE);
       });
     });
   });

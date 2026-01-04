@@ -114,6 +114,7 @@ const FilterSchema = z
   .object({
     provider: ProviderSchema.optional(),
     contentType: ContentTypeSchema.optional(),
+    isFinished: z.boolean().optional(),
   })
   .optional();
 
@@ -208,6 +209,12 @@ export const itemsRouter = router({
       eq(userItems.userId, ctx.userId),
       eq(userItems.state, UserItemState.BOOKMARKED),
     ];
+
+    // Filter by finished status
+    // Default behavior: hide finished items (isFinished undefined or false)
+    // When isFinished: true is passed, show only finished items
+    const showFinished = input?.filter?.isFinished ?? false;
+    conditions.push(eq(userItems.isFinished, showFinished));
 
     // Apply cursor-based pagination (fetch items bookmarked before cursor)
     if (cursor) {
