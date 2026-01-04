@@ -11,7 +11,8 @@
     "lint": "expo lint",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build:ios:preview": "dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive"
+    "build:ios:preview": "dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
+    "deploy:ios:preview": "./scripts/build-and-install-ios.sh"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.11",
