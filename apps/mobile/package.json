@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c",
+    "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "start": "expo start -c",
     "android": "expo start --android -c",
     "ios": "expo start --ios -c",

@@ -7,7 +7,8 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": ["WORKER_PORT", "METRO_PORT"]
     },
     "lint": {
       "dependsOn": ["^build"]
