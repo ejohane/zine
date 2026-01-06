@@ -11,6 +11,8 @@
     "build": "turbo run build",
     "build:ios": "bun run --cwd apps/mobile build:ios",
     "dev": "turbo run dev",
+    "dev:worktree": "./scripts/dev.sh",
+    "dev:reset": "./scripts/dev-reset.sh",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",

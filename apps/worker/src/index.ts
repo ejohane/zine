@@ -45,21 +45,28 @@ app.use('*', honoLogger());
  *
  * Note: React Native/Expo mobile apps don't require CORS since requests
  * come from native HTTP clients. These origins are primarily for:
- * - Local development (Expo dev server)
+ * - Local development with Expo web
  * - Web builds (Expo web output)
  */
 app.use(
   '*',
   cors({
-    origin: [
-      // Local development
-      'http://localhost:8081',
-      'http://localhost:19006',
-      'http://localhost:3000',
-      // Production web (if you add web support later)
-      'https://myzine.app',
-      'https://www.myzine.app',
-    ],
+    origin: (origin) => {
+      // Development: Allow any localhost port (for worktree isolation)
+      // This covers Expo dev server, any webpack dev server, etc.
+      if (origin?.match(/^http:\/\/localhost:\d+$/)) return origin;
+
+      // Android emulator: 10.0.2.2 is the special alias for host machine
+      // This is only needed for Expo web running in Android emulator's Chrome
+      if (origin?.match(/^http:\/\/10\.0\.2\.2:\d+$/)) return origin;
+
+      // Production: Explicit allowlist
+      if (origin === 'https://myzine.app') return origin;
+      if (origin === 'https://www.myzine.app') return origin;
+
+      // Reject all other origins
+      return null;
+    },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
     exposeHeaders: ['X-Request-ID'],

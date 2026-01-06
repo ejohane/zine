@@ -11,7 +11,7 @@
   },
   "scripts": {
     "build": "echo 'Worker build handled by Wrangler'",
-    "dev": "wrangler dev --ip 0.0.0.0",
+    "dev": "wrangler dev --ip 0.0.0.0 --port ${WORKER_PORT:-8787}",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
