@@ -26,6 +26,7 @@ export enum Provider {
   SPOTIFY = 'SPOTIFY',
   RSS = 'RSS',
   SUBSTACK = 'SUBSTACK',
+  WEB = 'WEB',
 }
 
 /**
@@ -111,6 +112,12 @@ export interface Item {
 
   /** Duration in seconds (for video/audio content) */
   duration?: number;
+
+  /** Estimated word count (for articles) */
+  wordCount?: number;
+
+  /** Estimated reading time in minutes (for articles) */
+  readingTimeMinutes?: number;
 
   /** When this Item record was created */
   createdAt: string;

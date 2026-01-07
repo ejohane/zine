@@ -12,6 +12,7 @@ import {
 } from '@zine/shared';
 import { userItems, items } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
+import { getArticleContent } from '../../lib/article-storage';
 
 // ============================================================================
 // Types
@@ -43,6 +44,10 @@ export type ItemView = {
   summary: string | null;
   duration: number | null; // seconds
   publishedAt: string | null;
+
+  // Article-specific metadata
+  wordCount: number | null;
+  readingTimeMinutes: number | null;
 
   // User state
   state: UserItemState;
@@ -88,6 +93,8 @@ function toItemView(row: {
     summary: item.summary,
     duration: item.duration,
     publishedAt: item.publishedAt,
+    wordCount: item.wordCount,
+    readingTimeMinutes: item.readingTimeMinutes,
     state: userItem.state as UserItemState,
     ingestedAt: userItem.ingestedAt,
     bookmarkedAt: userItem.bookmarkedAt,
@@ -112,9 +119,9 @@ function toItemView(row: {
 
 const FilterSchema = z
   .object({
-    provider: ProviderSchema.optional(),
-    contentType: ContentTypeSchema.optional(),
-    isFinished: z.boolean().optional(),
+    provider: ProviderSchema.nullish(),
+    contentType: ContentTypeSchema.nullish(),
+    isFinished: z.boolean().nullish(),
   })
   .optional();
 
@@ -378,6 +385,31 @@ export const itemsRouter = router({
       }
 
       return toItemView(result[0]);
+    }),
+
+  /**
+   * Get article content for an item from R2.
+   * Returns null if no content is stored.
+   */
+  getArticleContent: protectedProcedure
+    .input(z.object({ itemId: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      // Verify user owns this item
+      const userItem = await ctx.db.query.userItems.findFirst({
+        where: and(eq(userItems.userId, ctx.userId), eq(userItems.itemId, input.itemId)),
+      });
+
+      if (!userItem) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Item not found',
+        });
+      }
+
+      // Fetch from R2
+      const content = await getArticleContent(ctx.env.ARTICLE_CONTENT, input.itemId);
+
+      return { content };
     }),
 
   /**

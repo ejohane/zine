@@ -93,6 +93,12 @@ function createMockEnv(): Env['Bindings'] {
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     } as unknown as KVNamespace,
+    ARTICLE_CONTENT: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+      head: vi.fn().mockResolvedValue(null),
+    } as unknown as R2Bucket,
     ENVIRONMENT: 'test',
     CLERK_WEBHOOK_SECRET: 'whsec_test_secret',
   };

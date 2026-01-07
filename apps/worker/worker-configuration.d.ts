@@ -2,6 +2,7 @@
 
 interface Env {
   WEBHOOK_IDEMPOTENCY: KVNamespace;
+  ARTICLE_CONTENT: R2Bucket;
   ENVIRONMENT: 'development' | 'staging' | 'production';
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   USER_DO: DurableObjectNamespace<import('./src/index').UserDO>;

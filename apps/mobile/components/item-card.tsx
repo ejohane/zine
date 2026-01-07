@@ -25,6 +25,7 @@ import { formatDuration, formatRelativeTime } from '@/lib/format';
 import {
   getContentIcon,
   getProviderColor,
+  getProviderLabel,
   getContentAspectRatio,
   isSquareContent,
   mapContentType,
@@ -53,6 +54,7 @@ export interface ItemCardData {
   contentType: ContentType;
   provider: Provider;
   duration?: number | null;
+  readingTimeMinutes?: number | null;
   bookmarkedAt?: string | null;
   publishedAt?: string | null;
   isFinished?: boolean;
@@ -113,10 +115,15 @@ export function ItemCard({
   const contentType = mapContentType(item.contentType);
   const contentColor = ContentColors[contentType];
   const providerColor = getProviderColor(item.provider);
+  const providerLabel = getProviderLabel(item.provider);
 
   // Calculate aspect ratio based on content type
   const isSquare = isSquareContent(item.contentType);
   const aspectRatio = getContentAspectRatio(item.contentType);
+
+  // Reading time for articles (only show when no duration - duration takes precedence for video/podcast)
+  const readingTimeText =
+    item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null;
 
   // Handle press - navigate to detail by default
   const handlePress = () => {
@@ -175,6 +182,12 @@ export function ItemCard({
                 <Text style={styles.durationText}>{durationText}</Text>
               </View>
             )}
+            {/* Reading time badge (for articles without duration) */}
+            {readingTimeText && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationText}>{readingTimeText}</Text>
+              </View>
+            )}
             {/* Completed badge */}
             {item.isFinished && (
               <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
@@ -196,6 +209,12 @@ export function ItemCard({
               >
                 {item.creator}
               </Text>
+              {providerLabel && (
+                <Text style={[styles.compactTime, { color: colors.textTertiary }]}>
+                  {' '}
+                  on {providerLabel}
+                </Text>
+              )}
               {timeText && (
                 <Text style={[styles.compactTime, { color: colors.textTertiary }]}>
                   {' '}
@@ -249,6 +268,12 @@ export function ItemCard({
                 <Text style={styles.durationText}>{durationText}</Text>
               </View>
             )}
+            {/* Reading time badge (for articles without duration) */}
+            {readingTimeText && (
+              <View style={styles.durationBadge}>
+                <Text style={styles.durationText}>{readingTimeText}</Text>
+              </View>
+            )}
             {/* Content type badge */}
             <View style={[styles.typeBadge, { backgroundColor: contentColor }]}>
               <Text style={styles.typeText}>{contentType}</Text>
@@ -260,9 +285,17 @@ export function ItemCard({
             <Text style={[styles.fullTitle, { color: colors.text }]} numberOfLines={2}>
               {item.title}
             </Text>
-            <Text style={[styles.fullCreator, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.creator}
-            </Text>
+            <View style={styles.fullMeta}>
+              <Text style={[styles.fullCreator, { color: colors.textSecondary }]} numberOfLines={1}>
+                {item.creator}
+              </Text>
+              {providerLabel && (
+                <Text style={[styles.fullProvider, { color: colors.textTertiary }]}>
+                  {' '}
+                  on {providerLabel}
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Actions */}
@@ -344,6 +377,12 @@ export function ItemCard({
               <Text style={styles.largeDurationText}>{durationText}</Text>
             </View>
           )}
+          {/* Reading time badge (for articles without duration) */}
+          {readingTimeText && (
+            <View style={styles.largeDurationBadge}>
+              <Text style={styles.largeDurationText}>{readingTimeText}</Text>
+            </View>
+          )}
         </View>
 
         {/* Content */}
@@ -356,6 +395,12 @@ export function ItemCard({
             <Text style={[styles.largeCreator, { color: colors.textSecondary }]} numberOfLines={1}>
               {item.creator}
             </Text>
+            {providerLabel && (
+              <Text style={[styles.largeProvider, { color: colors.textTertiary }]}>
+                {' '}
+                on {providerLabel}
+              </Text>
+            )}
           </View>
         </View>
       </Pressable>
@@ -436,6 +481,14 @@ const styles = StyleSheet.create({
   fullCreator: {
     ...Typography.bodyMedium,
   },
+  fullMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  fullProvider: {
+    ...Typography.bodyMedium,
+  },
   fullActions: {
     flexDirection: 'row',
     padding: Spacing.md,
@@ -478,7 +531,9 @@ const styles = StyleSheet.create({
   },
   largeCreator: {
     ...Typography.bodyMedium,
-    flex: 1,
+  },
+  largeProvider: {
+    ...Typography.bodyMedium,
   },
   largeDurationBadge: {
     position: 'absolute',

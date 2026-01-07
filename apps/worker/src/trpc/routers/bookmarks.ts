@@ -15,11 +15,16 @@ import { ulid } from 'ulid';
 import { eq, and } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
-import { items, userItems, providerConnections } from '../../db/schema';
+import { items, userItems, users, providerConnections } from '../../db/schema';
 import { fetchLinkPreview } from '../../lib/link-preview';
 import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refresh';
+import { extractArticle } from '../../lib/article-extractor';
+import { storeArticleContent } from '../../lib/article-storage';
+import { logger } from '../../lib/logger';
 import type { createDb } from '../../db';
 import type { Bindings } from '../../types';
+
+const bookmarksLogger = logger.child('bookmarks');
 
 // ============================================================================
 // Types
@@ -58,6 +63,11 @@ const SaveInputSchema = z.object({
   duration: z.number().int().min(0).nullable(),
   canonicalUrl: z.string().url('Invalid canonical URL'),
   description: z.string().optional(),
+  // Article-specific fields
+  siteName: z.string().optional(),
+  wordCount: z.number().int().min(0).optional(),
+  readingTimeMinutes: z.number().int().min(0).optional(),
+  hasArticleContent: z.boolean().optional(),
 });
 
 // ============================================================================
@@ -160,6 +170,57 @@ export const bookmarksRouter = router({
     } else {
       // Create new item
       itemId = ulid();
+
+      // Initialize article metadata fields
+      let wordCount: number | null = input.wordCount ?? null;
+      let readingTimeMinutes: number | null = input.readingTimeMinutes ?? null;
+      let articleContentKey: string | null = null;
+
+      // For WEB provider items with article content, extract and store the article
+      if (input.provider === 'WEB' && input.hasArticleContent === true) {
+        try {
+          bookmarksLogger.debug('Extracting article content', {
+            url: input.canonicalUrl,
+            itemId,
+          });
+
+          const articleData = await extractArticle(input.canonicalUrl);
+
+          if (articleData?.content && ctx.env.ARTICLE_CONTENT) {
+            // Store article content in R2
+            articleContentKey = await storeArticleContent(
+              ctx.env.ARTICLE_CONTENT,
+              itemId,
+              articleData.content
+            );
+
+            // Use extracted metadata if not provided in input
+            wordCount = wordCount ?? articleData.wordCount;
+            readingTimeMinutes = readingTimeMinutes ?? articleData.readingTimeMinutes;
+
+            bookmarksLogger.info('Article content stored', {
+              itemId,
+              articleContentKey,
+              wordCount,
+              readingTimeMinutes,
+            });
+          } else if (!articleData?.content) {
+            bookmarksLogger.debug('No article content to store', {
+              url: input.canonicalUrl,
+              itemId,
+              isArticle: articleData?.isArticle,
+            });
+          }
+        } catch (error) {
+          // Article storage is best-effort - log error but don't fail the save
+          bookmarksLogger.error('Failed to extract/store article content', {
+            error,
+            url: input.canonicalUrl,
+            itemId,
+          });
+        }
+      }
+
       await ctx.db.insert(items).values({
         id: itemId,
         contentType: input.contentType,
@@ -169,10 +230,13 @@ export const bookmarksRouter = router({
         title: input.title,
         thumbnailUrl: input.thumbnailUrl,
         creator: input.creator,
-        publisher: null,
+        publisher: input.siteName ?? null,
         summary: input.description ?? null,
         duration: input.duration,
         publishedAt: null,
+        wordCount,
+        readingTimeMinutes,
+        articleContentKey,
         createdAt: now,
         updatedAt: now,
       });
@@ -212,6 +276,17 @@ export const bookmarksRouter = router({
     }
 
     // 3c. No existing user_item - create new one with BOOKMARKED status
+    // First ensure user exists in the users table (handles race condition if webhook hasn't fired yet)
+    await ctx.db
+      .insert(users)
+      .values({
+        id: ctx.userId,
+        email: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoNothing();
+
     const userItemId = ulid();
     await ctx.db.insert(userItems).values({
       id: userItemId,

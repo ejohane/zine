@@ -269,7 +269,7 @@ function parseGeneric(url: URL): ParsedLink {
   const canonicalUrl = stripTrackingParams(url);
 
   return {
-    provider: Provider.RSS,
+    provider: Provider.WEB,
     contentType: ContentType.ARTICLE,
     providerId: canonicalUrl, // Use full URL as provider ID
     canonicalUrl,

@@ -63,6 +63,10 @@ export function LinkPreviewCard({ preview, style }: LinkPreviewCardProps) {
   const showDuration =
     durationText && (preview.contentType === 'VIDEO' || preview.contentType === 'PODCAST');
 
+  // Format reading time for articles
+  const showReadingTime = preview.readingTimeMinutes && preview.contentType === 'ARTICLE';
+  const readingTimeText = showReadingTime ? `${preview.readingTimeMinutes} min read` : null;
+
   // Check if this is from a connected provider (provider_api source)
   const isConnected = preview.source === 'provider_api';
 
@@ -73,6 +77,7 @@ export function LinkPreviewCard({ preview, style }: LinkPreviewCardProps) {
     `by ${preview.creator}`,
     `from ${providerLabel}`,
     showDuration ? durationText : null,
+    showReadingTime ? readingTimeText : null,
     isConnected ? 'Connected source' : null,
   ]
     .filter(Boolean)
@@ -113,6 +118,13 @@ export function LinkPreviewCard({ preview, style }: LinkPreviewCardProps) {
         {showDuration && (
           <View style={styles.durationBadge}>
             <Text style={styles.durationText}>{durationText}</Text>
+          </View>
+        )}
+
+        {/* Reading time badge - bottom right (for articles) */}
+        {showReadingTime && (
+          <View style={styles.durationBadge}>
+            <Text style={styles.durationText}>{readingTimeText}</Text>
           </View>
         )}
 

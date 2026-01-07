@@ -356,9 +356,22 @@ export default function ItemDetailScreen() {
           <View style={styles.metaRow}>
             <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
             <Text style={[styles.creator, { color: colors.textSecondary }]}>{item.creator}</Text>
-            <Text style={[styles.separator, { color: colors.textTertiary }]}>{' on '}</Text>
-            <Text style={[styles.provider, { color: colors.textSecondary }]}>{providerLabel}</Text>
+            {providerLabel && (
+              <>
+                <Text style={[styles.separator, { color: colors.textTertiary }]}>{' on '}</Text>
+                <Text style={[styles.provider, { color: colors.textSecondary }]}>
+                  {providerLabel}
+                </Text>
+              </>
+            )}
           </View>
+
+          {/* Reading Time */}
+          {item.readingTimeMinutes && (
+            <Text style={[styles.readingTime, { color: colors.textTertiary }]}>
+              {item.readingTimeMinutes} min read
+            </Text>
+          )}
 
           {/* Published date */}
           {item.publishedAt && (
@@ -376,7 +389,9 @@ export default function ItemDetailScreen() {
               pressed && { opacity: 0.9 },
             ]}
           >
-            <Text style={styles.openButtonText}>Open in {providerLabel}</Text>
+            <Text style={styles.openButtonText}>
+              {providerLabel ? `Open in ${providerLabel}` : 'Open'}
+            </Text>
             <ChevronRightIcon size={20} color="#fff" />
           </Pressable>
 
@@ -544,6 +559,10 @@ const styles = StyleSheet.create({
   publishedAt: {
     ...Typography.bodySmall,
     marginBottom: Spacing.lg,
+  },
+  readingTime: {
+    ...Typography.bodySmall,
+    marginBottom: Spacing.xs,
   },
 
   // Open Button

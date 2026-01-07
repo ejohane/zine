@@ -27,8 +27,13 @@ export interface LinkPreview {
   thumbnailUrl: string | null;
   duration: number | null;
   canonicalUrl: string;
-  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback';
+  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor';
   description?: string;
+  // Article-specific fields
+  siteName?: string;
+  wordCount?: number;
+  readingTimeMinutes?: number;
+  hasArticleContent?: boolean;
 }
 
 /**
@@ -54,6 +59,11 @@ export interface SaveBookmarkInput {
   duration: number | null;
   canonicalUrl: string;
   description?: string;
+  // Article-specific fields
+  siteName?: string;
+  wordCount?: number;
+  readingTimeMinutes?: number;
+  hasArticleContent?: boolean;
 }
 
 // ============================================================================
@@ -244,6 +254,11 @@ export function useSaveBookmark() {
       duration: preview.duration,
       canonicalUrl: preview.canonicalUrl,
       description: preview.description,
+      // Article-specific fields
+      siteName: preview.siteName,
+      wordCount: preview.wordCount,
+      readingTimeMinutes: preview.readingTimeMinutes,
+      hasArticleContent: preview.hasArticleContent,
     });
   };
 
@@ -272,6 +287,11 @@ export function useSaveBookmark() {
       duration: preview.duration,
       canonicalUrl: preview.canonicalUrl,
       description: preview.description,
+      // Article-specific fields
+      siteName: preview.siteName,
+      wordCount: preview.wordCount,
+      readingTimeMinutes: preview.readingTimeMinutes,
+      hasArticleContent: preview.hasArticleContent,
     });
   };
 
