@@ -14,6 +14,8 @@ export interface Bindings {
   WEBHOOK_IDEMPOTENCY: KVNamespace;
   /** KV namespace for OAuth state storage */
   OAUTH_STATE_KV: KVNamespace;
+  /** R2 bucket for article content storage */
+  ARTICLE_CONTENT: R2Bucket;
   /** Current environment (development, staging, production) */
   ENVIRONMENT: string;
   /** Clerk publishable key */

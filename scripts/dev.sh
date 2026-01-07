@@ -31,18 +31,56 @@ SEEDED_MARKER="$STATE_DIR/.seeded-from-main"
 # -----------------------------------------------------------------------------
 # Port Assignment: Deterministic from worktree path (with manual override)
 # -----------------------------------------------------------------------------
+# Function to check if a port is in use
+port_in_use() {
+    command -v lsof >/dev/null 2>&1 && lsof -i :$1 >/dev/null 2>&1
+}
+
+# Function to find an available port starting from a base
+find_available_port() {
+    local base=$1
+    local max_attempts=100
+    local port=$base
+    
+    for ((i=0; i<max_attempts; i++)); do
+        if ! port_in_use $port; then
+            echo $port
+            return 0
+        fi
+        port=$((port + 1))
+        # Wrap around within 8700-8799 range for worker ports
+        if [ $port -ge 8800 ]; then
+            port=8700
+        fi
+    done
+    
+    # Fallback: return original and let wrangler fail with clear error
+    echo $base
+    return 1
+}
+
 if [ -n "$ZINE_WORKER_PORT" ]; then
   WORKER_PORT=$ZINE_WORKER_PORT
 else
   PORT_OFFSET=$(($(echo "$WORKTREE_PATH" | cksum | awk '{print $1}') % 100))
-  WORKER_PORT=$((8700 + PORT_OFFSET))
+  PREFERRED_PORT=$((8700 + PORT_OFFSET))
+  WORKER_PORT=$(find_available_port $PREFERRED_PORT)
+  
+  if [ "$WORKER_PORT" != "$PREFERRED_PORT" ]; then
+    echo "   ℹ️  Port $PREFERRED_PORT in use, using $WORKER_PORT instead"
+  fi
 fi
 
 # Metro bundler port: 8081 for main, 8100+ for worktrees
 if [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ]; then
   METRO_PORT=8081
 else
-  METRO_PORT=$((8100 + PORT_OFFSET))
+  PREFERRED_METRO=$((8100 + PORT_OFFSET))
+  METRO_PORT=$(find_available_port $PREFERRED_METRO)
+  
+  if [ "$METRO_PORT" != "$PREFERRED_METRO" ]; then
+    echo "   ℹ️  Metro port $PREFERRED_METRO in use, using $METRO_PORT instead"
+  fi
 fi
 
 echo "🚀 Zine Dev Environment"
@@ -51,15 +89,7 @@ echo "   Main:     $MAIN_WORKTREE"
 echo "   Worker:   http://localhost:$WORKER_PORT"
 echo "   Metro:    http://localhost:$METRO_PORT"
 
-# -----------------------------------------------------------------------------
-# Port Conflict Detection
-# -----------------------------------------------------------------------------
-if command -v lsof >/dev/null 2>&1 && lsof -i :$WORKER_PORT >/dev/null 2>&1; then
-    echo ""
-    echo "   ⚠️  Port $WORKER_PORT is already in use!"
-    echo "   Override with: ZINE_WORKER_PORT=8888 bun run dev:worktree"
-    exit 1
-fi
+# Port conflict detection is now handled above in find_available_port
 
 # -----------------------------------------------------------------------------
 # Database Seeding: Copy state from main worktree on first run
@@ -70,13 +100,24 @@ if [ "$WORKTREE_PATH" != "$MAIN_WORKTREE" ] && [ ! -f "$SEEDED_MARKER" ] && [ -d
     cp -R "$MAIN_WORKTREE/$STATE_DIR" "$STATE_DIR"
     echo "Seeded from $MAIN_WORKTREE on $(date)" > "$SEEDED_MARKER"
     echo "   ✓ Database seeded (includes OAuth tokens, existing data)"
-    echo "   ℹ️  If your branch has new migrations, run: cd apps/worker && bun run db:migrate"
 elif [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ]; then
     echo "   ℹ️  Running in main worktree"
 elif [ ! -d "$MAIN_WORKTREE/$STATE_DIR" ]; then
     echo "   ⚠️  No main worktree database found"
     echo "      Starting with empty database"
     echo "      (Run main worktree first to enable seeding)"
+fi
+
+# Apply any pending database migrations (branch may have migrations not in main's DB)
+if [ -d "$STATE_DIR" ]; then
+    echo "   🔄 Checking for pending database migrations..."
+    MIGRATION_OUTPUT=$(cd apps/worker && bun wrangler d1 migrations apply DB --local 2>&1)
+    if echo "$MIGRATION_OUTPUT" | grep -q "Migrations to be applied"; then
+        echo "$MIGRATION_OUTPUT" | grep -E "(Migrations to be applied|✅|name)" | head -10
+        echo "   ✓ Migrations applied"
+    else
+        echo "   ✓ Database schema up to date"
+    fi
 fi
 
 # -----------------------------------------------------------------------------

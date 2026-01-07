@@ -30,6 +30,7 @@ import { parseLink, type ParsedLink } from './link-parser';
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
+import { extractArticle } from './article-extractor';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 
@@ -60,7 +61,17 @@ export interface LinkPreviewResult {
   /** Description/summary of the content */
   description?: string;
   /** Source that provided the metadata */
-  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback';
+  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor';
+
+  // Article-specific fields
+  /** Publication or site name (for articles) */
+  siteName?: string;
+  /** Estimated word count (for articles) */
+  wordCount?: number;
+  /** Estimated reading time in minutes (for articles) */
+  readingTimeMinutes?: number;
+  /** Whether article content was extracted for reader view */
+  hasArticleContent?: boolean;
 }
 
 /**
@@ -450,6 +461,11 @@ export async function fetchLinkPreview(
       result = await fetchViaOpenGraph(parsedLink);
       break;
 
+    case Provider.WEB:
+      // WEB provider uses article extraction with OG fallback
+      result = await fetchWebProviderPreview(parsedLink);
+      break;
+
     default:
       // Fallback to Open Graph for unknown providers
       result = await fetchViaOpenGraph(parsedLink);
@@ -535,5 +551,39 @@ async function fetchRssProviderPreview(parsedLink: ParsedLink): Promise<LinkPrev
   }
 
   // Fall back to Open Graph for all RSS provider URLs
+  return fetchViaOpenGraph(parsedLink);
+}
+
+/**
+ * Fetch WEB provider preview with article extraction fallback chain
+ *
+ * Fallback order:
+ * 1. Article Extraction (Readability) - best for article content
+ * 2. Open Graph scraping - fallback for non-article pages
+ */
+async function fetchWebProviderPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  // Try article extraction first
+  const articleData = await extractArticle(parsedLink.canonicalUrl);
+
+  if (articleData?.isArticle) {
+    return {
+      provider: parsedLink.provider,
+      contentType: parsedLink.contentType,
+      providerId: parsedLink.providerId,
+      title: articleData.title,
+      creator: articleData.author || articleData.siteName || 'Unknown',
+      thumbnailUrl: articleData.thumbnailUrl,
+      duration: null,
+      canonicalUrl: parsedLink.canonicalUrl,
+      description: articleData.excerpt || undefined,
+      source: 'article_extractor',
+      siteName: articleData.siteName || undefined,
+      wordCount: articleData.wordCount || undefined,
+      readingTimeMinutes: articleData.readingTimeMinutes || undefined,
+      hasArticleContent: !!articleData.content,
+    };
+  }
+
+  // Fall back to Open Graph
   return fetchViaOpenGraph(parsedLink);
 }

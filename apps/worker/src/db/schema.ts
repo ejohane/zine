@@ -41,6 +41,11 @@ export const items = sqliteTable(
     duration: integer('duration'), // Seconds
     publishedAt: text('published_at'), // ISO8601 (legacy)
 
+    // Article-specific metadata
+    wordCount: integer('word_count'),
+    readingTimeMinutes: integer('reading_time_minutes'),
+    articleContentKey: text('article_content_key'), // R2 object key for full article content
+
     // System
     createdAt: text('created_at').notNull(), // ISO8601 (legacy)
     updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)

@@ -13,6 +13,11 @@ id = "9b2d9ef82c02438ba13184bfc68c2d43"
 binding = "OAUTH_STATE_KV"
 id = "2101381b080942f9a7799583ccb2e096"
 
+# R2 bucket for article content storage
+[[r2_buckets]]
+binding = "ARTICLE_CONTENT"
+bucket_name = "zine-article-content-dev"
+
 # D1 Database binding (development)
 [[d1_databases]]
 binding = "DB"
@@ -47,6 +52,9 @@ id = "abb1a04762cb4a129218d8c9651adf7c"
 [[env.staging.kv_namespaces]]
 binding = "OAUTH_STATE_KV"
 id = "acb7c409523d4ddeb7941ec2783ace9d"
+[[env.staging.r2_buckets]]
+binding = "ARTICLE_CONTENT"
+bucket_name = "zine-article-content-staging"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "zine-db-staging"
@@ -77,6 +85,9 @@ id = "9937928f2eb54074bda5e035dac09c14"
 binding = "OAUTH_STATE_KV"
 id = "c58624987cd94f3285ca7f62e5c2fe16"
 
+[[env.production.r2_buckets]]
+binding = "ARTICLE_CONTENT"
+bucket_name = "zine-article-content-prod"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "zine-db-production"
