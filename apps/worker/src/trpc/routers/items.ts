@@ -132,7 +132,8 @@ export const itemsRouter = router({
   /**
    * Get items in the triage queue (INBOX state).
    * Supports filtering by provider and content type.
-   * Uses cursor-based pagination sorted by ingestedAt DESC.
+   * Uses cursor-based pagination sorted by publishedAt DESC (most recent first).
+   * Falls back to ingestedAt for items without a publishedAt date.
    */
   inbox: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
     const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
@@ -145,12 +146,12 @@ export const itemsRouter = router({
       eq(userItems.isFinished, false),
     ];
 
-    // Apply cursor-based pagination (fetch items older than cursor)
+    // Apply cursor-based pagination (fetch items published before cursor)
     if (cursor) {
       conditions.push(
         or(
-          lt(userItems.ingestedAt, cursor.sortValue),
-          and(eq(userItems.ingestedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+          lt(items.publishedAt, cursor.sortValue),
+          and(eq(items.publishedAt, cursor.sortValue), lt(userItems.id, cursor.id))
         )!
       );
     }
@@ -169,7 +170,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .where(and(...conditions))
-      .orderBy(desc(userItems.ingestedAt), desc(userItems.id))
+      .orderBy(desc(items.publishedAt), desc(userItems.id))
       .limit(limit + 1); // Fetch one extra to check for more
 
     // Check if there are more results
@@ -184,7 +185,7 @@ export const itemsRouter = router({
     if (hasMore && pageResults.length > 0) {
       const lastResult = pageResults[pageResults.length - 1];
       nextCursor = encodeCursor({
-        sortValue: lastResult.user_items.ingestedAt,
+        sortValue: lastResult.items.publishedAt ?? lastResult.user_items.ingestedAt,
         id: lastResult.user_items.id,
       });
     }
