@@ -475,3 +475,85 @@ export async function fetchVideoDetails(
     return new Map();
   }
 }
+
+/**
+ * Fetch video details for a large batch of videos across multiple subscriptions.
+ *
+ * This function is optimized for the polling use case where we need to fetch
+ * details for videos from many channels. It automatically chunks requests
+ * to stay within YouTube API limits (50 IDs per call).
+ *
+ * YouTube API Cost: ceil(videoIds.length / 50) quota units
+ *
+ * Example: 200 videos across 20 channels = 4 API calls (vs 20 without batching)
+ *
+ * @param client - Authenticated YouTube client
+ * @param videoIds - Array of video IDs (can exceed 50)
+ * @param concurrency - Max concurrent API calls (default: 3, max 6 for CF Workers)
+ * @returns Map of videoId to VideoDetails. Missing videos omitted (graceful degradation).
+ */
+export async function fetchVideoDetailsBatched(
+  client: YouTubeClient,
+  videoIds: string[],
+  concurrency: number = 3
+): Promise<Map<string, VideoDetails>> {
+  if (videoIds.length === 0) {
+    return new Map();
+  }
+
+  // Chunk into groups of 50 (YouTube API limit)
+  const chunks: string[][] = [];
+  for (let i = 0; i < videoIds.length; i += 50) {
+    chunks.push(videoIds.slice(i, i + 50));
+  }
+
+  const allDetails = new Map<string, VideoDetails>();
+
+  // Process in waves of `concurrency` chunks
+  for (let i = 0; i < chunks.length; i += concurrency) {
+    const wave = chunks.slice(i, i + concurrency);
+    const results = await Promise.all(
+      wave.map(async (chunk) => {
+        try {
+          return await fetchVideoDetailsChunk(client, chunk);
+        } catch (error) {
+          console.warn('Failed to fetch video details chunk:', error);
+          return new Map<string, VideoDetails>();
+        }
+      })
+    );
+
+    // Merge results
+    for (const result of results) {
+      for (const [id, details] of result) {
+        allDetails.set(id, details);
+      }
+    }
+  }
+
+  return allDetails;
+}
+
+/**
+ * Internal: Fetch details for a single chunk of videos (max 50).
+ */
+async function fetchVideoDetailsChunk(
+  client: YouTubeClient,
+  videoIds: string[]
+): Promise<Map<string, VideoDetails>> {
+  const response = await client.api.videos.list({
+    part: ['contentDetails', 'snippet'],
+    id: videoIds,
+  });
+
+  const details = new Map<string, VideoDetails>();
+  for (const video of response.data.items || []) {
+    if (video.id && video.contentDetails?.duration) {
+      details.set(video.id, {
+        durationSeconds: parseISO8601Duration(video.contentDetails.duration),
+        description: video.snippet?.description ?? '',
+      });
+    }
+  }
+  return details;
+}

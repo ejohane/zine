@@ -22,6 +22,7 @@ import {
   getYouTubeClientForConnection,
   fetchRecentVideos,
   fetchVideoDetails,
+  fetchVideoDetailsBatched,
   getUserSubscriptions,
   getAllUserSubscriptions,
   searchChannels,
@@ -619,6 +620,268 @@ describe('fetchVideoDetails', () => {
     const result = await fetchVideoDetails(client, ['video123']);
 
     expect(result.get('video123')?.description).toBe('');
+  });
+});
+
+// ============================================================================
+// fetchVideoDetailsBatched Tests
+// ============================================================================
+
+describe('fetchVideoDetailsBatched', () => {
+  beforeEach(() => {
+    mockVideosList.mockReset();
+  });
+
+  it('should return empty map for empty input', async () => {
+    const client = createMockYouTubeClient();
+    const result = await fetchVideoDetailsBatched(client, []);
+    expect(result.size).toBe(0);
+    expect(mockVideosList).not.toHaveBeenCalled();
+  });
+
+  it('should fetch all videos in minimal API calls (120 videos = 3 calls)', async () => {
+    const client = createMockYouTubeClient();
+    // Mock 3 chunks of responses
+    mockVideosList
+      .mockResolvedValueOnce({
+        data: {
+          items: Array.from({ length: 50 }, (_, i) =>
+            createMockVideo({
+              id: `video${i}`,
+              contentDetails: { duration: 'PT1M' },
+              snippet: { description: `Description ${i}` },
+            })
+          ),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          items: Array.from({ length: 50 }, (_, i) =>
+            createMockVideo({
+              id: `video${50 + i}`,
+              contentDetails: { duration: 'PT2M' },
+              snippet: { description: `Description ${50 + i}` },
+            })
+          ),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          items: Array.from({ length: 20 }, (_, i) =>
+            createMockVideo({
+              id: `video${100 + i}`,
+              contentDetails: { duration: 'PT3M' },
+              snippet: { description: `Description ${100 + i}` },
+            })
+          ),
+        },
+      });
+
+    const videoIds = Array.from({ length: 120 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds);
+
+    // 120 / 50 = 3 calls (ceiling)
+    expect(mockVideosList).toHaveBeenCalledTimes(3);
+    expect(result.size).toBe(120);
+    // Verify first video from each chunk
+    expect(result.get('video0')?.durationSeconds).toBe(60); // PT1M
+    expect(result.get('video50')?.durationSeconds).toBe(120); // PT2M
+    expect(result.get('video100')?.durationSeconds).toBe(180); // PT3M
+  });
+
+  it('should handle partial chunk failures gracefully', async () => {
+    const client = createMockYouTubeClient();
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    mockVideosList
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            createMockVideo({
+              id: 'video0',
+              contentDetails: { duration: 'PT1M' },
+              snippet: { description: 'test' },
+            }),
+          ],
+        },
+      })
+      .mockRejectedValueOnce(new Error('API Error'));
+
+    const videoIds = Array.from({ length: 100 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds);
+
+    // Should have results from successful chunk only
+    expect(result.size).toBe(1);
+    expect(result.get('video0')).toBeDefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'Failed to fetch video details chunk:',
+      expect.any(Error)
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it('should merge results from all chunks', async () => {
+    const client = createMockYouTubeClient();
+
+    mockVideosList
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            createMockVideo({
+              id: 'video0',
+              contentDetails: { duration: 'PT10M' },
+              snippet: { description: 'First video' },
+            }),
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          items: [
+            createMockVideo({
+              id: 'video50',
+              contentDetails: { duration: 'PT5M' },
+              snippet: { description: 'Second chunk video' },
+            }),
+          ],
+        },
+      });
+
+    // Create 52 IDs so we need 2 API calls
+    const videoIds = Array.from({ length: 52 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds);
+
+    expect(mockVideosList).toHaveBeenCalledTimes(2);
+    expect(result.get('video0')?.durationSeconds).toBe(600); // 10 minutes
+    expect(result.get('video0')?.description).toBe('First video');
+    expect(result.get('video50')?.durationSeconds).toBe(300); // 5 minutes
+    expect(result.get('video50')?.description).toBe('Second chunk video');
+  });
+
+  it('should handle exactly 50 videos in one call', async () => {
+    const client = createMockYouTubeClient();
+    mockVideosList.mockResolvedValue({
+      data: {
+        items: Array.from({ length: 50 }, (_, i) =>
+          createMockVideo({
+            id: `video${i}`,
+            contentDetails: { duration: 'PT1M' },
+          })
+        ),
+      },
+    });
+
+    const videoIds = Array.from({ length: 50 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds);
+
+    expect(mockVideosList).toHaveBeenCalledTimes(1);
+    expect(result.size).toBe(50);
+  });
+
+  it('should handle single video', async () => {
+    const client = createMockYouTubeClient();
+    mockVideosList.mockResolvedValue({
+      data: {
+        items: [
+          createMockVideo({
+            id: 'single-video',
+            contentDetails: { duration: 'PT2M30S' },
+            snippet: { description: 'Single video description' },
+          }),
+        ],
+      },
+    });
+
+    const result = await fetchVideoDetailsBatched(client, ['single-video']);
+
+    expect(mockVideosList).toHaveBeenCalledTimes(1);
+    expect(result.size).toBe(1);
+    expect(result.get('single-video')?.durationSeconds).toBe(150); // 2m 30s
+  });
+
+  it('should respect concurrency limit', async () => {
+    const client = createMockYouTubeClient();
+    // With 200 videos and default concurrency of 3:
+    // 4 chunks of 50, processed in 2 waves (3 + 1)
+    mockVideosList.mockResolvedValue({
+      data: {
+        items: Array.from({ length: 50 }, (_, i) =>
+          createMockVideo({
+            id: `video${i}`,
+            contentDetails: { duration: 'PT1M' },
+          })
+        ),
+      },
+    });
+
+    const videoIds = Array.from({ length: 200 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds, 3);
+
+    // 200 / 50 = 4 calls total
+    expect(mockVideosList).toHaveBeenCalledTimes(4);
+    // Result will only have 50 unique IDs due to mock returning same IDs
+    // In real scenario, each chunk would have different IDs
+    expect(result.size).toBeGreaterThan(0);
+  });
+
+  it('should handle all chunks failing gracefully', async () => {
+    const client = createMockYouTubeClient();
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockVideosList.mockRejectedValue(new Error('Total API failure'));
+
+    const videoIds = Array.from({ length: 100 }, (_, i) => `video${i}`);
+    const result = await fetchVideoDetailsBatched(client, videoIds);
+
+    expect(result.size).toBe(0);
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle videos without duration', async () => {
+    const client = createMockYouTubeClient();
+    mockVideosList.mockResolvedValue({
+      data: {
+        items: [
+          createMockVideo({
+            id: 'video-with-duration',
+            contentDetails: { duration: 'PT5M' },
+          }),
+          createMockVideo({
+            id: 'video-without-duration',
+            contentDetails: { duration: undefined },
+          }),
+        ],
+      },
+    });
+
+    const result = await fetchVideoDetailsBatched(client, [
+      'video-with-duration',
+      'video-without-duration',
+    ]);
+
+    expect(result.size).toBe(1);
+    expect(result.has('video-with-duration')).toBe(true);
+    expect(result.has('video-without-duration')).toBe(false);
+  });
+
+  it('should pass correct IDs to each chunk', async () => {
+    const client = createMockYouTubeClient();
+    mockVideosList.mockResolvedValue({ data: { items: [] } });
+
+    const videoIds = Array.from({ length: 75 }, (_, i) => `video${i}`);
+    await fetchVideoDetailsBatched(client, videoIds);
+
+    expect(mockVideosList).toHaveBeenCalledTimes(2);
+    // First chunk: video0-video49
+    expect(mockVideosList).toHaveBeenNthCalledWith(1, {
+      part: ['contentDetails', 'snippet'],
+      id: videoIds.slice(0, 50),
+    });
+    // Second chunk: video50-video74
+    expect(mockVideosList).toHaveBeenNthCalledWith(2, {
+      part: ['contentDetails', 'snippet'],
+      id: videoIds.slice(50, 75),
+    });
   });
 });
 

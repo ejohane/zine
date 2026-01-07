@@ -20,6 +20,7 @@ import type {
   Show,
   Episode,
   AccessToken,
+  Market,
 } from '@spotify/web-api-ts-sdk';
 import {
   getValidAccessToken,
@@ -300,6 +301,53 @@ export async function getShow(client: SpotifyApi, showId: string): Promise<Spoti
   // Market defaults to user's market when using authenticated client
   const show = await client.shows.get(showId, 'US');
   return transformShow(show);
+}
+
+/**
+ * Get multiple shows (podcasts) by their IDs in a single API call.
+ *
+ * This is the batch version of getShow() - use this when fetching metadata
+ * for multiple subscriptions to dramatically reduce API calls.
+ *
+ * Key use case: Delta detection for polling. The returned `totalEpisodes`
+ * field can be compared with stored `subscription.totalItems` to determine
+ * if new episodes exist without fetching the actual episodes.
+ *
+ * Spotify API Cost: 1 API call per 50 shows
+ * Endpoint: GET /shows?ids=...
+ * Rate Limit: ~180 req/30s
+ *
+ * @param client - Authenticated SpotifyApi client
+ * @param showIds - Array of Spotify show IDs (max 50 per API call, automatically chunked)
+ * @param market - Market code (default: 'US')
+ * @returns Array of SpotifyShow objects in same order as input IDs.
+ *          Missing shows will have undefined at that index (SDK behavior).
+ */
+export async function getMultipleShows(
+  client: SpotifyApi,
+  showIds: string[],
+  market: Market = 'US'
+): Promise<SpotifyShow[]> {
+  if (showIds.length === 0) {
+    return [];
+  }
+
+  // Chunk into groups of 50 (API limit)
+  const chunks: string[][] = [];
+  for (let i = 0; i < showIds.length; i += 50) {
+    chunks.push(showIds.slice(i, i + 50));
+  }
+
+  const allShows: SpotifyShow[] = [];
+
+  for (const chunk of chunks) {
+    // SDK's get() is overloaded: string[] returns Show[]
+    const shows = await client.shows.get(chunk, market);
+    // Transform each show to our simplified type
+    allShows.push(...shows.map(transformShow));
+  }
+
+  return allShows;
 }
 
 /**
