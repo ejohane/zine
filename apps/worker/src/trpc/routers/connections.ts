@@ -173,6 +173,28 @@ export const connectionsRouter = router({
           },
         });
 
+      // 7. Reactivate DISCONNECTED subscriptions for this provider
+      // When a user reconnects their account, their previously disconnected subscriptions
+      // should become active again so they can be synced
+      await ctx.db
+        .update(subscriptions)
+        .set({
+          status: 'ACTIVE',
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(subscriptions.userId, ctx.userId),
+            eq(subscriptions.provider, input.provider),
+            eq(subscriptions.status, 'DISCONNECTED')
+          )
+        );
+
+      authLogger.info('Provider reconnected, reactivated disconnected subscriptions', {
+        provider: input.provider,
+        userId: ctx.userId,
+      });
+
       return { success: true };
     }),
 

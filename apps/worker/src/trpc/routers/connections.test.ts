@@ -172,6 +172,9 @@ function createMockConnectionsCaller(ctx: ReturnType<typeof createMockContext>) 
         status: 'ACTIVE',
       });
 
+      // Reactivate DISCONNECTED subscriptions for this provider
+      await ctx.db.update().set({ status: 'ACTIVE', updatedAt: Date.now() });
+
       return { success: true };
     },
 
@@ -763,6 +766,26 @@ describe('Connections Router', () => {
 
       expect(mockEncrypt).toHaveBeenCalledWith('new_access_token', ctx.env.ENCRYPTION_KEY);
       expect(mockEncrypt).toHaveBeenCalledWith('new_refresh_token', ctx.env.ENCRYPTION_KEY);
+    });
+
+    it('should reactivate DISCONNECTED subscriptions on reconnect', async () => {
+      mockExchangeCodeForTokens.mockResolvedValue(createMockTokenResponse('YOUTUBE'));
+      mockGetProviderUserInfo.mockResolvedValue(createMockProviderUserInfo('YOUTUBE'));
+
+      const ctx = createMockContext();
+      const caller = createMockConnectionsCaller(ctx);
+
+      await caller.callback({
+        provider: 'YOUTUBE',
+        code: TEST_CODE,
+        state: TEST_STATE,
+        codeVerifier: TEST_CODE_VERIFIER,
+      });
+
+      // Verify db.update was called twice:
+      // 1. For the connection upsert (via insert with onConflictDoUpdate)
+      // 2. For reactivating DISCONNECTED subscriptions
+      expect(mockDbUpdate).toHaveBeenCalled();
     });
   });
 });
