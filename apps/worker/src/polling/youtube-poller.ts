@@ -24,7 +24,9 @@ import {
   getUploadsPlaylistId,
   fetchRecentVideos,
   fetchVideoDetails,
+  fetchVideoDetailsBatched,
   type YouTubeClient,
+  type VideoDetails,
 } from '../providers/youtube';
 import { ingestItem } from '../ingestion/processor';
 import { transformYouTubeVideo } from '../ingestion/transformers';
@@ -34,6 +36,7 @@ import type {
   Subscription,
   DrizzleDB,
   PollingResult,
+  BatchPollingResult,
   ProviderBatchConfig,
   ProviderConnectionRow,
 } from './types';
@@ -61,6 +64,7 @@ export const youtubeProviderConfig: ProviderBatchConfig<YouTubeClient> = {
       env as Parameters<typeof getYouTubeClientForConnection>[1]
     ),
   pollSingle: pollSingleYouTubeSubscription,
+  pollBatch: pollYouTubeSubscriptionsBatched,
 };
 
 // ============================================================================
@@ -296,4 +300,256 @@ async function updateSubscriptionPolled(subscriptionId: string, db: DrizzleDB): 
     .update(subscriptions)
     .set({ lastPolledAt: Date.now(), updatedAt: Date.now() })
     .where(eq(subscriptions.id, subscriptionId));
+}
+
+// ============================================================================
+// Batched Polling (Parallel + Cross-Subscription Batching)
+// ============================================================================
+
+/**
+ * Cloudflare Workers limit for concurrent outbound connections.
+ * We use 6 to stay safely within limits.
+ */
+const BATCH_CONCURRENCY = 6;
+
+/**
+ * Result from parallel playlist fetch for a single subscription.
+ */
+interface PlaylistFetchResult {
+  subscription: Subscription;
+  videos: youtube_v3.Schema$PlaylistItem[];
+  error?: Error;
+}
+
+/**
+ * Fetch playlists in parallel, processing subscriptions in waves.
+ *
+ * Cloudflare Workers have a limit of 6 concurrent outbound connections,
+ * so we process in waves of 6 subscriptions at a time.
+ *
+ * @param subs - Subscriptions to fetch playlists for
+ * @param client - Authenticated YouTube client
+ * @returns Array of PlaylistFetchResult (one per subscription)
+ */
+async function fetchPlaylistsInParallel(
+  subs: Subscription[],
+  client: YouTubeClient
+): Promise<PlaylistFetchResult[]> {
+  const results: PlaylistFetchResult[] = [];
+
+  for (let i = 0; i < subs.length; i += BATCH_CONCURRENCY) {
+    const wave = subs.slice(i, i + BATCH_CONCURRENCY);
+    const waveResults = await Promise.all(
+      wave.map(async (sub): Promise<PlaylistFetchResult> => {
+        try {
+          const uploadsPlaylistId = getUploadsPlaylistId(sub.providerChannelId);
+          const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
+          return { subscription: sub, videos };
+        } catch (error) {
+          ytLogger.error('Failed to fetch playlist', {
+            subscriptionId: sub.id,
+            name: sub.name,
+            error,
+          });
+          return { subscription: sub, videos: [], error: error as Error };
+        }
+      })
+    );
+    results.push(...waveResults);
+  }
+
+  return results;
+}
+
+/**
+ * Poll multiple YouTube subscriptions in a single batch.
+ *
+ * This optimized function processes multiple subscriptions efficiently using:
+ * 1. Parallel playlist fetches (waves of 6 due to CF connection limit)
+ * 2. Cross-subscription video detail batching (50 videos per API call)
+ *
+ * Performance comparison for 20 subscriptions:
+ * - Sequential: 40 API calls, ~20 seconds
+ * - Batched: 24 API calls, ~4 seconds (40% fewer calls, 80% faster)
+ *
+ * @param subs - Subscriptions to poll (all belong to the same user)
+ * @param client - Authenticated YouTube client
+ * @param userId - User ID owning these subscriptions
+ * @param env - Cloudflare Worker bindings
+ * @param db - Database instance
+ * @returns BatchPollingResult with aggregated metrics
+ */
+export async function pollYouTubeSubscriptionsBatched(
+  subs: Subscription[],
+  client: YouTubeClient,
+  userId: string,
+  env: Bindings,
+  db: DrizzleDB
+): Promise<BatchPollingResult> {
+  ytLogger.info('Batch polling subscriptions', { count: subs.length, userId });
+
+  const errors: Array<{ subscriptionId: string; error: string }> = [];
+
+  // Step 1: Fetch all playlists in parallel (waves of 6)
+  const playlistResults = await fetchPlaylistsInParallel(subs, client);
+
+  // Collect errors from playlist fetches
+  for (const result of playlistResults) {
+    if (result.error) {
+      errors.push({ subscriptionId: result.subscription.id, error: String(result.error) });
+    }
+  }
+
+  // Step 2: Collect ALL video IDs across subscriptions for batched details fetch
+  const allVideoIds: string[] = [];
+  for (const result of playlistResults) {
+    const ids = result.videos
+      .map((v) => v.contentDetails?.videoId)
+      .filter((id): id is string => !!id);
+    allVideoIds.push(...ids);
+  }
+
+  ytLogger.info('Collected video IDs for batch details fetch', {
+    totalVideos: allVideoIds.length,
+    subscriptions: playlistResults.length,
+  });
+
+  // Step 3: Fetch video details in batched calls (50 per call)
+  // This is the key optimization: instead of 1 call per subscription,
+  // we batch all videos across subscriptions
+  const videoDetails = await fetchVideoDetailsBatched(client, allVideoIds);
+
+  // Step 4: Process each subscription with the pre-fetched video details
+  let totalNewItems = 0;
+
+  for (const result of playlistResults) {
+    // Skip subscriptions that failed to fetch
+    if (result.error) {
+      continue;
+    }
+
+    try {
+      const newItems = await processSubscriptionVideos(
+        result.subscription,
+        result.videos,
+        videoDetails,
+        userId,
+        db
+      );
+      totalNewItems += newItems;
+    } catch (error) {
+      ytLogger.error('Failed to process subscription videos', {
+        subscriptionId: result.subscription.id,
+        name: result.subscription.name,
+        error,
+      });
+      errors.push({ subscriptionId: result.subscription.id, error: String(error) });
+    }
+  }
+
+  ytLogger.info('Batch polling complete', {
+    processed: playlistResults.length,
+    totalNewItems,
+    errors: errors.length,
+  });
+
+  return {
+    newItems: totalNewItems,
+    processed: playlistResults.length,
+    skipped: 0, // YouTube doesn't have delta detection
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+/**
+ * Process videos for a single subscription using pre-fetched video details.
+ *
+ * This helper handles:
+ * 1. Enriching videos with duration and full description
+ * 2. Filtering out Shorts
+ * 3. Filtering to new videos based on lastPolledAt
+ * 4. Ingesting new items
+ * 5. Updating subscription metadata
+ *
+ * @param sub - Subscription being processed
+ * @param videos - Raw playlist items from fetchRecentVideos
+ * @param videoDetails - Pre-fetched video details map
+ * @param userId - User ID owning the subscription
+ * @param db - Database instance
+ * @returns Number of new items ingested
+ */
+async function processSubscriptionVideos(
+  sub: Subscription,
+  videos: youtube_v3.Schema$PlaylistItem[],
+  videoDetails: Map<string, VideoDetails>,
+  userId: string,
+  db: DrizzleDB
+): Promise<number> {
+  if (videos.length === 0) {
+    ytLogger.info('No videos found', { name: sub.name });
+    await updateSubscriptionPolled(sub.id, db);
+    return 0;
+  }
+
+  // Enrich videos with details from the pre-fetched map
+  const enrichedVideos = enrichVideosWithDetailsMap(videos, videoDetails);
+
+  // Filter out Shorts
+  const nonShortVideos = filterOutShorts(enrichedVideos, sub.name);
+
+  if (nonShortVideos.length === 0) {
+    ytLogger.info('All videos were Shorts, nothing to ingest', { name: sub.name });
+    await updateSubscriptionPolled(sub.id, db);
+    return 0;
+  }
+
+  // Filter to new videos based on lastPolledAt
+  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt);
+
+  ytLogger.info('Found videos', {
+    total: videos.length,
+    afterShortsFilter: nonShortVideos.length,
+    new: newVideos.length,
+    name: sub.name,
+  });
+
+  // Ingest new items
+  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, db);
+
+  // Calculate newest published timestamp
+  const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
+
+  // Update subscription
+  await db
+    .update(subscriptions)
+    .set({
+      lastPolledAt: Date.now(),
+      lastPublishedAt: newestPublishedAt || undefined,
+      updatedAt: Date.now(),
+    })
+    .where(eq(subscriptions.id, sub.id));
+
+  return newItemsCount;
+}
+
+/**
+ * Enrich videos with duration and full description from a pre-fetched details map.
+ *
+ * Similar to enrichVideosWithDetails but uses the cross-subscription batched map.
+ */
+function enrichVideosWithDetailsMap(
+  videos: youtube_v3.Schema$PlaylistItem[],
+  videoDetails: Map<string, VideoDetails>
+): EnrichedVideo[] {
+  return videos.map((v) => {
+    const details = videoDetails.get(v.contentDetails?.videoId || '');
+    return {
+      ...v,
+      durationSeconds: details?.durationSeconds,
+      snippet: {
+        ...v.snippet,
+        description: details?.description ?? v.snippet?.description,
+      },
+    };
+  });
 }

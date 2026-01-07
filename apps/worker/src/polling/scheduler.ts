@@ -63,6 +63,75 @@ export interface PollResult {
   newItems?: number;
 }
 
+/**
+ * Metrics for a single poll cycle.
+ * Used for optimization validation and monitoring.
+ */
+interface PollCycleMetrics {
+  /** Wall-clock duration in milliseconds */
+  durationMs: number;
+  /** Total subscriptions found due for polling */
+  subscriptionsDue: number;
+  /** Subscriptions actually processed */
+  subscriptionsProcessed: number;
+  /** New items ingested */
+  newItemsIngested: number;
+  /** Provider-specific metrics */
+  providers: {
+    youtube?: ProviderMetrics;
+    spotify?: ProviderMetrics;
+  };
+}
+
+interface ProviderMetrics {
+  /** Subscriptions for this provider */
+  subscriptions: number;
+  /** Subscriptions processed */
+  processed: number;
+  /** Subscriptions skipped via delta detection */
+  skipped: number;
+  /** New items from this provider */
+  newItems: number;
+  /** Estimated API calls made */
+  estimatedApiCalls: number;
+}
+
+// ============================================================================
+// Metrics Helper Functions
+// ============================================================================
+
+/**
+ * Estimate YouTube API calls for batch polling.
+ * - Playlist calls: N (all parallel)
+ * - Video details calls: ceil(totalVideos / 50)
+ */
+function estimateYouTubeApiCalls(subCount: number, result: BatchResult): number {
+  const avgVideosPerSub = 10;
+  const totalVideos = result.processed * avgVideosPerSub;
+  const detailsCalls = Math.ceil(totalVideos / 50);
+  return subCount + detailsCalls;
+}
+
+/**
+ * Estimate Spotify API calls for batch polling with delta detection.
+ * - Metadata calls: ceil(subCount / 50)
+ * - Episode calls: only for changed subscriptions
+ */
+function estimateSpotifyApiCalls(subCount: number, result: BatchResult): number {
+  const metadataCalls = Math.ceil(subCount / 50);
+  const episodeCalls = result.processed - (result.skipped ?? 0);
+  return metadataCalls + episodeCalls;
+}
+
+/**
+ * Calculate percentage reduction from old to new call count.
+ */
+function calculateReductionPercent(oldCalls: number, newCalls: number): string {
+  if (oldCalls === 0) return '0%';
+  const reduction = ((oldCalls - newCalls) / oldCalls) * 100;
+  return `${Math.round(reduction)}%`;
+}
+
 // ============================================================================
 // Main Polling Function
 // ============================================================================
@@ -81,6 +150,8 @@ export async function pollSubscriptions(
   env: Bindings,
   _ctx: ExecutionContext
 ): Promise<PollResult> {
+  const startTime = Date.now();
+
   // 1. Try to acquire distributed lock
   const lockAcquired = await tryAcquireLock(env.OAUTH_STATE_KV, POLL_LOCK_KEY, POLL_LOCK_TTL);
   if (!lockAcquired) {
@@ -134,8 +205,60 @@ export async function pollSubscriptions(
 
     const totalProcessed = ytResult.processed + spResult.processed;
     const totalNewItems = ytResult.newItems + spResult.newItems;
+    const durationMs = Date.now() - startTime;
 
-    pollLogger.info('Polling complete', { processed: totalProcessed, newItems: totalNewItems });
+    // Build metrics object
+    const metrics: PollCycleMetrics = {
+      durationMs,
+      subscriptionsDue: dueSubscriptions.length,
+      subscriptionsProcessed: totalProcessed,
+      newItemsIngested: totalNewItems,
+      providers: {
+        youtube:
+          youtube.length > 0
+            ? {
+                subscriptions: youtube.length,
+                processed: ytResult.processed,
+                skipped: ytResult.skipped ?? 0,
+                newItems: ytResult.newItems,
+                estimatedApiCalls: estimateYouTubeApiCalls(youtube.length, ytResult),
+              }
+            : undefined,
+        spotify:
+          spotify.length > 0
+            ? {
+                subscriptions: spotify.length,
+                processed: spResult.processed,
+                skipped: spResult.skipped ?? 0,
+                newItems: spResult.newItems,
+                estimatedApiCalls: estimateSpotifyApiCalls(spotify.length, spResult),
+              }
+            : undefined,
+      },
+    };
+
+    pollLogger.info('Poll cycle metrics', { metrics });
+
+    // Log summary with efficiency metrics
+    pollLogger.info('Polling complete', {
+      processed: totalProcessed,
+      newItems: totalNewItems,
+      durationMs,
+      spotifyCallsReduction:
+        spotify.length > 0
+          ? calculateReductionPercent(
+              spotify.length, // old: 1 call per sub
+              metrics.providers.spotify?.estimatedApiCalls ?? 0
+            )
+          : undefined,
+      youtubeCallsReduction:
+        youtube.length > 0
+          ? calculateReductionPercent(
+              youtube.length * 2, // old: 2 calls per sub
+              metrics.providers.youtube?.estimatedApiCalls ?? 0
+            )
+          : undefined,
+    });
 
     return {
       skipped: false,
@@ -153,20 +276,68 @@ export async function pollSubscriptions(
 // ============================================================================
 
 /**
+ * Process subscriptions sequentially using pollSingle.
+ *
+ * This helper function encapsulates the sequential polling logic,
+ * used as a fallback when batch polling is unavailable or fails.
+ *
+ * @param userSubs - Subscriptions for a single user to process
+ * @param client - Authenticated provider client
+ * @param config - Provider-specific configuration
+ * @param userId - User ID owning these subscriptions
+ * @param env - Cloudflare Worker bindings
+ * @param db - Database instance
+ * @param providerLower - Lowercase provider name for logging
+ * @returns BatchResult with processed count and new items count
+ */
+async function processSubscriptionsSequentially<TClient>(
+  userSubs: Subscription[],
+  client: TClient,
+  config: ProviderBatchConfig<TClient>,
+  userId: string,
+  env: Bindings,
+  db: DrizzleDB,
+  providerLower: string
+): Promise<BatchResult> {
+  let processed = 0;
+  let newItems = 0;
+
+  for (const sub of userSubs) {
+    try {
+      const result = await config.pollSingle(sub, client, userId, env, db);
+      processed++;
+      newItems += result.newItems;
+    } catch (subError) {
+      pollLogger.child(providerLower).error('Error polling subscription', {
+        subscriptionId: sub.id,
+        error: subError,
+      });
+      // Update lastPolledAt even on error to prevent infinite retry
+      await updateSubscriptionPolled(sub.id, db);
+      processed++;
+    }
+  }
+
+  return { processed, newItems };
+}
+
+/**
  * Process a batch of subscriptions for any provider.
  *
  * This generic function encapsulates the shared batch processing logic:
  * 1. Group subscriptions by user to share API connections
  * 2. Check rate limits per user
  * 3. Get active provider connection from DB
- * 4. Create provider client and process each subscription
- * 5. Handle auth errors by marking connections/subscriptions disconnected
+ * 4. Create provider client and process subscriptions
+ * 5. Prefer batch polling when available and >1 subscription
+ * 6. Fall back to sequential polling if batch fails or unavailable
+ * 7. Handle auth errors by marking connections/subscriptions disconnected
  *
  * @param subs - Subscriptions to process
  * @param config - Provider-specific configuration (client creation, polling logic)
  * @param env - Cloudflare Worker bindings
  * @param db - Database instance
- * @returns BatchResult with processed count and new items count
+ * @returns BatchResult with processed count, new items count, and skipped count
  */
 async function processProviderBatch<TClient>(
   subs: Subscription[],
@@ -176,9 +347,10 @@ async function processProviderBatch<TClient>(
 ): Promise<BatchResult> {
   let processed = 0;
   let newItems = 0;
+  let skipped = 0;
 
   if (subs.length === 0) {
-    return { processed, newItems };
+    return { processed, newItems, skipped };
   }
 
   const providerLower = config.provider.toLowerCase();
@@ -223,21 +395,55 @@ async function processProviderBatch<TClient>(
       // Create provider client with valid token
       const client = await config.getClient(connection as ProviderConnectionRow, env);
 
-      // Process each subscription for this user
-      for (const sub of userSubs) {
+      // Determine if batch polling should be used
+      const shouldUseBatchPolling = config.pollBatch && userSubs.length > 1;
+
+      if (shouldUseBatchPolling) {
         try {
-          const result = await config.pollSingle(sub, client, userId, env, db);
-          processed++;
-          newItems += result.newItems;
-        } catch (subError) {
-          pollLogger.child(providerLower).error('Error polling subscription', {
-            subscriptionId: sub.id,
-            error: subError,
+          const batchResult = await config.pollBatch!(userSubs, client, userId, env, db);
+          processed += batchResult.processed;
+          newItems += batchResult.newItems;
+          skipped += batchResult.skipped ?? 0;
+
+          pollLogger.child(providerLower).info('Batch polling complete', {
+            userId,
+            subscriptions: userSubs.length,
+            processed: batchResult.processed,
+            skipped: batchResult.skipped ?? 0,
+            newItems: batchResult.newItems,
           });
-          // Update lastPolledAt even on error to prevent infinite retry
-          await updateSubscriptionPolled(sub.id, db);
-          processed++;
+        } catch (batchError) {
+          // Batch polling failed - fall back to sequential
+          pollLogger.child(providerLower).warn('Batch polling failed, falling back to sequential', {
+            userId,
+            error: batchError,
+          });
+
+          const fallbackResult = await processSubscriptionsSequentially(
+            userSubs,
+            client,
+            config,
+            userId,
+            env,
+            db,
+            providerLower
+          );
+          processed += fallbackResult.processed;
+          newItems += fallbackResult.newItems;
         }
+      } else {
+        // No batch polling available or only 1 subscription
+        const result = await processSubscriptionsSequentially(
+          userSubs,
+          client,
+          config,
+          userId,
+          env,
+          db,
+          providerLower
+        );
+        processed += result.processed;
+        newItems += result.newItems;
       }
     } catch (error: unknown) {
       // Handle auth errors at the user level
@@ -256,7 +462,7 @@ async function processProviderBatch<TClient>(
     }
   }
 
-  return { processed, newItems };
+  return { processed, newItems, skipped };
 }
 
 // ============================================================================

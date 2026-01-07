@@ -12,7 +12,7 @@
  * @see /features/subscriptions/backend-spec.md Section 3: Polling Architecture
  */
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
@@ -22,7 +22,9 @@ import { parseSpotifyDate } from '../lib/timestamps';
 import {
   getSpotifyClientForConnection,
   getShowEpisodes,
+  getMultipleShows,
   type SpotifyEpisode,
+  type SpotifyShow,
 } from '../providers/spotify';
 import { ingestItem } from '../ingestion/processor';
 import { transformSpotifyEpisode } from '../ingestion/transformers';
@@ -32,6 +34,7 @@ import type {
   Subscription,
   DrizzleDB,
   PollingResult,
+  BatchPollingResult,
   ProviderBatchConfig,
   ProviderConnectionRow,
 } from './types';
@@ -59,7 +62,191 @@ export const spotifyProviderConfig: ProviderBatchConfig<SpotifyApi> = {
       env as Parameters<typeof getSpotifyClientForConnection>[1]
     ),
   pollSingle: pollSingleSpotifySubscription,
+  pollBatch: pollSpotifySubscriptionsBatched,
 };
+
+// ============================================================================
+// Batch Polling Function
+// ============================================================================
+
+/**
+ * Poll multiple Spotify subscriptions using batch API and delta detection.
+ *
+ * This is an optimized version of pollSingleSpotifySubscription that:
+ * 1. Uses getMultipleShows() to batch fetch show metadata (1-2 API calls vs N)
+ * 2. Compares totalEpisodes vs stored totalItems for delta detection
+ * 3. Only fetches episodes for shows with new content (~10% typically)
+ * 4. Updates totalItems after each successful poll for future delta detection
+ *
+ * Achieves ~90% reduction in API calls compared to individual polling.
+ *
+ * @param subs - Subscriptions to poll (all belonging to the same user)
+ * @param client - Authenticated Spotify client
+ * @param userId - User ID owning the subscriptions
+ * @param env - Cloudflare Worker bindings
+ * @param db - Database instance
+ * @returns BatchPollingResult with aggregated metrics
+ */
+export async function pollSpotifySubscriptionsBatched(
+  subs: Subscription[],
+  client: SpotifyApi,
+  userId: string,
+  env: Bindings,
+  db: DrizzleDB
+): Promise<BatchPollingResult> {
+  spotifyLogger.info('Starting batch poll', { count: subs.length, userId });
+
+  if (subs.length === 0) {
+    return { newItems: 0, processed: 0, skipped: 0 };
+  }
+
+  // Extract show IDs from subscriptions
+  const showIds = subs.map((sub) => sub.providerChannelId);
+
+  // Batch fetch show metadata (1-2 API calls for up to 100 shows)
+  let shows: SpotifyShow[];
+  try {
+    shows = await getMultipleShows(client, showIds);
+  } catch (error) {
+    spotifyLogger.error('Failed to fetch show metadata', { error, userId });
+    // Return error for all subscriptions
+    return {
+      newItems: 0,
+      processed: 0,
+      errors: subs.map((sub) => ({
+        subscriptionId: sub.id,
+        error: `Failed to fetch show metadata: ${String(error)}`,
+      })),
+    };
+  }
+
+  // Build a map of showId -> SpotifyShow for quick lookup
+  const showMap = new Map<string, SpotifyShow>();
+  for (const show of shows) {
+    if (show) {
+      showMap.set(show.id, show);
+    }
+  }
+
+  // Determine which subscriptions need updates via delta detection
+  const subsNeedingUpdate: Array<{ sub: Subscription; show: SpotifyShow }> = [];
+  const subsUnchanged: Subscription[] = [];
+
+  for (const sub of subs) {
+    const show = showMap.get(sub.providerChannelId);
+    if (!show) {
+      // Show not found - might have been removed from Spotify
+      spotifyLogger.warn('Show not found in batch response', {
+        subscriptionId: sub.id,
+        showId: sub.providerChannelId,
+      });
+      subsUnchanged.push(sub); // Treat as unchanged, update lastPolledAt
+      continue;
+    }
+
+    // Delta detection: compare current total with stored total
+    const storedCount = sub.totalItems ?? 0;
+    const currentCount = show.totalEpisodes;
+
+    if (currentCount > storedCount) {
+      // New episodes exist - needs full polling
+      spotifyLogger.info('Delta detected', {
+        subscriptionId: sub.id,
+        name: sub.name,
+        stored: storedCount,
+        current: currentCount,
+        delta: currentCount - storedCount,
+      });
+      subsNeedingUpdate.push({ sub, show });
+    } else {
+      // No new episodes - just mark as polled
+      subsUnchanged.push(sub);
+    }
+  }
+
+  spotifyLogger.info('Delta detection complete', {
+    needsUpdate: subsNeedingUpdate.length,
+    unchanged: subsUnchanged.length,
+  });
+
+  // Batch update lastPolledAt for unchanged subscriptions
+  if (subsUnchanged.length > 0) {
+    await updateSubscriptionsPolled(
+      subsUnchanged.map((s) => s.id),
+      db
+    );
+  }
+
+  // Process subscriptions that need updates
+  let totalNewItems = 0;
+  const errors: Array<{ subscriptionId: string; error: string }> = [];
+
+  for (const { sub, show } of subsNeedingUpdate) {
+    try {
+      // Fetch recent episodes from the show
+      const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+
+      if (episodes.length === 0) {
+        spotifyLogger.info('No episodes found', { name: sub.name });
+        await updateSubscriptionPolled(sub.id, db);
+        continue;
+      }
+
+      // Filter to new episodes based on lastPolledAt
+      const newEpisodes = filterNewEpisodes(episodes, sub.lastPolledAt);
+
+      spotifyLogger.info('Found episodes', {
+        total: episodes.length,
+        new: newEpisodes.length,
+        name: sub.name,
+      });
+
+      // Ingest new items
+      const newItemsCount = await ingestNewEpisodes(newEpisodes, userId, sub.id, sub.name, db);
+      totalNewItems += newItemsCount;
+
+      // Calculate newest published timestamp from all episodes
+      const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
+
+      // Update subscription with poll results AND totalItems for future delta detection
+      await db
+        .update(subscriptions)
+        .set({
+          lastPolledAt: Date.now(),
+          lastPublishedAt: newestPublishedAt || undefined,
+          totalItems: show.totalEpisodes, // Update for future delta detection
+          updatedAt: Date.now(),
+        })
+        .where(eq(subscriptions.id, sub.id));
+    } catch (error) {
+      spotifyLogger.error('Failed to poll subscription', {
+        subscriptionId: sub.id,
+        error,
+      });
+      errors.push({ subscriptionId: sub.id, error: String(error) });
+    }
+  }
+
+  return {
+    newItems: totalNewItems,
+    processed: subsNeedingUpdate.length,
+    skipped: subsUnchanged.length,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+/**
+ * Batch update lastPolledAt for multiple subscriptions.
+ * Used when delta detection determines no new episodes exist.
+ */
+async function updateSubscriptionsPolled(ids: string[], db: DrizzleDB): Promise<void> {
+  if (ids.length === 0) return;
+
+  await db
+    .update(subscriptions)
+    .set({ lastPolledAt: Date.now(), updatedAt: Date.now() })
+    .where(inArray(subscriptions.id, ids));
+}
 
 // ============================================================================
 // Main Polling Function

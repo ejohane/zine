@@ -47,6 +47,27 @@ export interface BatchResult {
   processed: number;
   /** Number of new items ingested */
   newItems: number;
+  /** Number of subscriptions skipped (e.g., delta detection) */
+  skipped?: number;
+}
+
+// ============================================================================
+// Batch Polling Types
+// ============================================================================
+
+/**
+ * Result of batch polling multiple subscriptions.
+ * Extended version of PollingResult with batch-specific metrics.
+ */
+export interface BatchPollingResult {
+  /** Total new items ingested across all subscriptions */
+  newItems: number;
+  /** Number of subscriptions successfully processed */
+  processed: number;
+  /** Number of subscriptions skipped (e.g., delta detection) */
+  skipped?: number;
+  /** Any errors that occurred during batch processing */
+  errors?: Array<{ subscriptionId: string; error: string }>;
 }
 
 // ============================================================================
@@ -72,6 +93,34 @@ export interface ProviderBatchConfig<TClient> {
     env: Bindings,
     db: DrizzleDB
   ) => Promise<PollingResult>;
+  /**
+   * Poll multiple subscriptions in a batch (optional).
+   *
+   * When provided, the scheduler will prefer this method over pollSingle
+   * for improved efficiency. Batch polling typically offers:
+   * - Reduced API calls via batching and delta detection
+   * - Parallel processing for faster wall-clock time
+   * - Cross-subscription optimizations
+   *
+   * The scheduler handles grouping subscriptions by user before calling
+   * this method, so all subs passed here belong to the same user.
+   *
+   * If batch polling fails, the scheduler may fall back to pollSingle.
+   *
+   * @param subs - Subscriptions to poll (grouped by userId)
+   * @param client - Authenticated provider client
+   * @param userId - User ID owning these subscriptions
+   * @param env - Cloudflare Worker bindings
+   * @param db - Database instance
+   * @returns BatchPollingResult with aggregated metrics
+   */
+  pollBatch?: (
+    subs: Subscription[],
+    client: TClient,
+    userId: string,
+    env: Bindings,
+    db: DrizzleDB
+  ) => Promise<BatchPollingResult>;
 }
 
 /**

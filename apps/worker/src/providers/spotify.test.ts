@@ -18,6 +18,7 @@ import {
   getLatestEpisode,
   getEpisode,
   getShow,
+  getMultipleShows,
   searchShows,
   checkSavedShows,
   type SpotifyShow,
@@ -650,6 +651,158 @@ describe('getShow', () => {
       externalUrl: 'https://spotify.com/show/test-show',
       totalEpisodes: 150,
     });
+  });
+});
+
+// ============================================================================
+// getMultipleShows Tests
+// ============================================================================
+
+describe('getMultipleShows', () => {
+  it('should return empty array for empty input', async () => {
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, []);
+    expect(result).toEqual([]);
+    expect(mockShowsGet).not.toHaveBeenCalled();
+  });
+
+  it('should fetch multiple shows in one API call', async () => {
+    const mockShowsResponse = [
+      createMockSDKShow({ id: 'show1', name: 'Show 1', total_episodes: 100 }),
+      createMockSDKShow({ id: 'show2', name: 'Show 2', total_episodes: 50 }),
+    ];
+    mockShowsGet.mockResolvedValue(mockShowsResponse);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, ['show1', 'show2']);
+
+    expect(mockShowsGet).toHaveBeenCalledTimes(1);
+    expect(mockShowsGet).toHaveBeenCalledWith(['show1', 'show2'], 'US');
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('show1');
+    expect(result[0].totalEpisodes).toBe(100);
+    expect(result[1].id).toBe('show2');
+    expect(result[1].totalEpisodes).toBe(50);
+  });
+
+  it('should chunk requests for >50 shows', async () => {
+    // Return shows matching the chunk sizes
+    mockShowsGet
+      .mockResolvedValueOnce(
+        Array.from({ length: 50 }, (_, i) =>
+          createMockSDKShow({ id: `show${i}`, total_episodes: i })
+        )
+      )
+      .mockResolvedValueOnce(
+        Array.from({ length: 25 }, (_, i) =>
+          createMockSDKShow({ id: `show${50 + i}`, total_episodes: 50 + i })
+        )
+      );
+
+    const showIds = Array.from({ length: 75 }, (_, i) => `show${i}`);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, showIds);
+
+    expect(mockShowsGet).toHaveBeenCalledTimes(2);
+    // First call with 50 IDs
+    expect(mockShowsGet).toHaveBeenNthCalledWith(1, showIds.slice(0, 50), 'US');
+    // Second call with remaining 25 IDs
+    expect(mockShowsGet).toHaveBeenNthCalledWith(2, showIds.slice(50), 'US');
+    expect(result).toHaveLength(75);
+  });
+
+  it('should handle exactly 50 shows in one call', async () => {
+    const mockShowsResponse = Array.from({ length: 50 }, (_, i) =>
+      createMockSDKShow({ id: `show${i}` })
+    );
+    mockShowsGet.mockResolvedValue(mockShowsResponse);
+
+    const showIds = Array.from({ length: 50 }, (_, i) => `show${i}`);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, showIds);
+
+    expect(mockShowsGet).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(50);
+  });
+
+  it('should handle 100 shows with exactly 2 API calls', async () => {
+    mockShowsGet
+      .mockResolvedValueOnce(
+        Array.from({ length: 50 }, (_, i) => createMockSDKShow({ id: `show${i}` }))
+      )
+      .mockResolvedValueOnce(
+        Array.from({ length: 50 }, (_, i) => createMockSDKShow({ id: `show${50 + i}` }))
+      );
+
+    const showIds = Array.from({ length: 100 }, (_, i) => `show${i}`);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, showIds);
+
+    expect(mockShowsGet).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(100);
+  });
+
+  it('should transform shows correctly', async () => {
+    const mockShowsResponse = [
+      createMockSDKShow({
+        id: 'test-show-id',
+        name: 'Test Show Name',
+        description: 'Test Description',
+        publisher: 'Test Publisher',
+        images: [{ url: 'https://image.jpg', height: 640, width: 640 }],
+        external_urls: { spotify: 'https://spotify.com/show/test-show-id' },
+        total_episodes: 42,
+      }),
+    ];
+    mockShowsGet.mockResolvedValue(mockShowsResponse);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, ['test-show-id']);
+
+    expect(result[0]).toEqual({
+      id: 'test-show-id',
+      name: 'Test Show Name',
+      description: 'Test Description',
+      publisher: 'Test Publisher',
+      images: [{ url: 'https://image.jpg', height: 640, width: 640 }],
+      externalUrl: 'https://spotify.com/show/test-show-id',
+      totalEpisodes: 42,
+    });
+  });
+
+  it('should use custom market when provided', async () => {
+    mockShowsGet.mockResolvedValue([createMockSDKShow()]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    await getMultipleShows(client, ['show1'], 'GB');
+
+    expect(mockShowsGet).toHaveBeenCalledWith(['show1'], 'GB');
+  });
+
+  it('should handle single show', async () => {
+    mockShowsGet.mockResolvedValue([createMockSDKShow({ id: 'single-show' })]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const result = await getMultipleShows(client, ['single-show']);
+
+    expect(mockShowsGet).toHaveBeenCalledTimes(1);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('single-show');
+  });
+
+  it('should propagate API errors', async () => {
+    const error = new Error('Rate limit exceeded');
+    (error as Error & { status: number }).status = 429;
+    mockShowsGet.mockRejectedValue(error);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+
+    await expect(getMultipleShows(client, ['show1', 'show2'])).rejects.toThrow(
+      'Rate limit exceeded'
+    );
   });
 });
 
