@@ -275,7 +275,12 @@ export async function pollSingleSpotifySubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<PollingResult> {
-  spotifyLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
+  spotifyLogger.info('Polling subscription', {
+    subscriptionId: sub.id,
+    name: sub.name,
+    lastPublishedAt: sub.lastPublishedAt,
+    lastPublishedAtDate: sub.lastPublishedAt ? new Date(sub.lastPublishedAt).toISOString() : null,
+  });
 
   // Fetch recent episodes from the show
   const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
@@ -289,11 +294,21 @@ export async function pollSingleSpotifySubscription(
   // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
   const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
 
-  spotifyLogger.info('Found episodes', {
-    total: episodes.length,
-    new: newEpisodes.length,
-    name: sub.name,
-  });
+  // Log detailed episode info for debugging
+  if (episodes.length > 0) {
+    const latestEpisode = episodes[0];
+    const latestReleaseDate = parseSpotifyDate(latestEpisode.releaseDate);
+    spotifyLogger.info('Found episodes', {
+      name: sub.name,
+      total: episodes.length,
+      new: newEpisodes.length,
+      latestEpisodeTitle: latestEpisode.name,
+      latestEpisodeDate: latestEpisode.releaseDate,
+      latestEpisodeDateParsed: new Date(latestReleaseDate).toISOString(),
+      lastPublishedAt: sub.lastPublishedAt ? new Date(sub.lastPublishedAt).toISOString() : null,
+      wouldBeNew: sub.lastPublishedAt ? latestReleaseDate > sub.lastPublishedAt : true,
+    });
+  }
 
   // Ingest new items
   const newItemsCount = await ingestNewEpisodes(newEpisodes, userId, sub.id, sub.name, db);
@@ -310,6 +325,12 @@ export async function pollSingleSpotifySubscription(
       updatedAt: Date.now(),
     })
     .where(eq(subscriptions.id, sub.id));
+
+  spotifyLogger.info('Poll complete', {
+    name: sub.name,
+    newItemsIngested: newItemsCount,
+    updatedLastPublishedAt: newestPublishedAt ? new Date(newestPublishedAt).toISOString() : null,
+  });
 
   return { newItems: newItemsCount };
 }
@@ -362,6 +383,7 @@ async function ingestNewEpisodes(
   db: DrizzleDB
 ): Promise<number> {
   let newItemsCount = 0;
+  let skippedCount = 0;
 
   for (const episode of episodes) {
     try {
@@ -386,10 +408,39 @@ async function ingestNewEpisodes(
       );
       if (result.created) {
         newItemsCount++;
+        spotifyLogger.info('Episode ingested', {
+          showName,
+          episodeId: episode.id,
+          episodeName: episode.name,
+          releaseDate: episode.releaseDate,
+          itemId: result.itemId,
+          userItemId: result.userItemId,
+        });
+      } else {
+        skippedCount++;
+        spotifyLogger.debug('Episode skipped (already seen)', {
+          showName,
+          episodeId: episode.id,
+          episodeName: episode.name,
+          reason: result.skipped,
+        });
       }
     } catch (ingestError) {
-      spotifyLogger.error('Failed to ingest episode', { error: ingestError });
+      spotifyLogger.error('Failed to ingest episode', {
+        showName,
+        episodeId: episode.id,
+        episodeName: episode.name,
+        error: ingestError,
+      });
     }
+  }
+
+  if (skippedCount > 0) {
+    spotifyLogger.info('Ingestion summary', {
+      showName,
+      created: newItemsCount,
+      skipped: skippedCount,
+    });
   }
 
   return newItemsCount;

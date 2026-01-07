@@ -586,10 +586,15 @@ export const subscriptionsRouter = router({
    * @returns Summary of sync results
    */
   syncAll: protectedProcedure.mutation(async ({ ctx }) => {
+    const syncStartTime = Date.now();
+    logger.info('syncAll: started', { userId: ctx.userId });
+
     // 1. Check user-level rate limit (2 minutes between sync-all)
     const rateLimitKey = `sync-all:${ctx.userId}`;
     const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
     if (lastSync && Date.now() - parseInt(lastSync, 10) < 2 * 60 * 1000) {
+      const waitTime = Math.ceil((2 * 60 * 1000 - (Date.now() - parseInt(lastSync, 10))) / 1000);
+      logger.info('syncAll: rate limited', { userId: ctx.userId, waitTimeSeconds: waitTime });
       throw new TRPCError({
         code: 'TOO_MANY_REQUESTS',
         message: 'Please wait 2 minutes between full syncs',
@@ -602,8 +607,16 @@ export const subscriptionsRouter = router({
     });
 
     if (activeSubs.length === 0) {
+      logger.info('syncAll: no active subscriptions', { userId: ctx.userId });
       return { success: true as const, synced: 0, itemsFound: 0, errors: [] as string[] };
     }
+
+    logger.info('syncAll: found subscriptions', {
+      userId: ctx.userId,
+      total: activeSubs.length,
+      youtube: activeSubs.filter((s) => s.provider === 'YOUTUBE').length,
+      spotify: activeSubs.filter((s) => s.provider === 'SPOTIFY').length,
+    });
 
     // 3. Update rate limit immediately (before processing)
     await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 120 });
@@ -752,14 +765,17 @@ export const subscriptionsRouter = router({
     // Calculate if there are remaining subscriptions that weren't synced
     const hasMoreToSync = skippedYouTube > 0 || skippedSpotify > 0;
 
-    logger.info('syncAll completed', {
+    const syncDuration = Date.now() - syncStartTime;
+    logger.info('syncAll: completed', {
       userId: ctx.userId,
       synced: results.synced,
       itemsFound: results.itemsFound,
       errorCount: results.errors.length,
+      errors: results.errors.length > 0 ? results.errors : undefined,
       hasMoreToSync,
       skippedYouTube,
       skippedSpotify,
+      durationMs: syncDuration,
     });
 
     return {
