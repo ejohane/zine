@@ -192,8 +192,8 @@ export async function pollSpotifySubscriptionsBatched(
         continue;
       }
 
-      // Filter to new episodes based on lastPolledAt
-      const newEpisodes = filterNewEpisodes(episodes, sub.lastPolledAt);
+      // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
+      const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
 
       spotifyLogger.info('Found episodes', {
         total: episodes.length,
@@ -286,8 +286,8 @@ export async function pollSingleSpotifySubscription(
     return { newItems: 0 };
   }
 
-  // Filter to new episodes based on lastPolledAt
-  const newEpisodes = filterNewEpisodes(episodes, sub.lastPolledAt);
+  // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
+  const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
 
   spotifyLogger.info('Found episodes', {
     total: episodes.length,
@@ -319,17 +319,31 @@ export async function pollSingleSpotifySubscription(
 // ============================================================================
 
 /**
- * Filter episodes to only those published after lastPolledAt.
- * For first poll (no lastPolledAt), return only the latest episode.
+ * Filter episodes to only those published after lastPublishedAt.
+ * For first poll (no lastPublishedAt), return only the latest episode.
+ *
+ * IMPORTANT: We use lastPublishedAt (the release date of the newest episode
+ * we've already seen) instead of lastPolledAt (when we last checked).
+ *
+ * This is critical because Spotify release dates are day-precision only
+ * (YYYY-MM-DD at midnight UTC). If we compared against lastPolledAt:
+ * - Episode released: 2026-01-06T00:00:00Z (midnight, day-precision)
+ * - We poll at: 2026-01-06T12:00:00Z (noon)
+ * - Next poll compares: releaseDate (midnight) > lastPolledAt (noon) = FALSE!
+ * - The episode would be incorrectly filtered out.
+ *
+ * By comparing against lastPublishedAt (also day-precision), we ensure
+ * episodes released on a NEW day are always included.
  */
 function filterNewEpisodes(
   episodes: SpotifyEpisode[],
-  lastPolledAt: number | null
+  lastPublishedAt: number | null
 ): SpotifyEpisode[] {
-  if (lastPolledAt) {
+  if (lastPublishedAt) {
     return episodes.filter((e) => {
       const releaseDate = parseSpotifyDate(e.releaseDate);
-      return releaseDate > lastPolledAt;
+      // Include episodes released AFTER the newest one we've already seen
+      return releaseDate > lastPublishedAt;
     });
   }
   // First poll: only latest episode
