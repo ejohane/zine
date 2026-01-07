@@ -33,8 +33,14 @@ import {
 import type { ProviderConnection } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 import { triggerInitialFetch, type InitialFetchEnv } from '../../subscriptions/initial-fetch';
-import { pollSingleYouTubeSubscription } from '../../polling/youtube-poller';
-import { pollSingleSpotifySubscription } from '../../polling/spotify-poller';
+import {
+  pollSingleYouTubeSubscription,
+  pollYouTubeSubscriptionsBatched,
+} from '../../polling/youtube-poller';
+import {
+  pollSingleSpotifySubscription,
+  pollSpotifySubscriptionsBatched,
+} from '../../polling/spotify-poller';
 import type { Bindings } from '../../types';
 import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
 
@@ -668,7 +674,7 @@ export const subscriptionsRouter = router({
       });
     }
 
-    // 6. Process YouTube subscriptions
+    // 6. Process YouTube subscriptions using batched polling
     if (byProvider.YOUTUBE.length > 0) {
       const ytConnection = await ctx.db.query.providerConnections.findFirst({
         where: and(
@@ -685,28 +691,25 @@ export const subscriptionsRouter = router({
             ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
           );
 
-          for (const sub of byProvider.YOUTUBE) {
-            try {
-              const result = await pollSingleYouTubeSubscription(
-                sub as PollingSubscription,
-                client,
-                ctx.userId,
-                ctx.env as Bindings,
-                ctx.db as unknown as DrizzleDB
-              );
-              results.synced++;
-              results.itemsFound += result.newItems;
-            } catch (err) {
-              logger.error('syncAll: YouTube sub failed', {
-                subId: sub.id,
-                name: sub.name,
-                error: err,
-              });
-              results.errors.push(`YouTube: ${sub.name}`);
+          const batchResult = await pollYouTubeSubscriptionsBatched(
+            byProvider.YOUTUBE as PollingSubscription[],
+            client,
+            ctx.userId,
+            ctx.env as Bindings,
+            ctx.db as unknown as DrizzleDB
+          );
+
+          results.synced += batchResult.processed;
+          results.itemsFound += batchResult.newItems;
+
+          if (batchResult.errors) {
+            for (const err of batchResult.errors) {
+              const sub = byProvider.YOUTUBE.find((s) => s.id === err.subscriptionId);
+              results.errors.push(`YouTube: ${sub?.name ?? err.subscriptionId}`);
             }
           }
         } catch (err) {
-          logger.error('syncAll: YouTube client creation failed', { error: err });
+          logger.error('syncAll: YouTube batch polling failed', { error: err });
           results.errors.push('YouTube connection error');
         }
       } else {
@@ -715,7 +718,7 @@ export const subscriptionsRouter = router({
       }
     }
 
-    // 7. Process Spotify subscriptions
+    // 7. Process Spotify subscriptions using batched polling with delta detection
     if (byProvider.SPOTIFY.length > 0) {
       const spConnection = await ctx.db.query.providerConnections.findFirst({
         where: and(
@@ -732,28 +735,25 @@ export const subscriptionsRouter = router({
             ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
           );
 
-          for (const sub of byProvider.SPOTIFY) {
-            try {
-              const result = await pollSingleSpotifySubscription(
-                sub as PollingSubscription,
-                client,
-                ctx.userId,
-                ctx.env as Bindings,
-                ctx.db as unknown as DrizzleDB
-              );
-              results.synced++;
-              results.itemsFound += result.newItems;
-            } catch (err) {
-              logger.error('syncAll: Spotify sub failed', {
-                subId: sub.id,
-                name: sub.name,
-                error: err,
-              });
-              results.errors.push(`Spotify: ${sub.name}`);
+          const batchResult = await pollSpotifySubscriptionsBatched(
+            byProvider.SPOTIFY as PollingSubscription[],
+            client,
+            ctx.userId,
+            ctx.env as Bindings,
+            ctx.db as unknown as DrizzleDB
+          );
+
+          results.synced += batchResult.processed;
+          results.itemsFound += batchResult.newItems;
+
+          if (batchResult.errors) {
+            for (const err of batchResult.errors) {
+              const sub = byProvider.SPOTIFY.find((s) => s.id === err.subscriptionId);
+              results.errors.push(`Spotify: ${sub?.name ?? err.subscriptionId}`);
             }
           }
         } catch (err) {
-          logger.error('syncAll: Spotify client creation failed', { error: err });
+          logger.error('syncAll: Spotify batch polling failed', { error: err });
           results.errors.push('Spotify connection error');
         }
       } else {
