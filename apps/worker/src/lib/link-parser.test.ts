@@ -170,19 +170,19 @@ describe('parseLink', () => {
       it('falls back to generic for invalid video ID length', () => {
         // Invalid YouTube URLs fall through to generic handler
         const shortResult = parseLink('https://youtube.com/watch?v=short');
-        expect(shortResult?.provider).toBe(Provider.RSS);
+        expect(shortResult?.provider).toBe(Provider.WEB);
         expect(shortResult?.contentType).toBe(ContentType.ARTICLE);
 
         const longResult = parseLink('https://youtube.com/watch?v=waytoolongvideoid');
-        expect(longResult?.provider).toBe(Provider.RSS);
+        expect(longResult?.provider).toBe(Provider.WEB);
       });
 
       it('falls back to generic for missing video ID', () => {
         const result1 = parseLink('https://youtube.com/watch');
-        expect(result1?.provider).toBe(Provider.RSS);
+        expect(result1?.provider).toBe(Provider.WEB);
 
         const result2 = parseLink('https://youtube.com/watch?');
-        expect(result2?.provider).toBe(Provider.RSS);
+        expect(result2?.provider).toBe(Provider.WEB);
       });
 
       it('handles video IDs with special chars', () => {
@@ -223,25 +223,25 @@ describe('parseLink', () => {
       it('falls back to generic for invalid episode ID length', () => {
         // Invalid Spotify URLs fall through to generic handler
         const shortResult = parseLink('https://open.spotify.com/episode/short');
-        expect(shortResult?.provider).toBe(Provider.RSS);
+        expect(shortResult?.provider).toBe(Provider.WEB);
         expect(shortResult?.contentType).toBe(ContentType.ARTICLE);
 
         const longResult = parseLink(
           'https://open.spotify.com/episode/waytoolongepisodeid12345678'
         );
-        expect(longResult?.provider).toBe(Provider.RSS);
+        expect(longResult?.provider).toBe(Provider.WEB);
       });
 
       it('falls back to generic for non-episode content types', () => {
         // Track URLs should fall through to generic
         const result = parseLink('https://open.spotify.com/track/abc123');
-        expect(result?.provider).toBe(Provider.RSS);
+        expect(result?.provider).toBe(Provider.WEB);
         expect(result?.contentType).toBe(ContentType.ARTICLE);
       });
 
       it('falls back to generic for wrong hostname', () => {
         const result = parseLink('https://spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk');
-        expect(result?.provider).toBe(Provider.RSS); // Falls through to generic
+        expect(result?.provider).toBe(Provider.WEB); // Falls through to generic
       });
     });
   });
@@ -286,12 +286,12 @@ describe('parseLink', () => {
       it('returns null for non-post URLs', () => {
         // Homepage should fall through to generic
         const result = parseLink('https://example.substack.com');
-        expect(result?.provider).toBe(Provider.RSS);
+        expect(result?.provider).toBe(Provider.WEB);
       });
 
       it('returns null for missing slug', () => {
         const result = parseLink('https://example.substack.com/p/');
-        expect(result?.provider).toBe(Provider.RSS); // Falls through to generic
+        expect(result?.provider).toBe(Provider.WEB); // Falls through to generic
       });
     });
   });
@@ -340,7 +340,7 @@ describe('parseLink', () => {
       it('returns null for non-status URLs', () => {
         // Profile URL should fall through to generic
         const result = parseLink('https://twitter.com/elonmusk');
-        expect(result?.provider).toBe(Provider.RSS);
+        expect(result?.provider).toBe(Provider.WEB);
         expect(result?.contentType).toBe(ContentType.ARTICLE);
       });
 
@@ -356,7 +356,7 @@ describe('parseLink', () => {
       const result = parseLink('https://example.com/article/hello-world');
 
       expect(result).toEqual({
-        provider: Provider.RSS,
+        provider: Provider.WEB,
         contentType: ContentType.ARTICLE,
         providerId: 'https://example.com/article/hello-world',
         canonicalUrl: 'https://example.com/article/hello-world',

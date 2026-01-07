@@ -369,7 +369,7 @@ describe('link-preview', () => {
         const result = await fetchLinkPreview('https://example.com/blog/article');
 
         expect(result).not.toBeNull();
-        expect(result!.provider).toBe(Provider.RSS);
+        expect(result!.provider).toBe(Provider.WEB);
         expect(result!.contentType).toBe(ContentType.ARTICLE);
         expect(result!.title).toBe('Generic Article Title');
         expect(result!.creator).toBe('Blog Author');
