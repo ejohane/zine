@@ -165,7 +165,13 @@ export async function getUserSavedShows(
     offset
   );
 
-  return response.items.map((item) => transformShow(item.show));
+  // Filter out null items (can occur when shows are unavailable or removed)
+  return response.items
+    .filter(
+      (item): item is { show: SimplifiedShow; added_at: string } =>
+        item !== null && item.show !== null
+    )
+    .map((item) => transformShow(item.show));
 }
 
 /**
@@ -229,7 +235,10 @@ export async function getShowEpisodes(
     offset
   );
 
-  return response.items.map(transformEpisode);
+  // Filter out null episodes (can occur when episodes are unavailable in user's market or removed)
+  return response.items
+    .filter((episode): episode is SimplifiedEpisode => episode !== null)
+    .map(transformEpisode);
 }
 
 /**
