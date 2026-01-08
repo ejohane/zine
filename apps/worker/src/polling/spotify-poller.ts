@@ -208,13 +208,21 @@ export async function pollSpotifySubscriptionsBatched(
       // Calculate newest published timestamp from all episodes
       const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
 
-      // Update subscription with poll results AND totalItems for future delta detection
+      // Update subscription with poll results
+      // IMPORTANT: Only update totalItems if we have a valid lastPublishedAt.
+      // This prevents the bug where totalItems gets updated without lastPublishedAt,
+      // causing future delta detection to skip the subscription even when new episodes exist.
+      // The key invariant is: if totalItems == totalEpisodes, then lastPublishedAt must
+      // accurately reflect the newest episode we've seen, so future polls can detect
+      // episodes released after that date.
+      const shouldUpdateTotalItems = newestPublishedAt !== null;
+
       await db
         .update(subscriptions)
         .set({
           lastPolledAt: Date.now(),
           lastPublishedAt: newestPublishedAt || undefined,
-          totalItems: show.totalEpisodes, // Update for future delta detection
+          ...(shouldUpdateTotalItems && { totalItems: show.totalEpisodes }),
           updatedAt: Date.now(),
         })
         .where(eq(subscriptions.id, sub.id));

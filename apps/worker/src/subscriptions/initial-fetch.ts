@@ -140,6 +140,8 @@ export async function triggerInitialFetch(
   fetchLogger.info('Starting', { provider, providerChannelId });
   try {
     let itemIngested = false;
+    let lastPublishedAt: number | null = null;
+    let totalItems: number | null = null;
 
     if (provider === Provider.YOUTUBE) {
       itemIngested = await fetchInitialYouTubeItem(
@@ -151,7 +153,7 @@ export async function triggerInitialFetch(
         env
       );
     } else if (provider === Provider.SPOTIFY) {
-      itemIngested = await fetchInitialSpotifyItem(
+      const result = await fetchInitialSpotifyItem(
         userId,
         subscriptionId,
         connection,
@@ -159,18 +161,31 @@ export async function triggerInitialFetch(
         db,
         env
       );
+      itemIngested = result.created;
+      lastPublishedAt = result.releaseDate;
+      totalItems = result.totalEpisodes;
     }
 
-    // Update subscription with initial poll timestamp
+    // Update subscription with initial poll timestamp and metadata
+    // Setting lastPublishedAt and totalItems here prevents the delta detection bug
+    // where totalItems gets set without lastPublishedAt, causing future episodes to be missed
     await db
       .update(subscriptions)
       .set({
         lastPolledAt: Date.now(),
+        ...(lastPublishedAt && { lastPublishedAt }),
+        ...(totalItems !== null && { totalItems }),
         updatedAt: Date.now(),
       })
       .where(eq(subscriptions.id, subscriptionId));
 
-    fetchLogger.info('Completed', { provider, providerChannelId, itemIngested });
+    fetchLogger.info('Completed', {
+      provider,
+      providerChannelId,
+      itemIngested,
+      lastPublishedAt: lastPublishedAt ? new Date(lastPublishedAt).toISOString() : null,
+      totalItems,
+    });
     return { itemIngested };
   } catch (error) {
     // Log but don't fail subscription creation
@@ -356,6 +371,15 @@ function convertToYouTubePlaylistItem(
 /**
  * Fetch the latest Spotify episode for initial subscription
  */
+/**
+ * Result of initial Spotify fetch with metadata for subscription update
+ */
+interface SpotifyFetchResult {
+  created: boolean;
+  releaseDate: number | null;
+  totalEpisodes: number | null;
+}
+
 async function fetchInitialSpotifyItem(
   userId: string,
   subscriptionId: string,
@@ -363,9 +387,12 @@ async function fetchInitialSpotifyItem(
   showId: string,
   db: Database,
   env: InitialFetchEnv
-): Promise<boolean> {
+): Promise<SpotifyFetchResult> {
   fetchLogger.debug('Fetching Spotify client', { showId });
   const client = await getSpotifyClientForConnection(connection, env);
+
+  // Get show details (includes totalEpisodes for delta detection)
+  const show = await getShow(client, showId);
 
   // Get the latest episode
   fetchLogger.debug('Getting latest episode', { showId });
@@ -373,18 +400,16 @@ async function fetchInitialSpotifyItem(
 
   if (!episode) {
     fetchLogger.info('No episodes found for show', { showId });
-    return false;
+    // Still return totalEpisodes so we can set it for future delta detection
+    return { created: false, releaseDate: null, totalEpisodes: show.totalEpisodes };
   }
 
   // Check if episode is already released (not scheduled)
   const releaseDate = parseSpotifyDate(episode.releaseDate);
   if (releaseDate > Date.now()) {
     fetchLogger.info('Latest episode is scheduled, skipping', { showId });
-    return false;
+    return { created: false, releaseDate: null, totalEpisodes: show.totalEpisodes };
   }
-
-  // Get show name for the transformer
-  const show = await getShow(client, showId);
 
   // Transform to the format expected by transformSpotifyEpisode
   const spotifyEpisode = {
@@ -407,5 +432,9 @@ async function fetchInitialSpotifyItem(
     (ep) => transformSpotifyEpisode(ep, show.name)
   );
 
-  return result.created;
+  return {
+    created: result.created,
+    releaseDate: result.created ? releaseDate : null,
+    totalEpisodes: show.totalEpisodes,
+  };
 }
