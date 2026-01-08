@@ -302,7 +302,7 @@ describe('parseLink', () => {
         const result = parseLink('https://twitter.com/elonmusk/status/1234567890123456789');
 
         expect(result).toEqual({
-          provider: Provider.RSS, // X is not OAuth-connected
+          provider: Provider.X,
           contentType: ContentType.POST,
           providerId: '1234567890123456789',
           canonicalUrl: 'https://x.com/elonmusk/status/1234567890123456789',
@@ -313,7 +313,7 @@ describe('parseLink', () => {
         const result = parseLink('https://x.com/elonmusk/status/1234567890123456789');
 
         expect(result).toEqual({
-          provider: Provider.RSS,
+          provider: Provider.X,
           contentType: ContentType.POST,
           providerId: '1234567890123456789',
           canonicalUrl: 'https://x.com/elonmusk/status/1234567890123456789',
@@ -323,7 +323,7 @@ describe('parseLink', () => {
       it('handles www prefix', () => {
         const result = parseLink('https://www.twitter.com/user/status/1234567890123456789');
 
-        expect(result?.provider).toBe(Provider.RSS);
+        expect(result?.provider).toBe(Provider.X);
         expect(result?.providerId).toBe('1234567890123456789');
       });
     });

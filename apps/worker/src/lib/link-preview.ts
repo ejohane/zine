@@ -31,6 +31,7 @@ import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oe
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
 import { extractArticle } from './article-extractor';
+import { fetchFxTwitterByUrl, type FxTwitterResponse } from './fxtwitter';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 
@@ -61,7 +62,7 @@ export interface LinkPreviewResult {
   /** Description/summary of the content */
   description?: string;
   /** Source that provided the metadata */
-  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor';
+  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor' | 'fxtwitter';
 
   // Article-specific fields
   /** Publication or site name (for articles) */
@@ -72,6 +73,12 @@ export interface LinkPreviewResult {
   readingTimeMinutes?: number;
   /** Whether article content was extracted for reader view */
   hasArticleContent?: boolean;
+
+  // X/Twitter-specific fields
+  /** When content was published (ISO8601 string) */
+  publishedAt?: string;
+  /** Raw API response from provider (JSON string, for future features) */
+  rawMetadata?: string;
 }
 
 /**
@@ -326,6 +333,92 @@ async function fetchTwitterViaOEmbed(parsedLink: ParsedLink): Promise<LinkPrevie
   };
 }
 
+/**
+ * Map FxTwitter response to LinkPreviewResult
+ */
+function mapFxTwitterToPreview(
+  response: FxTwitterResponse,
+  parsedLink: ParsedLink
+): LinkPreviewResult | null {
+  const tweet = response.tweet;
+
+  if (!tweet) {
+    return null;
+  }
+
+  // Get best thumbnail: first photo > video thumbnail > author avatar
+  const thumbnailUrl =
+    tweet.media?.photos?.[0]?.url ??
+    tweet.media?.videos?.[0]?.thumbnail_url ??
+    tweet.author.avatar_url ??
+    null;
+
+  // Format creator as "Display Name (@handle)"
+  const creator = `${tweet.author.name} (@${tweet.author.screen_name})`;
+
+  // Convert Unix timestamp to ISO8601
+  const publishedAt = new Date(tweet.created_timestamp * 1000).toISOString();
+
+  // Get video duration if available
+  const duration = tweet.media?.videos?.[0]?.duration ?? null;
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: tweet.id,
+    title: tweet.text,
+    creator,
+    thumbnailUrl,
+    duration,
+    canonicalUrl: tweet.url,
+    description: undefined,
+    source: 'fxtwitter',
+    publishedAt,
+    rawMetadata: JSON.stringify(response),
+  };
+}
+
+/**
+ * Fetch X (Twitter) preview with fallback chain:
+ * 1. FxTwitter API (rich metadata)
+ * 2. Twitter oEmbed (limited)
+ * 3. Fallback
+ */
+async function fetchXProviderPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  // Try FxTwitter first
+  const fxResponse = await fetchFxTwitterByUrl(parsedLink.canonicalUrl);
+
+  if (fxResponse?.code === 200 && fxResponse.tweet) {
+    previewLogger.debug('FxTwitter fetch successful', {
+      url: parsedLink.canonicalUrl,
+      hasMedia: !!fxResponse.tweet.media,
+    });
+
+    const result = mapFxTwitterToPreview(fxResponse, parsedLink);
+    if (result) return result;
+  }
+
+  // Log why FxTwitter failed
+  if (fxResponse) {
+    previewLogger.debug('FxTwitter returned error', {
+      url: parsedLink.canonicalUrl,
+      code: fxResponse.code,
+      message: fxResponse.message,
+    });
+  }
+
+  // Fall back to Twitter oEmbed
+  previewLogger.debug('Falling back to Twitter oEmbed', {
+    url: parsedLink.canonicalUrl,
+  });
+
+  const oembedResult = await fetchTwitterViaOEmbed(parsedLink);
+  if (oembedResult) return oembedResult;
+
+  // All methods failed
+  return null;
+}
+
 // ============================================================================
 // Open Graph Scraper
 // ============================================================================
@@ -449,6 +542,10 @@ export async function fetchLinkPreview(
 
     case Provider.SPOTIFY:
       result = await fetchSpotifyPreview(parsedLink, context);
+      break;
+
+    case Provider.X:
+      result = await fetchXProviderPreview(parsedLink);
       break;
 
     case Provider.RSS:

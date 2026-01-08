@@ -366,24 +366,31 @@ export async function fetchTwitterOEmbed(tweetUrl: string): Promise<OEmbedResult
  * Extract tweet text/title from Twitter oEmbed HTML
  *
  * The HTML contains the tweet text in a <p> tag within a blockquote.
+ * The content may include HTML tags like <br>, <a>, etc. that need to be stripped.
  */
 function extractTwitterTitle(html: string): string {
-  // Extract text from the first <p> tag inside the blockquote
-  // Format: <blockquote...><p...>Tweet text here</p>...
-  const paragraphMatch = html.match(/<p[^>]*>([^<]+)<\/p>/);
+  // Extract content from the first <p> tag inside the blockquote
+  // Format: <blockquote...><p...>Tweet text with <br> and <a href="...">@mentions</a></p>...
+  // We use [\s\S]* to match everything including newlines, and make it non-greedy with *?
+  const paragraphMatch = html.match(/<p[^>]*>([\s\S]*?)<\/p>/);
   if (paragraphMatch && paragraphMatch[1]) {
-    // Clean up HTML entities and trim
+    // Strip all HTML tags from the content
     const text = paragraphMatch[1]
+      .replace(/<br\s*\/?>/gi, ' ') // Replace <br> with space
+      .replace(/<[^>]+>/g, '') // Remove all other HTML tags
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
+      .replace(/&mdash;/g, '—')
+      .replace(/&ndash;/g, '–')
+      .replace(/\s+/g, ' ') // Collapse multiple spaces
       .trim();
 
     // Truncate if too long (for display purposes)
-    if (text.length > 140) {
-      return text.substring(0, 137) + '...';
+    if (text.length > 280) {
+      return text.substring(0, 277) + '...';
     }
     return text;
   }

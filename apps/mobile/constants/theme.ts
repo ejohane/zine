@@ -37,7 +37,8 @@ export const ProviderColors = {
   youtube: '#FF0000',
   spotify: '#1DB954',
   substack: '#FF6719',
-  twitter: '#1DA1F2',
+  twitter: '#1DA1F2', // Keep for backward compatibility
+  x: '#1DA1F2', // X (same as twitter)
   pocket: '#EF4154',
 };
 

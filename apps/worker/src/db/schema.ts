@@ -24,7 +24,7 @@ export const items = sqliteTable(
 
     // Classification - values stored as UPPERCASE to match existing enums
     contentType: text('content_type').notNull(), // VIDEO | PODCAST | ARTICLE | POST
-    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | SUBSTACK | RSS
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | SUBSTACK | RSS | X
     providerId: text('provider_id').notNull(), // External ID
     canonicalUrl: text('canonical_url').notNull(),
 
@@ -40,6 +40,7 @@ export const items = sqliteTable(
     summary: text('summary'),
     duration: integer('duration'), // Seconds
     publishedAt: text('published_at'), // ISO8601 (legacy)
+    rawMetadata: text('raw_metadata'), // JSON string of provider API response
 
     // Article-specific metadata
     wordCount: integer('word_count'),

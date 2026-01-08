@@ -27,13 +27,16 @@ export interface LinkPreview {
   thumbnailUrl: string | null;
   duration: number | null;
   canonicalUrl: string;
-  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor';
+  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor' | 'fxtwitter';
   description?: string;
   // Article-specific fields
   siteName?: string;
   wordCount?: number;
   readingTimeMinutes?: number;
   hasArticleContent?: boolean;
+  // X/Twitter-specific fields
+  publishedAt?: string;
+  rawMetadata?: string;
 }
 
 /**
@@ -64,6 +67,9 @@ export interface SaveBookmarkInput {
   wordCount?: number;
   readingTimeMinutes?: number;
   hasArticleContent?: boolean;
+  // X/Twitter-specific fields
+  publishedAt?: string;
+  rawMetadata?: string;
 }
 
 // ============================================================================
@@ -259,6 +265,9 @@ export function useSaveBookmark() {
       wordCount: preview.wordCount,
       readingTimeMinutes: preview.readingTimeMinutes,
       hasArticleContent: preview.hasArticleContent,
+      // X/Twitter-specific fields
+      publishedAt: preview.publishedAt,
+      rawMetadata: preview.rawMetadata,
     });
   };
 
@@ -292,6 +301,9 @@ export function useSaveBookmark() {
       wordCount: preview.wordCount,
       readingTimeMinutes: preview.readingTimeMinutes,
       hasArticleContent: preview.hasArticleContent,
+      // X/Twitter-specific fields
+      publishedAt: preview.publishedAt,
+      rawMetadata: preview.rawMetadata,
     });
   };
 

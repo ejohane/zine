@@ -27,12 +27,12 @@ export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
 /**
  * API provider types (uppercase, from backend)
  */
-export type Provider = 'YOUTUBE' | 'SPOTIFY' | 'RSS' | 'SUBSTACK' | 'WEB';
+export type Provider = 'YOUTUBE' | 'SPOTIFY' | 'RSS' | 'SUBSTACK' | 'WEB' | 'X';
 
 /**
  * UI provider types (lowercase, for display/styling)
  */
-export type UIProvider = 'youtube' | 'spotify' | 'rss' | 'substack' | 'web';
+export type UIProvider = 'youtube' | 'spotify' | 'rss' | 'substack' | 'web' | 'x';
 
 // ============================================================================
 // Type Mapping
@@ -169,6 +169,8 @@ export function getProviderColor(provider: Provider | UIProvider): string {
       return ProviderColors.substack;
     case 'web':
       return '#6366F1'; // Indigo for web links
+    case 'x':
+      return ProviderColors.x;
     case 'rss':
     default:
       return '#6366F1'; // Fallback to primary indigo
@@ -227,6 +229,8 @@ export function getProviderLabel(provider: Provider | UIProvider): string {
       return 'Spotify';
     case 'substack':
       return 'Substack';
+    case 'x':
+      return 'X';
     case 'rss':
       return 'RSS';
     case 'web':

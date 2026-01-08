@@ -27,6 +27,7 @@ export enum Provider {
   RSS = 'RSS',
   SUBSTACK = 'SUBSTACK',
   WEB = 'WEB',
+  X = 'X',
 }
 
 /**
