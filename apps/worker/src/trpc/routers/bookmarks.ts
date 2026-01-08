@@ -68,6 +68,9 @@ const SaveInputSchema = z.object({
   wordCount: z.number().int().min(0).optional(),
   readingTimeMinutes: z.number().int().min(0).optional(),
   hasArticleContent: z.boolean().optional(),
+  // X/Twitter-specific fields
+  publishedAt: z.string().optional(), // ISO8601 timestamp
+  rawMetadata: z.string().optional(), // JSON string of provider API response
 });
 
 // ============================================================================
@@ -233,10 +236,11 @@ export const bookmarksRouter = router({
         publisher: input.siteName ?? null,
         summary: input.description ?? null,
         duration: input.duration,
-        publishedAt: null,
+        publishedAt: input.publishedAt ?? null,
         wordCount,
         readingTimeMinutes,
         articleContentKey,
+        rawMetadata: input.rawMetadata ?? null,
         createdAt: now,
         updatedAt: now,
       });

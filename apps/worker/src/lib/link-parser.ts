@@ -225,7 +225,6 @@ function parseSubstack(url: URL): ParsedLink | null {
  * - twitter.com/USERNAME/status/STATUS_ID
  * - x.com/USERNAME/status/STATUS_ID
  *
- * Note: Uses RSS provider since X is not OAuth-connected
  */
 function parseTwitter(url: URL): ParsedLink | null {
   const hostname = url.hostname.toLowerCase().replace('www.', '');
@@ -249,7 +248,7 @@ function parseTwitter(url: URL): ParsedLink | null {
     const canonicalUrl = `https://x.com/${username}/status/${statusId}`;
 
     return {
-      provider: Provider.RSS, // X is not OAuth-connected, use RSS provider
+      provider: Provider.X,
       contentType: ContentType.POST,
       providerId: statusId,
       canonicalUrl,

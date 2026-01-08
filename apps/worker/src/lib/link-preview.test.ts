@@ -13,6 +13,10 @@ vi.mock('./oembed', () => ({
   fetchTwitterOEmbed: vi.fn(),
 }));
 
+vi.mock('./fxtwitter', () => ({
+  fetchFxTwitterByUrl: vi.fn(),
+}));
+
 vi.mock('./opengraph', () => ({
   scrapeOpenGraph: vi.fn(),
 }));
@@ -36,6 +40,7 @@ vi.mock('./logger', () => ({
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode } from '../providers/spotify';
+import { fetchFxTwitterByUrl } from './fxtwitter';
 
 describe('link-preview', () => {
   beforeEach(() => {
@@ -256,58 +261,85 @@ describe('link-preview', () => {
     });
 
     describe('Twitter/X URLs', () => {
-      it('fetches via oEmbed for twitter.com URLs', async () => {
-        vi.mocked(fetchTwitterOEmbed).mockResolvedValue({
-          title: 'Just posted something interesting! Check it out...',
-          author_name: 'Test User',
-          author_url: 'https://twitter.com/testuser',
-          provider_name: 'Twitter',
-          provider_url: 'https://twitter.com/',
-          html: '<blockquote>...</blockquote>',
+      it('fetches via FxTwitter for twitter.com URLs', async () => {
+        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '1234567890',
+            url: 'https://x.com/testuser/status/1234567890',
+            text: 'Just posted something interesting! Check it out...',
+            created_at: 'Sun Jul 17 09:35:58 +0000 2022',
+            created_timestamp: 1658050558,
+            author: {
+              name: 'Test User',
+              screen_name: 'testuser',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 100,
+            retweets: 50,
+            replies: 10,
+            views: 1000,
+            lang: 'en',
+            source: 'Twitter Web App',
+          },
         });
 
         const result = await fetchLinkPreview('https://twitter.com/testuser/status/1234567890');
 
         expect(result).not.toBeNull();
-        expect(result!.provider).toBe(Provider.RSS); // Twitter maps to RSS provider
+        expect(result!.provider).toBe(Provider.X); // Twitter maps to X provider
         expect(result!.contentType).toBe(ContentType.POST);
         expect(result!.title).toBe('Just posted something interesting! Check it out...');
-        expect(result!.creator).toBe('Test User');
-        expect(result!.source).toBe('oembed');
+        expect(result!.creator).toBe('Test User (@testuser)');
+        expect(result!.source).toBe('fxtwitter');
       });
 
-      it('fetches via oEmbed for x.com URLs', async () => {
-        vi.mocked(fetchTwitterOEmbed).mockResolvedValue({
-          title: 'X post content',
-          author_name: 'X User',
-          provider_name: 'Twitter',
-          provider_url: 'https://twitter.com/',
+      it('fetches via FxTwitter for x.com URLs', async () => {
+        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '9876543210',
+            url: 'https://x.com/xuser/status/9876543210',
+            text: 'X post content',
+            created_at: 'Sun Jul 17 09:35:58 +0000 2022',
+            created_timestamp: 1658050558,
+            author: {
+              name: 'X User',
+              screen_name: 'xuser',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 100,
+            retweets: 50,
+            replies: 10,
+            views: 1000,
+            lang: 'en',
+            source: 'Twitter Web App',
+          },
         });
 
         const result = await fetchLinkPreview('https://x.com/xuser/status/9876543210');
 
         expect(result).not.toBeNull();
-        expect(result!.creator).toBe('X User');
-        expect(result!.source).toBe('oembed');
+        expect(result!.creator).toBe('X User (@xuser)');
+        expect(result!.source).toBe('fxtwitter');
       });
 
-      it('falls back to Open Graph if oEmbed fails', async () => {
-        vi.mocked(fetchTwitterOEmbed).mockResolvedValue(null);
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
-          title: 'Tweet from OG',
-          description: 'Tweet content via OG',
-          image: 'https://pbs.twimg.com/media/xyz.jpg',
-          siteName: 'X',
-          url: 'https://x.com/user/status/123',
-          type: null,
-          author: 'OG Author',
+      it('falls back to oEmbed if FxTwitter fails', async () => {
+        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue(null);
+        vi.mocked(fetchTwitterOEmbed).mockResolvedValue({
+          title: 'Tweet from oEmbed',
+          author_name: 'oEmbed User',
+          provider_name: 'Twitter',
+          provider_url: 'https://twitter.com/',
         });
 
         const result = await fetchLinkPreview('https://twitter.com/user/status/123456789012345678');
 
         expect(result).not.toBeNull();
-        expect(result!.source).toBe('opengraph');
-        expect(result!.title).toBe('Tweet from OG');
+        expect(result!.source).toBe('oembed');
+        expect(result!.title).toBe('Tweet from oEmbed');
       });
     });
 

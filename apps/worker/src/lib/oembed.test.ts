@@ -353,8 +353,8 @@ describe('fetchTwitterOEmbed', () => {
     expect(result?.title).toBe('Hello world! This is a test tweet.');
   });
 
-  it('should truncate long tweets to 140 characters', async () => {
-    const longTweetText = 'A'.repeat(200);
+  it('should truncate long tweets to 280 characters', async () => {
+    const longTweetText = 'A'.repeat(300);
     const tweetWithLongText = {
       ...TWITTER_OEMBED_RESPONSE,
       html: `<blockquote><p>${longTweetText}</p></blockquote>`,
@@ -366,8 +366,23 @@ describe('fetchTwitterOEmbed', () => {
 
     const result = await fetchTwitterOEmbed('https://twitter.com/user/status/123');
 
-    expect(result?.title?.length).toBe(140);
+    expect(result?.title?.length).toBe(280);
     expect(result?.title?.endsWith('...')).toBe(true);
+  });
+
+  it('should handle tweets with HTML tags like br and a', async () => {
+    const tweetWithHtml = {
+      ...TWITTER_OEMBED_RESPONSE,
+      html: '<blockquote><p lang="en">First line<br><br>Second line with <a href="https://example.com">@mention</a></p></blockquote>',
+    };
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(tweetWithHtml),
+    });
+
+    const result = await fetchTwitterOEmbed('https://twitter.com/user/status/123');
+
+    expect(result?.title).toBe('First line Second line with @mention');
   });
 
   it('should decode HTML entities in tweet text', async () => {
