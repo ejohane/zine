@@ -1,5 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { Surface } from 'heroui-native';
+import { Image } from 'expo-image';
 import { useMemo } from 'react';
 import {
   View,
@@ -7,87 +8,46 @@ import {
   ScrollView,
   StyleSheet,
   Pressable,
-  Dimensions,
+  FlatList,
   ActivityIndicator,
 } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 
-import {
-  BookmarkIcon,
-  HeadphonesIcon,
-  PlayIcon,
-  SettingsIcon,
-  VideoIcon,
-} from '@/components/icons';
-import {
-  ContentCard,
-  FeaturedCard,
-  QuickStats,
-  SectionHeader,
-  type ContentItem,
-  type FeaturedContentItem,
-  type LocalProvider,
-  type QuickStatsData,
-} from '@/components/home';
-import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useInboxItems, mapContentType, type ItemWithUserState } from '@/hooks/use-items';
 import {
+  useInboxItems,
   useHomeData,
   formatDuration,
-  useLibraryItems as useTRPCLibraryItems,
+  useLibraryItems,
 } from '@/hooks/use-items-trpc';
 
-import type { ContentType as UIContentType, Provider } from '@/lib/content-utils';
-import type { ContentType as ContentTypeEnum } from '@zine/shared';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH * 0.42;
-
 // =============================================================================
-// Transform Function: Domain -> UI Types
+// Types
 // =============================================================================
 
-/**
- * Transform domain ItemWithUserState to ItemCardData (for shared ItemCard component)
- */
-function transformToItemCardData({ item, userItem }: ItemWithUserState): ItemCardData {
-  // Infer provider from canonicalUrl (uppercase for Provider type)
-  const urlLower = item.canonicalUrl?.toLowerCase() ?? '';
-  let inferredProvider: Provider = 'RSS';
-  if (urlLower.includes('youtube')) inferredProvider = 'YOUTUBE';
-  else if (urlLower.includes('spotify')) inferredProvider = 'SPOTIFY';
-  else if (urlLower.includes('substack')) inferredProvider = 'SUBSTACK';
-
-  return {
-    id: userItem.id,
-    title: item.title ?? 'Untitled',
-    creator: item.publisher ?? item.creator ?? 'Unknown',
-    thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(
-      (item.contentType ?? 'ARTICLE') as ContentTypeEnum
-    ) as UIContentType,
-    provider: inferredProvider,
-    duration: item.duration ?? null,
-    bookmarkedAt: userItem.bookmarkedAt ?? null,
-    publishedAt: item.publishedAt ?? null,
-  };
+interface ContentItem {
+  id: string;
+  title: string;
+  source: string;
+  imageUrl: string | null;
+  duration: string | null;
+  type: 'podcast' | 'video' | 'article' | 'post';
 }
 
 // =============================================================================
-// Static Mock Data (kept for featured section only)
+// Icons
 // =============================================================================
 
-// Featured content is curated/editorial, kept as static for now
-const featuredContent: FeaturedContentItem = {
-  id: 'featured-1',
-  title: 'The Art of Calm Technology',
-  subtitle: 'How to design products that respect human attention',
-  source: 'Substack',
-  gradient: ['#6366F1', '#8B5CF6'],
-};
+function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 // =============================================================================
 // Utility Functions
@@ -100,168 +60,256 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
-function formatDate(): string {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+function mapContentType(type: string): ContentItem['type'] {
+  const typeMap: Record<string, ContentItem['type']> = {
+    VIDEO: 'video',
+    PODCAST: 'podcast',
+    ARTICLE: 'article',
+    POST: 'post',
+  };
+  return typeMap[type] ?? 'article';
+}
+
+// =============================================================================
+// Components
+// =============================================================================
+
+function SectionHeader({
+  title,
+  count,
+  colors,
+  onPress,
+}: {
+  title: string;
+  count?: number;
+  colors: typeof Colors.dark;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.sectionHeader} disabled={!onPress}>
+      <View style={styles.sectionHeaderLeft}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        {count !== undefined && (
+          <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>{count}</Text>
+        )}
+      </View>
+      {onPress && <ChevronRightIcon size={20} color={colors.textTertiary} />}
+    </Pressable>
+  );
+}
+
+function HorizontalCard({
+  item,
+  colors,
+  onPress,
+}: {
+  item: ContentItem;
+  colors: typeof Colors.dark;
+  onPress: () => void;
+}) {
+  const typeColor = ContentColors[item.type];
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.horizontalCard, { backgroundColor: colors.backgroundSecondary }]}
+    >
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.horizontalCardImage}
+          contentFit="cover"
+        />
+      ) : (
+        <View
+          style={[styles.horizontalCardImage, { backgroundColor: colors.backgroundTertiary }]}
+        />
+      )}
+      <View style={styles.horizontalCardContent}>
+        <Text style={[styles.horizontalCardTitle, { color: colors.text }]} numberOfLines={2}>
+          {item.title}
+        </Text>
+        <View style={styles.horizontalCardMeta}>
+          <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
+          <Text
+            style={[styles.horizontalCardSource, { color: colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {item.source}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+function LargeCard({
+  item,
+  colors,
+  onPress,
+}: {
+  item: ContentItem;
+  colors: typeof Colors.dark;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.largeCard}>
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={styles.largeCardImage} contentFit="cover" />
+      ) : (
+        <View style={[styles.largeCardImage, { backgroundColor: colors.backgroundTertiary }]} />
+      )}
+      <View style={styles.largeCardOverlay}>
+        <Text style={styles.largeCardSource}>{item.source}</Text>
+        <Text style={styles.largeCardTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+        {item.duration && <Text style={styles.largeCardDuration}>{item.duration}</Text>}
+      </View>
+    </Pressable>
+  );
+}
+
+function CondensedListItem({
+  item,
+  colors,
+  onPress,
+}: {
+  item: ContentItem;
+  colors: typeof Colors.dark;
+  onPress: () => void;
+}) {
+  const typeLabel = item.type.charAt(0).toUpperCase() + item.type.slice(1);
+
+  return (
+    <Pressable onPress={onPress} style={styles.condensedItem}>
+      {item.imageUrl ? (
+        <Image
+          source={{ uri: item.imageUrl }}
+          style={styles.condensedItemImage}
+          contentFit="cover"
+        />
+      ) : (
+        <View style={[styles.condensedItemImage, { backgroundColor: colors.backgroundTertiary }]} />
+      )}
+      <View style={styles.condensedItemContent}>
+        <Text style={[styles.condensedItemTitle, { color: colors.text }]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={[styles.condensedItemMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+          {item.source} · {typeLabel}
+          {item.duration ? ` · ${item.duration}` : ''}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+function CategoryPill({
+  label,
+  count,
+  color,
+  colors,
+  onPress,
+}: {
+  label: string;
+  count: number;
+  color: string;
+  colors: typeof Colors.dark;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.categoryPill, { backgroundColor: colors.backgroundSecondary }]}
+    >
+      <View style={[styles.categoryDot, { backgroundColor: color }]} />
+      <Text style={[styles.categoryLabel, { color: colors.text }]}>{label}</Text>
+      <Text style={[styles.categoryCount, { color: colors.textTertiary }]}>{count}</Text>
+    </Pressable>
+  );
 }
 
 // =============================================================================
 // Main Screen
 // =============================================================================
 
-/**
- * Transform ItemView from tRPC to ContentItem for ContentCard component
- */
-function transformToContentItem(item: {
-  id: string;
-  title: string;
-  thumbnailUrl: string | null;
-  creator: string;
-  publisher: string | null;
-  provider: string;
-  contentType: string;
-  duration: number | null;
-}): ContentItem {
-  // Map provider to lowercase for ContentCard
-  const providerMap: Record<string, LocalProvider> = {
-    YOUTUBE: 'youtube',
-    SPOTIFY: 'spotify',
-    SUBSTACK: 'substack',
-    RSS: 'substack', // RSS doesn't have a specific color, use substack as fallback
-  };
-
-  // Map content type to lowercase
-  const typeMap: Record<string, 'video' | 'podcast' | 'article' | 'post'> = {
-    VIDEO: 'video',
-    PODCAST: 'podcast',
-    ARTICLE: 'article',
-    POST: 'post',
-  };
-
-  return {
-    id: item.id,
-    title: item.title,
-    source: item.publisher ?? item.creator,
-    provider: providerMap[item.provider] ?? 'substack',
-    type: typeMap[item.contentType] ?? 'article',
-    thumbnailUrl: item.thumbnailUrl ?? undefined,
-    duration: item.duration ? formatDuration(item.duration) : undefined,
-  };
-}
-
-/**
- * Transform ItemView from tRPC home data to ItemCardData for ItemCard component
- */
-function transformItemViewToCardData(item: {
-  id: string;
-  title: string;
-  thumbnailUrl: string | null;
-  creator: string;
-  publisher: string | null;
-  provider: string;
-  contentType: string;
-  duration: number | null;
-  bookmarkedAt: string | null;
-  publishedAt: string | null;
-}): ItemCardData {
-  return {
-    id: item.id,
-    title: item.title,
-    creator: item.publisher ?? item.creator,
-    thumbnailUrl: item.thumbnailUrl,
-    contentType: item.contentType.toLowerCase() as UIContentType,
-    provider: item.provider as Provider,
-    duration: item.duration,
-    bookmarkedAt: item.bookmarkedAt,
-    publishedAt: item.publishedAt,
-  };
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'dark'];
   const greeting = useMemo(() => getGreeting(), []);
-  const dateStr = useMemo(() => formatDate(), []);
 
-  // Data hooks for live data
-  const inboxItemsData = useInboxItems();
-
-  // Home data hook for curated sections (Jump Back In, podcasts, videos, etc.)
+  // Data hooks
+  const { data: inboxData, isLoading: isInboxLoading } = useInboxItems();
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
+  const { data: libraryData } = useLibraryItems();
 
-  // Library data with loading state for stats
-  const { data: libraryData, isLoading: isLibraryLoading } = useTRPCLibraryItems();
+  // Transform to ContentItem format
+  const recentlyBookmarked = useMemo((): ContentItem[] => {
+    return (homeData?.recentBookmarks ?? []).slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title,
+      source: item.publisher ?? item.creator,
+      imageUrl: item.thumbnailUrl,
+      duration: item.duration ? formatDuration(item.duration) : null,
+      type: mapContentType(item.contentType),
+    }));
+  }, [homeData?.recentBookmarks]);
 
-  // Compute quick stats from real data
-  const quickStats = useMemo((): QuickStatsData => {
+  const inboxItems = useMemo((): ContentItem[] => {
+    return (inboxData?.items ?? []).slice(0, 4).map((item) => ({
+      id: item.id,
+      title: item.title,
+      source: item.creator,
+      imageUrl: item.thumbnailUrl,
+      duration: item.duration ? formatDuration(item.duration) : null,
+      type: mapContentType(item.contentType),
+    }));
+  }, [inboxData?.items]);
+
+  const podcasts = useMemo((): ContentItem[] => {
+    return (homeData?.byContentType.podcasts ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      source: item.publisher ?? item.creator,
+      imageUrl: item.thumbnailUrl,
+      duration: item.duration ? formatDuration(item.duration) : null,
+      type: 'podcast',
+    }));
+  }, [homeData?.byContentType.podcasts]);
+
+  const videos = useMemo((): ContentItem[] => {
+    return (homeData?.byContentType.videos ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      source: item.publisher ?? item.creator,
+      imageUrl: item.thumbnailUrl,
+      duration: item.duration ? formatDuration(item.duration) : null,
+      type: 'video',
+    }));
+  }, [homeData?.byContentType.videos]);
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
     const items = libraryData?.items ?? [];
-
-    // Saved count: total bookmarked items
-    const savedCount = items.length;
-
-    // In Progress count: items that have been started but not finished
-    // (items with progress object that has position > 0 and not finished)
-    const inProgressCount = items.filter(
-      (item) => item.progress && item.progress.position > 0 && !item.isFinished
-    ).length;
-
-    // This Week count: items bookmarked in the last 7 days
-    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const thisWeekCount = items.filter((item) => {
-      if (!item.bookmarkedAt) return false;
-      const bookmarkedTime =
-        typeof item.bookmarkedAt === 'string'
-          ? new Date(item.bookmarkedAt).getTime()
-          : item.bookmarkedAt;
-      return bookmarkedTime > oneWeekAgo;
-    }).length;
-
-    return { savedCount, inProgressCount, thisWeekCount };
+    return {
+      podcast: items.filter((item) => item.contentType === 'PODCAST').length,
+      video: items.filter((item) => item.contentType === 'VIDEO').length,
+      article: items.filter((item) => item.contentType === 'ARTICLE').length,
+      post: items.filter((item) => item.contentType === 'POST').length,
+    };
   }, [libraryData?.items]);
 
-  // Transform to ItemCardData for shared ItemCard component (live data sections)
-  // Use homeData.recentBookmarks which filters out finished items
-  const jumpBackInCards = useMemo(
-    () => (homeData?.recentBookmarks ?? []).map(transformItemViewToCardData),
-    [homeData?.recentBookmarks]
-  );
+  const handleItemPress = (id: string) => {
+    router.push(`/item/${id}`);
+  };
 
-  const recentInboxCards = useMemo(
-    () => inboxItemsData.map(transformToItemCardData),
-    [inboxItemsData]
-  );
-
-  // Transform home data for ContentCard sections
-  const podcasts = useMemo(
-    () => (homeData?.byContentType.podcasts ?? []).map(transformToContentItem),
-    [homeData?.byContentType.podcasts]
-  );
-
-  const videos = useMemo(
-    () => (homeData?.byContentType.videos ?? []).map(transformToContentItem),
-    [homeData?.byContentType.videos]
-  );
+  const isLoading = isInboxLoading || isHomeLoading;
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          headerShown: false,
-          headerRight: () => (
-            <Pressable
-              onPress={() => router.push('/settings')}
-              style={styles.settingsButton}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <SettingsIcon size={24} color={colors.text} />
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
           style={styles.scrollView}
@@ -270,157 +318,150 @@ export default function HomeScreen() {
         >
           {/* Header */}
           <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-            <View style={styles.headerRow}>
-              <View style={styles.headerText}>
-                <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Your Library</Text>
-                <Text style={[styles.dateText, { color: colors.textTertiary }]}>{dateStr}</Text>
-              </View>
-              <Pressable
-                onPress={() => router.push('/settings')}
-                style={[styles.settingsButton, { backgroundColor: colors.backgroundSecondary }]}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <SettingsIcon size={22} color={colors.textSecondary} />
-              </Pressable>
-            </View>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
           </Animated.View>
 
-          {/* Quick Stats */}
-          <QuickStats colors={colors} stats={quickStats} isLoading={isLibraryLoading} />
+          {isLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <>
+              {/* Recently Bookmarked - Horizontal Cards */}
+              {recentlyBookmarked.length > 0 && (
+                <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                  <SectionHeader
+                    title="Recently Bookmarked"
+                    count={recentlyBookmarked.length}
+                    colors={colors}
+                  />
+                  <FlatList
+                    horizontal
+                    data={recentlyBookmarked}
+                    renderItem={({ item }) => (
+                      <HorizontalCard
+                        item={item}
+                        colors={colors}
+                        onPress={() => handleItemPress(item.id)}
+                      />
+                    )}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
+                  />
+                </Animated.View>
+              )}
 
-          {/* Featured Card */}
-          <View style={styles.section}>
-            <FeaturedCard item={featuredContent} colors={colors} />
-          </View>
-
-          {/* Jump Back In - Live tRPC Data (Bookmarked Items) */}
-          <View style={styles.section}>
-            <SectionHeader
-              title="Jump Back In"
-              icon={<PlayIcon size={20} color={colors.primary} />}
-              colors={colors}
-            />
-            {jumpBackInCards.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-              >
-                {jumpBackInCards.map((item, index) => (
-                  <ItemCard key={item.id} item={item} variant="large" index={index} />
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
-                  No bookmarked items yet. Bookmark some content to see it here!
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Recent Inbox - Live tRPC Data */}
-          <View style={styles.section}>
-            <SectionHeader
-              title="Recent Inbox"
-              icon={<BookmarkIcon size={20} color={ContentColors.article} />}
-              colors={colors}
-            />
-            {recentInboxCards.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-              >
-                {recentInboxCards.map((item, index) => (
-                  <View key={item.id} style={{ width: CARD_WIDTH }}>
-                    <ItemCard item={item} variant="compact" index={index} />
+              {/* Inbox Section - Condensed List */}
+              {inboxItems.length > 0 && (
+                <Animated.View
+                  entering={FadeInDown.delay(200).duration(400)}
+                  style={styles.section}
+                >
+                  <SectionHeader
+                    title="Inbox"
+                    count={inboxData?.items.length ?? 0}
+                    colors={colors}
+                    onPress={() => router.push('/(tabs)/inbox')}
+                  />
+                  <View
+                    style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
+                  >
+                    {inboxItems.map((item) => (
+                      <CondensedListItem
+                        key={item.id}
+                        item={item}
+                        colors={colors}
+                        onPress={() => handleItemPress(item.id)}
+                      />
+                    ))}
                   </View>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
-                  No items in your inbox yet.
-                </Text>
-              </View>
-            )}
-          </View>
+                </Animated.View>
+              )}
 
-          {/* Podcasts - Live tRPC Data */}
-          <View style={styles.section}>
-            <SectionHeader
-              title="Podcasts"
-              icon={<HeadphonesIcon size={20} color={ContentColors.podcast} />}
-              colors={colors}
-            />
-            {isHomeLoading ? (
-              <View style={styles.loadingState}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : podcasts.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-              >
-                {podcasts.map((item, index) => (
-                  <ContentCard
-                    key={item.id}
-                    item={item}
-                    colors={colors}
-                    index={index}
-                    variant="square"
-                    onPress={() => router.push(`/item/${item.id}` as any)}
+              {/* Category Collection - Large Cards */}
+              {podcasts.length > 0 && (
+                <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+                  <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
+                  <FlatList
+                    horizontal
+                    data={podcasts.slice(0, 5)}
+                    renderItem={({ item }) => (
+                      <LargeCard
+                        item={item}
+                        colors={colors}
+                        onPress={() => handleItemPress(item.id)}
+                      />
+                    )}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
                   />
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
-                  No podcasts in your library yet.
-                </Text>
-              </View>
-            )}
-          </View>
+                </Animated.View>
+              )}
 
-          {/* Videos - Live tRPC Data */}
-          <View style={styles.section}>
-            <SectionHeader
-              title="Videos"
-              icon={<VideoIcon size={20} color={ContentColors.video} />}
-              colors={colors}
-            />
-            {isHomeLoading ? (
-              <View style={styles.loadingState}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : videos.length > 0 ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.horizontalScrollContent}
-              >
-                {videos.map((item, index) => (
-                  <ContentCard
-                    key={item.id}
-                    item={item}
+              {/* Categories */}
+              <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
+                <SectionHeader title="Categories" colors={colors} />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesContainer}
+                >
+                  <CategoryPill
+                    label="Podcasts"
+                    count={categoryCounts.podcast}
+                    color={ContentColors.podcast}
                     colors={colors}
-                    index={index}
-                    variant="wide"
-                    onPress={() => router.push(`/item/${item.id}` as any)}
+                    onPress={() => router.push('/(tabs)/library')}
                   />
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={[styles.emptyStateText, { color: colors.textTertiary }]}>
-                  No videos in your library yet.
-                </Text>
-              </View>
-            )}
-          </View>
+                  <CategoryPill
+                    label="Videos"
+                    count={categoryCounts.video}
+                    color={ContentColors.video}
+                    colors={colors}
+                    onPress={() => router.push('/(tabs)/library')}
+                  />
+                  <CategoryPill
+                    label="Articles"
+                    count={categoryCounts.article}
+                    color={ContentColors.article}
+                    colors={colors}
+                    onPress={() => router.push('/(tabs)/library')}
+                  />
+                  <CategoryPill
+                    label="Posts"
+                    count={categoryCounts.post}
+                    color={ContentColors.post}
+                    colors={colors}
+                    onPress={() => router.push('/(tabs)/library')}
+                  />
+                </ScrollView>
+              </Animated.View>
+
+              {/* Videos - Horizontal Cards */}
+              {videos.length > 0 && (
+                <Animated.View entering={FadeInDown.delay(500).duration(400)}>
+                  <SectionHeader title="Videos" count={videos.length} colors={colors} />
+                  <FlatList
+                    horizontal
+                    data={videos}
+                    renderItem={({ item }) => (
+                      <HorizontalCard
+                        item={item}
+                        colors={colors}
+                        onPress={() => handleItemPress(item.id)}
+                      />
+                    )}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
+                  />
+                </Animated.View>
+              )}
+            </>
+          )}
 
           {/* Bottom spacing for tab bar */}
           <View style={styles.bottomSpacer} />
@@ -450,25 +491,9 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.md,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerText: {
-    flex: 1,
-  },
-  settingsButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.xs,
   },
   greeting: {
     ...Typography.labelMedium,
@@ -476,42 +501,172 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.displayMedium,
+  },
+
+  // Section
+  section: {
+    marginBottom: Spacing.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  sectionTitle: {
+    ...Typography.titleLarge,
+  },
+  sectionCount: {
+    ...Typography.bodySmall,
+  },
+
+  // Horizontal List
+  horizontalList: {
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+
+  // Horizontal Card
+  horizontalCard: {
+    width: 200,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  horizontalCardImage: {
+    width: '100%',
+    height: 112,
+  },
+  horizontalCardContent: {
+    padding: Spacing.md,
+  },
+  horizontalCardTitle: {
+    ...Typography.bodyMedium,
+    fontWeight: '500',
     marginBottom: Spacing.xs,
   },
-  dateText: {
+  horizontalCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  horizontalCardSource: {
+    ...Typography.bodySmall,
+    flex: 1,
+  },
+  typeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  // Large Card
+  largeCard: {
+    width: 280,
+    height: 180,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  largeCardImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  largeCardOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: Spacing.lg,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  largeCardSource: {
+    ...Typography.labelSmall,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: Spacing.xs,
+  },
+  largeCardTitle: {
+    ...Typography.titleMedium,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  largeCardDuration: {
+    ...Typography.bodySmall,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+
+  // Inbox Container
+  inboxContainer: {
+    marginHorizontal: Spacing.md,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+
+  // Condensed Item
+  condensedItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  condensedItemImage: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.sm,
+    marginRight: Spacing.md,
+  },
+  condensedItemContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  condensedItemTitle: {
     ...Typography.bodyMedium,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  condensedItemMeta: {
+    ...Typography.bodySmall,
   },
 
-  // Sections
-  section: {
-    marginBottom: Spacing['2xl'],
+  // Categories
+  categoriesContainer: {
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+  },
+  categoryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.full,
+    gap: Spacing.sm,
+  },
+  categoryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  categoryLabel: {
+    ...Typography.labelMedium,
+  },
+  categoryCount: {
+    ...Typography.bodySmall,
   },
 
-  // Horizontal scroll
-  horizontalScrollContent: {
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.md,
+  // Loading state
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing['5xl'],
   },
 
   // Bottom spacer
   bottomSpacer: {
     height: 40,
-  },
-
-  // Empty state
-  emptyState: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
-  },
-  emptyStateText: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
-  },
-
-  // Loading state
-  loadingState: {
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.xl,
-    alignItems: 'center',
   },
 });

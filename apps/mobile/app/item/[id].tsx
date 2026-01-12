@@ -1,18 +1,19 @@
 /**
  * Item Detail Page
  *
- * Displays the full content of a saved item - Spotify podcasts or YouTube videos.
+ * Displays the full content of a saved item - Spotify podcasts, YouTube videos, articles, or posts.
  * Accessible from all item cards throughout the app (Inbox, Library, Home).
  *
  * Features:
- * - Cover image with adaptive aspect ratio (1:1 podcast, 16:9 video)
- * - Title and creator display
- * - Open Link button (opens in browser/native app)
- * - Action Row with Check, Bookmark, Share, and Add to Collection buttons
- * - Full description with scrolling
+ * - Large cover image at top
+ * - Provider and type badges
+ * - Title, source/creator row, and metadata
+ * - Action row with icon buttons and FAB for external link
+ * - Full description section
  * - Loading, error, and not found states
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -27,40 +28,109 @@ import {
   Share,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import {
+  Colors,
+  Typography,
+  Spacing,
+  Radius,
+  ContentColors,
+  ProviderColors,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import {
-  useItem,
-  useBookmarkItem,
-  useUnbookmarkItem,
-  useToggleFinished,
-} from '@/hooks/use-items-trpc';
+import { useItem, useToggleFinished } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
-import {
-  getContentIcon,
-  getContentAspectRatio,
-  getProviderLabel,
-  getProviderColor,
-} from '@/lib/content-utils';
+import { getContentIcon, getContentAspectRatio, getProviderLabel } from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
-import {
-  ChevronRightIcon,
-  CheckIcon,
-  CheckOutlineIcon,
-  BookmarkIcon,
-  BookmarkOutlineIcon,
-  ShareIcon,
-  PlusIcon,
-} from '@/components/icons';
+
+// ============================================================================
+// Badge Components
+// ============================================================================
+
+function SourceBadge({ provider }: { provider: string }) {
+  const providerMap: Record<string, { color: string; label: string }> = {
+    YOUTUBE: { color: ProviderColors.youtube, label: 'YouTube' },
+    SPOTIFY: { color: ProviderColors.spotify, label: 'Spotify' },
+    SUBSTACK: { color: ProviderColors.substack, label: 'Substack' },
+    X: { color: ProviderColors.x, label: 'X' },
+    TWITTER: { color: ProviderColors.twitter, label: 'X' },
+    WEB: { color: '#6A6A6A', label: 'Web' },
+  };
+  const { color, label } = providerMap[provider] ?? { color: '#6A6A6A', label: 'Web' };
+
+  return (
+    <View style={[styles.badge, { backgroundColor: color }]}>
+      <Text style={styles.badgeText}>{label}</Text>
+    </View>
+  );
+}
+
+function TypeBadge({ contentType }: { contentType: string }) {
+  const typeMap: Record<string, { color: string; label: string }> = {
+    VIDEO: { color: ContentColors.video, label: 'Video' },
+    PODCAST: { color: ContentColors.podcast, label: 'Podcast' },
+    ARTICLE: { color: ContentColors.article, label: 'Article' },
+    POST: { color: ContentColors.post, label: 'Post' },
+  };
+  const { color, label } = typeMap[contentType] ?? { color: '#6A6A6A', label: 'Content' };
+
+  return (
+    <View style={[styles.badge, { backgroundColor: color }]}>
+      <Text style={styles.badgeText}>{label}</Text>
+    </View>
+  );
+}
+
+// ============================================================================
+// Icon Action Button
+// ============================================================================
+
+function IconActionButton({
+  icon,
+  color,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable onPress={onPress} style={styles.iconActionButton}>
+      <Ionicons name={icon} size={20} color={color} />
+    </Pressable>
+  );
+}
+
+// ============================================================================
+// Floating Header Button
+// ============================================================================
+
+function HeaderIconButton({
+  icon,
+  colors,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  colors: typeof Colors.dark;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.headerIconButton, { backgroundColor: colors.backgroundSecondary }]}
+    >
+      <Ionicons name={icon} size={20} color={colors.text} />
+    </Pressable>
+  );
+}
 
 // ============================================================================
 // Loading State
 // ============================================================================
 
-function LoadingState({ colors }: { colors: typeof Colors.light }) {
+function LoadingState({ colors }: { colors: typeof Colors.dark }) {
   return (
     <View style={styles.centerContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
@@ -78,7 +148,7 @@ function ErrorState({
   message,
   onRetry,
 }: {
-  colors: typeof Colors.light;
+  colors: typeof Colors.dark;
   message: string;
   onRetry?: () => void;
 }) {
@@ -89,9 +159,11 @@ function ErrorState({
       {onRetry && (
         <Pressable
           onPress={onRetry}
-          style={[styles.retryButton, { backgroundColor: colors.primary }]}
+          style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
         >
-          <Text style={styles.retryButtonText}>Try Again</Text>
+          <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>
+            Try Again
+          </Text>
         </Pressable>
       )}
     </View>
@@ -102,7 +174,7 @@ function ErrorState({
 // Not Found State
 // ============================================================================
 
-function NotFoundState({ colors }: { colors: typeof Colors.light }) {
+function NotFoundState({ colors }: { colors: typeof Colors.dark }) {
   const router = useRouter();
 
   return (
@@ -113,9 +185,9 @@ function NotFoundState({ colors }: { colors: typeof Colors.light }) {
       </Text>
       <Pressable
         onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.primary }]}
+        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
       >
-        <Text style={styles.retryButtonText}>Go Back</Text>
+        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
       </Pressable>
     </View>
   );
@@ -125,7 +197,7 @@ function NotFoundState({ colors }: { colors: typeof Colors.light }) {
 // Invalid Parameter State
 // ============================================================================
 
-function InvalidParamState({ colors, message }: { colors: typeof Colors.light; message: string }) {
+function InvalidParamState({ colors, message }: { colors: typeof Colors.dark; message: string }) {
   const router = useRouter();
 
   return (
@@ -134,9 +206,9 @@ function InvalidParamState({ colors, message }: { colors: typeof Colors.light; m
       <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
       <Pressable
         onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.primary }]}
+        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
       >
-        <Text style={styles.retryButtonText}>Go Back</Text>
+        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
       </Pressable>
     </View>
   );
@@ -149,7 +221,9 @@ function InvalidParamState({ colors, message }: { colors: typeof Colors.light; m
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'dark'];
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // Validate the id parameter early
   const idValidation = validateItemId(id);
@@ -162,9 +236,7 @@ export default function ItemDetailScreen() {
     refetch,
   } = useItem(idValidation.success ? idValidation.data : '');
 
-  // Bookmark mutations
-  const bookmarkMutation = useBookmarkItem();
-  const unbookmarkMutation = useUnbookmarkItem();
+  // Mutations
   const toggleFinishedMutation = useToggleFinished();
 
   // Render invalid param state if id is invalid
@@ -174,9 +246,7 @@ export default function ItemDetailScreen() {
         <Stack.Screen
           options={{
             title: '',
-            headerBackButtonDisplayMode: 'minimal',
-            headerTransparent: true,
-            headerTintColor: colors.text,
+            headerShown: false,
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -222,37 +292,11 @@ export default function ItemDetailScreen() {
     toggleFinishedMutation.mutate({ id: item.id });
   };
 
-  // Handle bookmark toggle
-  const handleToggleBookmark = () => {
-    if (!item) return;
-
-    if (item.state === 'BOOKMARKED') {
-      // Unbookmark: move back to INBOX
-      unbookmarkMutation.mutate({ id: item.id });
-    } else {
-      // Bookmark: move to BOOKMARKED (Library)
-      bookmarkMutation.mutate({ id: item.id });
-    }
-  };
-
-  // Handle add to collection (placeholder)
-  const handleAddToCollection = () => {
-    // No-op placeholder for future functionality
-    logger.debug('Add to collection - placeholder');
-  };
-
   // Render loading state
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: '',
-            headerBackButtonDisplayMode: 'minimal',
-            headerTransparent: true,
-            headerTintColor: colors.text,
-          }}
-        />
+        <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
           <LoadingState colors={colors} />
         </SafeAreaView>
@@ -264,14 +308,7 @@ export default function ItemDetailScreen() {
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: '',
-            headerBackButtonDisplayMode: 'minimal',
-            headerTransparent: true,
-            headerTintColor: colors.text,
-          }}
-        />
+        <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
           <ErrorState colors={colors} message={error.message} onRetry={() => refetch()} />
         </SafeAreaView>
@@ -283,14 +320,7 @@ export default function ItemDetailScreen() {
   if (!item) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{
-            title: '',
-            headerBackButtonDisplayMode: 'minimal',
-            headerTransparent: true,
-            headerTintColor: colors.text,
-          }}
-        />
+        <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
           <NotFoundState colors={colors} />
         </SafeAreaView>
@@ -301,18 +331,27 @@ export default function ItemDetailScreen() {
   // Calculate aspect ratio based on content type
   const aspectRatio = getContentAspectRatio(item.contentType);
   const providerLabel = getProviderLabel(item.provider);
-  const providerColor = getProviderColor(item.provider);
+
+  // Get description label based on content type
+  const getDescriptionLabel = () => {
+    switch (item.contentType) {
+      case 'VIDEO':
+        return 'About this video';
+      case 'PODCAST':
+        return 'About this episode';
+      case 'ARTICLE':
+        return 'About this article';
+      case 'POST':
+        return 'About this post';
+      default:
+        return 'Description';
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen
-        options={{
-          title: '',
-          headerBackButtonDisplayMode: 'minimal',
-          headerTransparent: true,
-          headerTintColor: colors.text,
-        }}
-      />
+      <Stack.Screen options={{ title: '', headerShown: false }} />
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -335,12 +374,6 @@ export default function ItemDetailScreen() {
                 {getContentIcon(item.contentType, 64, colors.textTertiary)}
               </View>
             )}
-            {/* Duration badge */}
-            {item.duration && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{formatDuration(item.duration)}</Text>
-              </View>
-            )}
           </View>
         </Animated.View>
 
@@ -349,119 +382,88 @@ export default function ItemDetailScreen() {
           entering={FadeInDown.delay(100).duration(400)}
           style={styles.contentContainer}
         >
+          {/* Badges Row */}
+          <View style={styles.badgeRow}>
+            <SourceBadge provider={item.provider} />
+            <TypeBadge contentType={item.contentType} />
+          </View>
+
           {/* Title */}
           <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
 
-          {/* Creator and Provider */}
+          {/* Source/Creator Row */}
+          <Pressable style={styles.sourceRow}>
+            {item.thumbnailUrl && (
+              <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={styles.sourceThumbnail}
+                contentFit="cover"
+              />
+            )}
+            <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </Pressable>
+
+          {/* Meta Row */}
           <View style={styles.metaRow}>
-            <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
-            <Text style={[styles.creator, { color: colors.textSecondary }]}>{item.creator}</Text>
             {providerLabel && (
               <>
-                <Text style={[styles.separator, { color: colors.textTertiary }]}>{' on '}</Text>
-                <Text style={[styles.provider, { color: colors.textSecondary }]}>
+                <Text style={[styles.metaText, { color: colors.textTertiary }]}>
                   {providerLabel}
                 </Text>
+                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
               </>
+            )}
+            {item.publishedAt && (
+              <>
+                <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                  {formatRelativeTime(item.publishedAt)}
+                </Text>
+                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+              </>
+            )}
+            {item.duration && (
+              <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                {formatDuration(item.duration)}
+              </Text>
+            )}
+            {item.readingTimeMinutes && (
+              <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                {item.readingTimeMinutes} min read
+              </Text>
             )}
           </View>
 
-          {/* Reading Time */}
-          {item.readingTimeMinutes && (
-            <Text style={[styles.readingTime, { color: colors.textTertiary }]}>
-              {item.readingTimeMinutes} min read
-            </Text>
-          )}
-
-          {/* Published date */}
-          {item.publishedAt && (
-            <Text style={[styles.publishedAt, { color: colors.textTertiary }]}>
-              Published {formatRelativeTime(item.publishedAt)}
-            </Text>
-          )}
-
-          {/* Open Button */}
-          <Pressable
-            onPress={handleOpenLink}
-            style={({ pressed }) => [
-              styles.openButton,
-              { backgroundColor: colors.primary },
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <Text style={styles.openButtonText}>
-              {providerLabel ? `Open in ${providerLabel}` : 'Open'}
-            </Text>
-            <ChevronRightIcon size={20} color="#fff" />
-          </Pressable>
-
           {/* Action Row */}
           <View style={styles.actionRow}>
-            {/* Mark as Finished */}
+            <View style={styles.actionRowLeft}>
+              <IconActionButton
+                icon="pricetag-outline"
+                color={colors.textSecondary}
+                onPress={handleToggleFinished}
+              />
+              <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
+              <IconActionButton
+                icon="share-outline"
+                color={colors.textSecondary}
+                onPress={handleShare}
+              />
+              <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
+            </View>
             <Pressable
-              onPress={handleToggleFinished}
-              disabled={toggleFinishedMutation.isPending}
-              style={({ pressed }) => [
-                styles.actionButton,
-                { backgroundColor: colors.backgroundSecondary },
-                pressed && { opacity: 0.7 },
-                toggleFinishedMutation.isPending && { opacity: 0.5 },
-              ]}
+              onPress={handleOpenLink}
+              style={[styles.fabButton, { backgroundColor: colors.buttonPrimary }]}
             >
-              {item.isFinished ? (
-                <CheckIcon size={24} color={colors.success} />
-              ) : (
-                <CheckOutlineIcon size={24} color={colors.textSecondary} />
-              )}
-            </Pressable>
-
-            {/* Bookmark */}
-            <Pressable
-              onPress={handleToggleBookmark}
-              disabled={bookmarkMutation.isPending || unbookmarkMutation.isPending}
-              style={({ pressed }) => [
-                styles.actionButton,
-                { backgroundColor: colors.backgroundSecondary },
-                pressed && { opacity: 0.7 },
-                (bookmarkMutation.isPending || unbookmarkMutation.isPending) && { opacity: 0.5 },
-              ]}
-            >
-              {item.state === 'BOOKMARKED' ? (
-                <BookmarkIcon size={24} color={colors.primary} />
-              ) : (
-                <BookmarkOutlineIcon size={24} color={colors.textSecondary} />
-              )}
-            </Pressable>
-
-            {/* Share */}
-            <Pressable
-              onPress={handleShare}
-              style={({ pressed }) => [
-                styles.actionButton,
-                { backgroundColor: colors.backgroundSecondary },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <ShareIcon size={24} color={colors.textSecondary} />
-            </Pressable>
-
-            {/* Add to Collection */}
-            <Pressable
-              onPress={handleAddToCollection}
-              style={({ pressed }) => [
-                styles.actionButton,
-                { backgroundColor: colors.backgroundSecondary },
-                pressed && { opacity: 0.7 },
-              ]}
-            >
-              <PlusIcon size={24} color={colors.textSecondary} />
+              <Ionicons name="open-outline" size={24} color={colors.buttonPrimaryText} />
             </Pressable>
           </View>
 
           {/* Description */}
           {item.summary && (
             <View style={styles.descriptionContainer}>
-              <Text style={[styles.descriptionLabel, { color: colors.text }]}>Description</Text>
+              <Text style={[styles.descriptionLabel, { color: colors.text }]}>
+                {getDescriptionLabel()}
+              </Text>
               <Text style={[styles.description, { color: colors.textSecondary }]}>
                 {item.summary}
               </Text>
@@ -469,6 +471,13 @@ export default function ItemDetailScreen() {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* Floating Back Button */}
+      <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+        <Animated.View entering={FadeIn.duration(300)}>
+          <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -491,15 +500,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['3xl'],
   },
 
-  // Cover Image - extends edge-to-edge, top to top of screen
+  // Cover Image
   coverContainer: {
     width: '100%',
     position: 'relative',
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
-    overflow: 'hidden',
   },
   coverImage: {
     width: '100%',
@@ -511,20 +515,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  durationBadge: {
+
+  // Floating Header
+  floatingHeader: {
     position: 'absolute',
-    bottom: Spacing.md,
-    right: Spacing.md,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
+    left: Spacing.xl,
+    right: Spacing.xl,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 100,
   },
-  durationText: {
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Badges
+  badgeRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  badge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+  },
+  badgeText: {
     ...Typography.labelMedium,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
+    color: '#FFFFFF',
   },
 
   // Content
@@ -533,66 +556,61 @@ const styles = StyleSheet.create({
   },
   title: {
     ...Typography.headlineMedium,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
+
+  // Source Row
+  sourceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  sourceThumbnail: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    marginRight: Spacing.sm,
+  },
+  sourceName: {
+    ...Typography.labelLarge,
+    marginRight: Spacing.xs,
+  },
+
+  // Meta Row
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: Spacing.xs,
-  },
-  providerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: Spacing.sm,
-  },
-  creator: {
-    ...Typography.bodyMedium,
-  },
-  separator: {
-    ...Typography.bodyMedium,
-  },
-  provider: {
-    ...Typography.bodyMedium,
-    fontWeight: '500',
-  },
-  publishedAt: {
-    ...Typography.bodySmall,
+    flexWrap: 'wrap',
     marginBottom: Spacing.lg,
   },
-  readingTime: {
+  metaText: {
     ...Typography.bodySmall,
-    marginBottom: Spacing.xs,
   },
-
-  // Open Button
-  openButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: Radius.lg,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xl,
-    gap: Spacing.xs,
-    ...Shadows.sm,
-  },
-  openButtonText: {
-    ...Typography.labelLarge,
-    color: '#fff',
+  metaDot: {
+    ...Typography.bodySmall,
   },
 
   // Action Row
   actionRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.xl,
   },
-  actionButton: {
-    width: 52,
-    height: 52,
+  actionRowLeft: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  iconActionButton: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabButton: {
+    width: 56,
+    height: 56,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -603,7 +621,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   descriptionLabel: {
-    ...Typography.titleSmall,
+    ...Typography.titleLarge,
     marginBottom: Spacing.sm,
   },
   description: {
@@ -639,6 +657,5 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     ...Typography.labelMedium,
-    color: '#fff',
   },
 });

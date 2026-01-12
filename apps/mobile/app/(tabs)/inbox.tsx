@@ -215,9 +215,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: Spacing.xl,
+    paddingHorizontal: Spacing.md,
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.lg,
+    paddingBottom: Spacing.md,
   },
   headerTitle: {
     ...Typography.displayMedium,
@@ -228,7 +228,6 @@ const styles = StyleSheet.create({
   },
   // List
   listContent: {
-    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing['3xl'],
   },
   emptyListContent: {
