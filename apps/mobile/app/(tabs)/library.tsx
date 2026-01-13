@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 
 import { Surface } from 'heroui-native';
+import { useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +27,14 @@ function SearchIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: s
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </Svg>
+  );
+}
+
+function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -104,11 +113,17 @@ function FilterChip({ label, isSelected, onPress, color, colors }: FilterChipPro
 // =============================================================================
 
 export default function LibraryScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   // Filter state
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null);
+
+  // Handle add bookmark
+  const handleAddBookmark = useCallback(() => {
+    router.push('/add-link');
+  }, [router]);
 
   // Memoize filter to prevent unnecessary query key changes
   const filter = useMemo(
@@ -140,7 +155,17 @@ export default function LibraryScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
+          <View style={styles.headerTitleRow}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
+            <Pressable
+              onPress={handleAddBookmark}
+              style={[styles.addButton, { backgroundColor: colors.backgroundTertiary }]}
+              accessibilityLabel="Add bookmark"
+              accessibilityRole="button"
+            >
+              <PlusIcon size={20} color={colors.text} />
+            </Pressable>
+          </View>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
             {isLoading
               ? 'Loading...'
@@ -234,12 +259,24 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
   headerTitle: {
     ...Typography.displayMedium,
-    marginBottom: Spacing.xs,
   },
   headerSubtitle: {
     ...Typography.bodyMedium,
+  },
+  addButton: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Search
