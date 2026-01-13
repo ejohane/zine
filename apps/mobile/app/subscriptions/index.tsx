@@ -1,215 +1,130 @@
 /**
- * Subscription Management Screen
+ * Subscriptions Screen
  *
- * Displays the user's subscriptions with add subscription buttons for YouTube/Spotify.
- * Shows subscription status (ACTIVE=green, PAUSED=yellow) and empty state.
- *
- * @see features/subscriptions/frontend-spec.md Section 2 (Navigation Structure)
+ * Shows provider cards (YouTube, Spotify) that users can tap to manage
+ * their subscriptions for each provider.
  */
 
 import { useRouter, type Href } from 'expo-router';
-import { useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Surface } from 'heroui-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 
-import { Colors, Spacing, Radius, Typography, ProviderColors } from '@/constants/theme';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
-import type { Subscription } from '@/hooks/use-subscriptions-query';
+
+// ============================================================================
+// Icons
+// ============================================================================
+
+function YouTubeIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </Svg>
+  );
+}
+
+function SpotifyIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+    </Svg>
+  );
+}
+
+function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
 // ============================================================================
 // Types
 // ============================================================================
 
-interface ProviderButtonProps {
+interface ProviderCardProps {
   provider: 'YOUTUBE' | 'SPOTIFY';
   isConnected: boolean;
+  subscriptionCount: number;
   onPress: () => void;
-  colors: typeof Colors.light;
-}
-
-interface SubscriptionCardProps {
-  subscription: Subscription;
-  colors: typeof Colors.light;
-  onPress: () => void;
-}
-
-interface EmptyStateProps {
-  colors: typeof Colors.light;
-  hasConnections: boolean;
-  onConnectYouTube: () => void;
-  onConnectSpotify: () => void;
+  colors: typeof Colors.dark;
 }
 
 // ============================================================================
 // Components
 // ============================================================================
 
-/**
- * Provider connection/add subscription button
- */
-function ProviderButton({ provider, isConnected, onPress, colors }: ProviderButtonProps) {
-  const providerConfig = {
+function ProviderCard({
+  provider,
+  isConnected,
+  subscriptionCount,
+  onPress,
+  colors,
+}: ProviderCardProps) {
+  const config = {
     YOUTUBE: {
-      icon: '🎬',
       name: 'YouTube',
-      color: ProviderColors.youtube,
-      description: isConnected ? 'Add YouTube subscriptions' : 'Connect YouTube first',
+      icon: YouTubeIcon,
+      brandColor: '#FF0000',
     },
     SPOTIFY: {
-      icon: '🎧',
       name: 'Spotify',
-      color: ProviderColors.spotify,
-      description: isConnected ? 'Add Spotify podcasts' : 'Connect Spotify first',
+      icon: SpotifyIcon,
+      brandColor: '#1DB954',
     },
-  };
+  }[provider];
 
-  const config = providerConfig[provider];
+  const Icon = config.icon;
 
   return (
     <Pressable
-      style={[
-        styles.providerButton,
-        {
-          backgroundColor: colors.card,
-          borderColor: isConnected ? config.color : colors.border,
-          opacity: isConnected ? 1 : 0.6,
-        },
-      ]}
       onPress={onPress}
-      disabled={!isConnected}
+      style={({ pressed }) => [styles.providerCard, pressed && { opacity: 0.8 }]}
     >
-      <Text style={styles.providerIcon}>{config.icon}</Text>
-      <View style={styles.providerTextContainer}>
+      <View style={[styles.providerIconContainer, { backgroundColor: config.brandColor }]}>
+        <Icon size={24} color="#FFFFFF" />
+      </View>
+      <View style={styles.providerContent}>
         <Text style={[styles.providerName, { color: colors.text }]}>{config.name}</Text>
-        <Text style={[styles.providerDescription, { color: colors.textSecondary }]}>
-          {config.description}
-        </Text>
+        <View style={styles.providerStatusRow}>
+          {isConnected ? (
+            <>
+              <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+              <Text style={[styles.providerStatus, { color: colors.textSecondary }]}>
+                Connected
+              </Text>
+              {subscriptionCount > 0 && (
+                <Text style={[styles.providerCount, { color: colors.textTertiary }]}>
+                  {' '}
+                  · {subscriptionCount} subscription{subscriptionCount !== 1 ? 's' : ''}
+                </Text>
+              )}
+            </>
+          ) : (
+            <>
+              <View style={[styles.statusDot, { backgroundColor: colors.textTertiary }]} />
+              <Text style={[styles.providerStatus, { color: colors.textTertiary }]}>
+                Not connected
+              </Text>
+            </>
+          )}
+        </View>
       </View>
-      <Text
-        style={[styles.providerArrow, { color: isConnected ? config.color : colors.textTertiary }]}
-      >
-        {isConnected ? '+' : '→'}
-      </Text>
+      <ChevronRightIcon size={20} color={colors.textTertiary} />
     </Pressable>
   );
 }
 
-/**
- * Subscription card for FlatList item
- */
-function SubscriptionCard({ subscription, colors, onPress }: SubscriptionCardProps) {
-  const providerIcon = subscription.provider === 'YOUTUBE' ? '📺' : '🎧';
-  const statusColor =
-    subscription.status === 'ACTIVE'
-      ? colors.success
-      : subscription.status === 'PAUSED'
-        ? colors.warning
-        : colors.textTertiary;
-
-  return (
-    <Pressable
-      style={[styles.subscriptionCard, { backgroundColor: colors.card }]}
-      onPress={onPress}
-    >
-      {subscription.imageUrl ? (
-        <Image source={{ uri: subscription.imageUrl }} style={styles.subscriptionImage} />
-      ) : (
-        <View
-          style={[
-            styles.subscriptionImagePlaceholder,
-            { backgroundColor: colors.backgroundSecondary },
-          ]}
-        >
-          <Text style={styles.subscriptionImagePlaceholderText}>{providerIcon}</Text>
-        </View>
-      )}
-      <View style={styles.subscriptionContent}>
-        <Text style={[styles.subscriptionName, { color: colors.text }]} numberOfLines={1}>
-          {subscription.name}
-        </Text>
-        <View style={styles.subscriptionMeta}>
-          <Text style={styles.subscriptionProvider}>{providerIcon}</Text>
-          <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-          <Text style={[styles.subscriptionStatus, { color: statusColor }]}>
-            {subscription.status}
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.subscriptionArrow, { color: colors.textTertiary }]}>›</Text>
-    </Pressable>
-  );
-}
-
-/**
- * Empty state when no subscriptions exist
- */
-function EmptyState({
-  colors,
-  hasConnections,
-  onConnectYouTube,
-  onConnectSpotify,
-}: EmptyStateProps) {
-  return (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyEmoji}>📭</Text>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>No subscriptions yet</Text>
-      <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
-        {hasConnections
-          ? 'Add your favorite YouTube channels and Spotify podcasts to get started.'
-          : 'Connect your YouTube or Spotify account to start adding subscriptions.'}
-      </Text>
-      {!hasConnections && (
-        <View style={styles.emptyActions}>
-          <Pressable
-            style={[styles.emptyActionButton, { backgroundColor: ProviderColors.youtube }]}
-            onPress={onConnectYouTube}
-          >
-            <Text style={styles.emptyActionText}>Connect YouTube</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.emptyActionButton, { backgroundColor: ProviderColors.spotify }]}
-            onPress={onConnectSpotify}
-          >
-            <Text style={styles.emptyActionText}>Connect Spotify</Text>
-          </Pressable>
-        </View>
-      )}
-    </View>
-  );
-}
-
-/**
- * Loading state component
- */
-function LoadingState({ colors }: { colors: typeof Colors.light }) {
+function LoadingState({ colors }: { colors: typeof Colors.dark }) {
   return (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-        Loading subscriptions...
-      </Text>
-    </View>
-  );
-}
-
-// ErrorState component intentionally kept for future use when error handling is needed
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _ErrorState({ colors, message }: { colors: typeof Colors.light; message: string }) {
-  return (
-    <View style={styles.errorContainer}>
-      <Text style={styles.errorEmoji}>⚠️</Text>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Something went wrong</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
     </View>
   );
 }
@@ -221,146 +136,63 @@ function _ErrorState({ colors, message }: { colors: typeof Colors.light; message
 export default function SubscriptionsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'dark'];
 
-  // Fetch connections and subscriptions
   const { data: connections, isLoading: connectionsLoading } = useConnections();
-  const { subscriptions, isLoading: subscriptionsLoading, refetch } = useSubscriptions();
+  const { subscriptions, isLoading: subscriptionsLoading } = useSubscriptions();
 
   const isLoading = connectionsLoading || subscriptionsLoading;
 
-  // Check if providers are connected
-  const youtubeConnection = connections?.find(
-    (c: { provider: string }) => c.provider === 'YOUTUBE'
-  );
-  const spotifyConnection = connections?.find(
-    (c: { provider: string }) => c.provider === 'SPOTIFY'
-  );
+  // Check connection status
+  const youtubeConnection = connections?.find((c) => c.provider === 'YOUTUBE');
+  const spotifyConnection = connections?.find((c) => c.provider === 'SPOTIFY');
   const isYouTubeConnected = youtubeConnection?.status === 'ACTIVE';
   const isSpotifyConnected = spotifyConnection?.status === 'ACTIVE';
-  const hasAnyConnection = isYouTubeConnected || isSpotifyConnected;
 
-  // Navigation handlers
-  const handleConnectYouTube = useCallback(() => {
-    router.push('/subscriptions/connect/youtube' as Href);
-  }, [router]);
+  // Count subscriptions per provider
+  const youtubeCount = subscriptions.filter((s) => s.provider === 'YOUTUBE').length;
+  const spotifyCount = subscriptions.filter((s) => s.provider === 'SPOTIFY').length;
 
-  const handleConnectSpotify = useCallback(() => {
-    router.push('/subscriptions/connect/spotify' as Href);
-  }, [router]);
+  const handleProviderPress = (provider: 'YOUTUBE' | 'SPOTIFY') => {
+    router.push(`/subscriptions/${provider.toLowerCase()}` as Href);
+  };
 
-  const handleAddYouTube = useCallback(() => {
-    router.push('/subscriptions/discover/YOUTUBE' as Href);
-  }, [router]);
-
-  const handleAddSpotify = useCallback(() => {
-    router.push('/subscriptions/discover/SPOTIFY' as Href);
-  }, [router]);
-
-  const handleSubscriptionPress = useCallback(
-    (subscription: Subscription) => {
-      router.push(`/subscriptions/${subscription.id}` as Href);
-    },
-    [router]
-  );
-
-  // Render subscription item
-  const renderSubscription = useCallback(
-    ({ item }: { item: Subscription }) => (
-      <SubscriptionCard
-        subscription={item}
-        colors={colors}
-        onPress={() => handleSubscriptionPress(item)}
-      />
-    ),
-    [colors, handleSubscriptionPress]
-  );
-
-  // Key extractor
-  const keyExtractor = useCallback((item: Subscription) => item.id, []);
-
-  // List header with add subscription buttons
-  const ListHeader = useCallback(
-    () => (
-      <View style={styles.headerSection}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ADD SUBSCRIPTION</Text>
-        <View style={styles.providerButtons}>
-          <ProviderButton
-            provider="YOUTUBE"
-            isConnected={isYouTubeConnected}
-            onPress={isYouTubeConnected ? handleAddYouTube : handleConnectYouTube}
-            colors={colors}
-          />
-          <ProviderButton
-            provider="SPOTIFY"
-            isConnected={isSpotifyConnected}
-            onPress={isSpotifyConnected ? handleAddSpotify : handleConnectSpotify}
-            colors={colors}
-          />
-        </View>
-        {subscriptions.length > 0 && (
-          <Text
-            style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: Spacing.xl }]}
-          >
-            YOUR SUBSCRIPTIONS ({subscriptions.length})
-          </Text>
-        )}
-      </View>
-    ),
-    [
-      colors,
-      isYouTubeConnected,
-      isSpotifyConnected,
-      handleAddYouTube,
-      handleAddSpotify,
-      handleConnectYouTube,
-      handleConnectSpotify,
-      subscriptions.length,
-    ]
-  );
-
-  // List empty component
-  const ListEmpty = useCallback(
-    () => (
-      <EmptyState
-        colors={colors}
-        hasConnections={hasAnyConnection}
-        onConnectYouTube={handleConnectYouTube}
-        onConnectSpotify={handleConnectSpotify}
-      />
-    ),
-    [colors, hasAnyConnection, handleConnectYouTube, handleConnectSpotify]
-  );
-
-  // Render content based on state
   if (isLoading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        edges={['bottom']}
-      >
+      <Surface style={[styles.container, { backgroundColor: colors.background }]}>
         <LoadingState colors={colors} />
-      </SafeAreaView>
+      </Surface>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['bottom']}
-    >
-      <FlatList
-        data={subscriptions}
-        renderItem={renderSubscription}
-        keyExtractor={keyExtractor}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
-        contentContainerStyle={styles.listContent}
+    <Surface style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
-        onRefresh={refetch}
-        refreshing={false}
-      />
-    </SafeAreaView>
+      >
+        <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+          <ProviderCard
+            provider="YOUTUBE"
+            isConnected={isYouTubeConnected}
+            subscriptionCount={youtubeCount}
+            onPress={() => handleProviderPress('YOUTUBE')}
+            colors={colors}
+          />
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+          <ProviderCard
+            provider="SPOTIFY"
+            isConnected={isSpotifyConnected}
+            subscriptionCount={spotifyCount}
+            onPress={() => handleProviderPress('SPOTIFY')}
+            colors={colors}
+          />
+        </Animated.View>
+      </ScrollView>
+    </Surface>
   );
 }
 
@@ -372,171 +204,49 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  listContent: {
+  content: {
     padding: Spacing.lg,
-    paddingBottom: Spacing['3xl'],
+    gap: Spacing.md,
   },
-
-  // Header Section
-  headerSection: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    ...Typography.labelSmall,
-    marginBottom: Spacing.sm,
-    marginLeft: Spacing.xs,
-  },
-
-  // Provider Buttons
-  providerButtons: {
-    gap: Spacing.sm,
-  },
-  providerButton: {
+  providerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
+    paddingVertical: Spacing.md,
   },
-  providerIcon: {
-    fontSize: 28,
+  providerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: Spacing.md,
   },
-  providerTextContainer: {
+  providerContent: {
     flex: 1,
   },
   providerName: {
     ...Typography.titleMedium,
+    marginBottom: Spacing.xs,
   },
-  providerDescription: {
-    ...Typography.bodySmall,
-    marginTop: 2,
-  },
-  providerArrow: {
-    fontSize: 24,
-    fontWeight: '300',
-  },
-
-  // Subscription Card
-  subscriptionCard: {
+  providerStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.md,
-    borderRadius: Radius.lg,
-    marginBottom: Spacing.sm,
-  },
-  subscriptionImage: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-  },
-  subscriptionImagePlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subscriptionImagePlaceholderText: {
-    fontSize: 24,
-  },
-  subscriptionContent: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  subscriptionName: {
-    ...Typography.titleMedium,
-    marginBottom: 4,
-  },
-  subscriptionMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  subscriptionProvider: {
-    fontSize: 14,
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: Spacing.sm,
   },
-  subscriptionStatus: {
-    ...Typography.labelMedium,
-    textTransform: 'capitalize',
+  providerStatus: {
+    ...Typography.bodySmall,
   },
-  subscriptionArrow: {
-    fontSize: 24,
-    marginLeft: Spacing.sm,
+  providerCount: {
+    ...Typography.bodySmall,
   },
-
-  // Empty State
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing['4xl'],
-    paddingHorizontal: Spacing.lg,
-  },
-  emptyEmoji: {
-    fontSize: 56,
-    marginBottom: Spacing.lg,
-  },
-  emptyTitle: {
-    ...Typography.titleLarge,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  emptyActions: {
-    marginTop: Spacing.xl,
-    gap: Spacing.sm,
-    width: '100%',
-    maxWidth: 280,
-  },
-  emptyActionButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing['2xl'],
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-  },
-  emptyActionText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-
-  // Loading State
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.md,
-  },
-  loadingText: {
-    ...Typography.bodyMedium,
-  },
-
-  // Error State
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing['2xl'],
-  },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: Spacing.md,
-  },
-  errorTitle: {
-    ...Typography.titleMedium,
-    marginBottom: Spacing.sm,
-  },
-  errorMessage: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
   },
 });

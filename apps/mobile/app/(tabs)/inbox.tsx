@@ -1,6 +1,7 @@
+import { useRouter, type Href } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -42,6 +43,23 @@ function InboxArrowIcon({ size = 64, color = '#6366F1' }: { size?: number; color
   );
 }
 
+function SubscriptionsIcon({ size = 24, color = '#6366F1' }: { size?: number; color?: string }) {
+  // RSS/subscriptions icon (signal waves with plus)
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M4 11a9 9 0 0 1 9 9" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M4 4a16 16 0 0 1 16 16" strokeLinecap="round" strokeLinejoin="round" />
+      <Path
+        d="M5 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+        fill={color}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path d="M18 8h4M20 6v4" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // =============================================================================
 // Custom Empty State for Inbox
 // =============================================================================
@@ -71,6 +89,7 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
 // =============================================================================
 
 export default function InboxScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
@@ -170,12 +189,22 @@ export default function InboxScreen() {
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            {inboxItems.length > 0
-              ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
-              : 'Decide what to keep'}
-          </Text>
+          <View style={styles.headerTextContainer}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+              {inboxItems.length > 0
+                ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
+                : 'Decide what to keep'}
+            </Text>
+          </View>
+          <Pressable
+            style={[styles.subscriptionsButton, { backgroundColor: colors.backgroundSecondary }]}
+            onPress={() => router.push('/subscriptions' as Href)}
+            accessibilityLabel="Manage subscriptions"
+            accessibilityRole="button"
+          >
+            <SubscriptionsIcon size={22} color={colors.primary} />
+          </Pressable>
         </View>
 
         {/* Content */}
@@ -215,9 +244,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
     ...Typography.displayMedium,
@@ -225,6 +260,14 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     ...Typography.bodyMedium,
+  },
+  subscriptionsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Spacing.md,
   },
   // List
   listContent: {

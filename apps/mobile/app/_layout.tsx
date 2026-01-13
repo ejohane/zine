@@ -29,7 +29,12 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                   <Stack.Screen name="settings" options={{ headerShown: false }} />
-                  <Stack.Screen name="subscriptions" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="subscriptions"
+                    options={{
+                      headerShown: false,
+                    }}
+                  />
                   <Stack.Screen name="onboarding" options={{ headerShown: false }} />
                   <Stack.Screen
                     name="item/[id]"
