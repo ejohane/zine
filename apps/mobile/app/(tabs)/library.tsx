@@ -87,7 +87,12 @@ function FilterChip({ label, isSelected, onPress, color, colors }: FilterChipPro
       ]}
     >
       {color && !isSelected && <View style={[styles.filterDot, { backgroundColor: color }]} />}
-      <Text style={[styles.filterChipText, { color: isSelected ? '#fff' : colors.text }]}>
+      <Text
+        style={[
+          styles.filterChipText,
+          { color: isSelected ? colors.buttonPrimaryText : colors.text },
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
