@@ -59,6 +59,7 @@ const SaveInputSchema = z.object({
   providerId: z.string().min(1, 'Provider ID is required'),
   title: z.string().min(1, 'Title is required'),
   creator: z.string().min(1, 'Creator is required'),
+  creatorImageUrl: z.string().url().nullable().optional(), // Channel/show/podcast image
   thumbnailUrl: z.string().url().nullable(),
   duration: z.number().int().min(0).nullable(),
   canonicalUrl: z.string().url('Invalid canonical URL'),
@@ -233,6 +234,7 @@ export const bookmarksRouter = router({
         title: input.title,
         thumbnailUrl: input.thumbnailUrl,
         creator: input.creator,
+        creatorImageUrl: input.creatorImageUrl ?? null,
         publisher: input.siteName ?? null,
         summary: input.description ?? null,
         duration: input.duration,

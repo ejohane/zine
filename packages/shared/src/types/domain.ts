@@ -102,6 +102,9 @@ export interface Item {
   /** Creator/author name (renamed from author to match D1 schema) */
   creator: string;
 
+  /** URL to creator/channel/podcast show image (distinct from episode thumbnail) */
+  creatorImageUrl?: string;
+
   /** Publisher/channel name */
   publisher?: string;
 

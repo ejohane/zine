@@ -61,6 +61,8 @@ export interface SpotifyEpisode {
   showName?: string;
   /** Show publisher - only available from full episode endpoint */
   showPublisher?: string;
+  /** Show image URL (podcast image) - only available from full episode endpoint */
+  showImageUrl?: string;
 }
 
 /**
@@ -449,6 +451,9 @@ function transformEpisode(episode: SimplifiedEpisode): SpotifyEpisode {
  * The full Episode type is returned from GET /episodes/{id}
  */
 function transformFullEpisode(episode: Episode): SpotifyEpisode {
+  // Get the show's image (prefer larger sizes)
+  const showImageUrl = episode.show?.images?.[0]?.url;
+
   return {
     id: episode.id,
     name: episode.name,
@@ -464,5 +469,6 @@ function transformFullEpisode(episode: Episode): SpotifyEpisode {
     isPlayable: episode.is_playable,
     showName: episode.show?.name,
     showPublisher: episode.show?.publisher,
+    showImageUrl,
   };
 }

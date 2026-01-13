@@ -388,11 +388,22 @@ export default function ItemDetailScreen() {
 
               {/* Source/Creator Row */}
               <Pressable style={styles.sourceRow}>
-                <Image
-                  source={{ uri: item.thumbnailUrl! }}
-                  style={styles.sourceThumbnail}
-                  contentFit="cover"
-                />
+                {item.creatorImageUrl ? (
+                  <Image
+                    source={{ uri: item.creatorImageUrl }}
+                    style={styles.sourceThumbnail}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.sourcePlaceholder,
+                      { backgroundColor: colors.backgroundTertiary },
+                    ]}
+                  >
+                    {getContentIcon(item.contentType, 14, colors.textTertiary)}
+                  </View>
+                )}
                 <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
               </Pressable>
@@ -505,11 +516,19 @@ export default function ItemDetailScreen() {
 
           {/* Source/Creator Row */}
           <Pressable style={styles.sourceRow}>
-            <View
-              style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-            >
-              {getContentIcon(item.contentType, 14, colors.textTertiary)}
-            </View>
+            {item.creatorImageUrl ? (
+              <Image
+                source={{ uri: item.creatorImageUrl }}
+                style={styles.sourceThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+              >
+                {getContentIcon(item.contentType, 14, colors.textTertiary)}
+              </View>
+            )}
             <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>

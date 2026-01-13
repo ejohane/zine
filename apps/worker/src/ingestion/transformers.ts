@@ -70,6 +70,7 @@ export interface NewItem {
   description?: string;
   creator: string;
   creatorId?: string;
+  creatorImageUrl?: string; // Channel/show/podcast image (distinct from episode thumbnail)
   imageUrl?: string;
   durationSeconds?: number;
   publishedAt: number; // Unix ms
@@ -130,10 +131,14 @@ interface YouTubePlaylistItem {
  * - thumbnails.high.url → imageUrl (falls back to default)
  *
  * @param playlistItem - Raw YouTube playlist item from API
+ * @param channelImageUrl - Optional channel avatar/image URL (from subscription context)
  * @returns NewItem ready for database insertion
  * @throws TransformError if videoId is missing
  */
-export function transformYouTubeVideo(playlistItem: YouTubePlaylistItem): NewItem {
+export function transformYouTubeVideo(
+  playlistItem: YouTubePlaylistItem,
+  channelImageUrl?: string
+): NewItem {
   const videoId = playlistItem.contentDetails?.videoId;
   if (!videoId) {
     throw new TransformError('YouTube video missing videoId');
@@ -152,6 +157,7 @@ export function transformYouTubeVideo(playlistItem: YouTubePlaylistItem): NewIte
     description: snippet.description ? decodeHtmlEntities(snippet.description) : undefined,
     creator: decodeHtmlEntities(snippet.channelTitle || 'Unknown'),
     creatorId: snippet.channelId,
+    creatorImageUrl: channelImageUrl,
     imageUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
     durationSeconds: playlistItem.durationSeconds,
     publishedAt: snippet.publishedAt ? new Date(snippet.publishedAt).getTime() : now,
@@ -188,15 +194,20 @@ interface SpotifyEpisode {
  * - duration_ms → durationSeconds (converted)
  * - images[0].url → imageUrl
  *
- * Note: The showName must be passed in since episodes don't include
- * the parent show name directly.
+ * Note: The showName and showImageUrl must be passed in since episodes don't include
+ * the parent show details directly.
  *
  * @param episode - Raw Spotify episode from API
  * @param showName - Name of the podcast show (from parent context)
+ * @param showImageUrl - Image URL of the podcast show (from parent context)
  * @returns NewItem ready for database insertion
  * @throws TransformError if episode id is missing
  */
-export function transformSpotifyEpisode(episode: SpotifyEpisode, showName: string): NewItem {
+export function transformSpotifyEpisode(
+  episode: SpotifyEpisode,
+  showName: string,
+  showImageUrl?: string
+): NewItem {
   if (!episode.id) {
     throw new TransformError('Spotify episode missing id');
   }
@@ -215,6 +226,7 @@ export function transformSpotifyEpisode(episode: SpotifyEpisode, showName: strin
     title: decodeHtmlEntities(episode.name),
     description: episode.description ? decodeHtmlEntities(episode.description) : undefined,
     creator: decodeHtmlEntities(showName),
+    creatorImageUrl: showImageUrl,
     imageUrl: episode.images?.[0]?.url,
     durationSeconds: Math.floor(episode.duration_ms / 1000),
     publishedAt,

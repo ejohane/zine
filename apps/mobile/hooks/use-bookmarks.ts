@@ -24,6 +24,7 @@ export interface LinkPreview {
   providerId: string;
   title: string;
   creator: string;
+  creatorImageUrl?: string;
   thumbnailUrl: string | null;
   duration: number | null;
   canonicalUrl: string;
@@ -58,6 +59,7 @@ export interface SaveBookmarkInput {
   providerId: string;
   title: string;
   creator: string;
+  creatorImageUrl?: string | null;
   thumbnailUrl: string | null;
   duration: number | null;
   canonicalUrl: string;
@@ -256,6 +258,7 @@ export function useSaveBookmark() {
       providerId: preview.providerId,
       title: preview.title,
       creator: preview.creator,
+      creatorImageUrl: preview.creatorImageUrl ?? null,
       thumbnailUrl: preview.thumbnailUrl,
       duration: preview.duration,
       canonicalUrl: preview.canonicalUrl,
@@ -292,6 +295,7 @@ export function useSaveBookmark() {
       providerId: preview.providerId,
       title: preview.title,
       creator: preview.creator,
+      creatorImageUrl: preview.creatorImageUrl ?? null,
       thumbnailUrl: preview.thumbnailUrl,
       duration: preview.duration,
       canonicalUrl: preview.canonicalUrl,

@@ -142,7 +142,7 @@ export async function pollSingleYouTubeSubscription(
   });
 
   // Ingest new items
-  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, db);
+  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, sub.imageUrl, db);
 
   // Calculate newest published timestamp from all videos
   const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
@@ -245,6 +245,7 @@ async function ingestNewVideos(
   videos: EnrichedVideo[],
   userId: string,
   subscriptionId: string,
+  channelImageUrl: string | null,
   db: DrizzleDB
 ): Promise<number> {
   let newItemsCount = 0;
@@ -258,9 +259,11 @@ async function ingestNewVideos(
         video as youtube_v3.Schema$PlaylistItem,
         Provider.YOUTUBE,
         db as unknown as DrizzleD1Database,
-        transformYouTubeVideo as (
-          raw: youtube_v3.Schema$PlaylistItem
-        ) => ReturnType<typeof transformYouTubeVideo>
+        (raw: youtube_v3.Schema$PlaylistItem) =>
+          transformYouTubeVideo(
+            raw as Parameters<typeof transformYouTubeVideo>[0],
+            channelImageUrl ?? undefined
+          )
       );
       if (result.created) {
         newItemsCount++;
@@ -514,7 +517,7 @@ async function processSubscriptionVideos(
   });
 
   // Ingest new items
-  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, db);
+  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, sub.imageUrl, db);
 
   // Calculate newest published timestamp
   const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);

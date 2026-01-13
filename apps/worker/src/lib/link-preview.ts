@@ -53,6 +53,8 @@ export interface LinkPreviewResult {
   title: string;
   /** Creator/author name */
   creator: string;
+  /** URL to creator/channel/podcast image (distinct from episode thumbnail) */
+  creatorImageUrl?: string;
   /** URL to thumbnail image */
   thumbnailUrl: string | null;
   /** Duration in seconds (for video/podcast content) */
@@ -243,7 +245,7 @@ async function fetchSpotifyViaAPI(
  * Transform Spotify episode to LinkPreviewResult
  */
 function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string): LinkPreviewResult {
-  // Get the best available thumbnail
+  // Get the best available thumbnail (episode image)
   const thumbnail = episode.images[0]?.url ?? null;
 
   return {
@@ -252,6 +254,7 @@ function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string):
     providerId: episode.id,
     title: episode.name,
     creator: episode.showName ?? 'Unknown',
+    creatorImageUrl: episode.showImageUrl,
     thumbnailUrl: thumbnail,
     duration: Math.round(episode.durationMs / 1000), // Convert ms to seconds
     canonicalUrl,

@@ -34,6 +34,7 @@ export const items = sqliteTable(
 
     // Attribution
     creator: text('creator').notNull(), // Channel/author/podcast name
+    creatorImageUrl: text('creator_image_url'), // Channel/show/podcast image (distinct from episode thumbnail)
     publisher: text('publisher'), // Optional: network
 
     // Metadata
