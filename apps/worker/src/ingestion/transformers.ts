@@ -13,6 +13,46 @@ import { ulid } from 'ulid';
 import { parseSpotifyDate } from '../lib/timestamps';
 
 // ============================================================================
+// HTML Entity Decoding
+// ============================================================================
+
+/**
+ * Common HTML entity mappings for decoding API responses.
+ * Spotify and YouTube APIs often return HTML-encoded strings.
+ */
+const HTML_ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&apos;': "'",
+  '&#39;': "'",
+  '&#x27;': "'",
+  '&#x2F;': '/',
+  '&#47;': '/',
+};
+
+/**
+ * Decode HTML entities in a string.
+ * Handles both named entities (&amp;) and numeric entities (&#x27;, &#39;).
+ */
+function decodeHtmlEntities(text: string): string {
+  // First, replace known named/numeric entities
+  let decoded = text;
+  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
+    decoded = decoded.split(entity).join(char);
+  }
+
+  // Handle remaining numeric entities (&#xHH; and &#DDD;)
+  decoded = decoded.replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+  decoded = decoded.replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+
+  return decoded;
+}
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -108,9 +148,9 @@ export function transformYouTubeVideo(playlistItem: YouTubePlaylistItem): NewIte
     provider: Provider.YOUTUBE,
     providerId: videoId,
     canonicalUrl: `https://www.youtube.com/watch?v=${videoId}`,
-    title: snippet.title || 'Untitled',
-    description: snippet.description,
-    creator: snippet.channelTitle || 'Unknown',
+    title: decodeHtmlEntities(snippet.title || 'Untitled'),
+    description: snippet.description ? decodeHtmlEntities(snippet.description) : undefined,
+    creator: decodeHtmlEntities(snippet.channelTitle || 'Unknown'),
     creatorId: snippet.channelId,
     imageUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url,
     durationSeconds: playlistItem.durationSeconds,
@@ -172,9 +212,9 @@ export function transformSpotifyEpisode(episode: SpotifyEpisode, showName: strin
     provider: Provider.SPOTIFY,
     providerId: episode.id,
     canonicalUrl: episode.external_urls.spotify,
-    title: episode.name,
-    description: episode.description,
-    creator: showName,
+    title: decodeHtmlEntities(episode.name),
+    description: episode.description ? decodeHtmlEntities(episode.description) : undefined,
+    creator: decodeHtmlEntities(showName),
     imageUrl: episode.images?.[0]?.url,
     durationSeconds: Math.floor(episode.duration_ms / 1000),
     publishedAt,
