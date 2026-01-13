@@ -1,44 +1,72 @@
 /**
  * Subscriptions Layout
  *
- * Stack navigator configuration for the subscriptions route group.
- * Handles subscription management, provider connections, and discovery screens.
- *
- * @see features/subscriptions/frontend-spec.md Section 2 (Navigation Structure)
+ * Uses a nested Stack to enable proper back navigation between
+ * the subscriptions list and provider detail pages.
  */
 
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { Pressable } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export default function SubscriptionsLayout() {
+function BackButton() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme ?? 'dark'];
 
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.background,
-        },
-        headerTintColor: colors.text,
-        headerTitleStyle: {
-          fontWeight: '600',
-        },
-        headerBackTitle: '',
-      }}
+    <Pressable
+      onPress={() => router.back()}
+      hitSlop={8}
+      style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
     >
+      <Svg
+        width={24}
+        height={24}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke={colors.primary}
+        strokeWidth={2.5}
+      >
+        <Path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    </Pressable>
+  );
+}
+
+export default function SubscriptionsLayout() {
+  return (
+    <Stack>
       <Stack.Screen
         name="index"
         options={{
           title: 'Subscriptions',
+          headerLargeTitle: true,
+          headerLargeTitleShadowVisible: false,
+          headerLeft: () => <BackButton />,
+        }}
+      />
+      <Stack.Screen
+        name="[provider]"
+        options={{
+          headerBackButtonDisplayMode: 'minimal',
+          headerLargeTitle: true,
+          headerLargeTitleShadowVisible: false,
+        }}
+      />
+      <Stack.Screen
+        name="connect"
+        options={{
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="discover"
         options={{
-          headerShown: false, // Discover has its own layout
+          headerShown: false,
         }}
       />
     </Stack>
