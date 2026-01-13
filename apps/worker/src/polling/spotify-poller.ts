@@ -202,7 +202,14 @@ export async function pollSpotifySubscriptionsBatched(
       });
 
       // Ingest new items
-      const newItemsCount = await ingestNewEpisodes(newEpisodes, userId, sub.id, sub.name, db);
+      const newItemsCount = await ingestNewEpisodes(
+        newEpisodes,
+        userId,
+        sub.id,
+        sub.name,
+        sub.imageUrl,
+        db
+      );
       totalNewItems += newItemsCount;
 
       // Calculate newest published timestamp from all episodes
@@ -319,7 +326,14 @@ export async function pollSingleSpotifySubscription(
   }
 
   // Ingest new items
-  const newItemsCount = await ingestNewEpisodes(newEpisodes, userId, sub.id, sub.name, db);
+  const newItemsCount = await ingestNewEpisodes(
+    newEpisodes,
+    userId,
+    sub.id,
+    sub.name,
+    sub.imageUrl,
+    db
+  );
 
   // Calculate newest published timestamp from all episodes
   const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
@@ -388,6 +402,7 @@ async function ingestNewEpisodes(
   userId: string,
   subscriptionId: string,
   showName: string,
+  showImageUrl: string | null,
   db: DrizzleDB
 ): Promise<number> {
   let newItemsCount = 0;
@@ -412,7 +427,8 @@ async function ingestNewEpisodes(
         rawEpisode,
         Provider.SPOTIFY,
         db as unknown as DrizzleD1Database,
-        (raw: typeof rawEpisode) => transformSpotifyEpisode(raw, showName)
+        (raw: typeof rawEpisode) =>
+          transformSpotifyEpisode(raw, showName, showImageUrl ?? undefined)
       );
       if (result.created) {
         newItemsCount++;

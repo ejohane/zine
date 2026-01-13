@@ -232,6 +232,7 @@ async function findOrCreateCanonicalItem(
     title: newItem.title,
     summary: newItem.description,
     creator: newItem.creator,
+    creatorImageUrl: newItem.creatorImageUrl,
     thumbnailUrl: newItem.imageUrl,
     duration: newItem.durationSeconds,
     publishedAt: publishedAtISO,

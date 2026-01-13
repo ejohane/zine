@@ -21,18 +21,17 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Colors, Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { formatDuration, formatRelativeTime } from '@/lib/format';
+import { formatDuration } from '@/lib/format';
 import {
   getContentIcon,
   getProviderColor,
   getProviderLabel,
   getContentAspectRatio,
-  isSquareContent,
   mapContentType,
   type ContentType,
   type Provider,
 } from '@/lib/content-utils';
-import { ArchiveIcon, BookmarkIcon, CheckIcon } from '@/components/icons';
+import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
 
 // ============================================================================
 // Types
@@ -118,7 +117,6 @@ export function ItemCard({
   const providerLabel = getProviderLabel(item.provider);
 
   // Calculate aspect ratio based on content type
-  const isSquare = isSquareContent(item.contentType);
   const aspectRatio = getContentAspectRatio(item.contentType);
 
   // Reading time for articles (only show when no duration - duration takes precedence for video/podcast)
@@ -144,84 +142,53 @@ export function ItemCard({
 
   // Format metadata
   const durationText = formatDuration(item.duration);
-  const timeText = formatRelativeTime(item.bookmarkedAt ?? item.publishedAt);
 
   // Render based on variant
   if (variant === 'compact') {
+    // Build metadata parts
+    const contentTypeLabel = contentType.charAt(0).toUpperCase() + contentType.slice(1);
+    const metaParts = [item.creator, contentTypeLabel];
+    if (durationText) {
+      metaParts.push(durationText);
+    } else if (readingTimeText) {
+      metaParts.push(readingTimeText);
+    }
+
     return (
-      <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+      <Animated.View entering={FadeInDown.delay(index * 30).duration(200)}>
         <Pressable
           onPress={handlePress}
-          style={({ pressed }) => [
-            styles.compactCard,
-            { backgroundColor: colors.card, borderColor: colors.borderLight },
-            pressed && { opacity: 0.95 },
-          ]}
+          style={({ pressed }) => [styles.compactRow, pressed && { opacity: 0.7 }]}
         >
           {/* Thumbnail */}
-          <View style={[styles.compactThumbnail, { aspectRatio: isSquare ? 1 : 16 / 9 }]}>
+          <View style={styles.compactThumbnailContainer}>
             {item.thumbnailUrl ? (
               <Image
                 source={{ uri: item.thumbnailUrl }}
-                style={styles.thumbnailImage}
+                style={styles.compactThumbnailImage}
                 contentFit="cover"
                 transition={200}
               />
             ) : (
-              <View style={[styles.thumbnailImage, { backgroundColor: colors.backgroundTertiary }]}>
-                {getContentIcon(item.contentType, 24, colors.textTertiary)}
-              </View>
-            )}
-            {/* Type indicator */}
-            <View style={[styles.typeIndicator, { backgroundColor: contentColor }]}>
-              {getContentIcon(item.contentType, 12, '#fff')}
-            </View>
-            {/* Duration badge */}
-            {durationText && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{durationText}</Text>
-              </View>
-            )}
-            {/* Reading time badge (for articles without duration) */}
-            {readingTimeText && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{readingTimeText}</Text>
-              </View>
-            )}
-            {/* Completed badge */}
-            {item.isFinished && (
-              <View style={[styles.completedBadge, { backgroundColor: colors.success }]}>
-                <CheckIcon size={12} color="#fff" />
+              <View
+                style={[
+                  styles.compactThumbnailImage,
+                  { backgroundColor: colors.backgroundTertiary },
+                ]}
+              >
+                {getContentIcon(item.contentType, 20, colors.textTertiary)}
               </View>
             )}
           </View>
 
           {/* Content */}
           <View style={styles.compactContent}>
-            <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={2}>
+            <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title}
             </Text>
-            <View style={styles.compactMeta}>
-              <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
-              <Text
-                style={[styles.compactSource, { color: colors.textSecondary }]}
-                numberOfLines={1}
-              >
-                {item.creator}
-              </Text>
-              {providerLabel && (
-                <Text style={[styles.compactTime, { color: colors.textTertiary }]}>
-                  {' '}
-                  on {providerLabel}
-                </Text>
-              )}
-              {timeText && (
-                <Text style={[styles.compactTime, { color: colors.textTertiary }]}>
-                  {' '}
-                  · {timeText}
-                </Text>
-              )}
-            </View>
+            <Text style={[styles.compactMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+              {metaParts.join(' · ')}
+            </Text>
           </View>
         </Pressable>
       </Animated.View>
@@ -413,38 +380,35 @@ export function ItemCard({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  // Compact variant (library)
-  compactCard: {
+  // Compact variant (library) - simple list row
+  compactRow: {
     flexDirection: 'row',
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    ...Shadows.sm,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
-  compactThumbnail: {
-    width: 100,
-    position: 'relative',
+  compactThumbnailContainer: {
+    width: 48,
+    height: 48,
+    marginRight: Spacing.md,
+  },
+  compactThumbnailImage: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   compactContent: {
     flex: 1,
-    padding: Spacing.md,
     justifyContent: 'center',
   },
   compactTitle: {
-    ...Typography.titleSmall,
-    marginBottom: Spacing.xs,
+    ...Typography.bodyMedium,
+    fontWeight: '500',
+    marginBottom: 2,
   },
   compactMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  compactSource: {
-    ...Typography.bodySmall,
-    flex: 1,
-  },
-  compactTime: {
     ...Typography.bodySmall,
   },
 

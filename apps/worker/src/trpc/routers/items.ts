@@ -1,7 +1,7 @@
 // apps/worker/src/trpc/routers/items.ts
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import { eq, and, desc, or, lt, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, or, lt, isNotNull, sql } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
@@ -38,6 +38,7 @@ export type ItemView = {
 
   // Attribution
   creator: string;
+  creatorImageUrl: string | null;
   publisher: string | null;
 
   // Metadata
@@ -89,6 +90,7 @@ function toItemView(row: {
     contentType: item.contentType as ContentType,
     provider: item.provider as Provider,
     creator: item.creator,
+    creatorImageUrl: item.creatorImageUrl,
     publisher: item.publisher,
     summary: item.summary,
     duration: item.duration,
@@ -153,12 +155,15 @@ export const itemsRouter = router({
       eq(userItems.isFinished, false),
     ];
 
+    // Use COALESCE to handle NULL publishedAt - falls back to ingestedAt
+    const sortField = sql`COALESCE(${items.publishedAt}, ${userItems.ingestedAt})`;
+
     // Apply cursor-based pagination (fetch items published before cursor)
     if (cursor) {
       conditions.push(
         or(
-          lt(items.publishedAt, cursor.sortValue),
-          and(eq(items.publishedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+          sql`${sortField} < ${cursor.sortValue}`,
+          and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
         )!
       );
     }
@@ -177,7 +182,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .where(and(...conditions))
-      .orderBy(desc(items.publishedAt), desc(userItems.id))
+      .orderBy(sql`${sortField} DESC`, desc(userItems.id))
       .limit(limit + 1); // Fetch one extra to check for more
 
     // Check if there are more results
@@ -224,12 +229,15 @@ export const itemsRouter = router({
     const showFinished = input?.filter?.isFinished ?? false;
     conditions.push(eq(userItems.isFinished, showFinished));
 
+    // Use COALESCE to handle NULL bookmarkedAt - falls back to ingestedAt
+    const librarySortField = sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;
+
     // Apply cursor-based pagination (fetch items bookmarked before cursor)
     if (cursor) {
       conditions.push(
         or(
-          lt(userItems.bookmarkedAt, cursor.sortValue),
-          and(eq(userItems.bookmarkedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+          sql`${librarySortField} < ${cursor.sortValue}`,
+          and(sql`${librarySortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
         )!
       );
     }
@@ -248,7 +256,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .where(and(...conditions))
-      .orderBy(desc(userItems.bookmarkedAt), desc(userItems.id))
+      .orderBy(sql`${librarySortField} DESC`, desc(userItems.id))
       .limit(limit + 1);
 
     // Check if there are more results
