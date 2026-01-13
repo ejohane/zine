@@ -57,6 +57,10 @@ export interface SpotifyEpisode {
   externalUrl: string;
   images: { url: string; height: number; width: number }[];
   isPlayable: boolean;
+  /** Show name (podcast name) - only available from full episode endpoint */
+  showName?: string;
+  /** Show publisher - only available from full episode endpoint */
+  showPublisher?: string;
 }
 
 /**
@@ -458,5 +462,7 @@ function transformFullEpisode(episode: Episode): SpotifyEpisode {
       width: img.width,
     })),
     isPlayable: episode.is_playable,
+    showName: episode.show?.name,
+    showPublisher: episode.show?.publisher,
   };
 }

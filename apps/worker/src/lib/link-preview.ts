@@ -251,12 +251,15 @@ function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string):
     contentType: ContentType.PODCAST,
     providerId: episode.id,
     title: episode.name,
-    creator: 'Spotify', // Episodes don't have direct author, show name would be better but requires extra fetch
+    creator: episode.showName ?? 'Unknown',
     thumbnailUrl: thumbnail,
     duration: Math.round(episode.durationMs / 1000), // Convert ms to seconds
     canonicalUrl,
     description: episode.description,
     source: 'provider_api',
+    siteName: episode.showPublisher,
+    publishedAt: episode.releaseDate,
+    rawMetadata: JSON.stringify(episode),
   };
 }
 
@@ -625,12 +628,53 @@ async function fetchSpotifyPreview(
     if (apiResult) return apiResult;
   }
 
+  // For episodes, prefer OpenGraph over oEmbed because OG has show name in description
+  // Format: "Show Name · Episode" in og:description
+  if (parsedLink.contentType === ContentType.PODCAST) {
+    const ogResult = await fetchSpotifyViaOpenGraph(parsedLink);
+    if (ogResult) return ogResult;
+  }
+
   // Fall back to oEmbed
   const oembedResult = await fetchSpotifyViaOEmbed(parsedLink);
   if (oembedResult) return oembedResult;
 
   // Fall back to Open Graph
   return fetchViaOpenGraph(parsedLink);
+}
+
+/**
+ * Fetch Spotify episode metadata via OpenGraph scraping
+ * Extracts show name from og:description format: "Show Name · Episode"
+ */
+async function fetchSpotifyViaOpenGraph(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
+  const ogData = await scrapeOpenGraph(parsedLink.canonicalUrl);
+
+  if (!ogData?.title) {
+    return null;
+  }
+
+  // Extract show name from description format: "Show Name · Episode"
+  let creator = 'Unknown';
+  if (ogData.description) {
+    const match = ogData.description.match(/^(.+?)\s*·\s*Episode$/);
+    if (match && match[1]) {
+      creator = match[1].trim();
+    }
+  }
+
+  return {
+    provider: parsedLink.provider,
+    contentType: parsedLink.contentType,
+    providerId: parsedLink.providerId,
+    title: ogData.title,
+    creator,
+    thumbnailUrl: ogData.image,
+    duration: null,
+    canonicalUrl: ogData.url ?? parsedLink.canonicalUrl,
+    description: ogData.description ?? undefined,
+    source: 'opengraph',
+  };
 }
 
 /**

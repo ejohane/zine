@@ -24,22 +24,22 @@ const semantic = {
   info: '#3B82F6',
 };
 
-// Content type colors (for visual categorization)
+// Content type colors (for visual categorization) - Monotone grayscale
 export const ContentColors = {
-  podcast: '#8B5CF6', // Purple
-  video: '#EF4444', // Red (YouTube-inspired)
-  article: '#3B82F6', // Blue
-  post: '#14B8A6', // Teal
+  podcast: '#3A3A3A',
+  video: '#1A1A1A',
+  article: '#5A5A5A',
+  post: '#4A4A4A',
 };
 
-// Provider colors
+// Provider colors - Monotone grayscale
 export const ProviderColors = {
-  youtube: '#FF0000',
-  spotify: '#1DB954',
-  substack: '#FF6719',
-  twitter: '#1DA1F2', // Keep for backward compatibility
-  x: '#1DA1F2', // X (same as twitter)
-  pocket: '#EF4154',
+  youtube: '#2A2A2A',
+  spotify: '#1A1A1A',
+  substack: '#3A3A3A',
+  twitter: '#2A2A2A',
+  x: '#2A2A2A',
+  pocket: '#4A4A4A',
 };
 
 export const Colors = {

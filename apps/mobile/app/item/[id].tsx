@@ -30,6 +30,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import ParallaxScrollView from '@/components/ParallaxScrollView';
 import {
   Colors,
   Typography,
@@ -41,7 +42,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useItem, useToggleFinished } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
-import { getContentIcon, getContentAspectRatio, getProviderLabel } from '@/lib/content-utils';
+import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
 
@@ -328,8 +329,6 @@ export default function ItemDetailScreen() {
     );
   }
 
-  // Calculate aspect ratio based on content type
-  const aspectRatio = getContentAspectRatio(item.contentType);
   const providerLabel = getProviderLabel(item.provider);
 
   // Get description label based on content type
@@ -348,35 +347,148 @@ export default function ItemDetailScreen() {
     }
   };
 
+  // Check if we have a thumbnail for parallax
+  const hasThumbnail = !!item.thumbnailUrl;
+
+  // Determine aspect ratio based on content type
+  // Videos use 16:9, podcasts/articles use square (1:1)
+  const headerAspectRatio = item.contentType === 'VIDEO' ? 16 / 9 : 1;
+
+  // Render with parallax for items with thumbnails
+  if (hasThumbnail) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: '', headerShown: false }} />
+
+        <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+          <ParallaxScrollView
+            headerImage={
+              <Image
+                source={{ uri: item.thumbnailUrl! }}
+                style={styles.parallaxCoverImage}
+                contentFit="cover"
+                transition={300}
+              />
+            }
+            headerAspectRatio={headerAspectRatio}
+          >
+            {/* Content */}
+            <Animated.View
+              entering={FadeInDown.delay(200).duration(400)}
+              style={styles.contentContainer}
+            >
+              {/* Badges Row */}
+              <View style={styles.badgeRow}>
+                <SourceBadge provider={item.provider} />
+                <TypeBadge contentType={item.contentType} />
+              </View>
+
+              {/* Title */}
+              <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+
+              {/* Source/Creator Row */}
+              <Pressable style={styles.sourceRow}>
+                <Image
+                  source={{ uri: item.thumbnailUrl! }}
+                  style={styles.sourceThumbnail}
+                  contentFit="cover"
+                />
+                <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+              </Pressable>
+
+              {/* Meta Row */}
+              <View style={styles.metaRow}>
+                {providerLabel && (
+                  <>
+                    <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                      {providerLabel}
+                    </Text>
+                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                  </>
+                )}
+                {item.publishedAt && (
+                  <>
+                    <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                      {formatRelativeTime(item.publishedAt)}
+                    </Text>
+                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                  </>
+                )}
+                {item.duration && (
+                  <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                    {formatDuration(item.duration)}
+                  </Text>
+                )}
+                {item.readingTimeMinutes && (
+                  <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+                    {item.readingTimeMinutes} min read
+                  </Text>
+                )}
+              </View>
+            </Animated.View>
+
+            {/* Icon Action Row */}
+            <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
+              <View style={styles.actionRowLeft}>
+                <IconActionButton
+                  icon="pricetag-outline"
+                  color={colors.textSecondary}
+                  onPress={handleToggleFinished}
+                />
+                <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
+                <IconActionButton
+                  icon="share-outline"
+                  color={colors.textSecondary}
+                  onPress={handleShare}
+                />
+                <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
+              </View>
+              <Pressable
+                onPress={handleOpenLink}
+                style={[styles.fabButton, { backgroundColor: colors.buttonPrimary }]}
+              >
+                <Ionicons name="open-outline" size={24} color={colors.buttonPrimaryText} />
+              </Pressable>
+            </Animated.View>
+
+            {/* Description */}
+            {item.summary && (
+              <Animated.View
+                entering={FadeInDown.delay(400).duration(400)}
+                style={styles.descriptionContainer}
+              >
+                <Text style={[styles.descriptionLabel, { color: colors.text }]}>
+                  {getDescriptionLabel()}
+                </Text>
+                <Text style={[styles.description, { color: colors.textSecondary }]}>
+                  {item.summary}
+                </Text>
+              </Animated.View>
+            )}
+          </ParallaxScrollView>
+        </Animated.View>
+
+        {/* Floating Back Button */}
+        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <Animated.View entering={FadeIn.duration(300)}>
+            <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
+
+  // Fallback for items without thumbnails - use regular ScrollView
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 56 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Cover Image */}
-        <Animated.View entering={FadeIn.duration(400)}>
-          <View style={[styles.coverContainer, { aspectRatio }]}>
-            {item.thumbnailUrl ? (
-              <Image
-                source={{ uri: item.thumbnailUrl }}
-                style={styles.coverImage}
-                contentFit="cover"
-                transition={300}
-              />
-            ) : (
-              <View
-                style={[styles.coverPlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-              >
-                {getContentIcon(item.contentType, 64, colors.textTertiary)}
-              </View>
-            )}
-          </View>
-        </Animated.View>
-
         {/* Content */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(400)}
@@ -393,13 +505,11 @@ export default function ItemDetailScreen() {
 
           {/* Source/Creator Row */}
           <Pressable style={styles.sourceRow}>
-            {item.thumbnailUrl && (
-              <Image
-                source={{ uri: item.thumbnailUrl }}
-                style={styles.sourceThumbnail}
-                contentFit="cover"
-              />
-            )}
+            <View
+              style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+            >
+              {getContentIcon(item.contentType, 14, colors.textTertiary)}
+            </View>
             <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
@@ -490,6 +600,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  animatedContainer: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
   },
@@ -501,6 +614,10 @@ const styles = StyleSheet.create({
   },
 
   // Cover Image
+  parallaxCoverImage: {
+    width: '100%',
+    height: '100%',
+  },
   coverContainer: {
     width: '100%',
     position: 'relative',
@@ -571,6 +688,14 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     marginRight: Spacing.sm,
   },
+  sourcePlaceholder: {
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    marginRight: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sourceName: {
     ...Typography.labelLarge,
     marginRight: Spacing.xs,
@@ -596,6 +721,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: Spacing.xl,
+    paddingHorizontal: Spacing.xl,
   },
   actionRowLeft: {
     flexDirection: 'row',
@@ -619,6 +745,7 @@ const styles = StyleSheet.create({
   // Description
   descriptionContainer: {
     marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
   },
   descriptionLabel: {
     ...Typography.titleLarge,
