@@ -691,7 +691,7 @@ describe('error handling', () => {
     });
   });
 
-  it('should include provider error details in REFRESH_FAILED', async () => {
+  it('should detect permanent errors (invalid_grant) and return REFRESH_FAILED_PERMANENT', async () => {
     const connection = createMockConnection({
       tokenExpiresAt: MOCK_NOW - 1000,
     });
@@ -708,7 +708,7 @@ describe('error handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(TokenRefreshError);
       const tokenError = error as TokenRefreshError;
-      expect(tokenError.code).toBe('REFRESH_FAILED');
+      expect(tokenError.code).toBe('REFRESH_FAILED_PERMANENT');
       expect(tokenError.details).toContain('invalid_grant');
     }
   });

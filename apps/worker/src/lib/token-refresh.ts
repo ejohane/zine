@@ -42,6 +42,7 @@ const LOCK_WAIT_MS = 2000;
 export type TokenRefreshErrorCode =
   | 'REFRESH_IN_PROGRESS' // Another worker is refreshing
   | 'REFRESH_FAILED' // Provider rejected refresh request
+  | 'REFRESH_FAILED_PERMANENT' // Provider permanently rejected refresh (token revoked/expired)
   | 'CONNECTION_NOT_FOUND' // Connection doesn't exist
   | 'INVALID_PROVIDER' // Unknown provider
   | 'DECRYPTION_FAILED'; // Failed to decrypt refresh token
@@ -187,6 +188,12 @@ async function refreshWithLock(
     await persistRefreshedTokens(connection.id, refreshed, env);
 
     return refreshed.accessToken;
+  } catch (error) {
+    // If refresh failed permanently (token revoked/expired), mark connection as EXPIRED
+    if (error instanceof TokenRefreshError && error.code === 'REFRESH_FAILED_PERMANENT') {
+      await persistConnectionExpired(connection.id, env);
+    }
+    throw error;
   } finally {
     // Always release the lock
     await releaseLock(env.OAUTH_STATE_KV, lockKey);
@@ -239,8 +246,13 @@ async function refreshProviderToken(
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    // Check for permanent errors that indicate the refresh token is invalid
+    // These errors mean the user needs to reconnect (re-authenticate)
+    const isPermanentError = isPermanentRefreshError(response.status, errorText);
+
     throw new TokenRefreshError(
-      'REFRESH_FAILED',
+      isPermanentError ? 'REFRESH_FAILED_PERMANENT' : 'REFRESH_FAILED',
       `Token refresh failed: ${response.status}`,
       errorText
     );
@@ -347,4 +359,57 @@ async function getConnectionById(
  */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Check if a refresh error is permanent (token revoked or expired)
+ *
+ * Permanent errors indicate the refresh token is no longer valid and
+ * the user must re-authenticate. These include:
+ * - invalid_grant: Token was revoked, expired, or malformed
+ * - unauthorized_client: App authorization was revoked
+ *
+ * @see https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
+ */
+function isPermanentRefreshError(status: number, errorBody: string): boolean {
+  // 400 or 401 with specific error codes indicate permanent failure
+  if (status !== 400 && status !== 401) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(errorBody);
+    const errorCode = parsed.error as string | undefined;
+
+    // OAuth 2.0 error codes that indicate permanent token invalidation
+    const permanentErrors = [
+      'invalid_grant', // Refresh token expired, revoked, or invalid
+      'unauthorized_client', // App authorization revoked by user
+      'invalid_client', // Client credentials are invalid (rare but permanent)
+    ];
+
+    return permanentErrors.includes(errorCode ?? '');
+  } catch {
+    // If we can't parse the error, check for error strings in the body
+    return (
+      errorBody.includes('invalid_grant') ||
+      errorBody.includes('unauthorized_client') ||
+      errorBody.includes('Token has been expired or revoked')
+    );
+  }
+}
+
+/**
+ * Mark a connection as EXPIRED in the database
+ *
+ * Called when a refresh token is permanently rejected by the provider,
+ * indicating the user needs to reconnect (re-authenticate).
+ */
+async function persistConnectionExpired(connectionId: string, env: TokenRefreshEnv): Promise<void> {
+  const db = drizzle(env.DB);
+
+  await db
+    .update(providerConnections)
+    .set({ status: 'EXPIRED' })
+    .where(eq(providerConnections.id, connectionId));
 }
