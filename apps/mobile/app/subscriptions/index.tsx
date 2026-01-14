@@ -15,6 +15,7 @@ import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
+import { getStatusDisplay, type ConnectionStatus } from '@/lib/connection-status';
 
 // ============================================================================
 // Icons
@@ -47,9 +48,6 @@ function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; col
 // ============================================================================
 // Types
 // ============================================================================
-
-/** Connection status from the API */
-type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED' | null;
 
 interface ProviderCardProps {
   provider: 'YOUTUBE' | 'SPOTIFY';
@@ -85,35 +83,8 @@ function ProviderCard({
 
   const Icon = config.icon;
 
-  // Determine display state based on connection status
-  const getStatusDisplay = () => {
-    switch (connectionStatus) {
-      case 'ACTIVE':
-        return {
-          dotColor: colors.success,
-          text: 'Connected',
-          textColor: colors.textSecondary,
-          showCount: true,
-        };
-      case 'EXPIRED':
-      case 'REVOKED':
-        return {
-          dotColor: colors.warning,
-          text: 'Reconnect required',
-          textColor: colors.warning,
-          showCount: false,
-        };
-      default:
-        return {
-          dotColor: colors.textTertiary,
-          text: 'Not connected',
-          textColor: colors.textTertiary,
-          showCount: false,
-        };
-    }
-  };
-
-  const statusDisplay = getStatusDisplay();
+  // Get display state based on connection status
+  const statusDisplay = getStatusDisplay(connectionStatus, colors);
 
   return (
     <Pressable
