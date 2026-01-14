@@ -51,3 +51,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# simulator screenshots and recordings (keep .gitkeep)
+/tmp/*
+!/tmp/.gitkeep
