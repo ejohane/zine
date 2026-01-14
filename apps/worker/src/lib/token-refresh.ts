@@ -371,7 +371,7 @@ function sleep(ms: number): Promise<void> {
  *
  * @see https://datatracker.ietf.org/doc/html/rfc6749#section-5.2
  */
-function isPermanentRefreshError(status: number, errorBody: string): boolean {
+export function isPermanentRefreshError(status: number, errorBody: string): boolean {
   // 400 or 401 with specific error codes indicate permanent failure
   if (status !== 400 && status !== 401) {
     return false;
@@ -405,7 +405,10 @@ function isPermanentRefreshError(status: number, errorBody: string): boolean {
  * Called when a refresh token is permanently rejected by the provider,
  * indicating the user needs to reconnect (re-authenticate).
  */
-async function persistConnectionExpired(connectionId: string, env: TokenRefreshEnv): Promise<void> {
+export async function persistConnectionExpired(
+  connectionId: string,
+  env: TokenRefreshEnv
+): Promise<void> {
   const db = drizzle(env.DB);
 
   await db
