@@ -1,3 +1,8 @@
+---
+name: sim-launch
+description: Launch the Zine mobile app in the iOS simulator. Use when starting the app or switching to a different app.
+---
+
 # Launch Zine App in Simulator
 
 Launch the Zine mobile app in the iOS simulator.
@@ -20,6 +25,6 @@ Launch the Zine mobile app in the iOS simulator.
 ## Example Usage
 
 ```
-/project:sim:launch
-/project:sim:launch com.other.app
+/sim-launch
+/sim-launch com.other.app
 ```

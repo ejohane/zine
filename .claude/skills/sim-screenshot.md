@@ -1,1 +1,0 @@
-../../apps/mobile/.claude/commands/sim/screenshot.md

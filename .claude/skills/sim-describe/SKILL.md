@@ -1,3 +1,8 @@
+---
+name: sim-describe
+description: Describe UI elements on the iOS simulator screen. Use when the user wants to see what's on screen or find a specific element.
+---
+
 # Describe iOS Simulator Screen
 
 Get a description of all UI elements currently visible on the iOS simulator screen.
@@ -18,6 +23,6 @@ Get a description of all UI elements currently visible on the iOS simulator scre
 ## Example Usage
 
 ```
-/project:sim:describe
-/project:sim:describe settings button
+/sim-describe
+/sim-describe settings button
 ```

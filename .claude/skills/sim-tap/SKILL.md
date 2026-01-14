@@ -1,3 +1,8 @@
+---
+name: sim-tap
+description: Tap at coordinates or on a named element in the iOS simulator. Use when the user wants to interact with the app.
+---
+
 # Tap on iOS Simulator
 
 Tap at specific coordinates or on a named element in the iOS simulator.
@@ -18,7 +23,7 @@ Tap at specific coordinates or on a named element in the iOS simulator.
 ## Example Usage
 
 ```
-/project:sim:tap 200 300
-/project:sim:tap Login button
-/project:sim:tap Settings tab
+/sim-tap 200 300
+/sim-tap Login button
+/sim-tap Settings tab
 ```

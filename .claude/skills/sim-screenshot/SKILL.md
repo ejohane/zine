@@ -1,3 +1,8 @@
+---
+name: sim-screenshot
+description: Take a screenshot of the iOS simulator and save it to apps/mobile/tmp/. Use when the user wants to capture the current screen.
+---
+
 # Take iOS Simulator Screenshot
 
 Take a screenshot of the currently booted iOS simulator and save it to `apps/mobile/tmp/`.
@@ -15,6 +20,6 @@ Take a screenshot of the currently booted iOS simulator and save it to `apps/mob
 ## Example Usage
 
 ```
-/project:sim:screenshot
-/project:sim:screenshot login-screen
+/sim-screenshot
+/sim-screenshot login-screen
 ```

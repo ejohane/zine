@@ -1,16 +1,21 @@
+---
+name: sim-help
+description: Display help for all available iOS simulator slash commands and MCP tools.
+---
+
 # iOS Simulator Commands Help
 
 Display help for all available iOS simulator slash commands.
 
 ## Available Commands
 
-| Command                                   | Description                | Example                         |
-| ----------------------------------------- | -------------------------- | ------------------------------- |
-| `/project:sim:screenshot [name]`          | Take a screenshot          | `/project:sim:screenshot login` |
-| `/project:sim:describe [element]`         | Describe screen elements   | `/project:sim:describe`         |
-| `/project:sim:tap <x> <y>` or `<element>` | Tap coordinates or element | `/project:sim:tap Login button` |
-| `/project:sim:launch [bundle-id]`         | Launch the Zine app        | `/project:sim:launch`           |
-| `/project:sim:help`                       | Show this help             | `/project:sim:help`             |
+| Command                           | Description                | Example                 |
+| --------------------------------- | -------------------------- | ----------------------- |
+| `/sim-screenshot [name]`          | Take a screenshot          | `/sim-screenshot login` |
+| `/sim-describe [element]`         | Describe screen elements   | `/sim-describe`         |
+| `/sim-tap <x> <y>` or `<element>` | Tap coordinates or element | `/sim-tap Login button` |
+| `/sim-launch [bundle-id]`         | Launch the Zine app        | `/sim-launch`           |
+| `/sim-help`                       | Show this help             | `/sim-help`             |
 
 ## MCP Tools Reference
 
@@ -34,8 +39,6 @@ You can also interact with the simulator using natural language:
 - "What's on the screen right now?"
 - "Tap the Settings tab"
 - "Navigate to the subscriptions page"
-
-The ios-simulator-skill provides optimized scripts for complex workflows.
 
 ## Prerequisites
 
