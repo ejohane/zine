@@ -144,7 +144,7 @@ export function getRedirectUri(provider?: OAuthProvider): string {
 
   // For Spotify and fallback, use our custom scheme
   if (__DEV__) {
-    const uri = AuthSession.makeRedirectUri({ scheme: 'zine' });
+    const uri = AuthSession.makeRedirectUri({ scheme: 'zine', path: 'oauth/callback' });
     console.log('[OAuth] Dev redirect URI:', uri);
     return uri;
   }

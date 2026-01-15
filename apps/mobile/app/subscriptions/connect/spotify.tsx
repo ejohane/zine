@@ -22,6 +22,7 @@ import { Colors, Typography, Spacing, Radius, ProviderColors } from '@/constants
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { OAuthErrorBoundary } from '@/components/oauth-error-boundary';
 import { connectProvider } from '@/lib/oauth';
+import { trpc } from '@/lib/trpc';
 
 // Spotify brand color
 const SPOTIFY_GREEN = ProviderColors.spotify;
@@ -60,6 +61,7 @@ function SpotifyConnectContent() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const utils = trpc.useUtils();
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +72,8 @@ function SpotifyConnectContent() {
 
     try {
       await connectProvider('SPOTIFY');
+      // Invalidate connections cache so UI shows updated state immediately
+      await (utils as any).subscriptions?.connections?.list?.invalidate?.();
       // On success, navigate back to subscriptions screen
       // TODO: Navigate to /subscriptions/discover/spotify when discover screen is implemented
       router.replace('/subscriptions' as never);
@@ -84,7 +88,7 @@ function SpotifyConnectContent() {
     } finally {
       setIsConnecting(false);
     }
-  }, [router]);
+  }, [router, utils]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
