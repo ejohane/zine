@@ -50,7 +50,23 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import ContextMenu from 'react-native-context-menu-view';
+import Constants from 'expo-constants';
+
+// ContextMenu requires native code - doesn't work in Expo Go
+// Use conditional require to avoid loading the native module in Expo Go
+const isExpoGo = Constants.appOwnership === 'expo';
+
+const ContextMenu: React.ComponentType<{
+  actions?: { title: string; systemIcon?: string }[];
+  onPress?: (e: { nativeEvent: { name: string } }) => void;
+  previewBackgroundColor?: string;
+  children: React.ReactNode;
+}> = isExpoGo
+  ? ({ children }) => <>{children}</>
+  : // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react-native-context-menu-view').default;
+
+import { useRouter } from 'expo-router';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
@@ -212,6 +228,11 @@ export function SwipeableInboxItem({
   const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
+
+  // Track when a swipe action is being performed to prevent navigation
+  // This prevents the ItemCard's onPress from firing when completing a swipe gesture
+  const isSwipeActionPending = useRef(false);
 
   /**
    * Execute the actual action callback after exit animation starts
@@ -263,6 +284,14 @@ export function SwipeableInboxItem({
   };
 
   /**
+   * Handle swipeable will open (swipe gesture is about to complete)
+   * Sets flag to prevent ItemCard navigation from firing
+   */
+  const handleSwipeableWillOpen = useCallback(() => {
+    isSwipeActionPending.current = true;
+  }, []);
+
+  /**
    * Handle swipeable open (full swipe completed)
    * Triggers haptic feedback, exit animation, then executes the action callback
    */
@@ -289,6 +318,20 @@ export function SwipeableInboxItem({
     },
     [executeAction]
   );
+
+  /**
+   * Handle item press - only navigate if not in the middle of a swipe action
+   * Prevents navigation when completing a swipe gesture
+   */
+  const handleItemPress = useCallback(() => {
+    if (isSwipeActionPending.current) {
+      // Swipe action is pending, don't navigate
+      return;
+    }
+    // Navigate to item detail page
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
+    router.push(`/item/${item.id}` as any);
+  }, [router, item.id]);
 
   /**
    * Handle context menu action selection
@@ -395,9 +438,10 @@ export function SwipeableInboxItem({
           overshootRight={false}
           renderLeftActions={renderLeftActions}
           renderRightActions={renderRightActions}
+          onSwipeableWillOpen={handleSwipeableWillOpen}
           onSwipeableOpen={handleSwipeableOpen}
         >
-          <ItemCard item={item} variant="compact" index={index} />
+          <ItemCard item={item} variant="compact" index={index} onPress={handleItemPress} />
         </ReanimatedSwipeable>
       </ContextMenu>
     </Animated.View>

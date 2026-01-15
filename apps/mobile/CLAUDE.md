@@ -66,6 +66,17 @@ Quick commands for simulator interaction:
 
 ## Development Workflows
 
+### Expo Go Only (Critical Constraint)
+
+**IMPORTANT**: When testing or interacting with the iOS simulator, you MUST:
+
+- **Only use Expo Go** - Never create development builds or custom native builds
+- **Run in Expo Go mode** - Use `pnpm dev` which starts Metro for Expo Go
+- **Never run EAS builds** - Do not use `eas build`, `pnpm build:ios:*`, or similar commands
+- **Never install custom .ipa/.app files** - Only use the Expo Go app from the App Store
+
+Expo Go provides a pre-built native runtime that loads JavaScript bundles over the network. This is sufficient for testing UI, navigation, and most app functionality.
+
 ### Running the App
 
 ```bash
@@ -76,16 +87,7 @@ pnpm dev
 METRO_PORT=8082 pnpm dev
 ```
 
-### Building for iOS Simulator
-
-```bash
-# Build and install preview build
-pnpm deploy:ios:preview
-
-# Or manually:
-pnpm build:ios:preview
-# Then install via Simulator or drag .ipa to device
-```
+Then open Expo Go on the simulator and scan the QR code or enter the URL shown in the terminal.
 
 ### Testing
 
