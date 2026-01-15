@@ -10,6 +10,7 @@
  * - Full swipe auto-completes action
  * - Partial swipe + release animates back smoothly
  * - Smooth exit animation when action completes
+ * - Haptic feedback on action completion (Light for archive, Medium for bookmark)
  */
 
 import React, { useRef, useState, useCallback } from 'react';
@@ -28,6 +29,7 @@ import Animated, {
   SlideInRight,
   Layout,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
@@ -190,10 +192,21 @@ export function SwipeableInboxItem({
 
   /**
    * Handle swipeable open (full swipe completed)
-   * Triggers exit animation, then executes the action callback
+   * Triggers haptic feedback, exit animation, then executes the action callback
    */
   const handleSwipeableOpen = useCallback(
     (direction: 'left' | 'right') => {
+      // Trigger haptic feedback on action completion
+      // Archive (swipe right) = Light haptic (subtle, neutral action)
+      // Bookmark (swipe left) = Medium haptic (more prominent, positive action)
+      if (direction === 'right') {
+        // Archive action - subtle feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } else {
+        // Bookmark action - more satisfying feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+
       // Set exit direction to trigger exit animation
       // Archive (swipe right) exits to left, Bookmark (swipe left) exits to right
       const exitDir = direction === 'right' ? 'left' : 'right';
