@@ -105,19 +105,25 @@ To enable iOS simulator interaction, add this to your MCP configuration:
 
 ## Development Workflows
 
+### Expo Go Only (Critical Constraint)
+
+**IMPORTANT**: When testing or interacting with the iOS simulator, agents MUST:
+
+- **Only use Expo Go** - Never create development builds or custom native builds
+- **Run in Expo Go mode** - Use `pnpm dev` which starts Metro for Expo Go
+- **Never run EAS builds** - Do not use `eas build`, `pnpm build:ios:*`, or similar commands
+- **Never install custom .ipa/.app files** - Only use the Expo Go app from the App Store
+
+Expo Go provides a pre-built native runtime that loads JavaScript bundles over the network. This is sufficient for testing UI, navigation, and most app functionality.
+
 ### Running the App
 
 ```bash
 cd apps/mobile
-pnpm dev           # Start Metro with Expo
+pnpm dev           # Start Metro with Expo Go
 ```
 
-### Building for iOS
-
-```bash
-pnpm build:ios:preview    # Build .ipa
-pnpm deploy:ios:preview   # Build and install to simulator
-```
+Then open Expo Go on the simulator and scan the QR code or enter the URL.
 
 ### Testing
 

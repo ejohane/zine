@@ -1,19 +1,20 @@
 import { useRouter, type Href } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
-import { useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
+import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   useInboxItems,
-  useBookmarkItem,
   useArchiveItem,
+  useBookmarkItem,
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
@@ -21,6 +22,13 @@ import { useSyncAll } from '@/hooks/use-sync-all';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/** How long to wait before clearing reappeared state (ms) */
+const REENTRY_CLEANUP_DELAY = 500;
 
 // =============================================================================
 // Icons
@@ -95,8 +103,62 @@ export default function InboxScreen() {
   const { toast } = useToast();
 
   const { data, isLoading, error } = useInboxItems();
-  const bookmarkMutation = useBookmarkItem();
+
+  // Track items that should animate in after a failed mutation (rollback)
+  // Maps item ID to the direction they should enter from
+  const [reappearingItems, setReappearingItems] = useState<Map<string, EnterDirection>>(new Map());
+
+  // Action mutations for swipeable items with rollback handling
   const archiveMutation = useArchiveItem();
+  const bookmarkMutation = useBookmarkItem();
+
+  /**
+   * Mark an item as reappearing with a specific enter direction.
+   * Auto-clears after animation completes.
+   */
+  const markAsReappearing = useCallback((id: string, enterFrom: EnterDirection) => {
+    setReappearingItems((prev) => new Map(prev).set(id, enterFrom));
+    // Clear after animation completes
+    setTimeout(() => {
+      setReappearingItems((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }, REENTRY_CLEANUP_DELAY);
+  }, []);
+
+  const handleArchive = useCallback(
+    (id: string) => {
+      archiveMutation.mutate(
+        { id },
+        {
+          onError: () => {
+            // Archive exits left, so reappear from left
+            markAsReappearing(id, 'left');
+            showError(toast, new Error('Archive failed'), 'Failed to archive item', 'archive');
+          },
+        }
+      );
+    },
+    [archiveMutation, markAsReappearing, toast]
+  );
+
+  const handleBookmark = useCallback(
+    (id: string) => {
+      bookmarkMutation.mutate(
+        { id },
+        {
+          onError: () => {
+            // Bookmark exits right, so reappear from right
+            markAsReappearing(id, 'right');
+            showError(toast, new Error('Bookmark failed'), 'Failed to save item', 'bookmark');
+          },
+        }
+      );
+    },
+    [bookmarkMutation, markAsReappearing, toast]
+  );
 
   // Sync hooks
   const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
@@ -129,34 +191,6 @@ export default function InboxScreen() {
     // Don't show toast for "No subscriptions to sync"
   }, [lastResult, toast]);
 
-  const handleBookmark = (id: string) => {
-    bookmarkMutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          showSuccess(toast, 'Saved to library');
-        },
-        onError: (err) => {
-          showError(toast, err, 'Failed to save item', 'bookmark');
-        },
-      }
-    );
-  };
-
-  const handleArchive = (id: string) => {
-    archiveMutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          showSuccess(toast, 'Archived');
-        },
-        onError: (err) => {
-          showError(toast, err, 'Failed to archive item', 'archive');
-        },
-      }
-    );
-  };
-
   // Transform API response to ItemCardData format
   const inboxItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
     id: item.id,
@@ -171,17 +205,17 @@ export default function InboxScreen() {
     isFinished: item.isFinished,
   }));
 
-  const renderItem = ({ item, index }: { item: ItemCardData; index: number }) => (
-    <ItemCard
-      item={item}
-      variant="full"
-      index={index}
-      showActions
-      onBookmark={() => handleBookmark(item.id)}
-      onArchive={() => handleArchive(item.id)}
-      isBookmarking={bookmarkMutation.isPending && bookmarkMutation.variables?.id === item.id}
-      isArchiving={archiveMutation.isPending && archiveMutation.variables?.id === item.id}
-    />
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
+      <SwipeableInboxItem
+        item={item}
+        index={index}
+        onArchive={handleArchive}
+        onBookmark={handleBookmark}
+        enterFrom={reappearingItems.get(item.id)}
+      />
+    ),
+    [handleArchive, handleBookmark, reappearingItems]
   );
 
   return (
@@ -213,7 +247,7 @@ export default function InboxScreen() {
         ) : error ? (
           <ErrorState message={error.message} />
         ) : (
-          <FlatList
+          <Animated.FlatList
             data={inboxItems}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
@@ -225,6 +259,7 @@ export default function InboxScreen() {
             onRefresh={handleRefresh}
             refreshing={isSyncing}
             ListEmptyComponent={<InboxEmptyState colors={colors} />}
+            itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
           />
         )}
       </SafeAreaView>
