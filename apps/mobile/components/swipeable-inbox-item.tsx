@@ -11,10 +11,12 @@
  * - Partial swipe + release animates back smoothly
  * - Smooth exit animation when action completes
  * - Haptic feedback on action completion (Light for archive, Medium for bookmark)
+ * - Long-press context menu as accessibility fallback
+ * - VoiceOver accessibility actions
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, type AccessibilityActionEvent } from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -30,6 +32,7 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import ContextMenu from 'react-native-context-menu-view';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
@@ -151,6 +154,18 @@ function RightActionPanel({ progress }: ActionPanelProps) {
 // Main Component
 // ============================================================================
 
+/** Context menu action names (match title for handler dispatch) */
+const CONTEXT_MENU_ACTION = {
+  SAVE_TO_LIBRARY: 'Save to Library',
+  ARCHIVE: 'Archive',
+} as const;
+
+/** Accessibility action names (for VoiceOver) */
+const ACCESSIBILITY_ACTION = {
+  BOOKMARK: 'bookmark',
+  ARCHIVE: 'archive',
+} as const;
+
 export function SwipeableInboxItem({
   item,
   onArchive,
@@ -160,6 +175,8 @@ export function SwipeableInboxItem({
 }: SwipeableInboxItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
 
   /**
    * Execute the actual action callback after exit animation starts
@@ -175,6 +192,26 @@ export function SwipeableInboxItem({
     },
     [item.id, onArchive, onBookmark]
   );
+
+  /**
+   * Handle bookmark action (from context menu or swipe)
+   * Triggers haptic feedback and exit animation, then calls callback
+   */
+  const handleBookmarkAction = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setExitDirection('right');
+    onBookmark(item.id);
+  }, [item.id, onBookmark]);
+
+  /**
+   * Handle archive action (from context menu or swipe)
+   * Triggers haptic feedback and exit animation, then calls callback
+   */
+  const handleArchiveAction = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setExitDirection('left');
+    onArchive(item.id);
+  }, [item.id, onArchive]);
 
   /**
    * Render left actions (Archive) - appears when swiping right
@@ -218,6 +255,40 @@ export function SwipeableInboxItem({
     [executeAction]
   );
 
+  /**
+   * Handle context menu action selection
+   * Dispatches to the appropriate handler based on action name
+   */
+  const handleContextMenuPress = useCallback(
+    (e: { nativeEvent: { name: string } }) => {
+      const { name } = e.nativeEvent;
+      if (name === CONTEXT_MENU_ACTION.SAVE_TO_LIBRARY) {
+        handleBookmarkAction();
+      } else if (name === CONTEXT_MENU_ACTION.ARCHIVE) {
+        handleArchiveAction();
+      }
+    },
+    [handleBookmarkAction, handleArchiveAction]
+  );
+
+  /**
+   * Handle VoiceOver accessibility action
+   * Provides non-gesture access to bookmark/archive for users who can't swipe
+   */
+  const handleAccessibilityAction = useCallback(
+    (event: AccessibilityActionEvent) => {
+      switch (event.nativeEvent.actionName) {
+        case ACCESSIBILITY_ACTION.BOOKMARK:
+          handleBookmarkAction();
+          break;
+        case ACCESSIBILITY_ACTION.ARCHIVE:
+          handleArchiveAction();
+          break;
+      }
+    },
+    [handleBookmarkAction, handleArchiveAction]
+  );
+
   // Determine exit animation based on direction
   // Archive exits left (SlideOutLeft), Bookmark exits right (SlideOutRight)
   const exitAnimation =
@@ -238,6 +309,24 @@ export function SwipeableInboxItem({
           ? FadeIn.duration(REENTRY_ANIMATION_DURATION)
           : undefined;
 
+  // Context menu actions - native iOS menu with system icons
+  const contextMenuActions = [
+    {
+      title: CONTEXT_MENU_ACTION.SAVE_TO_LIBRARY,
+      systemIcon: 'bookmark',
+    },
+    {
+      title: CONTEXT_MENU_ACTION.ARCHIVE,
+      systemIcon: 'archivebox',
+    },
+  ];
+
+  // Accessibility actions for VoiceOver users
+  const accessibilityActions = [
+    { name: ACCESSIBILITY_ACTION.BOOKMARK, label: 'Save to Library' },
+    { name: ACCESSIBILITY_ACTION.ARCHIVE, label: 'Archive' },
+  ];
+
   // Don't render if item is exiting (animation will handle unmount)
   // The exiting prop triggers Reanimated's exit animation before removal
   return (
@@ -245,20 +334,32 @@ export function SwipeableInboxItem({
       entering={enteringAnimation}
       exiting={exitAnimation}
       layout={Layout.springify().damping(15).stiffness(100)}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}${item.creator ? ` by ${item.creator}` : ''}`}
+      accessibilityHint="Swipe right to archive, swipe left to save. Double tap and hold for more options."
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={handleAccessibilityAction}
     >
-      <ReanimatedSwipeable
-        ref={swipeableRef}
-        friction={2}
-        leftThreshold={SWIPE_THRESHOLD}
-        rightThreshold={SWIPE_THRESHOLD}
-        overshootLeft={false}
-        overshootRight={false}
-        renderLeftActions={renderLeftActions}
-        renderRightActions={renderRightActions}
-        onSwipeableOpen={handleSwipeableOpen}
+      <ContextMenu
+        actions={contextMenuActions}
+        onPress={handleContextMenuPress}
+        previewBackgroundColor={colors.background}
       >
-        <ItemCard item={item} variant="compact" index={index} />
-      </ReanimatedSwipeable>
+        <ReanimatedSwipeable
+          ref={swipeableRef}
+          friction={2}
+          leftThreshold={SWIPE_THRESHOLD}
+          rightThreshold={SWIPE_THRESHOLD}
+          overshootLeft={false}
+          overshootRight={false}
+          renderLeftActions={renderLeftActions}
+          renderRightActions={renderRightActions}
+          onSwipeableOpen={handleSwipeableOpen}
+        >
+          <ItemCard item={item} variant="compact" index={index} />
+        </ReanimatedSwipeable>
+      </ContextMenu>
     </Animated.View>
   );
 }
