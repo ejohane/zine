@@ -69,8 +69,25 @@ export type ExitDirection = 'left' | 'right' | null;
 /** Width of action panel in pixels - ~100px for finger-friendly tap target */
 const ACTION_WIDTH = 100;
 
-/** Swipe threshold to trigger action (full swipe distance) */
+/**
+ * Swipe threshold to trigger action (full swipe distance)
+ * 100px chosen because:
+ * - Large enough to prevent accidental triggers (~2.5x typical accidental swipe of 40px)
+ * - Small enough to be easily reachable (~1/4 of smallest phone width)
+ * - Matches action panel width for consistent feel
+ * @see zine-2qn for threshold tuning rationale
+ */
 const SWIPE_THRESHOLD = 100;
+
+/**
+ * Friction value for swipe resistance (1-3 range)
+ * Value of 2 provides balanced resistance:
+ * - 1: Too loose, feels slippery
+ * - 2: Balanced, feels responsive but controlled
+ * - 3: Too stiff, feels sluggish
+ * @see zine-2qn for friction tuning rationale
+ */
+const SWIPE_FRICTION = 2;
 
 /** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
 const EXIT_ANIMATION_DURATION = 250;
@@ -348,9 +365,14 @@ export function SwipeableInboxItem({
       >
         <ReanimatedSwipeable
           ref={swipeableRef}
-          friction={2}
+          // Friction controls drag resistance (1-3 range, 2 is balanced)
+          // @see zine-2qn for tuning rationale
+          friction={SWIPE_FRICTION}
           leftThreshold={SWIPE_THRESHOLD}
           rightThreshold={SWIPE_THRESHOLD}
+          // Overshoot disabled to prevent bouncing past action panel
+          // Creates crisp, predictable stopping at threshold
+          // Spring snap-back handles release animation (~150-300ms)
           overshootLeft={false}
           overshootRight={false}
           renderLeftActions={renderLeftActions}
