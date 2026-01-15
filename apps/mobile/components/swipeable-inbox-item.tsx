@@ -12,7 +12,7 @@
  */
 
 import React, { useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -20,7 +20,7 @@ import Animated, { useAnimatedStyle, interpolate, type SharedValue } from 'react
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // ============================================================================
@@ -42,11 +42,11 @@ export interface SwipeableInboxItemProps {
 // Constants
 // ============================================================================
 
-/** Width of action panel in pixels */
-const ACTION_WIDTH = 80;
+/** Width of action panel in pixels - ~100px for finger-friendly tap target */
+const ACTION_WIDTH = 100;
 
 /** Swipe threshold to trigger action (full swipe distance) */
-const SWIPE_THRESHOLD = 80;
+const SWIPE_THRESHOLD = 100;
 
 // ============================================================================
 // Action Panel Components
@@ -58,7 +58,7 @@ interface ActionPanelProps {
 
 /**
  * Left action panel (Archive) - revealed when swiping right
- * Gray/neutral styling per design spec
+ * Gray/neutral styling per design spec (soft delete, not destructive)
  */
 function LeftActionPanel({ progress }: ActionPanelProps) {
   const colorScheme = useColorScheme();
@@ -84,6 +84,7 @@ function LeftActionPanel({ progress }: ActionPanelProps) {
     >
       <Animated.View style={[styles.actionContent, animatedStyle]}>
         <ArchiveIcon size={24} color={colors.textSecondary} />
+        <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Archive</Text>
       </Animated.View>
     </View>
   );
@@ -186,6 +187,8 @@ const styles = StyleSheet.create({
     width: ACTION_WIDTH,
     justifyContent: 'center',
     alignItems: 'center',
+    // Ensure minimum touch target (iOS HIG: 44x44)
+    minHeight: 44,
   },
   leftActionPanel: {
     // Archive panel - left side (revealed on right swipe)
@@ -197,6 +200,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.md,
+    gap: Spacing.xs,
+  },
+  actionLabel: {
+    ...Typography.labelSmall,
   },
 });
 
