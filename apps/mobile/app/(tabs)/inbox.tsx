@@ -10,13 +10,7 @@ import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import {
-  useInboxItems,
-  useBookmarkItem,
-  useArchiveItem,
-  mapContentType,
-  mapProvider,
-} from '@/hooks/use-items-trpc';
+import { useInboxItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showError } from '@/lib/toast-utils';
@@ -95,8 +89,6 @@ export default function InboxScreen() {
   const { toast } = useToast();
 
   const { data, isLoading, error } = useInboxItems();
-  const bookmarkMutation = useBookmarkItem();
-  const archiveMutation = useArchiveItem();
 
   // Sync hooks
   const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
@@ -129,34 +121,6 @@ export default function InboxScreen() {
     // Don't show toast for "No subscriptions to sync"
   }, [lastResult, toast]);
 
-  const handleBookmark = (id: string) => {
-    bookmarkMutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          showSuccess(toast, 'Saved to library');
-        },
-        onError: (err) => {
-          showError(toast, err, 'Failed to save item', 'bookmark');
-        },
-      }
-    );
-  };
-
-  const handleArchive = (id: string) => {
-    archiveMutation.mutate(
-      { id },
-      {
-        onSuccess: () => {
-          showSuccess(toast, 'Archived');
-        },
-        onError: (err) => {
-          showError(toast, err, 'Failed to archive item', 'archive');
-        },
-      }
-    );
-  };
-
   // Transform API response to ItemCardData format
   const inboxItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
     id: item.id,
@@ -172,16 +136,7 @@ export default function InboxScreen() {
   }));
 
   const renderItem = ({ item, index }: { item: ItemCardData; index: number }) => (
-    <ItemCard
-      item={item}
-      variant="full"
-      index={index}
-      showActions
-      onBookmark={() => handleBookmark(item.id)}
-      onArchive={() => handleArchive(item.id)}
-      isBookmarking={bookmarkMutation.isPending && bookmarkMutation.variables?.id === item.id}
-      isArchiving={archiveMutation.isPending && archiveMutation.variables?.id === item.id}
-    />
+    <ItemCard item={item} variant="compact" index={index} />
   );
 
   return (
