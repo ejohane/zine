@@ -186,9 +186,12 @@ export function ItemCard({
             <Text style={[styles.compactTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title}
             </Text>
-            <Text style={[styles.compactMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-              {metaParts.join(' · ')}
-            </Text>
+            <View style={styles.compactMetaRow}>
+              <View style={[styles.compactProviderDot, { backgroundColor: providerColor }]} />
+              <Text style={[styles.compactMeta, { color: colors.textSecondary }]} numberOfLines={1}>
+                {metaParts.join(' · ')}
+              </Text>
+            </View>
           </View>
         </Pressable>
       </Animated.View>
@@ -408,8 +411,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 2,
   },
+  compactMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactProviderDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: Spacing.xs,
+    flexShrink: 0,
+  },
   compactMeta: {
     ...Typography.bodySmall,
+    flex: 1,
   },
 
   // Full variant (inbox)
