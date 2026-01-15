@@ -1,8 +1,8 @@
 import { useRouter, type Href } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -160,13 +160,16 @@ export default function InboxScreen() {
     isFinished: item.isFinished,
   }));
 
-  const renderItem = ({ item, index }: { item: ItemCardData; index: number }) => (
-    <SwipeableInboxItem
-      item={item}
-      index={index}
-      onArchive={handleArchive}
-      onBookmark={handleBookmark}
-    />
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
+      <SwipeableInboxItem
+        item={item}
+        index={index}
+        onArchive={handleArchive}
+        onBookmark={handleBookmark}
+      />
+    ),
+    [handleArchive, handleBookmark]
   );
 
   return (
@@ -198,7 +201,7 @@ export default function InboxScreen() {
         ) : error ? (
           <ErrorState message={error.message} />
         ) : (
-          <FlatList
+          <Animated.FlatList
             data={inboxItems}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
@@ -210,6 +213,7 @@ export default function InboxScreen() {
             onRefresh={handleRefresh}
             refreshing={isSyncing}
             ListEmptyComponent={<InboxEmptyState colors={colors} />}
+            itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
           />
         )}
       </SafeAreaView>

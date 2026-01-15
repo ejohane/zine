@@ -9,14 +9,22 @@
  * - Swipe right to bookmark (primary color panel)
  * - Full swipe auto-completes action
  * - Partial swipe + release animates back smoothly
+ * - Smooth exit animation when action completes
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Text } from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
-import Animated, { useAnimatedStyle, interpolate, type SharedValue } from 'react-native-reanimated';
+import Animated, {
+  useAnimatedStyle,
+  interpolate,
+  type SharedValue,
+  SlideOutLeft,
+  SlideOutRight,
+  Layout,
+} from 'react-native-reanimated';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
@@ -38,6 +46,9 @@ export interface SwipeableInboxItemProps {
   index?: number;
 }
 
+/** Direction of exit animation */
+export type ExitDirection = 'left' | 'right' | null;
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -47,6 +58,9 @@ const ACTION_WIDTH = 100;
 
 /** Swipe threshold to trigger action (full swipe distance) */
 const SWIPE_THRESHOLD = 100;
+
+/** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
+const EXIT_ANIMATION_DURATION = 250;
 
 // ============================================================================
 // Action Panel Components
@@ -131,6 +145,22 @@ export function SwipeableInboxItem({
   index = 0,
 }: SwipeableInboxItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
+  const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
+
+  /**
+   * Execute the actual action callback after exit animation starts
+   * Called via runOnJS from animation worklet
+   */
+  const executeAction = useCallback(
+    (direction: 'left' | 'right') => {
+      if (direction === 'left') {
+        onBookmark(item.id);
+      } else {
+        onArchive(item.id);
+      }
+    },
+    [item.id, onArchive, onBookmark]
+  );
 
   /**
    * Render left actions (Archive) - appears when swiping right
@@ -148,34 +178,48 @@ export function SwipeableInboxItem({
 
   /**
    * Handle swipeable open (full swipe completed)
+   * Triggers exit animation, then executes the action callback
    */
-  const handleSwipeableOpen = (direction: 'left' | 'right') => {
-    if (direction === 'left') {
-      // Swiped left = right action panel revealed = bookmark
-      onBookmark(item.id);
-    } else if (direction === 'right') {
-      // Swiped right = left action panel revealed = archive
-      onArchive(item.id);
-    }
+  const handleSwipeableOpen = useCallback(
+    (direction: 'left' | 'right') => {
+      // Set exit direction to trigger exit animation
+      // Archive (swipe right) exits to left, Bookmark (swipe left) exits to right
+      const exitDir = direction === 'right' ? 'left' : 'right';
+      setExitDirection(exitDir);
 
-    // Close the swipeable after action
-    swipeableRef.current?.close();
-  };
+      // Execute the action callback
+      executeAction(direction);
+    },
+    [executeAction]
+  );
 
+  // Determine exit animation based on direction
+  // Archive exits left (SlideOutLeft), Bookmark exits right (SlideOutRight)
+  const exitAnimation =
+    exitDirection === 'left'
+      ? SlideOutLeft.duration(EXIT_ANIMATION_DURATION)
+      : exitDirection === 'right'
+        ? SlideOutRight.duration(EXIT_ANIMATION_DURATION)
+        : undefined;
+
+  // Don't render if item is exiting (animation will handle unmount)
+  // The exiting prop triggers Reanimated's exit animation before removal
   return (
-    <ReanimatedSwipeable
-      ref={swipeableRef}
-      friction={2}
-      leftThreshold={SWIPE_THRESHOLD}
-      rightThreshold={SWIPE_THRESHOLD}
-      overshootLeft={false}
-      overshootRight={false}
-      renderLeftActions={renderLeftActions}
-      renderRightActions={renderRightActions}
-      onSwipeableOpen={handleSwipeableOpen}
-    >
-      <ItemCard item={item} variant="compact" index={index} />
-    </ReanimatedSwipeable>
+    <Animated.View exiting={exitAnimation} layout={Layout.springify().damping(15).stiffness(100)}>
+      <ReanimatedSwipeable
+        ref={swipeableRef}
+        friction={2}
+        leftThreshold={SWIPE_THRESHOLD}
+        rightThreshold={SWIPE_THRESHOLD}
+        overshootLeft={false}
+        overshootRight={false}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        onSwipeableOpen={handleSwipeableOpen}
+      >
+        <ItemCard item={item} variant="compact" index={index} />
+      </ReanimatedSwipeable>
+    </Animated.View>
   );
 }
 
