@@ -114,6 +114,7 @@ function RightActionPanel({ progress }: ActionPanelProps) {
     >
       <Animated.View style={[styles.actionContent, animatedStyle]}>
         <BookmarkIcon size={24} color={colors.buttonPrimaryText} />
+        <Text style={[styles.actionLabel, { color: colors.buttonPrimaryText }]}>Save</Text>
       </Animated.View>
     </View>
   );
