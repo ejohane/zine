@@ -13,6 +13,24 @@
  * - Haptic feedback on action completion (Light for archive, Medium for bookmark)
  * - Long-press context menu as accessibility fallback
  * - VoiceOver accessibility actions
+ *
+ * Performance Considerations (see zine-iln):
+ * - ReanimatedSwipeable runs gesture handling on UI thread (not JS thread)
+ * - All interpolations use useAnimatedStyle worklets (UI thread)
+ * - Exit/entry animations use hardware-accelerated transforms (SlideOut/SlideIn)
+ * - Layout animation uses spring physics with controlled damping (no bounce)
+ * - Haptics are fire-and-forget (async, non-blocking)
+ * - Callbacks wrapped in useCallback to prevent re-renders
+ *
+ * To profile performance:
+ * 1. Shake device / Cmd+D in simulator
+ * 2. Enable "Perf Monitor"
+ * 3. Watch JS and UI frame rates during swipes
+ * 4. Both should stay at or near 60 FPS
+ * Note: Simulator performance is not representative - test on real device
+ *
+ * @see zine-iln for performance profiling task
+ * @see swipeable-inbox-performance.test.ts for performance validation tests
  */
 
 import React, { useRef, useState, useCallback } from 'react';
