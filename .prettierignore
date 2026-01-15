@@ -1,2 +1,3 @@
 apps/mobile/expo-env.d.ts
+apps/mobile/ios/
 .opencode/
