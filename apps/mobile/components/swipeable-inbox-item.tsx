@@ -23,6 +23,9 @@ import Animated, {
   type SharedValue,
   SlideOutLeft,
   SlideOutRight,
+  FadeIn,
+  SlideInLeft,
+  SlideInRight,
   Layout,
 } from 'react-native-reanimated';
 
@@ -35,6 +38,9 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 // Types
 // ============================================================================
 
+/** Direction from which item should enter (for rollback animation) */
+export type EnterDirection = 'left' | 'right' | 'fade' | null;
+
 export interface SwipeableInboxItemProps {
   /** The item data to display */
   item: ItemCardData;
@@ -44,6 +50,8 @@ export interface SwipeableInboxItemProps {
   onBookmark: (id: string) => void;
   /** Animation delay index for staggered entry */
   index?: number;
+  /** Direction from which item should enter (for rollback animation) */
+  enterFrom?: EnterDirection;
 }
 
 /** Direction of exit animation */
@@ -61,6 +69,9 @@ const SWIPE_THRESHOLD = 100;
 
 /** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
 const EXIT_ANIMATION_DURATION = 250;
+
+/** Re-entry animation duration in milliseconds (after rollback) */
+const REENTRY_ANIMATION_DURATION = 300;
 
 // ============================================================================
 // Action Panel Components
@@ -143,6 +154,7 @@ export function SwipeableInboxItem({
   onArchive,
   onBookmark,
   index = 0,
+  enterFrom = null,
 }: SwipeableInboxItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
@@ -202,10 +214,25 @@ export function SwipeableInboxItem({
         ? SlideOutRight.duration(EXIT_ANIMATION_DURATION)
         : undefined;
 
+  // Determine entering animation for items reappearing after rollback
+  // Item slides back in from the direction it exited (tracked by parent)
+  const enteringAnimation =
+    enterFrom === 'left'
+      ? SlideInLeft.duration(REENTRY_ANIMATION_DURATION)
+      : enterFrom === 'right'
+        ? SlideInRight.duration(REENTRY_ANIMATION_DURATION)
+        : enterFrom === 'fade'
+          ? FadeIn.duration(REENTRY_ANIMATION_DURATION)
+          : undefined;
+
   // Don't render if item is exiting (animation will handle unmount)
   // The exiting prop triggers Reanimated's exit animation before removal
   return (
-    <Animated.View exiting={exitAnimation} layout={Layout.springify().damping(15).stiffness(100)}>
+    <Animated.View
+      entering={enteringAnimation}
+      exiting={exitAnimation}
+      layout={Layout.springify().damping(15).stiffness(100)}
+    >
       <ReanimatedSwipeable
         ref={swipeableRef}
         friction={2}

@@ -1,6 +1,6 @@
 import { useRouter, type Href } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
-import { SwipeableInboxItem } from '@/components/swipeable-inbox-item';
+import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
@@ -22,6 +22,13 @@ import { useSyncAll } from '@/hooks/use-sync-all';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/** How long to wait before clearing reappeared state (ms) */
+const REENTRY_CLEANUP_DELAY = 500;
 
 // =============================================================================
 // Icons
@@ -97,22 +104,60 @@ export default function InboxScreen() {
 
   const { data, isLoading, error } = useInboxItems();
 
-  // Action mutations for swipeable items
+  // Track items that should animate in after a failed mutation (rollback)
+  // Maps item ID to the direction they should enter from
+  const [reappearingItems, setReappearingItems] = useState<Map<string, EnterDirection>>(new Map());
+
+  // Action mutations for swipeable items with rollback handling
   const archiveMutation = useArchiveItem();
   const bookmarkMutation = useBookmarkItem();
 
+  /**
+   * Mark an item as reappearing with a specific enter direction.
+   * Auto-clears after animation completes.
+   */
+  const markAsReappearing = useCallback((id: string, enterFrom: EnterDirection) => {
+    setReappearingItems((prev) => new Map(prev).set(id, enterFrom));
+    // Clear after animation completes
+    setTimeout(() => {
+      setReappearingItems((prev) => {
+        const next = new Map(prev);
+        next.delete(id);
+        return next;
+      });
+    }, REENTRY_CLEANUP_DELAY);
+  }, []);
+
   const handleArchive = useCallback(
     (id: string) => {
-      archiveMutation.mutate({ id });
+      archiveMutation.mutate(
+        { id },
+        {
+          onError: () => {
+            // Archive exits left, so reappear from left
+            markAsReappearing(id, 'left');
+            showError(toast, new Error('Archive failed'), 'Failed to archive item', 'archive');
+          },
+        }
+      );
     },
-    [archiveMutation]
+    [archiveMutation, markAsReappearing, toast]
   );
 
   const handleBookmark = useCallback(
     (id: string) => {
-      bookmarkMutation.mutate({ id });
+      bookmarkMutation.mutate(
+        { id },
+        {
+          onError: () => {
+            // Bookmark exits right, so reappear from right
+            markAsReappearing(id, 'right');
+            showError(toast, new Error('Bookmark failed'), 'Failed to save item', 'bookmark');
+          },
+        }
+      );
     },
-    [bookmarkMutation]
+    [bookmarkMutation, markAsReappearing, toast]
   );
 
   // Sync hooks
@@ -167,9 +212,10 @@ export default function InboxScreen() {
         index={index}
         onArchive={handleArchive}
         onBookmark={handleBookmark}
+        enterFrom={reappearingItems.get(item.id)}
       />
     ),
-    [handleArchive, handleBookmark]
+    [handleArchive, handleBookmark, reappearingItems]
   );
 
   return (
