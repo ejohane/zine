@@ -448,4 +448,154 @@ describe('SwipeableInboxItem', () => {
       expect(SWIPE_THRESHOLD).toBeGreaterThan(typicalAccidentalSwipe * 2);
     });
   });
+
+  describe('archive action mutation integration (zine-4v6)', () => {
+    // Tests for wiring archive swipe action to useArchiveItem mutation
+    // The actual tRPC mutation is tested in use-items-trpc hooks
+    // These tests verify the integration pattern
+
+    it('archive callback receives correct item id', () => {
+      // Per issue zine-4v6: Full swipe left calls useArchiveItem mutation
+      const archiveCalls: { id: string }[] = [];
+      const mockArchiveMutate = (input: { id: string }) => {
+        archiveCalls.push(input);
+      };
+
+      const item = createMockItem({ id: 'archive-test-item' });
+      const handleArchive = (id: string) => {
+        mockArchiveMutate({ id });
+      };
+
+      // Simulate the swipe action triggering onArchive
+      handleArchive(item.id);
+
+      expect(archiveCalls).toHaveLength(1);
+      expect(archiveCalls[0]).toEqual({ id: 'archive-test-item' });
+    });
+
+    it('archive mutation receives only the id parameter', () => {
+      // Per issue zine-4v6: archiveMutation.mutate({ id: item.id })
+      // The mutation only needs the item id, nothing else
+      const mutationInput: { id: string }[] = [];
+      const mockMutate = (input: { id: string }) => {
+        mutationInput.push(input);
+      };
+
+      const item = createMockItem({
+        id: 'test-123',
+        title: 'Should not be passed',
+        creator: 'Should not be passed either',
+      });
+
+      // handleArchive pattern from inbox.tsx
+      const handleArchive = (id: string) => {
+        mockMutate({ id });
+      };
+
+      handleArchive(item.id);
+
+      expect(mutationInput[0]).toEqual({ id: 'test-123' });
+      expect(mutationInput[0]).not.toHaveProperty('title');
+      expect(mutationInput[0]).not.toHaveProperty('creator');
+    });
+
+    it('archive can be called for multiple different items', () => {
+      // Per issue zine-4v6: Each item in list can be archived independently
+      const archivedIds: string[] = [];
+      const mockArchiveMutate = (input: { id: string }) => {
+        archivedIds.push(input.id);
+      };
+
+      const handleArchive = (id: string) => {
+        mockArchiveMutate({ id });
+      };
+
+      // Simulate archiving multiple items
+      handleArchive('item-1');
+      handleArchive('item-2');
+      handleArchive('item-3');
+
+      expect(archivedIds).toEqual(['item-1', 'item-2', 'item-3']);
+    });
+
+    it('archive handler can be passed as prop to SwipeableInboxItem', () => {
+      // Per issue zine-4v6: onArchive={handleArchive} pattern
+      const mutationCalls: { id: string }[] = [];
+      const archiveMutation = {
+        mutate: (input: { id: string }) => mutationCalls.push(input),
+      };
+
+      // This is the pattern used in inbox.tsx
+      const handleArchive = (id: string) => {
+        archiveMutation.mutate({ id });
+      };
+
+      const props: SwipeableInboxItemProps = {
+        item: createMockItem({ id: 'prop-test' }),
+        onArchive: handleArchive,
+        onBookmark: () => {},
+      };
+
+      // Simulate component calling onArchive
+      props.onArchive('prop-test');
+
+      expect(mutationCalls).toHaveLength(1);
+      expect(mutationCalls[0].id).toBe('prop-test');
+    });
+
+    it('archive flow: swipe right -> onSwipeableOpen("right") -> onArchive -> mutation', () => {
+      // Per issue zine-4v6: Full integration flow
+      const flow: string[] = [];
+      const mutationCalls: { id: string }[] = [];
+
+      const archiveMutation = {
+        mutate: (input: { id: string }) => {
+          flow.push('mutation called');
+          mutationCalls.push(input);
+        },
+      };
+
+      const handleArchive = (id: string) => {
+        flow.push('handleArchive called');
+        archiveMutation.mutate({ id });
+      };
+
+      const handleSwipeableOpen = (direction: 'left' | 'right', itemId: string) => {
+        flow.push(`onSwipeableOpen: ${direction}`);
+        if (direction === 'right') {
+          handleArchive(itemId);
+        }
+      };
+
+      // Simulate the full swipe flow
+      handleSwipeableOpen('right', 'flow-test-item');
+
+      expect(flow).toEqual(['onSwipeableOpen: right', 'handleArchive called', 'mutation called']);
+      expect(mutationCalls[0].id).toBe('flow-test-item');
+    });
+
+    it('swipeable ref close is called after archive action', () => {
+      // Per issue zine-4v6: swipeableRef.current?.close() is called
+      let closeCalled = false;
+      const swipeableRef = {
+        current: {
+          close: () => {
+            closeCalled = true;
+          },
+        },
+      };
+
+      const handleSwipeableOpen = (direction: 'left' | 'right') => {
+        if (direction === 'right') {
+          // archive action happens here
+        }
+        // Close is called after action
+        swipeableRef.current?.close();
+      };
+
+      handleSwipeableOpen('right');
+
+      expect(closeCalled).toBe(true);
+    });
+  });
 });

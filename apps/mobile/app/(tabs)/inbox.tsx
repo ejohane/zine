@@ -6,11 +6,18 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
+import { SwipeableInboxItem } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useInboxItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import {
+  useInboxItems,
+  useArchiveItem,
+  useBookmarkItem,
+  mapContentType,
+  mapProvider,
+} from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showError } from '@/lib/toast-utils';
@@ -90,6 +97,24 @@ export default function InboxScreen() {
 
   const { data, isLoading, error } = useInboxItems();
 
+  // Action mutations for swipeable items
+  const archiveMutation = useArchiveItem();
+  const bookmarkMutation = useBookmarkItem();
+
+  const handleArchive = useCallback(
+    (id: string) => {
+      archiveMutation.mutate({ id });
+    },
+    [archiveMutation]
+  );
+
+  const handleBookmark = useCallback(
+    (id: string) => {
+      bookmarkMutation.mutate({ id });
+    },
+    [bookmarkMutation]
+  );
+
   // Sync hooks
   const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
   const { isConnected, isInternetReachable } = useNetworkStatus();
@@ -136,7 +161,12 @@ export default function InboxScreen() {
   }));
 
   const renderItem = ({ item, index }: { item: ItemCardData; index: number }) => (
-    <ItemCard item={item} variant="compact" index={index} />
+    <SwipeableInboxItem
+      item={item}
+      index={index}
+      onArchive={handleArchive}
+      onBookmark={handleBookmark}
+    />
   );
 
   return (
