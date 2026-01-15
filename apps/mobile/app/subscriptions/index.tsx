@@ -15,6 +15,7 @@ import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
+import { getStatusDisplay, type ConnectionStatus } from '@/lib/connection-status';
 
 // ============================================================================
 // Icons
@@ -50,7 +51,7 @@ function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; col
 
 interface ProviderCardProps {
   provider: 'YOUTUBE' | 'SPOTIFY';
-  isConnected: boolean;
+  connectionStatus: ConnectionStatus;
   subscriptionCount: number;
   onPress: () => void;
   colors: typeof Colors.dark;
@@ -62,7 +63,7 @@ interface ProviderCardProps {
 
 function ProviderCard({
   provider,
-  isConnected,
+  connectionStatus,
   subscriptionCount,
   onPress,
   colors,
@@ -82,6 +83,9 @@ function ProviderCard({
 
   const Icon = config.icon;
 
+  // Get display state based on connection status
+  const statusDisplay = getStatusDisplay(connectionStatus, colors);
+
   return (
     <Pressable
       onPress={onPress}
@@ -93,26 +97,15 @@ function ProviderCard({
       <View style={styles.providerContent}>
         <Text style={[styles.providerName, { color: colors.text }]}>{config.name}</Text>
         <View style={styles.providerStatusRow}>
-          {isConnected ? (
-            <>
-              <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
-              <Text style={[styles.providerStatus, { color: colors.textSecondary }]}>
-                Connected
-              </Text>
-              {subscriptionCount > 0 && (
-                <Text style={[styles.providerCount, { color: colors.textTertiary }]}>
-                  {' '}
-                  · {subscriptionCount} subscription{subscriptionCount !== 1 ? 's' : ''}
-                </Text>
-              )}
-            </>
-          ) : (
-            <>
-              <View style={[styles.statusDot, { backgroundColor: colors.textTertiary }]} />
-              <Text style={[styles.providerStatus, { color: colors.textTertiary }]}>
-                Not connected
-              </Text>
-            </>
+          <View style={[styles.statusDot, { backgroundColor: statusDisplay.dotColor }]} />
+          <Text style={[styles.providerStatus, { color: statusDisplay.textColor }]}>
+            {statusDisplay.text}
+          </Text>
+          {statusDisplay.showCount && subscriptionCount > 0 && (
+            <Text style={[styles.providerCount, { color: colors.textTertiary }]}>
+              {' '}
+              · {subscriptionCount} subscription{subscriptionCount !== 1 ? 's' : ''}
+            </Text>
           )}
         </View>
       </View>
@@ -143,11 +136,11 @@ export default function SubscriptionsScreen() {
 
   const isLoading = connectionsLoading || subscriptionsLoading;
 
-  // Check connection status
+  // Get connection status for each provider
   const youtubeConnection = connections?.find((c) => c.provider === 'YOUTUBE');
   const spotifyConnection = connections?.find((c) => c.provider === 'SPOTIFY');
-  const isYouTubeConnected = youtubeConnection?.status === 'ACTIVE';
-  const isSpotifyConnected = spotifyConnection?.status === 'ACTIVE';
+  const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
+  const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
 
   // Count subscriptions per provider
   const youtubeCount = subscriptions.filter((s) => s.provider === 'YOUTUBE').length;
@@ -175,7 +168,7 @@ export default function SubscriptionsScreen() {
         <Animated.View entering={FadeInDown.delay(100).duration(400)}>
           <ProviderCard
             provider="YOUTUBE"
-            isConnected={isYouTubeConnected}
+            connectionStatus={youtubeStatus}
             subscriptionCount={youtubeCount}
             onPress={() => handleProviderPress('YOUTUBE')}
             colors={colors}
@@ -185,7 +178,7 @@ export default function SubscriptionsScreen() {
         <Animated.View entering={FadeInDown.delay(200).duration(400)}>
           <ProviderCard
             provider="SPOTIFY"
-            isConnected={isSpotifyConnected}
+            connectionStatus={spotifyStatus}
             subscriptionCount={spotifyCount}
             onPress={() => handleProviderPress('SPOTIFY')}
             colors={colors}

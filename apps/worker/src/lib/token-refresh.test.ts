@@ -12,7 +12,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ProviderConnection, TokenRefreshEnv } from './token-refresh';
-import { getValidAccessToken, TokenRefreshError } from './token-refresh';
+import {
+  getValidAccessToken,
+  TokenRefreshError,
+  isPermanentRefreshError,
+  persistConnectionExpired,
+} from './token-refresh';
 
 // ============================================================================
 // Mocks
@@ -691,7 +696,7 @@ describe('error handling', () => {
     });
   });
 
-  it('should include provider error details in REFRESH_FAILED', async () => {
+  it('should detect permanent errors (invalid_grant) and return REFRESH_FAILED_PERMANENT', async () => {
     const connection = createMockConnection({
       tokenExpiresAt: MOCK_NOW - 1000,
     });
@@ -708,7 +713,7 @@ describe('error handling', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(TokenRefreshError);
       const tokenError = error as TokenRefreshError;
-      expect(tokenError.code).toBe('REFRESH_FAILED');
+      expect(tokenError.code).toBe('REFRESH_FAILED_PERMANENT');
       expect(tokenError.details).toContain('invalid_grant');
     }
   });
@@ -830,6 +835,62 @@ describe('integration scenarios', () => {
     expect(setCall.refreshToken).toBe('encrypted:rotated-spotify-refresh-token');
   });
 
+  it('should mark connection EXPIRED when provider returns invalid_grant', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('{"error":"invalid_grant"}'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify connection status was updated to EXPIRED
+    expect(mockDbUpdate).toHaveBeenCalled();
+    const updateCalls = mockDbUpdate.mock.results;
+    // The last update call should be the status update to EXPIRED
+    const lastUpdateCall = updateCalls[updateCalls.length - 1].value;
+    const setCall = lastUpdateCall.set.mock.calls[0][0];
+    expect(setCall.status).toBe('EXPIRED');
+  });
+
+  it('should NOT mark connection EXPIRED for transient 500 error', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: vi.fn().mockResolvedValue('Internal server error'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify update was NOT called (no status update for transient errors)
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('should NOT mark connection EXPIRED for 429 rate limit error', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      text: vi.fn().mockResolvedValue('Rate limit exceeded'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify update was NOT called (no status update for rate limit errors)
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
   // Skip: vi.advanceTimersByTimeAsync not compatible with Workers vitest pool
   it.skip('should handle multiple rapid refresh requests with locking', async () => {
     const connection = createMockConnection({
@@ -860,5 +921,244 @@ describe('integration scenarios', () => {
     await vi.advanceTimersByTimeAsync(2500);
     const result2 = await resultPromise2;
     expect(result2).toBe('concurrent-refreshed-token');
+  });
+});
+
+// ============================================================================
+// isPermanentRefreshError Unit Tests
+// ============================================================================
+
+describe('isPermanentRefreshError', () => {
+  it('should return true for invalid_grant error with 400 status', () => {
+    expect(isPermanentRefreshError(400, '{"error":"invalid_grant"}')).toBe(true);
+  });
+
+  it('should return true for invalid_grant error with 401 status', () => {
+    expect(isPermanentRefreshError(401, '{"error":"invalid_grant"}')).toBe(true);
+  });
+
+  it('should return true for unauthorized_client error', () => {
+    expect(isPermanentRefreshError(400, '{"error":"unauthorized_client"}')).toBe(true);
+  });
+
+  it('should return true for invalid_client error', () => {
+    expect(isPermanentRefreshError(400, '{"error":"invalid_client"}')).toBe(true);
+  });
+
+  it('should return true for "Token has been expired or revoked" message', () => {
+    expect(isPermanentRefreshError(400, 'Token has been expired or revoked')).toBe(true);
+  });
+
+  it('should return true for revoked token message containing invalid_grant', () => {
+    expect(isPermanentRefreshError(400, 'Error: invalid_grant - Token has been revoked')).toBe(
+      true
+    );
+  });
+
+  it('should return false for 5xx server errors', () => {
+    expect(isPermanentRefreshError(500, 'Internal server error')).toBe(false);
+    expect(isPermanentRefreshError(502, 'Bad Gateway')).toBe(false);
+    expect(isPermanentRefreshError(503, 'Service Unavailable')).toBe(false);
+  });
+
+  it('should return false for 429 rate limit errors', () => {
+    expect(isPermanentRefreshError(429, 'Rate limit exceeded')).toBe(false);
+  });
+
+  it('should return false for network-like errors (status 0)', () => {
+    expect(isPermanentRefreshError(0, '')).toBe(false);
+  });
+
+  it('should return false for 403 Forbidden (not 400/401)', () => {
+    // 403 is not treated as permanent in the current implementation
+    expect(isPermanentRefreshError(403, 'Access denied')).toBe(false);
+  });
+
+  it('should return false for 400 with non-permanent error code', () => {
+    expect(isPermanentRefreshError(400, '{"error":"invalid_request"}')).toBe(false);
+    expect(isPermanentRefreshError(400, '{"error":"server_error"}')).toBe(false);
+  });
+
+  it('should return false for 400 with malformed JSON', () => {
+    expect(isPermanentRefreshError(400, 'Not a JSON response')).toBe(false);
+  });
+
+  it('should return false for empty error body', () => {
+    expect(isPermanentRefreshError(400, '')).toBe(false);
+  });
+
+  it('should handle JSON with additional fields', () => {
+    const errorBody = JSON.stringify({
+      error: 'invalid_grant',
+      error_description: 'Token has been revoked',
+    });
+    expect(isPermanentRefreshError(400, errorBody)).toBe(true);
+  });
+});
+
+// ============================================================================
+// persistConnectionExpired Unit Tests
+// ============================================================================
+
+describe('persistConnectionExpired', () => {
+  it('should update connection status to EXPIRED', async () => {
+    const env = createMockEnv();
+
+    await persistConnectionExpired('test-connection-id', env);
+
+    // Verify update was called
+    expect(mockDbUpdate).toHaveBeenCalled();
+
+    // Verify the status was set to EXPIRED
+    const updateCall = mockDbUpdate.mock.results[0].value;
+    const setCall = updateCall.set.mock.calls[0][0];
+    expect(setCall.status).toBe('EXPIRED');
+  });
+
+  it('should update the correct connection by ID', async () => {
+    const env = createMockEnv();
+    const connectionId = 'specific-connection-123';
+
+    await persistConnectionExpired(connectionId, env);
+
+    // Verify where clause was called with correct ID
+    const updateCall = mockDbUpdate.mock.results[0].value;
+    const setResult = updateCall.set.mock.results[0].value;
+    const whereCall = setResult.where.mock.calls[0][0];
+    expect(whereCall.val).toBe(connectionId);
+  });
+});
+
+// ============================================================================
+// Integration Tests for Expired Token Flow
+// ============================================================================
+
+describe('expired token flow integration', () => {
+  it('should mark connection EXPIRED and throw REFRESH_FAILED_PERMANENT for invalid_grant', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('{"error":"invalid_grant"}'),
+    });
+
+    try {
+      await getValidAccessToken(connection, env);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TokenRefreshError);
+      const tokenError = error as TokenRefreshError;
+      expect(tokenError.code).toBe('REFRESH_FAILED_PERMANENT');
+    }
+
+    // Verify connection was marked as EXPIRED
+    expect(mockDbUpdate).toHaveBeenCalled();
+    const updateCalls = mockDbUpdate.mock.results;
+    const lastUpdateCall = updateCalls[updateCalls.length - 1].value;
+    const setCall = lastUpdateCall.set.mock.calls[0][0];
+    expect(setCall.status).toBe('EXPIRED');
+  });
+
+  it('should mark connection EXPIRED for unauthorized_client error', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('{"error":"unauthorized_client"}'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify connection was marked as EXPIRED
+    const updateCalls = mockDbUpdate.mock.results;
+    const lastUpdateCall = updateCalls[updateCalls.length - 1].value;
+    const setCall = lastUpdateCall.set.mock.calls[0][0];
+    expect(setCall.status).toBe('EXPIRED');
+  });
+
+  it('should mark connection EXPIRED for Google "Token has been expired or revoked" message', async () => {
+    const connection = createMockConnection({
+      provider: 'YOUTUBE',
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('Token has been expired or revoked'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify connection was marked as EXPIRED
+    const updateCalls = mockDbUpdate.mock.results;
+    const lastUpdateCall = updateCalls[updateCalls.length - 1].value;
+    const setCall = lastUpdateCall.set.mock.calls[0][0];
+    expect(setCall.status).toBe('EXPIRED');
+  });
+
+  it('should NOT mark connection EXPIRED for temporary server errors', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: vi.fn().mockResolvedValue('Service temporarily unavailable'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify no DB update was made for transient errors
+    expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it('should release lock even after marking connection as EXPIRED', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('{"error":"invalid_grant"}'),
+    });
+
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
+
+    // Verify lock was released
+    expect(mockReleaseLock).toHaveBeenCalledWith(env.OAUTH_STATE_KV, 'token:refresh:conn-123');
+  });
+
+  it('should return REFRESH_FAILED (not PERMANENT) for 400 with unknown error', async () => {
+    const connection = createMockConnection({
+      tokenExpiresAt: MOCK_NOW - 1000,
+    });
+    const env = createMockEnv();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: vi.fn().mockResolvedValue('{"error":"temporarily_unavailable"}'),
+    });
+
+    try {
+      await getValidAccessToken(connection, env);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error).toBeInstanceOf(TokenRefreshError);
+      const tokenError = error as TokenRefreshError;
+      // Should be regular REFRESH_FAILED, not PERMANENT
+      expect(tokenError.code).toBe('REFRESH_FAILED');
+    }
+
+    // Should NOT update connection status
+    expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 });

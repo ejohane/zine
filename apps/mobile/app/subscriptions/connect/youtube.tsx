@@ -23,6 +23,7 @@ import { Colors, Spacing, Radius, Typography, Shadows } from '@/constants/theme'
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { OAuthErrorBoundary } from '@/components/oauth-error-boundary';
 import { connectProvider } from '@/lib/oauth';
+import { trpc } from '@/lib/trpc';
 
 // YouTube brand color
 const YOUTUBE_RED = '#EA4335';
@@ -99,6 +100,7 @@ function YouTubeConnectContent() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
+  const utils = trpc.useUtils();
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +111,8 @@ function YouTubeConnectContent() {
 
     try {
       await connectProvider('YOUTUBE');
+      // Invalidate connections cache so UI shows updated state immediately
+      await (utils as any).subscriptions?.connections?.list?.invalidate?.();
       // On success, navigate to subscriptions discover screen
       router.replace('/subscriptions/discover/youtube' as const);
     } catch (err) {
@@ -120,7 +124,7 @@ function YouTubeConnectContent() {
     } finally {
       setIsConnecting(false);
     }
-  }, [router]);
+  }, [router, utils]);
 
   const handleRetry = useCallback(() => {
     setError(null);
