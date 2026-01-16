@@ -16,6 +16,7 @@ import { eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
+import pLimit from 'p-limit';
 import { subscriptions } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import { parseSpotifyDate } from '../lib/timestamps';
@@ -51,6 +52,13 @@ import {
 // ============================================================================
 
 const spotifyLogger = pollLogger.child('spotify');
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Default concurrency for parallel episode fetching */
+const DEFAULT_EPISODE_FETCH_CONCURRENCY = 5;
 
 // ============================================================================
 // Provider Configuration
@@ -207,39 +215,94 @@ export async function pollSpotifySubscriptionsBatched(
     );
   }
 
-  // Process subscriptions that need updates
-  let totalNewItems = 0;
+  // Process subscriptions that need updates in parallel
   const pollingErrors: PollingError[] = [];
 
-  for (const { sub, show } of subsNeedingUpdate) {
-    try {
-      // Fetch recent episodes from the show
-      const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+  // Get concurrency limit from environment, falling back to default
+  const concurrency =
+    parseInt(env.SPOTIFY_EPISODE_FETCH_CONCURRENCY ?? '', 10) || DEFAULT_EPISODE_FETCH_CONCURRENCY;
+  const limit = pLimit(concurrency);
 
-      if (allEpisodes.length === 0) {
-        spotifyLogger.info('No episodes found', { name: sub.name });
-        await updateSubscriptionPolled(sub.id, db);
-        continue;
-      }
+  // Parallel episode fetching with concurrency control
+  const parallelFetchStart = Date.now();
 
-      // Filter out unplayable episodes first (geo-restricted, removed, etc.)
-      const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
+  const episodeResults = await Promise.all(
+    subsNeedingUpdate.map(({ sub, show }) =>
+      limit(async () => {
+        try {
+          const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+          return { sub, show, episodes, error: undefined as Error | undefined };
+        } catch (error) {
+          // Don't let one failure block others
+          spotifyLogger.error('Failed to fetch episodes for show', {
+            subscriptionId: sub.id,
+            showId: sub.providerChannelId,
+            showName: sub.name,
+            error: serializeError(error),
+          });
+          return { sub, show, episodes: [] as SpotifyEpisode[], error: error as Error };
+        }
+      })
+    )
+  );
 
-      if (episodes.length === 0) {
-        spotifyLogger.info('No playable episodes found', { name: sub.name });
-        await updateSubscriptionPolled(sub.id, db);
-        continue;
-      }
+  const parallelFetchDuration = Date.now() - parallelFetchStart;
+  const failedFetchCount = episodeResults.filter((r) => r.error).length;
 
-      // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
-      const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
+  spotifyLogger.info('Parallel episode fetch completed', {
+    subscriptionCount: subsNeedingUpdate.length,
+    durationMs: parallelFetchDuration,
+    avgPerSubscription:
+      subsNeedingUpdate.length > 0
+        ? Math.round(parallelFetchDuration / subsNeedingUpdate.length)
+        : 0,
+    concurrency,
+    failedCount: failedFetchCount,
+    successCount: subsNeedingUpdate.length - failedFetchCount,
+  });
 
-      spotifyLogger.info('Found episodes', {
-        total: episodes.length,
-        new: newEpisodes.length,
-        name: sub.name,
+  // Process fetched episodes (ingestion happens sequentially to avoid DB contention)
+  let totalNewItems = 0;
+
+  for (const { sub, show, episodes: allEpisodes, error } of episodeResults) {
+    // Handle fetch errors
+    if (error) {
+      const pollingError = createPollingError(sub.id, error, {
+        showId: sub.providerChannelId,
+        showName: sub.name,
+        userId,
+        operation: 'getShowEpisodes',
       });
+      pollingErrors.push(pollingError);
+      continue;
+    }
 
+    // No episodes found
+    if (allEpisodes.length === 0) {
+      spotifyLogger.info('No episodes found', { name: sub.name });
+      await updateSubscriptionPolled(sub.id, db);
+      continue;
+    }
+
+    // Filter out unplayable episodes first (geo-restricted, removed, etc.)
+    const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
+
+    if (episodes.length === 0) {
+      spotifyLogger.info('No playable episodes found', { name: sub.name });
+      await updateSubscriptionPolled(sub.id, db);
+      continue;
+    }
+
+    // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
+    const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
+
+    spotifyLogger.info('Found episodes', {
+      total: episodes.length,
+      new: newEpisodes.length,
+      name: sub.name,
+    });
+
+    try {
       // Ingest new items and get the newest successfully ingested timestamp
       const { count: newItemsCount, newestIngestedAt } = await ingestNewEpisodes(
         newEpisodes,
@@ -273,14 +336,14 @@ export async function pollSpotifySubscriptionsBatched(
           updatedAt: Date.now(),
         })
         .where(eq(subscriptions.id, sub.id));
-    } catch (error) {
-      const pollingError = createPollingError(sub.id, error, {
+    } catch (ingestError) {
+      const pollingError = createPollingError(sub.id, ingestError, {
         showId: sub.providerChannelId,
         showName: sub.name,
         userId,
-        operation: 'pollSubscription',
+        operation: 'ingestEpisodes',
       });
-      spotifyLogger.error('Failed to poll subscription', {
+      spotifyLogger.error('Failed to ingest episodes for subscription', {
         subscriptionId: sub.id,
         error: pollingError.error,
         errorType: pollingError.errorType,

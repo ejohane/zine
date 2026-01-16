@@ -1036,6 +1036,387 @@ describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
 });
 
 // ============================================================================
+// Parallel Episode Fetching Tests (zine-p5h)
+// ============================================================================
+
+describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
+  const originalDateNow = Date.now;
+  const MOCK_NOW = 1705320000000;
+
+  beforeEach(() => {
+    Date.now = vi.fn(() => MOCK_NOW);
+    vi.clearAllMocks();
+    dbUpdateCalls.length = 0;
+
+    // Default mock implementations
+    mockGetShowEpisodes.mockResolvedValue([]);
+    mockGetMultipleShows.mockResolvedValue([]);
+    mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
+  });
+
+  afterEach(() => {
+    Date.now = originalDateNow;
+  });
+
+  describe('pollSpotifySubscriptionsBatched - parallel fetching', () => {
+    it('should fetch episodes for multiple subscriptions in parallel', async () => {
+      // Create multiple subscriptions needing updates
+      const sub1 = createMockSubscription({
+        id: 'sub1',
+        providerChannelId: 'show1',
+        name: 'Show 1',
+        totalItems: 10,
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub2',
+        providerChannelId: 'show2',
+        name: 'Show 2',
+        totalItems: 20,
+      });
+      const sub3 = createMockSubscription({
+        id: 'sub3',
+        providerChannelId: 'show3',
+        name: 'Show 3',
+        totalItems: 30,
+      });
+
+      // All shows have delta detected
+      mockGetMultipleShows.mockResolvedValue([
+        { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
+        { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
+        { id: 'show3', name: 'Show 3', totalEpisodes: 31 },
+      ]);
+
+      // Each show has one new episode
+      mockGetShowEpisodes.mockImplementation((_, showId: string) => {
+        return Promise.resolve([
+          createMockSpotifyEpisode({
+            id: `ep-${showId}`,
+            name: `Episode for ${showId}`,
+            releaseDate: '2024-01-15',
+          }),
+        ]);
+      });
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never, sub3 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // All subscriptions should be processed
+      expect(result.processed).toBe(3);
+      expect(result.newItems).toBe(3);
+
+      // getShowEpisodes should be called for each subscription
+      expect(mockGetShowEpisodes).toHaveBeenCalledTimes(3);
+    });
+
+    it('should isolate failures - one failed fetch should not block others', async () => {
+      const sub1 = createMockSubscription({
+        id: 'sub_success',
+        providerChannelId: 'show_success',
+        name: 'Success Show',
+        totalItems: 10,
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub_fail',
+        providerChannelId: 'show_fail',
+        name: 'Failing Show',
+        totalItems: 20,
+      });
+      const sub3 = createMockSubscription({
+        id: 'sub_success_2',
+        providerChannelId: 'show_success_2',
+        name: 'Success Show 2',
+        totalItems: 30,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        { id: 'show_success', name: 'Success Show', totalEpisodes: 11 },
+        { id: 'show_fail', name: 'Failing Show', totalEpisodes: 21 },
+        { id: 'show_success_2', name: 'Success Show 2', totalEpisodes: 31 },
+      ]);
+
+      // Second call fails, others succeed
+      mockGetShowEpisodes
+        .mockImplementationOnce(() =>
+          Promise.resolve([createMockSpotifyEpisode({ id: 'ep1', releaseDate: '2024-01-15' })])
+        )
+        .mockImplementationOnce(() => Promise.reject(new Error('API rate limit exceeded')))
+        .mockImplementationOnce(() =>
+          Promise.resolve([createMockSpotifyEpisode({ id: 'ep3', releaseDate: '2024-01-15' })])
+        );
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never, sub3 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // 3 subscriptions processed, but one failed
+      expect(result.processed).toBe(3);
+      // 2 successfully ingested (the one that failed fetch returns 0 new items)
+      expect(result.newItems).toBe(2);
+      // Should have an error recorded for the failed subscription
+      expect(result.errors).toBeDefined();
+      expect(result.errors?.length).toBe(1);
+      expect(result.errors?.[0].subscriptionId).toBe('sub_fail');
+    });
+
+    it('should respect concurrency limit from environment', async () => {
+      // Create 10 subscriptions to test concurrency
+      const subs = Array.from({ length: 10 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      // All shows have delta
+      mockGetMultipleShows.mockResolvedValue(
+        subs.map((s, i) => ({
+          id: s.providerChannelId,
+          name: s.name,
+          totalEpisodes: 11 + i,
+        }))
+      );
+
+      // Track concurrent calls
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+
+      mockGetShowEpisodes.mockImplementation(async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        // Simulate API latency
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        currentConcurrent--;
+        return [createMockSpotifyEpisode({ id: 'ep', releaseDate: '2024-01-15' })];
+      });
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      // Pass env with concurrency limit of 3
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        { SPOTIFY_EPISODE_FETCH_CONCURRENCY: '3' } as never,
+        db as never
+      );
+
+      // Max concurrent should not exceed concurrency limit
+      expect(maxConcurrent).toBeLessThanOrEqual(3);
+      expect(maxConcurrent).toBeGreaterThan(0);
+    });
+
+    it('should use default concurrency when env var not set', async () => {
+      const subs = Array.from({ length: 8 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShows.mockResolvedValue(
+        subs.map((s) => ({
+          id: s.providerChannelId,
+          name: s.name,
+          totalEpisodes: 11,
+        }))
+      );
+
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+
+      mockGetShowEpisodes.mockImplementation(async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        currentConcurrent--;
+        return [createMockSpotifyEpisode({ id: 'ep', releaseDate: '2024-01-15' })];
+      });
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      // Pass env without concurrency limit set
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never, // No SPOTIFY_EPISODE_FETCH_CONCURRENCY
+        db as never
+      );
+
+      // Default concurrency is 5
+      expect(maxConcurrent).toBeLessThanOrEqual(5);
+    });
+
+    it('should return all results including both successes and failures', async () => {
+      const sub1 = createMockSubscription({
+        id: 'sub_ok',
+        providerChannelId: 'show_ok',
+        totalItems: 10,
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub_api_error',
+        providerChannelId: 'show_api_error',
+        totalItems: 20,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        { id: 'show_ok', name: 'Show OK', totalEpisodes: 11 },
+        { id: 'show_api_error', name: 'Show API Error', totalEpisodes: 21 },
+      ]);
+
+      mockGetShowEpisodes
+        .mockImplementationOnce(() =>
+          Promise.resolve([createMockSpotifyEpisode({ id: 'ep_ok', releaseDate: '2024-01-15' })])
+        )
+        .mockImplementationOnce(() => Promise.reject(new Error('Spotify API error')));
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // Processed count includes all attempted (both success and failure)
+      expect(result.processed).toBe(2);
+      // New items only from successful subscription
+      expect(result.newItems).toBe(1);
+      // Error recorded for failed subscription
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors?.[0].subscriptionId).toBe('sub_api_error');
+    });
+
+    it('should handle all parallel fetches failing gracefully', async () => {
+      const sub1 = createMockSubscription({
+        id: 'sub_fail_1',
+        providerChannelId: 'show_fail_1',
+        totalItems: 10,
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub_fail_2',
+        providerChannelId: 'show_fail_2',
+        totalItems: 20,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        { id: 'show_fail_1', name: 'Show Fail 1', totalEpisodes: 11 },
+        { id: 'show_fail_2', name: 'Show Fail 2', totalEpisodes: 21 },
+      ]);
+
+      // All fetches fail
+      mockGetShowEpisodes.mockRejectedValue(new Error('Network error'));
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // Both processed but failed
+      expect(result.processed).toBe(2);
+      expect(result.newItems).toBe(0);
+      expect(result.errors).toHaveLength(2);
+    });
+
+    it('should preserve watermark integrity during parallel processing', async () => {
+      const sub1 = createMockSubscription({
+        id: 'sub1',
+        providerChannelId: 'show1',
+        totalItems: 10,
+        lastPublishedAt: MOCK_NOW - 86400000,
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub2',
+        providerChannelId: 'show2',
+        totalItems: 20,
+        lastPublishedAt: MOCK_NOW - 86400000,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
+        { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
+      ]);
+
+      mockGetShowEpisodes.mockImplementation((_, showId: string) => {
+        return Promise.resolve([
+          createMockSpotifyEpisode({
+            id: `ep-${showId}`,
+            releaseDate: '2024-01-15',
+          }),
+        ]);
+      });
+
+      // sub1 ingestion succeeds, sub2 ingestion fails
+      mockIngestItem
+        .mockResolvedValueOnce({ created: true, itemId: 'i1', userItemId: 'ui1' })
+        .mockRejectedValueOnce(new Error('Ingestion failed'));
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // sub1 should have lastPublishedAt updated (ingestion succeeded)
+      const update1 = dbUpdateCalls.find((c) => c.subscriptionId === 'sub1');
+      expect(update1?.values.lastPublishedAt).toBeDefined();
+      expect(update1?.values.totalItems).toBe(11);
+
+      // sub2 should NOT have lastPublishedAt updated (ingestion failed)
+      const update2 = dbUpdateCalls.find((c) => c.subscriptionId === 'sub2');
+      expect(update2?.values.lastPublishedAt).toBeUndefined();
+      expect(update2?.values.totalItems).toBeUndefined();
+    });
+  });
+});
+
+// ============================================================================
 // Deleted/Unavailable Show Handling Tests (zine-ew6)
 // ============================================================================
 

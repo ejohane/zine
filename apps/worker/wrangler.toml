@@ -40,6 +40,7 @@ persist = true
 # Development environment vars
 [vars]
 ENVIRONMENT = "development"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -62,6 +63,7 @@ database_id = "bc9e61b1-94b2-4f3c-b19b-b3a50936b811"
 migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *"]  # Run every hour
@@ -95,6 +97,7 @@ database_id = "82911dea-5a6b-411b-ab4b-4145cb0c191d"
 migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *"]  # Run every hour

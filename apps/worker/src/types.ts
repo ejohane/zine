@@ -38,6 +38,8 @@ export interface Bindings {
   SPOTIFY_CLIENT_SECRET?: string;
   /** OAuth redirect URI */
   OAUTH_REDIRECT_URI?: string;
+  /** Spotify episode fetch concurrency limit (default: 5) */
+  SPOTIFY_EPISODE_FETCH_CONCURRENCY?: string;
 }
 
 /**
