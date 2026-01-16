@@ -201,8 +201,8 @@ export async function pollSpotifySubscriptionsBatched(
         name: sub.name,
       });
 
-      // Ingest new items
-      const newItemsCount = await ingestNewEpisodes(
+      // Ingest new items and get the newest successfully ingested timestamp
+      const { count: newItemsCount, newestIngestedAt } = await ingestNewEpisodes(
         newEpisodes,
         userId,
         sub.id,
@@ -212,23 +212,24 @@ export async function pollSpotifySubscriptionsBatched(
       );
       totalNewItems += newItemsCount;
 
-      // Calculate newest published timestamp from all episodes
-      const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
-
       // Update subscription with poll results
-      // IMPORTANT: Only update totalItems if we have a valid lastPublishedAt.
-      // This prevents the bug where totalItems gets updated without lastPublishedAt,
-      // causing future delta detection to skip the subscription even when new episodes exist.
+      // IMPORTANT: Only update lastPublishedAt and totalItems if we successfully ingested at least one episode.
+      // This prevents the watermark corruption bug where:
+      // 1. Ingestion fails or all episodes are skipped
+      // 2. lastPublishedAt gets updated anyway based on ALL fetched episodes
+      // 3. Future polls filter out those episodes forever
+      // 4. The subscription is stuck with missed episodes
+      //
       // The key invariant is: if totalItems == totalEpisodes, then lastPublishedAt must
-      // accurately reflect the newest episode we've seen, so future polls can detect
-      // episodes released after that date.
-      const shouldUpdateTotalItems = newestPublishedAt !== null;
+      // accurately reflect the newest episode we've actually ingested.
+      const shouldUpdateTotalItems = newestIngestedAt !== null;
 
       await db
         .update(subscriptions)
         .set({
           lastPolledAt: Date.now(),
-          lastPublishedAt: newestPublishedAt || undefined,
+          // Only advance the watermark based on successfully ingested episodes
+          ...(newestIngestedAt && { lastPublishedAt: newestIngestedAt }),
           ...(shouldUpdateTotalItems && { totalItems: show.totalEpisodes }),
           updatedAt: Date.now(),
         })
@@ -325,8 +326,8 @@ export async function pollSingleSpotifySubscription(
     });
   }
 
-  // Ingest new items
-  const newItemsCount = await ingestNewEpisodes(
+  // Ingest new items and get the newest successfully ingested timestamp
+  const { count: newItemsCount, newestIngestedAt } = await ingestNewEpisodes(
     newEpisodes,
     userId,
     sub.id,
@@ -335,15 +336,15 @@ export async function pollSingleSpotifySubscription(
     db
   );
 
-  // Calculate newest published timestamp from all episodes
-  const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
-
   // Update subscription with poll results
+  // IMPORTANT: Only update lastPublishedAt if we successfully ingested at least one episode.
+  // This prevents watermark corruption when ingestion fails or all episodes are skipped.
   await db
     .update(subscriptions)
     .set({
       lastPolledAt: Date.now(),
-      lastPublishedAt: newestPublishedAt || undefined,
+      // Only advance the watermark based on successfully ingested episodes
+      ...(newestIngestedAt && { lastPublishedAt: newestIngestedAt }),
       updatedAt: Date.now(),
     })
     .where(eq(subscriptions.id, sub.id));
@@ -351,7 +352,7 @@ export async function pollSingleSpotifySubscription(
   spotifyLogger.info('Poll complete', {
     name: sub.name,
     newItemsIngested: newItemsCount,
-    updatedLastPublishedAt: newestPublishedAt ? new Date(newestPublishedAt).toISOString() : null,
+    updatedLastPublishedAt: newestIngestedAt ? new Date(newestIngestedAt).toISOString() : null,
   });
 
   return { newItems: newItemsCount };
@@ -394,8 +395,23 @@ function filterNewEpisodes(
 }
 
 /**
+ * Result of ingesting new episodes.
+ * Contains the count of successfully created items and the newest timestamp
+ * from successfully ingested episodes (used to update lastPublishedAt).
+ */
+interface IngestResult {
+  count: number;
+  newestIngestedAt: number | null;
+}
+
+/**
  * Ingest new episodes into the database.
- * Returns the count of successfully created items.
+ * Returns the count of successfully created items AND the newest timestamp
+ * from successfully ingested episodes.
+ *
+ * IMPORTANT: The newestIngestedAt timestamp is ONLY updated for episodes that
+ * were actually created (ingested successfully). This prevents the lastPublishedAt
+ * watermark from being corrupted when ingestion fails or episodes are skipped.
  */
 async function ingestNewEpisodes(
   episodes: SpotifyEpisode[],
@@ -404,9 +420,10 @@ async function ingestNewEpisodes(
   showName: string,
   showImageUrl: string | null,
   db: DrizzleDB
-): Promise<number> {
+): Promise<IngestResult> {
   let newItemsCount = 0;
   let skippedCount = 0;
+  let newestIngestedAt: number | null = null;
 
   for (const episode of episodes) {
     try {
@@ -432,6 +449,13 @@ async function ingestNewEpisodes(
       );
       if (result.created) {
         newItemsCount++;
+
+        // Track the newest successfully ingested timestamp
+        const episodeTimestamp = parseSpotifyDate(episode.releaseDate);
+        if (episodeTimestamp > 0 && (!newestIngestedAt || episodeTimestamp > newestIngestedAt)) {
+          newestIngestedAt = episodeTimestamp;
+        }
+
         spotifyLogger.info('Episode ingested', {
           showName,
           episodeId: episode.id,
@@ -450,6 +474,8 @@ async function ingestNewEpisodes(
         });
       }
     } catch (ingestError) {
+      // IMPORTANT: Do NOT update newestIngestedAt on failure.
+      // This ensures lastPublishedAt is only advanced for successful ingestions.
       spotifyLogger.error('Failed to ingest episode', {
         showName,
         episodeId: episode.id,
@@ -467,24 +493,7 @@ async function ingestNewEpisodes(
     });
   }
 
-  return newItemsCount;
-}
-
-/**
- * Calculate the newest published timestamp from a list of episodes.
- * Used to update subscription.lastPublishedAt.
- */
-function calculateNewestPublishedAt(
-  episodes: SpotifyEpisode[],
-  fallback: number | null
-): number | null {
-  if (episodes.length === 0) {
-    return fallback;
-  }
-
-  const timestamps = episodes.map((e) => parseSpotifyDate(e.releaseDate)).filter((t) => t > 0);
-
-  return timestamps.length > 0 ? Math.max(...timestamps) : fallback;
+  return { count: newItemsCount, newestIngestedAt };
 }
 
 /**
