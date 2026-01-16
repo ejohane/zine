@@ -21,12 +21,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock Spotify provider
 const mockGetShowEpisodes = vi.fn();
-const mockGetMultipleShows = vi.fn();
+const mockGetMultipleShowsWithCache = vi.fn();
+const mockUpdateShowCache = vi.fn();
+const mockInvalidateShowCache = vi.fn();
 
 vi.mock('../providers/spotify', () => ({
   getSpotifyClientForConnection: vi.fn().mockResolvedValue({}),
   getShowEpisodes: (...args: unknown[]) => mockGetShowEpisodes(...args),
-  getMultipleShows: (...args: unknown[]) => mockGetMultipleShows(...args),
+  getMultipleShowsWithCache: (...args: unknown[]) => mockGetMultipleShowsWithCache(...args),
+  updateShowCache: (...args: unknown[]) => mockUpdateShowCache(...args),
+  invalidateShowCache: (...args: unknown[]) => mockInvalidateShowCache(...args),
 }));
 
 // Mock ingestion processor
@@ -119,6 +123,34 @@ function createMockDb() {
   };
 }
 
+/**
+ * Helper to convert an array of shows to the CacheResult format
+ * returned by getMultipleShowsWithCache.
+ */
+interface MockShow {
+  id: string;
+  name?: string;
+  totalEpisodes?: number;
+  description?: string;
+  publisher?: string;
+  images?: Array<{ url: string; height: number; width: number }>;
+  externalUrl?: string;
+}
+
+function createCacheResult(shows: MockShow[]) {
+  const data = new Map<string, MockShow>();
+  for (const show of shows) {
+    if (show) {
+      data.set(show.id, show);
+    }
+  }
+  return {
+    data,
+    cacheHits: 0,
+    cacheMisses: shows.length,
+  };
+}
+
 interface MockSubscription {
   id: string;
   userId: string;
@@ -158,7 +190,9 @@ describe('Spotify Poller - Watermark Integrity', () => {
 
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
-    mockGetMultipleShows.mockResolvedValue([]);
+    mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockUpdateShowCache.mockResolvedValue(undefined);
+    mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
   });
 
@@ -374,13 +408,15 @@ describe('Spotify Poller - Watermark Integrity', () => {
       });
 
       // Show has new episodes (delta detected)
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: sub.providerChannelId,
-          name: 'Test Show',
-          totalEpisodes: 55, // 5 new episodes
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: sub.providerChannelId,
+            name: 'Test Show',
+            totalEpisodes: 55, // 5 new episodes
+          },
+        ])
+      );
 
       const episodes = [createMockSpotifyEpisode({ id: 'ep1', releaseDate: '2024-01-15' })];
       mockGetShowEpisodes.mockResolvedValue(episodes);
@@ -412,13 +448,15 @@ describe('Spotify Poller - Watermark Integrity', () => {
         totalItems: 50,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: sub.providerChannelId,
-          name: 'Test Show',
-          totalEpisodes: 51,
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: sub.providerChannelId,
+            name: 'Test Show',
+            totalEpisodes: 51,
+          },
+        ])
+      );
 
       const episodes = [createMockSpotifyEpisode({ id: 'ep1', releaseDate: '2024-01-15' })];
       mockGetShowEpisodes.mockResolvedValue(episodes);
@@ -456,10 +494,12 @@ describe('Spotify Poller - Watermark Integrity', () => {
         totalItems: 20,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
-        { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
+          { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
+        ])
+      );
 
       // Both shows have new episodes
       mockGetShowEpisodes
@@ -599,7 +639,9 @@ describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
 
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
-    mockGetMultipleShows.mockResolvedValue([]);
+    mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockUpdateShowCache.mockResolvedValue(undefined);
+    mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
   });
 
@@ -755,13 +797,15 @@ describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
         totalItems: 10,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: sub.providerChannelId,
-          name: 'Test Show',
-          totalEpisodes: 12, // Delta detected
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: sub.providerChannelId,
+            name: 'Test Show',
+            totalEpisodes: 12, // Delta detected
+          },
+        ])
+      );
 
       // Mix of playable and unplayable episodes
       const episodes = [
@@ -804,13 +848,15 @@ describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
         totalItems: 5,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: sub.providerChannelId,
-          name: 'Test Show',
-          totalEpisodes: 6, // Delta detected
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: sub.providerChannelId,
+            name: 'Test Show',
+            totalEpisodes: 6, // Delta detected
+          },
+        ])
+      );
 
       // All unplayable
       const episodes = [
@@ -1050,7 +1096,9 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
 
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
-    mockGetMultipleShows.mockResolvedValue([]);
+    mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockUpdateShowCache.mockResolvedValue(undefined);
+    mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
   });
 
@@ -1081,11 +1129,13 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       });
 
       // All shows have delta detected
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
-        { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
-        { id: 'show3', name: 'Show 3', totalEpisodes: 31 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
+          { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
+          { id: 'show3', name: 'Show 3', totalEpisodes: 31 },
+        ])
+      );
 
       // Each show has one new episode
       mockGetShowEpisodes.mockImplementation((_, showId: string) => {
@@ -1139,11 +1189,13 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         totalItems: 30,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show_success', name: 'Success Show', totalEpisodes: 11 },
-        { id: 'show_fail', name: 'Failing Show', totalEpisodes: 21 },
-        { id: 'show_success_2', name: 'Success Show 2', totalEpisodes: 31 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show_success', name: 'Success Show', totalEpisodes: 11 },
+          { id: 'show_fail', name: 'Failing Show', totalEpisodes: 21 },
+          { id: 'show_success_2', name: 'Success Show 2', totalEpisodes: 31 },
+        ])
+      );
 
       // Second call fails, others succeed
       mockGetShowEpisodes
@@ -1190,12 +1242,14 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       );
 
       // All shows have delta
-      mockGetMultipleShows.mockResolvedValue(
-        subs.map((s, i) => ({
-          id: s.providerChannelId,
-          name: s.name,
-          totalEpisodes: 11 + i,
-        }))
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s, i) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 11 + i,
+          }))
+        )
       );
 
       // Track concurrent calls
@@ -1240,12 +1294,14 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         })
       );
 
-      mockGetMultipleShows.mockResolvedValue(
-        subs.map((s) => ({
-          id: s.providerChannelId,
-          name: s.name,
-          totalEpisodes: 11,
-        }))
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 11,
+          }))
+        )
       );
 
       let maxConcurrent = 0;
@@ -1289,10 +1345,12 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         totalItems: 20,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show_ok', name: 'Show OK', totalEpisodes: 11 },
-        { id: 'show_api_error', name: 'Show API Error', totalEpisodes: 21 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show_ok', name: 'Show OK', totalEpisodes: 11 },
+          { id: 'show_api_error', name: 'Show API Error', totalEpisodes: 21 },
+        ])
+      );
 
       mockGetShowEpisodes
         .mockImplementationOnce(() =>
@@ -1334,10 +1392,12 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         totalItems: 20,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show_fail_1', name: 'Show Fail 1', totalEpisodes: 11 },
-        { id: 'show_fail_2', name: 'Show Fail 2', totalEpisodes: 21 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show_fail_1', name: 'Show Fail 1', totalEpisodes: 11 },
+          { id: 'show_fail_2', name: 'Show Fail 2', totalEpisodes: 21 },
+        ])
+      );
 
       // All fetches fail
       mockGetShowEpisodes.mockRejectedValue(new Error('Network error'));
@@ -1373,10 +1433,12 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         lastPublishedAt: MOCK_NOW - 86400000,
       });
 
-      mockGetMultipleShows.mockResolvedValue([
-        { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
-        { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          { id: 'show1', name: 'Show 1', totalEpisodes: 11 },
+          { id: 'show2', name: 'Show 2', totalEpisodes: 21 },
+        ])
+      );
 
       mockGetShowEpisodes.mockImplementation((_, showId: string) => {
         return Promise.resolve([
@@ -1431,7 +1493,9 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
 
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
-    mockGetMultipleShows.mockResolvedValue([]);
+    mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockUpdateShowCache.mockResolvedValue(undefined);
+    mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
   });
 
@@ -1448,7 +1512,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       });
 
       // getMultipleShows returns empty array (show not found)
-      mockGetMultipleShows.mockResolvedValue([]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
 
       const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
 
@@ -1487,7 +1551,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       });
 
       // Neither show found
-      mockGetMultipleShows.mockResolvedValue([]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
 
       const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
 
@@ -1520,13 +1584,15 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       });
 
       // Only one show found
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: 'active_show',
-          name: 'Active Show',
-          totalEpisodes: 11, // Delta detected
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: 'active_show',
+            name: 'Active Show',
+            totalEpisodes: 11, // Delta detected
+          },
+        ])
+      );
 
       // Episodes for the active show
       const episodes = [
@@ -1577,7 +1643,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       });
 
       // getMultipleShows returns null for this show (filtered out in showMap building)
-      mockGetMultipleShows.mockResolvedValue([null]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([null] as never));
 
       const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
 
@@ -1602,7 +1668,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
         providerChannelId: 'deleted_show',
       });
 
-      mockGetMultipleShows.mockResolvedValue([]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
 
       const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
 
@@ -1628,13 +1694,15 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       });
 
       // Even if it did reach the poller and the show exists
-      mockGetMultipleShows.mockResolvedValue([
-        {
-          id: sub.providerChannelId,
-          name: 'Reconnected Show',
-          totalEpisodes: 100,
-        },
-      ]);
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult([
+          {
+            id: sub.providerChannelId,
+            name: 'Reconnected Show',
+            totalEpisodes: 100,
+          },
+        ])
+      );
 
       const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
 

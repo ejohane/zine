@@ -70,6 +70,10 @@ export interface BatchPollingResult {
   disconnected?: number;
   /** Any errors that occurred during batch processing */
   errors?: Array<{ subscriptionId: string; error: string }>;
+  /** Cache hit count for show metadata lookups (Spotify only) */
+  cacheHits?: number;
+  /** Cache miss count for show metadata lookups (Spotify only) */
+  cacheMisses?: number;
 }
 
 // ============================================================================

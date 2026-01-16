@@ -23,7 +23,9 @@ import { parseSpotifyDate } from '../lib/timestamps';
 import {
   getSpotifyClientForConnection,
   getShowEpisodes,
-  getMultipleShows,
+  getMultipleShowsWithCache,
+  updateShowCache,
+  invalidateShowCache,
   type SpotifyEpisode,
   type SpotifyShow,
 } from '../providers/spotify';
@@ -117,10 +119,23 @@ export async function pollSpotifySubscriptionsBatched(
   // Extract show IDs from subscriptions
   const showIds = subs.map((sub) => sub.providerChannelId);
 
-  // Batch fetch show metadata (1-2 API calls for up to 100 shows)
-  let shows: SpotifyShow[];
+  // Batch fetch show metadata with caching
+  // This checks KV cache first, then fetches uncached shows from API
+  let showMap: Map<string, SpotifyShow>;
+  let cacheHits = 0;
+  let cacheMisses = 0;
   try {
-    shows = await getMultipleShows(client, showIds);
+    const cacheResult = await getMultipleShowsWithCache(client, showIds, env);
+    showMap = cacheResult.data;
+    cacheHits = cacheResult.cacheHits;
+    cacheMisses = cacheResult.cacheMisses;
+
+    spotifyLogger.info('Show metadata cache lookup', {
+      total: showIds.length,
+      cacheHits,
+      cacheMisses,
+      hitRate: showIds.length > 0 ? Math.round((cacheHits / showIds.length) * 100) : 0,
+    });
   } catch (error) {
     spotifyLogger.error('Failed to fetch show metadata', {
       error: serializeError(error),
@@ -133,21 +148,13 @@ export async function pollSpotifySubscriptionsBatched(
       errors: subs.map((sub) =>
         formatPollingErrorLegacy(
           createPollingError(sub.id, error, {
-            operation: 'getMultipleShows',
+            operation: 'getMultipleShowsWithCache',
             userId,
             showCount: showIds.length,
           })
         )
       ),
     };
-  }
-
-  // Build a map of showId -> SpotifyShow for quick lookup
-  const showMap = new Map<string, SpotifyShow>();
-  for (const show of shows) {
-    if (show) {
-      showMap.set(show.id, show);
-    }
   }
 
   // Determine which subscriptions need updates via delta detection
@@ -194,13 +201,17 @@ export async function pollSpotifySubscriptionsBatched(
     missing: subsMissing.length,
   });
 
-  // Mark missing shows as disconnected
+  // Mark missing shows as disconnected and invalidate their cache
   if (subsMissing.length > 0) {
     await markSubscriptionsAsDisconnected(
       subsMissing.map((s) => s.id),
       'Show no longer available on Spotify',
       db
     );
+
+    // Invalidate cache for missing shows to ensure we don't serve stale data
+    await Promise.all(subsMissing.map((s) => invalidateShowCache(s.providerChannelId, env)));
+
     spotifyLogger.info('Marked subscriptions as disconnected due to missing shows', {
       count: subsMissing.length,
       subscriptionIds: subsMissing.map((s) => s.id),
@@ -336,6 +347,12 @@ export async function pollSpotifySubscriptionsBatched(
           updatedAt: Date.now(),
         })
         .where(eq(subscriptions.id, sub.id));
+
+      // Update the cache with fresh show data after successful ingestion
+      // This ensures the cache has the latest totalEpisodes for future delta detection
+      if (shouldUpdateTotalItems) {
+        await updateShowCache(show.id, show, env);
+      }
     } catch (ingestError) {
       const pollingError = createPollingError(sub.id, ingestError, {
         showId: sub.providerChannelId,
@@ -359,6 +376,8 @@ export async function pollSpotifySubscriptionsBatched(
     skipped: subsUnchanged.length,
     disconnected: subsMissing.length,
     errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    cacheHits,
+    cacheMisses,
   };
 }
 
