@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { classifyError } from './processor';
+import { classifyError, ValidationError } from './processor';
 import { TransformError } from './transformers';
 
 // ============================================================================
@@ -99,6 +99,19 @@ describe('classifyError', () => {
   });
 
   describe('validation errors', () => {
+    it('should classify ValidationError instances as validation', () => {
+      const error = new ValidationError('Invalid data', 'testField', 'testValue');
+      expect(classifyError(error)).toBe('validation');
+    });
+
+    it('should classify ValidationError with context as validation', () => {
+      const error = new ValidationError('Invalid data', 'testField', 'testValue', {
+        providerId: 'test123',
+        allErrors: [],
+      });
+      expect(classifyError(error)).toBe('validation');
+    });
+
     it('should classify errors with "validation" in name as validation', () => {
       const error = new Error('Invalid data');
       error.name = 'ValidationError';
@@ -156,5 +169,11 @@ describe('classifyError - Edge Cases', () => {
     // TransformError should be classified as transform even if message contains other keywords
     const error = new TransformError('Database field missing');
     expect(classifyError(error)).toBe('transform');
+  });
+
+  it('should prioritize ValidationError classification over message heuristics', () => {
+    // ValidationError should be classified as validation even if message contains other keywords
+    const error = new ValidationError('Database constraint failed', 'field', 'value');
+    expect(classifyError(error)).toBe('validation');
   });
 });

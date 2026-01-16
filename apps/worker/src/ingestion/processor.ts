@@ -32,6 +32,7 @@ import {
 import type { NewItem } from './transformers';
 import { TransformError } from './transformers';
 import { serializeError } from '../utils/error-utils';
+import { validateCanonicalItem, isValidationError } from './validation';
 
 // ============================================================================
 // Types
@@ -76,6 +77,10 @@ export type DLQErrorType = 'transform' | 'database' | 'validation' | 'timeout' |
 export function classifyError(error: unknown): DLQErrorType {
   if (error instanceof TransformError) {
     return 'transform';
+  }
+
+  if (isValidationError(error)) {
+    return 'validation';
   }
 
   if (error instanceof Error) {
@@ -190,7 +195,11 @@ export async function ingestItem<T>(
   // 1. Transform raw provider data to our item format
   const transformedItem = transformFn(rawItem);
 
-  // 2. Check idempotency (has this user already seen this item?)
+  // 2. Validate transformed item before any DB operations
+  // This catches missing required fields, invalid URLs, out-of-range values, etc.
+  validateCanonicalItem(transformedItem, rawItem);
+
+  // 3. Check idempotency (has this user already seen this item?)
   // This query is safe outside the transaction since it's a read-only check
   // and the transaction will handle the actual write atomicity
   const seen = await db
@@ -209,10 +218,10 @@ export async function ingestItem<T>(
     return { created: false, skipped: 'already_seen' };
   }
 
-  // 3. Find or create canonical item (shared across users)
+  // 4. Find or create canonical item (shared across users)
   const item = await findOrCreateCanonicalItem(transformedItem, provider, db);
 
-  // 4. Prepare all the insert statements for batch execution
+  // 5. Prepare all the insert statements for batch execution
   const userItemId = ulid();
   const nowISO = new Date().toISOString(); // ISO8601 for existing table
   const now = Date.now(); // Unix ms for new tables
@@ -445,3 +454,10 @@ export async function ingestBatch<T>(
 
   return result;
 }
+
+// ============================================================================
+// Re-exports
+// ============================================================================
+
+// Re-export validation utilities for external use
+export { ValidationError, isValidationError } from './validation';

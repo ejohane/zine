@@ -579,6 +579,7 @@ describe('Polling Scheduler', () => {
           durationMs: 3600000,
           externalUrl: 'https://open.spotify.com/episode/episode123',
           images: [],
+          isPlayable: true, // Required after zine-ej7 (Filter Unplayable Episodes)
         },
       ];
 
