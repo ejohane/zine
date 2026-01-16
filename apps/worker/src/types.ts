@@ -40,6 +40,8 @@ export interface Bindings {
   OAUTH_REDIRECT_URI?: string;
   /** Spotify episode fetch concurrency limit (default: 5) */
   SPOTIFY_EPISODE_FETCH_CONCURRENCY?: string;
+  /** User processing concurrency limit for multi-user parallel polling (default: 10) */
+  USER_PROCESSING_CONCURRENCY?: string;
 }
 
 /**

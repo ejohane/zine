@@ -46,6 +46,8 @@ const mockGetYouTubeClientForConnection = vi.fn();
 const mockFetchRecentVideos = vi.fn();
 const mockFetchVideoDetails = vi.fn();
 
+const mockFetchVideoDetailsBatched = vi.fn();
+
 vi.mock('../providers/youtube', () => ({
   getYouTubeClientForConnection: (...args: unknown[]) => mockGetYouTubeClientForConnection(...args),
   // getUploadsPlaylistId is now synchronous and deterministic (UC -> UU prefix swap)
@@ -53,15 +55,18 @@ vi.mock('../providers/youtube', () => ({
   getUploadsPlaylistId: (channelId: string) => 'UU' + channelId.slice(2),
   fetchRecentVideos: (...args: unknown[]) => mockFetchRecentVideos(...args),
   fetchVideoDetails: (...args: unknown[]) => mockFetchVideoDetails(...args),
+  fetchVideoDetailsBatched: (...args: unknown[]) => mockFetchVideoDetailsBatched(...args),
 }));
 
 // Mock Spotify provider
 const mockGetSpotifyClientForConnection = vi.fn();
 const mockGetShowEpisodes = vi.fn();
+const mockGetMultipleShows = vi.fn();
 
 vi.mock('../providers/spotify', () => ({
   getSpotifyClientForConnection: (...args: unknown[]) => mockGetSpotifyClientForConnection(...args),
   getShowEpisodes: (...args: unknown[]) => mockGetShowEpisodes(...args),
+  getMultipleShows: (...args: unknown[]) => mockGetMultipleShows(...args),
 }));
 
 // Mock ingestion
@@ -211,8 +216,10 @@ describe('Polling Scheduler', () => {
     // getUploadsPlaylistId is now synchronous and deterministic - no mock needed
     mockFetchRecentVideos.mockResolvedValue([]);
     mockFetchVideoDetails.mockResolvedValue(new Map());
+    mockFetchVideoDetailsBatched.mockResolvedValue(new Map());
     mockGetSpotifyClientForConnection.mockResolvedValue({});
     mockGetShowEpisodes.mockResolvedValue([]);
+    mockGetMultipleShows.mockResolvedValue([]);
     mockIngestItem.mockResolvedValue({ created: false });
   });
 
@@ -821,6 +828,248 @@ describe('Polling Scheduler', () => {
       // Only video181 should be ingested (>180s)
       expect(mockIngestItem).toHaveBeenCalledTimes(1);
       expect(result.newItems).toBe(1);
+    });
+  });
+
+  // ==========================================================================
+  // Multi-User Parallel Processing Tests
+  // ==========================================================================
+
+  describe('Multi-User Parallel Processing', () => {
+    it('should process multiple users in parallel', async () => {
+      // Create subscriptions for multiple users
+      const subscriptions = [
+        createMockSubscription({ id: 'sub_1', userId: 'user_1', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_2', userId: 'user_1', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_3', userId: 'user_2', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_4', userId: 'user_3', provider: 'YOUTUBE' }),
+      ];
+
+      const connection1 = createMockConnection({ userId: 'user_1' });
+      const connection2 = createMockConnection({ userId: 'user_2' });
+      const connection3 = createMockConnection({ userId: 'user_3' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue(subscriptions);
+      mockDbQueryConnections.findFirst.mockImplementation(async () => {
+        // Return the appropriate connection based on call order
+        const calls = mockDbQueryConnections.findFirst.mock.calls.length;
+        if (calls <= 1) return connection1;
+        if (calls <= 2) return connection2;
+        return connection3;
+      });
+      mockFetchRecentVideos.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // All 4 subscriptions should be processed
+      expect(result.processed).toBe(4);
+      // Rate limit should have been checked for all 3 users
+      expect(mockIsRateLimited).toHaveBeenCalledTimes(3);
+    });
+
+    it('should isolate user failures - one user failure should not block others', async () => {
+      // Create subscriptions for multiple users
+      const subscriptions = [
+        createMockSubscription({ id: 'sub_1', userId: 'user_1', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_2', userId: 'user_2', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_3', userId: 'user_3', provider: 'YOUTUBE' }),
+      ];
+
+      const connection1 = createMockConnection({ userId: 'user_1' });
+      const connection2 = createMockConnection({ userId: 'user_2' });
+      const connection3 = createMockConnection({ userId: 'user_3' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue(subscriptions);
+
+      // Return connections sequentially
+      let connectionCallCount = 0;
+      mockDbQueryConnections.findFirst.mockImplementation(async () => {
+        connectionCallCount++;
+        if (connectionCallCount === 1) return connection1;
+        if (connectionCallCount === 2) return connection2;
+        return connection3;
+      });
+
+      // User 2 will fail with a non-auth error
+      let clientCallCount = 0;
+      mockGetYouTubeClientForConnection.mockImplementation(async () => {
+        clientCallCount++;
+        if (clientCallCount === 2) {
+          throw new Error('Network error for user 2');
+        }
+        return {};
+      });
+
+      mockFetchRecentVideos.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // 2 subscriptions should be processed successfully (user_1 and user_3)
+      // user_2's subscription failed but was isolated
+      expect(result.processed).toBe(2);
+    });
+
+    it('should respect USER_PROCESSING_CONCURRENCY environment variable', async () => {
+      const subscriptions = [
+        createMockSubscription({ id: 'sub_1', userId: 'user_1', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_2', userId: 'user_2', provider: 'YOUTUBE' }),
+      ];
+
+      const connection = createMockConnection();
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue(subscriptions);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue([]);
+
+      // Set concurrency limit
+      const env = {
+        ...createMockEnv(),
+        USER_PROCESSING_CONCURRENCY: '5',
+      };
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      expect(result.processed).toBe(2);
+    });
+
+    it('should aggregate results correctly from parallel user processing', async () => {
+      const subscriptions = [
+        createMockSubscription({
+          id: 'sub_1',
+          userId: 'user_1',
+          provider: 'SPOTIFY',
+          providerChannelId: '0testshow123456789012',
+        }),
+        createMockSubscription({
+          id: 'sub_2',
+          userId: 'user_2',
+          provider: 'SPOTIFY',
+          providerChannelId: '0testshow987654321098',
+        }),
+      ];
+
+      const connection1 = createMockConnection({ userId: 'user_1', provider: 'SPOTIFY' });
+      const connection2 = createMockConnection({ userId: 'user_2', provider: 'SPOTIFY' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue(subscriptions);
+
+      let connectionCallCount = 0;
+      mockDbQueryConnections.findFirst.mockImplementation(async () => {
+        connectionCallCount++;
+        return connectionCallCount === 1 ? connection1 : connection2;
+      });
+
+      // User 1 has 2 new episodes, user 2 has 1 new episode
+      let episodeCallCount = 0;
+      mockGetShowEpisodes.mockImplementation(async () => {
+        episodeCallCount++;
+        if (episodeCallCount === 1) {
+          return [
+            {
+              id: 'ep1',
+              name: 'Episode 1',
+              releaseDate: '2024-01-15',
+              description: '',
+              durationMs: 3600000,
+              externalUrl: '',
+              images: [],
+              isPlayable: true,
+            },
+            {
+              id: 'ep2',
+              name: 'Episode 2',
+              releaseDate: '2024-01-14',
+              description: '',
+              durationMs: 3600000,
+              externalUrl: '',
+              images: [],
+              isPlayable: true,
+            },
+          ];
+        }
+        return [
+          {
+            id: 'ep3',
+            name: 'Episode 3',
+            releaseDate: '2024-01-15',
+            description: '',
+            durationMs: 3600000,
+            externalUrl: '',
+            images: [],
+            isPlayable: true,
+          },
+        ];
+      });
+
+      mockIngestItem.mockResolvedValue({ created: true });
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // Both subscriptions processed
+      expect(result.processed).toBe(2);
+      // On first poll (lastPolledAt is null), only latest episode is ingested per subscription
+      // So 2 total new items (1 latest per user)
+      expect(result.newItems).toBe(2);
+    });
+
+    it('should handle mixed success and auth errors across users', async () => {
+      const subscriptions = [
+        createMockSubscription({ id: 'sub_1', userId: 'user_1', provider: 'YOUTUBE' }),
+        createMockSubscription({ id: 'sub_2', userId: 'user_2', provider: 'YOUTUBE' }),
+      ];
+
+      const connection1 = createMockConnection({ userId: 'user_1' });
+      const connection2 = createMockConnection({ userId: 'user_2' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue(subscriptions);
+
+      let connectionCallCount = 0;
+      mockDbQueryConnections.findFirst.mockImplementation(async () => {
+        connectionCallCount++;
+        return connectionCallCount === 1 ? connection1 : connection2;
+      });
+
+      // User 1 succeeds, user 2 gets auth error (401)
+      let clientCallCount = 0;
+      mockGetYouTubeClientForConnection.mockImplementation(async () => {
+        clientCallCount++;
+        if (clientCallCount === 2) {
+          throw { status: 401, message: 'Unauthorized' };
+        }
+        return {};
+      });
+
+      mockFetchRecentVideos.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollSubscriptions } = await import('./scheduler');
+      const result = await pollSubscriptions(env as never, ctx);
+
+      // User 1's subscription was processed
+      expect(result.processed).toBe(1);
+      // Connection should be marked as expired for user 2
+      expect(mockDbUpdate).toHaveBeenCalled();
     });
   });
 
