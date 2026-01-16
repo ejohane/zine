@@ -576,6 +576,347 @@ describe('Spotify Poller - Watermark Integrity', () => {
 });
 
 // ============================================================================
+// Unplayable Episodes Filtering Tests (zine-ej7)
+// ============================================================================
+
+describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
+  const originalDateNow = Date.now;
+  const MOCK_NOW = 1705320000000;
+
+  beforeEach(() => {
+    Date.now = vi.fn(() => MOCK_NOW);
+    vi.clearAllMocks();
+    dbUpdateCalls.length = 0;
+
+    // Default mock implementations
+    mockGetShowEpisodes.mockResolvedValue([]);
+    mockGetMultipleShows.mockResolvedValue([]);
+    mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
+  });
+
+  afterEach(() => {
+    Date.now = originalDateNow;
+  });
+
+  describe('pollSingleSpotifySubscription', () => {
+    it('should filter out unplayable episodes before ingestion', async () => {
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 259200000, // 3 days ago (Jan 12)
+      });
+
+      // Mix of playable and unplayable episodes - all within the date window
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'playable1',
+          name: 'Playable Episode 1',
+          releaseDate: '2024-01-15', // > Jan 12 ✓
+          isPlayable: true,
+        }),
+        createMockSpotifyEpisode({
+          id: 'unplayable1',
+          name: 'Geo-Restricted Episode',
+          releaseDate: '2024-01-14', // > Jan 12 ✓ (but unplayable)
+          isPlayable: false,
+        }),
+        createMockSpotifyEpisode({
+          id: 'playable2',
+          name: 'Playable Episode 2',
+          releaseDate: '2024-01-13', // > Jan 12 ✓
+          isPlayable: true,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      // Ingestion succeeds for all attempts
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSingleSpotifySubscription } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSingleSpotifySubscription(
+        sub as never,
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Should have ingested 2 playable episodes, not the unplayable one
+      expect(mockIngestItem).toHaveBeenCalledTimes(2);
+
+      // Verify unplayable episode was NOT ingested
+      const ingestCalls = mockIngestItem.mock.calls;
+      const ingestedIds = ingestCalls.map((call) => (call[2] as { id: string }).id);
+      expect(ingestedIds).toContain('playable1');
+      expect(ingestedIds).toContain('playable2');
+      expect(ingestedIds).not.toContain('unplayable1');
+
+      expect(result.newItems).toBe(2);
+    });
+
+    it('should handle all episodes being unplayable', async () => {
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 86400000, // Yesterday
+      });
+
+      // All episodes are unplayable
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'unplayable1',
+          name: 'Geo-Restricted Episode 1',
+          releaseDate: '2024-01-15',
+          isPlayable: false,
+        }),
+        createMockSpotifyEpisode({
+          id: 'unplayable2',
+          name: 'Removed Episode',
+          releaseDate: '2024-01-14',
+          isPlayable: false,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      const { pollSingleSpotifySubscription } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSingleSpotifySubscription(
+        sub as never,
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // No episodes should be ingested
+      expect(mockIngestItem).not.toHaveBeenCalled();
+      expect(result.newItems).toBe(0);
+
+      // lastPolledAt should still be updated
+      const updateCall = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
+      expect(updateCall?.values.lastPolledAt).toBeDefined();
+    });
+
+    it('should not count unplayable episodes when updating lastPublishedAt', async () => {
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 259200000, // 3 days ago
+      });
+
+      // Newest episode is unplayable, older one is playable
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'unplayable-newest',
+          name: 'Newest but Unplayable',
+          releaseDate: '2024-01-15', // Newest
+          isPlayable: false,
+        }),
+        createMockSpotifyEpisode({
+          id: 'playable-older',
+          name: 'Older but Playable',
+          releaseDate: '2024-01-14', // Older
+          isPlayable: true,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSingleSpotifySubscription } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSingleSpotifySubscription(
+        sub as never,
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // lastPublishedAt should be updated to the playable episode's date (Jan 14),
+      // NOT the unplayable newest episode's date (Jan 15)
+      const updateCall = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
+      const expectedTimestamp = new Date('2024-01-14T00:00:00Z').getTime();
+      expect(updateCall?.values.lastPublishedAt).toBe(expectedTimestamp);
+    });
+  });
+
+  describe('pollSpotifySubscriptionsBatched', () => {
+    it('should filter out unplayable episodes in batch polling', async () => {
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 172800000,
+        totalItems: 10,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        {
+          id: sub.providerChannelId,
+          name: 'Test Show',
+          totalEpisodes: 12, // Delta detected
+        },
+      ]);
+
+      // Mix of playable and unplayable episodes
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'playable1',
+          name: 'Playable Episode',
+          releaseDate: '2024-01-15',
+          isPlayable: true,
+        }),
+        createMockSpotifyEpisode({
+          id: 'unplayable1',
+          name: 'Unplayable Episode',
+          releaseDate: '2024-01-14',
+          isPlayable: false,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Should only ingest the playable episode
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      expect(result.newItems).toBe(1);
+    });
+
+    it('should handle all episodes being unplayable in batch polling', async () => {
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 86400000,
+        totalItems: 5,
+      });
+
+      mockGetMultipleShows.mockResolvedValue([
+        {
+          id: sub.providerChannelId,
+          name: 'Test Show',
+          totalEpisodes: 6, // Delta detected
+        },
+      ]);
+
+      // All unplayable
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'unplayable1',
+          releaseDate: '2024-01-15',
+          isPlayable: false,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // No ingestion attempts
+      expect(mockIngestItem).not.toHaveBeenCalled();
+      expect(result.newItems).toBe(0);
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('should handle episode becoming playable after initial filter', async () => {
+      // Scenario: Episode was previously unplayable, now is playable
+      // It should be picked up if within the lookback window
+      const sub = createMockSubscription({
+        lastPublishedAt: MOCK_NOW - 172800000, // 2 days ago
+      });
+
+      // Episode that was previously unplayable is now playable
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'previously-unavailable',
+          name: 'Now Available Episode',
+          releaseDate: '2024-01-14', // Released yesterday, within window
+          isPlayable: true, // Now playable
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSingleSpotifySubscription } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSingleSpotifySubscription(
+        sub as never,
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Should be ingested since it's now playable and within window
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      expect(result.newItems).toBe(1);
+    });
+
+    it('should filter unplayable before applying date filter on first poll', async () => {
+      // First poll: should only take the latest PLAYABLE episode
+      const sub = createMockSubscription({
+        lastPublishedAt: null, // First poll
+      });
+
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'newest-unplayable',
+          name: 'Newest but Unplayable',
+          releaseDate: '2024-01-15',
+          isPlayable: false,
+        }),
+        createMockSpotifyEpisode({
+          id: 'second-playable',
+          name: 'Second Newest and Playable',
+          releaseDate: '2024-01-14',
+          isPlayable: true,
+        }),
+        createMockSpotifyEpisode({
+          id: 'third-playable',
+          name: 'Third Newest and Playable',
+          releaseDate: '2024-01-13',
+          isPlayable: true,
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSingleSpotifySubscription } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSingleSpotifySubscription(
+        sub as never,
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // First poll only takes latest episode - should be Jan 14 (newest playable)
+      expect(mockIngestItem).toHaveBeenCalledTimes(1);
+      const ingestCall = mockIngestItem.mock.calls[0];
+      expect((ingestCall[2] as { id: string }).id).toBe('second-playable');
+    });
+  });
+});
+
+// ============================================================================
 // Regression Tests for Bug zine-ej0
 // ============================================================================
 

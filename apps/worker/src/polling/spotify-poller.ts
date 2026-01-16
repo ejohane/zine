@@ -184,10 +184,19 @@ export async function pollSpotifySubscriptionsBatched(
   for (const { sub, show } of subsNeedingUpdate) {
     try {
       // Fetch recent episodes from the show
-      const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+      const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+
+      if (allEpisodes.length === 0) {
+        spotifyLogger.info('No episodes found', { name: sub.name });
+        await updateSubscriptionPolled(sub.id, db);
+        continue;
+      }
+
+      // Filter out unplayable episodes first (geo-restricted, removed, etc.)
+      const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
 
       if (episodes.length === 0) {
-        spotifyLogger.info('No episodes found', { name: sub.name });
+        spotifyLogger.info('No playable episodes found', { name: sub.name });
         await updateSubscriptionPolled(sub.id, db);
         continue;
       }
@@ -299,10 +308,19 @@ export async function pollSingleSpotifySubscription(
   });
 
   // Fetch recent episodes from the show
-  const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+  const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+
+  if (allEpisodes.length === 0) {
+    spotifyLogger.info('No episodes found', { name: sub.name });
+    await updateSubscriptionPolled(sub.id, db);
+    return { newItems: 0 };
+  }
+
+  // Filter out unplayable episodes first (geo-restricted, removed, etc.)
+  const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
 
   if (episodes.length === 0) {
-    spotifyLogger.info('No episodes found', { name: sub.name });
+    spotifyLogger.info('No playable episodes found', { name: sub.name });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -361,6 +379,39 @@ export async function pollSingleSpotifySubscription(
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Filter out unplayable episodes before processing.
+ *
+ * Spotify episodes can be unplayable due to:
+ * - Geo-restrictions (not available in user's region)
+ * - Removed by publisher
+ * - Rights expired
+ * - Content policy violation
+ * - Temporary takedown
+ *
+ * Unplayable episodes should not be ingested into the user's inbox
+ * as they would create frustration (content they can't access).
+ *
+ * @param episodes - Episodes to filter
+ * @param showName - Show name for logging context
+ * @returns Only playable episodes
+ */
+function filterPlayableEpisodes(episodes: SpotifyEpisode[], showName: string): SpotifyEpisode[] {
+  const playableEpisodes = episodes.filter((e) => e.isPlayable);
+
+  const unplayableCount = episodes.length - playableEpisodes.length;
+  if (unplayableCount > 0) {
+    spotifyLogger.info('Filtered unplayable episodes', {
+      showName,
+      totalEpisodes: episodes.length,
+      unplayableCount,
+      playableCount: playableEpisodes.length,
+    });
+  }
+
+  return playableEpisodes;
+}
 
 /**
  * Filter episodes to only those published after lastPublishedAt.
