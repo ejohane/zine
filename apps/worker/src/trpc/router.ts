@@ -5,6 +5,7 @@ import { sourcesRouter } from './routers/sources';
 import { subscriptionsRouter } from './routers/subscriptions';
 import { connectionsRouter } from './routers/connections';
 import { bookmarksRouter } from './routers/bookmarks';
+import { adminRouter } from './routers/admin';
 
 /**
  * Root tRPC router
@@ -55,6 +56,8 @@ export const appRouter = router({
     syncAll: subscriptionsRouter.syncAll,
     discover: subscriptionsRouter.discover,
   }),
+  // Admin operations (data repair, diagnostics)
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;
