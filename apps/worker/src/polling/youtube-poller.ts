@@ -49,6 +49,35 @@ import { MAX_ITEMS_PER_POLL, SHORTS_DURATION_THRESHOLD } from './types';
 const ytLogger = pollLogger.child('youtube');
 
 // ============================================================================
+// Date Parsing Utilities
+// ============================================================================
+
+/**
+ * Parse a YouTube date string into a Unix timestamp.
+ *
+ * Handles edge cases:
+ * - Missing/undefined date strings return null
+ * - Invalid date strings that produce NaN return null
+ * - Valid ISO 8601 dates return the timestamp in milliseconds
+ *
+ * @param dateString - The date string from YouTube API (ISO 8601 format)
+ * @returns Unix timestamp in milliseconds, or null if invalid/missing
+ */
+export function parseYouTubeDate(dateString: string | undefined | null): number | null {
+  if (!dateString) {
+    return null;
+  }
+
+  const parsed = new Date(dateString).getTime();
+
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+// ============================================================================
 // Provider Configuration
 // ============================================================================
 
@@ -132,7 +161,7 @@ export async function pollSingleYouTubeSubscription(
   }
 
   // Filter to new videos based on lastPolledAt
-  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt);
+  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt, sub.name);
 
   ytLogger.info('Found videos', {
     total: videos.length,
@@ -224,17 +253,64 @@ function filterOutShorts(videos: EnrichedVideo[], subscriptionName: string): Enr
 
 /**
  * Filter videos to only those published after lastPolledAt.
- * For first poll (no lastPolledAt), return only the latest video.
+ *
+ * Edge cases handled:
+ * - Missing/invalid dates: Videos without valid publishedAt are logged and skipped
+ *   (they can't be properly ordered in the inbox)
+ * - First poll (lastPolledAt = null/0): Return only the latest video with a valid date
+ * - NaN prevention: parseYouTubeDate explicitly returns null for invalid dates
+ *
+ * @param videos - Videos to filter
+ * @param lastPolledAt - Timestamp of last poll, or null for first poll
+ * @param subscriptionName - Name of subscription for logging context
+ * @returns Videos that are new (published after lastPolledAt) with valid dates
  */
-function filterNewVideos(videos: EnrichedVideo[], lastPolledAt: number | null): EnrichedVideo[] {
-  if (lastPolledAt) {
-    return videos.filter((v) => {
-      const publishedAt = v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0;
-      return publishedAt > lastPolledAt;
+function filterNewVideos(
+  videos: EnrichedVideo[],
+  lastPolledAt: number | null,
+  subscriptionName?: string
+): EnrichedVideo[] {
+  // Track invalid dates for logging
+  let invalidDateCount = 0;
+
+  // Filter to videos with valid dates
+  const validVideos = videos.filter((v) => {
+    const publishedAt = parseYouTubeDate(v.snippet?.publishedAt);
+
+    if (publishedAt === null) {
+      invalidDateCount++;
+      ytLogger.warn('Video missing or invalid publishedAt', {
+        videoId: v.contentDetails?.videoId || v.id,
+        publishedAt: v.snippet?.publishedAt,
+        subscriptionName,
+      });
+      return false;
+    }
+
+    return true;
+  });
+
+  // Log summary if we filtered out invalid dates
+  if (invalidDateCount > 0) {
+    ytLogger.info('Videos with invalid dates filtered', {
+      subscriptionName,
+      invalidCount: invalidDateCount,
+      totalVideos: videos.length,
+      validVideos: validVideos.length,
     });
   }
-  // First poll: only latest video
-  return videos.slice(0, 1);
+
+  // First poll (no lastPolledAt): return only the latest video
+  if (!lastPolledAt) {
+    return validVideos.slice(0, 1);
+  }
+
+  // Filter to videos published after lastPolledAt
+  return validVideos.filter((v) => {
+    // We know publishedAt is valid here since we filtered above
+    const publishedAt = parseYouTubeDate(v.snippet?.publishedAt)!;
+    return publishedAt > lastPolledAt;
+  });
 }
 
 /**
@@ -279,6 +355,10 @@ async function ingestNewVideos(
 /**
  * Calculate the newest published timestamp from a list of videos.
  * Used to update subscription.lastPublishedAt.
+ *
+ * Uses parseYouTubeDate for consistent date handling:
+ * - Invalid/missing dates are filtered out
+ * - Only valid timestamps are considered for the max calculation
  */
 function calculateNewestPublishedAt(
   videos: youtube_v3.Schema$PlaylistItem[],
@@ -289,8 +369,8 @@ function calculateNewestPublishedAt(
   }
 
   const timestamps = videos
-    .map((v) => (v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0))
-    .filter((t) => t > 0);
+    .map((v) => parseYouTubeDate(v.snippet?.publishedAt))
+    .filter((t): t is number => t !== null);
 
   return timestamps.length > 0 ? Math.max(...timestamps) : fallback;
 }
@@ -507,7 +587,7 @@ async function processSubscriptionVideos(
   }
 
   // Filter to new videos based on lastPolledAt
-  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt);
+  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt, sub.name);
 
   ytLogger.info('Found videos', {
     total: videos.length,
