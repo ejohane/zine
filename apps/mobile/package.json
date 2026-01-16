@@ -60,7 +60,8 @@
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.1.17",
     "ulid": "^3.0.2",
-    "uniwind": "^1.2.2"
+    "uniwind": "^1.2.2",
+    "lucide-react-native": "^0.474.0"
   },
   "devDependencies": {
     "@testing-library/react-hooks": "^8.0.1",

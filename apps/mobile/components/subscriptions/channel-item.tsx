@@ -10,7 +10,7 @@ import { View, Text, Pressable, Image, ActivityIndicator, StyleSheet } from 'rea
 
 import type { Colors } from '@/constants/theme';
 import { Spacing, Radius, Typography, ProviderColors } from '@/constants/theme';
-import { CheckboxIcon } from '@/components/icons/checkbox-icon';
+import { CheckboxIcon } from '@/components/icons';
 
 // ============================================================================
 // Types

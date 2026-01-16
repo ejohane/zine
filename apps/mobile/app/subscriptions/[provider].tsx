@@ -525,9 +525,6 @@ export default function ProviderDetailScreen() {
       <Stack.Screen
         options={{
           title: config.name,
-          headerLargeTitle: true,
-          headerLargeTitleShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
         }}
       />
       <Surface style={[styles.container, { backgroundColor: colors.background }]}>
