@@ -9,6 +9,7 @@
  * - Use D1 batch API for atomic writes (items, user_items, subscription_items, provider_items_seen)
  * - Share canonical items across users
  * - Bridge timestamp formats between new tables (Unix ms) and existing tables (ISO8601)
+ * - Store failed items in dead-letter queue for later retry
  *
  * Note: D1 doesn't support traditional SQL transactions. We use db.batch() which
  * executes all statements in a single round-trip and rolls back on any failure.
@@ -21,8 +22,15 @@ import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Provider } from '@zine/shared';
 import { UserItemState } from '@zine/shared';
-import { items, userItems, subscriptionItems, providerItemsSeen } from '../db/schema';
+import {
+  items,
+  userItems,
+  subscriptionItems,
+  providerItemsSeen,
+  deadLetterQueue,
+} from '../db/schema';
 import type { NewItem } from './transformers';
+import { TransformError } from './transformers';
 
 // ============================================================================
 // Types
@@ -40,6 +48,76 @@ export interface IngestResult {
   userItemId?: string;
   /** Reason for skipping (if not created) */
   skipped?: 'already_seen';
+}
+
+// ============================================================================
+// Error Classification
+// ============================================================================
+
+/**
+ * Error types for dead-letter queue classification.
+ * Helps with understanding failure patterns and retry strategies.
+ */
+export type DLQErrorType = 'transform' | 'database' | 'validation' | 'timeout' | 'unknown';
+
+/**
+ * Classify an error into a category for dead-letter queue tracking.
+ * This helps with understanding failure patterns and determining retry strategies:
+ * - transform: Data transformation failed (likely needs manual fix)
+ * - database: DB operation failed (often transient, safe to retry)
+ * - validation: Data validation failed (likely needs manual fix)
+ * - timeout: Operation timed out (transient, safe to retry)
+ * - unknown: Unclassified error
+ *
+ * @param error - The error to classify
+ * @returns The error type classification
+ */
+export function classifyError(error: unknown): DLQErrorType {
+  if (error instanceof TransformError) {
+    return 'transform';
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    const name = error.name.toLowerCase();
+
+    // Database errors (D1, SQLite, Drizzle)
+    if (
+      name.includes('database') ||
+      name.includes('sql') ||
+      name.includes('d1') ||
+      message.includes('database') ||
+      message.includes('sqlite') ||
+      message.includes('constraint') ||
+      message.includes('unique') ||
+      message.includes('foreign key')
+    ) {
+      return 'database';
+    }
+
+    // Timeout errors
+    if (
+      name.includes('timeout') ||
+      message.includes('timeout') ||
+      message.includes('timed out') ||
+      message.includes('deadline exceeded')
+    ) {
+      return 'timeout';
+    }
+
+    // Validation errors
+    if (
+      name.includes('validation') ||
+      message.includes('validation') ||
+      message.includes('invalid') ||
+      message.includes('required field') ||
+      message.includes('missing')
+    ) {
+      return 'validation';
+    }
+  }
+
+  return 'unknown';
 }
 
 // ============================================================================
@@ -329,10 +407,32 @@ export async function ingestBatch<T>(
       }
     } catch (error) {
       result.errors++;
+      const providerId = getProviderId(rawItem);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       result.errorDetails.push({
-        providerId: getProviderId(rawItem),
-        error: error instanceof Error ? error.message : String(error),
+        providerId,
+        error: errorMessage,
       });
+
+      // Store failed item in dead-letter queue for later retry
+      try {
+        await db.insert(deadLetterQueue).values({
+          id: ulid(),
+          subscriptionId,
+          userId,
+          provider,
+          providerId,
+          rawData: JSON.stringify(rawItem),
+          errorMessage,
+          errorType: classifyError(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          createdAt: Date.now(),
+        });
+      } catch (dlqError) {
+        // Log but don't fail the batch if DLQ storage fails
+        // This is a best-effort operation
+        console.error('Failed to store item in dead-letter queue:', dlqError);
+      }
     }
   }
 

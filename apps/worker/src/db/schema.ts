@@ -248,6 +248,41 @@ export const subscriptionItems = sqliteTable(
 );
 
 // ============================================================================
+// Dead Letter Queue (Failed Ingestion Tracking)
+// ============================================================================
+// Stores items that failed during ingestion for later retry or manual review.
+// This prevents permanent data loss when ingestion fails due to transient errors.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const deadLetterQueue = sqliteTable(
+  'dead_letter_queue',
+  {
+    id: text('id').primaryKey(), // ULID
+    subscriptionId: text('subscription_id').references(() => subscriptions.id),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
+    providerId: text('provider_id').notNull(), // Episode/video ID from provider
+    rawData: text('raw_data').notNull(), // JSON string of full raw item
+    errorMessage: text('error_message').notNull(),
+    errorType: text('error_type'), // transform | database | validation | timeout | unknown
+    errorStack: text('error_stack'),
+    retryCount: integer('retry_count').notNull().default(0),
+    lastRetryAt: integer('last_retry_at'), // Unix ms
+    status: text('status').notNull().default('pending'), // pending | retrying | resolved | abandoned
+    createdAt: integer('created_at').notNull(), // Unix ms
+  },
+  (table) => [
+    // Fast queries for pending items to retry
+    index('dlq_status_idx').on(table.status),
+    // Fast queries by user
+    index('dlq_user_idx').on(table.userId),
+    // Prevent duplicate entries for the same provider item
+    index('dlq_provider_item_idx').on(table.provider, table.providerId, table.userId),
+  ]
+);
+
+// ============================================================================
 // Provider Items Seen (Ingestion Idempotency)
 // ============================================================================
 // This table is CRITICAL for preventing duplicate inbox items during ingestion.
