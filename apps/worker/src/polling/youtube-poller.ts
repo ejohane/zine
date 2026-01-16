@@ -41,6 +41,12 @@ import type {
   ProviderConnectionRow,
 } from './types';
 import { MAX_ITEMS_PER_POLL, SHORTS_DURATION_THRESHOLD } from './types';
+import {
+  serializeError,
+  createPollingError,
+  formatPollingErrorLegacy,
+  type PollingError,
+} from '../utils/error-utils';
 
 // ============================================================================
 // Logger
@@ -345,7 +351,14 @@ async function ingestNewVideos(
         newItemsCount++;
       }
     } catch (ingestError) {
-      ytLogger.error('Failed to ingest video', { error: ingestError });
+      const serialized = serializeError(ingestError);
+      ytLogger.error('Failed to ingest video', {
+        videoId: video.contentDetails?.videoId,
+        videoTitle: video.snippet?.title,
+        error: serialized,
+        errorType: serialized.type,
+        errorStack: serialized.stack,
+      });
     }
   }
 
@@ -429,10 +442,12 @@ async function fetchPlaylistsInParallel(
           const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
           return { subscription: sub, videos };
         } catch (error) {
+          const serialized = serializeError(error);
           ytLogger.error('Failed to fetch playlist', {
             subscriptionId: sub.id,
             name: sub.name,
-            error,
+            error: serialized,
+            errorType: serialized.type,
           });
           return { subscription: sub, videos: [], error: error as Error };
         }
@@ -471,7 +486,7 @@ export async function pollYouTubeSubscriptionsBatched(
 ): Promise<BatchPollingResult> {
   ytLogger.info('Batch polling subscriptions', { count: subs.length, userId });
 
-  const errors: Array<{ subscriptionId: string; error: string }> = [];
+  const pollingErrors: PollingError[] = [];
 
   // Step 1: Fetch all playlists in parallel (waves of 6)
   const playlistResults = await fetchPlaylistsInParallel(subs, client);
@@ -479,7 +494,14 @@ export async function pollYouTubeSubscriptionsBatched(
   // Collect errors from playlist fetches
   for (const result of playlistResults) {
     if (result.error) {
-      errors.push({ subscriptionId: result.subscription.id, error: String(result.error) });
+      pollingErrors.push(
+        createPollingError(result.subscription.id, result.error, {
+          channelId: result.subscription.providerChannelId,
+          channelName: result.subscription.name,
+          userId,
+          operation: 'fetchPlaylist',
+        })
+      );
     }
   }
 
@@ -521,26 +543,34 @@ export async function pollYouTubeSubscriptionsBatched(
       );
       totalNewItems += newItems;
     } catch (error) {
+      const pollingError = createPollingError(result.subscription.id, error, {
+        channelId: result.subscription.providerChannelId,
+        channelName: result.subscription.name,
+        userId,
+        operation: 'processSubscriptionVideos',
+      });
       ytLogger.error('Failed to process subscription videos', {
         subscriptionId: result.subscription.id,
         name: result.subscription.name,
-        error,
+        error: pollingError.error,
+        errorType: pollingError.errorType,
+        context: pollingError.context,
       });
-      errors.push({ subscriptionId: result.subscription.id, error: String(error) });
+      pollingErrors.push(pollingError);
     }
   }
 
   ytLogger.info('Batch polling complete', {
     processed: playlistResults.length,
     totalNewItems,
-    errors: errors.length,
+    errors: pollingErrors.length,
   });
 
   return {
     newItems: totalNewItems,
     processed: playlistResults.length,
     skipped: 0, // YouTube doesn't have delta detection
-    errors: errors.length > 0 ? errors : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
   };
 }
 

@@ -31,6 +31,7 @@ import {
 } from '../db/schema';
 import type { NewItem } from './transformers';
 import { TransformError } from './transformers';
+import { serializeError } from '../utils/error-utils';
 
 // ============================================================================
 // Types
@@ -408,7 +409,9 @@ export async function ingestBatch<T>(
     } catch (error) {
       result.errors++;
       const providerId = getProviderId(rawItem);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const serialized = serializeError(error);
+      // Build a richer error message that includes type and context
+      const errorMessage = `[${serialized.type}] ${serialized.message}`;
       result.errorDetails.push({
         providerId,
         error: errorMessage,
@@ -425,13 +428,17 @@ export async function ingestBatch<T>(
           rawData: JSON.stringify(rawItem),
           errorMessage,
           errorType: classifyError(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
+          errorStack: serialized.stack,
           createdAt: Date.now(),
         });
       } catch (dlqError) {
         // Log but don't fail the batch if DLQ storage fails
         // This is a best-effort operation
-        console.error('Failed to store item in dead-letter queue:', dlqError);
+        const dlqSerialized = serializeError(dlqError);
+        console.error('Failed to store item in dead-letter queue:', {
+          error: dlqSerialized,
+          providerId,
+        });
       }
     }
   }

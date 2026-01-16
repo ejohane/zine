@@ -39,6 +39,12 @@ import type {
   ProviderConnectionRow,
 } from './types';
 import { MAX_ITEMS_PER_POLL } from './types';
+import {
+  serializeError,
+  createPollingError,
+  formatPollingErrorLegacy,
+  type PollingError,
+} from '../utils/error-utils';
 
 // ============================================================================
 // Logger
@@ -108,15 +114,23 @@ export async function pollSpotifySubscriptionsBatched(
   try {
     shows = await getMultipleShows(client, showIds);
   } catch (error) {
-    spotifyLogger.error('Failed to fetch show metadata', { error, userId });
+    spotifyLogger.error('Failed to fetch show metadata', {
+      error: serializeError(error),
+      userId,
+    });
     // Return error for all subscriptions
     return {
       newItems: 0,
       processed: 0,
-      errors: subs.map((sub) => ({
-        subscriptionId: sub.id,
-        error: `Failed to fetch show metadata: ${String(error)}`,
-      })),
+      errors: subs.map((sub) =>
+        formatPollingErrorLegacy(
+          createPollingError(sub.id, error, {
+            operation: 'getMultipleShows',
+            userId,
+            showCount: showIds.length,
+          })
+        )
+      ),
     };
   }
 
@@ -195,7 +209,7 @@ export async function pollSpotifySubscriptionsBatched(
 
   // Process subscriptions that need updates
   let totalNewItems = 0;
-  const errors: Array<{ subscriptionId: string; error: string }> = [];
+  const pollingErrors: PollingError[] = [];
 
   for (const { sub, show } of subsNeedingUpdate) {
     try {
@@ -260,11 +274,19 @@ export async function pollSpotifySubscriptionsBatched(
         })
         .where(eq(subscriptions.id, sub.id));
     } catch (error) {
+      const pollingError = createPollingError(sub.id, error, {
+        showId: sub.providerChannelId,
+        showName: sub.name,
+        userId,
+        operation: 'pollSubscription',
+      });
       spotifyLogger.error('Failed to poll subscription', {
         subscriptionId: sub.id,
-        error,
+        error: pollingError.error,
+        errorType: pollingError.errorType,
+        context: pollingError.context,
       });
-      errors.push({ subscriptionId: sub.id, error: String(error) });
+      pollingErrors.push(pollingError);
     }
   }
 
@@ -273,7 +295,7 @@ export async function pollSpotifySubscriptionsBatched(
     processed: subsNeedingUpdate.length,
     skipped: subsUnchanged.length,
     disconnected: subsMissing.length,
-    errors: errors.length > 0 ? errors : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
   };
 }
 
@@ -567,11 +589,14 @@ async function ingestNewEpisodes(
     } catch (ingestError) {
       // IMPORTANT: Do NOT update newestIngestedAt on failure.
       // This ensures lastPublishedAt is only advanced for successful ingestions.
+      const serialized = serializeError(ingestError);
       spotifyLogger.error('Failed to ingest episode', {
         showName,
         episodeId: episode.id,
         episodeName: episode.name,
-        error: ingestError,
+        error: serialized,
+        errorType: serialized.type,
+        errorStack: serialized.stack,
       });
     }
   }
