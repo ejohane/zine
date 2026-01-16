@@ -201,6 +201,8 @@ export const subscriptions = sqliteTable(
 
     // Status
     status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | DISCONNECTED | UNSUBSCRIBED
+    disconnectedAt: integer('disconnected_at'), // Unix ms - when the subscription became disconnected
+    disconnectedReason: text('disconnected_reason'), // Human-readable reason for disconnection
 
     // Timestamps
     createdAt: integer('created_at').notNull(), // Unix ms

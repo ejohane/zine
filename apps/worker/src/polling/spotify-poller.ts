@@ -131,16 +131,18 @@ export async function pollSpotifySubscriptionsBatched(
   // Determine which subscriptions need updates via delta detection
   const subsNeedingUpdate: Array<{ sub: Subscription; show: SpotifyShow }> = [];
   const subsUnchanged: Subscription[] = [];
+  const subsMissing: Subscription[] = [];
 
   for (const sub of subs) {
     const show = showMap.get(sub.providerChannelId);
     if (!show) {
-      // Show not found - might have been removed from Spotify
-      spotifyLogger.warn('Show not found in batch response', {
+      // Show not found - likely deleted from Spotify or made unavailable
+      spotifyLogger.warn('Show not found in batch response - may be deleted from Spotify', {
         subscriptionId: sub.id,
         showId: sub.providerChannelId,
+        subscriptionName: sub.name,
       });
-      subsUnchanged.push(sub); // Treat as unchanged, update lastPolledAt
+      subsMissing.push(sub);
       continue;
     }
 
@@ -167,7 +169,21 @@ export async function pollSpotifySubscriptionsBatched(
   spotifyLogger.info('Delta detection complete', {
     needsUpdate: subsNeedingUpdate.length,
     unchanged: subsUnchanged.length,
+    missing: subsMissing.length,
   });
+
+  // Mark missing shows as disconnected
+  if (subsMissing.length > 0) {
+    await markSubscriptionsAsDisconnected(
+      subsMissing.map((s) => s.id),
+      'Show no longer available on Spotify',
+      db
+    );
+    spotifyLogger.info('Marked subscriptions as disconnected due to missing shows', {
+      count: subsMissing.length,
+      subscriptionIds: subsMissing.map((s) => s.id),
+    });
+  }
 
   // Batch update lastPolledAt for unchanged subscriptions
   if (subsUnchanged.length > 0) {
@@ -256,6 +272,7 @@ export async function pollSpotifySubscriptionsBatched(
     newItems: totalNewItems,
     processed: subsNeedingUpdate.length,
     skipped: subsUnchanged.length,
+    disconnected: subsMissing.length,
     errors: errors.length > 0 ? errors : undefined,
   };
 }
@@ -270,6 +287,29 @@ async function updateSubscriptionsPolled(ids: string[], db: DrizzleDB): Promise<
   await db
     .update(subscriptions)
     .set({ lastPolledAt: Date.now(), updatedAt: Date.now() })
+    .where(inArray(subscriptions.id, ids));
+}
+
+/**
+ * Mark subscriptions as disconnected with a reason.
+ * Used when a show is no longer available on Spotify.
+ */
+async function markSubscriptionsAsDisconnected(
+  ids: string[],
+  reason: string,
+  db: DrizzleDB
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  const now = Date.now();
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'DISCONNECTED',
+      disconnectedAt: now,
+      disconnectedReason: reason,
+      updatedAt: now,
+    })
     .where(inArray(subscriptions.id, ids));
 }
 

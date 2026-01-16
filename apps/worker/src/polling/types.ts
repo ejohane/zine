@@ -66,6 +66,8 @@ export interface BatchPollingResult {
   processed: number;
   /** Number of subscriptions skipped (e.g., delta detection) */
   skipped?: number;
+  /** Number of subscriptions marked as disconnected (e.g., show deleted from Spotify) */
+  disconnected?: number;
   /** Any errors that occurred during batch processing */
   errors?: Array<{ subscriptionId: string; error: string }>;
 }

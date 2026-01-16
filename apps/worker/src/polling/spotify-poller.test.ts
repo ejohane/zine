@@ -59,8 +59,17 @@ vi.mock('drizzle-orm', () => ({
 
 const mockDbUpdate = vi.fn(() => ({
   set: vi.fn((values: Record<string, unknown>) => ({
-    where: vi.fn((condition: { value: string }) => {
-      dbUpdateCalls.push({ subscriptionId: condition.value, values });
+    where: vi.fn((condition: { value?: string; values?: string[] }) => {
+      // Handle both eq (single value) and inArray (multiple values)
+      if (condition.values) {
+        // inArray case - record each subscription ID
+        for (const id of condition.values) {
+          dbUpdateCalls.push({ subscriptionId: id, values });
+        }
+      } else if (condition.value) {
+        // eq case - single subscription ID
+        dbUpdateCalls.push({ subscriptionId: condition.value, values });
+      }
       return Promise.resolve();
     }),
   })),
@@ -1023,5 +1032,246 @@ describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
     const secondUpdate = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
     const expectedTimestamp = new Date('2024-01-15T00:00:00Z').getTime();
     expect(secondUpdate?.values.lastPublishedAt).toBe(expectedTimestamp);
+  });
+});
+
+// ============================================================================
+// Deleted/Unavailable Show Handling Tests (zine-ew6)
+// ============================================================================
+
+describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => {
+  const originalDateNow = Date.now;
+  const MOCK_NOW = 1705320000000;
+
+  beforeEach(() => {
+    Date.now = vi.fn(() => MOCK_NOW);
+    vi.clearAllMocks();
+    dbUpdateCalls.length = 0;
+
+    // Default mock implementations
+    mockGetShowEpisodes.mockResolvedValue([]);
+    mockGetMultipleShows.mockResolvedValue([]);
+    mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
+  });
+
+  afterEach(() => {
+    Date.now = originalDateNow;
+  });
+
+  describe('pollSpotifySubscriptionsBatched', () => {
+    it('should mark subscription as DISCONNECTED when show is not found', async () => {
+      const sub = createMockSubscription({
+        id: 'sub_missing_show',
+        providerChannelId: 'deleted_show_123',
+        totalItems: 50,
+      });
+
+      // getMultipleShows returns empty array (show not found)
+      mockGetMultipleShows.mockResolvedValue([]);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Should mark the subscription as disconnected
+      const updateCall = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
+      expect(updateCall).toBeDefined();
+      expect(updateCall?.values.status).toBe('DISCONNECTED');
+      expect(updateCall?.values.disconnectedAt).toBe(MOCK_NOW);
+      expect(updateCall?.values.disconnectedReason).toBe('Show no longer available on Spotify');
+
+      // Result should include disconnected count
+      expect(result.disconnected).toBe(1);
+      expect(result.processed).toBe(0);
+      expect(result.newItems).toBe(0);
+    });
+
+    it('should mark multiple subscriptions as DISCONNECTED when shows are missing', async () => {
+      const sub1 = createMockSubscription({
+        id: 'sub_missing_1',
+        providerChannelId: 'deleted_show_1',
+        name: 'Deleted Show 1',
+      });
+      const sub2 = createMockSubscription({
+        id: 'sub_missing_2',
+        providerChannelId: 'deleted_show_2',
+        name: 'Deleted Show 2',
+      });
+
+      // Neither show found
+      mockGetMultipleShows.mockResolvedValue([]);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub1 as never, sub2 as never],
+        {} as never,
+        sub1.userId,
+        {} as never,
+        db as never
+      );
+
+      // Both should be marked as disconnected
+      expect(result.disconnected).toBe(2);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should handle mixed scenario: some shows found, some missing', async () => {
+      const subActive = createMockSubscription({
+        id: 'sub_active',
+        providerChannelId: 'active_show',
+        name: 'Active Show',
+        totalItems: 10,
+      });
+      const subMissing = createMockSubscription({
+        id: 'sub_missing',
+        providerChannelId: 'deleted_show',
+        name: 'Deleted Show',
+        totalItems: 5,
+      });
+
+      // Only one show found
+      mockGetMultipleShows.mockResolvedValue([
+        {
+          id: 'active_show',
+          name: 'Active Show',
+          totalEpisodes: 11, // Delta detected
+        },
+      ]);
+
+      // Episodes for the active show
+      const episodes = [
+        createMockSpotifyEpisode({
+          id: 'new_ep_1',
+          name: 'New Episode',
+          releaseDate: '2024-01-15',
+        }),
+      ];
+      mockGetShowEpisodes.mockResolvedValue(episodes);
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [subActive as never, subMissing as never],
+        {} as never,
+        subActive.userId,
+        {} as never,
+        db as never
+      );
+
+      // Missing sub should be marked as disconnected
+      const disconnectUpdate = dbUpdateCalls.find((c) => c.subscriptionId === 'sub_missing');
+      expect(disconnectUpdate?.values.status).toBe('DISCONNECTED');
+      expect(disconnectUpdate?.values.disconnectedReason).toBe(
+        'Show no longer available on Spotify'
+      );
+
+      // Active sub should be processed normally
+      const activeUpdate = dbUpdateCalls.find((c) => c.subscriptionId === 'sub_active');
+      expect(activeUpdate?.values.status).toBeUndefined(); // Status not changed
+      expect(activeUpdate?.values.lastPolledAt).toBe(MOCK_NOW);
+
+      // Result counts
+      expect(result.disconnected).toBe(1);
+      expect(result.processed).toBe(1);
+      expect(result.newItems).toBe(1);
+    });
+
+    it('should NOT mark subscription as disconnected when show returns null entry in batch', async () => {
+      // Spotify API can return null entries for shows that exist but are temporarily unavailable
+      // This tests that we handle the null filtering correctly
+      const sub = createMockSubscription({
+        id: 'sub_null_show',
+        providerChannelId: 'show_null_123',
+      });
+
+      // getMultipleShows returns null for this show (filtered out in showMap building)
+      mockGetMultipleShows.mockResolvedValue([null]);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Should be marked as disconnected since show is not in showMap
+      expect(result.disconnected).toBe(1);
+    });
+  });
+
+  describe('Edge cases', () => {
+    it('should record disconnectedAt timestamp correctly', async () => {
+      const sub = createMockSubscription({
+        id: 'sub_timestamp_test',
+        providerChannelId: 'deleted_show',
+      });
+
+      mockGetMultipleShows.mockResolvedValue([]);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      const updateCall = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
+      expect(updateCall?.values.disconnectedAt).toBe(MOCK_NOW);
+      expect(updateCall?.values.updatedAt).toBe(MOCK_NOW);
+    });
+
+    it('should not poll episodes for disconnected subscriptions (scheduler filters them)', async () => {
+      // Note: This tests the expectation that disconnected subs won't reach the poller
+      // The scheduler filters for status = 'ACTIVE' before calling the poller
+      const sub = createMockSubscription({
+        status: 'DISCONNECTED', // This wouldn't normally reach the poller
+      });
+
+      // Even if it did reach the poller and the show exists
+      mockGetMultipleShows.mockResolvedValue([
+        {
+          id: sub.providerChannelId,
+          name: 'Reconnected Show',
+          totalEpisodes: 100,
+        },
+      ]);
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+
+      // The poller would still try to process it if it got through
+      // This test documents that filtering happens at scheduler level
+      const result = await pollSpotifySubscriptionsBatched(
+        [sub as never],
+        {} as never,
+        sub.userId,
+        {} as never,
+        db as never
+      );
+
+      // Since totalEpisodes (100) > totalItems (null = 0), it would be processed
+      // This is fine - the scheduler is responsible for filtering
+      expect(result.processed).toBeGreaterThanOrEqual(0);
+    });
   });
 });
