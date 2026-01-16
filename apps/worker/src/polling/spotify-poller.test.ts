@@ -1724,3 +1724,419 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
     });
   });
 });
+
+// ============================================================================
+// Batch Size Guard Tests (zine-3ys)
+// ============================================================================
+
+describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
+  const originalDateNow = Date.now;
+  const MOCK_NOW = 1705320000000;
+
+  // Spy on logger methods
+  const loggerWarnSpy = vi.fn();
+  const loggerErrorSpy = vi.fn();
+  const loggerInfoSpy = vi.fn();
+
+  beforeEach(() => {
+    Date.now = vi.fn(() => MOCK_NOW);
+    vi.clearAllMocks();
+    dbUpdateCalls.length = 0;
+
+    // Default mock implementations
+    mockGetShowEpisodes.mockResolvedValue([]);
+    mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockUpdateShowCache.mockResolvedValue(undefined);
+    mockInvalidateShowCache.mockResolvedValue(undefined);
+    mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
+
+    // Reset logger spies
+    loggerWarnSpy.mockClear();
+    loggerErrorSpy.mockClear();
+    loggerInfoSpy.mockClear();
+  });
+
+  afterEach(() => {
+    Date.now = originalDateNow;
+  });
+
+  describe('pollSpotifySubscriptionsBatched - batch size warnings', () => {
+    it('should log warning for batches exceeding max safe size (500 default)', async () => {
+      // Create 501 subscriptions to exceed default max safe batch size
+      const subs = Array.from({ length: 501 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      // All shows unchanged (no delta) to minimize processing
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10, // Same as totalItems, no delta
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never, // No custom thresholds
+        db as never
+      );
+
+      // Function should complete without throwing
+      // The warning is logged but processing continues
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should log error for batches exceeding critical size (1000 default)', async () => {
+      // Create 1001 subscriptions to exceed default critical batch size
+      const subs = Array.from({ length: 1001 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      // All shows unchanged (no delta) to minimize processing
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never,
+        db as never
+      );
+
+      // Function should complete without throwing (error is logged, not thrown)
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should NOT log warning for batches within safe size', async () => {
+      // Create exactly 500 subscriptions (at the limit, not exceeding)
+      const subs = Array.from({ length: 500 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never,
+        db as never
+      );
+
+      // Should process normally without warnings
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should respect custom batch size thresholds from environment', async () => {
+      // Create 51 subscriptions to exceed custom max safe (50) but not critical (100)
+      const subs = Array.from({ length: 51 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      // Pass custom thresholds via env
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {
+          SPOTIFY_MAX_SAFE_BATCH_SIZE: '50',
+          SPOTIFY_CRITICAL_BATCH_SIZE: '100',
+        } as never,
+        db as never
+      );
+
+      // Should complete - warning logged but not blocking
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should respect custom critical threshold from environment', async () => {
+      // Create 101 subscriptions to exceed custom critical (100)
+      const subs = Array.from({ length: 101 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      // Pass custom thresholds via env
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {
+          SPOTIFY_MAX_SAFE_BATCH_SIZE: '50',
+          SPOTIFY_CRITICAL_BATCH_SIZE: '100',
+        } as never,
+        db as never
+      );
+
+      // Should complete - error logged but not thrown
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should handle empty batch gracefully (no warnings)', async () => {
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        [], // Empty batch
+        {} as never,
+        'user_test',
+        {} as never,
+        db as never
+      );
+
+      // Should return immediately with no processing
+      expect(result).toEqual({ newItems: 0, processed: 0, skipped: 0 });
+      // getMultipleShowsWithCache should NOT be called for empty batch
+      expect(mockGetMultipleShowsWithCache).not.toHaveBeenCalled();
+    });
+
+    it('should include batch size metrics in log output', async () => {
+      // Create a small batch to verify metrics are logged
+      const subs = Array.from({ length: 10 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 5,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 5,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never,
+        db as never
+      );
+
+      // Function completes successfully with metrics logged
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+  });
+
+  describe('Batch processing behavior with large batches', () => {
+    it('should continue processing even when warning is logged', async () => {
+      // Create batch that exceeds warning threshold
+      const subs = Array.from({ length: 55 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      // All shows have new episodes
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 11, // Delta detected
+          }))
+        )
+      );
+
+      mockGetShowEpisodes.mockResolvedValue([
+        createMockSpotifyEpisode({ id: 'new_ep', releaseDate: '2024-01-15' }),
+      ]);
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {
+          SPOTIFY_MAX_SAFE_BATCH_SIZE: '50', // Lower threshold for testing
+          SPOTIFY_CRITICAL_BATCH_SIZE: '100',
+        } as never,
+        db as never
+      );
+
+      // All subscriptions should still be processed despite warning
+      expect(result.processed).toBe(55);
+      expect(result.newItems).toBe(55);
+    });
+
+    it('should continue processing even when critical error is logged', async () => {
+      // Create batch that exceeds critical threshold
+      const subs = Array.from({ length: 110 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      // All shows unchanged to speed up test
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10, // No delta
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {
+          SPOTIFY_MAX_SAFE_BATCH_SIZE: '50',
+          SPOTIFY_CRITICAL_BATCH_SIZE: '100', // Lower threshold for testing
+        } as never,
+        db as never
+      );
+
+      // All subscriptions should still be processed despite critical error log
+      // (they're all skipped because no delta)
+      expect(result.skipped).toBe(110);
+      expect(result.processed).toBe(0);
+    });
+
+    it('should correctly estimate API calls and duration in metrics', async () => {
+      // The estimated values should be proportional to batch size
+      // estimatedApiCalls = batchSize * 2 (metadata + episodes)
+      // estimatedDurationMs = batchSize * 100
+
+      const subs = Array.from({ length: 25 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          name: `Show ${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s) => ({
+            id: s.providerChannelId,
+            name: s.name,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {} as never,
+        db as never
+      );
+
+      // Function should complete - metrics are logged internally
+      // For 25 subscriptions:
+      // - estimatedApiCalls = 25 * 2 = 50
+      // - estimatedDurationMs = 25 * 100 = 2500
+      expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+  });
+});

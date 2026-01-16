@@ -62,6 +62,28 @@ const spotifyLogger = pollLogger.child('spotify');
 /** Default concurrency for parallel episode fetching */
 const DEFAULT_EPISODE_FETCH_CONCURRENCY = 5;
 
+/**
+ * Batch size thresholds for subscription polling.
+ * These values help detect scaling issues before they cause problems.
+ *
+ * - MAX_SAFE_BATCH_SIZE: Batches larger than this log a warning
+ * - CRITICAL_BATCH_SIZE: Batches larger than this log an error
+ *
+ * Risks of large batches:
+ * 1. Memory exhaustion: Holding too many subscriptions in memory
+ * 2. Timeout: Cloudflare Workers have 30s (cron) or 15min (cron ≥1h) CPU limits
+ * 3. Rate limiting: Too many API calls in single batch
+ * 4. DB connection exhaustion: Too many concurrent DB operations
+ */
+const DEFAULT_MAX_SAFE_BATCH_SIZE = 500;
+const DEFAULT_CRITICAL_BATCH_SIZE = 1000;
+
+/** Estimated milliseconds per subscription for duration estimation */
+const ESTIMATED_MS_PER_SUBSCRIPTION = 100;
+
+/** Estimated API calls per subscription (metadata lookup + episode fetch) */
+const ESTIMATED_API_CALLS_PER_SUBSCRIPTION = 2;
+
 // ============================================================================
 // Provider Configuration
 // ============================================================================
@@ -110,7 +132,40 @@ export async function pollSpotifySubscriptionsBatched(
   env: Bindings,
   db: DrizzleDB
 ): Promise<BatchPollingResult> {
-  spotifyLogger.info('Starting batch poll', { count: subs.length, userId });
+  // Get configurable batch size thresholds from environment
+  const maxSafeBatchSize =
+    parseInt(env.SPOTIFY_MAX_SAFE_BATCH_SIZE ?? '', 10) || DEFAULT_MAX_SAFE_BATCH_SIZE;
+  const criticalBatchSize =
+    parseInt(env.SPOTIFY_CRITICAL_BATCH_SIZE ?? '', 10) || DEFAULT_CRITICAL_BATCH_SIZE;
+
+  // Batch size guard: log warnings/errors for large batches
+  if (subs.length > criticalBatchSize) {
+    spotifyLogger.error('Critical: Subscription batch size exceeds safe limit', {
+      batchSize: subs.length,
+      maxSafe: maxSafeBatchSize,
+      critical: criticalBatchSize,
+      userId,
+      estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+      estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+    });
+  } else if (subs.length > maxSafeBatchSize) {
+    spotifyLogger.warn('Large subscription batch detected', {
+      batchSize: subs.length,
+      maxSafe: maxSafeBatchSize,
+      critical: criticalBatchSize,
+      userId,
+      estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+      estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+    });
+  }
+
+  // Log batch metrics for observability
+  spotifyLogger.info('Starting batch poll', {
+    count: subs.length,
+    userId,
+    estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+    estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+  });
 
   if (subs.length === 0) {
     return { newItems: 0, processed: 0, skipped: 0 };
