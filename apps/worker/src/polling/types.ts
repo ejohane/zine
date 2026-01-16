@@ -56,6 +56,65 @@ export interface BatchResult {
 // ============================================================================
 
 /**
+ * YouTube skip reason metrics.
+ * Tracks why videos were filtered/skipped during polling.
+ */
+export interface YouTubeSkipMetrics {
+  /** Videos already in user's inbox */
+  alreadySeen: number;
+  /** YouTube Shorts excluded (≤ 3 minutes) */
+  shortsFiltered: number;
+  /** Videos without valid publishedAt date */
+  invalidDate: number;
+  /** Private/deleted/unavailable videos */
+  unavailable: number;
+  /** Other skip reasons (e.g., API errors during enrichment) */
+  other: number;
+}
+
+/**
+ * Create an empty YouTubeSkipMetrics object.
+ */
+export function createEmptyYouTubeSkipMetrics(): YouTubeSkipMetrics {
+  return {
+    alreadySeen: 0,
+    shortsFiltered: 0,
+    invalidDate: 0,
+    unavailable: 0,
+    other: 0,
+  };
+}
+
+/**
+ * Aggregate multiple YouTubeSkipMetrics into a single object.
+ */
+export function aggregateYouTubeSkipMetrics(metrics: YouTubeSkipMetrics[]): YouTubeSkipMetrics {
+  return metrics.reduce(
+    (acc, m) => ({
+      alreadySeen: acc.alreadySeen + m.alreadySeen,
+      shortsFiltered: acc.shortsFiltered + m.shortsFiltered,
+      invalidDate: acc.invalidDate + m.invalidDate,
+      unavailable: acc.unavailable + m.unavailable,
+      other: acc.other + m.other,
+    }),
+    createEmptyYouTubeSkipMetrics()
+  );
+}
+
+/**
+ * Get total count of all skips from a YouTubeSkipMetrics object.
+ */
+export function getTotalSkipCount(metrics: YouTubeSkipMetrics): number {
+  return (
+    metrics.alreadySeen +
+    metrics.shortsFiltered +
+    metrics.invalidDate +
+    metrics.unavailable +
+    metrics.other
+  );
+}
+
+/**
  * Result of batch polling multiple subscriptions.
  * Extended version of PollingResult with batch-specific metrics.
  */
@@ -74,6 +133,8 @@ export interface BatchPollingResult {
   cacheHits?: number;
   /** Cache miss count for show metadata lookups (Spotify only) */
   cacheMisses?: number;
+  /** YouTube-specific skip metrics (YouTube only) */
+  youtubeSkipMetrics?: YouTubeSkipMetrics;
 }
 
 // ============================================================================

@@ -7,11 +7,22 @@
  * - First poll (lastPolledAt = null) → valid items included
  * - Valid date → included when > lastPolledAt
  *
+ * Also tests YouTubeSkipMetrics:
+ * - Skip metrics type and utility functions
+ * - Aggregation of skip metrics
+ * - Skip counting
+ *
  * @vitest-environment miniflare
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { parseYouTubeDate } from './youtube-poller';
+import {
+  createEmptyYouTubeSkipMetrics,
+  aggregateYouTubeSkipMetrics,
+  getTotalSkipCount,
+  type YouTubeSkipMetrics,
+} from './types';
 
 // ============================================================================
 // Tests for parseYouTubeDate
@@ -333,6 +344,217 @@ describe('YouTube date filtering integration', () => {
       expect(newest).toBe(MOCK_NOW);
       // Should have filtered out the invalid one
       expect(timestamps.length).toBe(3);
+    });
+  });
+});
+
+// ============================================================================
+// Tests for YouTubeSkipMetrics
+// ============================================================================
+
+describe('YouTubeSkipMetrics', () => {
+  describe('createEmptyYouTubeSkipMetrics', () => {
+    it('should create an empty skip metrics object with all zeros', () => {
+      const metrics = createEmptyYouTubeSkipMetrics();
+
+      expect(metrics).toEqual({
+        alreadySeen: 0,
+        shortsFiltered: 0,
+        invalidDate: 0,
+        unavailable: 0,
+        other: 0,
+      });
+    });
+
+    it('should create independent objects each time', () => {
+      const metrics1 = createEmptyYouTubeSkipMetrics();
+      const metrics2 = createEmptyYouTubeSkipMetrics();
+
+      metrics1.shortsFiltered = 5;
+
+      expect(metrics1.shortsFiltered).toBe(5);
+      expect(metrics2.shortsFiltered).toBe(0);
+    });
+  });
+
+  describe('aggregateYouTubeSkipMetrics', () => {
+    it('should return empty metrics for empty array', () => {
+      const result = aggregateYouTubeSkipMetrics([]);
+
+      expect(result).toEqual(createEmptyYouTubeSkipMetrics());
+    });
+
+    it('should return same metrics for single element array', () => {
+      const metrics: YouTubeSkipMetrics = {
+        alreadySeen: 5,
+        shortsFiltered: 3,
+        invalidDate: 1,
+        unavailable: 2,
+        other: 0,
+      };
+
+      const result = aggregateYouTubeSkipMetrics([metrics]);
+
+      expect(result).toEqual(metrics);
+    });
+
+    it('should aggregate multiple metrics correctly', () => {
+      const metrics1: YouTubeSkipMetrics = {
+        alreadySeen: 5,
+        shortsFiltered: 3,
+        invalidDate: 1,
+        unavailable: 2,
+        other: 0,
+      };
+      const metrics2: YouTubeSkipMetrics = {
+        alreadySeen: 2,
+        shortsFiltered: 7,
+        invalidDate: 0,
+        unavailable: 1,
+        other: 4,
+      };
+      const metrics3: YouTubeSkipMetrics = {
+        alreadySeen: 1,
+        shortsFiltered: 0,
+        invalidDate: 3,
+        unavailable: 0,
+        other: 1,
+      };
+
+      const result = aggregateYouTubeSkipMetrics([metrics1, metrics2, metrics3]);
+
+      expect(result).toEqual({
+        alreadySeen: 8, // 5 + 2 + 1
+        shortsFiltered: 10, // 3 + 7 + 0
+        invalidDate: 4, // 1 + 0 + 3
+        unavailable: 3, // 2 + 1 + 0
+        other: 5, // 0 + 4 + 1
+      });
+    });
+
+    it('should handle metrics with all zeros', () => {
+      const emptyMetrics = createEmptyYouTubeSkipMetrics();
+      const result = aggregateYouTubeSkipMetrics([emptyMetrics, emptyMetrics, emptyMetrics]);
+
+      expect(result).toEqual(createEmptyYouTubeSkipMetrics());
+    });
+  });
+
+  describe('getTotalSkipCount', () => {
+    it('should return 0 for empty metrics', () => {
+      const metrics = createEmptyYouTubeSkipMetrics();
+
+      expect(getTotalSkipCount(metrics)).toBe(0);
+    });
+
+    it('should sum all skip counts', () => {
+      const metrics: YouTubeSkipMetrics = {
+        alreadySeen: 5,
+        shortsFiltered: 3,
+        invalidDate: 1,
+        unavailable: 2,
+        other: 4,
+      };
+
+      expect(getTotalSkipCount(metrics)).toBe(15); // 5 + 3 + 1 + 2 + 4
+    });
+
+    it('should handle large numbers', () => {
+      const metrics: YouTubeSkipMetrics = {
+        alreadySeen: 1000,
+        shortsFiltered: 500,
+        invalidDate: 250,
+        unavailable: 125,
+        other: 62,
+      };
+
+      expect(getTotalSkipCount(metrics)).toBe(1937);
+    });
+  });
+
+  describe('skip metrics integration scenarios', () => {
+    it('should track typical YouTube polling scenario', () => {
+      // Simulate polling a subscription with mixed video types
+      const skipMetrics = createEmptyYouTubeSkipMetrics();
+
+      // Found 10 videos total
+      // - 3 are Shorts
+      // - 2 have invalid dates
+      // - 1 is private/unavailable
+      // - 4 are valid new videos
+      skipMetrics.shortsFiltered = 3;
+      skipMetrics.invalidDate = 2;
+      skipMetrics.unavailable = 1;
+
+      expect(getTotalSkipCount(skipMetrics)).toBe(6);
+      // 10 total - 6 skipped = 4 valid videos
+    });
+
+    it('should aggregate metrics from multiple subscriptions', () => {
+      // Subscription 1: Tech channel with many Shorts
+      const sub1Metrics: YouTubeSkipMetrics = {
+        alreadySeen: 0,
+        shortsFiltered: 8,
+        invalidDate: 0,
+        unavailable: 0,
+        other: 0,
+      };
+
+      // Subscription 2: News channel with some unavailable videos
+      const sub2Metrics: YouTubeSkipMetrics = {
+        alreadySeen: 0,
+        shortsFiltered: 1,
+        invalidDate: 0,
+        unavailable: 3,
+        other: 0,
+      };
+
+      // Subscription 3: Old channel with date parsing issues
+      const sub3Metrics: YouTubeSkipMetrics = {
+        alreadySeen: 0,
+        shortsFiltered: 0,
+        invalidDate: 5,
+        unavailable: 1,
+        other: 0,
+      };
+
+      const aggregated = aggregateYouTubeSkipMetrics([sub1Metrics, sub2Metrics, sub3Metrics]);
+
+      expect(aggregated).toEqual({
+        alreadySeen: 0,
+        shortsFiltered: 9, // 8 + 1 + 0
+        invalidDate: 5, // 0 + 0 + 5
+        unavailable: 4, // 0 + 3 + 1
+        other: 0,
+      });
+
+      expect(getTotalSkipCount(aggregated)).toBe(18);
+    });
+
+    it('should provide insights for monitoring', () => {
+      // After a poll cycle, we can answer questions like:
+      const metrics: YouTubeSkipMetrics = {
+        alreadySeen: 0,
+        shortsFiltered: 15,
+        invalidDate: 2,
+        unavailable: 3,
+        other: 1,
+      };
+
+      const total = getTotalSkipCount(metrics);
+
+      // How many Shorts are we filtering? (validate filter working)
+      expect(metrics.shortsFiltered).toBe(15);
+
+      // What percentage are Shorts?
+      const shortsPercentage = (metrics.shortsFiltered / total) * 100;
+      expect(shortsPercentage).toBeCloseTo(71.43, 1);
+
+      // How many videos have invalid dates? (API data quality)
+      expect(metrics.invalidDate).toBe(2);
+
+      // Are there unavailable videos we should investigate?
+      expect(metrics.unavailable).toBe(3);
     });
   });
 });
