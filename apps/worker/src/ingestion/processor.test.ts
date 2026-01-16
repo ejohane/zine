@@ -199,6 +199,7 @@ describe('ingestBatchConsolidated', () => {
   const mockLimit = vi.fn();
   const mockInsert = vi.fn();
   const mockValues = vi.fn();
+  const mockOnConflictDoNothing = vi.fn();
   const mockBatch = vi.fn();
 
   const createMockDb = () => {
@@ -208,8 +209,13 @@ describe('ingestBatchConsolidated', () => {
       limit: mockLimit.mockResolvedValue([]),
     };
 
+    // Create a mock that returns itself for chaining (values -> onConflictDoNothing)
+    const valuesResult = {
+      onConflictDoNothing: mockOnConflictDoNothing.mockReturnThis(),
+    };
+
     const insertChain = {
-      values: mockValues.mockReturnValue({}),
+      values: mockValues.mockReturnValue(valuesResult),
     };
 
     return {
@@ -632,6 +638,148 @@ describe('ingestBatchConsolidated', () => {
       expect(result.skipped).toBe(1);
       expect(result.created).toBe(1);
       expect(result.errors).toBe(1);
+    });
+  });
+
+  describe('race condition handling', () => {
+    it('should use onConflictDoNothing for all insert statements', async () => {
+      const mockOnConflictDoNothing = vi.fn().mockReturnThis();
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoNothing: mockOnConflictDoNothing,
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        values: mockValues,
+      });
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]), // Not seen, no existing canonical
+      };
+
+      const mockDb = {
+        select: vi.fn().mockReturnValue(selectChain),
+        insert: mockInsert,
+        batch: mockBatch,
+      };
+
+      await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [createTestItem('ep1')],
+        Provider.SPOTIFY,
+        mockDb as never,
+        transformFn,
+        getProviderId
+      );
+
+      // Verify onConflictDoNothing was called for all insert operations
+      // For one item: 1 canonical item + 1 user_item + 1 subscription_item + 1 provider_items_seen = 4 inserts
+      expect(mockOnConflictDoNothing).toHaveBeenCalled();
+      expect(mockOnConflictDoNothing.mock.calls.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('should handle UNIQUE constraint violations gracefully via onConflictDoNothing', async () => {
+      // This test verifies the batch succeeds even when there would be conflicts
+      // In practice, onConflictDoNothing means the batch won't fail on duplicates
+      const mockOnConflictDoNothing = vi.fn().mockReturnThis();
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoNothing: mockOnConflictDoNothing,
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        values: mockValues,
+      });
+      // Batch succeeds (onConflictDoNothing prevents constraint violation errors)
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      };
+
+      const mockDb = {
+        select: vi.fn().mockReturnValue(selectChain),
+        insert: mockInsert,
+        batch: mockBatch,
+      };
+
+      const result = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [createTestItem('ep1'), createTestItem('ep2')],
+        Provider.SPOTIFY,
+        mockDb as never,
+        transformFn,
+        getProviderId
+      );
+
+      // Both items should be reported as created (batch succeeded)
+      expect(result.created).toBe(2);
+      expect(result.errors).toBe(0);
+      // Batch was called once (single chunk for 2 items)
+      expect(mockBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not fail when concurrent workers try to insert the same item', async () => {
+      // Simulates the race condition scenario:
+      // Worker A checks idempotency (not seen) → proceeds
+      // Worker B checks idempotency (not seen) → proceeds
+      // Worker A inserts with onConflictDoNothing → succeeds
+      // Worker B inserts with onConflictDoNothing → succeeds (no error due to IGNORE)
+
+      const mockOnConflictDoNothing = vi.fn().mockReturnThis();
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoNothing: mockOnConflictDoNothing,
+      });
+      const mockInsert = vi.fn().mockReturnValue({
+        values: mockValues,
+      });
+      // Both batches succeed - onConflictDoNothing handles the duplicate gracefully
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]), // Both workers see "not seen"
+      };
+
+      const mockDb = {
+        select: vi.fn().mockReturnValue(selectChain),
+        insert: mockInsert,
+        batch: mockBatch,
+      };
+
+      // Simulate Worker A
+      const resultA = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [createTestItem('same-episode')],
+        Provider.SPOTIFY,
+        mockDb as never,
+        transformFn,
+        getProviderId
+      );
+
+      // Simulate Worker B (same item, same user)
+      const resultB = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [createTestItem('same-episode')],
+        Provider.SPOTIFY,
+        mockDb as never,
+        transformFn,
+        getProviderId
+      );
+
+      // Both workers report success - no errors thrown
+      expect(resultA.errors).toBe(0);
+      expect(resultB.errors).toBe(0);
+      // Both workers think they created the item (in reality, only one did)
+      // This is acceptable because the end result is correct (exactly one item exists)
+      expect(resultA.created).toBe(1);
+      expect(resultB.created).toBe(1);
     });
   });
 });

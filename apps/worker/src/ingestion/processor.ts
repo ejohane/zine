@@ -227,39 +227,54 @@ export async function ingestItem<T>(
   const now = Date.now(); // Unix ms for new tables
 
   // Use db.batch() for atomic execution - all succeed or all fail
+  // Use onConflictDoNothing() on all inserts to handle race conditions:
+  // If two workers concurrently process the same item, both pass the idempotency check,
+  // but only one will succeed in inserting - the other will silently skip due to unique constraints.
   await db.batch([
     // Create user_item in INBOX state
-    db.insert(userItems).values({
-      id: userItemId,
-      userId,
-      itemId: item.id,
-      state: UserItemState.INBOX,
-      ingestedAt: nowISO,
-      createdAt: nowISO,
-      updatedAt: nowISO,
-    }),
+    // Unique constraint: (userId, itemId)
+    db
+      .insert(userItems)
+      .values({
+        id: userItemId,
+        userId,
+        itemId: item.id,
+        state: UserItemState.INBOX,
+        ingestedAt: nowISO,
+        createdAt: nowISO,
+        updatedAt: nowISO,
+      })
+      .onConflictDoNothing(),
 
     // Create subscription_item for tracking
-    db.insert(subscriptionItems).values({
-      id: ulid(),
-      subscriptionId,
-      itemId: item.id,
-      providerItemId: transformedItem.providerId,
-      publishedAt: transformedItem.publishedAt, // Unix ms for new table
-      fetchedAt: now, // Unix ms for new table
-    }),
+    // Unique constraint: (subscriptionId, providerItemId)
+    db
+      .insert(subscriptionItems)
+      .values({
+        id: ulid(),
+        subscriptionId,
+        itemId: item.id,
+        providerItemId: transformedItem.providerId,
+        publishedAt: transformedItem.publishedAt, // Unix ms for new table
+        fetchedAt: now, // Unix ms for new table
+      })
+      .onConflictDoNothing(),
 
     // Mark as seen for idempotency
     // Note: sourceId references legacy sources table, not subscriptions
     // We leave it null for subscription-based ingestion
-    db.insert(providerItemsSeen).values({
-      id: ulid(),
-      userId,
-      provider,
-      providerItemId: transformedItem.providerId,
-      sourceId: null, // Legacy field - not used for subscription-based ingestion
-      firstSeenAt: nowISO, // ISO8601 for existing table
-    }),
+    // Unique constraint: (userId, provider, providerItemId)
+    db
+      .insert(providerItemsSeen)
+      .values({
+        id: ulid(),
+        userId,
+        provider,
+        providerItemId: transformedItem.providerId,
+        sourceId: null, // Legacy field - not used for subscription-based ingestion
+        firstSeenAt: nowISO, // ISO8601 for existing table
+      })
+      .onConflictDoNothing(),
   ]);
 
   return {
@@ -311,22 +326,28 @@ async function findOrCreateCanonicalItem(
   const now = new Date().toISOString();
   const publishedAtISO = newItem.publishedAt ? toISO8601(newItem.publishedAt) : null;
 
-  await db.insert(items).values({
-    id: newItem.id,
-    contentType: newItem.contentType,
-    provider,
-    providerId: newItem.providerId,
-    canonicalUrl: newItem.canonicalUrl,
-    title: newItem.title,
-    summary: newItem.description,
-    creator: newItem.creator,
-    creatorImageUrl: newItem.creatorImageUrl,
-    thumbnailUrl: newItem.imageUrl,
-    duration: newItem.durationSeconds,
-    publishedAt: publishedAtISO,
-    createdAt: now,
-    updatedAt: now,
-  });
+  // Use onConflictDoNothing() to handle race conditions where another worker
+  // creates the same canonical item concurrently. The unique constraint on
+  // (provider, providerId) ensures only one item is created.
+  await db
+    .insert(items)
+    .values({
+      id: newItem.id,
+      contentType: newItem.contentType,
+      provider,
+      providerId: newItem.providerId,
+      canonicalUrl: newItem.canonicalUrl,
+      title: newItem.title,
+      summary: newItem.description,
+      creator: newItem.creator,
+      creatorImageUrl: newItem.creatorImageUrl,
+      thumbnailUrl: newItem.imageUrl,
+      duration: newItem.durationSeconds,
+      publishedAt: publishedAtISO,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing();
 
   return { id: newItem.id };
 }
@@ -722,66 +743,83 @@ async function executeChunkBatch(
 
     for (const prepared of itemChunk) {
       // 1. Create canonical item (if it doesn't exist)
+      // Use onConflictDoNothing() to handle race conditions where another worker
+      // creates the same canonical item concurrently.
       if (!prepared.canonicalItemExists) {
         const publishedAtISO = prepared.newItem.publishedAt
           ? new Date(prepared.newItem.publishedAt).toISOString()
           : null;
 
         statements.push(
-          db.insert(items).values({
-            id: prepared.newItem.id,
-            contentType: prepared.newItem.contentType,
-            provider,
-            providerId: prepared.newItem.providerId,
-            canonicalUrl: prepared.newItem.canonicalUrl,
-            title: prepared.newItem.title,
-            summary: prepared.newItem.description,
-            creator: prepared.newItem.creator,
-            creatorImageUrl: prepared.newItem.creatorImageUrl,
-            thumbnailUrl: prepared.newItem.imageUrl,
-            duration: prepared.newItem.durationSeconds,
-            publishedAt: publishedAtISO,
-            createdAt: nowISO,
-            updatedAt: nowISO,
-          })
+          db
+            .insert(items)
+            .values({
+              id: prepared.newItem.id,
+              contentType: prepared.newItem.contentType,
+              provider,
+              providerId: prepared.newItem.providerId,
+              canonicalUrl: prepared.newItem.canonicalUrl,
+              title: prepared.newItem.title,
+              summary: prepared.newItem.description,
+              creator: prepared.newItem.creator,
+              creatorImageUrl: prepared.newItem.creatorImageUrl,
+              thumbnailUrl: prepared.newItem.imageUrl,
+              duration: prepared.newItem.durationSeconds,
+              publishedAt: publishedAtISO,
+              createdAt: nowISO,
+              updatedAt: nowISO,
+            })
+            .onConflictDoNothing()
         );
       }
 
       // 2. Create user_item
+      // Unique constraint: (userId, itemId)
       statements.push(
-        db.insert(userItems).values({
-          id: prepared.userItemId,
-          userId,
-          itemId: prepared.canonicalItemId,
-          state: UserItemState.INBOX,
-          ingestedAt: nowISO,
-          createdAt: nowISO,
-          updatedAt: nowISO,
-        })
+        db
+          .insert(userItems)
+          .values({
+            id: prepared.userItemId,
+            userId,
+            itemId: prepared.canonicalItemId,
+            state: UserItemState.INBOX,
+            ingestedAt: nowISO,
+            createdAt: nowISO,
+            updatedAt: nowISO,
+          })
+          .onConflictDoNothing()
       );
 
       // 3. Create subscription_item
+      // Unique constraint: (subscriptionId, providerItemId)
       statements.push(
-        db.insert(subscriptionItems).values({
-          id: ulid(),
-          subscriptionId,
-          itemId: prepared.canonicalItemId,
-          providerItemId: prepared.newItem.providerId,
-          publishedAt: prepared.newItem.publishedAt,
-          fetchedAt: now,
-        })
+        db
+          .insert(subscriptionItems)
+          .values({
+            id: ulid(),
+            subscriptionId,
+            itemId: prepared.canonicalItemId,
+            providerItemId: prepared.newItem.providerId,
+            publishedAt: prepared.newItem.publishedAt,
+            fetchedAt: now,
+          })
+          .onConflictDoNothing()
       );
 
       // 4. Mark as seen for idempotency
+      // Unique constraint: (userId, provider, providerItemId)
       statements.push(
-        db.insert(providerItemsSeen).values({
-          id: ulid(),
-          userId,
-          provider,
-          providerItemId: prepared.newItem.providerId,
-          sourceId: null,
-          firstSeenAt: nowISO,
-        })
+        db
+          .insert(providerItemsSeen)
+          .values({
+            id: ulid(),
+            userId,
+            provider,
+            providerItemId: prepared.newItem.providerId,
+            sourceId: null,
+            firstSeenAt: nowISO,
+          })
+          .onConflictDoNothing()
       );
     }
 
@@ -819,66 +857,82 @@ async function executeIndividualInsert(
     const statements: unknown[] = [];
 
     // 1. Create canonical item (if it doesn't exist)
+    // Use onConflictDoNothing() to handle race conditions.
     if (!prepared.canonicalItemExists) {
       const publishedAtISO = prepared.newItem.publishedAt
         ? new Date(prepared.newItem.publishedAt).toISOString()
         : null;
 
       statements.push(
-        db.insert(items).values({
-          id: prepared.newItem.id,
-          contentType: prepared.newItem.contentType,
-          provider,
-          providerId: prepared.newItem.providerId,
-          canonicalUrl: prepared.newItem.canonicalUrl,
-          title: prepared.newItem.title,
-          summary: prepared.newItem.description,
-          creator: prepared.newItem.creator,
-          creatorImageUrl: prepared.newItem.creatorImageUrl,
-          thumbnailUrl: prepared.newItem.imageUrl,
-          duration: prepared.newItem.durationSeconds,
-          publishedAt: publishedAtISO,
-          createdAt: nowISO,
-          updatedAt: nowISO,
-        })
+        db
+          .insert(items)
+          .values({
+            id: prepared.newItem.id,
+            contentType: prepared.newItem.contentType,
+            provider,
+            providerId: prepared.newItem.providerId,
+            canonicalUrl: prepared.newItem.canonicalUrl,
+            title: prepared.newItem.title,
+            summary: prepared.newItem.description,
+            creator: prepared.newItem.creator,
+            creatorImageUrl: prepared.newItem.creatorImageUrl,
+            thumbnailUrl: prepared.newItem.imageUrl,
+            duration: prepared.newItem.durationSeconds,
+            publishedAt: publishedAtISO,
+            createdAt: nowISO,
+            updatedAt: nowISO,
+          })
+          .onConflictDoNothing()
       );
     }
 
     // 2. Create user_item
+    // Unique constraint: (userId, itemId)
     statements.push(
-      db.insert(userItems).values({
-        id: prepared.userItemId,
-        userId,
-        itemId: prepared.canonicalItemId,
-        state: UserItemState.INBOX,
-        ingestedAt: nowISO,
-        createdAt: nowISO,
-        updatedAt: nowISO,
-      })
+      db
+        .insert(userItems)
+        .values({
+          id: prepared.userItemId,
+          userId,
+          itemId: prepared.canonicalItemId,
+          state: UserItemState.INBOX,
+          ingestedAt: nowISO,
+          createdAt: nowISO,
+          updatedAt: nowISO,
+        })
+        .onConflictDoNothing()
     );
 
     // 3. Create subscription_item
+    // Unique constraint: (subscriptionId, providerItemId)
     statements.push(
-      db.insert(subscriptionItems).values({
-        id: ulid(),
-        subscriptionId,
-        itemId: prepared.canonicalItemId,
-        providerItemId: prepared.newItem.providerId,
-        publishedAt: prepared.newItem.publishedAt,
-        fetchedAt: now,
-      })
+      db
+        .insert(subscriptionItems)
+        .values({
+          id: ulid(),
+          subscriptionId,
+          itemId: prepared.canonicalItemId,
+          providerItemId: prepared.newItem.providerId,
+          publishedAt: prepared.newItem.publishedAt,
+          fetchedAt: now,
+        })
+        .onConflictDoNothing()
     );
 
     // 4. Mark as seen
+    // Unique constraint: (userId, provider, providerItemId)
     statements.push(
-      db.insert(providerItemsSeen).values({
-        id: ulid(),
-        userId,
-        provider,
-        providerItemId: prepared.newItem.providerId,
-        sourceId: null,
-        firstSeenAt: nowISO,
-      })
+      db
+        .insert(providerItemsSeen)
+        .values({
+          id: ulid(),
+          userId,
+          provider,
+          providerItemId: prepared.newItem.providerId,
+          sourceId: null,
+          firstSeenAt: nowISO,
+        })
+        .onConflictDoNothing()
     );
 
     // Type assertion needed because we build statements dynamically
