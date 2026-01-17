@@ -16,7 +16,7 @@ id = "2101381b080942f9a7799583ccb2e096"
 # KV namespace for Spotify show metadata cache
 [[kv_namespaces]]
 binding = "SPOTIFY_CACHE"
-id = "spotify-cache-dev"
+id = "1c15819b51bc43179cde8f0f90447993"
 
 # R2 bucket for article content storage
 [[r2_buckets]]
@@ -60,7 +60,7 @@ binding = "OAUTH_STATE_KV"
 id = "acb7c409523d4ddeb7941ec2783ace9d"
 [[env.staging.kv_namespaces]]
 binding = "SPOTIFY_CACHE"
-id = "spotify-cache-staging"
+id = "3e95aab6e54941f380e87734f184e275"
 [[env.staging.r2_buckets]]
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-staging"
@@ -96,7 +96,7 @@ binding = "OAUTH_STATE_KV"
 id = "c58624987cd94f3285ca7f62e5c2fe16"
 [[env.production.kv_namespaces]]
 binding = "SPOTIFY_CACHE"
-id = "spotify-cache-prod"
+id = "02e526b54aa94795a51957863fe8fb54"
 
 [[env.production.r2_buckets]]
 binding = "ARTICLE_CONTENT"
