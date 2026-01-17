@@ -13,6 +13,11 @@ id = "9b2d9ef82c02438ba13184bfc68c2d43"
 binding = "OAUTH_STATE_KV"
 id = "2101381b080942f9a7799583ccb2e096"
 
+# KV namespace for Spotify show metadata cache
+[[kv_namespaces]]
+binding = "SPOTIFY_CACHE"
+id = "spotify-cache-dev"
+
 # R2 bucket for article content storage
 [[r2_buckets]]
 binding = "ARTICLE_CONTENT"
@@ -40,6 +45,7 @@ persist = true
 # Development environment vars
 [vars]
 ENVIRONMENT = "development"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -52,6 +58,9 @@ id = "abb1a04762cb4a129218d8c9651adf7c"
 [[env.staging.kv_namespaces]]
 binding = "OAUTH_STATE_KV"
 id = "acb7c409523d4ddeb7941ec2783ace9d"
+[[env.staging.kv_namespaces]]
+binding = "SPOTIFY_CACHE"
+id = "spotify-cache-staging"
 [[env.staging.r2_buckets]]
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-staging"
@@ -62,6 +71,7 @@ database_id = "bc9e61b1-94b2-4f3c-b19b-b3a50936b811"
 migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *"]  # Run every hour
@@ -84,6 +94,9 @@ id = "9937928f2eb54074bda5e035dac09c14"
 [[env.production.kv_namespaces]]
 binding = "OAUTH_STATE_KV"
 id = "c58624987cd94f3285ca7f62e5c2fe16"
+[[env.production.kv_namespaces]]
+binding = "SPOTIFY_CACHE"
+id = "spotify-cache-prod"
 
 [[env.production.r2_buckets]]
 binding = "ARTICLE_CONTENT"
@@ -95,6 +108,7 @@ database_id = "82911dea-5a6b-411b-ab4b-4145cb0c191d"
 migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *"]  # Run every hour

@@ -14,6 +14,8 @@ export interface Bindings {
   WEBHOOK_IDEMPOTENCY: KVNamespace;
   /** KV namespace for OAuth state storage */
   OAUTH_STATE_KV: KVNamespace;
+  /** KV namespace for Spotify show metadata cache */
+  SPOTIFY_CACHE: KVNamespace;
   /** R2 bucket for article content storage */
   ARTICLE_CONTENT: R2Bucket;
   /** Current environment (development, staging, production) */
@@ -38,6 +40,14 @@ export interface Bindings {
   SPOTIFY_CLIENT_SECRET?: string;
   /** OAuth redirect URI */
   OAUTH_REDIRECT_URI?: string;
+  /** Spotify episode fetch concurrency limit (default: 5) */
+  SPOTIFY_EPISODE_FETCH_CONCURRENCY?: string;
+  /** User processing concurrency limit for multi-user parallel polling (default: 10) */
+  USER_PROCESSING_CONCURRENCY?: string;
+  /** Maximum safe batch size before logging warning (default: 500) */
+  SPOTIFY_MAX_SAFE_BATCH_SIZE?: string;
+  /** Critical batch size threshold before logging error (default: 1000) */
+  SPOTIFY_CRITICAL_BATCH_SIZE?: string;
 }
 
 /**

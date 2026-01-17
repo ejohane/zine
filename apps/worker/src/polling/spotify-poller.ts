@@ -16,13 +16,16 @@ import { eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
+import pLimit from 'p-limit';
 import { subscriptions } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import { parseSpotifyDate } from '../lib/timestamps';
 import {
   getSpotifyClientForConnection,
   getShowEpisodes,
-  getMultipleShows,
+  getMultipleShowsWithCache,
+  updateShowCache,
+  invalidateShowCache,
   type SpotifyEpisode,
   type SpotifyShow,
 } from '../providers/spotify';
@@ -39,12 +42,47 @@ import type {
   ProviderConnectionRow,
 } from './types';
 import { MAX_ITEMS_PER_POLL } from './types';
+import {
+  serializeError,
+  createPollingError,
+  formatPollingErrorLegacy,
+  type PollingError,
+} from '../utils/error-utils';
 
 // ============================================================================
 // Logger
 // ============================================================================
 
 const spotifyLogger = pollLogger.child('spotify');
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/** Default concurrency for parallel episode fetching */
+const DEFAULT_EPISODE_FETCH_CONCURRENCY = 5;
+
+/**
+ * Batch size thresholds for subscription polling.
+ * These values help detect scaling issues before they cause problems.
+ *
+ * - MAX_SAFE_BATCH_SIZE: Batches larger than this log a warning
+ * - CRITICAL_BATCH_SIZE: Batches larger than this log an error
+ *
+ * Risks of large batches:
+ * 1. Memory exhaustion: Holding too many subscriptions in memory
+ * 2. Timeout: Cloudflare Workers have 30s (cron) or 15min (cron ≥1h) CPU limits
+ * 3. Rate limiting: Too many API calls in single batch
+ * 4. DB connection exhaustion: Too many concurrent DB operations
+ */
+const DEFAULT_MAX_SAFE_BATCH_SIZE = 500;
+const DEFAULT_CRITICAL_BATCH_SIZE = 1000;
+
+/** Estimated milliseconds per subscription for duration estimation */
+const ESTIMATED_MS_PER_SUBSCRIPTION = 100;
+
+/** Estimated API calls per subscription (metadata lookup + episode fetch) */
+const ESTIMATED_API_CALLS_PER_SUBSCRIPTION = 2;
 
 // ============================================================================
 // Provider Configuration
@@ -94,7 +132,40 @@ export async function pollSpotifySubscriptionsBatched(
   env: Bindings,
   db: DrizzleDB
 ): Promise<BatchPollingResult> {
-  spotifyLogger.info('Starting batch poll', { count: subs.length, userId });
+  // Get configurable batch size thresholds from environment
+  const maxSafeBatchSize =
+    parseInt(env.SPOTIFY_MAX_SAFE_BATCH_SIZE ?? '', 10) || DEFAULT_MAX_SAFE_BATCH_SIZE;
+  const criticalBatchSize =
+    parseInt(env.SPOTIFY_CRITICAL_BATCH_SIZE ?? '', 10) || DEFAULT_CRITICAL_BATCH_SIZE;
+
+  // Batch size guard: log warnings/errors for large batches
+  if (subs.length > criticalBatchSize) {
+    spotifyLogger.error('Critical: Subscription batch size exceeds safe limit', {
+      batchSize: subs.length,
+      maxSafe: maxSafeBatchSize,
+      critical: criticalBatchSize,
+      userId,
+      estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+      estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+    });
+  } else if (subs.length > maxSafeBatchSize) {
+    spotifyLogger.warn('Large subscription batch detected', {
+      batchSize: subs.length,
+      maxSafe: maxSafeBatchSize,
+      critical: criticalBatchSize,
+      userId,
+      estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+      estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+    });
+  }
+
+  // Log batch metrics for observability
+  spotifyLogger.info('Starting batch poll', {
+    count: subs.length,
+    userId,
+    estimatedApiCalls: subs.length * ESTIMATED_API_CALLS_PER_SUBSCRIPTION,
+    estimatedDurationMs: subs.length * ESTIMATED_MS_PER_SUBSCRIPTION,
+  });
 
   if (subs.length === 0) {
     return { newItems: 0, processed: 0, skipped: 0 };
@@ -103,44 +174,59 @@ export async function pollSpotifySubscriptionsBatched(
   // Extract show IDs from subscriptions
   const showIds = subs.map((sub) => sub.providerChannelId);
 
-  // Batch fetch show metadata (1-2 API calls for up to 100 shows)
-  let shows: SpotifyShow[];
+  // Batch fetch show metadata with caching
+  // This checks KV cache first, then fetches uncached shows from API
+  let showMap: Map<string, SpotifyShow>;
+  let cacheHits = 0;
+  let cacheMisses = 0;
   try {
-    shows = await getMultipleShows(client, showIds);
+    const cacheResult = await getMultipleShowsWithCache(client, showIds, env);
+    showMap = cacheResult.data;
+    cacheHits = cacheResult.cacheHits;
+    cacheMisses = cacheResult.cacheMisses;
+
+    spotifyLogger.info('Show metadata cache lookup', {
+      total: showIds.length,
+      cacheHits,
+      cacheMisses,
+      hitRate: showIds.length > 0 ? Math.round((cacheHits / showIds.length) * 100) : 0,
+    });
   } catch (error) {
-    spotifyLogger.error('Failed to fetch show metadata', { error, userId });
+    spotifyLogger.error('Failed to fetch show metadata', {
+      error: serializeError(error),
+      userId,
+    });
     // Return error for all subscriptions
     return {
       newItems: 0,
       processed: 0,
-      errors: subs.map((sub) => ({
-        subscriptionId: sub.id,
-        error: `Failed to fetch show metadata: ${String(error)}`,
-      })),
+      errors: subs.map((sub) =>
+        formatPollingErrorLegacy(
+          createPollingError(sub.id, error, {
+            operation: 'getMultipleShowsWithCache',
+            userId,
+            showCount: showIds.length,
+          })
+        )
+      ),
     };
-  }
-
-  // Build a map of showId -> SpotifyShow for quick lookup
-  const showMap = new Map<string, SpotifyShow>();
-  for (const show of shows) {
-    if (show) {
-      showMap.set(show.id, show);
-    }
   }
 
   // Determine which subscriptions need updates via delta detection
   const subsNeedingUpdate: Array<{ sub: Subscription; show: SpotifyShow }> = [];
   const subsUnchanged: Subscription[] = [];
+  const subsMissing: Subscription[] = [];
 
   for (const sub of subs) {
     const show = showMap.get(sub.providerChannelId);
     if (!show) {
-      // Show not found - might have been removed from Spotify
-      spotifyLogger.warn('Show not found in batch response', {
+      // Show not found - likely deleted from Spotify or made unavailable
+      spotifyLogger.warn('Show not found in batch response - may be deleted from Spotify', {
         subscriptionId: sub.id,
         showId: sub.providerChannelId,
+        subscriptionName: sub.name,
       });
-      subsUnchanged.push(sub); // Treat as unchanged, update lastPolledAt
+      subsMissing.push(sub);
       continue;
     }
 
@@ -167,7 +253,25 @@ export async function pollSpotifySubscriptionsBatched(
   spotifyLogger.info('Delta detection complete', {
     needsUpdate: subsNeedingUpdate.length,
     unchanged: subsUnchanged.length,
+    missing: subsMissing.length,
   });
+
+  // Mark missing shows as disconnected and invalidate their cache
+  if (subsMissing.length > 0) {
+    await markSubscriptionsAsDisconnected(
+      subsMissing.map((s) => s.id),
+      'Show no longer available on Spotify',
+      db
+    );
+
+    // Invalidate cache for missing shows to ensure we don't serve stale data
+    await Promise.all(subsMissing.map((s) => invalidateShowCache(s.providerChannelId, env)));
+
+    spotifyLogger.info('Marked subscriptions as disconnected due to missing shows', {
+      count: subsMissing.length,
+      subscriptionIds: subsMissing.map((s) => s.id),
+    });
+  }
 
   // Batch update lastPolledAt for unchanged subscriptions
   if (subsUnchanged.length > 0) {
@@ -177,32 +281,96 @@ export async function pollSpotifySubscriptionsBatched(
     );
   }
 
-  // Process subscriptions that need updates
+  // Process subscriptions that need updates in parallel
+  const pollingErrors: PollingError[] = [];
+
+  // Get concurrency limit from environment, falling back to default
+  const concurrency =
+    parseInt(env.SPOTIFY_EPISODE_FETCH_CONCURRENCY ?? '', 10) || DEFAULT_EPISODE_FETCH_CONCURRENCY;
+  const limit = pLimit(concurrency);
+
+  // Parallel episode fetching with concurrency control
+  const parallelFetchStart = Date.now();
+
+  const episodeResults = await Promise.all(
+    subsNeedingUpdate.map(({ sub, show }) =>
+      limit(async () => {
+        try {
+          const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+          return { sub, show, episodes, error: undefined as Error | undefined };
+        } catch (error) {
+          // Don't let one failure block others
+          spotifyLogger.error('Failed to fetch episodes for show', {
+            subscriptionId: sub.id,
+            showId: sub.providerChannelId,
+            showName: sub.name,
+            error: serializeError(error),
+          });
+          return { sub, show, episodes: [] as SpotifyEpisode[], error: error as Error };
+        }
+      })
+    )
+  );
+
+  const parallelFetchDuration = Date.now() - parallelFetchStart;
+  const failedFetchCount = episodeResults.filter((r) => r.error).length;
+
+  spotifyLogger.info('Parallel episode fetch completed', {
+    subscriptionCount: subsNeedingUpdate.length,
+    durationMs: parallelFetchDuration,
+    avgPerSubscription:
+      subsNeedingUpdate.length > 0
+        ? Math.round(parallelFetchDuration / subsNeedingUpdate.length)
+        : 0,
+    concurrency,
+    failedCount: failedFetchCount,
+    successCount: subsNeedingUpdate.length - failedFetchCount,
+  });
+
+  // Process fetched episodes (ingestion happens sequentially to avoid DB contention)
   let totalNewItems = 0;
-  const errors: Array<{ subscriptionId: string; error: string }> = [];
 
-  for (const { sub, show } of subsNeedingUpdate) {
-    try {
-      // Fetch recent episodes from the show
-      const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
-
-      if (episodes.length === 0) {
-        spotifyLogger.info('No episodes found', { name: sub.name });
-        await updateSubscriptionPolled(sub.id, db);
-        continue;
-      }
-
-      // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
-      const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
-
-      spotifyLogger.info('Found episodes', {
-        total: episodes.length,
-        new: newEpisodes.length,
-        name: sub.name,
+  for (const { sub, show, episodes: allEpisodes, error } of episodeResults) {
+    // Handle fetch errors
+    if (error) {
+      const pollingError = createPollingError(sub.id, error, {
+        showId: sub.providerChannelId,
+        showName: sub.name,
+        userId,
+        operation: 'getShowEpisodes',
       });
+      pollingErrors.push(pollingError);
+      continue;
+    }
 
-      // Ingest new items
-      const newItemsCount = await ingestNewEpisodes(
+    // No episodes found
+    if (allEpisodes.length === 0) {
+      spotifyLogger.info('No episodes found', { name: sub.name });
+      await updateSubscriptionPolled(sub.id, db);
+      continue;
+    }
+
+    // Filter out unplayable episodes first (geo-restricted, removed, etc.)
+    const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
+
+    if (episodes.length === 0) {
+      spotifyLogger.info('No playable episodes found', { name: sub.name });
+      await updateSubscriptionPolled(sub.id, db);
+      continue;
+    }
+
+    // Filter to new episodes based on lastPublishedAt (the newest episode we've already seen)
+    const newEpisodes = filterNewEpisodes(episodes, sub.lastPublishedAt);
+
+    spotifyLogger.info('Found episodes', {
+      total: episodes.length,
+      new: newEpisodes.length,
+      name: sub.name,
+    });
+
+    try {
+      // Ingest new items and get the newest successfully ingested timestamp
+      const { count: newItemsCount, newestIngestedAt } = await ingestNewEpisodes(
         newEpisodes,
         userId,
         sub.id,
@@ -212,33 +380,48 @@ export async function pollSpotifySubscriptionsBatched(
       );
       totalNewItems += newItemsCount;
 
-      // Calculate newest published timestamp from all episodes
-      const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
-
       // Update subscription with poll results
-      // IMPORTANT: Only update totalItems if we have a valid lastPublishedAt.
-      // This prevents the bug where totalItems gets updated without lastPublishedAt,
-      // causing future delta detection to skip the subscription even when new episodes exist.
+      // IMPORTANT: Only update lastPublishedAt and totalItems if we successfully ingested at least one episode.
+      // This prevents the watermark corruption bug where:
+      // 1. Ingestion fails or all episodes are skipped
+      // 2. lastPublishedAt gets updated anyway based on ALL fetched episodes
+      // 3. Future polls filter out those episodes forever
+      // 4. The subscription is stuck with missed episodes
+      //
       // The key invariant is: if totalItems == totalEpisodes, then lastPublishedAt must
-      // accurately reflect the newest episode we've seen, so future polls can detect
-      // episodes released after that date.
-      const shouldUpdateTotalItems = newestPublishedAt !== null;
+      // accurately reflect the newest episode we've actually ingested.
+      const shouldUpdateTotalItems = newestIngestedAt !== null;
 
       await db
         .update(subscriptions)
         .set({
           lastPolledAt: Date.now(),
-          lastPublishedAt: newestPublishedAt || undefined,
+          // Only advance the watermark based on successfully ingested episodes
+          ...(newestIngestedAt && { lastPublishedAt: newestIngestedAt }),
           ...(shouldUpdateTotalItems && { totalItems: show.totalEpisodes }),
           updatedAt: Date.now(),
         })
         .where(eq(subscriptions.id, sub.id));
-    } catch (error) {
-      spotifyLogger.error('Failed to poll subscription', {
-        subscriptionId: sub.id,
-        error,
+
+      // Update the cache with fresh show data after successful ingestion
+      // This ensures the cache has the latest totalEpisodes for future delta detection
+      if (shouldUpdateTotalItems) {
+        await updateShowCache(show.id, show, env);
+      }
+    } catch (ingestError) {
+      const pollingError = createPollingError(sub.id, ingestError, {
+        showId: sub.providerChannelId,
+        showName: sub.name,
+        userId,
+        operation: 'ingestEpisodes',
       });
-      errors.push({ subscriptionId: sub.id, error: String(error) });
+      spotifyLogger.error('Failed to ingest episodes for subscription', {
+        subscriptionId: sub.id,
+        error: pollingError.error,
+        errorType: pollingError.errorType,
+        context: pollingError.context,
+      });
+      pollingErrors.push(pollingError);
     }
   }
 
@@ -246,7 +429,10 @@ export async function pollSpotifySubscriptionsBatched(
     newItems: totalNewItems,
     processed: subsNeedingUpdate.length,
     skipped: subsUnchanged.length,
-    errors: errors.length > 0 ? errors : undefined,
+    disconnected: subsMissing.length,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    cacheHits,
+    cacheMisses,
   };
 }
 
@@ -260,6 +446,29 @@ async function updateSubscriptionsPolled(ids: string[], db: DrizzleDB): Promise<
   await db
     .update(subscriptions)
     .set({ lastPolledAt: Date.now(), updatedAt: Date.now() })
+    .where(inArray(subscriptions.id, ids));
+}
+
+/**
+ * Mark subscriptions as disconnected with a reason.
+ * Used when a show is no longer available on Spotify.
+ */
+async function markSubscriptionsAsDisconnected(
+  ids: string[],
+  reason: string,
+  db: DrizzleDB
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  const now = Date.now();
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'DISCONNECTED',
+      disconnectedAt: now,
+      disconnectedReason: reason,
+      updatedAt: now,
+    })
     .where(inArray(subscriptions.id, ids));
 }
 
@@ -298,10 +507,19 @@ export async function pollSingleSpotifySubscription(
   });
 
   // Fetch recent episodes from the show
-  const episodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+  const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
+
+  if (allEpisodes.length === 0) {
+    spotifyLogger.info('No episodes found', { name: sub.name });
+    await updateSubscriptionPolled(sub.id, db);
+    return { newItems: 0 };
+  }
+
+  // Filter out unplayable episodes first (geo-restricted, removed, etc.)
+  const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
 
   if (episodes.length === 0) {
-    spotifyLogger.info('No episodes found', { name: sub.name });
+    spotifyLogger.info('No playable episodes found', { name: sub.name });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -325,8 +543,8 @@ export async function pollSingleSpotifySubscription(
     });
   }
 
-  // Ingest new items
-  const newItemsCount = await ingestNewEpisodes(
+  // Ingest new items and get the newest successfully ingested timestamp
+  const { count: newItemsCount, newestIngestedAt } = await ingestNewEpisodes(
     newEpisodes,
     userId,
     sub.id,
@@ -335,15 +553,15 @@ export async function pollSingleSpotifySubscription(
     db
   );
 
-  // Calculate newest published timestamp from all episodes
-  const newestPublishedAt = calculateNewestPublishedAt(episodes, sub.lastPublishedAt);
-
   // Update subscription with poll results
+  // IMPORTANT: Only update lastPublishedAt if we successfully ingested at least one episode.
+  // This prevents watermark corruption when ingestion fails or all episodes are skipped.
   await db
     .update(subscriptions)
     .set({
       lastPolledAt: Date.now(),
-      lastPublishedAt: newestPublishedAt || undefined,
+      // Only advance the watermark based on successfully ingested episodes
+      ...(newestIngestedAt && { lastPublishedAt: newestIngestedAt }),
       updatedAt: Date.now(),
     })
     .where(eq(subscriptions.id, sub.id));
@@ -351,7 +569,7 @@ export async function pollSingleSpotifySubscription(
   spotifyLogger.info('Poll complete', {
     name: sub.name,
     newItemsIngested: newItemsCount,
-    updatedLastPublishedAt: newestPublishedAt ? new Date(newestPublishedAt).toISOString() : null,
+    updatedLastPublishedAt: newestIngestedAt ? new Date(newestIngestedAt).toISOString() : null,
   });
 
   return { newItems: newItemsCount };
@@ -360,6 +578,39 @@ export async function pollSingleSpotifySubscription(
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Filter out unplayable episodes before processing.
+ *
+ * Spotify episodes can be unplayable due to:
+ * - Geo-restrictions (not available in user's region)
+ * - Removed by publisher
+ * - Rights expired
+ * - Content policy violation
+ * - Temporary takedown
+ *
+ * Unplayable episodes should not be ingested into the user's inbox
+ * as they would create frustration (content they can't access).
+ *
+ * @param episodes - Episodes to filter
+ * @param showName - Show name for logging context
+ * @returns Only playable episodes
+ */
+function filterPlayableEpisodes(episodes: SpotifyEpisode[], showName: string): SpotifyEpisode[] {
+  const playableEpisodes = episodes.filter((e) => e.isPlayable);
+
+  const unplayableCount = episodes.length - playableEpisodes.length;
+  if (unplayableCount > 0) {
+    spotifyLogger.info('Filtered unplayable episodes', {
+      showName,
+      totalEpisodes: episodes.length,
+      unplayableCount,
+      playableCount: playableEpisodes.length,
+    });
+  }
+
+  return playableEpisodes;
+}
 
 /**
  * Filter episodes to only those published after lastPublishedAt.
@@ -394,8 +645,23 @@ function filterNewEpisodes(
 }
 
 /**
+ * Result of ingesting new episodes.
+ * Contains the count of successfully created items and the newest timestamp
+ * from successfully ingested episodes (used to update lastPublishedAt).
+ */
+interface IngestResult {
+  count: number;
+  newestIngestedAt: number | null;
+}
+
+/**
  * Ingest new episodes into the database.
- * Returns the count of successfully created items.
+ * Returns the count of successfully created items AND the newest timestamp
+ * from successfully ingested episodes.
+ *
+ * IMPORTANT: The newestIngestedAt timestamp is ONLY updated for episodes that
+ * were actually created (ingested successfully). This prevents the lastPublishedAt
+ * watermark from being corrupted when ingestion fails or episodes are skipped.
  */
 async function ingestNewEpisodes(
   episodes: SpotifyEpisode[],
@@ -404,9 +670,10 @@ async function ingestNewEpisodes(
   showName: string,
   showImageUrl: string | null,
   db: DrizzleDB
-): Promise<number> {
+): Promise<IngestResult> {
   let newItemsCount = 0;
   let skippedCount = 0;
+  let newestIngestedAt: number | null = null;
 
   for (const episode of episodes) {
     try {
@@ -432,6 +699,13 @@ async function ingestNewEpisodes(
       );
       if (result.created) {
         newItemsCount++;
+
+        // Track the newest successfully ingested timestamp
+        const episodeTimestamp = parseSpotifyDate(episode.releaseDate);
+        if (episodeTimestamp > 0 && (!newestIngestedAt || episodeTimestamp > newestIngestedAt)) {
+          newestIngestedAt = episodeTimestamp;
+        }
+
         spotifyLogger.info('Episode ingested', {
           showName,
           episodeId: episode.id,
@@ -450,11 +724,16 @@ async function ingestNewEpisodes(
         });
       }
     } catch (ingestError) {
+      // IMPORTANT: Do NOT update newestIngestedAt on failure.
+      // This ensures lastPublishedAt is only advanced for successful ingestions.
+      const serialized = serializeError(ingestError);
       spotifyLogger.error('Failed to ingest episode', {
         showName,
         episodeId: episode.id,
         episodeName: episode.name,
-        error: ingestError,
+        error: serialized,
+        errorType: serialized.type,
+        errorStack: serialized.stack,
       });
     }
   }
@@ -467,24 +746,7 @@ async function ingestNewEpisodes(
     });
   }
 
-  return newItemsCount;
-}
-
-/**
- * Calculate the newest published timestamp from a list of episodes.
- * Used to update subscription.lastPublishedAt.
- */
-function calculateNewestPublishedAt(
-  episodes: SpotifyEpisode[],
-  fallback: number | null
-): number | null {
-  if (episodes.length === 0) {
-    return fallback;
-  }
-
-  const timestamps = episodes.map((e) => parseSpotifyDate(e.releaseDate)).filter((t) => t > 0);
-
-  return timestamps.length > 0 ? Math.max(...timestamps) : fallback;
+  return { count: newItemsCount, newestIngestedAt };
 }
 
 /**

@@ -39,14 +39,56 @@ import type {
   BatchPollingResult,
   ProviderBatchConfig,
   ProviderConnectionRow,
+  YouTubeSkipMetrics,
 } from './types';
-import { MAX_ITEMS_PER_POLL, SHORTS_DURATION_THRESHOLD } from './types';
+import {
+  MAX_ITEMS_PER_POLL,
+  SHORTS_DURATION_THRESHOLD,
+  createEmptyYouTubeSkipMetrics,
+  aggregateYouTubeSkipMetrics,
+  getTotalSkipCount,
+} from './types';
+import {
+  serializeError,
+  createPollingError,
+  formatPollingErrorLegacy,
+  type PollingError,
+} from '../utils/error-utils';
 
 // ============================================================================
 // Logger
 // ============================================================================
 
 const ytLogger = pollLogger.child('youtube');
+
+// ============================================================================
+// Date Parsing Utilities
+// ============================================================================
+
+/**
+ * Parse a YouTube date string into a Unix timestamp.
+ *
+ * Handles edge cases:
+ * - Missing/undefined date strings return null
+ * - Invalid date strings that produce NaN return null
+ * - Valid ISO 8601 dates return the timestamp in milliseconds
+ *
+ * @param dateString - The date string from YouTube API (ISO 8601 format)
+ * @returns Unix timestamp in milliseconds, or null if invalid/missing
+ */
+export function parseYouTubeDate(dateString: string | undefined | null): number | null {
+  if (!dateString) {
+    return null;
+  }
+
+  const parsed = new Date(dateString).getTime();
+
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
 
 // ============================================================================
 // Provider Configuration
@@ -121,28 +163,43 @@ export async function pollSingleYouTubeSubscription(
   // Enrich videos with duration and full description from videos.list API
   const enrichedVideos = enrichVideosWithDetails(videos, videoDetails);
 
-  // Filter out Shorts before processing
-  const nonShortVideos = filterOutShorts(enrichedVideos, sub.name);
+  // Filter out Shorts before processing (returns skip metrics)
+  const shortsFilterResult = filterOutShorts(enrichedVideos, sub.name);
 
   // If all videos were Shorts, we're done
-  if (nonShortVideos.length === 0) {
-    ytLogger.info('All videos were Shorts, nothing to ingest', { name: sub.name });
+  if (shortsFilterResult.filtered.length === 0) {
+    ytLogger.info('All videos were Shorts, nothing to ingest', {
+      name: sub.name,
+      skipMetrics: shortsFilterResult.skipMetrics,
+    });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
 
-  // Filter to new videos based on lastPolledAt
-  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt);
+  // Filter to new videos based on lastPolledAt (passing along skip metrics)
+  const newVideosResult = filterNewVideos(
+    shortsFilterResult.filtered,
+    sub.lastPolledAt,
+    sub.name,
+    shortsFilterResult.skipMetrics
+  );
 
   ytLogger.info('Found videos', {
     total: videos.length,
-    afterShortsFilter: nonShortVideos.length,
-    new: newVideos.length,
+    afterShortsFilter: shortsFilterResult.filtered.length,
+    new: newVideosResult.filtered.length,
     name: sub.name,
+    skipMetrics: newVideosResult.skipMetrics,
   });
 
   // Ingest new items
-  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, sub.imageUrl, db);
+  const newItemsCount = await ingestNewVideos(
+    newVideosResult.filtered,
+    userId,
+    sub.id,
+    sub.imageUrl,
+    db
+  );
 
   // Calculate newest published timestamp from all videos
   const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
@@ -196,45 +253,117 @@ function enrichVideosWithDetails(
 }
 
 /**
+ * Result of filtering with skip metrics.
+ */
+interface FilterResult<T> {
+  /** Filtered items that passed the filter */
+  filtered: T[];
+  /** Skip metrics tracking why items were filtered */
+  skipMetrics: YouTubeSkipMetrics;
+}
+
+/**
  * Filter out YouTube Shorts from video list.
  *
  * Shorts are videos ≤ 3 minutes (180 seconds) as of 2024.
  * Videos with undefined duration (API error) are NOT filtered - fail-safe behavior.
+ *
+ * @returns Object containing filtered videos and skip metrics
  */
-function filterOutShorts(videos: EnrichedVideo[], subscriptionName: string): EnrichedVideo[] {
-  const nonShortVideos = videos.filter((v) => {
+function filterOutShorts(
+  videos: EnrichedVideo[],
+  subscriptionName: string
+): FilterResult<EnrichedVideo> {
+  const skipMetrics = createEmptyYouTubeSkipMetrics();
+
+  const filtered = videos.filter((v) => {
     if (v.durationSeconds === undefined) {
       return true; // Graceful degradation - don't lose content
     }
-    return v.durationSeconds > SHORTS_DURATION_THRESHOLD;
+    if (v.durationSeconds <= SHORTS_DURATION_THRESHOLD) {
+      skipMetrics.shortsFiltered++;
+      return false;
+    }
+    return true;
   });
 
   // Log filtering stats
-  const filteredCount = videos.length - nonShortVideos.length;
-  if (filteredCount > 0) {
+  if (skipMetrics.shortsFiltered > 0) {
     ytLogger.info('Filtered Shorts', {
-      filtered: filteredCount,
-      remaining: nonShortVideos.length,
+      filtered: skipMetrics.shortsFiltered,
+      remaining: filtered.length,
       name: subscriptionName,
     });
   }
 
-  return nonShortVideos;
+  return { filtered, skipMetrics };
 }
 
 /**
  * Filter videos to only those published after lastPolledAt.
- * For first poll (no lastPolledAt), return only the latest video.
+ *
+ * Edge cases handled:
+ * - Missing/invalid dates: Videos without valid publishedAt are logged and skipped
+ *   (they can't be properly ordered in the inbox)
+ * - First poll (lastPolledAt = null/0): Return only the latest video with a valid date
+ * - NaN prevention: parseYouTubeDate explicitly returns null for invalid dates
+ *
+ * @param videos - Videos to filter
+ * @param lastPolledAt - Timestamp of last poll, or null for first poll
+ * @param subscriptionName - Name of subscription for logging context
+ * @param existingSkipMetrics - Optional existing skip metrics to add to
+ * @returns Object containing filtered videos and updated skip metrics
  */
-function filterNewVideos(videos: EnrichedVideo[], lastPolledAt: number | null): EnrichedVideo[] {
-  if (lastPolledAt) {
-    return videos.filter((v) => {
-      const publishedAt = v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0;
-      return publishedAt > lastPolledAt;
+function filterNewVideos(
+  videos: EnrichedVideo[],
+  lastPolledAt: number | null,
+  subscriptionName?: string,
+  existingSkipMetrics?: YouTubeSkipMetrics
+): FilterResult<EnrichedVideo> {
+  const skipMetrics = existingSkipMetrics
+    ? { ...existingSkipMetrics }
+    : createEmptyYouTubeSkipMetrics();
+
+  // Filter to videos with valid dates
+  const validVideos = videos.filter((v) => {
+    const publishedAt = parseYouTubeDate(v.snippet?.publishedAt);
+
+    if (publishedAt === null) {
+      skipMetrics.invalidDate++;
+      ytLogger.warn('Video missing or invalid publishedAt', {
+        videoId: v.contentDetails?.videoId || v.id,
+        publishedAt: v.snippet?.publishedAt,
+        subscriptionName,
+      });
+      return false;
+    }
+
+    return true;
+  });
+
+  // Log summary if we filtered out invalid dates
+  if (skipMetrics.invalidDate > 0) {
+    ytLogger.info('Videos with invalid dates filtered', {
+      subscriptionName,
+      invalidCount: skipMetrics.invalidDate,
+      totalVideos: videos.length,
+      validVideos: validVideos.length,
     });
   }
-  // First poll: only latest video
-  return videos.slice(0, 1);
+
+  // First poll (no lastPolledAt): return only the latest video
+  if (!lastPolledAt) {
+    return { filtered: validVideos.slice(0, 1), skipMetrics };
+  }
+
+  // Filter to videos published after lastPolledAt
+  const filtered = validVideos.filter((v) => {
+    // We know publishedAt is valid here since we filtered above
+    const publishedAt = parseYouTubeDate(v.snippet?.publishedAt)!;
+    return publishedAt > lastPolledAt;
+  });
+
+  return { filtered, skipMetrics };
 }
 
 /**
@@ -269,7 +398,14 @@ async function ingestNewVideos(
         newItemsCount++;
       }
     } catch (ingestError) {
-      ytLogger.error('Failed to ingest video', { error: ingestError });
+      const serialized = serializeError(ingestError);
+      ytLogger.error('Failed to ingest video', {
+        videoId: video.contentDetails?.videoId,
+        videoTitle: video.snippet?.title,
+        error: serialized,
+        errorType: serialized.type,
+        errorStack: serialized.stack,
+      });
     }
   }
 
@@ -279,6 +415,10 @@ async function ingestNewVideos(
 /**
  * Calculate the newest published timestamp from a list of videos.
  * Used to update subscription.lastPublishedAt.
+ *
+ * Uses parseYouTubeDate for consistent date handling:
+ * - Invalid/missing dates are filtered out
+ * - Only valid timestamps are considered for the max calculation
  */
 function calculateNewestPublishedAt(
   videos: youtube_v3.Schema$PlaylistItem[],
@@ -289,8 +429,8 @@ function calculateNewestPublishedAt(
   }
 
   const timestamps = videos
-    .map((v) => (v.snippet?.publishedAt ? new Date(v.snippet.publishedAt).getTime() : 0))
-    .filter((t) => t > 0);
+    .map((v) => parseYouTubeDate(v.snippet?.publishedAt))
+    .filter((t): t is number => t !== null);
 
   return timestamps.length > 0 ? Math.max(...timestamps) : fallback;
 }
@@ -349,10 +489,12 @@ async function fetchPlaylistsInParallel(
           const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
           return { subscription: sub, videos };
         } catch (error) {
+          const serialized = serializeError(error);
           ytLogger.error('Failed to fetch playlist', {
             subscriptionId: sub.id,
             name: sub.name,
-            error,
+            error: serialized,
+            errorType: serialized.type,
           });
           return { subscription: sub, videos: [], error: error as Error };
         }
@@ -391,7 +533,7 @@ export async function pollYouTubeSubscriptionsBatched(
 ): Promise<BatchPollingResult> {
   ytLogger.info('Batch polling subscriptions', { count: subs.length, userId });
 
-  const errors: Array<{ subscriptionId: string; error: string }> = [];
+  const pollingErrors: PollingError[] = [];
 
   // Step 1: Fetch all playlists in parallel (waves of 6)
   const playlistResults = await fetchPlaylistsInParallel(subs, client);
@@ -399,7 +541,14 @@ export async function pollYouTubeSubscriptionsBatched(
   // Collect errors from playlist fetches
   for (const result of playlistResults) {
     if (result.error) {
-      errors.push({ subscriptionId: result.subscription.id, error: String(result.error) });
+      pollingErrors.push(
+        createPollingError(result.subscription.id, result.error, {
+          channelId: result.subscription.providerChannelId,
+          channelName: result.subscription.name,
+          userId,
+          operation: 'fetchPlaylist',
+        })
+      );
     }
   }
 
@@ -424,6 +573,7 @@ export async function pollYouTubeSubscriptionsBatched(
 
   // Step 4: Process each subscription with the pre-fetched video details
   let totalNewItems = 0;
+  const allSkipMetrics: YouTubeSkipMetrics[] = [];
 
   for (const result of playlistResults) {
     // Skip subscriptions that failed to fetch
@@ -432,36 +582,63 @@ export async function pollYouTubeSubscriptionsBatched(
     }
 
     try {
-      const newItems = await processSubscriptionVideos(
+      const processResult = await processSubscriptionVideos(
         result.subscription,
         result.videos,
         videoDetails,
         userId,
         db
       );
-      totalNewItems += newItems;
+      totalNewItems += processResult.newItems;
+      allSkipMetrics.push(processResult.skipMetrics);
     } catch (error) {
+      const pollingError = createPollingError(result.subscription.id, error, {
+        channelId: result.subscription.providerChannelId,
+        channelName: result.subscription.name,
+        userId,
+        operation: 'processSubscriptionVideos',
+      });
       ytLogger.error('Failed to process subscription videos', {
         subscriptionId: result.subscription.id,
         name: result.subscription.name,
-        error,
+        error: pollingError.error,
+        errorType: pollingError.errorType,
+        context: pollingError.context,
       });
-      errors.push({ subscriptionId: result.subscription.id, error: String(error) });
+      pollingErrors.push(pollingError);
     }
   }
+
+  // Aggregate skip metrics across all subscriptions
+  const aggregatedSkipMetrics = aggregateYouTubeSkipMetrics(allSkipMetrics);
+  const totalSkipped = getTotalSkipCount(aggregatedSkipMetrics);
 
   ytLogger.info('Batch polling complete', {
     processed: playlistResults.length,
     totalNewItems,
-    errors: errors.length,
+    errors: pollingErrors.length,
+    skipMetrics: aggregatedSkipMetrics,
+    totalSkipped,
   });
 
   return {
     newItems: totalNewItems,
     processed: playlistResults.length,
-    skipped: 0, // YouTube doesn't have delta detection
-    errors: errors.length > 0 ? errors : undefined,
+    skipped: totalSkipped,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    youtubeSkipMetrics: aggregatedSkipMetrics,
   };
+}
+
+/**
+ * Result of processing a subscription's videos.
+ * Includes both new item count and skip metrics.
+ */
+interface SubscriptionProcessResult {
+  /** Number of new items ingested */
+  newItems: number;
+  /** Skip metrics for this subscription */
+  skipMetrics: YouTubeSkipMetrics;
 }
 
 /**
@@ -479,7 +656,7 @@ export async function pollYouTubeSubscriptionsBatched(
  * @param videoDetails - Pre-fetched video details map
  * @param userId - User ID owning the subscription
  * @param db - Database instance
- * @returns Number of new items ingested
+ * @returns Object containing new items count and skip metrics
  */
 async function processSubscriptionVideos(
   sub: Subscription,
@@ -487,37 +664,52 @@ async function processSubscriptionVideos(
   videoDetails: Map<string, VideoDetails>,
   userId: string,
   db: DrizzleDB
-): Promise<number> {
+): Promise<SubscriptionProcessResult> {
   if (videos.length === 0) {
     ytLogger.info('No videos found', { name: sub.name });
     await updateSubscriptionPolled(sub.id, db);
-    return 0;
+    return { newItems: 0, skipMetrics: createEmptyYouTubeSkipMetrics() };
   }
 
   // Enrich videos with details from the pre-fetched map
   const enrichedVideos = enrichVideosWithDetailsMap(videos, videoDetails);
 
-  // Filter out Shorts
-  const nonShortVideos = filterOutShorts(enrichedVideos, sub.name);
+  // Filter out Shorts (returns skip metrics)
+  const shortsFilterResult = filterOutShorts(enrichedVideos, sub.name);
 
-  if (nonShortVideos.length === 0) {
-    ytLogger.info('All videos were Shorts, nothing to ingest', { name: sub.name });
+  if (shortsFilterResult.filtered.length === 0) {
+    ytLogger.info('All videos were Shorts, nothing to ingest', {
+      name: sub.name,
+      skipMetrics: shortsFilterResult.skipMetrics,
+    });
     await updateSubscriptionPolled(sub.id, db);
-    return 0;
+    return { newItems: 0, skipMetrics: shortsFilterResult.skipMetrics };
   }
 
-  // Filter to new videos based on lastPolledAt
-  const newVideos = filterNewVideos(nonShortVideos, sub.lastPolledAt);
+  // Filter to new videos based on lastPolledAt (passing along skip metrics)
+  const newVideosResult = filterNewVideos(
+    shortsFilterResult.filtered,
+    sub.lastPolledAt,
+    sub.name,
+    shortsFilterResult.skipMetrics
+  );
 
   ytLogger.info('Found videos', {
     total: videos.length,
-    afterShortsFilter: nonShortVideos.length,
-    new: newVideos.length,
+    afterShortsFilter: shortsFilterResult.filtered.length,
+    new: newVideosResult.filtered.length,
     name: sub.name,
+    skipMetrics: newVideosResult.skipMetrics,
   });
 
   // Ingest new items
-  const newItemsCount = await ingestNewVideos(newVideos, userId, sub.id, sub.imageUrl, db);
+  const newItemsCount = await ingestNewVideos(
+    newVideosResult.filtered,
+    userId,
+    sub.id,
+    sub.imageUrl,
+    db
+  );
 
   // Calculate newest published timestamp
   const newestPublishedAt = calculateNewestPublishedAt(videos, sub.lastPublishedAt);
@@ -532,7 +724,7 @@ async function processSubscriptionVideos(
     })
     .where(eq(subscriptions.id, sub.id));
 
-  return newItemsCount;
+  return { newItems: newItemsCount, skipMetrics: newVideosResult.skipMetrics };
 }
 
 /**

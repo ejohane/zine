@@ -1121,3 +1121,329 @@ describe('edge cases', () => {
     expect(episodes[0].isPlayable).toBe(false);
   });
 });
+
+// ============================================================================
+// Show Metadata Cache Tests
+// ============================================================================
+
+import {
+  getMultipleShowsWithCache,
+  updateShowCache,
+  invalidateShowCache,
+  SHOW_CACHE_CONFIG,
+  type CachedShowMetadata,
+} from './spotify';
+
+describe('getMultipleShowsWithCache', () => {
+  const mockKVGet = vi.fn();
+  const mockKVPut = vi.fn();
+
+  function createMockCacheEnv() {
+    return {
+      SPOTIFY_CACHE: {
+        get: mockKVGet,
+        put: mockKVPut,
+        delete: vi.fn(),
+      } as unknown as KVNamespace,
+    };
+  }
+
+  beforeEach(() => {
+    mockKVGet.mockReset();
+    mockKVPut.mockReset();
+  });
+
+  it('should return empty map for empty input', async () => {
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, [], env);
+
+    expect(result.data.size).toBe(0);
+    expect(result.cacheHits).toBe(0);
+    expect(result.cacheMisses).toBe(0);
+    expect(mockKVGet).not.toHaveBeenCalled();
+    expect(mockShowsGet).not.toHaveBeenCalled();
+  });
+
+  it('should return cached data when all shows are in cache', async () => {
+    const cachedShow: CachedShowMetadata = {
+      id: 'show1',
+      name: 'Cached Show',
+      description: 'Cached description',
+      publisher: 'Cached Publisher',
+      images: [{ url: 'https://image.jpg', height: 640, width: 640 }],
+      externalUrl: 'https://spotify.com/show/show1',
+      totalEpisodes: 50,
+      cachedAt: MOCK_NOW - 1000,
+    };
+
+    mockKVGet.mockResolvedValue(cachedShow);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show1'], env);
+
+    expect(result.data.size).toBe(1);
+    expect(result.data.get('show1')?.name).toBe('Cached Show');
+    expect(result.cacheHits).toBe(1);
+    expect(result.cacheMisses).toBe(0);
+    expect(mockShowsGet).not.toHaveBeenCalled();
+    expect(mockKVPut).not.toHaveBeenCalled();
+  });
+
+  it('should fetch from API and cache when show is not cached', async () => {
+    mockKVGet.mockResolvedValue(null);
+    mockKVPut.mockResolvedValue(undefined);
+
+    const apiShow = createMockSDKShow({ id: 'show2', name: 'API Show' });
+    mockShowsGet.mockResolvedValue([apiShow]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show2'], env);
+
+    expect(result.data.size).toBe(1);
+    expect(result.data.get('show2')?.name).toBe('API Show');
+    expect(result.cacheHits).toBe(0);
+    expect(result.cacheMisses).toBe(1);
+    expect(mockShowsGet).toHaveBeenCalledWith(['show2'], 'US');
+    expect(mockKVPut).toHaveBeenCalledWith(
+      `${SHOW_CACHE_CONFIG.KEY_PREFIX}show2`,
+      expect.stringContaining('"id":"show2"'),
+      { expirationTtl: SHOW_CACHE_CONFIG.TTL_SECONDS }
+    );
+  });
+
+  it('should mix cached and API data', async () => {
+    const cachedShow: CachedShowMetadata = {
+      id: 'show1',
+      name: 'Cached Show',
+      description: 'Cached',
+      publisher: 'Cached',
+      images: [],
+      externalUrl: 'https://spotify.com/show/show1',
+      totalEpisodes: 10,
+      cachedAt: MOCK_NOW - 1000,
+    };
+
+    // First call (show1) returns cached, second call (show2) returns null
+    mockKVGet.mockImplementation((key: string) => {
+      if (key === `${SHOW_CACHE_CONFIG.KEY_PREFIX}show1`) {
+        return Promise.resolve(cachedShow);
+      }
+      return Promise.resolve(null);
+    });
+    mockKVPut.mockResolvedValue(undefined);
+
+    const apiShow = createMockSDKShow({ id: 'show2', name: 'API Show' });
+    mockShowsGet.mockResolvedValue([apiShow]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show1', 'show2'], env);
+
+    expect(result.data.size).toBe(2);
+    expect(result.data.get('show1')?.name).toBe('Cached Show');
+    expect(result.data.get('show2')?.name).toBe('API Show');
+    expect(result.cacheHits).toBe(1);
+    expect(result.cacheMisses).toBe(1);
+    // Only uncached show should be fetched from API
+    expect(mockShowsGet).toHaveBeenCalledWith(['show2'], 'US');
+  });
+
+  it('should fall back to API when cache read fails', async () => {
+    mockKVGet.mockRejectedValue(new Error('KV read error'));
+    mockKVPut.mockResolvedValue(undefined);
+
+    const apiShow = createMockSDKShow({ id: 'show1', name: 'API Show' });
+    mockShowsGet.mockResolvedValue([apiShow]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show1'], env);
+
+    expect(result.data.size).toBe(1);
+    expect(result.data.get('show1')?.name).toBe('API Show');
+    expect(result.cacheHits).toBe(0);
+    expect(result.cacheMisses).toBe(1);
+  });
+
+  it('should continue if cache write fails', async () => {
+    mockKVGet.mockResolvedValue(null);
+    mockKVPut.mockRejectedValue(new Error('KV write error'));
+
+    const apiShow = createMockSDKShow({ id: 'show1', name: 'API Show' });
+    mockShowsGet.mockResolvedValue([apiShow]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show1'], env);
+
+    expect(result.data.size).toBe(1);
+    expect(result.data.get('show1')?.name).toBe('API Show');
+    expect(result.cacheMisses).toBe(1);
+    // Should not throw
+  });
+
+  it('should use custom market when provided', async () => {
+    mockKVGet.mockResolvedValue(null);
+    mockKVPut.mockResolvedValue(undefined);
+
+    const apiShow = createMockSDKShow({ id: 'show1' });
+    mockShowsGet.mockResolvedValue([apiShow]);
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    await getMultipleShowsWithCache(client, ['show1'], env, 'GB');
+
+    expect(mockShowsGet).toHaveBeenCalledWith(['show1'], 'GB');
+  });
+
+  it('should handle multiple shows with all cache hits', async () => {
+    const cachedShows: CachedShowMetadata[] = [
+      {
+        id: 'show1',
+        name: 'Show 1',
+        description: '',
+        publisher: '',
+        images: [],
+        externalUrl: '',
+        totalEpisodes: 10,
+        cachedAt: MOCK_NOW,
+      },
+      {
+        id: 'show2',
+        name: 'Show 2',
+        description: '',
+        publisher: '',
+        images: [],
+        externalUrl: '',
+        totalEpisodes: 20,
+        cachedAt: MOCK_NOW,
+      },
+      {
+        id: 'show3',
+        name: 'Show 3',
+        description: '',
+        publisher: '',
+        images: [],
+        externalUrl: '',
+        totalEpisodes: 30,
+        cachedAt: MOCK_NOW,
+      },
+    ];
+
+    mockKVGet.mockImplementation((key: string) => {
+      const id = key.replace(SHOW_CACHE_CONFIG.KEY_PREFIX, '');
+      const show = cachedShows.find((s) => s.id === id);
+      return Promise.resolve(show ?? null);
+    });
+
+    const client = createSpotifyClient('test-token', createMockEnv());
+    const env = createMockCacheEnv();
+
+    const result = await getMultipleShowsWithCache(client, ['show1', 'show2', 'show3'], env);
+
+    expect(result.data.size).toBe(3);
+    expect(result.cacheHits).toBe(3);
+    expect(result.cacheMisses).toBe(0);
+    expect(mockShowsGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateShowCache', () => {
+  const mockKVPut = vi.fn();
+
+  function createMockCacheEnv() {
+    return {
+      SPOTIFY_CACHE: {
+        put: mockKVPut,
+      } as unknown as KVNamespace,
+    };
+  }
+
+  beforeEach(() => {
+    mockKVPut.mockReset();
+  });
+
+  it('should store show in cache with TTL', async () => {
+    mockKVPut.mockResolvedValue(undefined);
+
+    const show: SpotifyShow = {
+      id: 'show1',
+      name: 'Test Show',
+      description: 'Test',
+      publisher: 'Test',
+      images: [],
+      externalUrl: 'https://spotify.com/show/show1',
+      totalEpisodes: 50,
+    };
+
+    const env = createMockCacheEnv();
+    await updateShowCache('show1', show, env);
+
+    expect(mockKVPut).toHaveBeenCalledWith(
+      `${SHOW_CACHE_CONFIG.KEY_PREFIX}show1`,
+      expect.stringContaining('"id":"show1"'),
+      { expirationTtl: SHOW_CACHE_CONFIG.TTL_SECONDS }
+    );
+  });
+
+  it('should not throw on cache write failure', async () => {
+    mockKVPut.mockRejectedValue(new Error('KV error'));
+
+    const show: SpotifyShow = {
+      id: 'show1',
+      name: 'Test',
+      description: '',
+      publisher: '',
+      images: [],
+      externalUrl: '',
+      totalEpisodes: 0,
+    };
+
+    const env = createMockCacheEnv();
+    // Should not throw
+    await expect(updateShowCache('show1', show, env)).resolves.not.toThrow();
+  });
+});
+
+describe('invalidateShowCache', () => {
+  const mockKVDelete = vi.fn();
+
+  function createMockCacheEnv() {
+    return {
+      SPOTIFY_CACHE: {
+        delete: mockKVDelete,
+      } as unknown as KVNamespace,
+    };
+  }
+
+  beforeEach(() => {
+    mockKVDelete.mockReset();
+  });
+
+  it('should delete show from cache', async () => {
+    mockKVDelete.mockResolvedValue(undefined);
+
+    const env = createMockCacheEnv();
+    await invalidateShowCache('show1', env);
+
+    expect(mockKVDelete).toHaveBeenCalledWith(`${SHOW_CACHE_CONFIG.KEY_PREFIX}show1`);
+  });
+
+  it('should not throw on cache delete failure', async () => {
+    mockKVDelete.mockRejectedValue(new Error('KV error'));
+
+    const env = createMockCacheEnv();
+    // Should not throw
+    await expect(invalidateShowCache('show1', env)).resolves.not.toThrow();
+  });
+});
