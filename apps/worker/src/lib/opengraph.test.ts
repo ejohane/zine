@@ -39,6 +39,10 @@ function createHtmlWithOG(og: Partial<OpenGraphData>, extras?: string): string {
   if (og.type) metaTags.push(`<meta property="og:type" content="${escapeAttr(og.type)}">`);
   if (og.author)
     metaTags.push(`<meta property="article:author" content="${escapeAttr(og.author)}">`);
+  if (og.authorImageUrl)
+    metaTags.push(
+      `<meta property="article:author:image" content="${escapeAttr(og.authorImageUrl)}">`
+    );
 
   return `
     <!DOCTYPE html>
@@ -55,7 +59,12 @@ function createHtmlWithOG(og: Partial<OpenGraphData>, extras?: string): string {
 /**
  * Generate HTML with standard meta tags (no OG)
  */
-function createHtmlWithMeta(title: string, description?: string, author?: string): string {
+function createHtmlWithMeta(
+  title: string,
+  description?: string,
+  author?: string,
+  authorImage?: string
+): string {
   return `
     <!DOCTYPE html>
     <html>
@@ -63,6 +72,7 @@ function createHtmlWithMeta(title: string, description?: string, author?: string
       <title>${title}</title>
       ${description ? `<meta name="description" content="${description}">` : ''}
       ${author ? `<meta name="author" content="${author}">` : ''}
+      ${authorImage ? `<meta name="author:image" content="${authorImage}">` : ''}
     </head>
     <body><p>Content</p></body>
     </html>
@@ -402,6 +412,137 @@ describe('scrapeOpenGraph', () => {
       // HTMLRewriter returns attribute values with entities preserved
       expect(result.title).toBe('Test &amp; &quot;Quotes&quot;');
       expect(result.description).toBe("Description with 'quotes' and unicode: \u00e9\u00f1");
+    });
+  });
+
+  describe('Author image URL extraction', () => {
+    it('should extract article:author:image meta property', async () => {
+      mockFetch(
+        createHtmlWithOG({
+          title: 'Article with Author Image',
+          author: 'John Doe',
+          authorImageUrl: 'https://example.com/avatars/john.jpg',
+        })
+      );
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBe('https://example.com/avatars/john.jpg');
+    });
+
+    it('should use author:image with property attribute as fallback', async () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta property="og:title" content="Test Article">
+          <meta property="author:image" content="https://example.com/author-avatar.png">
+        </head>
+        <body></body>
+        </html>
+      `;
+      mockFetch(html);
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBe('https://example.com/author-avatar.png');
+    });
+
+    it('should use author:image with name attribute as fallback', async () => {
+      mockFetch(
+        createHtmlWithMeta('Title', undefined, 'Jane Smith', 'https://example.com/jane.jpg')
+      );
+
+      const result = await scrapeOpenGraph('https://example.com/page');
+
+      expect(result.authorImageUrl).toBe('https://example.com/jane.jpg');
+    });
+
+    it('should prefer article:author:image over author:image fallbacks', async () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta property="og:title" content="Test">
+          <meta property="article:author:image" content="https://example.com/preferred.jpg">
+          <meta property="author:image" content="https://example.com/fallback1.jpg">
+          <meta name="author:image" content="https://example.com/fallback2.jpg">
+        </head>
+        <body></body>
+        </html>
+      `;
+      mockFetch(html);
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBe('https://example.com/preferred.jpg');
+    });
+
+    it('should resolve relative author image URLs', async () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta property="og:title" content="Test">
+          <meta property="article:author:image" content="/images/authors/avatar.jpg">
+        </head>
+        <body></body>
+        </html>
+      `;
+      mockFetch(html);
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBe('https://example.com/images/authors/avatar.jpg');
+    });
+
+    it('should resolve protocol-relative author image URLs', async () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta property="og:title" content="Test">
+          <meta property="article:author:image" content="//cdn.example.com/avatar.jpg">
+        </head>
+        <body></body>
+        </html>
+      `;
+      mockFetch(html);
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBe('https://cdn.example.com/avatar.jpg');
+    });
+
+    it('should return null when no author image is present', async () => {
+      mockFetch(
+        createHtmlWithOG({
+          title: 'Article without Author Image',
+          author: 'John Doe',
+        })
+      );
+
+      const result = await scrapeOpenGraph('https://example.com/article');
+
+      expect(result.authorImageUrl).toBeNull();
+    });
+
+    it('should take first article:author:image when multiple present', async () => {
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta property="article:author:image" content="https://example.com/first.jpg">
+          <meta property="article:author:image" content="https://example.com/second.jpg">
+        </head>
+        <body></body>
+        </html>
+      `;
+      mockFetch(html);
+
+      const result = await scrapeOpenGraph('https://example.com/multi-author-image');
+
+      expect(result.authorImageUrl).toBe('https://example.com/first.jpg');
     });
   });
 });

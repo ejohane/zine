@@ -31,6 +31,7 @@ vi.mock('./logger', () => ({
 function createArticleHtml(options: {
   title?: string;
   author?: string;
+  authorImageUrl?: string;
   ogImage?: string;
   siteName?: string;
   publishedTime?: string;
@@ -39,6 +40,7 @@ function createArticleHtml(options: {
   const {
     title = 'Test Article Title',
     author,
+    authorImageUrl,
     ogImage,
     siteName,
     publishedTime,
@@ -50,6 +52,8 @@ function createArticleHtml(options: {
   if (siteName) metaTags.push(`<meta property="og:site_name" content="${siteName}">`);
   if (publishedTime)
     metaTags.push(`<meta property="article:published_time" content="${publishedTime}">`);
+  if (authorImageUrl)
+    metaTags.push(`<meta property="article:author:image" content="${authorImageUrl}">`);
 
   return `
     <!DOCTYPE html>
@@ -72,15 +76,20 @@ function createArticleHtml(options: {
 /**
  * Generate minimal HTML that is not a readable article
  */
-function createNonArticleHtml(options: { ogImage?: string } = {}): string {
-  const { ogImage } = options;
+function createNonArticleHtml(options: { ogImage?: string; authorImageUrl?: string } = {}): string {
+  const { ogImage, authorImageUrl } = options;
+
+  const metaTags: string[] = [];
+  if (ogImage) metaTags.push(`<meta property="og:image" content="${ogImage}">`);
+  if (authorImageUrl)
+    metaTags.push(`<meta property="article:author:image" content="${authorImageUrl}">`);
 
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Home Page</title>
-      ${ogImage ? `<meta property="og:image" content="${ogImage}">` : ''}
+      ${metaTags.join('\n      ')}
     </head>
     <body>
       <nav><a href="/">Home</a><a href="/about">About</a></nav>
@@ -355,6 +364,117 @@ describe('article-extractor', () => {
         expect(result!.thumbnailUrl).toBe('https://example.com/first.jpg');
       });
     });
+
+    describe('author image extraction', () => {
+      it('extracts article:author:image from meta tag', () => {
+        const html = createArticleHtml({
+          title: 'Article With Author Image',
+          authorImageUrl: 'https://cdn.example.com/author.jpg',
+        });
+
+        const result = extractArticleFromHtml(html, 'https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBe('https://cdn.example.com/author.jpg');
+      });
+
+      it('extracts author image from non-article pages', () => {
+        const html = createNonArticleHtml({
+          authorImageUrl: 'https://example.com/author-avatar.png',
+        });
+
+        const result = extractArticleFromHtml(html, 'https://example.com/');
+
+        expect(result).not.toBeNull();
+        expect(result!.isArticle).toBe(false);
+        expect(result!.authorImageUrl).toBe('https://example.com/author-avatar.png');
+      });
+
+      it('returns null when no author image present', () => {
+        const html = createArticleHtml({
+          title: 'Article Without Author Image',
+        });
+
+        const result = extractArticleFromHtml(html, 'https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBeNull();
+      });
+
+      it('resolves relative author image URLs to absolute', () => {
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta property="article:author:image" content="/images/author.jpg">
+          </head>
+          <body>
+            <article>
+              <h1>Article Title</h1>
+              <p>${'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(50)}</p>
+            </article>
+          </body>
+          </html>
+        `;
+
+        const result = extractArticleFromHtml(html, 'https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBe('https://example.com/images/author.jpg');
+      });
+
+      it('falls back to author:image property when article:author:image missing', () => {
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta property="author:image" content="https://example.com/fallback-author.jpg">
+          </head>
+          <body><nav>Links</nav></body>
+          </html>
+        `;
+
+        const result = extractArticleFromHtml(html, 'https://example.com/');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBe('https://example.com/fallback-author.jpg');
+      });
+
+      it('falls back to author:image name attribute when others missing', () => {
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta name="author:image" content="https://example.com/name-author.jpg">
+          </head>
+          <body><nav>Links</nav></body>
+          </html>
+        `;
+
+        const result = extractArticleFromHtml(html, 'https://example.com/');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBe('https://example.com/name-author.jpg');
+      });
+
+      it('takes first author image when multiple present', () => {
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta property="article:author:image" content="https://example.com/first-author.jpg">
+            <meta property="author:image" content="https://example.com/second-author.jpg">
+          </head>
+          <body><nav>Links</nav></body>
+          </html>
+        `;
+
+        const result = extractArticleFromHtml(html, 'https://example.com/');
+
+        expect(result).not.toBeNull();
+        expect(result!.authorImageUrl).toBe('https://example.com/first-author.jpg');
+      });
+    });
   });
 
   describe('extractArticle', () => {
@@ -363,6 +483,7 @@ describe('article-extractor', () => {
         const html = createArticleHtml({
           title: 'Fetched Article',
           ogImage: 'https://example.com/thumb.jpg',
+          authorImageUrl: 'https://example.com/author.jpg',
         });
         mockFetch(html);
 
@@ -371,6 +492,7 @@ describe('article-extractor', () => {
         expect(result).not.toBeNull();
         expect(result!.title).toBe('Fetched Article');
         expect(result!.thumbnailUrl).toBe('https://example.com/thumb.jpg');
+        expect(result!.authorImageUrl).toBe('https://example.com/author.jpg');
         expect(globalThis.fetch).toHaveBeenCalledWith(
           'https://example.com/article',
           expect.objectContaining({
@@ -572,7 +694,8 @@ describe('article-extractor', () => {
       const result = extractArticleFromHtml(html, 'https://example.com/');
 
       expect(result).not.toBeNull();
-      expect(result!.thumbnailUrl).toBe('//cdn.example.com/image.jpg');
+      // Protocol-relative URLs are resolved to absolute URLs using the base URL's protocol
+      expect(result!.thumbnailUrl).toBe('https://cdn.example.com/image.jpg');
     });
   });
 });

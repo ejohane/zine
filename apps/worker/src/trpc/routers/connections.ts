@@ -13,7 +13,7 @@ import { router, protectedProcedure } from '../trpc';
 import { registerOAuthState, validateOAuthState } from '../../lib/oauth-state';
 import { exchangeCodeForTokens, getProviderUserInfo } from '../../lib/auth';
 import { encrypt, decrypt } from '../../lib/crypto';
-import { providerConnections, subscriptions } from '../../db/schema';
+import { providerConnections, subscriptions, users } from '../../db/schema';
 import type { Bindings } from '../../types';
 import { authLogger } from '../../lib/logger';
 import type { Provider } from '@zine/shared';
@@ -136,15 +136,28 @@ export const connectionsRouter = router({
       // 3. Get provider user info (for provider_user_id)
       const providerUser = await getProviderUserInfo(input.provider, tokens.access_token);
 
-      // 4. Encrypt tokens before storage
+      // 4. Ensure user exists in database (handles post-migration or webhook race condition)
+      // This is idempotent - if user already exists, no change is made
+      const now = Date.now();
+      const nowIso = new Date(now).toISOString();
+      await ctx.db
+        .insert(users)
+        .values({
+          id: ctx.userId,
+          email: null,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        })
+        .onConflictDoNothing();
+
+      // 5. Encrypt tokens before storage
       const encryptedAccessToken = await encrypt(tokens.access_token, ctx.env.ENCRYPTION_KEY);
       const encryptedRefreshToken = await encrypt(tokens.refresh_token, ctx.env.ENCRYPTION_KEY);
 
-      // 5. Calculate token expiry timestamp
-      const now = Date.now();
+      // 6. Calculate token expiry timestamp
       const tokenExpiresAt = now + tokens.expires_in * 1000;
 
-      // 6. Upsert connection (update if exists, insert if not)
+      // 7. Upsert connection (update if exists, insert if not)
       await ctx.db
         .insert(providerConnections)
         .values({
@@ -173,7 +186,7 @@ export const connectionsRouter = router({
           },
         });
 
-      // 7. Reactivate DISCONNECTED subscriptions for this provider
+      // 8. Reactivate DISCONNECTED subscriptions for this provider
       // When a user reconnects their account, their previously disconnected subscriptions
       // should become active again so they can be synced
       await ctx.db

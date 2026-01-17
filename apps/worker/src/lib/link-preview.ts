@@ -32,6 +32,7 @@ import { scrapeOpenGraph } from './opengraph';
 import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
 import { extractArticle } from './article-extractor';
 import { fetchFxTwitterByUrl, type FxTwitterResponse } from './fxtwitter';
+import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 
@@ -374,6 +375,7 @@ function mapFxTwitterToPreview(
     providerId: tweet.id,
     title: tweet.text,
     creator,
+    creatorImageUrl: tweet.author.avatar_url,
     thumbnailUrl,
     duration,
     canonicalUrl: tweet.url,
@@ -446,6 +448,7 @@ async function fetchViaOpenGraph(parsedLink: ParsedLink): Promise<LinkPreviewRes
     providerId: parsedLink.providerId,
     title: ogData.title,
     creator: ogData.author ?? ogData.siteName ?? 'Unknown',
+    creatorImageUrl: ogData.authorImageUrl ?? undefined,
     thumbnailUrl: ogData.image,
     duration: null,
     canonicalUrl: ogData.url ?? parsedLink.canonicalUrl,
@@ -704,18 +707,55 @@ async function fetchRssProviderPreview(parsedLink: ParsedLink): Promise<LinkPrev
  * Fallback order:
  * 1. Article Extraction (Readability) - best for article content
  * 2. Open Graph scraping - fallback for non-article pages
+ *
+ * Creator image fallback chain:
+ * 1. Author image from article metadata
+ * 2. Favicon from the website
+ * 3. null (mobile shows default icon)
  */
 async function fetchWebProviderPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult | null> {
   // Try article extraction first
   const articleData = await extractArticle(parsedLink.canonicalUrl);
 
   if (articleData?.isArticle) {
+    // Try to get creator image with fallback chain
+    let creatorImageUrl: string | undefined = undefined;
+
+    // 1. First try author image from article metadata
+    if (articleData.authorImageUrl) {
+      creatorImageUrl = articleData.authorImageUrl;
+      previewLogger.debug('Using author image from article metadata', {
+        url: parsedLink.canonicalUrl,
+        authorImageUrl: creatorImageUrl,
+      });
+    }
+
+    // 2. Fall back to favicon if no author image
+    if (!creatorImageUrl) {
+      const favicon = await fetchFavicon(parsedLink.canonicalUrl);
+      if (favicon) {
+        creatorImageUrl = favicon;
+        previewLogger.debug('Using favicon as creator image fallback', {
+          url: parsedLink.canonicalUrl,
+          favicon: creatorImageUrl,
+        });
+      }
+    }
+
+    // 3. If all fails, creatorImageUrl stays undefined (mobile shows default icon)
+    if (!creatorImageUrl) {
+      previewLogger.debug('No creator image available, using default', {
+        url: parsedLink.canonicalUrl,
+      });
+    }
+
     return {
       provider: parsedLink.provider,
       contentType: parsedLink.contentType,
       providerId: parsedLink.providerId,
       title: articleData.title,
       creator: articleData.author || articleData.siteName || 'Unknown',
+      creatorImageUrl,
       thumbnailUrl: articleData.thumbnailUrl,
       duration: null,
       canonicalUrl: parsedLink.canonicalUrl,
@@ -729,5 +769,19 @@ async function fetchWebProviderPreview(parsedLink: ParsedLink): Promise<LinkPrev
   }
 
   // Fall back to Open Graph
-  return fetchViaOpenGraph(parsedLink);
+  const ogResult = await fetchViaOpenGraph(parsedLink);
+
+  // For non-articles, also try favicon as fallback if no creatorImageUrl
+  if (ogResult && !ogResult.creatorImageUrl) {
+    const favicon = await fetchFavicon(parsedLink.canonicalUrl);
+    if (favicon) {
+      ogResult.creatorImageUrl = favicon;
+      previewLogger.debug('Using favicon as creator image fallback for OG result', {
+        url: parsedLink.canonicalUrl,
+        favicon,
+      });
+    }
+  }
+
+  return ogResult;
 }

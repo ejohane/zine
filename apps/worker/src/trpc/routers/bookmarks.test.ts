@@ -30,11 +30,18 @@ function createMockPreviewResult(
     providerId: string;
     title: string;
     creator: string;
+    creatorImageUrl: string | null;
     thumbnailUrl: string | null;
     duration: number | null;
     canonicalUrl: string;
     description?: string;
-    source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback';
+    source:
+      | 'provider_api'
+      | 'oembed'
+      | 'opengraph'
+      | 'fallback'
+      | 'fxtwitter'
+      | 'article_extractor';
   }> = {}
 ) {
   return {
@@ -43,6 +50,7 @@ function createMockPreviewResult(
     providerId: 'dQw4w9WgXcQ',
     title: 'Test Video',
     creator: 'Test Channel',
+    creatorImageUrl: null,
     thumbnailUrl: 'https://example.com/thumb.jpg',
     duration: 3600,
     canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -62,6 +70,7 @@ function createMockSaveInput(
     providerId: string;
     title: string;
     creator: string;
+    creatorImageUrl: string | null;
     thumbnailUrl: string | null;
     duration: number | null;
     canonicalUrl: string;
@@ -75,6 +84,7 @@ function createMockSaveInput(
     providerId: 'dQw4w9WgXcQ',
     title: 'Test Video',
     creator: 'Test Channel',
+    creatorImageUrl: null as string | null,
     thumbnailUrl: 'https://example.com/thumb.jpg',
     duration: 3600,
     canonicalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
@@ -95,6 +105,7 @@ interface MockItem {
   providerId: string;
   title: string;
   creator: string;
+  creatorImageUrl: string | null;
   contentType: string;
   thumbnailUrl: string | null;
   duration: number | null;
@@ -155,6 +166,7 @@ function createMockBookmarksCaller(options: {
       providerId: string;
       title: string;
       creator: string;
+      creatorImageUrl?: string | null;
       thumbnailUrl: string | null;
       duration: number | null;
       canonicalUrl: string;
@@ -182,6 +194,7 @@ function createMockBookmarksCaller(options: {
           providerId: input.providerId,
           title: input.title,
           creator: input.creator,
+          creatorImageUrl: input.creatorImageUrl ?? null,
           contentType: input.contentType,
           thumbnailUrl: input.thumbnailUrl,
           duration: input.duration,
@@ -393,6 +406,7 @@ describe('Bookmarks Router', () => {
         providerId: 'dQw4w9WgXcQ',
         title: 'Test Video',
         creator: 'Test Channel',
+        creatorImageUrl: null,
         contentType: ContentType.VIDEO,
         thumbnailUrl: null,
         duration: null,
@@ -430,6 +444,7 @@ describe('Bookmarks Router', () => {
         providerId: 'dQw4w9WgXcQ',
         title: 'Test Video',
         creator: 'Test Channel',
+        creatorImageUrl: null,
         contentType: ContentType.VIDEO,
         thumbnailUrl: null,
         duration: null,
@@ -467,6 +482,7 @@ describe('Bookmarks Router', () => {
         providerId: 'dQw4w9WgXcQ',
         title: 'Test Video',
         creator: 'Test Channel',
+        creatorImageUrl: null,
         contentType: ContentType.VIDEO,
         thumbnailUrl: null,
         duration: null,
@@ -504,6 +520,7 @@ describe('Bookmarks Router', () => {
         providerId: 'dQw4w9WgXcQ',
         title: 'Test Video',
         creator: 'Test Channel',
+        creatorImageUrl: null,
         contentType: ContentType.VIDEO,
         thumbnailUrl: null,
         duration: null,
@@ -581,6 +598,138 @@ describe('Bookmarks Router', () => {
       expect(result.status).toBe('created');
       expect(result.itemId).toBeDefined();
       expect(result.userItemId).toBeDefined();
+    });
+
+    describe('creatorImageUrl handling', () => {
+      it('should save X/Twitter post with author avatar', async () => {
+        const caller = createMockBookmarksCaller({
+          userId: TEST_USER_ID,
+          items: new Map(),
+          userItems: new Map(),
+        });
+
+        const result = await caller.save(
+          createMockSaveInput({
+            url: 'https://x.com/naval/status/1234567890',
+            provider: Provider.X,
+            contentType: ContentType.POST,
+            providerId: '1234567890',
+            title: 'Naval tweet',
+            creator: 'Naval (@naval)',
+            creatorImageUrl: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            thumbnailUrl: null,
+            duration: null,
+            canonicalUrl: 'https://x.com/naval/status/1234567890',
+          })
+        );
+
+        expect(result.status).toBe('created');
+        expect(result.itemId).toBeDefined();
+      });
+
+      it('should save web article with author image', async () => {
+        const caller = createMockBookmarksCaller({
+          userId: TEST_USER_ID,
+          items: new Map(),
+          userItems: new Map(),
+        });
+
+        const result = await caller.save(
+          createMockSaveInput({
+            url: 'https://steve-yegge.medium.com/article',
+            provider: Provider.WEB,
+            contentType: ContentType.ARTICLE,
+            providerId: 'article',
+            title: 'Great Article',
+            creator: 'Steve Yegge',
+            creatorImageUrl: 'https://cdn.medium.com/author-avatar.jpg',
+            thumbnailUrl: 'https://cdn.medium.com/og-image.jpg',
+            duration: null,
+            canonicalUrl: 'https://steve-yegge.medium.com/article',
+          })
+        );
+
+        expect(result.status).toBe('created');
+        expect(result.itemId).toBeDefined();
+      });
+
+      it('should save web article with favicon fallback', async () => {
+        const caller = createMockBookmarksCaller({
+          userId: TEST_USER_ID,
+          items: new Map(),
+          userItems: new Map(),
+        });
+
+        const result = await caller.save(
+          createMockSaveInput({
+            url: 'https://example.com/blog/article',
+            provider: Provider.WEB,
+            contentType: ContentType.ARTICLE,
+            providerId: 'article',
+            title: 'Blog Post',
+            creator: 'Blog Author',
+            creatorImageUrl: 'https://example.com/favicon.ico', // Favicon fallback
+            thumbnailUrl: null,
+            duration: null,
+            canonicalUrl: 'https://example.com/blog/article',
+          })
+        );
+
+        expect(result.status).toBe('created');
+        expect(result.itemId).toBeDefined();
+      });
+
+      it('should save bookmark with null creatorImageUrl (no favicon)', async () => {
+        const caller = createMockBookmarksCaller({
+          userId: TEST_USER_ID,
+          items: new Map(),
+          userItems: new Map(),
+        });
+
+        const result = await caller.save(
+          createMockSaveInput({
+            url: 'https://example.com/page',
+            provider: Provider.WEB,
+            contentType: ContentType.ARTICLE,
+            providerId: 'page',
+            title: 'Page without favicon',
+            creator: 'Unknown',
+            creatorImageUrl: null, // No author image or favicon
+            thumbnailUrl: null,
+            duration: null,
+            canonicalUrl: 'https://example.com/page',
+          })
+        );
+
+        expect(result.status).toBe('created');
+        expect(result.itemId).toBeDefined();
+      });
+
+      it('should save Spotify podcast with show image', async () => {
+        const caller = createMockBookmarksCaller({
+          userId: TEST_USER_ID,
+          items: new Map(),
+          userItems: new Map(),
+        });
+
+        const result = await caller.save(
+          createMockSaveInput({
+            url: 'https://open.spotify.com/episode/abc123',
+            provider: Provider.SPOTIFY,
+            contentType: ContentType.PODCAST,
+            providerId: 'abc123',
+            title: 'Podcast Episode',
+            creator: 'Podcast Show',
+            creatorImageUrl: 'https://i.scdn.co/image/show-image.jpg', // Show image
+            thumbnailUrl: 'https://i.scdn.co/image/episode-thumb.jpg',
+            duration: 3600,
+            canonicalUrl: 'https://open.spotify.com/episode/abc123',
+          })
+        );
+
+        expect(result.status).toBe('created');
+        expect(result.itemId).toBeDefined();
+      });
     });
   });
 });
