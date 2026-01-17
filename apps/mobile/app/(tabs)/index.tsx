@@ -1,6 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { Image } from 'expo-image';
 import { useMemo } from 'react';
 import {
   View,
@@ -15,27 +14,17 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import {
   useInboxItems,
   useHomeData,
-  formatDuration,
   useLibraryItems,
+  mapContentType,
+  mapProvider,
 } from '@/hooks/use-items-trpc';
-
-// =============================================================================
-// Types
-// =============================================================================
-
-interface ContentItem {
-  id: string;
-  title: string;
-  source: string;
-  imageUrl: string | null;
-  duration: string | null;
-  type: 'podcast' | 'video' | 'article' | 'post';
-}
+import type { ContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -58,16 +47,6 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
-}
-
-function mapContentType(type: string): ContentItem['type'] {
-  const typeMap: Record<string, ContentItem['type']> = {
-    VIDEO: 'video',
-    PODCAST: 'podcast',
-    ARTICLE: 'article',
-    POST: 'post',
-  };
-  return typeMap[type] ?? 'article';
 }
 
 // =============================================================================
@@ -94,113 +73,6 @@ function SectionHeader({
         )}
       </View>
       {onPress && <ChevronRightIcon size={20} color={colors.textTertiary} />}
-    </Pressable>
-  );
-}
-
-function HorizontalCard({
-  item,
-  colors,
-  onPress,
-}: {
-  item: ContentItem;
-  colors: typeof Colors.dark;
-  onPress: () => void;
-}) {
-  const typeColor = ContentColors[item.type];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.horizontalCard, { backgroundColor: colors.backgroundSecondary }]}
-    >
-      {item.imageUrl ? (
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.horizontalCardImage}
-          contentFit="cover"
-        />
-      ) : (
-        <View
-          style={[styles.horizontalCardImage, { backgroundColor: colors.backgroundTertiary }]}
-        />
-      )}
-      <View style={styles.horizontalCardContent}>
-        <Text style={[styles.horizontalCardTitle, { color: colors.text }]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        <View style={styles.horizontalCardMeta}>
-          <View style={[styles.typeDot, { backgroundColor: typeColor }]} />
-          <Text
-            style={[styles.horizontalCardSource, { color: colors.textSecondary }]}
-            numberOfLines={1}
-          >
-            {item.source}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function LargeCard({
-  item,
-  colors,
-  onPress,
-}: {
-  item: ContentItem;
-  colors: typeof Colors.dark;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={styles.largeCard}>
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.largeCardImage} contentFit="cover" />
-      ) : (
-        <View style={[styles.largeCardImage, { backgroundColor: colors.backgroundTertiary }]} />
-      )}
-      <View style={styles.largeCardOverlay}>
-        <Text style={styles.largeCardSource}>{item.source}</Text>
-        <Text style={styles.largeCardTitle} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.duration && <Text style={styles.largeCardDuration}>{item.duration}</Text>}
-      </View>
-    </Pressable>
-  );
-}
-
-function CondensedListItem({
-  item,
-  colors,
-  onPress,
-}: {
-  item: ContentItem;
-  colors: typeof Colors.dark;
-  onPress: () => void;
-}) {
-  const typeLabel = item.type.charAt(0).toUpperCase() + item.type.slice(1);
-
-  return (
-    <Pressable onPress={onPress} style={styles.condensedItem}>
-      {item.imageUrl ? (
-        <Image
-          source={{ uri: item.imageUrl }}
-          style={styles.condensedItemImage}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={[styles.condensedItemImage, { backgroundColor: colors.backgroundTertiary }]} />
-      )}
-      <View style={styles.condensedItemContent}>
-        <Text style={[styles.condensedItemTitle, { color: colors.text }]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={[styles.condensedItemMeta, { color: colors.textSecondary }]} numberOfLines={1}>
-          {item.source} · {typeLabel}
-          {item.duration ? ` · ${item.duration}` : ''}
-        </Text>
-      </View>
     </Pressable>
   );
 }
@@ -245,48 +117,52 @@ export default function HomeScreen() {
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
 
-  // Transform to ContentItem format
-  const recentlyBookmarked = useMemo((): ContentItem[] => {
+  // Transform to ItemCardData format for use with ItemCard component
+  const recentlyBookmarked = useMemo((): ItemCardData[] => {
     return (homeData?.recentBookmarks ?? []).slice(0, 6).map((item) => ({
       id: item.id,
       title: item.title,
-      source: item.publisher ?? item.creator,
-      imageUrl: item.thumbnailUrl,
-      duration: item.duration ? formatDuration(item.duration) : null,
-      type: mapContentType(item.contentType),
+      creator: item.publisher ?? item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: mapContentType(item.contentType) as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
     }));
   }, [homeData?.recentBookmarks]);
 
-  const inboxItems = useMemo((): ContentItem[] => {
+  const inboxItems = useMemo((): ItemCardData[] => {
     return (inboxData?.items ?? []).slice(0, 4).map((item) => ({
       id: item.id,
       title: item.title,
-      source: item.creator,
-      imageUrl: item.thumbnailUrl,
-      duration: item.duration ? formatDuration(item.duration) : null,
-      type: mapContentType(item.contentType),
+      creator: item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: mapContentType(item.contentType) as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
     }));
   }, [inboxData?.items]);
 
-  const podcasts = useMemo((): ContentItem[] => {
+  const podcasts = useMemo((): ItemCardData[] => {
     return (homeData?.byContentType.podcasts ?? []).map((item) => ({
       id: item.id,
       title: item.title,
-      source: item.publisher ?? item.creator,
-      imageUrl: item.thumbnailUrl,
-      duration: item.duration ? formatDuration(item.duration) : null,
-      type: 'podcast',
+      creator: item.publisher ?? item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: 'podcast' as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
     }));
   }, [homeData?.byContentType.podcasts]);
 
-  const videos = useMemo((): ContentItem[] => {
+  const videos = useMemo((): ItemCardData[] => {
     return (homeData?.byContentType.videos ?? []).map((item) => ({
       id: item.id,
       title: item.title,
-      source: item.publisher ?? item.creator,
-      imageUrl: item.thumbnailUrl,
-      duration: item.duration ? formatDuration(item.duration) : null,
-      type: 'video',
+      creator: item.publisher ?? item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: 'video' as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
     }));
   }, [homeData?.byContentType.videos]);
 
@@ -300,10 +176,6 @@ export default function HomeScreen() {
       post: items.filter((item) => item.contentType === 'POST').length,
     };
   }, [libraryData?.items]);
-
-  const handleItemPress = (id: string) => {
-    router.push(`/item/${id}`);
-  };
 
   const isLoading = isInboxLoading || isHomeLoading;
 
@@ -339,12 +211,8 @@ export default function HomeScreen() {
                   <FlatList
                     horizontal
                     data={recentlyBookmarked}
-                    renderItem={({ item }) => (
-                      <HorizontalCard
-                        item={item}
-                        colors={colors}
-                        onPress={() => handleItemPress(item.id)}
-                      />
+                    renderItem={({ item, index }) => (
+                      <ItemCard item={item} variant="horizontal" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -353,7 +221,7 @@ export default function HomeScreen() {
                 </Animated.View>
               )}
 
-              {/* Inbox Section - Condensed List */}
+              {/* Inbox Section - Condensed List using compact ItemCard */}
               {inboxItems.length > 0 && (
                 <Animated.View
                   entering={FadeInDown.delay(200).duration(400)}
@@ -368,31 +236,22 @@ export default function HomeScreen() {
                   <View
                     style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
                   >
-                    {inboxItems.map((item) => (
-                      <CondensedListItem
-                        key={item.id}
-                        item={item}
-                        colors={colors}
-                        onPress={() => handleItemPress(item.id)}
-                      />
+                    {inboxItems.map((item, index) => (
+                      <ItemCard key={item.id} item={item} variant="compact" index={index} />
                     ))}
                   </View>
                 </Animated.View>
               )}
 
-              {/* Category Collection - Large Cards */}
+              {/* Category Collection - Large Cards with overlay */}
               {podcasts.length > 0 && (
                 <Animated.View entering={FadeInDown.delay(300).duration(400)}>
                   <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
                   <FlatList
                     horizontal
                     data={podcasts.slice(0, 5)}
-                    renderItem={({ item }) => (
-                      <LargeCard
-                        item={item}
-                        colors={colors}
-                        onPress={() => handleItemPress(item.id)}
-                      />
+                    renderItem={({ item, index }) => (
+                      <ItemCard item={item} variant="large" overlay index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -447,12 +306,8 @@ export default function HomeScreen() {
                   <FlatList
                     horizontal
                     data={videos}
-                    renderItem={({ item }) => (
-                      <HorizontalCard
-                        item={item}
-                        colors={colors}
-                        onPress={() => handleItemPress(item.id)}
-                      />
+                    renderItem={({ item, index }) => (
+                      <ItemCard item={item} variant="horizontal" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -533,103 +388,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
 
-  // Horizontal Card
-  horizontalCard: {
-    width: 200,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  horizontalCardImage: {
-    width: '100%',
-    height: 112,
-  },
-  horizontalCardContent: {
-    padding: Spacing.md,
-  },
-  horizontalCardTitle: {
-    ...Typography.bodyMedium,
-    fontWeight: '500',
-    marginBottom: Spacing.xs,
-  },
-  horizontalCardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-  },
-  horizontalCardSource: {
-    ...Typography.bodySmall,
-    flex: 1,
-  },
-  typeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-
-  // Large Card
-  largeCard: {
-    width: 280,
-    height: 180,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  largeCardImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  largeCardOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    padding: Spacing.lg,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  largeCardSource: {
-    ...Typography.labelSmall,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginBottom: Spacing.xs,
-  },
-  largeCardTitle: {
-    ...Typography.titleMedium,
-    color: '#FFFFFF',
-    marginBottom: Spacing.xs,
-  },
-  largeCardDuration: {
-    ...Typography.bodySmall,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-
   // Inbox Container
   inboxContainer: {
     marginHorizontal: Spacing.md,
     borderRadius: Radius.lg,
     overflow: 'hidden',
-  },
-
-  // Condensed Item
-  condensedItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  condensedItemImage: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.sm,
-    marginRight: Spacing.md,
-  },
-  condensedItemContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  condensedItemTitle: {
-    ...Typography.bodyMedium,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  condensedItemMeta: {
-    ...Typography.bodySmall,
   },
 
   // Categories

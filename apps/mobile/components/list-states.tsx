@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -145,6 +146,105 @@ export function EmptyState({
           <Text style={styles.buttonText}>{actionLabel}</Text>
         </Pressable>
       )}
+    </View>
+  );
+}
+
+/**
+ * Props for NotFoundState component
+ */
+interface NotFoundStateProps {
+  /** Title to display (defaults to "Not found") */
+  title?: string;
+  /** Message to display */
+  message?: string;
+  /** Label for back button (defaults to "Go Back") */
+  backLabel?: string;
+  /** Custom back handler (defaults to router.back()) */
+  onBack?: () => void;
+}
+
+/**
+ * NotFoundState component displays a not found message with optional back navigation.
+ * Used for item detail pages when the requested resource doesn't exist.
+ *
+ * @example
+ * ```tsx
+ * // Basic usage with defaults
+ * <NotFoundState />
+ *
+ * // With custom message
+ * <NotFoundState
+ *   title="Item not found"
+ *   message="This item may have been deleted."
+ * />
+ * ```
+ */
+export function NotFoundState({
+  title = 'Not found',
+  message = 'The requested item could not be found.',
+  backLabel = 'Go Back',
+  onBack,
+}: NotFoundStateProps) {
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const handleBack = onBack ?? (() => router.back());
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.emoji}>🔍</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+      {message && <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>}
+      <Pressable onPress={handleBack} style={[styles.button, { backgroundColor: colors.primary }]}>
+        <Text style={styles.buttonText}>{backLabel}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Props for InvalidParamState component
+ */
+interface InvalidParamStateProps {
+  /** Title to display (defaults to "Invalid Link") */
+  title?: string;
+  /** Validation error message */
+  message: string;
+  /** Label for back button (defaults to "Go Back") */
+  backLabel?: string;
+  /** Custom back handler (defaults to router.back()) */
+  onBack?: () => void;
+}
+
+/**
+ * InvalidParamState component displays an invalid parameter/link error with back navigation.
+ * Used when URL parameters fail validation.
+ *
+ * @example
+ * ```tsx
+ * <InvalidParamState message="The item ID is missing or invalid." />
+ * ```
+ */
+export function InvalidParamState({
+  title = 'Invalid Link',
+  message,
+  backLabel = 'Go Back',
+  onBack,
+}: InvalidParamStateProps) {
+  const router = useRouter();
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
+  const handleBack = onBack ?? (() => router.back());
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.emoji}>⚠️</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
+      <Pressable onPress={handleBack} style={[styles.button, { backgroundColor: colors.primary }]}>
+        <Text style={styles.buttonText}>{backLabel}</Text>
+      </Pressable>
     </View>
   );
 }

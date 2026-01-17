@@ -17,72 +17,25 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-  Share,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SourceBadge, TypeBadge } from '@/components/badges';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  ContentColors,
-  ProviderColors,
-} from '@/constants/theme';
+  LoadingState,
+  ErrorState,
+  NotFoundState,
+  InvalidParamState,
+} from '@/components/list-states';
+import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useItem, useBookmarkItem, useUnbookmarkItem, UserItemState } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
 import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
-
-// ============================================================================
-// Badge Components
-// ============================================================================
-
-function SourceBadge({ provider }: { provider: string }) {
-  const providerMap: Record<string, { color: string; label: string }> = {
-    YOUTUBE: { color: ProviderColors.youtube, label: 'YouTube' },
-    SPOTIFY: { color: ProviderColors.spotify, label: 'Spotify' },
-    SUBSTACK: { color: ProviderColors.substack, label: 'Substack' },
-    X: { color: ProviderColors.x, label: 'X' },
-    TWITTER: { color: ProviderColors.twitter, label: 'X' },
-    WEB: { color: '#6A6A6A', label: 'Web' },
-  };
-  const { color, label } = providerMap[provider] ?? { color: '#6A6A6A', label: 'Web' };
-
-  return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-}
-
-function TypeBadge({ contentType }: { contentType: string }) {
-  const typeMap: Record<string, { color: string; label: string }> = {
-    VIDEO: { color: ContentColors.video, label: 'Video' },
-    PODCAST: { color: ContentColors.podcast, label: 'Podcast' },
-    ARTICLE: { color: ContentColors.article, label: 'Article' },
-    POST: { color: ContentColors.post, label: 'Post' },
-  };
-  const { color, label } = typeMap[contentType] ?? { color: '#6A6A6A', label: 'Content' };
-
-  return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-}
 
 // ============================================================================
 // FAB Configuration by Provider
@@ -208,94 +161,6 @@ function HeaderIconButton({
 }
 
 // ============================================================================
-// Loading State
-// ============================================================================
-
-function LoadingState({ colors }: { colors: typeof Colors.dark }) {
-  return (
-    <View style={styles.centerContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading item...</Text>
-    </View>
-  );
-}
-
-// ============================================================================
-// Error State
-// ============================================================================
-
-function ErrorState({
-  colors,
-  message,
-  onRetry,
-}: {
-  colors: typeof Colors.dark;
-  message: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Something went wrong</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
-      {onRetry && (
-        <Pressable
-          onPress={onRetry}
-          style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-        >
-          <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>
-            Try Again
-          </Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-// ============================================================================
-// Not Found State
-// ============================================================================
-
-function NotFoundState({ colors }: { colors: typeof Colors.dark }) {
-  const router = useRouter();
-
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Item not found</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
-        This item may have been deleted or does not exist.
-      </Text>
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-      >
-        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-// ============================================================================
-// Invalid Parameter State
-// ============================================================================
-
-function InvalidParamState({ colors, message }: { colors: typeof Colors.dark; message: string }) {
-  const router = useRouter();
-
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Invalid Link</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-      >
-        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -332,7 +197,7 @@ export default function ItemDetailScreen() {
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <InvalidParamState colors={colors} message={idValidation.message} />
+          <InvalidParamState message={idValidation.message} />
         </SafeAreaView>
       </View>
     );
@@ -389,7 +254,7 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <LoadingState colors={colors} />
+          <LoadingState message="Loading item..." />
         </SafeAreaView>
       </View>
     );
@@ -401,7 +266,7 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <ErrorState colors={colors} message={error.message} onRetry={() => refetch()} />
+          <ErrorState message={error.message} onRetry={() => refetch()} />
         </SafeAreaView>
       </View>
     );
@@ -413,7 +278,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <NotFoundState colors={colors} />
+          <NotFoundState
+            title="Item not found"
+            message="This item may have been deleted or does not exist."
+          />
         </SafeAreaView>
       </View>
     );
@@ -779,20 +647,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Badges
+  // Badges Row
   badgeRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
     marginBottom: Spacing.md,
-  },
-  badge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-  },
-  badgeText: {
-    ...Typography.labelMedium,
-    color: '#FFFFFF',
   },
 
   // Content
@@ -883,35 +742,5 @@ const styles = StyleSheet.create({
   description: {
     ...Typography.bodyMedium,
     lineHeight: 24,
-  },
-
-  // Center Container (for loading/error/not found)
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.xl,
-  },
-  loadingText: {
-    ...Typography.bodyMedium,
-    marginTop: Spacing.md,
-  },
-  errorTitle: {
-    ...Typography.headlineSmall,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
-    marginBottom: Spacing.lg,
-  },
-  retryButton: {
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: Radius.md,
-  },
-  retryButtonText: {
-    ...Typography.labelMedium,
   },
 });

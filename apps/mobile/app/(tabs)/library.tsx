@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { ContentType } from '@zine/shared';
 
+import { FilterChip } from '@/components/filter-chip';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
@@ -70,43 +71,6 @@ const filterOptions = [
     contentType: ContentType.POST,
   },
 ];
-
-// =============================================================================
-// Components
-// =============================================================================
-
-interface FilterChipProps {
-  label: string;
-  isSelected: boolean;
-  onPress: () => void;
-  color?: string;
-  colors: typeof Colors.light;
-}
-
-function FilterChip({ label, isSelected, onPress, color, colors }: FilterChipProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: isSelected ? colors.primary : colors.backgroundSecondary,
-          borderColor: isSelected ? colors.primary : colors.border,
-        },
-      ]}
-    >
-      {color && !isSelected && <View style={[styles.filterDot, { backgroundColor: color }]} />}
-      <Text
-        style={[
-          styles.filterChipText,
-          { color: isSelected ? colors.buttonPrimaryText : colors.text },
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 // =============================================================================
 // Main Screen
@@ -209,8 +173,7 @@ export default function LibraryScreen() {
                 label={option.label}
                 isSelected={contentTypeFilter === option.contentType}
                 onPress={() => setContentTypeFilter(option.contentType)}
-                color={option.color}
-                colors={colors}
+                dotColor={option.color}
               />
             ))}
           </ScrollView>
@@ -304,23 +267,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
     marginBottom: Spacing.md,
-  },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    gap: Spacing.xs,
-  },
-  filterChipText: {
-    ...Typography.labelMedium,
-  },
-  filterDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
 
   // List
