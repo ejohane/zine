@@ -13,7 +13,7 @@
  * - Loading, error, and not found states
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -40,7 +40,7 @@ import {
   ProviderColors,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useItem, useToggleFinished } from '@/hooks/use-items-trpc';
+import { useItem, useBookmarkItem, useUnbookmarkItem, UserItemState } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
 import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
@@ -85,6 +85,86 @@ function TypeBadge({ contentType }: { contentType: string }) {
 }
 
 // ============================================================================
+// FAB Configuration by Provider
+// ============================================================================
+
+type FabConfig = {
+  backgroundColor: string;
+  providerIcon: React.ReactNode;
+};
+
+function getFabConfig(provider: string): FabConfig {
+  switch (provider) {
+    case 'SPOTIFY':
+      return {
+        providerIcon: <FontAwesome5 name="spotify" size={22} color="#FFFFFF" />,
+        backgroundColor: '#1DB954',
+      };
+    case 'YOUTUBE':
+      return {
+        providerIcon: <Ionicons name="logo-youtube" size={22} color="#FFFFFF" />,
+        backgroundColor: '#FF0000',
+      };
+    default:
+      // Web, Substack, X, and other providers
+      return {
+        providerIcon: <Ionicons name="globe-outline" size={22} color="#FFFFFF" />,
+        backgroundColor: '#1A1A1A',
+      };
+  }
+}
+
+// ============================================================================
+// Linked Text Component (URL Detection)
+// ============================================================================
+
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function LinkedText({
+  children,
+  style,
+  linkColor,
+}: {
+  children: string;
+  style?: object;
+  linkColor: string;
+}) {
+  const parts = children.split(URL_REGEX);
+
+  const handleLinkPress = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      }
+    } catch (err) {
+      logger.error('Failed to open URL', { error: err });
+    }
+  };
+
+  return (
+    <Text style={style}>
+      {parts.map((part, index) => {
+        if (URL_REGEX.test(part)) {
+          // Reset regex lastIndex since we're reusing it
+          URL_REGEX.lastIndex = 0;
+          return (
+            <Text
+              key={index}
+              style={{ color: linkColor, textDecorationLine: 'underline' }}
+              onPress={() => handleLinkPress(part)}
+            >
+              {part}
+            </Text>
+          );
+        }
+        return part;
+      })}
+    </Text>
+  );
+}
+
+// ============================================================================
 // Icon Action Button
 // ============================================================================
 
@@ -99,7 +179,7 @@ function IconActionButton({
 }) {
   return (
     <Pressable onPress={onPress} style={styles.iconActionButton}>
-      <Ionicons name={icon} size={20} color={color} />
+      <Ionicons name={icon} size={24} color={color} style={{ fontWeight: '700' }} />
     </Pressable>
   );
 }
@@ -238,7 +318,8 @@ export default function ItemDetailScreen() {
   } = useItem(idValidation.success ? idValidation.data : '');
 
   // Mutations
-  const toggleFinishedMutation = useToggleFinished();
+  const bookmarkMutation = useBookmarkItem();
+  const unbookmarkMutation = useUnbookmarkItem();
 
   // Render invalid param state if id is invalid
   if (!idValidation.success) {
@@ -261,6 +342,8 @@ export default function ItemDetailScreen() {
   const handleOpenLink = async () => {
     if (!item?.canonicalUrl) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     try {
       const supported = await Linking.canOpenURL(item.canonicalUrl);
       if (supported) {
@@ -275,6 +358,8 @@ export default function ItemDetailScreen() {
   const handleShare = async () => {
     if (!item) return;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     try {
       await Share.share({
         title: item.title,
@@ -286,11 +371,16 @@ export default function ItemDetailScreen() {
     }
   };
 
-  // Handle mark as finished toggle
-  const handleToggleFinished = () => {
+  // Handle bookmark toggle
+  const handleToggleBookmark = () => {
     if (!item) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    toggleFinishedMutation.mutate({ id: item.id });
+    const isBookmarked = item.state === UserItemState.BOOKMARKED;
+    if (isBookmarked) {
+      unbookmarkMutation.mutate({ id: item.id });
+    } else {
+      bookmarkMutation.mutate({ id: item.id });
+    }
   };
 
   // Render loading state
@@ -349,6 +439,9 @@ export default function ItemDetailScreen() {
 
   // Check if we have a thumbnail for parallax
   const hasThumbnail = !!item.thumbnailUrl;
+
+  // Check if item is bookmarked
+  const isBookmarked = item.state === UserItemState.BOOKMARKED;
 
   // Determine aspect ratio based on content type
   // Videos use 16:9, podcasts/articles use square (1:1)
@@ -443,9 +536,9 @@ export default function ItemDetailScreen() {
             <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
               <View style={styles.actionRowLeft}>
                 <IconActionButton
-                  icon="pricetag-outline"
-                  color={colors.textSecondary}
-                  onPress={handleToggleFinished}
+                  icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+                  color={isBookmarked ? colors.primary : colors.textSecondary}
+                  onPress={handleToggleBookmark}
                 />
                 <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
                 <IconActionButton
@@ -455,12 +548,17 @@ export default function ItemDetailScreen() {
                 />
                 <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
               </View>
-              <Pressable
-                onPress={handleOpenLink}
-                style={[styles.fabButton, { backgroundColor: colors.buttonPrimary }]}
-              >
-                <Ionicons name="open-outline" size={24} color={colors.buttonPrimaryText} />
-              </Pressable>
+              {(() => {
+                const fabConfig = getFabConfig(item.provider);
+                return (
+                  <Pressable
+                    onPress={handleOpenLink}
+                    style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
+                  >
+                    {fabConfig.providerIcon}
+                  </Pressable>
+                );
+              })()}
             </Animated.View>
 
             {/* Description */}
@@ -472,9 +570,12 @@ export default function ItemDetailScreen() {
                 <Text style={[styles.descriptionLabel, { color: colors.text }]}>
                   {getDescriptionLabel()}
                 </Text>
-                <Text style={[styles.description, { color: colors.textSecondary }]}>
+                <LinkedText
+                  style={[styles.description, { color: colors.textSecondary }]}
+                  linkColor={colors.primary}
+                >
                   {item.summary}
-                </Text>
+                </LinkedText>
               </Animated.View>
             )}
           </ParallaxScrollView>
@@ -567,9 +668,9 @@ export default function ItemDetailScreen() {
           <View style={styles.actionRow}>
             <View style={styles.actionRowLeft}>
               <IconActionButton
-                icon="pricetag-outline"
-                color={colors.textSecondary}
-                onPress={handleToggleFinished}
+                icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+                color={isBookmarked ? colors.primary : colors.textSecondary}
+                onPress={handleToggleBookmark}
               />
               <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
               <IconActionButton
@@ -579,12 +680,17 @@ export default function ItemDetailScreen() {
               />
               <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
             </View>
-            <Pressable
-              onPress={handleOpenLink}
-              style={[styles.fabButton, { backgroundColor: colors.buttonPrimary }]}
-            >
-              <Ionicons name="open-outline" size={24} color={colors.buttonPrimaryText} />
-            </Pressable>
+            {(() => {
+              const fabConfig = getFabConfig(item.provider);
+              return (
+                <Pressable
+                  onPress={handleOpenLink}
+                  style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
+                >
+                  {fabConfig.providerIcon}
+                </Pressable>
+              );
+            })()}
           </View>
 
           {/* Description */}
@@ -593,9 +699,12 @@ export default function ItemDetailScreen() {
               <Text style={[styles.descriptionLabel, { color: colors.text }]}>
                 {getDescriptionLabel()}
               </Text>
-              <Text style={[styles.description, { color: colors.textSecondary }]}>
+              <LinkedText
+                style={[styles.description, { color: colors.textSecondary }]}
+                linkColor={colors.primary}
+              >
                 {item.summary}
-              </Text>
+              </LinkedText>
             </View>
           )}
         </Animated.View>
@@ -739,16 +848,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.xl,
-    paddingHorizontal: Spacing.xl,
+    marginBottom: Spacing.md,
+    paddingLeft: Spacing.xl,
+    paddingRight: Spacing.xl + Spacing.sm,
   },
   actionRowLeft: {
     flexDirection: 'row',
     gap: Spacing.md,
   },
   iconActionButton: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
