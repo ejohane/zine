@@ -2,7 +2,7 @@
  * Tests for Link Preview Orchestration Module
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { fetchLinkPreview, type PreviewContext } from './link-preview';
 import { Provider, ContentType } from '@zine/shared';
 
@@ -25,6 +25,14 @@ vi.mock('../providers/spotify', () => ({
   getEpisode: vi.fn(),
 }));
 
+vi.mock('./article-extractor', () => ({
+  extractArticle: vi.fn(),
+}));
+
+vi.mock('./favicon', () => ({
+  fetchFavicon: vi.fn(),
+}));
+
 vi.mock('./logger', () => ({
   logger: {
     child: () => ({
@@ -36,11 +44,23 @@ vi.mock('./logger', () => ({
   },
 }));
 
-// Import mocked modules
+// Import mocked modules and cast them
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode } from '../providers/spotify';
 import { fetchFxTwitterByUrl } from './fxtwitter';
+import { extractArticle } from './article-extractor';
+import { fetchFavicon } from './favicon';
+
+// Cast mock functions for type safety
+const mockFetchYouTubeOEmbed = fetchYouTubeOEmbed as Mock;
+const mockFetchSpotifyOEmbed = fetchSpotifyOEmbed as Mock;
+const mockFetchTwitterOEmbed = fetchTwitterOEmbed as Mock;
+const mockScrapeOpenGraph = scrapeOpenGraph as Mock;
+const mockGetEpisode = getEpisode as Mock;
+const mockFetchFxTwitterByUrl = fetchFxTwitterByUrl as Mock;
+const mockExtractArticle = extractArticle as Mock;
+const mockFetchFavicon = fetchFavicon as Mock;
 
 describe('link-preview', () => {
   beforeEach(() => {
@@ -73,7 +93,7 @@ describe('link-preview', () => {
       const youtubeUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 
       it('fetches via oEmbed when no token provided', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue({
           title: 'Rick Astley - Never Gonna Give You Up',
           author_name: 'Rick Astley',
           author_url: 'https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw',
@@ -96,7 +116,7 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed even with token (API not implemented)', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue({
           title: 'Test Video',
           author_name: 'Test Channel',
           provider_name: 'YouTube',
@@ -115,8 +135,8 @@ describe('link-preview', () => {
       });
 
       it('falls back to Open Graph if oEmbed fails', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue(null);
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
           title: 'Fallback Title',
           description: 'Some description',
           image: 'https://example.com/image.jpg',
@@ -135,8 +155,8 @@ describe('link-preview', () => {
       });
 
       it('uses fallback result when all methods fail', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue(null);
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
           title: null,
           description: null,
           image: null,
@@ -156,7 +176,7 @@ describe('link-preview', () => {
       });
 
       it('handles youtu.be short URLs', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue({
           title: 'Short URL Video',
           author_name: 'Creator',
           provider_name: 'YouTube',
@@ -176,7 +196,7 @@ describe('link-preview', () => {
       const episodeId = '4rOoJ6Egrf8K2IrywzwOMk';
 
       it('fetches via API when token provided', async () => {
-        vi.mocked(getEpisode).mockResolvedValue({
+        mockGetEpisode.mockResolvedValue({
           id: episodeId,
           name: 'Amazing Podcast Episode',
           description: 'This is an amazing episode about something interesting.',
@@ -205,7 +225,7 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed when no token provided', async () => {
-        vi.mocked(fetchSpotifyOEmbed).mockResolvedValue({
+        mockFetchSpotifyOEmbed.mockResolvedValue({
           title: 'Podcast Episode Title',
           author_name: 'Podcast Host',
           thumbnail_url: 'https://i.scdn.co/image/fallback',
@@ -223,8 +243,8 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed when API fails', async () => {
-        vi.mocked(getEpisode).mockRejectedValue(new Error('API error'));
-        vi.mocked(fetchSpotifyOEmbed).mockResolvedValue({
+        mockGetEpisode.mockRejectedValue(new Error('API error'));
+        mockFetchSpotifyOEmbed.mockResolvedValue({
           title: 'oEmbed Fallback',
           author_name: 'Host',
           provider_name: 'Spotify',
@@ -243,8 +263,8 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed when episode not found', async () => {
-        vi.mocked(getEpisode).mockResolvedValue(null);
-        vi.mocked(fetchSpotifyOEmbed).mockResolvedValue({
+        mockGetEpisode.mockResolvedValue(null);
+        mockFetchSpotifyOEmbed.mockResolvedValue({
           title: 'oEmbed Title',
           author_name: 'Host',
           provider_name: 'Spotify',
@@ -264,7 +284,7 @@ describe('link-preview', () => {
 
     describe('Twitter/X URLs', () => {
       it('fetches via FxTwitter for twitter.com URLs', async () => {
-        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue({
+        mockFetchFxTwitterByUrl.mockResolvedValue({
           code: 200,
           message: 'OK',
           tweet: {
@@ -298,7 +318,7 @@ describe('link-preview', () => {
       });
 
       it('fetches via FxTwitter for x.com URLs', async () => {
-        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue({
+        mockFetchFxTwitterByUrl.mockResolvedValue({
           code: 200,
           message: 'OK',
           tweet: {
@@ -329,8 +349,8 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed if FxTwitter fails', async () => {
-        vi.mocked(fetchFxTwitterByUrl).mockResolvedValue(null);
-        vi.mocked(fetchTwitterOEmbed).mockResolvedValue({
+        mockFetchFxTwitterByUrl.mockResolvedValue(null);
+        mockFetchTwitterOEmbed.mockResolvedValue({
           title: 'Tweet from oEmbed',
           author_name: 'oEmbed User',
           provider_name: 'Twitter',
@@ -347,7 +367,7 @@ describe('link-preview', () => {
 
     describe('Substack URLs', () => {
       it('fetches via Open Graph', async () => {
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockScrapeOpenGraph.mockResolvedValue({
           title: 'Interesting Newsletter Post',
           description: 'A deep dive into something fascinating.',
           image: 'https://substackcdn.com/image/fetch/xyz',
@@ -372,7 +392,7 @@ describe('link-preview', () => {
       });
 
       it('uses siteName as fallback creator when author missing', async () => {
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockScrapeOpenGraph.mockResolvedValue({
           title: 'Post Title',
           description: null,
           image: null,
@@ -392,7 +412,8 @@ describe('link-preview', () => {
 
     describe('Generic URLs', () => {
       it('fetches via Open Graph for generic articles', async () => {
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockExtractArticle.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
           title: 'Generic Article Title',
           description: 'Article description here',
           image: 'https://example.com/og-image.png',
@@ -402,6 +423,7 @@ describe('link-preview', () => {
           author: 'Blog Author',
           authorImageUrl: null,
         });
+        mockFetchFavicon.mockResolvedValue(null);
 
         const result = await fetchLinkPreview('https://example.com/blog/article');
 
@@ -414,7 +436,8 @@ describe('link-preview', () => {
       });
 
       it('creates fallback result when Open Graph fails', async () => {
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockExtractArticle.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
           title: null,
           description: null,
           image: null,
@@ -434,7 +457,8 @@ describe('link-preview', () => {
       });
 
       it('handles URLs with no path gracefully', async () => {
-        vi.mocked(scrapeOpenGraph).mockResolvedValue({
+        mockExtractArticle.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
           title: null,
           description: null,
           image: null,
@@ -453,9 +477,125 @@ describe('link-preview', () => {
       });
     });
 
+    describe('WEB provider creatorImageUrl fallback chain', () => {
+      it('uses authorImageUrl from article extractor when available', async () => {
+        mockExtractArticle.mockResolvedValue({
+          title: 'Test Article',
+          author: 'Test Author',
+          authorImageUrl: 'https://example.com/author.jpg',
+          siteName: 'Test Site',
+          publishedAt: null,
+          thumbnailUrl: 'https://example.com/thumb.jpg',
+          excerpt: 'Test excerpt',
+          wordCount: 500,
+          readingTimeMinutes: 3,
+          content: '<p>Content</p>',
+          isArticle: true,
+        });
+
+        const result = await fetchLinkPreview('https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.creatorImageUrl).toBe('https://example.com/author.jpg');
+        expect(result!.source).toBe('article_extractor');
+        expect(mockFetchFavicon).not.toHaveBeenCalled();
+      });
+
+      it('falls back to favicon when no authorImageUrl', async () => {
+        mockExtractArticle.mockResolvedValue({
+          title: 'Test Article',
+          author: 'Test Author',
+          authorImageUrl: null,
+          siteName: 'Test Site',
+          publishedAt: null,
+          thumbnailUrl: 'https://example.com/thumb.jpg',
+          excerpt: 'Test excerpt',
+          wordCount: 500,
+          readingTimeMinutes: 3,
+          content: '<p>Content</p>',
+          isArticle: true,
+        });
+        mockFetchFavicon.mockResolvedValue('https://example.com/favicon.ico');
+
+        const result = await fetchLinkPreview('https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.creatorImageUrl).toBe('https://example.com/favicon.ico');
+        expect(result!.source).toBe('article_extractor');
+        expect(mockFetchFavicon).toHaveBeenCalledWith('https://example.com/article');
+      });
+
+      it('leaves creatorImageUrl undefined when no authorImageUrl and no favicon', async () => {
+        mockExtractArticle.mockResolvedValue({
+          title: 'Test Article',
+          author: 'Test Author',
+          authorImageUrl: null,
+          siteName: 'Test Site',
+          publishedAt: null,
+          thumbnailUrl: 'https://example.com/thumb.jpg',
+          excerpt: 'Test excerpt',
+          wordCount: 500,
+          readingTimeMinutes: 3,
+          content: '<p>Content</p>',
+          isArticle: true,
+        });
+        mockFetchFavicon.mockResolvedValue(null);
+
+        const result = await fetchLinkPreview('https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.creatorImageUrl).toBeUndefined();
+        expect(result!.source).toBe('article_extractor');
+        expect(mockFetchFavicon).toHaveBeenCalledWith('https://example.com/article');
+      });
+
+      it('uses authorImageUrl from OG data when article extraction fails', async () => {
+        mockExtractArticle.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'OG Article',
+          description: 'Description',
+          image: 'https://example.com/og-image.jpg',
+          siteName: 'Example Site',
+          url: null,
+          type: 'article',
+          author: 'OG Author',
+          authorImageUrl: 'https://example.com/og-author.jpg',
+        });
+
+        const result = await fetchLinkPreview('https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.creatorImageUrl).toBe('https://example.com/og-author.jpg');
+        expect(result!.source).toBe('opengraph');
+        expect(mockFetchFavicon).not.toHaveBeenCalled();
+      });
+
+      it('falls back to favicon for OG results without authorImageUrl', async () => {
+        mockExtractArticle.mockResolvedValue(null);
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'OG Article',
+          description: 'Description',
+          image: 'https://example.com/og-image.jpg',
+          siteName: 'Example Site',
+          url: null,
+          type: 'article',
+          author: 'OG Author',
+          authorImageUrl: null,
+        });
+        mockFetchFavicon.mockResolvedValue('https://example.com/favicon.ico');
+
+        const result = await fetchLinkPreview('https://example.com/article');
+
+        expect(result).not.toBeNull();
+        expect(result!.creatorImageUrl).toBe('https://example.com/favicon.ico');
+        expect(result!.source).toBe('opengraph');
+        expect(mockFetchFavicon).toHaveBeenCalled();
+      });
+    });
+
     describe('result shape', () => {
       it('always returns all required fields', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue({
           title: 'Test',
           author_name: 'Author',
           provider_name: 'YouTube',
@@ -476,7 +616,7 @@ describe('link-preview', () => {
       });
 
       it('returns canonical URL from parsed link', async () => {
-        vi.mocked(fetchYouTubeOEmbed).mockResolvedValue({
+        mockFetchYouTubeOEmbed.mockResolvedValue({
           title: 'Test',
           author_name: 'Author',
           provider_name: 'YouTube',
