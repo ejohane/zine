@@ -12,6 +12,8 @@ export interface ArticleMetadata {
   title: string;
   /** Author/byline */
   author: string | null;
+  /** Author profile image URL */
+  authorImageUrl: string | null;
   /** Publication/site name */
   siteName: string | null;
   /** ISO8601 publication date */
@@ -73,9 +75,10 @@ export function extractArticleFromHtml(html: string, url: string): ArticleMetada
       return {
         title: '',
         author: null,
+        authorImageUrl: resolveUrl(extractAuthorImage(document), url),
         siteName: extractSiteNameFromDomain(url),
         publishedAt: null,
-        thumbnailUrl: extractOgImage(document),
+        thumbnailUrl: resolveUrl(extractOgImage(document), url),
         excerpt: null,
         wordCount: null,
         readingTimeMinutes: null,
@@ -102,9 +105,10 @@ export function extractArticleFromHtml(html: string, url: string): ArticleMetada
     return {
       title: article.title ?? '',
       author: article.byline ?? null,
+      authorImageUrl: resolveUrl(extractAuthorImage(document), url),
       siteName: article.siteName ?? extractSiteNameFromDomain(url),
       publishedAt: article.publishedTime ?? null,
-      thumbnailUrl: extractOgImage(document),
+      thumbnailUrl: resolveUrl(extractOgImage(document), url),
       excerpt: article.excerpt ?? null,
       wordCount: estimatedWords,
       readingTimeMinutes,
@@ -123,6 +127,48 @@ export function extractArticleFromHtml(html: string, url: string): ArticleMetada
 function extractOgImage(document: Document): string | null {
   const ogImage = document.querySelector('meta[property="og:image"]');
   return ogImage?.getAttribute('content') || null;
+}
+
+/**
+ * Extract author image from document meta tags
+ * Checks article:author:image and author:image meta tags
+ */
+function extractAuthorImage(document: Document): string | null {
+  // Priority order matching OpenGraph parser
+  const selectors = [
+    'meta[property="article:author:image"]',
+    'meta[property="author:image"]',
+    'meta[name="author:image"]',
+  ];
+
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    const content = el?.getAttribute('content');
+    if (content) return content;
+  }
+
+  return null;
+}
+
+/**
+ * Resolve a potentially relative URL to an absolute URL
+ */
+function resolveUrl(urlString: string | null, baseUrl: string): string | null {
+  if (!urlString) return null;
+
+  try {
+    // If it's already absolute, return as-is
+    if (urlString.startsWith('http://') || urlString.startsWith('https://')) {
+      return urlString;
+    }
+
+    // Resolve relative URL against base
+    const resolved = new URL(urlString, baseUrl);
+    return resolved.href;
+  } catch {
+    extractorLogger.warn('Failed to resolve URL', { urlString, baseUrl });
+    return null;
+  }
 }
 
 /**
