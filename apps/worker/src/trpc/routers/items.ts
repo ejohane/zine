@@ -72,6 +72,17 @@ export type ItemView = {
 // ============================================================================
 
 /**
+ * Normalize a string value that might contain the literal string "null" to actual null.
+ * This handles legacy data where null values were stored as the string "null".
+ */
+function normalizeNullString(value: string | null): string | null {
+  if (value === 'null' || value === null) {
+    return null;
+  }
+  return value;
+}
+
+/**
  * Transform a joined DB row (userItems + items) into an ItemView
  */
 function toItemView(row: {
@@ -90,7 +101,7 @@ function toItemView(row: {
     contentType: item.contentType as ContentType,
     provider: item.provider as Provider,
     creator: item.creator,
-    creatorImageUrl: item.creatorImageUrl,
+    creatorImageUrl: normalizeNullString(item.creatorImageUrl),
     publisher: item.publisher,
     summary: item.summary,
     duration: item.duration,
@@ -622,3 +633,6 @@ export const itemsRouter = router({
 });
 
 export type ItemsRouter = typeof itemsRouter;
+
+// Export helper for testing
+export { normalizeNullString };

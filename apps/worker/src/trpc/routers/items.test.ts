@@ -17,6 +17,7 @@ import { describe, it, expect } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 import type { ItemView } from './items';
+import { normalizeNullString } from './items';
 
 // ============================================================================
 // Test Fixtures
@@ -1059,5 +1060,32 @@ describe('ItemView Type', () => {
     expect(itemWithProgress.progress).not.toBeNull();
     expect(itemWithProgress.progress?.position).toBe(1800);
     expect(itemWithProgress.progress?.percent).toBe(25);
+  });
+});
+
+// ============================================================================
+// normalizeNullString Helper Tests
+// ============================================================================
+
+describe('normalizeNullString', () => {
+  it('should return null for the literal string "null"', () => {
+    expect(normalizeNullString('null')).toBeNull();
+  });
+
+  it('should return null for actual null', () => {
+    expect(normalizeNullString(null)).toBeNull();
+  });
+
+  it('should return the original value for valid URLs', () => {
+    const url = 'https://example.com/image.jpg';
+    expect(normalizeNullString(url)).toBe(url);
+  });
+
+  it('should return empty string as-is (not normalized to null)', () => {
+    expect(normalizeNullString('')).toBe('');
+  });
+
+  it('should preserve normal strings', () => {
+    expect(normalizeNullString('some-value')).toBe('some-value');
   });
 });
