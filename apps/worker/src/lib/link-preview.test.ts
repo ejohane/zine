@@ -124,6 +124,7 @@ describe('link-preview', () => {
           url: null,
           type: 'video',
           author: null,
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview(youtubeUrl);
@@ -143,6 +144,7 @@ describe('link-preview', () => {
           url: null,
           type: null,
           author: null,
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview(youtubeUrl);
@@ -353,6 +355,7 @@ describe('link-preview', () => {
           url: 'https://coolnewsletter.substack.com/p/interesting-post',
           type: 'article',
           author: 'Newsletter Author',
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview(
@@ -377,6 +380,7 @@ describe('link-preview', () => {
           url: null,
           type: null,
           author: null,
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview('https://tech.substack.com/p/some-post');
@@ -396,6 +400,7 @@ describe('link-preview', () => {
           url: 'https://example.com/blog/article',
           type: 'article',
           author: 'Blog Author',
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview('https://example.com/blog/article');
@@ -417,6 +422,7 @@ describe('link-preview', () => {
           url: null,
           type: null,
           author: null,
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview('https://example.com/some-article-slug');
@@ -436,6 +442,7 @@ describe('link-preview', () => {
           url: null,
           type: null,
           author: null,
+          authorImageUrl: null,
         });
 
         const result = await fetchLinkPreview('https://example.com');

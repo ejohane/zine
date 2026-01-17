@@ -44,6 +44,8 @@ export interface OpenGraphData {
   type: string | null;
   /** Author from article:author or meta author */
   author: string | null;
+  /** Author image URL from article:author:image or author:image (resolved to absolute URL) */
+  authorImageUrl: string | null;
 }
 
 /**
@@ -79,6 +81,7 @@ function createEmptyResult(): OpenGraphData {
     url: null,
     type: null,
     author: null,
+    authorImageUrl: null,
   };
 }
 
@@ -215,6 +218,20 @@ export async function scrapeOpenGraph(
           if (content) result.author = content;
         },
       })
+      // Article author image (Open Graph extension)
+      .on('meta[property="article:author:image"]', {
+        element(el) {
+          const content = el.getAttribute('content');
+          if (content && !result.authorImageUrl) result.authorImageUrl = content;
+        },
+      })
+      // Fallback: author:image with property attribute
+      .on('meta[property="author:image"]', {
+        element(el) {
+          const content = el.getAttribute('content');
+          if (content && !result.authorImageUrl) result.authorImageUrl = content;
+        },
+      })
       // Fallback: standard meta tags (name attribute)
       .on('meta[name="description"]', {
         element(el) {
@@ -229,6 +246,15 @@ export async function scrapeOpenGraph(
           if (!result.author) {
             const content = el.getAttribute('content');
             if (content) result.author = content;
+          }
+        },
+      })
+      // Fallback: author:image with name attribute
+      .on('meta[name="author:image"]', {
+        element(el) {
+          if (!result.authorImageUrl) {
+            const content = el.getAttribute('content');
+            if (content) result.authorImageUrl = content;
           }
         },
       })
@@ -259,12 +285,14 @@ export async function scrapeOpenGraph(
 
     // Resolve relative image URLs
     result.image = resolveUrl(result.image, url);
+    result.authorImageUrl = resolveUrl(result.authorImageUrl, url);
 
     ogLogger.debug('OG scrape complete', {
       url,
       hasTitle: !!result.title,
       hasDescription: !!result.description,
       hasImage: !!result.image,
+      hasAuthorImageUrl: !!result.authorImageUrl,
     });
 
     return result;
