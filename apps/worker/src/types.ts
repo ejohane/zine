@@ -44,6 +44,10 @@ export interface Bindings {
   SPOTIFY_EPISODE_FETCH_CONCURRENCY?: string;
   /** User processing concurrency limit for multi-user parallel polling (default: 10) */
   USER_PROCESSING_CONCURRENCY?: string;
+  /** Maximum safe batch size before logging warning (default: 500) */
+  SPOTIFY_MAX_SAFE_BATCH_SIZE?: string;
+  /** Critical batch size threshold before logging error (default: 1000) */
+  SPOTIFY_CRITICAL_BATCH_SIZE?: string;
 }
 
 /**

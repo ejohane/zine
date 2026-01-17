@@ -99,6 +99,11 @@ function createMockEnv(): Env['Bindings'] {
       delete: vi.fn().mockResolvedValue(undefined),
       head: vi.fn().mockResolvedValue(null),
     } as unknown as R2Bucket,
+    SPOTIFY_CACHE: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace,
     ENVIRONMENT: 'test',
     CLERK_WEBHOOK_SECRET: 'whsec_test_secret',
   };
