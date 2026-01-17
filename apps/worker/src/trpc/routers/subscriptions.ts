@@ -284,7 +284,8 @@ export const subscriptionsRouter = router({
         input.provider,
         input.providerChannelId,
         ctx.db,
-        ctx.env as InitialFetchEnv
+        ctx.env as InitialFetchEnv,
+        input.imageUrl ?? undefined
       );
     } catch (error) {
       // Extra safety: log but don't fail subscription creation

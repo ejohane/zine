@@ -135,7 +135,8 @@ export async function triggerInitialFetch(
   provider: Provider,
   providerChannelId: string,
   db: Database,
-  env: InitialFetchEnv
+  env: InitialFetchEnv,
+  subscriptionImageUrl?: string
 ): Promise<InitialFetchResult> {
   fetchLogger.info('Starting', { provider, providerChannelId });
   try {
@@ -150,7 +151,8 @@ export async function triggerInitialFetch(
         connection,
         providerChannelId,
         db,
-        env
+        env,
+        subscriptionImageUrl
       );
     } else if (provider === Provider.SPOTIFY) {
       const result = await fetchInitialSpotifyItem(
@@ -159,7 +161,8 @@ export async function triggerInitialFetch(
         connection,
         providerChannelId,
         db,
-        env
+        env,
+        subscriptionImageUrl
       );
       itemIngested = result.created;
       lastPublishedAt = result.releaseDate;
@@ -208,7 +211,8 @@ async function fetchInitialYouTubeItem(
   connection: ProviderConnection,
   channelId: string,
   db: Database,
-  env: InitialFetchEnv
+  env: InitialFetchEnv,
+  channelImageUrl?: string
 ): Promise<boolean> {
   const client = await getYouTubeClientForConnection(connection, env);
   const video = await fetchLatestYouTubeVideo(client, channelId);
@@ -225,7 +229,7 @@ async function fetchInitialYouTubeItem(
     Provider.YOUTUBE,
     // Cast to satisfy ingestItem's generic DrizzleD1Database type
     db as unknown as DrizzleD1Database,
-    transformYouTubeVideo
+    (v) => transformYouTubeVideo(v, channelImageUrl)
   );
 
   return result.created;
@@ -386,7 +390,8 @@ async function fetchInitialSpotifyItem(
   connection: ProviderConnection,
   showId: string,
   db: Database,
-  env: InitialFetchEnv
+  env: InitialFetchEnv,
+  subscriptionImageUrl?: string
 ): Promise<SpotifyFetchResult> {
   fetchLogger.debug('Fetching Spotify client', { showId });
   const client = await getSpotifyClientForConnection(connection, env);
@@ -422,6 +427,9 @@ async function fetchInitialSpotifyItem(
     images: episode.images,
   };
 
+  // Use show image from API (most current), fall back to subscription imageUrl
+  const showImageUrl = show.images[0]?.url ?? subscriptionImageUrl;
+
   const result = await ingestItem(
     userId,
     subscriptionId,
@@ -429,7 +437,7 @@ async function fetchInitialSpotifyItem(
     Provider.SPOTIFY,
     // Cast to satisfy ingestItem's generic DrizzleD1Database type
     db as unknown as DrizzleD1Database,
-    (ep) => transformSpotifyEpisode(ep, show.name)
+    (ep) => transformSpotifyEpisode(ep, show.name, showImageUrl)
   );
 
   return {
