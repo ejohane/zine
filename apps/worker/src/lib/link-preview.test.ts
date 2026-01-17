@@ -314,6 +314,7 @@ describe('link-preview', () => {
         expect(result!.contentType).toBe(ContentType.POST);
         expect(result!.title).toBe('Just posted something interesting! Check it out...');
         expect(result!.creator).toBe('Test User (@testuser)');
+        expect(result!.creatorImageUrl).toBe('https://pbs.twimg.com/profile_images/avatar.jpg');
         expect(result!.source).toBe('fxtwitter');
       });
 
@@ -345,6 +346,7 @@ describe('link-preview', () => {
 
         expect(result).not.toBeNull();
         expect(result!.creator).toBe('X User (@xuser)');
+        expect(result!.creatorImageUrl).toBe('https://pbs.twimg.com/profile_images/avatar.jpg');
         expect(result!.source).toBe('fxtwitter');
       });
 

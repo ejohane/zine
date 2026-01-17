@@ -375,6 +375,7 @@ function mapFxTwitterToPreview(
     providerId: tweet.id,
     title: tweet.text,
     creator,
+    creatorImageUrl: tweet.author.avatar_url,
     thumbnailUrl,
     duration,
     canonicalUrl: tweet.url,
