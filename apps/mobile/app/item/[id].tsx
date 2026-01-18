@@ -405,8 +405,13 @@ function IconActionButton({
   color: string;
   onPress?: () => void;
 }) {
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress?.();
+  };
+
   return (
-    <Pressable onPress={onPress} style={styles.iconActionButton}>
+    <Pressable onPress={handlePress} style={styles.iconActionButton}>
       <Ionicons name={icon} size={24} color={color} style={{ fontWeight: '700' }} />
     </Pressable>
   );
@@ -498,8 +503,6 @@ export default function ItemDetailScreen() {
   const handleShare = async () => {
     if (!item) return;
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
     try {
       await Share.share({
         title: item.title,
@@ -514,7 +517,6 @@ export default function ItemDetailScreen() {
   // Handle bookmark toggle
   const handleToggleBookmark = () => {
     if (!item) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const isBookmarked = item.state === UserItemState.BOOKMARKED;
     if (isBookmarked) {
       unbookmarkMutation.mutate({ id: item.id });
