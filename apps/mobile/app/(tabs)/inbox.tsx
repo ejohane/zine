@@ -1,4 +1,5 @@
 import { useRouter, type Href } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
@@ -195,7 +196,10 @@ export default function InboxScreen() {
           </View>
           <Pressable
             style={[styles.subscriptionsButton, { backgroundColor: colors.backgroundSecondary }]}
-            onPress={() => router.push('/subscriptions' as Href)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/subscriptions' as Href);
+            }}
             accessibilityLabel="Manage subscriptions"
             accessibilityRole="button"
           >

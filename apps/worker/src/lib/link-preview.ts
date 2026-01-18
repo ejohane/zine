@@ -31,7 +31,7 @@ import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oe
 import { scrapeOpenGraph } from './opengraph';
 import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
 import { extractArticle } from './article-extractor';
-import { fetchFxTwitterByUrl, type FxTwitterResponse } from './fxtwitter';
+import { fetchFxTwitterByUrl, type FxTwitterResponse, type FxTwitterTweet } from './fxtwitter';
 import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
@@ -341,24 +341,83 @@ async function fetchTwitterViaOEmbed(parsedLink: ParsedLink): Promise<LinkPrevie
 }
 
 /**
- * Map FxTwitter response to LinkPreviewResult
+ * Extract the first external URL from tweet facets
+ * Filters out Twitter/X URLs (we don't want to scrape Twitter pages)
  */
-function mapFxTwitterToPreview(
+function getFirstExternalUrl(tweet: FxTwitterTweet): string | null {
+  const facets = tweet.raw_text?.facets;
+  if (!facets || facets.length === 0) return null;
+
+  for (const facet of facets) {
+    if (facet.type === 'url' && facet.replacement) {
+      // Skip Twitter/X URLs - we don't want to scrape those
+      const url = facet.replacement.toLowerCase();
+      if (!url.includes('twitter.com') && !url.includes('x.com') && !url.includes('t.co')) {
+        return facet.replacement;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Map FxTwitter response to LinkPreviewResult
+ * If the tweet has no attached media but contains external URLs,
+ * fetches the OG image from the first external URL
+ */
+async function mapFxTwitterToPreview(
   response: FxTwitterResponse,
   parsedLink: ParsedLink
-): LinkPreviewResult | null {
+): Promise<LinkPreviewResult | null> {
   const tweet = response.tweet;
 
   if (!tweet) {
     return null;
   }
 
-  // Get best thumbnail: first photo > video thumbnail > author avatar
-  const thumbnailUrl =
-    tweet.media?.photos?.[0]?.url ??
-    tweet.media?.videos?.[0]?.thumbnail_url ??
-    tweet.author.avatar_url ??
-    null;
+  // Check if tweet has attached media (photos or videos)
+  const hasAttachedMedia =
+    (tweet.media?.photos && tweet.media.photos.length > 0) ||
+    (tweet.media?.videos && tweet.media.videos.length > 0);
+
+  // Get thumbnail from attached media first
+  let thumbnailUrl: string | null =
+    tweet.media?.photos?.[0]?.url ?? tweet.media?.videos?.[0]?.thumbnail_url ?? null;
+
+  // If no attached media, try to fetch OG image from embedded URL
+  if (!thumbnailUrl && !hasAttachedMedia) {
+    const externalUrl = getFirstExternalUrl(tweet);
+    if (externalUrl) {
+      previewLogger.debug('Tweet has no media, fetching OG image from embedded URL', {
+        tweetId: tweet.id,
+        externalUrl,
+      });
+
+      try {
+        const ogData = await scrapeOpenGraph(externalUrl);
+        if (ogData.image) {
+          thumbnailUrl = ogData.image;
+          previewLogger.debug('Got OG image from embedded URL', {
+            tweetId: tweet.id,
+            externalUrl,
+            imageUrl: thumbnailUrl,
+          });
+        }
+      } catch (error) {
+        previewLogger.warn('Failed to fetch OG image from embedded URL', {
+          tweetId: tweet.id,
+          externalUrl,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // Fall back to author avatar if still no thumbnail
+  if (!thumbnailUrl) {
+    thumbnailUrl = tweet.author.avatar_url ?? null;
+  }
 
   // Format creator as "Display Name (@handle)"
   const creator = `${tweet.author.name} (@${tweet.author.screen_name})`;
@@ -402,7 +461,7 @@ async function fetchXProviderPreview(parsedLink: ParsedLink): Promise<LinkPrevie
       hasMedia: !!fxResponse.tweet.media,
     });
 
-    const result = mapFxTwitterToPreview(fxResponse, parsedLink);
+    const result = await mapFxTwitterToPreview(fxResponse, parsedLink);
     if (result) return result;
   }
 

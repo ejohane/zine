@@ -12,12 +12,13 @@
  * - Provider color dot
  * - Duration badge for video/podcast content
  * - "Connected" badge for provider_api sources
+ * - Skeleton loading state
  * - Dark mode support
  * - Accessibility labels
  */
 
 import { Image } from 'expo-image';
-import { View, Text, StyleSheet, type ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, Linking, type ViewStyle } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -39,18 +40,164 @@ import type { LinkPreview } from '@/hooks/use-bookmarks';
 
 export interface LinkPreviewCardProps {
   /** Preview data from the bookmarks.preview endpoint */
-  preview: LinkPreview;
+  preview?: LinkPreview | null;
+  /** Show skeleton loading state */
+  isLoading?: boolean;
   /** Optional custom styles for the container */
   style?: ViewStyle;
+}
+
+// ============================================================================
+// Text Parsing Helpers
+// ============================================================================
+
+type TextPart = { type: 'text'; content: string } | { type: 'link'; content: string; url: string };
+
+/**
+ * Parse text to identify URLs and @mentions
+ */
+function parseTextWithLinks(text: string): TextPart[] {
+  // Match URLs and @mentions
+  const linkRegex = /(https?:\/\/[^\s]+)|(@[\w_]+)|([\w-]+\.(?:com|dev|io|org|net|co|app)[^\s]*)/gi;
+  const parts: TextPart[] = [];
+  let lastIndex = 0;
+
+  let match;
+  while ((match = linkRegex.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push({ type: 'text', content: text.slice(lastIndex, match.index) });
+    }
+
+    const matchedText = match[0];
+    let url: string;
+
+    if (matchedText.startsWith('@')) {
+      // Twitter mention
+      url = `https://twitter.com/${matchedText.slice(1)}`;
+    } else if (matchedText.startsWith('http')) {
+      url = matchedText;
+    } else {
+      // Domain without protocol
+      url = `https://${matchedText}`;
+    }
+
+    parts.push({ type: 'link', content: matchedText, url });
+    lastIndex = match.index + matchedText.length;
+  }
+
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push({ type: 'text', content: text.slice(lastIndex) });
+  }
+
+  return parts.length > 0 ? parts : [{ type: 'text', content: text }];
+}
+
+/**
+ * Render text with clickable links
+ */
+function LinkedText({
+  text,
+  style,
+  linkStyle,
+  numberOfLines,
+}: {
+  text: string;
+  style: object;
+  linkStyle: object;
+  numberOfLines?: number;
+}) {
+  const parts = parseTextWithLinks(text);
+
+  const handleLinkPress = (url: string) => {
+    Linking.openURL(url).catch(() => {
+      // Silently fail if URL can't be opened
+    });
+  };
+
+  return (
+    <Text style={style} numberOfLines={numberOfLines}>
+      {parts.map((part, index) =>
+        part.type === 'link' ? (
+          <Text
+            key={index}
+            style={linkStyle}
+            onPress={() => handleLinkPress(part.url)}
+            accessibilityRole="link"
+            accessibilityHint={`Opens ${part.url}`}
+          >
+            {part.content}
+          </Text>
+        ) : (
+          <Text key={index}>{part.content}</Text>
+        )
+      )}
+    </Text>
+  );
+}
+
+// ============================================================================
+// Skeleton Component
+// ============================================================================
+
+function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme ?? 'light'];
+
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      style={[styles.container, { backgroundColor: colors.card }, Shadows.md, style]}
+      accessible={true}
+      accessibilityLabel="Loading preview"
+    >
+      {/* Skeleton Thumbnail */}
+      <View style={[styles.thumbnailContainer, { backgroundColor: colors.backgroundTertiary }]} />
+
+      {/* Skeleton Content */}
+      <View style={styles.content}>
+        {/* Skeleton Meta Row - at top */}
+        <View style={styles.metaRow}>
+          <View style={[styles.skeletonAvatar, { backgroundColor: colors.backgroundTertiary }]} />
+          <View
+            style={[
+              styles.skeletonLine,
+              { backgroundColor: colors.backgroundTertiary, width: 120, marginBottom: 0 },
+            ]}
+          />
+        </View>
+
+        {/* Skeleton Tweet text - two lines */}
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.backgroundTertiary, width: '90%' },
+          ]}
+        />
+        <View
+          style={[
+            styles.skeletonLine,
+            { backgroundColor: colors.backgroundTertiary, width: '60%', marginBottom: 0 },
+          ]}
+        />
+      </View>
+    </Animated.View>
+  );
 }
 
 // ============================================================================
 // Component
 // ============================================================================
 
-export function LinkPreviewCard({ preview, style }: LinkPreviewCardProps) {
+export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+
+  // Show skeleton when loading
+  if (isLoading || !preview) {
+    return <LinkPreviewCardSkeleton style={style} />;
+  }
 
   // Get content type styling
   const contentColor = getContentColor(preview.contentType);
@@ -139,22 +286,30 @@ export function LinkPreviewCard({ preview, style }: LinkPreviewCardProps) {
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Title */}
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
-          {preview.title}
-        </Text>
-
-        {/* Creator with provider indicator */}
+        {/* Creator with avatar or provider indicator - Twitter style, at top */}
         <View style={styles.metaRow}>
-          <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
-          <Text style={[styles.creator, { color: colors.textSecondary }]} numberOfLines={1}>
+          {preview.creatorImageUrl ? (
+            <Image
+              source={{ uri: preview.creatorImageUrl }}
+              style={styles.creatorAvatar}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
+          )}
+          <Text style={[styles.creator, { color: colors.text }]} numberOfLines={1}>
             {preview.creator}
           </Text>
-          <Text style={[styles.providerLabel, { color: colors.textTertiary }]}>
-            {' '}
-            · {providerLabel}
-          </Text>
         </View>
+
+        {/* Title/Tweet text - below creator, smaller */}
+        <LinkedText
+          text={preview.title}
+          style={[styles.tweetText, { color: '#fff' }]}
+          linkStyle={{ color: colors.textTertiary }}
+          numberOfLines={3}
+        />
       </View>
     </Animated.View>
   );
@@ -246,18 +401,25 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.md,
   },
-  title: {
-    ...Typography.titleMedium,
-    marginBottom: Spacing.xs,
-  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  tweetText: {
+    ...Typography.bodyMedium,
+    lineHeight: 20,
   },
   providerDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    marginRight: Spacing.xs,
+  },
+  creatorAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     marginRight: Spacing.xs,
   },
   creator: {
@@ -266,6 +428,19 @@ const styles = StyleSheet.create({
   },
   providerLabel: {
     ...Typography.bodySmall,
+  },
+
+  // Skeleton styles
+  skeletonLine: {
+    height: 16,
+    borderRadius: Radius.xs,
+    marginBottom: Spacing.xs,
+  },
+  skeletonAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginRight: Spacing.xs,
   },
 });
 

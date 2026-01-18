@@ -116,6 +116,32 @@ export interface FxTwitterAuthor {
 }
 
 /**
+ * URL facet in raw_text - represents an expanded URL in the tweet
+ */
+export interface FxTwitterUrlFacet {
+  /** Facet type (always "url" for URL facets) */
+  type: 'url';
+  /** Character indices in the raw text [start, end] */
+  indices: [number, number];
+  /** Original t.co shortened URL */
+  original: string;
+  /** Expanded/resolved URL */
+  replacement: string;
+  /** Display text (truncated URL) */
+  display: string;
+}
+
+/**
+ * Raw text with facets (URLs, mentions, hashtags)
+ */
+export interface FxTwitterRawText {
+  /** Original tweet text with t.co URLs */
+  text: string;
+  /** Array of facets (URLs, mentions, etc.) */
+  facets?: FxTwitterUrlFacet[];
+}
+
+/**
  * Full tweet data from FxTwitter
  */
 export interface FxTwitterTweet {
@@ -125,6 +151,8 @@ export interface FxTwitterTweet {
   url: string;
   /** Full tweet text */
   text: string;
+  /** Raw text with facets containing expanded URLs */
+  raw_text?: FxTwitterRawText;
   /** ISO timestamp when the tweet was created */
   created_at: string;
   /** Unix timestamp (seconds) when the tweet was created */
@@ -212,6 +240,7 @@ async function fetchWithTimeout(
       signal: controller.signal,
       headers: {
         Accept: 'application/json',
+        'User-Agent': 'ZineApp/1.0',
       },
     });
     return response;

@@ -365,6 +365,224 @@ describe('link-preview', () => {
         expect(result!.source).toBe('oembed');
         expect(result!.title).toBe('Tweet from oEmbed');
       });
+
+      it('fetches OG image from embedded URL when tweet has no attached media', async () => {
+        // Mock a tweet that has an embedded URL but no photos/videos
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '2011830593772810266',
+            url: 'https://x.com/housecor/status/2011830593772810266',
+            text: 'Woah, Vercel just released the React Best Practices skill.',
+            raw_text: {
+              text: 'Woah, Vercel just released... https://t.co/abc123',
+              facets: [
+                {
+                  type: 'url',
+                  indices: [30, 53],
+                  original: 'https://t.co/abc123',
+                  replacement: 'https://vercel.com/blog/introducing-react-best-practices',
+                  display: 'vercel.com/blog/introduci…',
+                },
+              ],
+            },
+            created_at: 'Thu Jan 15 15:59:26 +0000 2026',
+            created_timestamp: 1768492766,
+            author: {
+              name: 'Cory House',
+              screen_name: 'housecor',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 559,
+            retweets: 39,
+            replies: 19,
+            views: 42367,
+            lang: 'en',
+            source: 'Twitter Web App',
+            // No media field - this is the key part
+          },
+        });
+
+        // Mock the OG scraper to return the blog's OG image
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Introducing: React Best Practices',
+          description: 'Learn React best practices from Vercel',
+          image: 'https://vercel.com/og/react-best-practices.png',
+          siteName: 'Vercel',
+          url: 'https://vercel.com/blog/introducing-react-best-practices',
+          type: 'article',
+          author: null,
+          authorImageUrl: null,
+        });
+
+        const result = await fetchLinkPreview('https://x.com/housecor/status/2011830593772810266');
+
+        expect(result).not.toBeNull();
+        expect(result!.source).toBe('fxtwitter');
+        // Should use the OG image from the embedded URL, NOT the author avatar
+        expect(result!.thumbnailUrl).toBe('https://vercel.com/og/react-best-practices.png');
+        expect(result!.creatorImageUrl).toBe('https://pbs.twimg.com/profile_images/avatar.jpg');
+        expect(mockScrapeOpenGraph).toHaveBeenCalledWith(
+          'https://vercel.com/blog/introducing-react-best-practices'
+        );
+      });
+
+      it('uses attached photo instead of embedded URL OG image', async () => {
+        // Mock a tweet that has BOTH an attached photo AND an embedded URL
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '1234567890',
+            url: 'https://x.com/testuser/status/1234567890',
+            text: 'Check this out! https://example.com/article',
+            raw_text: {
+              text: 'Check this out! https://t.co/xyz',
+              facets: [
+                {
+                  type: 'url',
+                  indices: [17, 40],
+                  original: 'https://t.co/xyz',
+                  replacement: 'https://example.com/article',
+                  display: 'example.com/article',
+                },
+              ],
+            },
+            created_at: 'Sun Jul 17 09:35:58 +0000 2022',
+            created_timestamp: 1658050558,
+            author: {
+              name: 'Test User',
+              screen_name: 'testuser',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 100,
+            retweets: 50,
+            replies: 10,
+            views: 1000,
+            lang: 'en',
+            source: 'Twitter Web App',
+            media: {
+              photos: [
+                {
+                  url: 'https://pbs.twimg.com/media/attached-photo.jpg',
+                  width: 1200,
+                  height: 675,
+                },
+              ],
+            },
+          },
+        });
+
+        const result = await fetchLinkPreview('https://x.com/testuser/status/1234567890');
+
+        expect(result).not.toBeNull();
+        // Should use the attached photo, NOT fetch OG from embedded URL
+        expect(result!.thumbnailUrl).toBe('https://pbs.twimg.com/media/attached-photo.jpg');
+        // Should NOT have called scrapeOpenGraph since we have attached media
+        expect(mockScrapeOpenGraph).not.toHaveBeenCalled();
+      });
+
+      it('falls back to author avatar when embedded URL has no OG image', async () => {
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '1234567890',
+            url: 'https://x.com/testuser/status/1234567890',
+            text: 'Check this link https://example.com/no-og',
+            raw_text: {
+              text: 'Check this link https://t.co/abc',
+              facets: [
+                {
+                  type: 'url',
+                  indices: [17, 40],
+                  original: 'https://t.co/abc',
+                  replacement: 'https://example.com/no-og',
+                  display: 'example.com/no-og',
+                },
+              ],
+            },
+            created_at: 'Sun Jul 17 09:35:58 +0000 2022',
+            created_timestamp: 1658050558,
+            author: {
+              name: 'Test User',
+              screen_name: 'testuser',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 100,
+            retweets: 50,
+            replies: 10,
+            views: 1000,
+            lang: 'en',
+            source: 'Twitter Web App',
+          },
+        });
+
+        // Mock OG scraper returning no image
+        mockScrapeOpenGraph.mockResolvedValue({
+          title: 'Page Title',
+          description: null,
+          image: null,
+          siteName: null,
+          url: null,
+          type: null,
+          author: null,
+          authorImageUrl: null,
+        });
+
+        const result = await fetchLinkPreview('https://x.com/testuser/status/1234567890');
+
+        expect(result).not.toBeNull();
+        // Should fall back to author avatar since OG image was null
+        expect(result!.thumbnailUrl).toBe('https://pbs.twimg.com/profile_images/avatar.jpg');
+      });
+
+      it('skips Twitter/X URLs when extracting embedded URLs', async () => {
+        // Mock a tweet that only has Twitter/X URLs (quote tweets, replies, etc.)
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '1234567890',
+            url: 'https://x.com/testuser/status/1234567890',
+            text: 'Check this tweet https://x.com/other/status/999',
+            raw_text: {
+              text: 'Check this tweet https://t.co/xyz',
+              facets: [
+                {
+                  type: 'url',
+                  indices: [18, 41],
+                  original: 'https://t.co/xyz',
+                  replacement: 'https://x.com/other/status/999',
+                  display: 'x.com/other/status/999',
+                },
+              ],
+            },
+            created_at: 'Sun Jul 17 09:35:58 +0000 2022',
+            created_timestamp: 1658050558,
+            author: {
+              name: 'Test User',
+              screen_name: 'testuser',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 100,
+            retweets: 50,
+            replies: 10,
+            views: 1000,
+            lang: 'en',
+            source: 'Twitter Web App',
+          },
+        });
+
+        const result = await fetchLinkPreview('https://x.com/testuser/status/1234567890');
+
+        expect(result).not.toBeNull();
+        // Should NOT have tried to scrape the x.com URL
+        expect(mockScrapeOpenGraph).not.toHaveBeenCalled();
+        // Should fall back to author avatar
+        expect(result!.thumbnailUrl).toBe('https://pbs.twimg.com/profile_images/avatar.jpg');
+      });
     });
 
     describe('Substack URLs', () => {

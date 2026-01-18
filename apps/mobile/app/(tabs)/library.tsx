@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 
+import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
 import { useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
@@ -86,6 +87,7 @@ export default function LibraryScreen() {
 
   // Handle add bookmark
   const handleAddBookmark = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/add-link');
   }, [router]);
 
@@ -123,11 +125,11 @@ export default function LibraryScreen() {
             <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
             <Pressable
               onPress={handleAddBookmark}
-              style={[styles.addButton, { backgroundColor: colors.backgroundTertiary }]}
+              style={[styles.addButton, { backgroundColor: colors.backgroundSecondary }]}
               accessibilityLabel="Add bookmark"
               accessibilityRole="button"
             >
-              <PlusIcon size={20} color={colors.text} />
+              <PlusIcon size={22} color={colors.text} />
             </Pressable>
           </View>
           <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
@@ -235,9 +237,9 @@ const styles = StyleSheet.create({
     ...Typography.bodyMedium,
   },
   addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
