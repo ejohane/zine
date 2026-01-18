@@ -131,7 +131,7 @@ describe('fxtwitter', () => {
       expect(mockFetch).toHaveBeenCalledWith(
         `${FXTWITTER_API_BASE}/user/status/12345`,
         expect.objectContaining({
-          headers: { Accept: 'application/json' },
+          headers: { Accept: 'application/json', 'User-Agent': 'ZineApp/1.0' },
         })
       );
     });

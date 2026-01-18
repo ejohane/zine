@@ -40,7 +40,7 @@ import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
 /**
  * Visual variant of the card
  */
-export type ItemCardVariant = 'compact' | 'full' | 'large';
+export type ItemCardVariant = 'compact' | 'full' | 'large' | 'horizontal';
 
 /**
  * Item data required for the card
@@ -89,6 +89,9 @@ export interface ItemCardProps {
 
   /** Custom press handler (default: navigate to detail) */
   onPress?: () => void;
+
+  /** Show overlay styling on large variant (text over image) */
+  overlay?: boolean;
 }
 
 // ============================================================================
@@ -105,6 +108,7 @@ export function ItemCard({
   isArchiving = false,
   index = 0,
   onPress,
+  overlay = false,
 }: ItemCardProps) {
   const router = useRouter();
   const colorScheme = useColorScheme();
@@ -305,6 +309,89 @@ export function ItemCard({
               </Pressable>
             </View>
           )}
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // Horizontal variant (for home "Recently Bookmarked" and "Videos" sections)
+  if (variant === 'horizontal') {
+    return (
+      <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => [
+            styles.horizontalCard,
+            { backgroundColor: colors.backgroundSecondary },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          {/* Thumbnail */}
+          {item.thumbnailUrl ? (
+            <Image
+              source={{ uri: item.thumbnailUrl }}
+              style={styles.horizontalCardImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View
+              style={[styles.horizontalCardImage, { backgroundColor: colors.backgroundTertiary }]}
+            >
+              {getContentIcon(item.contentType, 32, colors.textTertiary)}
+            </View>
+          )}
+
+          {/* Content */}
+          <View style={styles.horizontalCardContent}>
+            <Text style={[styles.horizontalCardTitle, { color: colors.text }]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.horizontalCardMeta}>
+              <View style={[styles.horizontalTypeDot, { backgroundColor: contentColor }]} />
+              <Text
+                style={[styles.horizontalCardSource, { color: colors.textSecondary }]}
+                numberOfLines={1}
+              >
+                {item.creator}
+              </Text>
+            </View>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  // Large variant with overlay (for home "Podcasts" section with text over image)
+  if (variant === 'large' && overlay) {
+    return (
+      <Animated.View entering={FadeInDown.delay(index * 100).duration(400)}>
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => [styles.largeOverlayCard, pressed && { opacity: 0.95 }]}
+        >
+          {/* Background Image */}
+          {item.thumbnailUrl ? (
+            <Image
+              source={{ uri: item.thumbnailUrl }}
+              style={styles.largeOverlayImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            <View
+              style={[styles.largeOverlayImage, { backgroundColor: colors.backgroundTertiary }]}
+            />
+          )}
+
+          {/* Overlay Content */}
+          <View style={styles.largeOverlayContent}>
+            <Text style={styles.largeOverlaySource}>{item.creator}</Text>
+            <Text style={styles.largeOverlayTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            {durationText && <Text style={styles.largeOverlayDuration}>{durationText}</Text>}
+          </View>
         </Pressable>
       </Animated.View>
     );
@@ -528,6 +615,75 @@ const styles = StyleSheet.create({
     color: '#fff',
     textTransform: 'none',
     letterSpacing: 0,
+  },
+
+  // Large variant with overlay (text over image)
+  largeOverlayCard: {
+    width: 280,
+    height: 180,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    marginRight: Spacing.md,
+  },
+  largeOverlayImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  largeOverlayContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    padding: Spacing.lg,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  largeOverlaySource: {
+    ...Typography.labelSmall,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginBottom: Spacing.xs,
+  },
+  largeOverlayTitle: {
+    ...Typography.titleMedium,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  largeOverlayDuration: {
+    ...Typography.bodySmall,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+
+  // Horizontal variant (home horizontal lists)
+  horizontalCard: {
+    width: 200,
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+  },
+  horizontalCardImage: {
+    width: '100%',
+    height: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  horizontalCardContent: {
+    padding: Spacing.md,
+  },
+  horizontalCardTitle: {
+    ...Typography.bodyMedium,
+    fontWeight: '500',
+    marginBottom: Spacing.xs,
+  },
+  horizontalCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  horizontalCardSource: {
+    ...Typography.bodySmall,
+    flex: 1,
+  },
+  horizontalTypeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 
   // Shared elements

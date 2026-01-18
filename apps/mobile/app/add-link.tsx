@@ -209,6 +209,7 @@ export default function AddLinkScreen() {
   const {
     data: preview,
     isLoading: isLoadingPreview,
+    isFetching: isFetchingPreview,
     error: previewError,
     refetch: refetchPreview,
   } = usePreview(debouncedUrl, {
@@ -222,12 +223,14 @@ export default function AddLinkScreen() {
   const hasInput = url.trim().length > 0;
   const isUrlValid = isValidUrl(url.trim());
   const showEmpty = !hasInput;
+  // Show loading only for initial load (no preview data yet)
   const showLoading = hasInput && isLoadingPreview && !preview;
-  const showError = hasInput && previewError && !isLoadingPreview;
-  const showPreview = hasInput && preview && !isLoadingPreview;
+  const showError = hasInput && previewError && !isLoadingPreview && !isFetchingPreview;
+  // Show preview card (with skeleton if fetching new data)
+  const showPreview = hasInput && (preview || isFetchingPreview) && !isLoadingPreview;
 
-  // Can save when we have a valid preview and not currently saving
-  const canSave = showPreview && !isSaving;
+  // Can save when we have a valid preview, not fetching, and not currently saving
+  const canSave = preview && !isFetchingPreview && !isSaving;
 
   // Handle paste from clipboard
   // Note: On iOS, the paste button triggers the system paste permission dialog
@@ -417,7 +420,7 @@ export default function AddLinkScreen() {
               )}
               {showPreview && (
                 <Animated.View entering={FadeInDown.duration(400)}>
-                  <LinkPreviewCard preview={preview} />
+                  <LinkPreviewCard preview={preview} isLoading={isFetchingPreview} />
                 </Animated.View>
               )}
             </View>
@@ -431,7 +434,7 @@ export default function AddLinkScreen() {
               style={({ pressed }) => [
                 styles.saveButton,
                 {
-                  backgroundColor: canSave ? colors.primary : colors.backgroundTertiary,
+                  backgroundColor: canSave ? colors.buttonPrimary : colors.backgroundTertiary,
                   opacity: pressed && canSave ? 0.9 : 1,
                 },
               ]}
@@ -440,10 +443,13 @@ export default function AddLinkScreen() {
               accessibilityState={{ disabled: !canSave }}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
               ) : (
                 <Text
-                  style={[styles.saveButtonText, { color: canSave ? '#fff' : colors.textTertiary }]}
+                  style={[
+                    styles.saveButtonText,
+                    { color: canSave ? colors.buttonPrimaryText : colors.textTertiary },
+                  ]}
                 >
                   Save to Library
                 </Text>

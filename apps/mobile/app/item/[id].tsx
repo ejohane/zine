@@ -17,72 +17,32 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  Linking,
-  Share,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SourceBadge, TypeBadge } from '@/components/badges';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  ContentColors,
-  ProviderColors,
-} from '@/constants/theme';
+  LoadingState,
+  ErrorState,
+  NotFoundState,
+  InvalidParamState,
+} from '@/components/list-states';
+import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useItem, useBookmarkItem, useUnbookmarkItem, UserItemState } from '@/hooks/use-items-trpc';
+import type { Provider } from '@/hooks/use-items-trpc';
+import {
+  useItem,
+  useBookmarkItem,
+  useUnbookmarkItem,
+  UserItemState,
+  ContentType,
+} from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
 import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
-
-// ============================================================================
-// Badge Components
-// ============================================================================
-
-function SourceBadge({ provider }: { provider: string }) {
-  const providerMap: Record<string, { color: string; label: string }> = {
-    YOUTUBE: { color: ProviderColors.youtube, label: 'YouTube' },
-    SPOTIFY: { color: ProviderColors.spotify, label: 'Spotify' },
-    SUBSTACK: { color: ProviderColors.substack, label: 'Substack' },
-    X: { color: ProviderColors.x, label: 'X' },
-    TWITTER: { color: ProviderColors.twitter, label: 'X' },
-    WEB: { color: '#6A6A6A', label: 'Web' },
-  };
-  const { color, label } = providerMap[provider] ?? { color: '#6A6A6A', label: 'Web' };
-
-  return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-}
-
-function TypeBadge({ contentType }: { contentType: string }) {
-  const typeMap: Record<string, { color: string; label: string }> = {
-    VIDEO: { color: ContentColors.video, label: 'Video' },
-    PODCAST: { color: ContentColors.podcast, label: 'Podcast' },
-    ARTICLE: { color: ContentColors.article, label: 'Article' },
-    POST: { color: ContentColors.post, label: 'Post' },
-  };
-  const { color, label } = typeMap[contentType] ?? { color: '#6A6A6A', label: 'Content' };
-
-  return (
-    <View style={[styles.badge, { backgroundColor: color }]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-}
 
 // ============================================================================
 // FAB Configuration by Provider
@@ -105,13 +65,32 @@ function getFabConfig(provider: string): FabConfig {
         providerIcon: <Ionicons name="logo-youtube" size={22} color="#FFFFFF" />,
         backgroundColor: '#FF0000',
       };
+    case 'X':
+    case 'TWITTER':
+      return {
+        providerIcon: <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>𝕏</Text>,
+        backgroundColor: '#1A1A1A',
+      };
     default:
-      // Web, Substack, X, and other providers
+      // Web, Substack, and other providers
       return {
         providerIcon: <Ionicons name="globe-outline" size={22} color="#FFFFFF" />,
         backgroundColor: '#1A1A1A',
       };
   }
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Extract @handle from X/Twitter URL
+ * e.g., "https://x.com/elithrar/status/123" => "elithrar"
+ */
+function extractXHandle(url: string): string | null {
+  const match = url.match(/(?:x\.com|twitter\.com)\/([^/]+)\//);
+  return match ? match[1] : null;
 }
 
 // ============================================================================
@@ -165,6 +144,255 @@ function LinkedText({
 }
 
 // ============================================================================
+// X Post Body Component
+// ============================================================================
+
+/**
+ * X Post Bookmark View
+ *
+ * Renders X/Twitter posts in a Twitter-like layout:
+ * - ScrollView (no parallax header image)
+ * - Tweet text as title at top
+ * - Profile row with avatar and name
+ * - Meta row with @handle and timestamp
+ * - Action row with icons + FAB
+ * - Twitter-like content section with avatar + author info + full text
+ */
+function XPostBookmarkView({
+  item,
+  colors,
+  insets,
+  onBack,
+  onOpenLink,
+  onShare,
+  onToggleBookmark,
+  isBookmarked,
+}: {
+  item: {
+    id: string;
+    title: string;
+    creator: string;
+    creatorImageUrl?: string | null;
+    thumbnailUrl?: string | null;
+    summary?: string | null;
+    publishedAt?: string | null;
+    canonicalUrl: string;
+    provider: string;
+  };
+  colors: typeof Colors.dark;
+  insets: { top: number; bottom: number };
+  onBack: () => void;
+  onOpenLink: () => void;
+  onShare: () => void;
+  onToggleBookmark: () => void;
+  isBookmarked: boolean;
+}) {
+  // Extract @handle from URL
+  const handle = extractXHandle(item.canonicalUrl);
+
+  // Get FAB config for X
+  const fabConfig = getFabConfig(item.provider);
+
+  // Check if we have a thumbnail for parallax
+  const hasThumbnail = !!item.thumbnailUrl;
+
+  // Shared content sections
+  const renderContent = () => (
+    <>
+      {/* Content Section */}
+      <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.contentContainer}>
+        {/* Badges Row */}
+        <View style={styles.badgeRow}>
+          <SourceBadge provider={item.provider as Provider} />
+          <TypeBadge contentType={ContentType.POST} />
+        </View>
+
+        {/* Profile Row */}
+        <Pressable style={styles.sourceRow}>
+          {item.creatorImageUrl ? (
+            <Image
+              source={{ uri: item.creatorImageUrl }}
+              style={styles.sourceThumbnail}
+              contentFit="cover"
+            />
+          ) : (
+            <View
+              style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+            >
+              <Ionicons name="person" size={14} color={colors.textTertiary} />
+            </View>
+          )}
+          <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </Pressable>
+
+        {/* Meta Row with @handle and timestamp */}
+        <View style={styles.metaRow}>
+          {handle && (
+            <>
+              <Text style={[styles.metaText, { color: colors.textTertiary }]}>@{handle}</Text>
+              <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+            </>
+          )}
+          {item.publishedAt && (
+            <Text style={[styles.metaText, { color: colors.textTertiary }]}>
+              {formatRelativeTime(item.publishedAt)}
+            </Text>
+          )}
+        </View>
+      </Animated.View>
+
+      {/* Icon Action Row */}
+      <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
+        <View style={styles.actionRowLeft}>
+          <IconActionButton
+            icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
+            color={isBookmarked ? colors.primary : colors.textSecondary}
+            onPress={onToggleBookmark}
+          />
+          <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
+          <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
+          <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
+        </View>
+        <Pressable
+          onPress={onOpenLink}
+          style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
+        >
+          {fabConfig.providerIcon}
+        </Pressable>
+      </Animated.View>
+
+      {/* Tweet Content Section - Twitter-like layout */}
+      <Animated.View
+        entering={FadeInDown.delay(400).duration(400)}
+        style={xPostStyles.tweetContentSection}
+      >
+        <View style={xPostStyles.tweetRow}>
+          {/* Avatar on the left */}
+          {item.creatorImageUrl ? (
+            <Image
+              source={{ uri: item.creatorImageUrl }}
+              style={xPostStyles.tweetAvatar}
+              contentFit="cover"
+            />
+          ) : (
+            <View
+              style={[
+                xPostStyles.tweetAvatar,
+                {
+                  backgroundColor: colors.backgroundTertiary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                },
+              ]}
+            >
+              <Ionicons name="person" size={24} color={colors.textTertiary} />
+            </View>
+          )}
+
+          {/* Content on the right */}
+          <View style={xPostStyles.tweetContentRight}>
+            {/* Name, handle, timestamp row */}
+            <View style={xPostStyles.tweetAuthorRow}>
+              <Text style={[xPostStyles.tweetAuthorName, { color: colors.text }]} numberOfLines={1}>
+                {item.creator}
+              </Text>
+              {handle && (
+                <Text
+                  style={[xPostStyles.tweetAuthorHandle, { color: colors.textTertiary }]}
+                  numberOfLines={1}
+                >
+                  @{handle}
+                </Text>
+              )}
+              {item.publishedAt && (
+                <Text style={[xPostStyles.tweetTimestamp, { color: colors.textTertiary }]}>
+                  · {formatRelativeTime(item.publishedAt)}
+                </Text>
+              )}
+            </View>
+
+            {/* Tweet text with link detection */}
+            <LinkedText
+              style={[xPostStyles.postText, { color: colors.text }]}
+              linkColor={colors.primary}
+            >
+              {item.title}
+            </LinkedText>
+
+            {/* Additional content from summary if different from title */}
+            {item.summary && item.summary !== item.title && (
+              <LinkedText
+                style={[xPostStyles.postText, { color: colors.text, marginTop: Spacing.sm }]}
+                linkColor={colors.primary}
+              >
+                {item.summary}
+              </LinkedText>
+            )}
+          </View>
+        </View>
+      </Animated.View>
+    </>
+  );
+
+  // Render with parallax for X posts with thumbnails
+  if (hasThumbnail) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: '', headerShown: false }} />
+
+        <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+          <ParallaxScrollView
+            headerImage={
+              <Image
+                source={{ uri: item.thumbnailUrl! }}
+                style={styles.parallaxCoverImage}
+                contentFit="cover"
+                transition={300}
+              />
+            }
+            headerAspectRatio={16 / 9}
+          >
+            {renderContent()}
+          </ParallaxScrollView>
+        </Animated.View>
+
+        {/* Floating Back Button */}
+        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <Animated.View entering={FadeIn.duration(300)}>
+            <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
+
+  // Fallback for X posts without thumbnails - use regular ScrollView
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Stack.Screen options={{ title: '', headerShown: false }} />
+
+      <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 56 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderContent()}
+        </ScrollView>
+      </Animated.View>
+
+      {/* Floating Back Button */}
+      <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+        <Animated.View entering={FadeIn.duration(300)}>
+          <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================================
 // Icon Action Button
 // ============================================================================
 
@@ -208,94 +436,6 @@ function HeaderIconButton({
 }
 
 // ============================================================================
-// Loading State
-// ============================================================================
-
-function LoadingState({ colors }: { colors: typeof Colors.dark }) {
-  return (
-    <View style={styles.centerContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading item...</Text>
-    </View>
-  );
-}
-
-// ============================================================================
-// Error State
-// ============================================================================
-
-function ErrorState({
-  colors,
-  message,
-  onRetry,
-}: {
-  colors: typeof Colors.dark;
-  message: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Something went wrong</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
-      {onRetry && (
-        <Pressable
-          onPress={onRetry}
-          style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-        >
-          <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>
-            Try Again
-          </Text>
-        </Pressable>
-      )}
-    </View>
-  );
-}
-
-// ============================================================================
-// Not Found State
-// ============================================================================
-
-function NotFoundState({ colors }: { colors: typeof Colors.dark }) {
-  const router = useRouter();
-
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Item not found</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
-        This item may have been deleted or does not exist.
-      </Text>
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-      >
-        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-// ============================================================================
-// Invalid Parameter State
-// ============================================================================
-
-function InvalidParamState({ colors, message }: { colors: typeof Colors.dark; message: string }) {
-  const router = useRouter();
-
-  return (
-    <View style={styles.centerContainer}>
-      <Text style={[styles.errorTitle, { color: colors.text }]}>Invalid Link</Text>
-      <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>{message}</Text>
-      <Pressable
-        onPress={() => router.back()}
-        style={[styles.retryButton, { backgroundColor: colors.buttonPrimary }]}
-      >
-        <Text style={[styles.retryButtonText, { color: colors.buttonPrimaryText }]}>Go Back</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -332,7 +472,7 @@ export default function ItemDetailScreen() {
           }}
         />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <InvalidParamState colors={colors} message={idValidation.message} />
+          <InvalidParamState message={idValidation.message} />
         </SafeAreaView>
       </View>
     );
@@ -389,7 +529,7 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <LoadingState colors={colors} />
+          <LoadingState message="Loading item..." />
         </SafeAreaView>
       </View>
     );
@@ -401,7 +541,7 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <ErrorState colors={colors} message={error.message} onRetry={() => refetch()} />
+          <ErrorState message={error.message} onRetry={() => refetch()} />
         </SafeAreaView>
       </View>
     );
@@ -413,7 +553,10 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
         <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-          <NotFoundState colors={colors} />
+          <NotFoundState
+            title="Item not found"
+            message="This item may have been deleted or does not exist."
+          />
         </SafeAreaView>
       </View>
     );
@@ -443,9 +586,28 @@ export default function ItemDetailScreen() {
   // Check if item is bookmarked
   const isBookmarked = item.state === UserItemState.BOOKMARKED;
 
+  // Check if this is an X post - affects title and description rendering
+  const isXPost = item.provider === 'X' && item.contentType === 'POST';
+
   // Determine aspect ratio based on content type
   // Videos use 16:9, podcasts/articles use square (1:1)
   const headerAspectRatio = item.contentType === 'VIDEO' ? 16 / 9 : 1;
+
+  // Render X Post view for X/Twitter posts
+  if (isXPost) {
+    return (
+      <XPostBookmarkView
+        item={item}
+        colors={colors}
+        insets={insets}
+        onBack={() => router.back()}
+        onOpenLink={handleOpenLink}
+        onShare={handleShare}
+        onToggleBookmark={handleToggleBookmark}
+        isBookmarked={isBookmarked}
+      />
+    );
+  }
 
   // Render with parallax for items with thumbnails
   if (hasThumbnail) {
@@ -779,20 +941,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Badges
+  // Badges Row
   badgeRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
     marginBottom: Spacing.md,
-  },
-  badge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
-  },
-  badgeText: {
-    ...Typography.labelMedium,
-    color: '#FFFFFF',
   },
 
   // Content
@@ -884,34 +1037,50 @@ const styles = StyleSheet.create({
     ...Typography.bodyMedium,
     lineHeight: 24,
   },
+});
 
-  // Center Container (for loading/error/not found)
-  centerContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: Spacing.xl,
-  },
-  loadingText: {
-    ...Typography.bodyMedium,
-    marginTop: Spacing.md,
-  },
-  errorTitle: {
-    ...Typography.headlineSmall,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
-  },
-  errorMessage: {
-    ...Typography.bodyMedium,
-    textAlign: 'center',
+// ============================================================================
+// X Post Styles
+// ============================================================================
+
+const xPostStyles = StyleSheet.create({
+  // Tweet content section - Twitter-like layout
+  tweetContentSection: {
     marginBottom: Spacing.lg,
-  },
-  retryButton: {
-    paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.xl,
-    borderRadius: Radius.md,
   },
-  retryButtonText: {
-    ...Typography.labelMedium,
+  tweetRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  tweetAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.full,
+    marginRight: Spacing.md,
+  },
+  tweetContentRight: {
+    flex: 1,
+  },
+  tweetAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+    flexWrap: 'wrap',
+  },
+  tweetAuthorName: {
+    ...Typography.labelLarge,
+    marginRight: Spacing.xs,
+  },
+  tweetAuthorHandle: {
+    ...Typography.bodyMedium,
+    marginRight: Spacing.xs,
+  },
+  tweetTimestamp: {
+    ...Typography.bodyMedium,
+  },
+  postText: {
+    ...Typography.bodyLarge,
+    lineHeight: 26,
   },
 });
