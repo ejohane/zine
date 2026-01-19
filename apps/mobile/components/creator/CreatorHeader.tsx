@@ -1,13 +1,14 @@
 /**
  * CreatorHeader Component
  *
- * Displays creator profile information at the top of the Creator View screen.
- * Shows creator image (or fallback), name, provider badge, and subscribe button.
+ * Displays creator profile information below the parallax header.
+ * Shows name, provider badge, and subscribe button.
+ * The creator image is displayed in the parallax header of the parent screen.
  */
 
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 import { SourceBadge } from '@/components/badges';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
@@ -94,23 +95,6 @@ export function CreatorHeader({ creator }: CreatorHeaderProps) {
 
   return (
     <View style={[styles.container, { borderBottomColor: colors.border }]}>
-      {/* Creator Image */}
-      <View style={styles.imageContainer}>
-        {creator.imageUrl ? (
-          <Image
-            source={{ uri: creator.imageUrl }}
-            style={styles.image}
-            accessibilityLabel={`${creator.name} profile image`}
-          />
-        ) : (
-          <View style={[styles.imagePlaceholder, { backgroundColor: colors.backgroundSecondary }]}>
-            <Text style={[styles.imagePlaceholderText, { color: colors.textTertiary }]}>
-              {creator.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-      </View>
-
       {/* Creator Name */}
       <Text style={[styles.name, { color: colors.text }]}>{creator.name}</Text>
 
@@ -170,25 +154,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     borderBottomWidth: 1,
     alignItems: 'center',
-  },
-  imageContainer: {
-    marginBottom: Spacing.lg,
-  },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: Radius.full,
-  },
-  imagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  imagePlaceholderText: {
-    fontSize: 28,
-    fontWeight: '700',
   },
   name: {
     ...Typography.headlineSmall,

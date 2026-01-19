@@ -829,7 +829,11 @@ export const subscriptionsRouter = router({
             .map((s) => ({
               id: s.snippet?.resourceId?.channelId || '',
               name: s.snippet?.title || '',
-              imageUrl: s.snippet?.thumbnails?.default?.url || undefined,
+              imageUrl:
+                s.snippet?.thumbnails?.high?.url ||
+                s.snippet?.thumbnails?.medium?.url ||
+                s.snippet?.thumbnails?.default?.url ||
+                undefined,
             }))
             .filter((s) => s.id);
         } else {
@@ -898,7 +902,11 @@ export const subscriptionsRouter = router({
             id: ch.id?.channelId || '',
             name: ch.snippet?.channelTitle || '',
             description: ch.snippet?.description || undefined,
-            imageUrl: ch.snippet?.thumbnails?.default?.url || undefined,
+            imageUrl:
+              ch.snippet?.thumbnails?.high?.url ||
+              ch.snippet?.thumbnails?.medium?.url ||
+              ch.snippet?.thumbnails?.default?.url ||
+              undefined,
           }))
           .filter((r) => r.id);
       } else {

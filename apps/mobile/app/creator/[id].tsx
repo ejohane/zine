@@ -12,17 +12,20 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import { View, Text, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreatorHeader, CreatorBookmarks, CreatorLatestContent } from '@/components/creator';
+import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreator, useCreatorBookmarks } from '@/hooks/use-creator';
 import { analytics, type CreatorViewSource } from '@/lib/analytics';
+import { upgradeYouTubeImageUrl } from '@/lib/content-utils';
 
 // ============================================================================
 // Floating Header Button
@@ -144,23 +147,68 @@ export default function CreatorScreen() {
   }
 
   // Success state with creator data
+  const hasImage = !!creator.imageUrl;
+
+  // Render with parallax if creator has an image
+  if (hasImage) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: '', headerShown: false }} />
+
+        <Animated.View entering={FadeIn.duration(300)} style={styles.animatedContainer}>
+          <ParallaxScrollView
+            headerImage={
+              <Image
+                source={{ uri: upgradeYouTubeImageUrl(creator.imageUrl) ?? undefined }}
+                style={styles.parallaxCoverImage}
+                contentFit="cover"
+                transition={300}
+              />
+            }
+            headerHeightFraction={0.22}
+          >
+            <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+              <CreatorHeader creator={creator} />
+              <CreatorBookmarks creatorId={id ?? ''} />
+              <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+            </Animated.View>
+          </ParallaxScrollView>
+        </Animated.View>
+
+        {/* Floating Back Button */}
+        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <Animated.View entering={FadeIn.duration(300)}>
+            <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
+          </Animated.View>
+        </View>
+      </View>
+    );
+  }
+
+  // Fallback for creators without an image
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
       <Animated.View entering={FadeIn.duration(300)} style={styles.animatedContainer}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingTop: insets.top + 56, paddingBottom: insets.bottom + Spacing['2xl'] },
-          ]}
-          showsVerticalScrollIndicator={false}
+        <ParallaxScrollView
+          headerImage={
+            <View
+              style={[styles.parallaxPlaceholder, { backgroundColor: colors.backgroundSecondary }]}
+            >
+              <Text style={[styles.parallaxPlaceholderText, { color: colors.textTertiary }]}>
+                {creator.name.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          }
+          headerHeightFraction={0.22}
         >
-          <CreatorHeader creator={creator} />
-          <CreatorBookmarks creatorId={id ?? ''} />
-          <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
-        </ScrollView>
+          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+            <CreatorHeader creator={creator} />
+            <CreatorBookmarks creatorId={id ?? ''} />
+            <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+          </Animated.View>
+        </ParallaxScrollView>
       </Animated.View>
 
       {/* Floating Back Button */}
@@ -184,11 +232,21 @@ const styles = StyleSheet.create({
   animatedContainer: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+
+  // Parallax header
+  parallaxCoverImage: {
+    width: '100%',
+    height: '100%',
   },
-  scrollContent: {
-    flexGrow: 1,
+  parallaxPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  parallaxPlaceholderText: {
+    fontSize: 64,
+    fontWeight: '700',
   },
 
   // Loading state

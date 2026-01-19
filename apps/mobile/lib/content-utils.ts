@@ -308,3 +308,41 @@ export function isVideoContent(type: ContentType | UIContentType): boolean {
 export function isPodcastContent(type: ContentType | UIContentType): boolean {
   return normalizeContentType(type) === 'podcast';
 }
+
+// ============================================================================
+// Image URL Helpers
+// ============================================================================
+
+/**
+ * Upgrade YouTube channel avatar URL to high resolution.
+ *
+ * YouTube channel avatars use a size parameter like `=s88` (88 pixels).
+ * This function replaces it with `=s800` for sharper images on high-DPI displays.
+ *
+ * Works with URLs from both:
+ * - yt3.ggpht.com (older format)
+ * - yt3.googleusercontent.com (newer format)
+ *
+ * @param url - The image URL (may be null/undefined)
+ * @param targetSize - Target size in pixels (default: 800)
+ * @returns Upgraded URL or original if not a YouTube channel avatar
+ *
+ * @example
+ * upgradeYouTubeImageUrl('https://yt3.ggpht.com/abc=s88-c-k') // '...=s800-c-k'
+ * upgradeYouTubeImageUrl('https://example.com/img.jpg')        // unchanged
+ * upgradeYouTubeImageUrl(null)                                 // null
+ */
+export function upgradeYouTubeImageUrl(
+  url: string | null | undefined,
+  targetSize: number = 800
+): string | null | undefined {
+  if (!url) return url;
+
+  // Match YouTube channel avatar URLs (yt3.ggpht.com or yt3.googleusercontent.com)
+  if (url.includes('yt3.ggpht.com') || url.includes('yt3.googleusercontent.com')) {
+    // Replace size parameter (e.g., =s88 or =s176) with target size
+    return url.replace(/=s\d+/, `=s${targetSize}`);
+  }
+
+  return url;
+}

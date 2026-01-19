@@ -44,6 +44,7 @@ import {
   isSquareContent,
   isVideoContent,
   isPodcastContent,
+  upgradeYouTubeImageUrl,
 } from './content-utils';
 import { ContentType, Provider } from '@zine/shared';
 
@@ -260,5 +261,53 @@ describe('isPodcastContent', () => {
 
   it('returns false for article', () => {
     expect(isPodcastContent('article')).toBe(false);
+  });
+});
+
+// ============================================================================
+// Image URL Helper Tests
+// ============================================================================
+
+describe('upgradeYouTubeImageUrl', () => {
+  it('upgrades yt3.ggpht.com URLs from s88 to s800', () => {
+    const url = 'https://yt3.ggpht.com/ytc/abc123=s88-c-k-c0x00ffffff-no-rj';
+    expect(upgradeYouTubeImageUrl(url)).toBe(
+      'https://yt3.ggpht.com/ytc/abc123=s800-c-k-c0x00ffffff-no-rj'
+    );
+  });
+
+  it('upgrades yt3.googleusercontent.com URLs from s88 to s800', () => {
+    const url = 'https://yt3.googleusercontent.com/abc123=s88-c-k-c0x00ffffff-no-rj';
+    expect(upgradeYouTubeImageUrl(url)).toBe(
+      'https://yt3.googleusercontent.com/abc123=s800-c-k-c0x00ffffff-no-rj'
+    );
+  });
+
+  it('upgrades from different sizes (s176)', () => {
+    const url = 'https://yt3.ggpht.com/ytc/abc123=s176-c-k';
+    expect(upgradeYouTubeImageUrl(url)).toBe('https://yt3.ggpht.com/ytc/abc123=s800-c-k');
+  });
+
+  it('accepts custom target size', () => {
+    const url = 'https://yt3.ggpht.com/ytc/abc123=s88-c-k';
+    expect(upgradeYouTubeImageUrl(url, 400)).toBe('https://yt3.ggpht.com/ytc/abc123=s400-c-k');
+  });
+
+  it('returns non-YouTube URLs unchanged', () => {
+    const url = 'https://example.com/image.jpg';
+    expect(upgradeYouTubeImageUrl(url)).toBe(url);
+  });
+
+  it('returns Spotify image URLs unchanged', () => {
+    const url = 'https://i.scdn.co/image/abc123';
+    expect(upgradeYouTubeImageUrl(url)).toBe(url);
+  });
+
+  it('returns null for null input', () => {
+    expect(upgradeYouTubeImageUrl(null)).toBe(null);
+  });
+
+  it('returns undefined for undefined input', () => {
+    expect(upgradeYouTubeImageUrl(undefined)).toBe(undefined);
   });
 });
