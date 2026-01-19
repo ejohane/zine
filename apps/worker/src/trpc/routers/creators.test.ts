@@ -15,7 +15,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
-import type { CheckSubscriptionResponse } from './creators';
+import type { CheckSubscriptionResponse, SubscribeResponse } from './creators';
 
 // ============================================================================
 // Test Fixtures
@@ -240,14 +240,71 @@ function createMockCreatorsCaller(options: {
       };
     },
 
-    subscribe: async (input: { creatorId: string }) => {
+    subscribe: async (input: { creatorId: string }): Promise<SubscribeResponse> => {
       requireAuth();
-      // Stub implementation - returns success as specified
-      void input;
+
+      // 1. Get the creator
+      const creator = creators.get(input.creatorId);
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // 2. Only YOUTUBE and SPOTIFY support subscriptions
+      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Subscriptions not supported for this provider',
+        });
+      }
+
+      // 3. Check if user is connected to the provider
+      let connection: ProviderConnection | undefined;
+      for (const conn of connections.values()) {
+        if (
+          conn.userId === userId &&
+          conn.provider === creator.provider &&
+          conn.status === 'ACTIVE'
+        ) {
+          connection = conn;
+          break;
+        }
+      }
+
+      if (!connection) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Please connect your account first',
+        });
+      }
+
+      // 4. Check if subscription already exists (idempotent)
+      for (const sub of subscriptions.values()) {
+        if (
+          sub.userId === userId &&
+          sub.provider === creator.provider &&
+          sub.providerChannelId === creator.providerCreatorId
+        ) {
+          return {
+            id: sub.id,
+            provider: sub.provider,
+            name: sub.name,
+            imageUrl: null, // Simplified for mock
+            enabled: sub.status === 'ACTIVE',
+          };
+        }
+      }
+
+      // 5. Create new subscription (mock: just return the expected shape)
+      const newSubscriptionId = `sub_new_${Date.now()}`;
       return {
-        success: true,
-        isSubscribed: true,
-        subscribedAt: new Date().toISOString(),
+        id: newSubscriptionId,
+        provider: creator.provider,
+        name: creator.name,
+        imageUrl: creator.imageUrl,
+        enabled: true,
       };
     },
   };
@@ -916,15 +973,382 @@ describe('Creators Router', () => {
   // ==========================================================================
 
   describe('creators.subscribe', () => {
-    it('should accept valid creatorId and return success (stub)', async () => {
+    it('should throw NOT_FOUND when creator does not exist', async () => {
       const caller = createMockCreatorsCaller({ userId: TEST_USER_ID });
 
-      const result = await caller.subscribe({ creatorId: TEST_CREATOR_ID });
+      await expect(caller.subscribe({ creatorId: 'nonexistent' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'nonexistent' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Creator not found',
+      });
+    });
 
-      expect(result.success).toBe(true);
-      expect(result.isSubscribed).toBe(true);
-      expect(result.subscribedAt).toBeDefined();
-      expect(typeof result.subscribedAt).toBe('string');
+    it('should throw BAD_REQUEST for unsupported provider (RSS)', async () => {
+      const rssCreator = createMockCreator({
+        id: 'rss_creator',
+        provider: 'RSS',
+        providerCreatorId: 'https://example.com/feed.xml',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('rss_creator', rssCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      await expect(caller.subscribe({ creatorId: 'rss_creator' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'rss_creator' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Subscriptions not supported for this provider',
+      });
+    });
+
+    it('should throw BAD_REQUEST for unsupported provider (SUBSTACK)', async () => {
+      const substackCreator = createMockCreator({
+        id: 'substack_creator',
+        provider: 'SUBSTACK',
+        providerCreatorId: 'substack-user-123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('substack_creator', substackCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      await expect(caller.subscribe({ creatorId: 'substack_creator' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'substack_creator' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Subscriptions not supported for this provider',
+      });
+    });
+
+    it('should throw PRECONDITION_FAILED if not connected to YouTube', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      // No connections
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: new Map(),
+      });
+
+      await expect(caller.subscribe({ creatorId: 'yt_creator' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'yt_creator' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: 'Please connect your account first',
+      });
+    });
+
+    it('should throw PRECONDITION_FAILED if not connected to Spotify', async () => {
+      const spotifyCreator = createMockCreator({
+        id: 'spotify_creator',
+        provider: 'SPOTIFY',
+        providerCreatorId: '0testshow123456789012',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('spotify_creator', spotifyCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: new Map(),
+      });
+
+      await expect(caller.subscribe({ creatorId: 'spotify_creator' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'spotify_creator' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: 'Please connect your account first',
+      });
+    });
+
+    it('should throw PRECONDITION_FAILED if connection exists but is not ACTIVE', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const expiredConnection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'EXPIRED', // Not active
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(expiredConnection.id, expiredConnection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+      });
+
+      await expect(caller.subscribe({ creatorId: 'yt_creator' })).rejects.toThrow(TRPCError);
+      await expect(caller.subscribe({ creatorId: 'yt_creator' })).rejects.toMatchObject({
+        code: 'PRECONDITION_FAILED',
+        message: 'Please connect your account first',
+      });
+    });
+
+    it('should create subscription for YouTube creator when connected', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+        name: 'My YouTube Channel',
+        imageUrl: 'https://example.com/yt-avatar.jpg',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: new Map(), // No existing subscriptions
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'yt_creator' });
+
+      expect(result.id).toBeDefined();
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.name).toBe('My YouTube Channel');
+      expect(result.imageUrl).toBe('https://example.com/yt-avatar.jpg');
+      expect(result.enabled).toBe(true);
+    });
+
+    it('should create subscription for Spotify creator when connected', async () => {
+      const spotifyCreator = createMockCreator({
+        id: 'spotify_creator',
+        provider: 'SPOTIFY',
+        providerCreatorId: '0testshow123456789012',
+        name: 'My Podcast',
+        imageUrl: 'https://example.com/podcast-art.jpg',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'SPOTIFY',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('spotify_creator', spotifyCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: new Map(),
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'spotify_creator' });
+
+      expect(result.id).toBeDefined();
+      expect(result.provider).toBe('SPOTIFY');
+      expect(result.name).toBe('My Podcast');
+      expect(result.imageUrl).toBe('https://example.com/podcast-art.jpg');
+      expect(result.enabled).toBe(true);
+    });
+
+    it('should return existing subscription if already subscribed (idempotent)', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+        name: 'My YouTube Channel',
+      });
+
+      const existingSubscription = createMockSubscription({
+        id: 'sub_existing_123',
+        provider: 'YOUTUBE',
+        providerChannelId: 'UCtest123',
+        name: 'Existing Subscription Name',
+        status: 'ACTIVE',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const subscriptionsMap = new Map<string, Subscription>();
+      subscriptionsMap.set(existingSubscription.id, existingSubscription);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: subscriptionsMap,
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'yt_creator' });
+
+      // Should return existing subscription, not create new one
+      expect(result.id).toBe('sub_existing_123');
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.name).toBe('Existing Subscription Name');
+      expect(result.enabled).toBe(true);
+    });
+
+    it('should return enabled=false for existing PAUSED subscription (idempotent)', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const pausedSubscription = createMockSubscription({
+        id: 'sub_paused_123',
+        provider: 'YOUTUBE',
+        providerChannelId: 'UCtest123',
+        status: 'PAUSED', // Not active
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const subscriptionsMap = new Map<string, Subscription>();
+      subscriptionsMap.set(pausedSubscription.id, pausedSubscription);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: subscriptionsMap,
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'yt_creator' });
+
+      expect(result.id).toBe('sub_paused_123');
+      expect(result.enabled).toBe(false);
+    });
+
+    it('should not match subscription from different provider', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+        name: 'YouTube Channel',
+      });
+
+      // Spotify subscription with same channel ID but different provider
+      const spotifySubscription = createMockSubscription({
+        id: 'sub_spotify_123',
+        provider: 'SPOTIFY',
+        providerChannelId: 'UCtest123', // Same ID but different provider
+        name: 'Spotify Show',
+        status: 'ACTIVE',
+      });
+
+      const ytConnection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const subscriptionsMap = new Map<string, Subscription>();
+      subscriptionsMap.set(spotifySubscription.id, spotifySubscription);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(ytConnection.id, ytConnection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: subscriptionsMap,
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'yt_creator' });
+
+      // Should create new subscription, not return the Spotify one
+      expect(result.id).not.toBe('sub_spotify_123');
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.name).toBe('YouTube Channel');
+    });
+
+    it('should return response matching SubscribeResponse interface', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+        name: 'Test Channel',
+        imageUrl: 'https://example.com/image.jpg',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        subscriptions: new Map(),
+        connections: connectionsMap,
+      });
+
+      const result = await caller.subscribe({ creatorId: 'yt_creator' });
+
+      // Verify response shape
+      expect(result).toHaveProperty('id');
+      expect(result).toHaveProperty('provider');
+      expect(result).toHaveProperty('name');
+      expect(result).toHaveProperty('imageUrl');
+      expect(result).toHaveProperty('enabled');
+      expect(typeof result.id).toBe('string');
+      expect(typeof result.provider).toBe('string');
+      expect(typeof result.name).toBe('string');
+      expect(typeof result.enabled).toBe('boolean');
     });
   });
 

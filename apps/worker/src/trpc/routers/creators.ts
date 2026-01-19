@@ -13,6 +13,7 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, desc, lt, or, sql } from 'drizzle-orm';
+import { ulid } from 'ulid';
 import { router, protectedProcedure } from '../trpc';
 import { creators, items, userItems, subscriptions, providerConnections } from '../../db/schema';
 import { UserItemState } from '@zine/shared';
@@ -31,6 +32,17 @@ export interface CheckSubscriptionResponse {
   subscriptionId?: string;
   canSubscribe: boolean;
   reason?: 'PROVIDER_NOT_SUPPORTED' | 'NOT_CONNECTED';
+}
+
+/**
+ * Response shape for subscribe
+ */
+export interface SubscribeResponse {
+  id: string;
+  provider: string;
+  name: string;
+  imageUrl: string | null;
+  enabled: boolean;
 }
 
 // ============================================================================
@@ -268,23 +280,104 @@ export const creatorsRouter = router({
   /**
    * Subscribe to a creator
    *
-   * Creates or updates a subscription to a creator. May also
-   * trigger a provider-level subscription if the user has
-   * connected their account.
+   * Creates a subscription to a creator's content. This is idempotent -
+   * if a subscription already exists, it returns the existing subscription.
+   *
+   * Requirements:
+   * - Creator must exist
+   * - Provider must support subscriptions (YOUTUBE or SPOTIFY)
+   * - User must have an active connection to the provider
    *
    * @param creatorId - The unique identifier of the creator
-   * @returns Updated subscription status
+   * @returns Subscription object
+   * @throws NOT_FOUND if creator doesn't exist
+   * @throws BAD_REQUEST if provider doesn't support subscriptions
+   * @throws PRECONDITION_FAILED if user isn't connected to the provider
    */
-  subscribe: protectedProcedure.input(SubscribeInputSchema).mutation(async ({ ctx, input }) => {
-    // TODO: Implement - will be done in zine-j4cd
-    void ctx;
-    void input;
-    return {
-      success: true,
-      isSubscribed: true,
-      subscribedAt: new Date().toISOString(),
-    };
-  }),
+  subscribe: protectedProcedure
+    .input(SubscribeInputSchema)
+    .mutation(async ({ ctx, input }): Promise<SubscribeResponse> => {
+      // 1. Get the creator
+      const creator = await ctx.db.query.creators.findFirst({
+        where: eq(creators.id, input.creatorId),
+      });
+
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // 2. Only YOUTUBE and SPOTIFY support subscriptions
+      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Subscriptions not supported for this provider',
+        });
+      }
+
+      // 3. Check if user is connected to the provider
+      const connection = await ctx.db.query.providerConnections.findFirst({
+        where: and(
+          eq(providerConnections.userId, ctx.userId),
+          eq(providerConnections.provider, creator.provider),
+          eq(providerConnections.status, 'ACTIVE')
+        ),
+      });
+
+      if (!connection) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Please connect your account first',
+        });
+      }
+
+      // 4. Check if subscription already exists (idempotent)
+      const existing = await ctx.db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.userId, ctx.userId),
+          eq(subscriptions.provider, creator.provider),
+          eq(subscriptions.providerChannelId, creator.providerCreatorId)
+        ),
+      });
+
+      if (existing) {
+        return {
+          id: existing.id,
+          provider: existing.provider,
+          name: existing.name,
+          imageUrl: existing.imageUrl,
+          enabled: existing.status === 'ACTIVE',
+        };
+      }
+
+      // 5. Create new subscription
+      const now = Date.now();
+      const subscriptionId = ulid();
+
+      await ctx.db.insert(subscriptions).values({
+        id: subscriptionId,
+        userId: ctx.userId,
+        provider: creator.provider,
+        providerChannelId: creator.providerCreatorId,
+        name: creator.name,
+        description: creator.description,
+        imageUrl: creator.imageUrl,
+        externalUrl: creator.externalUrl,
+        status: 'ACTIVE',
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      return {
+        id: subscriptionId,
+        provider: creator.provider,
+        name: creator.name,
+        imageUrl: creator.imageUrl,
+        enabled: true,
+      };
+    }),
 });
 
 export type CreatorsRouter = typeof creatorsRouter;
