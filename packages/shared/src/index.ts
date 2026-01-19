@@ -5,6 +5,9 @@
 // Domain types and enums
 export { ContentType, Provider, UserItemState } from './types/domain';
 
+// Domain interfaces
+export type { Creator, CreatorWithSubscription } from './types/domain';
+
 // Constants
 export { ZINE_VERSION, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from './constants';
 
