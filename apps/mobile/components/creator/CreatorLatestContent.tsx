@@ -6,11 +6,13 @@
  * Only available for YouTube and Spotify creators when the user is connected.
  */
 
+import { useEffect, useRef } from 'react';
 import { View, Text, FlatList, Pressable, Linking, StyleSheet } from 'react-native';
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreatorLatestContent, type CreatorContentItem } from '@/hooks/use-creator';
+import { analytics, type ConnectionPromptReason } from '@/lib/analytics';
 
 import { LatestContentCard, type LatestContentItem } from './LatestContentCard';
 
@@ -158,6 +160,37 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   // The hook will only fetch when enabled
   const { content, reason, connectUrl, isLoading, error } = useCreatorLatestContent(creatorId);
 
+  // Track content loaded once
+  const hasTrackedContentLoaded = useRef(false);
+  useEffect(() => {
+    if (!isLoading && !error && content.length > 0 && !hasTrackedContentLoaded.current) {
+      hasTrackedContentLoaded.current = true;
+      analytics.track('creator_latest_content_loaded', {
+        creatorId,
+        provider,
+        contentCount: content.length,
+        hadCache: false, // TODO: Expose cache status from hook if needed
+      });
+    }
+  }, [isLoading, error, content.length, creatorId, provider]);
+
+  // Track connect prompt shown once
+  const hasTrackedConnectPrompt = useRef(false);
+  useEffect(() => {
+    if (
+      !isLoading &&
+      (reason === 'NOT_CONNECTED' || reason === 'TOKEN_EXPIRED') &&
+      !hasTrackedConnectPrompt.current
+    ) {
+      hasTrackedConnectPrompt.current = true;
+      analytics.track('creator_connect_prompt_shown', {
+        creatorId,
+        provider,
+        reason: reason as ConnectionPromptReason,
+      });
+    }
+  }, [isLoading, reason, creatorId, provider]);
+
   // Don't render for unsupported providers
   if (!isSupported) {
     return null;
@@ -242,7 +275,9 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
       <FlatList
         data={items}
         keyExtractor={(item) => item.providerId}
-        renderItem={({ item }) => <LatestContentCard item={item} />}
+        renderItem={({ item }) => (
+          <LatestContentCard item={item} creatorId={creatorId} provider={provider} />
+        )}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}

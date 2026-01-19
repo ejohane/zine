@@ -13,6 +13,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +21,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CreatorHeader, CreatorBookmarks, CreatorLatestContent } from '@/components/creator';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useCreator } from '@/hooks/use-creator';
+import { useCreator, useCreatorBookmarks } from '@/hooks/use-creator';
+import { analytics, type CreatorViewSource } from '@/lib/analytics';
 
 // ============================================================================
 // Floating Header Button
@@ -52,13 +54,28 @@ function HeaderIconButton({
 // ============================================================================
 
 export default function CreatorScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, source } = useLocalSearchParams<{ id: string; source?: CreatorViewSource }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const { creator, isLoading, error, refetch } = useCreator(id ?? '');
+  const { bookmarks } = useCreatorBookmarks(id ?? '');
+
+  // Track view once when creator data is loaded
+  const hasTrackedView = useRef(false);
+  useEffect(() => {
+    if (creator && !hasTrackedView.current) {
+      hasTrackedView.current = true;
+      analytics.track('creator_view_opened', {
+        creatorId: creator.id,
+        provider: creator.provider,
+        source: source ?? 'item_page',
+        bookmarkCount: bookmarks.length,
+      });
+    }
+  }, [creator, source, bookmarks.length]);
 
   // Loading state
   if (isLoading) {

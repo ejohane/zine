@@ -9,6 +9,7 @@ import { View, Text, Image, Pressable, Linking, StyleSheet } from 'react-native'
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { analytics } from '@/lib/analytics';
 import { formatRelativeTime } from '@/lib/format';
 
 // ============================================================================
@@ -35,6 +36,10 @@ export interface LatestContentItem {
 export interface LatestContentCardProps {
   /** The content item to display */
   item: LatestContentItem;
+  /** The creator ID for analytics tracking */
+  creatorId: string;
+  /** The provider for analytics tracking */
+  provider: string;
 }
 
 // ============================================================================
@@ -57,15 +62,25 @@ export interface LatestContentCardProps {
  *     url: 'https://youtube.com/watch?v=abc123',
  *     isBookmarked: false,
  *   }}
+ *   creatorId="creator-123"
+ *   provider="YOUTUBE"
  * />
  * ```
  */
-export function LatestContentCard({ item }: LatestContentCardProps) {
+export function LatestContentCard({ item, creatorId, provider }: LatestContentCardProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   const handlePress = () => {
     if (item.url) {
+      // Track content opened
+      analytics.track('creator_content_opened', {
+        creatorId,
+        contentType: 'latest',
+        provider,
+        externalUrl: item.url,
+      });
+
       Linking.openURL(item.url);
     }
   };

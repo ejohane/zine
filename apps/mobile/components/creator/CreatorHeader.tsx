@@ -6,12 +6,14 @@
  */
 
 import * as Haptics from 'expo-haptics';
+import { useEffect, useRef } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 
 import { SourceBadge } from '@/components/badges';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { type Creator, useCreatorSubscription } from '@/hooks/use-creator';
+import { analytics } from '@/lib/analytics';
 
 // ============================================================================
 // Types
@@ -45,14 +47,48 @@ export function CreatorHeader({ creator }: CreatorHeaderProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
-  const { isSubscribed, canSubscribe, subscribe, isSubscribing, reason } = useCreatorSubscription(
-    creator.id
-  );
+  const { isSubscribed, canSubscribe, subscribe, isSubscribing, reason, error } =
+    useCreatorSubscription(creator.id);
+
+  // Track connect prompt shown in header once
+  const hasTrackedConnectPrompt = useRef(false);
+  useEffect(() => {
+    if (reason === 'NOT_CONNECTED' && !hasTrackedConnectPrompt.current) {
+      hasTrackedConnectPrompt.current = true;
+      analytics.track('creator_connect_prompt_shown', {
+        creatorId: creator.id,
+        provider: creator.provider,
+        reason: 'NOT_CONNECTED',
+      });
+    }
+  }, [reason, creator.id, creator.provider]);
 
   const handleSubscribe = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Track subscribe tap immediately
+    analytics.track('creator_subscribe_tapped', {
+      creatorId: creator.id,
+      provider: creator.provider,
+      success: true, // Will be updated if there's an error
+    });
+
     subscribe();
   };
+
+  // Track subscribe error if it occurs
+  const hasTrackedError = useRef(false);
+  useEffect(() => {
+    if (error && !hasTrackedError.current) {
+      hasTrackedError.current = true;
+      analytics.track('creator_subscribe_tapped', {
+        creatorId: creator.id,
+        provider: creator.provider,
+        success: false,
+        errorReason: error.message,
+      });
+    }
+  }, [error, creator.id, creator.provider]);
 
   const showSubscribeButton = SUBSCRIBABLE_PROVIDERS.includes(creator.provider) && !isSubscribed;
 
