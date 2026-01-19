@@ -252,3 +252,60 @@ export function isSubscriptionStatus(value: unknown): value is SubscriptionStatu
 export function isProviderConnectionStatus(value: unknown): value is ProviderConnectionStatus {
   return Object.values(ProviderConnectionStatus).includes(value as ProviderConnectionStatus);
 }
+
+// ============================================================================
+// Creator Models
+// ============================================================================
+
+/**
+ * A Creator represents a content creator across providers.
+ * Examples: YouTube channel, Spotify podcast, X/Twitter user, Substack author.
+ * Creators are canonical entities shared across users.
+ */
+export interface Creator {
+  /** Unique identifier (ULID) */
+  id: string;
+
+  /** Content provider */
+  provider: Provider;
+
+  /** Provider-specific creator ID (e.g., YouTube channel ID, Spotify show ID) */
+  providerCreatorId: string;
+
+  /** Display name */
+  name: string;
+
+  /** Lowercase, trimmed name for deduplication */
+  normalizedName: string;
+
+  /** URL to creator's profile image */
+  imageUrl?: string;
+
+  /** Creator's bio/description */
+  description?: string;
+
+  /** External URL to creator's page on the provider */
+  externalUrl?: string;
+
+  /** @username handle (for X/Twitter, YouTube, etc.) */
+  handle?: string;
+
+  /** When this Creator record was created (Unix ms) */
+  createdAt: number;
+
+  /** When this Creator record was last updated (Unix ms) */
+  updatedAt: number;
+}
+
+/**
+ * Creator with user-specific subscription status.
+ * Used for API responses that include whether the current user
+ * is subscribed to this creator.
+ */
+export interface CreatorWithSubscription extends Creator {
+  /** Whether the current user is subscribed to this creator */
+  isSubscribed: boolean;
+
+  /** The subscription ID if subscribed */
+  subscriptionId?: string;
+}
