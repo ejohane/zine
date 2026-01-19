@@ -33,6 +33,12 @@ import type { NewItem } from './transformers';
 import { TransformError } from './transformers';
 import { serializeError } from '../utils/error-utils';
 import { validateCanonicalItem, isValidationError } from './validation';
+import {
+  extractCreatorFromMetadata,
+  findOrCreateCreator,
+  generateSyntheticCreatorId,
+  type CreatorParams,
+} from '../db/helpers/creators';
 
 // ============================================================================
 // Types
@@ -127,6 +133,97 @@ export function classifyError(error: unknown): DLQErrorType {
 }
 
 // ============================================================================
+// Creator Extraction Helpers
+// ============================================================================
+
+/**
+ * Providers that have native creator IDs from their APIs.
+ * For these, we use extractCreatorFromMetadata to parse the raw API response.
+ */
+const PROVIDERS_WITH_NATIVE_CREATOR_IDS = ['YOUTUBE', 'SPOTIFY', 'X'];
+
+/**
+ * Providers that require synthetic creator IDs.
+ * For these, we generate a deterministic ID from provider + creator name.
+ */
+const PROVIDERS_WITH_SYNTHETIC_CREATOR_IDS = ['RSS', 'WEB', 'SUBSTACK'];
+
+/**
+ * Extract or create creator parameters from a raw provider item.
+ *
+ * This function handles two cases:
+ * 1. Providers with native IDs (YouTube, Spotify, X): Extract from raw API metadata
+ * 2. Providers without native IDs (RSS, WEB, SUBSTACK): Generate synthetic ID from creator name
+ *
+ * @param provider - The provider type
+ * @param rawItem - Raw item data from the provider API
+ * @param transformedItem - The transformed NewItem (for fallback creator name)
+ * @returns CreatorParams if extraction succeeded, null otherwise
+ */
+function extractCreatorParams(
+  provider: string,
+  rawItem: unknown,
+  transformedItem: NewItem
+): CreatorParams | null {
+  // Case 1: Providers with native creator IDs
+  if (PROVIDERS_WITH_NATIVE_CREATOR_IDS.includes(provider)) {
+    return extractCreatorFromMetadata(provider, rawItem);
+  }
+
+  // Case 2: Providers with synthetic creator IDs
+  if (PROVIDERS_WITH_SYNTHETIC_CREATOR_IDS.includes(provider) && transformedItem.creator) {
+    const syntheticId = generateSyntheticCreatorId(provider, transformedItem.creator);
+    return {
+      provider,
+      providerCreatorId: syntheticId,
+      name: transformedItem.creator,
+      imageUrl: transformedItem.creatorImageUrl,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Find or create a creator from raw item data.
+ *
+ * Uses extractCreatorParams to get creator info, then calls findOrCreateCreator
+ * to get the internal creator ID.
+ *
+ * @param db - Database instance
+ * @param provider - Provider type
+ * @param rawItem - Raw item data from provider API
+ * @param transformedItem - Transformed item data (for fallback creator name)
+ * @returns Internal creator ID if successful, null otherwise
+ */
+async function getOrCreateCreator(
+  db: DrizzleD1Database,
+  provider: string,
+  rawItem: unknown,
+  transformedItem: NewItem
+): Promise<string | null> {
+  try {
+    const creatorParams = extractCreatorParams(provider, rawItem, transformedItem);
+
+    if (!creatorParams) {
+      return null;
+    }
+
+    // findOrCreateCreator expects ctx with db property
+    const ctx = { db };
+    const creator = await findOrCreateCreator(ctx, creatorParams);
+    return creator.id;
+  } catch (error) {
+    // Log but don't fail ingestion if creator extraction fails
+    console.error('Failed to extract/create creator:', {
+      provider,
+      error: serializeError(error),
+    });
+    return null;
+  }
+}
+
+// ============================================================================
 // Timestamp Conversion Helpers
 // ============================================================================
 
@@ -218,10 +315,13 @@ export async function ingestItem<T>(
     return { created: false, skipped: 'already_seen' };
   }
 
-  // 4. Find or create canonical item (shared across users)
-  const item = await findOrCreateCanonicalItem(transformedItem, provider, db);
+  // 4. Extract or create creator from raw item metadata
+  const creatorId = await getOrCreateCreator(db, provider, rawItem, transformedItem);
 
-  // 5. Prepare all the insert statements for batch execution
+  // 5. Find or create canonical item (shared across users)
+  const item = await findOrCreateCanonicalItem(transformedItem, provider, db, creatorId);
+
+  // 6. Prepare all the insert statements for batch execution
   const userItemId = ulid();
   const nowISO = new Date().toISOString(); // ISO8601 for existing table
   const now = Date.now(); // Unix ms for new tables
@@ -298,17 +398,19 @@ export async function ingestItem<T>(
  * This function:
  * 1. Looks up existing item by provider + providerId
  * 2. If found, returns the existing item ID
- * 3. If not found, creates a new item with proper timestamp conversion
+ * 3. If not found, creates a new item with proper timestamp conversion and creatorId
  *
  * @param newItem - Transformed item data (with Unix ms timestamps)
  * @param provider - Provider type string
  * @param db - Database instance
+ * @param creatorId - Optional internal creator ID (from creators table)
  * @returns Object containing the item ID
  */
 async function findOrCreateCanonicalItem(
   newItem: NewItem,
   provider: string,
-  db: DrizzleD1Database
+  db: DrizzleD1Database,
+  creatorId?: string | null
 ): Promise<{ id: string }> {
   // Check if item already exists (shared across users)
   const existing = await db
@@ -341,6 +443,7 @@ async function findOrCreateCanonicalItem(
       summary: newItem.description,
       creator: newItem.creator,
       creatorImageUrl: newItem.creatorImageUrl,
+      creatorId: creatorId ?? null,
       thumbnailUrl: newItem.imageUrl,
       duration: newItem.durationSeconds,
       publishedAt: publishedAtISO,
@@ -512,7 +615,7 @@ function chunk<T>(array: T[], size: number): T[][] {
 
 /**
  * Prepared item ready for batch insertion.
- * Contains all the data needed for the 3 insert statements.
+ * Contains all the data needed for the insert statements.
  */
 interface PreparedItem {
   /** Transformed item data */
@@ -527,6 +630,8 @@ interface PreparedItem {
   canonicalItemExists: boolean;
   /** User item ID for this ingestion */
   userItemId: string;
+  /** Internal creator ID (from creators table) */
+  creatorId: string | null;
 }
 
 /**
@@ -638,6 +743,9 @@ export async function ingestBatchConsolidated<T>(
         .where(and(eq(items.provider, provider), eq(items.providerId, newItem.providerId)))
         .limit(1);
 
+      // Extract or create creator from raw metadata
+      const creatorId = await getOrCreateCreator(db, provider, rawItem, newItem);
+
       preparedItems.push({
         newItem,
         rawItem,
@@ -645,6 +753,7 @@ export async function ingestBatchConsolidated<T>(
         canonicalItemId: existingCanonical.length > 0 ? existingCanonical[0].id : newItem.id,
         canonicalItemExists: existingCanonical.length > 0,
         userItemId: ulid(),
+        creatorId,
       });
     } catch (error) {
       // Transformation or validation failed
@@ -763,6 +872,7 @@ async function executeChunkBatch(
               summary: prepared.newItem.description,
               creator: prepared.newItem.creator,
               creatorImageUrl: prepared.newItem.creatorImageUrl,
+              creatorId: prepared.creatorId,
               thumbnailUrl: prepared.newItem.imageUrl,
               duration: prepared.newItem.durationSeconds,
               publishedAt: publishedAtISO,
@@ -876,6 +986,7 @@ async function executeIndividualInsert(
             summary: prepared.newItem.description,
             creator: prepared.newItem.creator,
             creatorImageUrl: prepared.newItem.creatorImageUrl,
+            creatorId: prepared.creatorId,
             thumbnailUrl: prepared.newItem.imageUrl,
             duration: prepared.newItem.durationSeconds,
             publishedAt: publishedAtISO,
