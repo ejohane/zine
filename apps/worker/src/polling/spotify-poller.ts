@@ -13,8 +13,8 @@
  */
 
 import { eq, inArray } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
 import pLimit from 'p-limit';
 import { subscriptions } from '../db/schema';
@@ -693,7 +693,7 @@ async function ingestNewEpisodes(
         subscriptionId,
         rawEpisode,
         Provider.SPOTIFY,
-        db as unknown as DrizzleD1Database,
+        db as Database,
         (raw: typeof rawEpisode) =>
           transformSpotifyEpisode(raw, showName, showImageUrl ?? undefined)
       );

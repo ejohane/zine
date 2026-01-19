@@ -1028,7 +1028,7 @@ describe('ingestBatchConsolidated', () => {
 
       expect(itemInsertCall).toBeDefined();
       // creatorId should be a ULID (26 chars)
-      expect(itemInsertCall[0].creatorId).toHaveLength(26);
+      expect(itemInsertCall![0].creatorId).toHaveLength(26);
     });
 
     it('should handle creator extraction failure gracefully', async () => {

@@ -19,8 +19,8 @@
 
 import { ulid } from 'ulid';
 import { and, eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import { UserItemState } from '@zine/shared';
 import {
   items,
@@ -197,7 +197,7 @@ function extractCreatorParams(
  * @returns Internal creator ID if successful, null otherwise
  */
 async function getOrCreateCreator(
-  db: DrizzleD1Database,
+  db: Database,
   provider: string,
   rawItem: unknown,
   transformedItem: NewItem
@@ -286,7 +286,7 @@ export async function ingestItem<T>(
   subscriptionId: string,
   rawItem: T,
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem
 ): Promise<IngestResult> {
   // 1. Transform raw provider data to our item format
@@ -409,7 +409,7 @@ export async function ingestItem<T>(
 async function findOrCreateCanonicalItem(
   newItem: NewItem,
   provider: string,
-  db: DrizzleD1Database,
+  db: Database,
   creatorId?: string | null
 ): Promise<{ id: string }> {
   // Check if item already exists (shared across users)
@@ -530,7 +530,7 @@ export async function ingestBatch<T>(
   subscriptionId: string,
   rawItems: T[],
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem,
   getProviderId: (raw: T) => string
 ): Promise<BatchIngestResult> {
@@ -682,7 +682,7 @@ export async function ingestBatchConsolidated<T>(
   subscriptionId: string,
   rawItems: T[],
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem,
   getProviderId: (raw: T) => string,
   chunkSize: number = DEFAULT_BATCH_CHUNK_SIZE
@@ -840,7 +840,7 @@ async function executeChunkBatch(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: DrizzleD1Database
+  db: Database
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
@@ -957,7 +957,7 @@ async function executeIndividualInsert(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: DrizzleD1Database
+  db: Database
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
@@ -1062,7 +1062,7 @@ async function executeIndividualInsert(
  * Store a failed item in the dead-letter queue.
  */
 async function storeToDLQ(
-  db: DrizzleD1Database,
+  db: Database,
   subscriptionId: string,
   userId: string,
   provider: Provider,

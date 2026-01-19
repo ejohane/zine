@@ -11,7 +11,7 @@ import { ulid } from 'ulid';
 import { createHash } from 'crypto';
 import { eq, and } from 'drizzle-orm';
 import { creators } from '../schema';
-import type { TRPCContext } from '../../trpc/context';
+import type { Database } from '../index';
 import type { Creator } from '@zine/shared';
 
 // ============================================================================
@@ -90,6 +90,13 @@ function shouldUpdateCreator(existing: Creator, params: CreatorParams): boolean 
 }
 
 /**
+ * Context type for database operations
+ */
+export interface DbContext {
+  db: Database;
+}
+
+/**
  * Find existing creator or create a new one.
  * Handles the common pattern used throughout the app.
  *
@@ -98,14 +105,11 @@ function shouldUpdateCreator(existing: Creator, params: CreatorParams): boolean 
  * 2. If found and we have new info, updates the record
  * 3. If not found, creates a new creator
  *
- * @param ctx - tRPC context with database access
+ * @param ctx - Context with database access
  * @param params - Creator parameters
  * @returns The found or created Creator record
  */
-export async function findOrCreateCreator(
-  ctx: Pick<TRPCContext, 'db'>,
-  params: CreatorParams
-): Promise<Creator> {
+export async function findOrCreateCreator(ctx: DbContext, params: CreatorParams): Promise<Creator> {
   const normalizedName = normalizeCreatorName(params.name);
 
   // Try to find existing creator by provider + providerCreatorId

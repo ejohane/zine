@@ -14,8 +14,8 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
 import { subscriptions } from '../db/schema';
 import { pollLogger } from '../lib/logger';
@@ -387,7 +387,7 @@ async function ingestNewVideos(
         subscriptionId,
         video as youtube_v3.Schema$PlaylistItem,
         Provider.YOUTUBE,
-        db as unknown as DrizzleD1Database,
+        db as Database,
         (raw: youtube_v3.Schema$PlaylistItem) =>
           transformYouTubeVideo(
             raw as Parameters<typeof transformYouTubeVideo>[0],

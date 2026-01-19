@@ -16,7 +16,6 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { youtube_v3 } from 'googleapis';
 import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import {
@@ -227,8 +226,8 @@ async function fetchInitialYouTubeItem(
     subscriptionId,
     video,
     Provider.YOUTUBE,
-    // Cast to satisfy ingestItem's generic DrizzleD1Database type
-    db as unknown as DrizzleD1Database,
+    // Cast to Database type for ingestItem
+    db as Database,
     (v) => transformYouTubeVideo(v, channelImageUrl)
   );
 
@@ -435,8 +434,8 @@ async function fetchInitialSpotifyItem(
     subscriptionId,
     spotifyEpisode,
     Provider.SPOTIFY,
-    // Cast to satisfy ingestItem's generic DrizzleD1Database type
-    db as unknown as DrizzleD1Database,
+    // Cast to Database type for ingestItem
+    db as Database,
     (ep) => transformSpotifyEpisode(ep, show.name, showImageUrl)
   );
 
