@@ -43,6 +43,48 @@
       "when": 1766896000000,
       "tag": "0005_add_is_finished",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1766896000100,
+      "tag": "0006_add_article_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1766896000200,
+      "tag": "0007_add_raw_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1766896000300,
+      "tag": "0008_add_creator_image_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1766896000400,
+      "tag": "0009_add_dead_letter_queue",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1766896000500,
+      "tag": "0010_add_subscription_disconnected_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1766896000600,
+      "tag": "0011_add_creators_table",
+      "breakpoints": true
     }
   ]
 }
