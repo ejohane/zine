@@ -354,9 +354,9 @@ describe('generateRepairReport', () => {
     expect(report).toContain('CORRUPTED SUBSCRIPTIONS REPORT');
     expect(report).toContain('Total scanned: 10');
     expect(report).toContain('Corrupted: 2');
-    expect(report).toContain('Dithering');
+    expect(report).toContain('show_dithering');
     expect(report).toContain('14 days');
-    expect(report).toContain('Red Flags');
+    expect(report).toContain('show_red_flags');
     expect(report).toContain('NULL (no items)');
   });
 
