@@ -16,6 +16,10 @@ import {
   verifyRepairs,
   generateRepairReport,
 } from '../../admin/repair-subscriptions';
+import {
+  backfillCreatorsFromSubscriptions,
+  generateBackfillReport,
+} from '../../admin/backfill-creators-from-subscriptions';
 import { logger } from '../../lib/logger';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
@@ -51,6 +55,18 @@ const RepairInputSchema = z.object({
 const VerifyInputSchema = z.object({
   /** Provider to verify (default: SPOTIFY) */
   provider: ProviderSchema.optional(),
+});
+
+/**
+ * Input for backfill creators from subscriptions
+ */
+const BackfillCreatorsInputSchema = z.object({
+  /** If true, only report what would be done (default: true) */
+  dryRun: z.boolean().default(true),
+  /** Filter by provider (YOUTUBE | SPOTIFY) */
+  provider: ProviderSchema.optional(),
+  /** Limit number of subscriptions to process (for testing) */
+  limit: z.number().positive().optional(),
 });
 
 // ============================================================================
@@ -173,6 +189,77 @@ export const adminRouter = router({
       });
 
       return result;
+    }),
+
+  /**
+   * Backfill creator records from subscriptions
+   *
+   * Creates creator records from existing subscriptions. The subscriptions table
+   * is the cleanest data source since it has verified provider IDs.
+   *
+   * By default runs in dry-run mode (dryRun: true) to preview changes.
+   * Set dryRun: false to actually execute the backfill.
+   *
+   * @returns Backfill operation result with details of each subscription
+   */
+  backfillCreatorsFromSubscriptions: protectedProcedure
+    .input(BackfillCreatorsInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      adminLogger.info('backfillCreatorsFromSubscriptions called', {
+        userId: ctx.userId,
+        dryRun: input.dryRun,
+        provider: input.provider,
+        limit: input.limit,
+      });
+
+      const result = await backfillCreatorsFromSubscriptions(ctx.db, {
+        dryRun: input.dryRun,
+        userId: ctx.userId,
+        provider: input.provider,
+        limit: input.limit,
+      });
+
+      adminLogger.info('backfillCreatorsFromSubscriptions complete', {
+        userId: ctx.userId,
+        dryRun: result.dryRun,
+        totalProcessed: result.totalProcessed,
+        creatorsCreated: result.creatorsCreated,
+        creatorsExisted: result.creatorsExisted,
+        errorCount: result.errorCount,
+      });
+
+      return result;
+    }),
+
+  /**
+   * Generate a backfill report for creators from subscriptions
+   *
+   * Runs a dry-run backfill and returns a human-readable report.
+   *
+   * @returns Human-readable report of what would be created
+   */
+  backfillCreatorsReport: protectedProcedure
+    .input(BackfillCreatorsInputSchema.omit({ dryRun: true }).optional())
+    .query(async ({ ctx, input }) => {
+      adminLogger.info('backfillCreatorsReport called', {
+        userId: ctx.userId,
+        provider: input?.provider,
+        limit: input?.limit,
+      });
+
+      const result = await backfillCreatorsFromSubscriptions(ctx.db, {
+        dryRun: true,
+        userId: ctx.userId,
+        provider: input?.provider,
+        limit: input?.limit,
+      });
+
+      return {
+        report: generateBackfillReport(result),
+        totalProcessed: result.totalProcessed,
+        creatorsCreated: result.creatorsCreated,
+        creatorsExisted: result.creatorsExisted,
+      };
     }),
 });
 
