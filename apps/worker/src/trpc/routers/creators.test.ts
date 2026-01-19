@@ -98,11 +98,21 @@ function createMockCreatorsCaller(options: {
 
     listBookmarks: async (input: { creatorId: string; cursor?: string; limit?: number }) => {
       requireAuth();
-      // Stub implementation - returns empty list as specified
-      void input;
+
+      // Throw NOT_FOUND if creator doesn't exist
+      const creator = creators.get(input.creatorId);
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // Returns empty list for mock implementation
       return {
-        items: [],
+        items: [] as unknown[],
         nextCursor: null as string | null,
+        hasMore: false,
       };
     },
 
@@ -326,8 +336,15 @@ describe('Creators Router', () => {
   // ==========================================================================
 
   describe('creators.listBookmarks', () => {
-    it('should accept valid input and return empty list (stub)', async () => {
-      const caller = createMockCreatorsCaller({ userId: TEST_USER_ID });
+    it('should return empty list when creator exists but has no bookmarks', async () => {
+      const testCreator = createMockCreator({ id: TEST_CREATOR_ID });
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set(TEST_CREATOR_ID, testCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
 
       const result = await caller.listBookmarks({
         creatorId: TEST_CREATOR_ID,
@@ -337,11 +354,19 @@ describe('Creators Router', () => {
       expect(result).toEqual({
         items: [],
         nextCursor: null,
+        hasMore: false,
       });
     });
 
     it('should accept optional cursor parameter', async () => {
-      const caller = createMockCreatorsCaller({ userId: TEST_USER_ID });
+      const testCreator = createMockCreator({ id: TEST_CREATOR_ID });
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set(TEST_CREATOR_ID, testCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
 
       const result = await caller.listBookmarks({
         creatorId: TEST_CREATOR_ID,
@@ -352,7 +377,60 @@ describe('Creators Router', () => {
       expect(result).toEqual({
         items: [],
         nextCursor: null,
+        hasMore: false,
       });
+    });
+
+    it('should throw NOT_FOUND when creator does not exist', async () => {
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: new Map(),
+      });
+
+      await expect(caller.listBookmarks({ creatorId: 'nonexistent' })).rejects.toThrow(TRPCError);
+      await expect(caller.listBookmarks({ creatorId: 'nonexistent' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Creator not found',
+      });
+    });
+
+    it('should return response with hasMore boolean', async () => {
+      const testCreator = createMockCreator({ id: TEST_CREATOR_ID });
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set(TEST_CREATOR_ID, testCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.listBookmarks({
+        creatorId: TEST_CREATOR_ID,
+      });
+
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('nextCursor');
+      expect(result).toHaveProperty('hasMore');
+      expect(typeof result.hasMore).toBe('boolean');
+    });
+
+    it('should accept limit parameter', async () => {
+      const testCreator = createMockCreator({ id: TEST_CREATOR_ID });
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set(TEST_CREATOR_ID, testCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      // Should not throw with valid limit
+      const result = await caller.listBookmarks({
+        creatorId: TEST_CREATOR_ID,
+        limit: 50, // max limit
+      });
+
+      expect(result.items).toEqual([]);
     });
   });
 

@@ -634,5 +634,5 @@ export const itemsRouter = router({
 
 export type ItemsRouter = typeof itemsRouter;
 
-// Export helper for testing
-export { normalizeNullString };
+// Export helpers for testing and reuse
+export { normalizeNullString, toItemView };
