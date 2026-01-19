@@ -10,10 +10,6 @@
  * - creators.subscribe - Subscribe to creator
  * - Auth: Verify unauthenticated requests fail
  *
- * Note: These tests verify the router structure and authentication.
- * Implementation tests will be added in subsequent tasks when
- * the endpoints are fully implemented.
- *
  * @vitest-environment miniflare
  */
 
@@ -27,6 +23,44 @@ import { TRPCError } from '@trpc/server';
 const TEST_USER_ID = 'user_test_123';
 const TEST_CREATOR_ID = 'creator_test_abc';
 
+/**
+ * Creator type matching the database schema
+ */
+interface Creator {
+  id: string;
+  provider: string;
+  providerCreatorId: string;
+  name: string;
+  normalizedName: string;
+  imageUrl: string | null;
+  description: string | null;
+  externalUrl: string | null;
+  handle: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Create a mock Creator for testing
+ */
+function createMockCreator(overrides: Partial<Creator> = {}): Creator {
+  const now = Date.now();
+  return {
+    id: TEST_CREATOR_ID,
+    provider: 'YOUTUBE',
+    providerCreatorId: 'UC123456',
+    name: 'Test Creator',
+    normalizedName: 'test creator',
+    imageUrl: 'https://example.com/avatar.jpg',
+    description: 'A test creator description',
+    externalUrl: 'https://youtube.com/@testcreator',
+    handle: '@testcreator',
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 // ============================================================================
 // Mock Router Implementation for Testing
 // ============================================================================
@@ -35,8 +69,11 @@ const TEST_CREATOR_ID = 'creator_test_abc';
  * Create a mock router caller that simulates the creators router behavior.
  * This mirrors the actual router structure and validates authentication.
  */
-function createMockCreatorsCaller(options: { userId: string | null }) {
-  const { userId } = options;
+function createMockCreatorsCaller(options: {
+  userId: string | null;
+  creators?: Map<string, Creator>;
+}) {
+  const { userId, creators = new Map() } = options;
 
   const requireAuth = () => {
     if (!userId) {
@@ -47,9 +84,16 @@ function createMockCreatorsCaller(options: { userId: string | null }) {
   return {
     get: async (input: { creatorId: string }) => {
       requireAuth();
-      // Stub implementation - returns null as specified in the issue
-      void input;
-      return null;
+
+      const creator = creators.get(input.creatorId);
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      return creator;
     },
 
     listBookmarks: async (input: { creatorId: string; cursor?: string; limit?: number }) => {
@@ -169,13 +213,111 @@ describe('Creators Router', () => {
   // ==========================================================================
 
   describe('creators.get', () => {
-    it('should accept valid creatorId and return null (stub)', async () => {
-      const caller = createMockCreatorsCaller({ userId: TEST_USER_ID });
+    it('should return creator when found', async () => {
+      const testCreator = createMockCreator({
+        id: 'creator_123',
+        name: 'Found Creator',
+        provider: 'YOUTUBE',
+        handle: '@foundcreator',
+      });
 
-      const result = await caller.get({ creatorId: TEST_CREATOR_ID });
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('creator_123', testCreator);
 
-      // Stub returns null until implementation is done
-      expect(result).toBeNull();
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.get({ creatorId: 'creator_123' });
+
+      expect(result).toEqual(testCreator);
+      expect(result.id).toBe('creator_123');
+      expect(result.name).toBe('Found Creator');
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.handle).toBe('@foundcreator');
+    });
+
+    it('should throw NOT_FOUND when creator does not exist', async () => {
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: new Map(),
+      });
+
+      await expect(caller.get({ creatorId: 'nonexistent' })).rejects.toThrow(TRPCError);
+      await expect(caller.get({ creatorId: 'nonexistent' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Creator not found',
+      });
+    });
+
+    it('should return creator with all fields populated', async () => {
+      const now = Date.now();
+      const fullCreator = createMockCreator({
+        id: 'full_creator',
+        provider: 'SPOTIFY',
+        providerCreatorId: 'spotify_show_123',
+        name: 'Full Creator',
+        normalizedName: 'full creator',
+        imageUrl: 'https://example.com/full-avatar.jpg',
+        description: 'A complete creator profile with all fields',
+        externalUrl: 'https://spotify.com/show/123',
+        handle: null, // Spotify shows don't have handles
+        createdAt: now - 86400000, // Created 1 day ago
+        updatedAt: now,
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('full_creator', fullCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.get({ creatorId: 'full_creator' });
+
+      expect(result.id).toBe('full_creator');
+      expect(result.provider).toBe('SPOTIFY');
+      expect(result.providerCreatorId).toBe('spotify_show_123');
+      expect(result.name).toBe('Full Creator');
+      expect(result.normalizedName).toBe('full creator');
+      expect(result.imageUrl).toBe('https://example.com/full-avatar.jpg');
+      expect(result.description).toBe('A complete creator profile with all fields');
+      expect(result.externalUrl).toBe('https://spotify.com/show/123');
+      expect(result.handle).toBeNull();
+      expect(result.createdAt).toBe(now - 86400000);
+      expect(result.updatedAt).toBe(now);
+    });
+
+    it('should return creator with minimal fields (nullable fields as null)', async () => {
+      const minimalCreator = createMockCreator({
+        id: 'minimal_creator',
+        provider: 'RSS',
+        providerCreatorId: 'https://example.com/feed.xml',
+        name: 'Minimal Creator',
+        normalizedName: 'minimal creator',
+        imageUrl: null,
+        description: null,
+        externalUrl: null,
+        handle: null,
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('minimal_creator', minimalCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.get({ creatorId: 'minimal_creator' });
+
+      expect(result.id).toBe('minimal_creator');
+      expect(result.imageUrl).toBeNull();
+      expect(result.description).toBeNull();
+      expect(result.externalUrl).toBeNull();
+      expect(result.handle).toBeNull();
     });
   });
 
@@ -279,5 +421,72 @@ describe('Creators Router', () => {
       expect(typeof caller.checkSubscription).toBe('function');
       expect(typeof caller.subscribe).toBe('function');
     });
+  });
+});
+
+// ============================================================================
+// Creator Response Type Tests
+// ============================================================================
+
+describe('Creator Response Shape', () => {
+  it('should match the expected Creator interface', () => {
+    const now = Date.now();
+    const creator: Creator = {
+      id: 'creator_001',
+      provider: 'YOUTUBE',
+      providerCreatorId: 'UC123456',
+      name: 'Test Creator',
+      normalizedName: 'test creator',
+      imageUrl: 'https://example.com/image.jpg',
+      description: 'A test description',
+      externalUrl: 'https://youtube.com/@testcreator',
+      handle: '@testcreator',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Verify all expected fields are present
+    expect(creator).toHaveProperty('id');
+    expect(creator).toHaveProperty('provider');
+    expect(creator).toHaveProperty('providerCreatorId');
+    expect(creator).toHaveProperty('name');
+    expect(creator).toHaveProperty('normalizedName');
+    expect(creator).toHaveProperty('imageUrl');
+    expect(creator).toHaveProperty('description');
+    expect(creator).toHaveProperty('externalUrl');
+    expect(creator).toHaveProperty('handle');
+    expect(creator).toHaveProperty('createdAt');
+    expect(creator).toHaveProperty('updatedAt');
+
+    // Verify types
+    expect(typeof creator.id).toBe('string');
+    expect(typeof creator.provider).toBe('string');
+    expect(typeof creator.providerCreatorId).toBe('string');
+    expect(typeof creator.name).toBe('string');
+    expect(typeof creator.normalizedName).toBe('string');
+    expect(typeof creator.createdAt).toBe('number');
+    expect(typeof creator.updatedAt).toBe('number');
+  });
+
+  it('should allow nullable fields to be null', () => {
+    const now = Date.now();
+    const creator: Creator = {
+      id: 'creator_002',
+      provider: 'RSS',
+      providerCreatorId: 'https://example.com/feed',
+      name: 'RSS Feed',
+      normalizedName: 'rss feed',
+      imageUrl: null,
+      description: null,
+      externalUrl: null,
+      handle: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    expect(creator.imageUrl).toBeNull();
+    expect(creator.description).toBeNull();
+    expect(creator.externalUrl).toBeNull();
+    expect(creator.handle).toBeNull();
   });
 });

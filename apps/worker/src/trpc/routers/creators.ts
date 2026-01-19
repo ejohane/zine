@@ -11,7 +11,10 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
+import { eq } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
+import { creators } from '../../db/schema';
 
 // ============================================================================
 // Zod Schemas
@@ -50,13 +53,24 @@ export const creatorsRouter = router({
    * Returns the creator profile including name, image, and stats.
    *
    * @param creatorId - The unique identifier of the creator
-   * @returns Creator profile or null if not found
+   * @returns Creator profile
+   * @throws NOT_FOUND if creator doesn't exist
    */
   get: protectedProcedure.input(GetInputSchema).query(async ({ ctx, input }) => {
-    // TODO: Implement - will be done in zine-ezc3
-    void ctx;
-    void input;
-    return null;
+    const creator = await ctx.db
+      .select()
+      .from(creators)
+      .where(eq(creators.id, input.creatorId))
+      .limit(1);
+
+    if (creator.length === 0) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Creator not found',
+      });
+    }
+
+    return creator[0];
   }),
 
   /**
