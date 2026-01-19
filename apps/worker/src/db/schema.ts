@@ -48,6 +48,9 @@ export const items = sqliteTable(
     readingTimeMinutes: integer('reading_time_minutes'),
     articleContentKey: text('article_content_key'), // R2 object key for full article content
 
+    // Creator relationship
+    creatorId: text('creator_id').references(() => creators.id),
+
     // System
     createdAt: text('created_at').notNull(), // ISO8601 (legacy)
     updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
@@ -55,6 +58,8 @@ export const items = sqliteTable(
   (table) => [
     // Prevent duplicate content from same provider
     uniqueIndex('items_provider_provider_id_idx').on(table.provider, table.providerId),
+    // Fast lookups by creator
+    index('idx_items_creator_id').on(table.creatorId),
   ]
 );
 
