@@ -166,6 +166,7 @@ function XPostBookmarkView({
   onOpenLink,
   onShare,
   onToggleBookmark,
+  onCreatorPress,
   isBookmarked,
 }: {
   item: {
@@ -173,6 +174,7 @@ function XPostBookmarkView({
     title: string;
     creator: string;
     creatorImageUrl?: string | null;
+    creatorId?: string | null;
     thumbnailUrl?: string | null;
     summary?: string | null;
     publishedAt?: string | null;
@@ -185,6 +187,7 @@ function XPostBookmarkView({
   onOpenLink: () => void;
   onShare: () => void;
   onToggleBookmark: () => void;
+  onCreatorPress?: () => void;
   isBookmarked: boolean;
 }) {
   // Extract @handle from URL
@@ -208,23 +211,54 @@ function XPostBookmarkView({
         </View>
 
         {/* Profile Row */}
-        <Pressable style={styles.sourceRow}>
-          {item.creatorImageUrl ? (
-            <Image
-              source={{ uri: item.creatorImageUrl }}
-              style={styles.sourceThumbnail}
-              contentFit="cover"
-            />
-          ) : (
-            <View
-              style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-            >
-              <Ionicons name="person" size={14} color={colors.textTertiary} />
+        {item.creatorId && onCreatorPress ? (
+          <Pressable
+            style={styles.creatorRow}
+            onPress={onCreatorPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.creator}'s profile`}
+          >
+            {item.creatorImageUrl ? (
+              <Image
+                source={{ uri: item.creatorImageUrl }}
+                style={styles.creatorThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[styles.creatorPlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+              >
+                <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                  {item.creator?.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <View style={styles.creatorTextContainer}>
+              <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+              <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
+                View profile
+              </Text>
             </View>
-          )}
-          <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </Pressable>
+            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+          </Pressable>
+        ) : (
+          <View style={styles.sourceRow}>
+            {item.creatorImageUrl ? (
+              <Image
+                source={{ uri: item.creatorImageUrl }}
+                style={styles.sourceThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+              >
+                <Ionicons name="person" size={14} color={colors.textTertiary} />
+              </View>
+            )}
+            <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+          </View>
+        )}
 
         {/* Meta Row with @handle and timestamp */}
         <View style={styles.metaRow}>
@@ -606,6 +640,9 @@ export default function ItemDetailScreen() {
         onOpenLink={handleOpenLink}
         onShare={handleShare}
         onToggleBookmark={handleToggleBookmark}
+        onCreatorPress={
+          item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
+        }
         isBookmarked={isBookmarked}
       />
     );
@@ -644,26 +681,60 @@ export default function ItemDetailScreen() {
               <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
 
               {/* Source/Creator Row */}
-              <Pressable style={styles.sourceRow}>
-                {item.creatorImageUrl ? (
-                  <Image
-                    source={{ uri: item.creatorImageUrl }}
-                    style={styles.sourceThumbnail}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.sourcePlaceholder,
-                      { backgroundColor: colors.backgroundTertiary },
-                    ]}
-                  >
-                    {getContentIcon(item.contentType, 14, colors.textTertiary)}
+              {item.creatorId ? (
+                <Pressable
+                  style={styles.creatorRow}
+                  onPress={() => router.push(`/creator/${item.creatorId}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${item.creator}'s profile`}
+                >
+                  {item.creatorImageUrl ? (
+                    <Image
+                      source={{ uri: item.creatorImageUrl }}
+                      style={styles.creatorThumbnail}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.creatorPlaceholder,
+                        { backgroundColor: colors.backgroundTertiary },
+                      ]}
+                    >
+                      <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                        {item.creator?.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.creatorTextContainer}>
+                    <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+                    <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
+                      View profile
+                    </Text>
                   </View>
-                )}
-                <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-              </Pressable>
+                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                </Pressable>
+              ) : (
+                <View style={styles.sourceRow}>
+                  {item.creatorImageUrl ? (
+                    <Image
+                      source={{ uri: item.creatorImageUrl }}
+                      style={styles.sourceThumbnail}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.sourcePlaceholder,
+                        { backgroundColor: colors.backgroundTertiary },
+                      ]}
+                    >
+                      {getContentIcon(item.contentType, 14, colors.textTertiary)}
+                    </View>
+                  )}
+                  <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+                </View>
+              )}
 
               {/* Meta Row */}
               <View style={styles.metaRow}>
@@ -780,23 +851,57 @@ export default function ItemDetailScreen() {
           <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
 
           {/* Source/Creator Row */}
-          <Pressable style={styles.sourceRow}>
-            {item.creatorImageUrl ? (
-              <Image
-                source={{ uri: item.creatorImageUrl }}
-                style={styles.sourceThumbnail}
-                contentFit="cover"
-              />
-            ) : (
-              <View
-                style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-              >
-                {getContentIcon(item.contentType, 14, colors.textTertiary)}
+          {item.creatorId ? (
+            <Pressable
+              style={styles.creatorRow}
+              onPress={() => router.push(`/creator/${item.creatorId}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${item.creator}'s profile`}
+            >
+              {item.creatorImageUrl ? (
+                <Image
+                  source={{ uri: item.creatorImageUrl }}
+                  style={styles.creatorThumbnail}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.creatorPlaceholder,
+                    { backgroundColor: colors.backgroundTertiary },
+                  ]}
+                >
+                  <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                    {item.creator?.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.creatorTextContainer}>
+                <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+                <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
+                  View profile
+                </Text>
               </View>
-            )}
-            <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-          </Pressable>
+              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            </Pressable>
+          ) : (
+            <View style={styles.sourceRow}>
+              {item.creatorImageUrl ? (
+                <Image
+                  source={{ uri: item.creatorImageUrl }}
+                  style={styles.sourceThumbnail}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+                >
+                  {getContentIcon(item.contentType, 14, colors.textTertiary)}
+                </View>
+              )}
+              <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+            </View>
+          )}
 
           {/* Meta Row */}
           <View style={styles.metaRow}>
@@ -982,6 +1087,42 @@ const styles = StyleSheet.create({
   sourceName: {
     ...Typography.labelLarge,
     marginRight: Spacing.xs,
+  },
+
+  // Clickable Creator Row (when creatorId exists)
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  creatorThumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    marginRight: Spacing.md,
+  },
+  creatorPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    marginRight: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creatorInitial: {
+    ...Typography.labelLarge,
+    fontWeight: '600',
+  },
+  creatorTextContainer: {
+    flex: 1,
+  },
+  creatorName: {
+    ...Typography.labelLarge,
+    fontWeight: '500',
+  },
+  creatorSubtitle: {
+    ...Typography.bodySmall,
   },
 
   // Meta Row
