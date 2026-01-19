@@ -91,13 +91,14 @@ function createMockSubscription(overrides: Partial<MockSubscription> = {}): Mock
     userId: 'user_test_123',
     provider: 'SPOTIFY',
     providerChannelId: 'show123abc456',
-    name: 'Test Podcast',
+    creatorId: 'creator_123',
     status: 'ACTIVE',
     lastPolledAt: null,
     pollIntervalSeconds: 3600,
     lastPublishedAt: null,
     totalItems: null,
-    imageUrl: 'https://i.scdn.co/image/abc123',
+    createdAt: MOCK_NOW,
+    updatedAt: MOCK_NOW,
     ...overrides,
   };
 }
@@ -119,7 +120,15 @@ function createMockSpotifyEpisode(overrides: Partial<MockSpotifyEpisode> = {}): 
 function createMockDb() {
   return {
     update: mockDbUpdate,
-    query: {},
+    query: {
+      creators: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'creator_123',
+          name: 'Test Creator',
+          imageUrl: 'https://example.com/creator.jpg',
+        }),
+      },
+    },
   };
 }
 
@@ -141,7 +150,12 @@ function createCacheResult(shows: MockShow[]) {
   const data = new Map<string, MockShow>();
   for (const show of shows) {
     if (show) {
-      data.set(show.id, show);
+      // Add default images if not provided (required by ingestNewEpisodes)
+      const showWithImages = {
+        ...show,
+        images: show.images ?? [{ url: 'https://example.com/show.jpg', height: 640, width: 640 }],
+      };
+      data.set(show.id, showWithImages);
     }
   }
   return {
@@ -156,13 +170,14 @@ interface MockSubscription {
   userId: string;
   provider: string;
   providerChannelId: string;
-  name: string;
+  creatorId: string | null;
   status: string;
   lastPolledAt: number | null;
   pollIntervalSeconds: number;
   lastPublishedAt: number | null;
   totalItems: number | null;
-  imageUrl: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 interface MockSpotifyEpisode {
@@ -1112,19 +1127,16 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       const sub1 = createMockSubscription({
         id: 'sub1',
         providerChannelId: 'show1',
-        name: 'Show 1',
         totalItems: 10,
       });
       const sub2 = createMockSubscription({
         id: 'sub2',
         providerChannelId: 'show2',
-        name: 'Show 2',
         totalItems: 20,
       });
       const sub3 = createMockSubscription({
         id: 'sub3',
         providerChannelId: 'show3',
-        name: 'Show 3',
         totalItems: 30,
       });
 
@@ -1173,19 +1185,16 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       const sub1 = createMockSubscription({
         id: 'sub_success',
         providerChannelId: 'show_success',
-        name: 'Success Show',
         totalItems: 10,
       });
       const sub2 = createMockSubscription({
         id: 'sub_fail',
         providerChannelId: 'show_fail',
-        name: 'Failing Show',
         totalItems: 20,
       });
       const sub3 = createMockSubscription({
         id: 'sub_success_2',
         providerChannelId: 'show_success_2',
-        name: 'Success Show 2',
         totalItems: 30,
       });
 
@@ -1236,7 +1245,6 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
@@ -1246,7 +1254,7 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         createCacheResult(
           subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 11 + i,
           }))
         )
@@ -1289,16 +1297,15 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 11,
           }))
         )
@@ -1542,12 +1549,10 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       const sub1 = createMockSubscription({
         id: 'sub_missing_1',
         providerChannelId: 'deleted_show_1',
-        name: 'Deleted Show 1',
       });
       const sub2 = createMockSubscription({
         id: 'sub_missing_2',
         providerChannelId: 'deleted_show_2',
-        name: 'Deleted Show 2',
       });
 
       // Neither show found
@@ -1573,13 +1578,11 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
       const subActive = createMockSubscription({
         id: 'sub_active',
         providerChannelId: 'active_show',
-        name: 'Active Show',
         totalItems: 10,
       });
       const subMissing = createMockSubscription({
         id: 'sub_missing',
         providerChannelId: 'deleted_show',
-        name: 'Deleted Show',
         totalItems: 5,
       });
 
@@ -1767,7 +1770,6 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
@@ -1775,9 +1777,9 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
       // All shows unchanged (no delta) to minimize processing
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10, // Same as totalItems, no delta
           }))
         )
@@ -1805,7 +1807,6 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
@@ -1813,9 +1814,9 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
       // All shows unchanged (no delta) to minimize processing
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10,
           }))
         )
@@ -1842,16 +1843,15 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10,
           }))
         )
@@ -1878,16 +1878,15 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10,
           }))
         )
@@ -1918,16 +1917,15 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10,
           }))
         )
@@ -1976,16 +1974,15 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 5,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 5,
           }))
         )
@@ -2014,7 +2011,6 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
@@ -2022,9 +2018,9 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
       // All shows have new episodes
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 11, // Delta detected
           }))
         )
@@ -2061,7 +2057,6 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
@@ -2069,9 +2064,9 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
       // All shows unchanged to speed up test
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10, // No delta
           }))
         )
@@ -2106,16 +2101,15 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
         createMockSubscription({
           id: `sub_${i}`,
           providerChannelId: `show_${i}`,
-          name: `Show ${i}`,
           totalItems: 10,
         })
       );
 
       mockGetMultipleShowsWithCache.mockResolvedValue(
         createCacheResult(
-          subs.map((s) => ({
+          subs.map((s, i) => ({
             id: s.providerChannelId,
-            name: s.name,
+            name: `Show ${i}`,
             totalEpisodes: 10,
           }))
         )
