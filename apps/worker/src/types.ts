@@ -16,6 +16,8 @@ export interface Bindings {
   OAUTH_STATE_KV: KVNamespace;
   /** KV namespace for Spotify show metadata cache */
   SPOTIFY_CACHE: KVNamespace;
+  /** KV namespace for creator content cache (10-minute TTL) */
+  CREATOR_CONTENT_CACHE: KVNamespace;
   /** R2 bucket for article content storage */
   ARTICLE_CONTENT: R2Bucket;
   /** Current environment (development, staging, production) */
