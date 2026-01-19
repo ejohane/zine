@@ -15,7 +15,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
-import type { CheckSubscriptionResponse, SubscribeResponse } from './creators';
+import type {
+  CheckSubscriptionResponse,
+  SubscribeResponse,
+  FetchLatestContentResponse,
+} from './creators';
 
 // ============================================================================
 // Test Fixtures
@@ -119,6 +123,20 @@ function createMockProviderConnection(
 // ============================================================================
 
 /**
+ * Mock content item for testing fetchLatestContent
+ */
+interface MockContentItem {
+  id: string;
+  title: string;
+  description: string | null;
+  thumbnailUrl: string | null;
+  publishedAt: number;
+  externalUrl: string;
+  duration: number | null;
+  isBookmarked: boolean;
+}
+
+/**
  * Create a mock router caller that simulates the creators router behavior.
  * This mirrors the actual router structure and validates authentication.
  */
@@ -127,12 +145,22 @@ function createMockCreatorsCaller(options: {
   creators?: Map<string, Creator>;
   subscriptions?: Map<string, Subscription>;
   connections?: Map<string, ProviderConnection>;
+  /** Mock content for fetchLatestContent */
+  mockContentItems?: MockContentItem[];
+  /** Force a specific error or reason for fetchLatestContent */
+  fetchLatestContentBehavior?: {
+    reason?: 'PROVIDER_NOT_SUPPORTED' | 'NOT_CONNECTED' | 'TOKEN_EXPIRED' | 'RATE_LIMITED';
+    connectUrl?: string;
+    shouldThrowNotFound?: boolean;
+  };
 }) {
   const {
     userId,
     creators = new Map(),
     subscriptions = new Map(),
     connections = new Map(),
+    mockContentItems = [],
+    fetchLatestContentBehavior,
   } = options;
 
   const requireAuth = () => {
@@ -176,12 +204,73 @@ function createMockCreatorsCaller(options: {
       };
     },
 
-    fetchLatestContent: async (input: { creatorId: string }) => {
+    fetchLatestContent: async (input: {
+      creatorId: string;
+    }): Promise<FetchLatestContentResponse> => {
       requireAuth();
-      // Stub implementation - returns empty list as specified
-      void input;
+
+      // Check for forced behavior
+      if (fetchLatestContentBehavior?.shouldThrowNotFound) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // Get the creator
+      const creator = creators.get(input.creatorId);
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // Check for forced reason
+      if (fetchLatestContentBehavior?.reason) {
+        return {
+          items: [],
+          provider: creator.provider,
+          reason: fetchLatestContentBehavior.reason,
+          connectUrl: fetchLatestContentBehavior.connectUrl,
+        };
+      }
+
+      // Check provider support
+      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+        return {
+          items: [],
+          provider: creator.provider,
+          reason: 'PROVIDER_NOT_SUPPORTED',
+        };
+      }
+
+      // Check connection
+      let connection: ProviderConnection | undefined;
+      for (const conn of connections.values()) {
+        if (
+          conn.userId === userId &&
+          conn.provider === creator.provider &&
+          conn.status === 'ACTIVE'
+        ) {
+          connection = conn;
+          break;
+        }
+      }
+
+      if (!connection) {
+        return {
+          items: [],
+          provider: creator.provider,
+          reason: 'NOT_CONNECTED',
+          connectUrl: `/connect/${creator.provider.toLowerCase()}`,
+        };
+      }
+
+      // Return mock content items
       return {
-        items: [],
+        items: mockContentItems,
+        provider: creator.provider,
       };
     },
 
@@ -601,14 +690,420 @@ describe('Creators Router', () => {
   // ==========================================================================
 
   describe('creators.fetchLatestContent', () => {
-    it('should accept valid creatorId and return empty items (stub)', async () => {
-      const caller = createMockCreatorsCaller({ userId: TEST_USER_ID });
-
-      const result = await caller.fetchLatestContent({ creatorId: TEST_CREATOR_ID });
-
-      expect(result).toEqual({
-        items: [],
+    it('should throw NOT_FOUND when creator does not exist', async () => {
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: new Map(),
       });
+
+      await expect(caller.fetchLatestContent({ creatorId: 'nonexistent' })).rejects.toThrow(
+        TRPCError
+      );
+      await expect(caller.fetchLatestContent({ creatorId: 'nonexistent' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'Creator not found',
+      });
+    });
+
+    it('should return PROVIDER_NOT_SUPPORTED for RSS creator', async () => {
+      const rssCreator = createMockCreator({
+        id: 'rss_creator',
+        provider: 'RSS',
+        providerCreatorId: 'https://example.com/feed.xml',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('rss_creator', rssCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'rss_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('RSS');
+      expect(result.reason).toBe('PROVIDER_NOT_SUPPORTED');
+    });
+
+    it('should return PROVIDER_NOT_SUPPORTED for SUBSTACK creator', async () => {
+      const substackCreator = createMockCreator({
+        id: 'substack_creator',
+        provider: 'SUBSTACK',
+        providerCreatorId: 'substack-123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('substack_creator', substackCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'substack_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('SUBSTACK');
+      expect(result.reason).toBe('PROVIDER_NOT_SUPPORTED');
+    });
+
+    it('should return NOT_CONNECTED for YouTube creator when user has no connection', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: new Map(),
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.reason).toBe('NOT_CONNECTED');
+      expect(result.connectUrl).toBe('/connect/youtube');
+    });
+
+    it('should return NOT_CONNECTED for Spotify creator when user has no connection', async () => {
+      const spotifyCreator = createMockCreator({
+        id: 'spotify_creator',
+        provider: 'SPOTIFY',
+        providerCreatorId: '0testshow123456',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('spotify_creator', spotifyCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: new Map(),
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'spotify_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('SPOTIFY');
+      expect(result.reason).toBe('NOT_CONNECTED');
+      expect(result.connectUrl).toBe('/connect/spotify');
+    });
+
+    it('should return NOT_CONNECTED when connection exists but is not ACTIVE', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const expiredConnection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'EXPIRED',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(expiredConnection.id, expiredConnection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.reason).toBe('NOT_CONNECTED');
+    });
+
+    it('should return content items for YouTube creator when connected', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const mockItems: MockContentItem[] = [
+        {
+          id: 'video_123',
+          title: 'Test Video',
+          description: 'A test video description',
+          thumbnailUrl: 'https://example.com/thumb.jpg',
+          publishedAt: Date.now() - 86400000,
+          externalUrl: 'https://www.youtube.com/watch?v=video_123',
+          duration: 600,
+          isBookmarked: false,
+        },
+        {
+          id: 'video_456',
+          title: 'Another Video',
+          description: 'Another description',
+          thumbnailUrl: 'https://example.com/thumb2.jpg',
+          publishedAt: Date.now() - 172800000,
+          externalUrl: 'https://www.youtube.com/watch?v=video_456',
+          duration: 1200,
+          isBookmarked: true,
+        },
+      ];
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+        mockContentItems: mockItems,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.reason).toBeUndefined();
+      expect(result.items[0].id).toBe('video_123');
+      expect(result.items[0].title).toBe('Test Video');
+      expect(result.items[0].isBookmarked).toBe(false);
+      expect(result.items[1].id).toBe('video_456');
+      expect(result.items[1].isBookmarked).toBe(true);
+    });
+
+    it('should return content items for Spotify creator when connected', async () => {
+      const spotifyCreator = createMockCreator({
+        id: 'spotify_creator',
+        provider: 'SPOTIFY',
+        providerCreatorId: '0testshow123456',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'SPOTIFY',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('spotify_creator', spotifyCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const mockItems: MockContentItem[] = [
+        {
+          id: 'episode_123',
+          title: 'Episode 1',
+          description: 'First episode',
+          thumbnailUrl: 'https://example.com/ep1.jpg',
+          publishedAt: Date.now() - 86400000,
+          externalUrl: 'https://open.spotify.com/episode/episode_123',
+          duration: 3600,
+          isBookmarked: false,
+        },
+      ];
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+        mockContentItems: mockItems,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'spotify_creator' });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.provider).toBe('SPOTIFY');
+      expect(result.items[0].id).toBe('episode_123');
+      expect(result.items[0].duration).toBe(3600);
+    });
+
+    it('should return TOKEN_EXPIRED when token refresh fails', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        fetchLatestContentBehavior: {
+          reason: 'TOKEN_EXPIRED',
+          connectUrl: '/connect/youtube',
+        },
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.reason).toBe('TOKEN_EXPIRED');
+      expect(result.connectUrl).toBe('/connect/youtube');
+    });
+
+    it('should return RATE_LIMITED when API rate limit is hit', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        fetchLatestContentBehavior: {
+          reason: 'RATE_LIMITED',
+        },
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.reason).toBe('RATE_LIMITED');
+    });
+
+    it('should return empty items when creator has no content', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+        mockContentItems: [], // Empty content
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('YOUTUBE');
+      expect(result.reason).toBeUndefined();
+    });
+
+    it('should return response matching FetchLatestContentResponse interface', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      const connection = createMockProviderConnection({
+        provider: 'YOUTUBE',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(connection.id, connection);
+
+      const mockItems: MockContentItem[] = [
+        {
+          id: 'video_123',
+          title: 'Test Video',
+          description: 'Description',
+          thumbnailUrl: 'https://example.com/thumb.jpg',
+          publishedAt: Date.now(),
+          externalUrl: 'https://www.youtube.com/watch?v=video_123',
+          duration: 600,
+          isBookmarked: false,
+        },
+      ];
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+        mockContentItems: mockItems,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      // Verify response shape
+      expect(result).toHaveProperty('items');
+      expect(result).toHaveProperty('provider');
+      expect(Array.isArray(result.items)).toBe(true);
+      expect(typeof result.provider).toBe('string');
+
+      // Verify item shape
+      const item = result.items[0];
+      expect(item).toHaveProperty('id');
+      expect(item).toHaveProperty('title');
+      expect(item).toHaveProperty('description');
+      expect(item).toHaveProperty('thumbnailUrl');
+      expect(item).toHaveProperty('publishedAt');
+      expect(item).toHaveProperty('externalUrl');
+      expect(item).toHaveProperty('duration');
+      expect(item).toHaveProperty('isBookmarked');
+    });
+
+    it('should not match connection from different provider', async () => {
+      const youtubeCreator = createMockCreator({
+        id: 'yt_creator',
+        provider: 'YOUTUBE',
+        providerCreatorId: 'UCtest123',
+      });
+
+      // User has Spotify connection but not YouTube
+      const spotifyConnection = createMockProviderConnection({
+        provider: 'SPOTIFY',
+        status: 'ACTIVE',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('yt_creator', youtubeCreator);
+
+      const connectionsMap = new Map<string, ProviderConnection>();
+      connectionsMap.set(spotifyConnection.id, spotifyConnection);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+        connections: connectionsMap,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'yt_creator' });
+
+      // Should not match Spotify connection for YouTube creator
+      expect(result.reason).toBe('NOT_CONNECTED');
     });
   });
 
