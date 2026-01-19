@@ -275,6 +275,9 @@ function extractSpotifyCreator(metadata: unknown): CreatorParams | null {
   const showName = show.name as string | undefined;
   const images = show.images as Array<{ url?: string }> | undefined;
   const showImage = images?.[0]?.url;
+  const description = show.description as string | undefined;
+  const publisher = show.publisher as string | undefined;
+  const externalUrls = show.external_urls as { spotify?: string } | undefined;
 
   if (!showId || !showName) return null;
 
@@ -283,6 +286,9 @@ function extractSpotifyCreator(metadata: unknown): CreatorParams | null {
     providerCreatorId: showId,
     name: showName,
     imageUrl: showImage,
+    description: description,
+    handle: publisher,
+    externalUrl: externalUrls?.spotify,
   };
 }
 

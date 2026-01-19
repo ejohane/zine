@@ -25,12 +25,16 @@ const mockGetMultipleShowsWithCache = vi.fn();
 const mockUpdateShowCache = vi.fn();
 const mockInvalidateShowCache = vi.fn();
 
+const mockGetShow = vi.fn();
+
 vi.mock('../providers/spotify', () => ({
   getSpotifyClientForConnection: vi.fn().mockResolvedValue({}),
   getShowEpisodes: (...args: unknown[]) => mockGetShowEpisodes(...args),
   getMultipleShowsWithCache: (...args: unknown[]) => mockGetMultipleShowsWithCache(...args),
+  getShow: (...args: unknown[]) => mockGetShow(...args),
   updateShowCache: (...args: unknown[]) => mockUpdateShowCache(...args),
   invalidateShowCache: (...args: unknown[]) => mockInvalidateShowCache(...args),
+  getLargestImage: (images: { url: string }[] | undefined) => images?.[0]?.url,
 }));
 
 // Mock ingestion processor
@@ -165,6 +169,21 @@ function createCacheResult(shows: MockShow[]) {
   };
 }
 
+/**
+ * Helper to create a fully populated mock SpotifyShow for getShow calls.
+ */
+function createMockSpotifyShow(overrides: Partial<MockShow> = {}): MockShow {
+  return {
+    id: overrides.id ?? 'show123',
+    name: overrides.name ?? 'Test Show',
+    description: overrides.description ?? 'A test podcast',
+    publisher: overrides.publisher ?? 'Test Publisher',
+    images: overrides.images ?? [{ url: 'https://example.com/show.jpg', height: 640, width: 640 }],
+    externalUrl: overrides.externalUrl ?? 'https://open.spotify.com/show/show123',
+    totalEpisodes: overrides.totalEpisodes ?? 10,
+  };
+}
+
 interface MockSubscription {
   id: string;
   userId: string;
@@ -206,6 +225,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
     mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockGetShow.mockResolvedValue(createMockSpotifyShow());
     mockUpdateShowCache.mockResolvedValue(undefined);
     mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
@@ -655,6 +675,7 @@ describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
     mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockGetShow.mockResolvedValue(createMockSpotifyShow());
     mockUpdateShowCache.mockResolvedValue(undefined);
     mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
@@ -1112,6 +1133,7 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
     mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockGetShow.mockResolvedValue(createMockSpotifyShow());
     mockUpdateShowCache.mockResolvedValue(undefined);
     mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });
@@ -1501,6 +1523,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
     // Default mock implementations
     mockGetShowEpisodes.mockResolvedValue([]);
     mockGetMultipleShowsWithCache.mockResolvedValue(createCacheResult([]));
+    mockGetShow.mockResolvedValue(createMockSpotifyShow());
     mockUpdateShowCache.mockResolvedValue(undefined);
     mockInvalidateShowCache.mockResolvedValue(undefined);
     mockIngestItem.mockResolvedValue({ created: false, skipped: 'already_exists' });

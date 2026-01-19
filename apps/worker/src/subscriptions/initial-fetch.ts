@@ -421,7 +421,8 @@ async function fetchInitialSpotifyItem(
   }
 
   // Transform to the format expected by transformSpotifyEpisode
-  // CRITICAL: Include show metadata for creator extraction (extractSpotifyCreator expects rawItem.show)
+  // CRITICAL: Include full show metadata for creator extraction
+  // extractSpotifyCreator expects rawItem.show to contain { id, name, description, publisher, images, external_urls }
   const showImageUrl = getLargestImage(show.images) ?? subscriptionImageUrl;
   const spotifyEpisode = {
     id: episode.id,
@@ -431,11 +432,14 @@ async function fetchInitialSpotifyItem(
     duration_ms: episode.durationMs,
     external_urls: { spotify: episode.externalUrl },
     images: episode.images,
-    // Show metadata for creator extraction
+    // Full show metadata for creator extraction
     show: {
       id: showId,
       name: show.name,
-      images: showImageUrl ? [{ url: showImageUrl }] : [],
+      description: show.description,
+      publisher: show.publisher,
+      images: show.images,
+      external_urls: { spotify: show.externalUrl },
     },
   };
 

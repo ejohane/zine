@@ -17,13 +17,14 @@ import { Provider } from '@zine/shared';
 import type { Database } from '../db';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
 import pLimit from 'p-limit';
-import { subscriptions, creators } from '../db/schema';
+import { subscriptions } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import { parseSpotifyDate } from '../lib/timestamps';
 import {
   getSpotifyClientForConnection,
   getShowEpisodes,
   getMultipleShowsWithCache,
+  getShow,
   updateShowCache,
   invalidateShowCache,
   getLargestImage,
@@ -372,9 +373,7 @@ export async function pollSpotifySubscriptionsBatched(
         newEpisodes,
         userId,
         sub.id,
-        show.id,
-        show.name,
-        getLargestImage(show.images) ?? null,
+        show,
         db
       );
       totalNewItems += newItemsCount;
@@ -497,19 +496,15 @@ export async function pollSingleSpotifySubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<PollingResult> {
-  // Fetch creator data for ingestion
-  const creator = sub.creatorId
-    ? await db.query.creators.findFirst({ where: eq(creators.id, sub.creatorId) })
-    : null;
-  const creatorName = creator?.name ?? sub.providerChannelId;
-  const creatorImageUrl = creator?.imageUrl ?? null;
-
   spotifyLogger.info('Polling subscription', {
     subscriptionId: sub.id,
     showId: sub.providerChannelId,
     lastPublishedAt: sub.lastPublishedAt,
     lastPublishedAtDate: sub.lastPublishedAt ? new Date(sub.lastPublishedAt).toISOString() : null,
   });
+
+  // Fetch show details for full metadata (needed for creator extraction)
+  const show = await getShow(client, sub.providerChannelId);
 
   // Fetch recent episodes from the show
   const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
@@ -553,9 +548,7 @@ export async function pollSingleSpotifySubscription(
     newEpisodes,
     userId,
     sub.id,
-    sub.providerChannelId,
-    creatorName,
-    creatorImageUrl,
+    show,
     db
   );
 
@@ -673,20 +666,20 @@ async function ingestNewEpisodes(
   episodes: SpotifyEpisode[],
   userId: string,
   subscriptionId: string,
-  showId: string,
-  showName: string,
-  showImageUrl: string | null,
+  show: SpotifyShow,
   db: DrizzleDB
 ): Promise<IngestResult> {
   let newItemsCount = 0;
   let skippedCount = 0;
   let newestIngestedAt: number | null = null;
 
+  const showImageUrl = getLargestImage(show.images) ?? null;
+
   for (const episode of episodes) {
     try {
       // Transform SpotifyEpisode to the format expected by transformSpotifyEpisode
-      // CRITICAL: Include show metadata for creator extraction
-      // extractSpotifyCreator() expects rawItem.show to contain { id, name, images }
+      // CRITICAL: Include full show metadata for creator extraction
+      // extractSpotifyCreator() expects rawItem.show to contain { id, name, description, publisher, images, external_urls }
       const rawEpisode = {
         id: episode.id,
         name: episode.name,
@@ -695,11 +688,14 @@ async function ingestNewEpisodes(
         duration_ms: episode.durationMs,
         external_urls: { spotify: episode.externalUrl },
         images: episode.images,
-        // Show metadata for creator extraction (extractSpotifyCreator looks for this)
+        // Full show metadata for creator extraction (extractSpotifyCreator looks for this)
         show: {
-          id: showId,
-          name: showName,
-          images: showImageUrl ? [{ url: showImageUrl }] : [],
+          id: show.id,
+          name: show.name,
+          description: show.description,
+          publisher: show.publisher,
+          images: show.images,
+          external_urls: { spotify: show.externalUrl },
         },
       };
 
@@ -710,7 +706,7 @@ async function ingestNewEpisodes(
         Provider.SPOTIFY,
         db as Database,
         (raw: typeof rawEpisode) =>
-          transformSpotifyEpisode(raw, showName, showImageUrl ?? undefined)
+          transformSpotifyEpisode(raw, show.name, showImageUrl ?? undefined)
       );
       if (result.created) {
         newItemsCount++;
@@ -722,7 +718,7 @@ async function ingestNewEpisodes(
         }
 
         spotifyLogger.info('Episode ingested', {
-          showName,
+          showName: show.name,
           episodeId: episode.id,
           episodeName: episode.name,
           releaseDate: episode.releaseDate,
@@ -732,7 +728,7 @@ async function ingestNewEpisodes(
       } else {
         skippedCount++;
         spotifyLogger.debug('Episode skipped (already seen)', {
-          showName,
+          showName: show.name,
           episodeId: episode.id,
           episodeName: episode.name,
           reason: result.skipped,
@@ -743,7 +739,7 @@ async function ingestNewEpisodes(
       // This ensures lastPublishedAt is only advanced for successful ingestions.
       const serialized = serializeError(ingestError);
       spotifyLogger.error('Failed to ingest episode', {
-        showName,
+        showName: show.name,
         episodeId: episode.id,
         episodeName: episode.name,
         error: serialized,
@@ -755,7 +751,7 @@ async function ingestNewEpisodes(
 
   if (skippedCount > 0) {
     spotifyLogger.info('Ingestion summary', {
-      showName,
+      showName: show.name,
       created: newItemsCount,
       skipped: skippedCount,
     });

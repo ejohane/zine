@@ -25,8 +25,9 @@ import {
   fetchRecentVideos,
   fetchVideoDetails,
   extractVideoInfo,
+  getChannelDetails,
 } from '../../providers/youtube';
-import { getSpotifyClientForConnection, getShowEpisodes } from '../../providers/spotify';
+import { getSpotifyClientForConnection, getShowEpisodes, getShow } from '../../providers/spotify';
 import type { ProviderConnection } from '../../lib/token-refresh';
 import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
@@ -137,26 +138,131 @@ export const creatorsRouter = router({
    * Get a single creator by ID
    *
    * Returns the creator profile including name, image, and stats.
+   * If the creator is missing metadata (description/handle), attempts to
+   * enrich it from the provider API (requires user to be connected).
    *
    * @param creatorId - The unique identifier of the creator
    * @returns Creator profile
    * @throws NOT_FOUND if creator doesn't exist
    */
   get: protectedProcedure.input(GetInputSchema).query(async ({ ctx, input }) => {
-    const creator = await ctx.db
+    const creatorResult = await ctx.db
       .select()
       .from(creators)
       .where(eq(creators.id, input.creatorId))
       .limit(1);
 
-    if (creator.length === 0) {
+    if (creatorResult.length === 0) {
       throw new TRPCError({
         code: 'NOT_FOUND',
         message: 'Creator not found',
       });
     }
 
-    return creator[0];
+    const creator = creatorResult[0];
+
+    // Enrich Spotify creator metadata if missing
+    if (creator.provider === 'SPOTIFY' && (!creator.description || !creator.handle)) {
+      try {
+        // Check if user is connected to Spotify
+        const connection = await ctx.db.query.providerConnections.findFirst({
+          where: and(
+            eq(providerConnections.userId, ctx.userId),
+            eq(providerConnections.provider, 'SPOTIFY'),
+            eq(providerConnections.status, 'ACTIVE')
+          ),
+        });
+
+        if (connection) {
+          const spotifyClient = await getSpotifyClientForConnection(
+            connection as ProviderConnection,
+            ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+          );
+          const showDetails = await getShow(spotifyClient, creator.providerCreatorId);
+          if (showDetails) {
+            const updates: Partial<typeof creator> = {};
+            if (!creator.description && showDetails.description) {
+              updates.description = showDetails.description;
+            }
+            if (!creator.handle && showDetails.publisher) {
+              updates.handle = showDetails.publisher;
+            }
+            if (!creator.imageUrl && showDetails.images?.[0]?.url) {
+              updates.imageUrl = showDetails.images[0].url;
+            }
+            if (!creator.externalUrl && showDetails.externalUrl) {
+              updates.externalUrl = showDetails.externalUrl;
+            }
+
+            if (Object.keys(updates).length > 0) {
+              // Update DB and return enriched creator
+              await ctx.db
+                .update(creators)
+                .set({ ...updates, updatedAt: Date.now() })
+                .where(eq(creators.id, creator.id));
+
+              return { ...creator, ...updates, updatedAt: Date.now() };
+            }
+          }
+        }
+      } catch {
+        // Silently ignore enrichment errors - return original creator
+      }
+    }
+
+    // Enrich YouTube creator metadata if missing
+    if (creator.provider === 'YOUTUBE' && (!creator.description || !creator.handle)) {
+      try {
+        // Check if user is connected to YouTube
+        const connection = await ctx.db.query.providerConnections.findFirst({
+          where: and(
+            eq(providerConnections.userId, ctx.userId),
+            eq(providerConnections.provider, 'YOUTUBE'),
+            eq(providerConnections.status, 'ACTIVE')
+          ),
+        });
+
+        if (connection) {
+          const youtubeClient = await getYouTubeClientForConnection(
+            connection as ProviderConnection,
+            ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+          );
+          const channelDetails = await getChannelDetails(youtubeClient, creator.providerCreatorId);
+          if (channelDetails?.snippet) {
+            const updates: Partial<typeof creator> = {};
+            if (!creator.description && channelDetails.snippet.description) {
+              updates.description = channelDetails.snippet.description;
+            }
+            if (!creator.handle && channelDetails.snippet.customUrl) {
+              updates.handle = channelDetails.snippet.customUrl;
+            }
+            if (!creator.imageUrl) {
+              const newImageUrl =
+                channelDetails.snippet.thumbnails?.high?.url ||
+                channelDetails.snippet.thumbnails?.medium?.url;
+              if (newImageUrl) updates.imageUrl = newImageUrl;
+            }
+            if (!creator.externalUrl) {
+              updates.externalUrl = `https://www.youtube.com/channel/${creator.providerCreatorId}`;
+            }
+
+            if (Object.keys(updates).length > 0) {
+              // Update DB and return enriched creator
+              await ctx.db
+                .update(creators)
+                .set({ ...updates, updatedAt: Date.now() })
+                .where(eq(creators.id, creator.id));
+
+              return { ...creator, ...updates, updatedAt: Date.now() };
+            }
+          }
+        }
+      } catch {
+        // Silently ignore enrichment errors - return original creator
+      }
+    }
+
+    return creator;
   }),
 
   /**
@@ -311,7 +417,81 @@ export const creatorsRouter = router({
         };
       }
 
-      // 4. Check cache first
+      // 4. Enrich creator metadata if missing (background, non-blocking)
+      // This runs regardless of cache status to ensure existing creators get updated
+      if (creator.provider === 'YOUTUBE' && (!creator.description || !creator.handle)) {
+        // Fire-and-forget: don't block the response
+        (async () => {
+          try {
+            const youtubeClient = await getYouTubeClientForConnection(
+              connection as ProviderConnection,
+              ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+            );
+            const channelDetails = await getChannelDetails(
+              youtubeClient,
+              creator.providerCreatorId
+            );
+            if (channelDetails?.snippet) {
+              const updates: Record<string, unknown> = { updatedAt: Date.now() };
+              if (!creator.description && channelDetails.snippet.description) {
+                updates.description = channelDetails.snippet.description;
+              }
+              if (!creator.handle && channelDetails.snippet.customUrl) {
+                updates.handle = channelDetails.snippet.customUrl;
+              }
+              if (!creator.imageUrl) {
+                const newImageUrl =
+                  channelDetails.snippet.thumbnails?.high?.url ||
+                  channelDetails.snippet.thumbnails?.medium?.url;
+                if (newImageUrl) updates.imageUrl = newImageUrl;
+              }
+              if (!creator.externalUrl) {
+                updates.externalUrl = `https://www.youtube.com/channel/${creator.providerCreatorId}`;
+              }
+              if (Object.keys(updates).length > 1) {
+                await ctx.db.update(creators).set(updates).where(eq(creators.id, creator.id));
+              }
+            }
+          } catch {
+            // Silently ignore enrichment errors - non-critical
+          }
+        })();
+      }
+
+      if (creator.provider === 'SPOTIFY' && (!creator.description || !creator.handle)) {
+        // Fire-and-forget: don't block the response
+        (async () => {
+          try {
+            const spotifyClient = await getSpotifyClientForConnection(
+              connection as ProviderConnection,
+              ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
+            );
+            const showDetails = await getShow(spotifyClient, creator.providerCreatorId);
+            if (showDetails) {
+              const updates: Record<string, unknown> = { updatedAt: Date.now() };
+              if (!creator.description && showDetails.description) {
+                updates.description = showDetails.description;
+              }
+              if (!creator.handle && showDetails.publisher) {
+                updates.handle = showDetails.publisher;
+              }
+              if (!creator.imageUrl && showDetails.images?.[0]?.url) {
+                updates.imageUrl = showDetails.images[0].url;
+              }
+              if (!creator.externalUrl && showDetails.externalUrl) {
+                updates.externalUrl = showDetails.externalUrl;
+              }
+              if (Object.keys(updates).length > 1) {
+                await ctx.db.update(creators).set(updates).where(eq(creators.id, creator.id));
+              }
+            }
+          } catch {
+            // Silently ignore enrichment errors - non-critical
+          }
+        })();
+      }
+
+      // 5. Check cache first
       const cacheKey = `${LATEST_CONTENT_CACHE_CONFIG.KEY_PREFIX}${creatorId}`;
       const cached = await ctx.env.CREATOR_CONTENT_CACHE.get<CachedLatestContent>(cacheKey, 'json');
 
@@ -321,7 +501,7 @@ export const creatorsRouter = router({
         // Use cached items
         contentItems = cached.items;
       } else {
-        // 5. Fetch from provider
+        // 6. Fetch from provider
         try {
           contentItems = await fetchFromProvider(
             creator.provider,
@@ -330,7 +510,7 @@ export const creatorsRouter = router({
             ctx.env
           );
 
-          // 6. Cache the result
+          // 7. Cache the result
           await ctx.env.CREATOR_CONTENT_CACHE.put(
             cacheKey,
             JSON.stringify({

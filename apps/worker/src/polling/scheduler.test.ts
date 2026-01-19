@@ -63,10 +63,20 @@ const mockGetSpotifyClientForConnection = vi.fn();
 const mockGetShowEpisodes = vi.fn();
 const mockGetMultipleShows = vi.fn();
 
+const mockGetShow = vi.fn();
+const mockGetMultipleShowsWithCache = vi.fn();
+const mockUpdateShowCache = vi.fn();
+const mockInvalidateShowCache = vi.fn();
+
 vi.mock('../providers/spotify', () => ({
   getSpotifyClientForConnection: (...args: unknown[]) => mockGetSpotifyClientForConnection(...args),
   getShowEpisodes: (...args: unknown[]) => mockGetShowEpisodes(...args),
   getMultipleShows: (...args: unknown[]) => mockGetMultipleShows(...args),
+  getShow: (...args: unknown[]) => mockGetShow(...args),
+  getMultipleShowsWithCache: (...args: unknown[]) => mockGetMultipleShowsWithCache(...args),
+  updateShowCache: (...args: unknown[]) => mockUpdateShowCache(...args),
+  invalidateShowCache: (...args: unknown[]) => mockInvalidateShowCache(...args),
+  getLargestImage: (images: { url: string }[] | undefined) => images?.[0]?.url,
 }));
 
 // Mock ingestion
@@ -593,6 +603,15 @@ describe('Polling Scheduler', () => {
       mockTryAcquireLock.mockResolvedValue(true);
       mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
       mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockGetShow.mockResolvedValue({
+        id: '0testshow123456789012',
+        name: 'Test Show',
+        description: 'A test podcast',
+        publisher: 'Test Publisher',
+        images: [{ url: 'https://example.com/show.jpg', height: 640, width: 640 }],
+        externalUrl: 'https://open.spotify.com/show/0testshow123456789012',
+        totalEpisodes: 10,
+      });
       mockGetShowEpisodes.mockResolvedValue(episodes);
       mockIngestItem.mockResolvedValue({ created: true });
 
@@ -1013,6 +1032,21 @@ describe('Polling Scheduler', () => {
             isPlayable: true,
           },
         ];
+      });
+
+      // Mock getShow for Spotify subscriptions
+      let showCallCount = 0;
+      mockGetShow.mockImplementation(async () => {
+        showCallCount++;
+        return {
+          id: showCallCount === 1 ? '0testshow123456789012' : '0testshow987654321098',
+          name: `Test Show ${showCallCount}`,
+          description: 'A test podcast',
+          publisher: 'Test Publisher',
+          images: [{ url: 'https://example.com/show.jpg', height: 640, width: 640 }],
+          externalUrl: `https://open.spotify.com/show/${showCallCount}`,
+          totalEpisodes: 10,
+        };
       });
 
       mockIngestItem.mockResolvedValue({ created: true });
