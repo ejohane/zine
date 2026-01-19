@@ -214,11 +214,12 @@ export const creatorsRouter = router({
           );
         }
 
-        // Execute query with join
+        // Execute query with joins (items + creators)
         const results = await ctx.db
           .select()
           .from(userItems)
           .innerJoin(items, eq(userItems.itemId, items.id))
+          .leftJoin(creators, eq(items.creatorId, creators.id))
           .where(and(...conditions))
           .orderBy(sql`${sortField} DESC`, desc(userItems.id))
           .limit(limit + 1); // Fetch one extra to check for more
@@ -509,16 +510,17 @@ export const creatorsRouter = router({
       });
 
       if (existing) {
+        // Return creator data from normalized table
         return {
           id: existing.id,
           provider: existing.provider,
-          name: existing.name,
-          imageUrl: existing.imageUrl,
+          name: creator.name,
+          imageUrl: creator.imageUrl ?? null,
           enabled: existing.status === 'ACTIVE',
         };
       }
 
-      // 5. Create new subscription
+      // 5. Create new subscription with creatorId (normalized)
       const now = Date.now();
       const subscriptionId = ulid();
 
@@ -527,10 +529,7 @@ export const creatorsRouter = router({
         userId: ctx.userId,
         provider: creator.provider,
         providerChannelId: creator.providerCreatorId,
-        name: creator.name,
-        description: creator.description,
-        imageUrl: creator.imageUrl,
-        externalUrl: creator.externalUrl,
+        creatorId: creator.id,
         status: 'ACTIVE',
         createdAt: now,
         updatedAt: now,
@@ -540,7 +539,7 @@ export const creatorsRouter = router({
         id: subscriptionId,
         provider: creator.provider,
         name: creator.name,
-        imageUrl: creator.imageUrl,
+        imageUrl: creator.imageUrl ?? null,
         enabled: true,
       };
     }),

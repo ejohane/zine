@@ -431,6 +431,7 @@ async function findOrCreateCanonicalItem(
   // Use onConflictDoNothing() to handle race conditions where another worker
   // creates the same canonical item concurrently. The unique constraint on
   // (provider, providerId) ensures only one item is created.
+  // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
   await db
     .insert(items)
     .values({
@@ -441,8 +442,6 @@ async function findOrCreateCanonicalItem(
       canonicalUrl: newItem.canonicalUrl,
       title: newItem.title,
       summary: newItem.description,
-      creator: newItem.creator,
-      creatorImageUrl: newItem.creatorImageUrl,
       creatorId: creatorId ?? null,
       thumbnailUrl: newItem.imageUrl,
       duration: newItem.durationSeconds,
@@ -854,6 +853,7 @@ async function executeChunkBatch(
       // 1. Create canonical item (if it doesn't exist)
       // Use onConflictDoNothing() to handle race conditions where another worker
       // creates the same canonical item concurrently.
+      // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
       if (!prepared.canonicalItemExists) {
         const publishedAtISO = prepared.newItem.publishedAt
           ? new Date(prepared.newItem.publishedAt).toISOString()
@@ -870,8 +870,6 @@ async function executeChunkBatch(
               canonicalUrl: prepared.newItem.canonicalUrl,
               title: prepared.newItem.title,
               summary: prepared.newItem.description,
-              creator: prepared.newItem.creator,
-              creatorImageUrl: prepared.newItem.creatorImageUrl,
               creatorId: prepared.creatorId,
               thumbnailUrl: prepared.newItem.imageUrl,
               duration: prepared.newItem.durationSeconds,
@@ -968,6 +966,7 @@ async function executeIndividualInsert(
 
     // 1. Create canonical item (if it doesn't exist)
     // Use onConflictDoNothing() to handle race conditions.
+    // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
     if (!prepared.canonicalItemExists) {
       const publishedAtISO = prepared.newItem.publishedAt
         ? new Date(prepared.newItem.publishedAt).toISOString()
@@ -984,8 +983,6 @@ async function executeIndividualInsert(
             canonicalUrl: prepared.newItem.canonicalUrl,
             title: prepared.newItem.title,
             summary: prepared.newItem.description,
-            creator: prepared.newItem.creator,
-            creatorImageUrl: prepared.newItem.creatorImageUrl,
             creatorId: prepared.creatorId,
             thumbnailUrl: prepared.newItem.imageUrl,
             duration: prepared.newItem.durationSeconds,

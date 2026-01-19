@@ -32,9 +32,8 @@ export const items = sqliteTable(
     title: text('title').notNull(),
     thumbnailUrl: text('thumbnail_url'),
 
-    // Attribution
-    creator: text('creator').notNull(), // Channel/author/podcast name
-    creatorImageUrl: text('creator_image_url'), // Channel/show/podcast image (distinct from episode thumbnail)
+    // Attribution (normalized via creators table)
+    creatorId: text('creator_id').references(() => creators.id),
     publisher: text('publisher'), // Optional: network
 
     // Metadata
@@ -47,9 +46,6 @@ export const items = sqliteTable(
     wordCount: integer('word_count'),
     readingTimeMinutes: integer('reading_time_minutes'),
     articleContentKey: text('article_content_key'), // R2 object key for full article content
-
-    // Creator relationship
-    creatorId: text('creator_id').references(() => creators.id),
 
     // System
     createdAt: text('created_at').notNull(), // ISO8601 (legacy)
@@ -192,11 +188,8 @@ export const subscriptions = sqliteTable(
     provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
     providerChannelId: text('provider_channel_id').notNull(), // YouTube channel ID or Spotify show ID
 
-    // Display info
-    name: text('name').notNull(), // Channel/show name
-    description: text('description'),
-    imageUrl: text('image_url'),
-    externalUrl: text('external_url'), // Link to channel/show on provider
+    // Creator relationship (normalized - use JOIN to get name, imageUrl, etc.)
+    creatorId: text('creator_id').references(() => creators.id),
 
     // Polling metadata
     totalItems: integer('total_items').default(0), // Total videos/episodes (cached)
@@ -223,6 +216,8 @@ export const subscriptions = sqliteTable(
     // Fast polling queries
     index('subscriptions_poll_idx').on(table.status, table.lastPolledAt),
     index('subscriptions_user_idx').on(table.userId, table.status),
+    // Fast creator lookups
+    index('subscriptions_creator_idx').on(table.creatorId),
   ]
 );
 

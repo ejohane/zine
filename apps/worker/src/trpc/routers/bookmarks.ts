@@ -286,6 +286,8 @@ export const bookmarksRouter = router({
         }
       }
 
+      // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
+      // These deprecated fields are no longer written.
       await ctx.db.insert(items).values({
         id: itemId,
         contentType: input.contentType,
@@ -294,8 +296,6 @@ export const bookmarksRouter = router({
         canonicalUrl: input.canonicalUrl,
         title: input.title,
         thumbnailUrl: input.thumbnailUrl,
-        creator: input.creator,
-        creatorImageUrl: input.creatorImageUrl ?? null,
         creatorId,
         publisher: input.siteName ?? null,
         summary: input.description ?? null,

@@ -99,11 +99,14 @@ export interface Item {
   /** Summary or description */
   summary?: string;
 
-  /** Creator/author name (renamed from author to match D1 schema) */
+  /** Creator/author name (computed from creators table JOIN, not stored in items) */
   creator: string;
 
-  /** URL to creator/channel/podcast show image (distinct from episode thumbnail) */
+  /** URL to creator/channel/podcast show image (computed from creators table JOIN, not stored in items) */
   creatorImageUrl?: string;
+
+  /** Reference to the Creator entity (foreign key stored in items.creator_id) */
+  creatorId?: string;
 
   /** Publisher/channel name */
   publisher?: string;

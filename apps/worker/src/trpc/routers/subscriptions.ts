@@ -18,7 +18,14 @@ import { ulid } from 'ulid';
 import { and, eq, gt, asc, inArray, ne } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { ProviderSchema, SubscriptionStatusSchema, Provider } from '@zine/shared';
-import { subscriptions, userItems, subscriptionItems, providerConnections } from '../../db/schema';
+import {
+  subscriptions,
+  userItems,
+  subscriptionItems,
+  providerConnections,
+  creators,
+} from '../../db/schema';
+import { findOrCreateCreator } from '../../db/helpers/creators';
 import { logger } from '../../lib/logger';
 import {
   getYouTubeClientForConnection,
@@ -170,6 +177,7 @@ export const subscriptionsRouter = router({
    *
    * Supports filtering by provider and status.
    * Uses cursor-based pagination sorted by subscription ID (ULID, chronological).
+   * Joins creators table to get normalized name, imageUrl, etc.
    *
    * @returns Paginated list of subscriptions with nextCursor and hasMore flags
    */
@@ -192,14 +200,46 @@ export const subscriptionsRouter = router({
         conditions.push(gt(subscriptions.id, input.cursor));
       }
 
-      const results = await ctx.db.query.subscriptions.findMany({
-        where: and(...conditions),
-        orderBy: [asc(subscriptions.id)],
-        limit: limit + 1, // Fetch one extra to check for more
-      });
+      // Query with JOIN to creators for normalized data
+      const results = await ctx.db
+        .select({
+          subscription: subscriptions,
+          creator: creators,
+        })
+        .from(subscriptions)
+        .leftJoin(creators, eq(subscriptions.creatorId, creators.id))
+        .where(and(...conditions))
+        .orderBy(asc(subscriptions.id))
+        .limit(limit + 1);
 
       const hasMore = results.length > limit;
-      const items = hasMore ? results.slice(0, -1) : results;
+      const rows = hasMore ? results.slice(0, -1) : results;
+
+      // Transform to include creator data
+      const items = rows.map((row) => ({
+        id: row.subscription.id,
+        userId: row.subscription.userId,
+        provider: row.subscription.provider,
+        providerChannelId: row.subscription.providerChannelId,
+        creatorId: row.subscription.creatorId,
+        // Get name, imageUrl, etc. from creators table (normalized)
+        name: row.creator?.name ?? 'Unknown',
+        imageUrl: row.creator?.imageUrl ?? null,
+        description: row.creator?.description ?? null,
+        externalUrl: row.creator?.externalUrl ?? null,
+        // Polling metadata
+        totalItems: row.subscription.totalItems,
+        lastPublishedAt: row.subscription.lastPublishedAt,
+        lastPolledAt: row.subscription.lastPolledAt,
+        pollIntervalSeconds: row.subscription.pollIntervalSeconds,
+        // Status
+        status: row.subscription.status,
+        disconnectedAt: row.subscription.disconnectedAt,
+        disconnectedReason: row.subscription.disconnectedReason,
+        // Timestamps
+        createdAt: row.subscription.createdAt,
+        updatedAt: row.subscription.updatedAt,
+      }));
 
       return {
         items,
@@ -213,7 +253,8 @@ export const subscriptionsRouter = router({
    *
    * Requirements:
    * 1. User must have an active connection to the provider
-   * 2. Creates new subscription or reactivates existing one (upsert behavior)
+   * 2. Creates/finds creator in normalized creators table
+   * 3. Creates new subscription or reactivates existing one (upsert behavior)
    *
    * The initial fetch of content is handled asynchronously (zine-teq.18).
    *
@@ -236,7 +277,19 @@ export const subscriptionsRouter = router({
       });
     }
 
-    // 2. Create subscription (upsert: reactivate if previously unsubscribed)
+    // 2. Find or create creator in normalized creators table
+    const creatorName = input.name || input.providerChannelId;
+    const creator = await findOrCreateCreator(
+      { db: ctx.db },
+      {
+        provider: input.provider,
+        providerCreatorId: input.providerChannelId,
+        name: creatorName,
+        imageUrl: input.imageUrl,
+      }
+    );
+
+    // 3. Create subscription (upsert: reactivate if previously unsubscribed)
     const now = Date.now();
     const subscriptionId = ulid();
 
@@ -247,8 +300,7 @@ export const subscriptionsRouter = router({
         userId: ctx.userId,
         provider: input.provider,
         providerChannelId: input.providerChannelId,
-        name: input.name || input.providerChannelId,
-        imageUrl: input.imageUrl ?? null,
+        creatorId: creator.id,
         status: 'ACTIVE',
         pollIntervalSeconds: 3600, // 1 hour default
         createdAt: now,
@@ -258,23 +310,22 @@ export const subscriptionsRouter = router({
         target: [subscriptions.userId, subscriptions.provider, subscriptions.providerChannelId],
         set: {
           status: 'ACTIVE',
-          name: input.name || input.providerChannelId,
-          imageUrl: input.imageUrl ?? null,
+          creatorId: creator.id,
           updatedAt: now,
         },
       });
 
-    // 3. Get the subscription ID (might be existing one if upsert)
+    // 4. Get the subscription ID (might be existing one if upsert)
     const sub = await ctx.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, ctx.userId),
         eq(subscriptions.provider, input.provider),
         eq(subscriptions.providerChannelId, input.providerChannelId)
       ),
-      columns: { id: true, name: true, imageUrl: true },
+      columns: { id: true },
     });
 
-    // 4. Trigger initial fetch (await to ensure it completes before response)
+    // 5. Trigger initial fetch (await to ensure it completes before response)
     // Note: triggerInitialFetch catches its own errors internally and won't fail subscription creation
     try {
       await triggerInitialFetch(
@@ -294,8 +345,8 @@ export const subscriptionsRouter = router({
 
     return {
       subscriptionId: sub!.id,
-      name: sub!.name,
-      imageUrl: sub!.imageUrl,
+      name: creator.name,
+      imageUrl: creator.imageUrl ?? null,
     };
   }),
 
@@ -706,7 +757,7 @@ export const subscriptionsRouter = router({
           if (batchResult.errors) {
             for (const err of batchResult.errors) {
               const sub = byProvider.YOUTUBE.find((s) => s.id === err.subscriptionId);
-              results.errors.push(`YouTube: ${sub?.name ?? err.subscriptionId}`);
+              results.errors.push(`YouTube: ${sub?.providerChannelId ?? err.subscriptionId}`);
             }
           }
         } catch (err) {
@@ -750,7 +801,7 @@ export const subscriptionsRouter = router({
           if (batchResult.errors) {
             for (const err of batchResult.errors) {
               const sub = byProvider.SPOTIFY.find((s) => s.id === err.subscriptionId);
-              results.errors.push(`Spotify: ${sub?.name ?? err.subscriptionId}`);
+              results.errors.push(`Spotify: ${sub?.providerChannelId ?? err.subscriptionId}`);
             }
           }
         } catch (err) {

@@ -105,110 +105,127 @@ export const connectionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Validate that required services are available
-      if (!ctx.env.OAUTH_STATE_KV) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'OAuth state storage not configured',
-        });
-      }
+      try {
+        // Validate that required services are available
+        if (!ctx.env.OAUTH_STATE_KV) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'OAuth state storage not configured',
+          });
+        }
 
-      if (!ctx.env.ENCRYPTION_KEY) {
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Token encryption not configured',
-        });
-      }
+        if (!ctx.env.ENCRYPTION_KEY) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Token encryption not configured',
+          });
+        }
 
-      // 1. Validate state (CSRF protection)
-      // This also deletes the state after validation (one-time use)
-      await validateOAuthState(input.state, ctx.userId, ctx.env.OAUTH_STATE_KV);
+        // 1. Validate state (CSRF protection)
+        // This also deletes the state after validation (one-time use)
+        authLogger.debug('Step 1: Validating OAuth state');
+        await validateOAuthState(input.state, ctx.userId, ctx.env.OAUTH_STATE_KV);
 
-      // 2. Exchange authorization code + PKCE verifier for tokens
-      const tokens = await exchangeCodeForTokens(
-        input.provider,
-        input.code,
-        input.codeVerifier,
-        ctx.env,
-        input.redirectUri
-      );
+        // 2. Exchange authorization code + PKCE verifier for tokens
+        authLogger.debug('Step 2: Exchanging code for tokens');
+        const tokens = await exchangeCodeForTokens(
+          input.provider,
+          input.code,
+          input.codeVerifier,
+          ctx.env,
+          input.redirectUri
+        );
 
-      // 3. Get provider user info (for provider_user_id)
-      const providerUser = await getProviderUserInfo(input.provider, tokens.access_token);
+        // 3. Get provider user info (for provider_user_id)
+        authLogger.debug('Step 3: Getting provider user info');
+        const providerUser = await getProviderUserInfo(input.provider, tokens.access_token);
 
-      // 4. Ensure user exists in database (handles post-migration or webhook race condition)
-      // This is idempotent - if user already exists, no change is made
-      const now = Date.now();
-      const nowIso = new Date(now).toISOString();
-      await ctx.db
-        .insert(users)
-        .values({
-          id: ctx.userId,
-          email: null,
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        })
-        .onConflictDoNothing();
+        // 4. Ensure user exists in database (handles post-migration or webhook race condition)
+        // This is idempotent - if user already exists, no change is made
+        authLogger.debug('Step 4: Ensuring user exists');
+        const now = Date.now();
+        const nowIso = new Date(now).toISOString();
+        await ctx.db
+          .insert(users)
+          .values({
+            id: ctx.userId,
+            email: null,
+            createdAt: nowIso,
+            updatedAt: nowIso,
+          })
+          .onConflictDoNothing();
 
-      // 5. Encrypt tokens before storage
-      const encryptedAccessToken = await encrypt(tokens.access_token, ctx.env.ENCRYPTION_KEY);
-      const encryptedRefreshToken = await encrypt(tokens.refresh_token, ctx.env.ENCRYPTION_KEY);
+        // 5. Encrypt tokens before storage
+        authLogger.debug('Step 5: Encrypting tokens');
+        const encryptedAccessToken = await encrypt(tokens.access_token, ctx.env.ENCRYPTION_KEY);
+        const encryptedRefreshToken = await encrypt(tokens.refresh_token, ctx.env.ENCRYPTION_KEY);
 
-      // 6. Calculate token expiry timestamp
-      const tokenExpiresAt = now + tokens.expires_in * 1000;
+        // 6. Calculate token expiry timestamp
+        const tokenExpiresAt = now + tokens.expires_in * 1000;
 
-      // 7. Upsert connection (update if exists, insert if not)
-      await ctx.db
-        .insert(providerConnections)
-        .values({
-          id: ulid(),
-          userId: ctx.userId,
-          provider: input.provider,
-          providerUserId: providerUser.id,
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
-          tokenExpiresAt,
-          scopes: tokens.scope ?? null,
-          status: 'ACTIVE',
-          connectedAt: now,
-          lastRefreshedAt: null,
-        })
-        .onConflictDoUpdate({
-          target: [providerConnections.userId, providerConnections.provider],
-          set: {
+        // 7. Upsert connection (update if exists, insert if not)
+        authLogger.debug('Step 7: Upserting provider connection');
+        await ctx.db
+          .insert(providerConnections)
+          .values({
+            id: ulid(),
+            userId: ctx.userId,
+            provider: input.provider,
             providerUserId: providerUser.id,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
             tokenExpiresAt,
             scopes: tokens.scope ?? null,
             status: 'ACTIVE',
-            lastRefreshedAt: now,
-          },
+            connectedAt: now,
+            lastRefreshedAt: null,
+          })
+          .onConflictDoUpdate({
+            target: [providerConnections.userId, providerConnections.provider],
+            set: {
+              providerUserId: providerUser.id,
+              accessToken: encryptedAccessToken,
+              refreshToken: encryptedRefreshToken,
+              tokenExpiresAt,
+              scopes: tokens.scope ?? null,
+              status: 'ACTIVE',
+              lastRefreshedAt: now,
+            },
+          });
+
+        // 8. Reactivate DISCONNECTED subscriptions for this provider
+        // When a user reconnects their account, their previously disconnected subscriptions
+        // should become active again so they can be synced
+        authLogger.debug('Step 8: Reactivating disconnected subscriptions');
+        await ctx.db
+          .update(subscriptions)
+          .set({
+            status: 'ACTIVE',
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(subscriptions.userId, ctx.userId),
+              eq(subscriptions.provider, input.provider),
+              eq(subscriptions.status, 'DISCONNECTED')
+            )
+          );
+
+        authLogger.info('Provider reconnected, reactivated disconnected subscriptions', {
+          provider: input.provider,
+          userId: ctx.userId,
         });
 
-      // 8. Reactivate DISCONNECTED subscriptions for this provider
-      // When a user reconnects their account, their previously disconnected subscriptions
-      // should become active again so they can be synced
-      await ctx.db
-        .update(subscriptions)
-        .set({
-          status: 'ACTIVE',
-          updatedAt: now,
-        })
-        .where(
-          and(
-            eq(subscriptions.userId, ctx.userId),
-            eq(subscriptions.provider, input.provider),
-            eq(subscriptions.status, 'DISCONNECTED')
-          )
-        );
-
-      authLogger.info('Provider reconnected, reactivated disconnected subscriptions', {
-        provider: input.provider,
-        userId: ctx.userId,
-      });
-
-      return { success: true };
+        return { success: true };
+      } catch (error) {
+        // Log the actual error for debugging
+        authLogger.error('OAuth callback failed', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          provider: input.provider,
+        });
+        throw error;
+      }
     }),
 
   /**

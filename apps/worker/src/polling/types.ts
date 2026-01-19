@@ -9,7 +9,7 @@
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type * as schema from '../db/schema';
-import type { subscriptions } from '../db/schema';
+import type { subscriptions, creators } from '../db/schema';
 import type { Bindings } from '../types';
 import { YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 
@@ -23,9 +23,25 @@ import { YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 export type DrizzleDB = DrizzleD1Database<typeof schema>;
 
 /**
- * Subscription row from database
+ * Subscription row from database (normalized - no name/imageUrl fields)
  */
 export type Subscription = typeof subscriptions.$inferSelect;
+
+/**
+ * Creator row from database
+ */
+export type Creator = typeof creators.$inferSelect;
+
+/**
+ * Subscription with joined creator data for display.
+ * Use this type when you need the subscription's name/imageUrl (from creator).
+ */
+export interface SubscriptionWithCreator extends Subscription {
+  /** Creator name (from creators table) */
+  creatorName: string;
+  /** Creator image URL (from creators table) */
+  creatorImageUrl: string | null;
+}
 
 // ============================================================================
 // Polling Result Types
