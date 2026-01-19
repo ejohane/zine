@@ -39,6 +39,7 @@ export type ItemView = {
   // Attribution
   creator: string;
   creatorImageUrl: string | null;
+  creatorId: string | null;
   publisher: string | null;
 
   // Metadata
@@ -102,6 +103,7 @@ function toItemView(row: {
     provider: item.provider as Provider,
     creator: item.creator,
     creatorImageUrl: normalizeNullString(item.creatorImageUrl),
+    creatorId: item.creatorId ?? null,
     publisher: item.publisher,
     summary: item.summary,
     duration: item.duration,
