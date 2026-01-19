@@ -31,6 +31,7 @@ import {
   getYouTubeClientForConnection,
   getAllUserSubscriptions,
   searchChannels,
+  getChannelDetails,
 } from '../../providers/youtube';
 import {
   getSpotifyClientForConnection,
@@ -278,19 +279,51 @@ export const subscriptionsRouter = router({
       });
     }
 
-    // 2. Find or create creator in normalized creators table
-    const creatorName = input.name || input.providerChannelId;
+    // 2. Fetch channel/show metadata to enrich creator data
+    let creatorName = input.name || input.providerChannelId;
+    let creatorImageUrl = input.imageUrl;
+    let creatorDescription: string | undefined;
+    let creatorHandle: string | undefined;
+    let creatorExternalUrl: string | undefined;
+
+    if (input.provider === 'YOUTUBE') {
+      try {
+        const youtubeClient = await getYouTubeClientForConnection(
+          connection as ProviderConnection,
+          ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
+        );
+        const channelDetails = await getChannelDetails(youtubeClient, input.providerChannelId);
+        if (channelDetails?.snippet) {
+          creatorName = channelDetails.snippet.title || creatorName;
+          creatorDescription = channelDetails.snippet.description || undefined;
+          creatorHandle = channelDetails.snippet.customUrl || undefined;
+          creatorImageUrl =
+            channelDetails.snippet.thumbnails?.high?.url ||
+            channelDetails.snippet.thumbnails?.medium?.url ||
+            creatorImageUrl;
+          creatorExternalUrl = `https://www.youtube.com/channel/${input.providerChannelId}`;
+        }
+      } catch {
+        // Non-fatal: continue with provided data if channel details fetch fails
+        logger.warn(`Failed to fetch YouTube channel details for ${input.providerChannelId}`);
+      }
+    }
+
+    // 3. Find or create creator in normalized creators table
     const creator = await findOrCreateCreator(
       { db: ctx.db },
       {
         provider: input.provider,
         providerCreatorId: input.providerChannelId,
         name: creatorName,
-        imageUrl: input.imageUrl,
+        imageUrl: creatorImageUrl,
+        description: creatorDescription,
+        handle: creatorHandle,
+        externalUrl: creatorExternalUrl,
       }
     );
 
-    // 3. Create subscription (upsert: reactivate if previously unsubscribed)
+    // 4. Create subscription (upsert: reactivate if previously unsubscribed)
     const now = Date.now();
     const subscriptionId = ulid();
 
@@ -316,7 +349,7 @@ export const subscriptionsRouter = router({
         },
       });
 
-    // 4. Get the subscription ID (might be existing one if upsert)
+    // 5. Get the subscription ID (might be existing one if upsert)
     const sub = await ctx.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, ctx.userId),
@@ -326,7 +359,7 @@ export const subscriptionsRouter = router({
       columns: { id: true },
     });
 
-    // 5. Trigger initial fetch (await to ensure it completes before response)
+    // 6. Trigger initial fetch (await to ensure it completes before response)
     // Note: triggerInitialFetch catches its own errors internally and won't fail subscription creation
     try {
       await triggerInitialFetch(

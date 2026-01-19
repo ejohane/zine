@@ -102,8 +102,11 @@ function createMockCreator(overrides: Partial<Creator> = {}): Creator {
     imageUrl: 'https://example.com/avatar.jpg',
     provider: 'YOUTUBE',
     providerCreatorId: 'UC123456',
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
+    description: null,
+    handle: null,
+    externalUrl: null,
+    createdAt: 1704067200000, // 2024-01-01T00:00:00.000Z
+    updatedAt: 1704067200000, // 2024-01-01T00:00:00.000Z
     ...overrides,
   };
 }
@@ -125,15 +128,15 @@ function createMockBookmark(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// Create mock content item
+// Create mock content item (matches backend LatestContentItem shape)
 function createMockContentItem(overrides: Partial<CreatorContentItem> = {}): CreatorContentItem {
   return {
-    providerId: 'vid-123',
+    id: 'vid-123',
     title: 'New Video',
     thumbnailUrl: 'https://example.com/new-thumb.jpg',
     duration: 600,
-    publishedAt: '2024-01-15T00:00:00.000Z',
-    url: 'https://youtube.com/watch?v=vid-123',
+    publishedAt: 1705276800000, // 2024-01-15T00:00:00.000Z as Unix ms
+    externalUrl: 'https://youtube.com/watch?v=vid-123',
     ...overrides,
   };
 }
@@ -492,8 +495,8 @@ describe('useCreatorLatestContent', () => {
     });
 
     it('returns content items', () => {
-      const content1 = createMockContentItem({ providerId: 'vid-1' });
-      const content2 = createMockContentItem({ providerId: 'vid-2' });
+      const content1 = createMockContentItem({ id: 'vid-1' });
+      const content2 = createMockContentItem({ id: 'vid-2' });
 
       mockLatestContentUseQuery.mockReturnValue({
         data: { items: [content1, content2] },

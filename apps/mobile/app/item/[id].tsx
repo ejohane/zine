@@ -40,7 +40,12 @@ import {
   ContentType,
 } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
-import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
+import {
+  getContentIcon,
+  getProviderLabel,
+  upgradeSpotifyImageUrl,
+  upgradeYouTubeImageUrl,
+} from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
 
@@ -690,7 +695,11 @@ export default function ItemDetailScreen() {
                 >
                   {item.creatorImageUrl ? (
                     <Image
-                      source={{ uri: item.creatorImageUrl }}
+                      source={{
+                        uri:
+                          upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl)) ??
+                          undefined,
+                      }}
                       style={styles.creatorThumbnail}
                       contentFit="cover"
                     />
@@ -718,7 +727,11 @@ export default function ItemDetailScreen() {
                 <View style={styles.sourceRow}>
                   {item.creatorImageUrl ? (
                     <Image
-                      source={{ uri: item.creatorImageUrl }}
+                      source={{
+                        uri:
+                          upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl)) ??
+                          undefined,
+                      }}
                       style={styles.sourceThumbnail}
                       contentFit="cover"
                     />

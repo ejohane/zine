@@ -8,7 +8,7 @@
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
-import { EmptyState, ErrorState } from '@/components/list-states';
+import { ErrorState } from '@/components/list-states';
 import { Colors, Typography, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreatorBookmarks } from '@/hooks/use-creator';
@@ -110,20 +110,9 @@ export function CreatorBookmarks({ creatorId }: CreatorBookmarksProps) {
     );
   }
 
-  // Empty state
+  // Empty state - hide the section entirely when there are no bookmarks
   if (items.length === 0) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Your Bookmarks</Text>
-        </View>
-        <EmptyState
-          emoji="🔖"
-          title="No bookmarks yet"
-          message="Your bookmarks from this creator will appear here"
-        />
-      </View>
-    );
+    return null;
   }
 
   // Success state with items

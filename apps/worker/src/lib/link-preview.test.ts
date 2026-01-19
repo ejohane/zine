@@ -22,7 +22,7 @@ vi.mock('./opengraph', () => ({
 }));
 
 vi.mock('../providers/spotify', () => ({
-  getEpisode: vi.fn(),
+  getEpisodeWithRaw: vi.fn(),
 }));
 
 vi.mock('./article-extractor', () => ({
@@ -47,7 +47,7 @@ vi.mock('./logger', () => ({
 // Import mocked modules and cast them
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import { scrapeOpenGraph } from './opengraph';
-import { getEpisode } from '../providers/spotify';
+import { getEpisodeWithRaw } from '../providers/spotify';
 import { fetchFxTwitterByUrl } from './fxtwitter';
 import { extractArticle } from './article-extractor';
 import { fetchFavicon } from './favicon';
@@ -57,7 +57,7 @@ const mockFetchYouTubeOEmbed = fetchYouTubeOEmbed as Mock;
 const mockFetchSpotifyOEmbed = fetchSpotifyOEmbed as Mock;
 const mockFetchTwitterOEmbed = fetchTwitterOEmbed as Mock;
 const mockScrapeOpenGraph = scrapeOpenGraph as Mock;
-const mockGetEpisode = getEpisode as Mock;
+const mockGetEpisodeWithRaw = getEpisodeWithRaw as Mock;
 const mockFetchFxTwitterByUrl = fetchFxTwitterByUrl as Mock;
 const mockExtractArticle = extractArticle as Mock;
 const mockFetchFavicon = fetchFavicon as Mock;
@@ -196,7 +196,7 @@ describe('link-preview', () => {
       const episodeId = '4rOoJ6Egrf8K2IrywzwOMk';
 
       it('fetches via API when token provided', async () => {
-        mockGetEpisode.mockResolvedValue({
+        const episode = {
           id: episodeId,
           name: 'Amazing Podcast Episode',
           description: 'This is an amazing episode about something interesting.',
@@ -205,6 +205,11 @@ describe('link-preview', () => {
           externalUrl: spotifyUrl,
           images: [{ url: 'https://i.scdn.co/image/abc123', height: 640, width: 640 }],
           isPlayable: true,
+        };
+        // Mock returns both transformed episode and raw response
+        mockGetEpisodeWithRaw.mockResolvedValue({
+          episode,
+          raw: { id: episodeId, show: { id: 'show123', name: 'Test Show' } }, // Raw API response
         });
 
         const context: PreviewContext = {
@@ -222,6 +227,10 @@ describe('link-preview', () => {
         expect(result!.thumbnailUrl).toBe('https://i.scdn.co/image/abc123');
         expect(result!.description).toBe('This is an amazing episode about something interesting.');
         expect(result!.source).toBe('provider_api');
+        // Verify rawMetadata contains the raw response for creator extraction
+        expect(result!.rawMetadata).toBeDefined();
+        const parsed = JSON.parse(result!.rawMetadata!);
+        expect(parsed.show.id).toBe('show123');
       });
 
       it('falls back to oEmbed when no token provided', async () => {
@@ -238,12 +247,12 @@ describe('link-preview', () => {
         expect(result).not.toBeNull();
         expect(result!.source).toBe('oembed');
         expect(result!.title).toBe('Podcast Episode Title');
-        expect(getEpisode).not.toHaveBeenCalled();
+        expect(getEpisodeWithRaw).not.toHaveBeenCalled();
         expect(fetchSpotifyOEmbed).toHaveBeenCalled();
       });
 
       it('falls back to oEmbed when API fails', async () => {
-        mockGetEpisode.mockRejectedValue(new Error('API error'));
+        mockGetEpisodeWithRaw.mockRejectedValue(new Error('API error'));
         mockFetchSpotifyOEmbed.mockResolvedValue({
           title: 'oEmbed Fallback',
           author_name: 'Host',
@@ -263,7 +272,7 @@ describe('link-preview', () => {
       });
 
       it('falls back to oEmbed when episode not found', async () => {
-        mockGetEpisode.mockResolvedValue(null);
+        mockGetEpisodeWithRaw.mockResolvedValue(null);
         mockFetchSpotifyOEmbed.mockResolvedValue({
           title: 'oEmbed Title',
           author_name: 'Host',

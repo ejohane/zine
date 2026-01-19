@@ -238,6 +238,7 @@ export function extractCreatorFromMetadata(
 /**
  * Extract creator info from YouTube metadata.
  * Handles YouTube Data API v3 response format.
+ * Expects enriched metadata that includes channelImageUrl from the channels API.
  */
 function extractYouTubeCreator(metadata: unknown): CreatorParams | null {
   if (!metadata || typeof metadata !== 'object') return null;
@@ -252,10 +253,14 @@ function extractYouTubeCreator(metadata: unknown): CreatorParams | null {
 
   if (!channelId || !channelTitle) return null;
 
+  // Get channel image from enriched metadata (added by link-preview.ts)
+  const channelImageUrl = md.channelImageUrl as string | undefined;
+
   return {
     provider: 'YOUTUBE',
     providerCreatorId: channelId,
     name: channelTitle,
+    imageUrl: channelImageUrl,
   };
 }
 

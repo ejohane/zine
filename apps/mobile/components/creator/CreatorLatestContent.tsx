@@ -34,6 +34,20 @@ export interface CreatorLatestContentProps {
 /** Providers that support fetching latest content */
 const SUPPORTED_PROVIDERS = ['YOUTUBE', 'SPOTIFY'];
 
+/**
+ * Gets the section title based on provider
+ */
+function getSectionTitle(provider: string): string {
+  switch (provider) {
+    case 'SPOTIFY':
+      return 'Recent Episodes';
+    case 'YOUTUBE':
+      return 'Recent Videos';
+    default:
+      return 'Recent Content';
+  }
+}
+
 // ============================================================================
 // Helper Components
 // ============================================================================
@@ -41,7 +55,7 @@ const SUPPORTED_PROVIDERS = ['YOUTUBE', 'SPOTIFY'];
 function Skeleton({ colors }: { colors: typeof Colors.light }) {
   return (
     <View style={styles.skeletonContainer}>
-      {[1, 2, 3].map((i) => (
+      {[1, 2, 3, 4].map((i) => (
         <View
           key={i}
           style={[styles.skeletonItem, { backgroundColor: colors.backgroundTertiary }]}
@@ -197,12 +211,13 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   }
 
   const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
+  const sectionTitle = getSectionTitle(provider);
 
   // Loading state
   if (isLoading) {
     return (
-      <View style={[styles.container, { borderTopColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
         <Skeleton colors={colors} />
       </View>
     );
@@ -211,8 +226,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   // Not connected to provider
   if (reason === 'NOT_CONNECTED') {
     return (
-      <View style={[styles.container, { borderTopColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
         <ConnectPrompt
           provider={provider}
           message={`Connect your ${providerDisplayName} account to see latest content`}
@@ -226,8 +241,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   // Token expired
   if (reason === 'TOKEN_EXPIRED') {
     return (
-      <View style={[styles.container, { borderTopColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
         <ReconnectPrompt provider={provider} connectUrl={connectUrl} colors={colors} />
       </View>
     );
@@ -236,8 +251,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   // Error state
   if (error) {
     return (
-      <View style={[styles.container, { borderTopColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
         <Text style={[styles.errorText, { color: colors.error }]}>
           Failed to load latest content
         </Text>
@@ -248,8 +263,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   // Empty state
   if (content.length === 0) {
     return (
-      <View style={[styles.container, { borderTopColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+      <View style={styles.container}>
+        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
         <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
           No recent content found
         </Text>
@@ -259,29 +274,28 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
 
   // Transform API content to LatestContentItem format
   const items: LatestContentItem[] = content.map((item: CreatorContentItem) => ({
-    providerId: item.providerId,
+    providerId: item.id,
     title: item.title,
     thumbnailUrl: item.thumbnailUrl,
     duration: item.duration,
-    publishedAt: item.publishedAt,
-    url: item.url,
+    publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,
+    url: item.externalUrl,
     isBookmarked: false, // TODO: Cross-reference with bookmarks when needed
   }));
 
   // Success state with items
   return (
-    <View style={[styles.container, { borderTopColor: colors.border }]}>
-      <Text style={[styles.title, { color: colors.text }]}>More from this Creator</Text>
+    <View style={styles.container}>
+      <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
       <FlatList
         data={items}
         keyExtractor={(item) => item.providerId}
         renderItem={({ item }) => (
           <LatestContentCard item={item} creatorId={creatorId} provider={provider} />
         )}
-        horizontal
-        showsHorizontalScrollIndicator={false}
+        scrollEnabled={false}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
     </View>
   );
@@ -293,8 +307,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Spacing.lg,
-    borderTopWidth: 1,
+    paddingTop: Spacing.xl,
   },
   title: {
     ...Typography.titleMedium,
@@ -303,14 +316,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   skeletonContainer: {
-    flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
   },
   skeletonItem: {
-    width: 160,
-    height: 140,
+    height: 72,
     borderRadius: Radius.md,
-    marginRight: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   promptContainer: {
     marginHorizontal: Spacing.lg,
@@ -341,10 +352,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   listContent: {
-    paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.lg,
-  },
-  separator: {
-    width: Spacing.md,
   },
 });

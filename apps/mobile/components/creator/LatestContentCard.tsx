@@ -1,16 +1,17 @@
 /**
  * LatestContentCard Component
  *
- * Displays a single content item in the "More from this Creator" horizontal carousel.
- * Shows thumbnail, title, published date, and "Saved" badge if bookmarked.
+ * Displays a single content item in a vertical list row.
+ * Shows thumbnail, title, published date, duration, and chevron indicator.
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { View, Text, Image, Pressable, Linking, StyleSheet } from 'react-native';
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { analytics } from '@/lib/analytics';
-import { formatRelativeTime } from '@/lib/format';
+import { formatRelativeTime, formatDuration } from '@/lib/format';
 
 // ============================================================================
 // Types
@@ -85,13 +86,20 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
     }
   };
 
+  // Build metadata line (date · duration)
+  const metaParts: string[] = [];
+  if (item.publishedAt) {
+    metaParts.push(formatRelativeTime(item.publishedAt));
+  }
+  if (item.duration) {
+    metaParts.push(formatDuration(item.duration));
+  }
+  const metaLine = metaParts.join(' · ');
+
   return (
     <Pressable
       onPress={handlePress}
-      style={({ pressed }) => [
-        styles.container,
-        { backgroundColor: colors.card, opacity: pressed ? 0.8 : 1 },
-      ]}
+      style={({ pressed }) => [styles.container, { opacity: pressed ? 0.7 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.title}`}
       accessibilityHint="Opens content in external app"
@@ -114,19 +122,13 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
           {item.title}
         </Text>
-        {item.publishedAt && (
-          <Text style={[styles.publishedAt, { color: colors.textSecondary }]}>
-            {formatRelativeTime(item.publishedAt)}
-          </Text>
-        )}
+        {metaLine && <Text style={[styles.meta, { color: colors.textSecondary }]}>{metaLine}</Text>}
       </View>
 
-      {/* Bookmarked indicator */}
-      {item.isBookmarked && (
-        <View style={[styles.savedBadge, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.savedBadgeText, { color: colors.buttonPrimaryText }]}>Saved</Text>
-        </View>
-      )}
+      {/* Chevron */}
+      <View style={styles.chevronContainer}>
+        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+      </View>
     </Pressable>
   );
 }
@@ -135,48 +137,45 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
 // Styles
 // ============================================================================
 
+const THUMBNAIL_SIZE = 64;
+
 const styles = StyleSheet.create({
   container: {
-    width: 160,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
   thumbnail: {
-    width: '100%',
-    height: 90,
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: Radius.sm,
     resizeMode: 'cover',
   },
   thumbnailPlaceholder: {
-    width: '100%',
-    height: 90,
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   thumbnailPlaceholderText: {
-    fontSize: 24,
+    fontSize: 20,
   },
   content: {
-    padding: Spacing.sm,
+    flex: 1,
+    marginLeft: Spacing.md,
+    marginRight: Spacing.sm,
   },
   title: {
-    ...Typography.bodySmall,
+    ...Typography.bodyMedium,
     fontWeight: '500',
   },
-  publishedAt: {
-    ...Typography.labelMedium,
+  meta: {
+    ...Typography.bodySmall,
     marginTop: Spacing.xs,
   },
-  savedBadge: {
-    position: 'absolute',
-    top: Spacing.sm,
-    right: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.xs,
-  },
-  savedBadgeText: {
-    ...Typography.labelSmall,
-    textTransform: 'none',
-    letterSpacing: 0,
+  chevronContainer: {
+    paddingLeft: Spacing.sm,
   },
 });

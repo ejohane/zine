@@ -168,7 +168,7 @@ export default function CreatorScreen() {
                 transition={300}
               />
             }
-            headerHeightFraction={0.22}
+            headerHeightFraction={0.35}
           >
             <Animated.View entering={FadeInDown.delay(200).duration(400)}>
               <CreatorHeader creator={creator} />
@@ -204,7 +204,7 @@ export default function CreatorScreen() {
               </Text>
             </View>
           }
-          headerHeightFraction={0.22}
+          headerHeightFraction={0.45}
         >
           <Animated.View entering={FadeInDown.delay(200).duration(400)}>
             <CreatorHeader creator={creator} />

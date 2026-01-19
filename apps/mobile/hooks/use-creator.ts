@@ -26,20 +26,24 @@ export interface Creator {
   imageUrl: string | null;
   provider: string;
   providerCreatorId: string;
-  createdAt: string;
-  updatedAt: string;
+  description: string | null;
+  handle: string | null;
+  externalUrl: string | null;
+  createdAt: number;
+  updatedAt: number;
 }
 
 /**
  * Latest content item from a creator
+ * Note: Field names match backend LatestContentItem (id, externalUrl, publishedAt as number)
  */
 export interface CreatorContentItem {
-  providerId: string;
+  id: string;
   title: string;
   thumbnailUrl: string | null;
   duration: number | null;
-  publishedAt: string | null;
-  url: string;
+  publishedAt: number | null;
+  externalUrl: string;
 }
 
 /**
@@ -303,11 +307,15 @@ export function useCreatorSubscription(creatorId: string) {
       const previous = utils.creators.checkSubscription.getData({ creatorId });
 
       // Optimistically update to subscribed
-      utils.creators.checkSubscription.setData({ creatorId }, (old) => ({
-        ...old,
-        isSubscribed: true,
-        subscribedAt: new Date().toISOString(),
-      }));
+      utils.creators.checkSubscription.setData({ creatorId }, (old) =>
+        old
+          ? {
+              ...old,
+              isSubscribed: true,
+              subscribedAt: new Date().toISOString(),
+            }
+          : undefined
+      );
 
       return { previous };
     },

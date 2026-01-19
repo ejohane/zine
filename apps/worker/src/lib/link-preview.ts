@@ -29,7 +29,7 @@ import { ContentType, Provider } from '@zine/shared';
 import { parseLink, type ParsedLink } from './link-parser';
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import { scrapeOpenGraph } from './opengraph';
-import { getEpisode, type SpotifyEpisode } from '../providers/spotify';
+import { getEpisodeWithRaw, type SpotifyEpisode } from '../providers/spotify';
 import { extractArticle } from './article-extractor';
 import { fetchFxTwitterByUrl, type FxTwitterResponse, type FxTwitterTweet } from './fxtwitter';
 import { fetchFavicon } from './favicon';
@@ -114,6 +114,7 @@ interface YouTubeVideoResponse {
     snippet?: {
       title?: string;
       description?: string;
+      channelId?: string;
       channelTitle?: string;
       thumbnails?: {
         maxres?: { url?: string };
@@ -129,6 +130,79 @@ interface YouTubeVideoResponse {
 }
 
 /**
+ * YouTube Data API channel response shape (partial, just what we need)
+ */
+interface YouTubeChannelResponse {
+  items?: Array<{
+    id?: string;
+    snippet?: {
+      title?: string;
+      thumbnails?: {
+        high?: { url?: string };
+        medium?: { url?: string };
+        default?: { url?: string };
+      };
+    };
+  }>;
+}
+
+/**
+ * Fetch YouTube channel thumbnail via YouTube Data API
+ *
+ * Uses the channels.list endpoint to get the channel's avatar image.
+ * This is a separate call because the videos.list endpoint doesn't include channel thumbnails.
+ *
+ * YouTube API Cost: 1 quota unit
+ */
+async function fetchYouTubeChannelImage(
+  channelId: string,
+  accessToken: string
+): Promise<string | null> {
+  try {
+    previewLogger.debug('Fetching YouTube channel image', { channelId });
+
+    const url = new URL('https://www.googleapis.com/youtube/v3/channels');
+    url.searchParams.set('part', 'snippet');
+    url.searchParams.set('id', channelId);
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      previewLogger.warn('YouTube channel API request failed', {
+        channelId,
+        status: response.status,
+      });
+      return null;
+    }
+
+    const data = (await response.json()) as YouTubeChannelResponse;
+    const channel = data.items?.[0];
+
+    if (!channel?.snippet?.thumbnails) {
+      return null;
+    }
+
+    const thumbnails = channel.snippet.thumbnails;
+    const imageUrl = thumbnails.high?.url ?? thumbnails.medium?.url ?? thumbnails.default?.url;
+
+    previewLogger.debug('YouTube channel image fetched', {
+      channelId,
+      hasImage: !!imageUrl,
+    });
+
+    return imageUrl ?? null;
+  } catch (error) {
+    previewLogger.warn('YouTube channel image fetch error', { error, channelId });
+    return null;
+  }
+}
+
+/**
  * Fetch YouTube video metadata via YouTube Data API
  *
  * Uses the videos.list endpoint to get full video details including:
@@ -136,7 +210,9 @@ interface YouTubeVideoResponse {
  * - Duration
  * - High-quality thumbnails
  *
- * YouTube API Cost: 1 quota unit
+ * Also fetches the channel's avatar image via a separate channels.list call.
+ *
+ * YouTube API Cost: 2 quota units (1 for video, 1 for channel)
  */
 async function fetchYouTubeViaAPI(
   videoId: string,
@@ -195,11 +271,27 @@ async function fetchYouTubeViaAPI(
       }
     }
 
+    // Fetch channel image (best-effort, don't fail if it errors)
+    let creatorImageUrl: string | undefined = undefined;
+    if (video.snippet.channelId) {
+      const channelImage = await fetchYouTubeChannelImage(video.snippet.channelId, accessToken);
+      if (channelImage) {
+        creatorImageUrl = channelImage;
+      }
+    }
+
     previewLogger.debug('YouTube API fetch successful', {
       videoId,
       hasDescription: !!video.snippet.description,
       hasDuration: duration !== null,
+      hasChannelImage: !!creatorImageUrl,
     });
+
+    // Enrich video metadata with channel image for creator extraction
+    const enrichedVideo = {
+      ...video,
+      channelImageUrl: creatorImageUrl,
+    };
 
     return {
       provider: Provider.YOUTUBE,
@@ -207,11 +299,14 @@ async function fetchYouTubeViaAPI(
       providerId: videoId,
       title: video.snippet.title ?? 'Untitled Video',
       creator: video.snippet.channelTitle ?? 'Unknown',
+      creatorImageUrl,
       thumbnailUrl,
       duration,
       canonicalUrl: `https://www.youtube.com/watch?v=${videoId}`,
       description: video.snippet.description ?? undefined,
       source: 'provider_api',
+      // Store enriched API response for creator extraction (includes channelImageUrl)
+      rawMetadata: JSON.stringify(enrichedVideo),
     };
   } catch (error) {
     previewLogger.error('YouTube API fetch error', { error, videoId });
@@ -228,14 +323,14 @@ async function fetchSpotifyViaAPI(
   canonicalUrl: string
 ): Promise<LinkPreviewResult | null> {
   try {
-    const episode = await getEpisode(accessToken, episodeId);
+    const result = await getEpisodeWithRaw(accessToken, episodeId);
 
-    if (!episode) {
+    if (!result) {
       previewLogger.warn('Spotify episode not found via API', { episodeId });
       return null;
     }
 
-    return transformSpotifyEpisode(episode, canonicalUrl);
+    return transformSpotifyEpisode(result.episode, canonicalUrl, result.raw);
   } catch (error) {
     previewLogger.error('Spotify API fetch failed', { error, episodeId });
     return null;
@@ -244,8 +339,16 @@ async function fetchSpotifyViaAPI(
 
 /**
  * Transform Spotify episode to LinkPreviewResult
+ *
+ * @param episode - Transformed episode data
+ * @param canonicalUrl - Canonical URL for the episode
+ * @param rawResponse - Raw Spotify API response (used for rawMetadata to enable proper creator extraction)
  */
-function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string): LinkPreviewResult {
+function transformSpotifyEpisode(
+  episode: SpotifyEpisode,
+  canonicalUrl: string,
+  rawResponse?: unknown
+): LinkPreviewResult {
   // Get the best available thumbnail (episode image)
   const thumbnail = episode.images[0]?.url ?? null;
 
@@ -263,7 +366,8 @@ function transformSpotifyEpisode(episode: SpotifyEpisode, canonicalUrl: string):
     source: 'provider_api',
     siteName: episode.showPublisher,
     publishedAt: episode.releaseDate,
-    rawMetadata: JSON.stringify(episode),
+    // Store raw API response for creator extraction (has nested show object with show.id, etc.)
+    rawMetadata: rawResponse ? JSON.stringify(rawResponse) : JSON.stringify(episode),
   };
 }
 

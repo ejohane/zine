@@ -223,6 +223,60 @@ async function getOrCreateCreator(
   }
 }
 
+/**
+ * Backfill creatorId for an existing canonical item if it's missing.
+ * This handles items created before the schema normalization.
+ *
+ * Called when an item is "already seen" to ensure we still update
+ * the canonical item's creatorId even though we skip creating user_item.
+ */
+async function backfillCreatorIdIfMissing<T>(
+  db: Database,
+  provider: string,
+  rawItem: T,
+  transformedItem: NewItem
+): Promise<void> {
+  try {
+    // Check if canonical item exists and is missing creatorId
+    const existing = await db
+      .select({ id: items.id, creatorId: items.creatorId })
+      .from(items)
+      .where(and(eq(items.provider, provider), eq(items.providerId, transformedItem.providerId)))
+      .limit(1);
+
+    if (existing.length === 0 || existing[0].creatorId) {
+      // Item doesn't exist or already has creatorId - nothing to backfill
+      return;
+    }
+
+    // Extract creator from raw item
+    const creatorId = await getOrCreateCreator(db, provider, rawItem, transformedItem);
+    if (!creatorId) {
+      return;
+    }
+
+    // Update the canonical item with the creatorId
+    await db
+      .update(items)
+      .set({ creatorId, updatedAt: new Date().toISOString() })
+      .where(eq(items.id, existing[0].id));
+
+    console.log('Backfilled creatorId for item', {
+      itemId: existing[0].id,
+      provider,
+      providerId: transformedItem.providerId,
+      creatorId,
+    });
+  } catch (error) {
+    // Log but don't fail - backfill is best-effort
+    console.error('Failed to backfill creatorId:', {
+      provider,
+      providerId: transformedItem.providerId,
+      error: serializeError(error),
+    });
+  }
+}
+
 // ============================================================================
 // Timestamp Conversion Helpers
 // ============================================================================
@@ -312,6 +366,9 @@ export async function ingestItem<T>(
     .limit(1);
 
   if (seen.length > 0) {
+    // Even though user already saw this item, we should still backfill creatorId
+    // if the canonical item is missing it (migration from denormalized schema)
+    await backfillCreatorIdIfMissing(db, provider, rawItem, transformedItem);
     return { created: false, skipped: 'already_seen' };
   }
 
@@ -414,13 +471,20 @@ async function findOrCreateCanonicalItem(
 ): Promise<{ id: string }> {
   // Check if item already exists (shared across users)
   const existing = await db
-    .select({ id: items.id })
+    .select({ id: items.id, creatorId: items.creatorId })
     .from(items)
     .where(and(eq(items.provider, provider), eq(items.providerId, newItem.providerId)))
     .limit(1);
 
   if (existing.length > 0) {
-    return existing[0];
+    // Backfill creatorId if the existing item doesn't have one but we have one now
+    if (!existing[0].creatorId && creatorId) {
+      await db
+        .update(items)
+        .set({ creatorId, updatedAt: new Date().toISOString() })
+        .where(eq(items.id, existing[0].id));
+    }
+    return { id: existing[0].id };
   }
 
   // Create new canonical item
@@ -737,13 +801,21 @@ export async function ingestBatchConsolidated<T>(
 
       // Find or check canonical item existence
       const existingCanonical = await db
-        .select({ id: items.id })
+        .select({ id: items.id, creatorId: items.creatorId })
         .from(items)
         .where(and(eq(items.provider, provider), eq(items.providerId, newItem.providerId)))
         .limit(1);
 
       // Extract or create creator from raw metadata
       const creatorId = await getOrCreateCreator(db, provider, rawItem, newItem);
+
+      // Backfill creatorId if the existing item doesn't have one but we have one now
+      if (existingCanonical.length > 0 && !existingCanonical[0].creatorId && creatorId) {
+        await db
+          .update(items)
+          .set({ creatorId, updatedAt: new Date().toISOString() })
+          .where(eq(items.id, existingCanonical[0].id));
+      }
 
       preparedItems.push({
         newItem,

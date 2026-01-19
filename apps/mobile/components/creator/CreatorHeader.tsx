@@ -2,7 +2,7 @@
  * CreatorHeader Component
  *
  * Displays creator profile information below the parallax header.
- * Shows name, provider badge, and subscribe button.
+ * Shows provider badge, name, handle, stats, and description.
  * The creator image is displayed in the parallax header of the parent screen.
  */
 
@@ -31,6 +31,18 @@ export interface CreatorHeaderProps {
 
 /** Providers that support subscription via the app */
 const SUBSCRIBABLE_PROVIDERS = ['YOUTUBE', 'SPOTIFY'];
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Formats the handle for display (ensures @ prefix)
+ */
+function formatHandle(handle: string | null): string | null {
+  if (!handle) return null;
+  return handle.startsWith('@') ? handle : `@${handle}`;
+}
 
 // ============================================================================
 // Component
@@ -92,16 +104,27 @@ export function CreatorHeader({ creator }: CreatorHeaderProps) {
   }, [error, creator.id, creator.provider]);
 
   const showSubscribeButton = SUBSCRIBABLE_PROVIDERS.includes(creator.provider) && !isSubscribed;
+  const handle = formatHandle(creator.handle);
 
   return (
-    <View style={[styles.container, { borderBottomColor: colors.border }]}>
-      {/* Creator Name */}
-      <Text style={[styles.name, { color: colors.text }]}>{creator.name}</Text>
-
+    <View style={styles.container}>
       {/* Provider Badge */}
       <View style={styles.badgeContainer}>
         <SourceBadge provider={creator.provider} />
       </View>
+
+      {/* Creator Name */}
+      <Text style={[styles.name, { color: colors.text }]}>{creator.name}</Text>
+
+      {/* Handle (e.g., @waveform) */}
+      {handle && <Text style={[styles.handle, { color: colors.textSecondary }]}>{handle}</Text>}
+
+      {/* Description */}
+      {creator.description && (
+        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={4}>
+          {creator.description}
+        </Text>
+      )}
 
       {/* Subscribe Button */}
       {showSubscribeButton && (
@@ -138,7 +161,7 @@ export function CreatorHeader({ creator }: CreatorHeaderProps) {
       {/* Already Subscribed Indicator */}
       {isSubscribed && (
         <View style={styles.subscribedContainer}>
-          <Text style={[styles.subscribedText, { color: colors.textSecondary }]}>✓ Subscribed</Text>
+          <Text style={[styles.subscribedText, { color: colors.textSecondary }]}>Subscribed</Text>
         </View>
       )}
     </View>
@@ -151,21 +174,30 @@ export function CreatorHeader({ creator }: CreatorHeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: Spacing.lg,
-    borderBottomWidth: 1,
-    alignItems: 'center',
-  },
-  name: {
-    ...Typography.headlineSmall,
-    textAlign: 'center',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xl,
   },
   badgeContainer: {
-    marginTop: Spacing.sm,
+    alignSelf: 'flex-start',
+    marginBottom: Spacing.md,
+  },
+  name: {
+    ...Typography.headlineLarge,
+    fontWeight: '700',
+  },
+  handle: {
+    ...Typography.bodyMedium,
+    marginTop: Spacing.xs,
+  },
+  description: {
+    ...Typography.bodyMedium,
+    marginTop: Spacing.md,
+    lineHeight: 22,
   },
   subscribeContainer: {
     marginTop: Spacing.lg,
-    width: '100%',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   subscribeButton: {
     paddingVertical: Spacing.md,
@@ -187,7 +219,7 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
   },
   subscribedContainer: {
-    marginTop: Spacing.lg,
+    marginTop: Spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
   },
