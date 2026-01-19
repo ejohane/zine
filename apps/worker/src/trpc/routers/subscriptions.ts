@@ -36,6 +36,7 @@ import {
   getSpotifyClientForConnection,
   getAllUserSavedShows,
   searchShows,
+  getLargestImage,
 } from '../../providers/spotify';
 import type { ProviderConnection } from '../../lib/token-refresh';
 import type { Database } from '../../db';
@@ -896,7 +897,7 @@ export const subscriptionsRouter = router({
           providerSubs = shows.map((s) => ({
             id: s.id,
             name: s.name,
-            imageUrl: s.images?.[0]?.url,
+            imageUrl: getLargestImage(s.images),
           }));
         }
 
@@ -970,7 +971,7 @@ export const subscriptionsRouter = router({
           id: s.id,
           name: s.name,
           description: s.description,
-          imageUrl: s.images?.[0]?.url,
+          imageUrl: getLargestImage(s.images),
         }));
       }
 

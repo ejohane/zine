@@ -621,6 +621,30 @@ export async function checkSavedShows(client: SpotifyApi, showIds: string[]): Pr
 // ============================================================================
 
 /**
+ * Select the largest image from an array of images based on dimensions.
+ * Returns undefined if the array is empty or undefined.
+ *
+ * This is a defensive helper because Spotify's API documentation says images
+ * are returned "widest first", but we've observed cases where this isn't true.
+ */
+export function getLargestImage(
+  images: Array<{ url: string; height?: number | null; width?: number | null }> | undefined | null
+): string | undefined {
+  if (!images || images.length === 0) return undefined;
+
+  // Find image with largest dimensions (prefer width, fall back to height)
+  let largest = images[0];
+  for (const img of images) {
+    const currentSize = (largest.width ?? 0) * (largest.height ?? 0);
+    const imgSize = (img.width ?? 0) * (img.height ?? 0);
+    if (imgSize > currentSize) {
+      largest = img;
+    }
+  }
+  return largest?.url;
+}
+
+/**
  * Transform SDK's SimplifiedShow/Show to our SpotifyShow type
  */
 function transformShow(show: SimplifiedShow | Show): SpotifyShow {

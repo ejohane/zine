@@ -25,7 +25,7 @@ import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreator, useCreatorBookmarks } from '@/hooks/use-creator';
 import { analytics, type CreatorViewSource } from '@/lib/analytics';
-import { upgradeYouTubeImageUrl } from '@/lib/content-utils';
+import { upgradeYouTubeImageUrl, upgradeSpotifyImageUrl } from '@/lib/content-utils';
 
 // ============================================================================
 // Floating Header Button
@@ -159,7 +159,10 @@ export default function CreatorScreen() {
           <ParallaxScrollView
             headerImage={
               <Image
-                source={{ uri: upgradeYouTubeImageUrl(creator.imageUrl) ?? undefined }}
+                source={{
+                  uri:
+                    upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(creator.imageUrl)) ?? undefined,
+                }}
                 style={styles.parallaxCoverImage}
                 contentFit="cover"
                 transition={300}

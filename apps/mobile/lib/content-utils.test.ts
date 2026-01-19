@@ -45,6 +45,7 @@ import {
   isVideoContent,
   isPodcastContent,
   upgradeYouTubeImageUrl,
+  upgradeSpotifyImageUrl,
 } from './content-utils';
 import { ContentType, Provider } from '@zine/shared';
 
@@ -309,5 +310,85 @@ describe('upgradeYouTubeImageUrl', () => {
 
   it('returns undefined for undefined input', () => {
     expect(upgradeYouTubeImageUrl(undefined)).toBe(undefined);
+  });
+});
+
+// ============================================================================
+// Spotify Image URL Upgrade Tests
+// ============================================================================
+
+describe('upgradeSpotifyImageUrl', () => {
+  // Album art tests (ab67616d prefix)
+  it('upgrades 640px album art (b273) to 1400px (82c1)', () => {
+    const url = 'https://i.scdn.co/image/ab67616d0000b273abc123def456';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab67616d000082c1abc123def456'
+    );
+  });
+
+  it('upgrades 300px album art (1e02) to 1400px', () => {
+    const url = 'https://i.scdn.co/image/ab67616d00001e02abc123def456';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab67616d000082c1abc123def456'
+    );
+  });
+
+  it('upgrades alternative 640px album identifier (d452) to 1400px', () => {
+    const url = 'https://i.scdn.co/image/ab67616d0000d452abc123def456';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab67616d000082c1abc123def456'
+    );
+  });
+
+  it('upgrades alternative 300px album identifier (f848) to 1400px', () => {
+    const url = 'https://i.scdn.co/image/ab67616d0000f848abc123def456';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab67616d000082c1abc123def456'
+    );
+  });
+
+  // Podcast/Show art tests (ab6765630000 prefix)
+  it('upgrades 64px podcast art (f68d) to 640px (ba8a)', () => {
+    const url = 'https://i.scdn.co/image/ab6765630000f68d34fad3e8193cc7368ed83572';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab6765630000ba8a34fad3e8193cc7368ed83572'
+    );
+  });
+
+  it('upgrades 300px podcast art (5f1f) to 640px (ba8a)', () => {
+    const url = 'https://i.scdn.co/image/ab67656300005f1f34fad3e8193cc7368ed83572';
+    expect(upgradeSpotifyImageUrl(url)).toBe(
+      'https://i.scdn.co/image/ab6765630000ba8a34fad3e8193cc7368ed83572'
+    );
+  });
+
+  it('leaves 640px podcast art (ba8a) unchanged', () => {
+    const url = 'https://i.scdn.co/image/ab6765630000ba8a34fad3e8193cc7368ed83572';
+    expect(upgradeSpotifyImageUrl(url)).toBe(url);
+  });
+
+  // General tests
+  it('returns non-Spotify URLs unchanged', () => {
+    const url = 'https://example.com/image.jpg';
+    expect(upgradeSpotifyImageUrl(url)).toBe(url);
+  });
+
+  it('returns YouTube image URLs unchanged', () => {
+    const url = 'https://yt3.ggpht.com/ytc/abc123=s88-c-k';
+    expect(upgradeSpotifyImageUrl(url)).toBe(url);
+  });
+
+  it('returns Spotify URLs without known quality identifiers unchanged', () => {
+    // Unknown identifier - keep as-is (might already be high-res or different format)
+    const url = 'https://i.scdn.co/image/ab67616d0000xxxxabc123def456';
+    expect(upgradeSpotifyImageUrl(url)).toBe(url);
+  });
+
+  it('returns null for null input', () => {
+    expect(upgradeSpotifyImageUrl(null)).toBe(null);
+  });
+
+  it('returns undefined for undefined input', () => {
+    expect(upgradeSpotifyImageUrl(undefined)).toBe(undefined);
   });
 });

@@ -24,7 +24,12 @@ import {
   fetchVideoDetails,
   type YouTubeClient,
 } from '../providers/youtube';
-import { getSpotifyClientForConnection, getLatestEpisode, getShow } from '../providers/spotify';
+import {
+  getSpotifyClientForConnection,
+  getLatestEpisode,
+  getShow,
+  getLargestImage,
+} from '../providers/spotify';
 import { ingestItem } from '../ingestion/processor';
 import { transformYouTubeVideo, transformSpotifyEpisode } from '../ingestion/transformers';
 import { subscriptions } from '../db/schema';
@@ -416,6 +421,8 @@ async function fetchInitialSpotifyItem(
   }
 
   // Transform to the format expected by transformSpotifyEpisode
+  // CRITICAL: Include show metadata for creator extraction (extractSpotifyCreator expects rawItem.show)
+  const showImageUrl = getLargestImage(show.images) ?? subscriptionImageUrl;
   const spotifyEpisode = {
     id: episode.id,
     name: episode.name,
@@ -424,10 +431,13 @@ async function fetchInitialSpotifyItem(
     duration_ms: episode.durationMs,
     external_urls: { spotify: episode.externalUrl },
     images: episode.images,
+    // Show metadata for creator extraction
+    show: {
+      id: showId,
+      name: show.name,
+      images: showImageUrl ? [{ url: showImageUrl }] : [],
+    },
   };
-
-  // Use show image from API (most current), fall back to subscription imageUrl
-  const showImageUrl = show.images[0]?.url ?? subscriptionImageUrl;
 
   const result = await ingestItem(
     userId,

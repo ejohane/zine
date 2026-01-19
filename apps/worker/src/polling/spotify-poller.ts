@@ -26,6 +26,7 @@ import {
   getMultipleShowsWithCache,
   updateShowCache,
   invalidateShowCache,
+  getLargestImage,
   type SpotifyEpisode,
   type SpotifyShow,
 } from '../providers/spotify';
@@ -371,8 +372,9 @@ export async function pollSpotifySubscriptionsBatched(
         newEpisodes,
         userId,
         sub.id,
+        show.id,
         show.name,
-        show.images[0]?.url ?? null,
+        getLargestImage(show.images) ?? null,
         db
       );
       totalNewItems += newItemsCount;
@@ -551,6 +553,7 @@ export async function pollSingleSpotifySubscription(
     newEpisodes,
     userId,
     sub.id,
+    sub.providerChannelId,
     creatorName,
     creatorImageUrl,
     db
@@ -670,6 +673,7 @@ async function ingestNewEpisodes(
   episodes: SpotifyEpisode[],
   userId: string,
   subscriptionId: string,
+  showId: string,
   showName: string,
   showImageUrl: string | null,
   db: DrizzleDB
@@ -681,6 +685,8 @@ async function ingestNewEpisodes(
   for (const episode of episodes) {
     try {
       // Transform SpotifyEpisode to the format expected by transformSpotifyEpisode
+      // CRITICAL: Include show metadata for creator extraction
+      // extractSpotifyCreator() expects rawItem.show to contain { id, name, images }
       const rawEpisode = {
         id: episode.id,
         name: episode.name,
@@ -689,6 +695,12 @@ async function ingestNewEpisodes(
         duration_ms: episode.durationMs,
         external_urls: { spotify: episode.externalUrl },
         images: episode.images,
+        // Show metadata for creator extraction (extractSpotifyCreator looks for this)
+        show: {
+          id: showId,
+          name: showName,
+          images: showImageUrl ? [{ url: showImageUrl }] : [],
+        },
       };
 
       const result = await ingestItem(

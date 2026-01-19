@@ -346,3 +346,50 @@ export function upgradeYouTubeImageUrl(
 
   return url;
 }
+
+/**
+ * Spotify image quality identifiers:
+ *
+ * Album art (ab67616d0000 prefix):
+ * - 1e02, f848: 300x300
+ * - b273, d452: 640x640
+ * - 82c1: 1400x1400
+ *
+ * Podcast/Show art (ab6765630000 prefix):
+ * - f68d: 64x64
+ * - 5f1f: 300x300
+ * - ba8a: 640x640
+ *
+ * Upgrades Spotify CDN image URLs to use the highest available resolution.
+ * - Album art: upgraded to 1400x1400 (82c1)
+ * - Podcast art: upgraded to 640x640 (ba8a) - max available
+ *
+ * Non-Spotify URLs are returned unchanged.
+ *
+ * @param url - The image URL (may be Spotify CDN or other)
+ * @returns The upgraded URL for Spotify images, or the original URL for others
+ *
+ * @example
+ * upgradeSpotifyImageUrl('https://i.scdn.co/image/ab67616d0000b273abc123')   // album -> 1400px
+ * upgradeSpotifyImageUrl('https://i.scdn.co/image/ab6765630000f68dabc123')   // podcast -> 640px
+ * upgradeSpotifyImageUrl('https://example.com/img.jpg')                      // unchanged
+ * upgradeSpotifyImageUrl(null)                                               // null
+ */
+export function upgradeSpotifyImageUrl(url: string | null | undefined): string | null | undefined {
+  if (!url) return url;
+
+  // Match Spotify CDN image URLs (i.scdn.co/image/)
+  if (url.includes('i.scdn.co/image/')) {
+    // Album art: upgrade to 1400x1400 (82c1)
+    // JPEG: 1e02, f848 (300px), b273, d452 (640px)
+    let upgraded = url.replace(/ab67616d0000(1e02|f848|b273|d452)/, 'ab67616d000082c1');
+
+    // Podcast/Show art: upgrade to 640x640 (ba8a) - max available
+    // f68d (64px), 5f1f (300px) -> ba8a (640px)
+    upgraded = upgraded.replace(/ab6765630000(f68d|5f1f)/, 'ab6765630000ba8a');
+
+    return upgraded;
+  }
+
+  return url;
+}
