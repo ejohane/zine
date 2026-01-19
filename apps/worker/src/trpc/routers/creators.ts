@@ -14,10 +14,24 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, desc, lt, or, sql } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
-import { creators, items, userItems } from '../../db/schema';
+import { creators, items, userItems, subscriptions, providerConnections } from '../../db/schema';
 import { UserItemState } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
 import { toItemView, type ItemView } from './items';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Response shape for checkSubscription
+ */
+export interface CheckSubscriptionResponse {
+  isSubscribed: boolean;
+  subscriptionId?: string;
+  canSubscribe: boolean;
+  reason?: 'PROVIDER_NOT_SUPPORTED' | 'NOT_CONNECTED';
+}
 
 // ============================================================================
 // Zod Schemas
@@ -192,18 +206,62 @@ export const creatorsRouter = router({
    * both provider-level subscriptions (e.g., YouTube channel subscription)
    * and app-level following.
    *
+   * Use cases:
+   * 1. Subscribed + Connected: User can view and manage subscription
+   * 2. Not Subscribed + Connected: User can subscribe
+   * 3. Not Subscribed + Not Connected: Prompt to connect provider
+   * 4. Unsupported Provider: No subscription functionality
+   *
    * @param creatorId - The unique identifier of the creator
    * @returns Subscription status information
    */
   checkSubscription: protectedProcedure
     .input(CheckSubscriptionInputSchema)
-    .query(async ({ ctx, input }) => {
-      // TODO: Implement - will be done in zine-tqjs
-      void ctx;
-      void input;
+    .query(async ({ ctx, input }): Promise<CheckSubscriptionResponse> => {
+      // 1. Get the creator
+      const creator = await ctx.db.query.creators.findFirst({
+        where: eq(creators.id, input.creatorId),
+      });
+
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // 2. Only YOUTUBE and SPOTIFY support subscriptions
+      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+        return {
+          isSubscribed: false,
+          canSubscribe: false,
+          reason: 'PROVIDER_NOT_SUPPORTED',
+        };
+      }
+
+      // 3. Check if subscription exists for this user + provider + creator
+      const subscription = await ctx.db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.userId, ctx.userId),
+          eq(subscriptions.provider, creator.provider),
+          eq(subscriptions.providerChannelId, creator.providerCreatorId)
+        ),
+      });
+
+      // 4. Check if user is connected to the provider
+      const connection = await ctx.db.query.providerConnections.findFirst({
+        where: and(
+          eq(providerConnections.userId, ctx.userId),
+          eq(providerConnections.provider, creator.provider),
+          eq(providerConnections.status, 'ACTIVE')
+        ),
+      });
+
       return {
-        isSubscribed: false,
-        subscribedAt: null as string | null,
+        isSubscribed: !!subscription && subscription.status === 'ACTIVE',
+        subscriptionId: subscription?.id,
+        canSubscribe: !!connection,
+        reason: connection ? undefined : 'NOT_CONNECTED',
       };
     }),
 
