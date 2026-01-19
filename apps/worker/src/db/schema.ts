@@ -285,6 +285,34 @@ export const deadLetterQueue = sqliteTable(
 );
 
 // ============================================================================
+// Creators (Canonical Creator Entities)
+// ============================================================================
+// Stores creator entities across providers (YouTube channels, Spotify shows, X users, etc.)
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const creators = sqliteTable(
+  'creators',
+  {
+    id: text('id').primaryKey(), // ULID
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | RSS | SUBSTACK | WEB | X
+    providerCreatorId: text('provider_creator_id').notNull(), // Channel ID, show ID, etc.
+    name: text('name').notNull(), // Display name
+    normalizedName: text('normalized_name').notNull(), // Lowercase, trimmed for dedup
+    imageUrl: text('image_url'),
+    description: text('description'),
+    externalUrl: text('external_url'), // Link to creator's page
+    handle: text('handle'), // @username for X/YouTube
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
+  },
+  (table) => [
+    // Prevent duplicate creators from same provider
+    uniqueIndex('idx_creators_provider_creator').on(table.provider, table.providerCreatorId),
+    // Fast lookups by normalized name for deduplication
+    index('idx_creators_normalized_name').on(table.normalizedName),
+  ]
+);
+
+// ============================================================================
 // Provider Items Seen (Ingestion Idempotency)
 // ============================================================================
 // This table is CRITICAL for preventing duplicate inbox items during ingestion.
