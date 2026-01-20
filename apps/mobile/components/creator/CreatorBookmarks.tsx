@@ -140,6 +140,10 @@ export function CreatorBookmarks({ creatorId }: CreatorBookmarksProps) {
         }
         scrollEnabled={false} // Scroll handled by parent ScrollView
         showsVerticalScrollIndicator={false}
+        // Disable virtualization when nested in ScrollView - ensures all items render
+        initialNumToRender={50}
+        maxToRenderPerBatch={50}
+        windowSize={21}
       />
     </View>
   );

@@ -40,9 +40,9 @@ import {
   ContentType,
 } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
+import { useCreator } from '@/hooks/use-creator';
 import {
   getContentIcon,
-  getProviderLabel,
   upgradeSpotifyImageUrl,
   upgradeYouTubeImageUrl,
 } from '@/lib/content-utils';
@@ -96,6 +96,30 @@ function getFabConfig(provider: string): FabConfig {
 function extractXHandle(url: string): string | null {
   const match = url.match(/(?:x\.com|twitter\.com)\/([^/]+)\//);
   return match ? match[1] : null;
+}
+
+/**
+ * Extract podcast host names from description.
+ * Looks for common patterns like "from X and Y", "by X and Y", "with X and Y"
+ * Returns null if no pattern is found.
+ */
+function extractPodcastHosts(description: string | null | undefined): string | null {
+  if (!description) return null;
+
+  // Common patterns for podcast host attribution
+  const patterns = [
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+)/i,
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = description.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -173,6 +197,7 @@ function XPostBookmarkView({
   onToggleBookmark,
   onCreatorPress,
   isBookmarked,
+  creatorData,
 }: {
   item: {
     id: string;
@@ -194,9 +219,10 @@ function XPostBookmarkView({
   onToggleBookmark: () => void;
   onCreatorPress?: () => void;
   isBookmarked: boolean;
+  creatorData?: { handle?: string | null } | null;
 }) {
-  // Extract @handle from URL
-  const handle = extractXHandle(item.canonicalUrl);
+  // Extract @handle from URL as fallback if creatorData.handle not available
+  const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
 
   // Get FAB config for X
   const fabConfig = getFabConfig(item.provider);
@@ -215,7 +241,7 @@ function XPostBookmarkView({
           <TypeBadge contentType={ContentType.POST} />
         </View>
 
-        {/* Profile Row */}
+        {/* Creator Row - same as YouTube/Spotify */}
         {item.creatorId && onCreatorPress ? (
           <Pressable
             style={styles.creatorRow}
@@ -238,13 +264,8 @@ function XPostBookmarkView({
                 </Text>
               </View>
             )}
-            <View style={styles.creatorTextContainer}>
-              <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
-              <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
-                View profile
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
           </Pressable>
         ) : (
           <View style={styles.sourceRow}>
@@ -265,11 +286,11 @@ function XPostBookmarkView({
           </View>
         )}
 
-        {/* Meta Row with @handle and timestamp */}
+        {/* Meta Row - same format as YouTube/Spotify */}
         <View style={styles.metaRow}>
           {handle && (
             <>
-              <Text style={[styles.metaText, { color: colors.textTertiary }]}>@{handle}</Text>
+              <Text style={[styles.metaText, { color: colors.textTertiary }]}>{handle}</Text>
               <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
             </>
           )}
@@ -505,6 +526,9 @@ export default function ItemDetailScreen() {
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
 
+  // Fetch creator data for description (when creatorId is available)
+  const { creator: creatorData } = useCreator(item?.creatorId ?? '');
+
   // Render invalid param state if id is invalid
   if (!idValidation.success) {
     return (
@@ -603,8 +627,6 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const providerLabel = getProviderLabel(item.provider);
-
   // Get description label based on content type
   const getDescriptionLabel = () => {
     switch (item.contentType) {
@@ -649,6 +671,7 @@ export default function ItemDetailScreen() {
           item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
         }
         isBookmarked={isBookmarked}
+        creatorData={creatorData}
       />
     );
   }
@@ -715,13 +738,8 @@ export default function ItemDetailScreen() {
                       </Text>
                     </View>
                   )}
-                  <View style={styles.creatorTextContainer}>
-                    <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
-                    <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
-                      View profile
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+                  <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
                 </Pressable>
               ) : (
                 <View style={styles.sourceRow}>
@@ -751,10 +769,22 @@ export default function ItemDetailScreen() {
 
               {/* Meta Row */}
               <View style={styles.metaRow}>
-                {providerLabel && (
+                {/* First part: Creator names (Spotify) or @handle (YouTube/X) */}
+                {item.provider === 'SPOTIFY' && extractPodcastHosts(creatorData?.description) && (
+                  <>
+                    <Text
+                      style={[styles.metaText, { color: colors.textTertiary }]}
+                      numberOfLines={1}
+                    >
+                      {extractPodcastHosts(creatorData?.description)}
+                    </Text>
+                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                  </>
+                )}
+                {(item.provider === 'YOUTUBE' || item.provider === 'X') && creatorData?.handle && (
                   <>
                     <Text style={[styles.metaText, { color: colors.textTertiary }]}>
-                      {providerLabel}
+                      {creatorData.handle}
                     </Text>
                     <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
                   </>
@@ -764,7 +794,9 @@ export default function ItemDetailScreen() {
                     <Text style={[styles.metaText, { color: colors.textTertiary }]}>
                       {formatRelativeTime(item.publishedAt)}
                     </Text>
-                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                    {(item.duration || item.readingTimeMinutes) && (
+                      <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                    )}
                   </>
                 )}
                 {item.duration && (
@@ -889,13 +921,8 @@ export default function ItemDetailScreen() {
                   </Text>
                 </View>
               )}
-              <View style={styles.creatorTextContainer}>
-                <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
-                <Text style={[styles.creatorSubtitle, { color: colors.textTertiary }]}>
-                  View profile
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
             </Pressable>
           ) : (
             <View style={styles.sourceRow}>
@@ -918,10 +945,19 @@ export default function ItemDetailScreen() {
 
           {/* Meta Row */}
           <View style={styles.metaRow}>
-            {providerLabel && (
+            {/* First part: Creator names (Spotify) or @handle (YouTube/X) */}
+            {item.provider === 'SPOTIFY' && extractPodcastHosts(creatorData?.description) && (
+              <>
+                <Text style={[styles.metaText, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {extractPodcastHosts(creatorData?.description)}
+                </Text>
+                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+              </>
+            )}
+            {(item.provider === 'YOUTUBE' || item.provider === 'X') && creatorData?.handle && (
               <>
                 <Text style={[styles.metaText, { color: colors.textTertiary }]}>
-                  {providerLabel}
+                  {creatorData.handle}
                 </Text>
                 <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
               </>
@@ -931,7 +967,9 @@ export default function ItemDetailScreen() {
                 <Text style={[styles.metaText, { color: colors.textTertiary }]}>
                   {formatRelativeTime(item.publishedAt)}
                 </Text>
-                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                {(item.duration || item.readingTimeMinutes) && (
+                  <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                )}
               </>
             )}
             {item.duration && (
@@ -1106,36 +1144,30 @@ const styles = StyleSheet.create({
   creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   creatorThumbnail: {
-    width: 40,
-    height: 40,
+    width: 28,
+    height: 28,
     borderRadius: Radius.full,
-    marginRight: Spacing.md,
+    marginRight: Spacing.sm,
   },
   creatorPlaceholder: {
-    width: 40,
-    height: 40,
+    width: 28,
+    height: 28,
     borderRadius: Radius.full,
-    marginRight: Spacing.md,
+    marginRight: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   creatorInitial: {
-    ...Typography.labelLarge,
+    ...Typography.bodySmall,
     fontWeight: '600',
-  },
-  creatorTextContainer: {
-    flex: 1,
   },
   creatorName: {
     ...Typography.labelLarge,
     fontWeight: '500',
-  },
-  creatorSubtitle: {
-    ...Typography.bodySmall,
+    marginRight: Spacing.xs,
   },
 
   // Meta Row

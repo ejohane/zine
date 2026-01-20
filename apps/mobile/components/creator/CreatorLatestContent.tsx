@@ -296,6 +296,10 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
         scrollEnabled={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        // Disable virtualization when nested in ScrollView - ensures all items render
+        initialNumToRender={20}
+        maxToRenderPerBatch={20}
+        windowSize={21}
       />
     </View>
   );
