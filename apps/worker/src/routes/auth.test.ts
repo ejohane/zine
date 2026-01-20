@@ -104,6 +104,11 @@ function createMockEnv(): Env['Bindings'] {
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
     } as unknown as KVNamespace,
+    CREATOR_CONTENT_CACHE: {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as KVNamespace,
     ENVIRONMENT: 'test',
     CLERK_WEBHOOK_SECRET: 'whsec_test_secret',
   };

@@ -21,6 +21,11 @@ import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refre
 import { extractArticle } from '../../lib/article-extractor';
 import { storeArticleContent } from '../../lib/article-storage';
 import { logger } from '../../lib/logger';
+import {
+  findOrCreateCreator,
+  extractCreatorFromMetadata,
+  generateSyntheticCreatorId,
+} from '../../db/helpers/creators';
 import type { createDb } from '../../db';
 import type { Bindings } from '../../types';
 
@@ -169,8 +174,64 @@ export const bookmarksRouter = router({
 
     let itemId: string;
 
+    // Extract creator info (used for both new items and backfilling existing)
+    let creatorId: string | null = null;
+
+    // Try to extract from rawMetadata first (preferred - has real provider IDs)
+    if (input.rawMetadata) {
+      try {
+        const parsedMetadata = JSON.parse(input.rawMetadata);
+        const creatorParams = extractCreatorFromMetadata(input.provider, parsedMetadata);
+
+        if (creatorParams) {
+          const creator = await findOrCreateCreator(ctx, creatorParams);
+          creatorId = creator.id;
+          bookmarksLogger.debug('Creator extracted from metadata', {
+            creatorId,
+            provider: input.provider,
+            name: creatorParams.name,
+          });
+        }
+      } catch (error) {
+        bookmarksLogger.warn('Failed to parse rawMetadata for creator extraction', { error });
+      }
+    }
+
+    // Fallback: use creator name with synthetic ID
+    if (!creatorId && input.creator) {
+      const syntheticId = generateSyntheticCreatorId(input.provider, input.creator);
+      const creator = await findOrCreateCreator(ctx, {
+        provider: input.provider,
+        providerCreatorId: syntheticId,
+        name: input.creator,
+        imageUrl: input.creatorImageUrl ?? undefined,
+      });
+      creatorId = creator.id;
+      bookmarksLogger.debug('Creator created with synthetic ID', {
+        creatorId,
+        provider: input.provider,
+        name: input.creator,
+        syntheticId,
+      });
+    }
+
     if (existingItem) {
       itemId = existingItem.id;
+
+      // Backfill: update existing item with creatorId if missing
+      if (!existingItem.creatorId && creatorId) {
+        await ctx.db
+          .update(items)
+          .set({
+            creatorId,
+            updatedAt: now,
+          })
+          .where(eq(items.id, existingItem.id));
+        bookmarksLogger.info('Backfilled creatorId on existing item', {
+          itemId: existingItem.id,
+          creatorId,
+        });
+      }
     } else {
       // Create new item
       itemId = ulid();
@@ -225,6 +286,8 @@ export const bookmarksRouter = router({
         }
       }
 
+      // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
+      // These deprecated fields are no longer written.
       await ctx.db.insert(items).values({
         id: itemId,
         contentType: input.contentType,
@@ -233,8 +296,7 @@ export const bookmarksRouter = router({
         canonicalUrl: input.canonicalUrl,
         title: input.title,
         thumbnailUrl: input.thumbnailUrl,
-        creator: input.creator,
-        creatorImageUrl: input.creatorImageUrl ?? null,
+        creatorId,
         publisher: input.siteName ?? null,
         summary: input.description ?? null,
         duration: input.duration,

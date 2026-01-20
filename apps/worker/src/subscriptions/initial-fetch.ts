@@ -16,7 +16,6 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { youtube_v3 } from 'googleapis';
 import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import {
@@ -25,7 +24,12 @@ import {
   fetchVideoDetails,
   type YouTubeClient,
 } from '../providers/youtube';
-import { getSpotifyClientForConnection, getLatestEpisode, getShow } from '../providers/spotify';
+import {
+  getSpotifyClientForConnection,
+  getLatestEpisode,
+  getShow,
+  getLargestImage,
+} from '../providers/spotify';
 import { ingestItem } from '../ingestion/processor';
 import { transformYouTubeVideo, transformSpotifyEpisode } from '../ingestion/transformers';
 import { subscriptions } from '../db/schema';
@@ -227,8 +231,8 @@ async function fetchInitialYouTubeItem(
     subscriptionId,
     video,
     Provider.YOUTUBE,
-    // Cast to satisfy ingestItem's generic DrizzleD1Database type
-    db as unknown as DrizzleD1Database,
+    // Cast to Database type for ingestItem
+    db as Database,
     (v) => transformYouTubeVideo(v, channelImageUrl)
   );
 
@@ -417,6 +421,9 @@ async function fetchInitialSpotifyItem(
   }
 
   // Transform to the format expected by transformSpotifyEpisode
+  // CRITICAL: Include full show metadata for creator extraction
+  // extractSpotifyCreator expects rawItem.show to contain { id, name, description, publisher, images, external_urls }
+  const showImageUrl = getLargestImage(show.images) ?? subscriptionImageUrl;
   const spotifyEpisode = {
     id: episode.id,
     name: episode.name,
@@ -425,18 +432,24 @@ async function fetchInitialSpotifyItem(
     duration_ms: episode.durationMs,
     external_urls: { spotify: episode.externalUrl },
     images: episode.images,
+    // Full show metadata for creator extraction
+    show: {
+      id: showId,
+      name: show.name,
+      description: show.description,
+      publisher: show.publisher,
+      images: show.images,
+      external_urls: { spotify: show.externalUrl },
+    },
   };
-
-  // Use show image from API (most current), fall back to subscription imageUrl
-  const showImageUrl = show.images[0]?.url ?? subscriptionImageUrl;
 
   const result = await ingestItem(
     userId,
     subscriptionId,
     spotifyEpisode,
     Provider.SPOTIFY,
-    // Cast to satisfy ingestItem's generic DrizzleD1Database type
-    db as unknown as DrizzleD1Database,
+    // Cast to Database type for ingestItem
+    db as Database,
     (ep) => transformSpotifyEpisode(ep, show.name, showImageUrl)
   );
 

@@ -40,7 +40,12 @@ import {
   ContentType,
 } from '@/hooks/use-items-trpc';
 import { formatDuration, formatRelativeTime } from '@/lib/format';
-import { getContentIcon, getProviderLabel } from '@/lib/content-utils';
+import { useCreator } from '@/hooks/use-creator';
+import {
+  getContentIcon,
+  upgradeSpotifyImageUrl,
+  upgradeYouTubeImageUrl,
+} from '@/lib/content-utils';
 import { logger } from '@/lib/logger';
 import { validateItemId } from '@/lib/route-validation';
 
@@ -91,6 +96,30 @@ function getFabConfig(provider: string): FabConfig {
 function extractXHandle(url: string): string | null {
   const match = url.match(/(?:x\.com|twitter\.com)\/([^/]+)\//);
   return match ? match[1] : null;
+}
+
+/**
+ * Extract podcast host names from description.
+ * Looks for common patterns like "from X and Y", "by X and Y", "with X and Y"
+ * Returns null if no pattern is found.
+ */
+function extractPodcastHosts(description: string | null | undefined): string | null {
+  if (!description) return null;
+
+  // Common patterns for podcast host attribution
+  const patterns = [
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+)/i,
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = description.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -166,13 +195,16 @@ function XPostBookmarkView({
   onOpenLink,
   onShare,
   onToggleBookmark,
+  onCreatorPress,
   isBookmarked,
+  creatorData,
 }: {
   item: {
     id: string;
     title: string;
     creator: string;
     creatorImageUrl?: string | null;
+    creatorId?: string | null;
     thumbnailUrl?: string | null;
     summary?: string | null;
     publishedAt?: string | null;
@@ -185,10 +217,12 @@ function XPostBookmarkView({
   onOpenLink: () => void;
   onShare: () => void;
   onToggleBookmark: () => void;
+  onCreatorPress?: () => void;
   isBookmarked: boolean;
+  creatorData?: { handle?: string | null } | null;
 }) {
-  // Extract @handle from URL
-  const handle = extractXHandle(item.canonicalUrl);
+  // Extract @handle from URL as fallback if creatorData.handle not available
+  const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
 
   // Get FAB config for X
   const fabConfig = getFabConfig(item.provider);
@@ -207,30 +241,56 @@ function XPostBookmarkView({
           <TypeBadge contentType={ContentType.POST} />
         </View>
 
-        {/* Profile Row */}
-        <Pressable style={styles.sourceRow}>
-          {item.creatorImageUrl ? (
-            <Image
-              source={{ uri: item.creatorImageUrl }}
-              style={styles.sourceThumbnail}
-              contentFit="cover"
-            />
-          ) : (
-            <View
-              style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-            >
-              <Ionicons name="person" size={14} color={colors.textTertiary} />
-            </View>
-          )}
-          <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </Pressable>
+        {/* Creator Row - same as YouTube/Spotify */}
+        {item.creatorId && onCreatorPress ? (
+          <Pressable
+            style={styles.creatorRow}
+            onPress={onCreatorPress}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${item.creator}'s profile`}
+          >
+            {item.creatorImageUrl ? (
+              <Image
+                source={{ uri: item.creatorImageUrl }}
+                style={styles.creatorThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[styles.creatorPlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+              >
+                <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                  {item.creator?.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+            <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+          </Pressable>
+        ) : (
+          <View style={styles.sourceRow}>
+            {item.creatorImageUrl ? (
+              <Image
+                source={{ uri: item.creatorImageUrl }}
+                style={styles.sourceThumbnail}
+                contentFit="cover"
+              />
+            ) : (
+              <View
+                style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+              >
+                <Ionicons name="person" size={14} color={colors.textTertiary} />
+              </View>
+            )}
+            <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+          </View>
+        )}
 
-        {/* Meta Row with @handle and timestamp */}
+        {/* Meta Row - same format as YouTube/Spotify */}
         <View style={styles.metaRow}>
           {handle && (
             <>
-              <Text style={[styles.metaText, { color: colors.textTertiary }]}>@{handle}</Text>
+              <Text style={[styles.metaText, { color: colors.textTertiary }]}>{handle}</Text>
               <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
             </>
           )}
@@ -466,6 +526,9 @@ export default function ItemDetailScreen() {
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
 
+  // Fetch creator data for description (when creatorId is available)
+  const { creator: creatorData } = useCreator(item?.creatorId ?? '');
+
   // Render invalid param state if id is invalid
   if (!idValidation.success) {
     return (
@@ -564,8 +627,6 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const providerLabel = getProviderLabel(item.provider);
-
   // Get description label based on content type
   const getDescriptionLabel = () => {
     switch (item.contentType) {
@@ -606,7 +667,11 @@ export default function ItemDetailScreen() {
         onOpenLink={handleOpenLink}
         onShare={handleShare}
         onToggleBookmark={handleToggleBookmark}
+        onCreatorPress={
+          item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
+        }
         isBookmarked={isBookmarked}
+        creatorData={creatorData}
       />
     );
   }
@@ -644,33 +709,82 @@ export default function ItemDetailScreen() {
               <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
 
               {/* Source/Creator Row */}
-              <Pressable style={styles.sourceRow}>
-                {item.creatorImageUrl ? (
-                  <Image
-                    source={{ uri: item.creatorImageUrl }}
-                    style={styles.sourceThumbnail}
-                    contentFit="cover"
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.sourcePlaceholder,
-                      { backgroundColor: colors.backgroundTertiary },
-                    ]}
-                  >
-                    {getContentIcon(item.contentType, 14, colors.textTertiary)}
-                  </View>
-                )}
-                <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-              </Pressable>
+              {item.creatorId ? (
+                <Pressable
+                  style={styles.creatorRow}
+                  onPress={() => router.push(`/creator/${item.creatorId}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`View ${item.creator}'s profile`}
+                >
+                  {item.creatorImageUrl ? (
+                    <Image
+                      source={{
+                        uri:
+                          upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl)) ??
+                          undefined,
+                      }}
+                      style={styles.creatorThumbnail}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.creatorPlaceholder,
+                        { backgroundColor: colors.backgroundTertiary },
+                      ]}
+                    >
+                      <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                        {item.creator?.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+                </Pressable>
+              ) : (
+                <View style={styles.sourceRow}>
+                  {item.creatorImageUrl ? (
+                    <Image
+                      source={{
+                        uri:
+                          upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl)) ??
+                          undefined,
+                      }}
+                      style={styles.sourceThumbnail}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.sourcePlaceholder,
+                        { backgroundColor: colors.backgroundTertiary },
+                      ]}
+                    >
+                      {getContentIcon(item.contentType, 14, colors.textTertiary)}
+                    </View>
+                  )}
+                  <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+                </View>
+              )}
 
               {/* Meta Row */}
               <View style={styles.metaRow}>
-                {providerLabel && (
+                {/* First part: Creator names (Spotify) or @handle (YouTube/X) */}
+                {item.provider === 'SPOTIFY' && extractPodcastHosts(creatorData?.description) && (
+                  <>
+                    <Text
+                      style={[styles.metaText, { color: colors.textTertiary }]}
+                      numberOfLines={1}
+                    >
+                      {extractPodcastHosts(creatorData?.description)}
+                    </Text>
+                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                  </>
+                )}
+                {(item.provider === 'YOUTUBE' || item.provider === 'X') && creatorData?.handle && (
                   <>
                     <Text style={[styles.metaText, { color: colors.textTertiary }]}>
-                      {providerLabel}
+                      {creatorData.handle}
                     </Text>
                     <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
                   </>
@@ -680,7 +794,9 @@ export default function ItemDetailScreen() {
                     <Text style={[styles.metaText, { color: colors.textTertiary }]}>
                       {formatRelativeTime(item.publishedAt)}
                     </Text>
-                    <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                    {(item.duration || item.readingTimeMinutes) && (
+                      <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                    )}
                   </>
                 )}
                 {item.duration && (
@@ -780,30 +896,68 @@ export default function ItemDetailScreen() {
           <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
 
           {/* Source/Creator Row */}
-          <Pressable style={styles.sourceRow}>
-            {item.creatorImageUrl ? (
-              <Image
-                source={{ uri: item.creatorImageUrl }}
-                style={styles.sourceThumbnail}
-                contentFit="cover"
-              />
-            ) : (
-              <View
-                style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-              >
-                {getContentIcon(item.contentType, 14, colors.textTertiary)}
-              </View>
-            )}
-            <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-          </Pressable>
+          {item.creatorId ? (
+            <Pressable
+              style={styles.creatorRow}
+              onPress={() => router.push(`/creator/${item.creatorId}`)}
+              accessibilityRole="button"
+              accessibilityLabel={`View ${item.creator}'s profile`}
+            >
+              {item.creatorImageUrl ? (
+                <Image
+                  source={{ uri: item.creatorImageUrl }}
+                  style={styles.creatorThumbnail}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={[
+                    styles.creatorPlaceholder,
+                    { backgroundColor: colors.backgroundTertiary },
+                  ]}
+                >
+                  <Text style={[styles.creatorInitial, { color: colors.textTertiary }]}>
+                    {item.creator?.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <Text style={[styles.creatorName, { color: colors.text }]}>{item.creator}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+            </Pressable>
+          ) : (
+            <View style={styles.sourceRow}>
+              {item.creatorImageUrl ? (
+                <Image
+                  source={{ uri: item.creatorImageUrl }}
+                  style={styles.sourceThumbnail}
+                  contentFit="cover"
+                />
+              ) : (
+                <View
+                  style={[styles.sourcePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+                >
+                  {getContentIcon(item.contentType, 14, colors.textTertiary)}
+                </View>
+              )}
+              <Text style={[styles.sourceName, { color: colors.text }]}>{item.creator}</Text>
+            </View>
+          )}
 
           {/* Meta Row */}
           <View style={styles.metaRow}>
-            {providerLabel && (
+            {/* First part: Creator names (Spotify) or @handle (YouTube/X) */}
+            {item.provider === 'SPOTIFY' && extractPodcastHosts(creatorData?.description) && (
+              <>
+                <Text style={[styles.metaText, { color: colors.textTertiary }]} numberOfLines={1}>
+                  {extractPodcastHosts(creatorData?.description)}
+                </Text>
+                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+              </>
+            )}
+            {(item.provider === 'YOUTUBE' || item.provider === 'X') && creatorData?.handle && (
               <>
                 <Text style={[styles.metaText, { color: colors.textTertiary }]}>
-                  {providerLabel}
+                  {creatorData.handle}
                 </Text>
                 <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
               </>
@@ -813,7 +967,9 @@ export default function ItemDetailScreen() {
                 <Text style={[styles.metaText, { color: colors.textTertiary }]}>
                   {formatRelativeTime(item.publishedAt)}
                 </Text>
-                <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                {(item.duration || item.readingTimeMinutes) && (
+                  <Text style={[styles.metaDot, { color: colors.textTertiary }]}> · </Text>
+                )}
               </>
             )}
             {item.duration && (
@@ -981,6 +1137,36 @@ const styles = StyleSheet.create({
   },
   sourceName: {
     ...Typography.labelLarge,
+    marginRight: Spacing.xs,
+  },
+
+  // Clickable Creator Row (when creatorId exists)
+  creatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
+  },
+  creatorThumbnail: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    marginRight: Spacing.sm,
+  },
+  creatorPlaceholder: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    marginRight: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  creatorInitial: {
+    ...Typography.bodySmall,
+    fontWeight: '600',
+  },
+  creatorName: {
+    ...Typography.labelLarge,
+    fontWeight: '500',
     marginRight: Spacing.xs,
   },
 

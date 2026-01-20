@@ -30,6 +30,8 @@ type Props = PropsWithChildren<{
   scrollEnabled?: boolean;
   /** Aspect ratio for the header (width/height). Defaults to 1 (square). Use 16/9 for videos. */
   headerAspectRatio?: number;
+  /** Fraction of screen height to use for header when aspect ratio <= 1. Defaults to 0.33. */
+  headerHeightFraction?: number;
 }>;
 
 export default function ParallaxScrollView({
@@ -37,6 +39,7 @@ export default function ParallaxScrollView({
   headerImage,
   scrollEnabled = true,
   headerAspectRatio = 1,
+  headerHeightFraction = 0.33,
 }: Props) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -47,9 +50,10 @@ export default function ParallaxScrollView({
   const { width, height } = useWindowDimensions();
 
   // Calculate header height based on aspect ratio
-  // For square (1:1), use 33% of screen height
+  // For square (1:1), use headerHeightFraction of screen height
   // For wider ratios (16:9), calculate based on width to maintain aspect ratio
-  const headerHeight = headerAspectRatio > 1 ? width / headerAspectRatio : height * 0.33;
+  const headerHeight =
+    headerAspectRatio > 1 ? width / headerAspectRatio : height * headerHeightFraction;
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
     return {

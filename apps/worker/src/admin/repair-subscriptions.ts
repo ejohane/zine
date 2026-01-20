@@ -39,8 +39,8 @@ export interface CorruptedSubscription {
   id: string;
   /** User ID */
   userId: string;
-  /** Subscription name (channel/show title) */
-  name: string;
+  /** Provider channel ID (YouTube channel ID or Spotify show ID) */
+  providerChannelId: string;
   /** Provider (YOUTUBE | SPOTIFY) */
   provider: string;
   /** Current lastPublishedAt watermark (Unix ms) */
@@ -146,7 +146,7 @@ export async function findCorruptedSubscriptions(
     .select({
       id: subscriptions.id,
       userId: subscriptions.userId,
-      name: subscriptions.name,
+      providerChannelId: subscriptions.providerChannelId,
       provider: subscriptions.provider,
       lastPublishedAt: subscriptions.lastPublishedAt,
       // Get newest item timestamp - items.publishedAt is ISO8601 string
@@ -179,7 +179,7 @@ export async function findCorruptedSubscriptions(
       corrupted.push({
         id: sub.id,
         userId: sub.userId,
-        name: sub.name,
+        providerChannelId: sub.providerChannelId,
         provider: sub.provider,
         lastPublishedAt: sub.lastPublishedAt,
         newestItemAt: null,
@@ -195,7 +195,7 @@ export async function findCorruptedSubscriptions(
         corrupted.push({
           id: sub.id,
           userId: sub.userId,
-          name: sub.name,
+          providerChannelId: sub.providerChannelId,
           provider: sub.provider,
           lastPublishedAt: sub.lastPublishedAt,
           newestItemAt: sub.newestItemAt,
@@ -251,7 +251,7 @@ export function generateRepairReport(result: FindCorruptedResult): string {
 
   for (const sub of result.corrupted) {
     lines.push(`Subscription: ${sub.id}`);
-    lines.push(`  Name: ${sub.name}`);
+    lines.push(`  Name: ${sub.providerChannelId}`);
     lines.push(`  User: ${sub.userId}`);
     lines.push(`  Provider: ${sub.provider}`);
     lines.push(`  lastPublishedAt: ${new Date(sub.lastPublishedAt).toISOString()}`);
@@ -343,7 +343,7 @@ export async function repairCorruptedSubscriptions(
 
       repairLogger.debug('Would repair subscription', {
         subscriptionId: sub.id,
-        name: sub.name,
+        providerChannelId: sub.providerChannelId,
         oldWatermark: new Date(sub.lastPublishedAt).toISOString(),
         newWatermark: newWatermark ? new Date(newWatermark).toISOString() : 'NULL',
       });
@@ -367,7 +367,7 @@ export async function repairCorruptedSubscriptions(
 
         repairLogger.info('Repaired subscription', {
           subscriptionId: sub.id,
-          name: sub.name,
+          providerChannelId: sub.providerChannelId,
           oldWatermark: new Date(sub.lastPublishedAt).toISOString(),
           newWatermark: newWatermark ? new Date(newWatermark).toISOString() : 'NULL',
         });

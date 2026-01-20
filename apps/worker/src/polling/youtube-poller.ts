@@ -14,10 +14,10 @@
  */
 
 import { eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
-import { subscriptions } from '../db/schema';
+import { subscriptions, creators } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 import {
   getYouTubeClientForConnection,
@@ -139,7 +139,14 @@ export async function pollSingleYouTubeSubscription(
   env: Bindings,
   db: DrizzleDB
 ): Promise<PollingResult> {
-  ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: sub.name });
+  // Fetch creator data for logging and ingestion
+  const creator = sub.creatorId
+    ? await db.query.creators.findFirst({ where: eq(creators.id, sub.creatorId) })
+    : null;
+  const creatorName = creator?.name ?? sub.providerChannelId;
+  const creatorImageUrl = creator?.imageUrl ?? null;
+
+  ytLogger.info('Polling subscription', { subscriptionId: sub.id, name: creatorName });
 
   // Get the channel's uploads playlist (deterministic, no API call needed)
   const uploadsPlaylistId = getUploadsPlaylistId(sub.providerChannelId);
@@ -148,7 +155,7 @@ export async function pollSingleYouTubeSubscription(
   const videos = await fetchRecentVideos(client, uploadsPlaylistId, MAX_ITEMS_PER_POLL);
 
   if (videos.length === 0) {
-    ytLogger.info('No videos found', { name: sub.name });
+    ytLogger.info('No videos found', { name: creatorName });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -164,12 +171,12 @@ export async function pollSingleYouTubeSubscription(
   const enrichedVideos = enrichVideosWithDetails(videos, videoDetails);
 
   // Filter out Shorts before processing (returns skip metrics)
-  const shortsFilterResult = filterOutShorts(enrichedVideos, sub.name);
+  const shortsFilterResult = filterOutShorts(enrichedVideos, creatorName);
 
   // If all videos were Shorts, we're done
   if (shortsFilterResult.filtered.length === 0) {
     ytLogger.info('All videos were Shorts, nothing to ingest', {
-      name: sub.name,
+      name: creatorName,
       skipMetrics: shortsFilterResult.skipMetrics,
     });
     await updateSubscriptionPolled(sub.id, db);
@@ -180,7 +187,7 @@ export async function pollSingleYouTubeSubscription(
   const newVideosResult = filterNewVideos(
     shortsFilterResult.filtered,
     sub.lastPolledAt,
-    sub.name,
+    creatorName,
     shortsFilterResult.skipMetrics
   );
 
@@ -188,7 +195,7 @@ export async function pollSingleYouTubeSubscription(
     total: videos.length,
     afterShortsFilter: shortsFilterResult.filtered.length,
     new: newVideosResult.filtered.length,
-    name: sub.name,
+    name: creatorName,
     skipMetrics: newVideosResult.skipMetrics,
   });
 
@@ -197,7 +204,7 @@ export async function pollSingleYouTubeSubscription(
     newVideosResult.filtered,
     userId,
     sub.id,
-    sub.imageUrl,
+    creatorImageUrl,
     db
   );
 
@@ -387,7 +394,7 @@ async function ingestNewVideos(
         subscriptionId,
         video as youtube_v3.Schema$PlaylistItem,
         Provider.YOUTUBE,
-        db as unknown as DrizzleD1Database,
+        db as Database,
         (raw: youtube_v3.Schema$PlaylistItem) =>
           transformYouTubeVideo(
             raw as Parameters<typeof transformYouTubeVideo>[0],
@@ -492,7 +499,7 @@ async function fetchPlaylistsInParallel(
           const serialized = serializeError(error);
           ytLogger.error('Failed to fetch playlist', {
             subscriptionId: sub.id,
-            name: sub.name,
+            channelId: sub.providerChannelId,
             error: serialized,
             errorType: serialized.type,
           });
@@ -544,7 +551,6 @@ export async function pollYouTubeSubscriptionsBatched(
       pollingErrors.push(
         createPollingError(result.subscription.id, result.error, {
           channelId: result.subscription.providerChannelId,
-          channelName: result.subscription.name,
           userId,
           operation: 'fetchPlaylist',
         })
@@ -594,13 +600,12 @@ export async function pollYouTubeSubscriptionsBatched(
     } catch (error) {
       const pollingError = createPollingError(result.subscription.id, error, {
         channelId: result.subscription.providerChannelId,
-        channelName: result.subscription.name,
         userId,
         operation: 'processSubscriptionVideos',
       });
       ytLogger.error('Failed to process subscription videos', {
         subscriptionId: result.subscription.id,
-        name: result.subscription.name,
+        channelId: result.subscription.providerChannelId,
         error: pollingError.error,
         errorType: pollingError.errorType,
         context: pollingError.context,
@@ -665,8 +670,15 @@ async function processSubscriptionVideos(
   userId: string,
   db: DrizzleDB
 ): Promise<SubscriptionProcessResult> {
+  // Fetch creator data for logging and ingestion
+  const creator = sub.creatorId
+    ? await db.query.creators.findFirst({ where: eq(creators.id, sub.creatorId) })
+    : null;
+  const creatorName = creator?.name ?? sub.providerChannelId;
+  const creatorImageUrl = creator?.imageUrl ?? null;
+
   if (videos.length === 0) {
-    ytLogger.info('No videos found', { name: sub.name });
+    ytLogger.info('No videos found', { name: creatorName });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0, skipMetrics: createEmptyYouTubeSkipMetrics() };
   }
@@ -675,11 +687,11 @@ async function processSubscriptionVideos(
   const enrichedVideos = enrichVideosWithDetailsMap(videos, videoDetails);
 
   // Filter out Shorts (returns skip metrics)
-  const shortsFilterResult = filterOutShorts(enrichedVideos, sub.name);
+  const shortsFilterResult = filterOutShorts(enrichedVideos, creatorName);
 
   if (shortsFilterResult.filtered.length === 0) {
     ytLogger.info('All videos were Shorts, nothing to ingest', {
-      name: sub.name,
+      name: creatorName,
       skipMetrics: shortsFilterResult.skipMetrics,
     });
     await updateSubscriptionPolled(sub.id, db);
@@ -690,7 +702,7 @@ async function processSubscriptionVideos(
   const newVideosResult = filterNewVideos(
     shortsFilterResult.filtered,
     sub.lastPolledAt,
-    sub.name,
+    creatorName,
     shortsFilterResult.skipMetrics
   );
 
@@ -698,7 +710,7 @@ async function processSubscriptionVideos(
     total: videos.length,
     afterShortsFilter: shortsFilterResult.filtered.length,
     new: newVideosResult.filtered.length,
-    name: sub.name,
+    name: creatorName,
     skipMetrics: newVideosResult.skipMetrics,
   });
 
@@ -707,7 +719,7 @@ async function processSubscriptionVideos(
     newVideosResult.filtered,
     userId,
     sub.id,
-    sub.imageUrl,
+    creatorImageUrl,
     db
   );
 

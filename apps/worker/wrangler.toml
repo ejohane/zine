@@ -18,6 +18,11 @@ id = "2101381b080942f9a7799583ccb2e096"
 binding = "SPOTIFY_CACHE"
 id = "1c15819b51bc43179cde8f0f90447993"
 
+# KV namespace for creator content cache (10-minute TTL)
+[[kv_namespaces]]
+binding = "CREATOR_CONTENT_CACHE"
+id = "959e6f30a4c84298a96f8060fd9b4cef"
+
 # R2 bucket for article content storage
 [[r2_buckets]]
 binding = "ARTICLE_CONTENT"
@@ -61,6 +66,9 @@ id = "acb7c409523d4ddeb7941ec2783ace9d"
 [[env.staging.kv_namespaces]]
 binding = "SPOTIFY_CACHE"
 id = "3e95aab6e54941f380e87734f184e275"
+[[env.staging.kv_namespaces]]
+binding = "CREATOR_CONTENT_CACHE"
+id = "9c5919333b6442a88f2762f797b05139"
 [[env.staging.r2_buckets]]
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-staging"
@@ -97,6 +105,9 @@ id = "c58624987cd94f3285ca7f62e5c2fe16"
 [[env.production.kv_namespaces]]
 binding = "SPOTIFY_CACHE"
 id = "02e526b54aa94795a51957863fe8fb54"
+[[env.production.kv_namespaces]]
+binding = "CREATOR_CONTENT_CACHE"
+id = "727509fe6a7640bca2c49eedefc2a52b"
 
 [[env.production.r2_buckets]]
 binding = "ARTICLE_CONTENT"

@@ -782,4 +782,365 @@ describe('ingestBatchConsolidated', () => {
       expect(resultB.created).toBe(1);
     });
   });
+
+  describe('creator linking', () => {
+    // Helper to create a mock DB that tracks inserts
+    const createCreatorTrackingMockDb = () => {
+      const insertedCreators: any[] = [];
+      const insertedItems: any[] = [];
+      let creatorQueryCount = 0;
+
+      const mockQuery = {
+        creators: {
+          findFirst: vi.fn().mockImplementation(() => {
+            creatorQueryCount++;
+            // First call returns null (creator doesn't exist)
+            // Subsequent calls could return the created creator
+            return Promise.resolve(null);
+          }),
+        },
+      };
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      };
+
+      // Track what gets inserted
+      const mockInsert = vi.fn().mockImplementation((_table) => ({
+        values: vi.fn().mockImplementation((values) => {
+          // Check if this is a creators insert by looking at the values structure
+          if (values.normalizedName !== undefined) {
+            insertedCreators.push(values);
+          } else if (values.contentType !== undefined) {
+            insertedItems.push(values);
+          }
+          return {
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      }));
+
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      return {
+        db: {
+          select: vi.fn().mockReturnValue(selectChain),
+          insert: mockInsert,
+          batch: mockBatch,
+          query: mockQuery,
+        },
+        getInsertedCreators: () => insertedCreators,
+        getInsertedItems: () => insertedItems,
+        getCreatorQueryCount: () => creatorQueryCount,
+      };
+    };
+
+    it('should extract and create YouTube creator during batch ingestion', async () => {
+      const mockDbTracker = createCreatorTrackingMockDb();
+
+      // Create a YouTube video item with full metadata including snippet
+      const youtubeItem = {
+        id: 'ep1',
+        contentDetails: {
+          videoId: 'video123',
+        },
+        snippet: {
+          channelId: 'UC_youtube_channel_123',
+          channelTitle: 'Test YouTube Channel',
+          title: 'Test Video',
+          description: 'A test video',
+          publishedAt: '2024-01-15T10:00:00Z',
+        },
+      };
+
+      const transformFnWithCreator = (raw: typeof youtubeItem) => ({
+        id: 'item-' + raw.id,
+        contentType: ContentType.VIDEO,
+        provider: Provider.YOUTUBE,
+        providerId: raw.contentDetails?.videoId || raw.id,
+        canonicalUrl: `https://youtube.com/watch?v=${raw.contentDetails?.videoId}`,
+        title: raw.snippet?.title || 'Untitled',
+        description: raw.snippet?.description,
+        creator: raw.snippet?.channelTitle || 'Unknown',
+        creatorImageUrl: undefined,
+        imageUrl: undefined,
+        durationSeconds: undefined,
+        publishedAt: new Date(raw.snippet?.publishedAt || '').getTime(),
+        createdAt: MOCK_NOW,
+      });
+
+      const getProviderId = (raw: typeof youtubeItem) => raw.contentDetails?.videoId || raw.id;
+
+      const result = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [youtubeItem],
+        Provider.YOUTUBE,
+        mockDbTracker.db as never,
+        transformFnWithCreator,
+        getProviderId
+      );
+
+      expect(result.created).toBe(1);
+      expect(result.errors).toBe(0);
+
+      // Verify creator query was made (findOrCreateCreator calls findFirst)
+      expect(mockDbTracker.getCreatorQueryCount()).toBeGreaterThan(0);
+
+      // Verify creators.insert was called with YouTube channel info
+      const insertedCreators = mockDbTracker.getInsertedCreators();
+      expect(insertedCreators.length).toBeGreaterThan(0);
+
+      const youtubeCreator = insertedCreators.find(
+        (c) => c.provider === 'YOUTUBE' && c.providerCreatorId === 'UC_youtube_channel_123'
+      );
+      expect(youtubeCreator).toBeDefined();
+      expect(youtubeCreator?.name).toBe('Test YouTube Channel');
+    });
+
+    it('should generate synthetic creator ID for RSS provider', async () => {
+      const mockDbTracker = createCreatorTrackingMockDb();
+
+      // RSS items don't have native creator IDs, so we generate synthetic ones
+      const rssItem = {
+        id: 'rss-item-1',
+        title: 'RSS Article',
+        description: 'An article from RSS',
+        link: 'https://example.com/article',
+        pubDate: '2024-01-15T10:00:00Z',
+        creator: 'RSS Blog Author',
+      };
+
+      const transformFnRss = (raw: typeof rssItem) => ({
+        id: 'item-' + raw.id,
+        contentType: ContentType.ARTICLE,
+        provider: Provider.RSS,
+        providerId: raw.id,
+        canonicalUrl: raw.link,
+        title: raw.title,
+        description: raw.description,
+        creator: raw.creator,
+        creatorImageUrl: undefined,
+        imageUrl: undefined,
+        durationSeconds: undefined,
+        publishedAt: new Date(raw.pubDate).getTime(),
+        createdAt: MOCK_NOW,
+      });
+
+      const getProviderId = (raw: typeof rssItem) => raw.id;
+
+      const result = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [rssItem],
+        Provider.RSS as any, // RSS is a valid provider
+        mockDbTracker.db as never,
+        transformFnRss,
+        getProviderId
+      );
+
+      expect(result.created).toBe(1);
+
+      // Verify creators.insert was called with synthetic ID
+      const insertedCreators = mockDbTracker.getInsertedCreators();
+      // Note: For RSS, synthetic ID is generated, so we check the name and provider
+      const rssCreator = insertedCreators.find(
+        (c) => c.provider === 'RSS' && c.name === 'RSS Blog Author'
+      );
+      expect(rssCreator).toBeDefined();
+      // Synthetic ID should be a 32-char hex string
+      expect(rssCreator?.providerCreatorId).toMatch(/^[0-9a-f]{32}$/);
+    });
+
+    it('should include creatorId in batch item insert', async () => {
+      const mockOnConflictDoNothing = vi.fn().mockReturnThis();
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoNothing: mockOnConflictDoNothing,
+      });
+
+      const mockInsert = vi.fn().mockReturnValue({
+        values: mockValues,
+      });
+
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      };
+
+      const mockQuery = {
+        creators: {
+          findFirst: vi.fn().mockResolvedValue(null),
+        },
+      };
+
+      const mockDb = {
+        select: vi.fn().mockReturnValue(selectChain),
+        insert: mockInsert,
+        batch: mockBatch,
+        query: mockQuery,
+      };
+
+      const youtubeItem = {
+        id: 'ep1',
+        contentDetails: { videoId: 'video123' },
+        snippet: {
+          channelId: 'UC_youtube_channel_123',
+          channelTitle: 'Test YouTube Channel',
+          title: 'Test Video',
+          publishedAt: '2024-01-15T10:00:00Z',
+        },
+      };
+
+      const transformFn = (raw: typeof youtubeItem) => ({
+        id: 'item-' + raw.id,
+        contentType: ContentType.VIDEO,
+        provider: Provider.YOUTUBE,
+        providerId: raw.contentDetails?.videoId || raw.id,
+        canonicalUrl: `https://youtube.com/watch?v=${raw.contentDetails?.videoId}`,
+        title: raw.snippet?.title || 'Untitled',
+        creator: raw.snippet?.channelTitle || 'Unknown',
+        publishedAt: new Date(raw.snippet?.publishedAt || '').getTime(),
+        createdAt: MOCK_NOW,
+      });
+
+      await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [youtubeItem],
+        Provider.YOUTUBE,
+        mockDb as never,
+        transformFn,
+        (raw) => raw.contentDetails?.videoId || raw.id
+      );
+
+      // Verify that batch was called
+      expect(mockBatch).toHaveBeenCalled();
+
+      // Verify that mockValues was called with creatorId field
+      // Find the call that included creatorId (the items insert)
+      const allValuesCalls = mockValues.mock.calls;
+      const itemInsertCall = allValuesCalls.find((call) => call[0]?.creatorId !== undefined);
+
+      expect(itemInsertCall).toBeDefined();
+      // creatorId should be a ULID (26 chars)
+      expect(itemInsertCall![0].creatorId).toHaveLength(26);
+    });
+
+    it('should handle creator extraction failure gracefully', async () => {
+      // Create a mock that throws on creator findFirst
+      const mockQuery = {
+        creators: {
+          findFirst: vi.fn().mockRejectedValue(new Error('DB error')),
+        },
+      };
+
+      const selectChain = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue([]),
+      };
+
+      const mockOnConflictDoNothing = vi.fn().mockReturnThis();
+      const mockValues = vi.fn().mockReturnValue({
+        onConflictDoNothing: mockOnConflictDoNothing,
+      });
+
+      const mockInsert = vi.fn().mockReturnValue({
+        values: mockValues,
+      });
+
+      const mockBatch = vi.fn().mockResolvedValue([]);
+
+      const mockDb = {
+        select: vi.fn().mockReturnValue(selectChain),
+        insert: mockInsert,
+        batch: mockBatch,
+        query: mockQuery,
+      };
+
+      const youtubeItem = {
+        id: 'ep1',
+        contentDetails: { videoId: 'video123' },
+        snippet: {
+          channelId: 'UC_youtube_channel_123',
+          channelTitle: 'Test YouTube Channel',
+          title: 'Test Video',
+          publishedAt: '2024-01-15T10:00:00Z',
+        },
+      };
+
+      const transformFn = (raw: typeof youtubeItem) => ({
+        id: 'item-' + raw.id,
+        contentType: ContentType.VIDEO,
+        provider: Provider.YOUTUBE,
+        providerId: raw.contentDetails?.videoId || raw.id,
+        canonicalUrl: `https://youtube.com/watch?v=${raw.contentDetails?.videoId}`,
+        title: raw.snippet?.title || 'Untitled',
+        creator: raw.snippet?.channelTitle || 'Unknown',
+        publishedAt: new Date(raw.snippet?.publishedAt || '').getTime(),
+        createdAt: MOCK_NOW,
+      });
+
+      // Should NOT throw - creator extraction failure should be logged but not fail ingestion
+      const result = await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [youtubeItem],
+        Provider.YOUTUBE,
+        mockDb as never,
+        transformFn,
+        (raw) => raw.contentDetails?.videoId || raw.id
+      );
+
+      // Item should still be created, just without creatorId
+      expect(result.created).toBe(1);
+      expect(result.errors).toBe(0);
+
+      // Verify item insert was called (item still created despite creator failure)
+      expect(mockBatch).toHaveBeenCalled();
+    });
+
+    it('should not create creator for items with missing metadata', async () => {
+      const mockDbTracker = createCreatorTrackingMockDb();
+
+      // YouTube item without snippet (missing channel info)
+      const incompleteItem = {
+        id: 'ep1',
+        contentDetails: { videoId: 'video123' },
+        // No snippet - extractCreatorFromMetadata will return null
+      };
+
+      const transformFn = (raw: typeof incompleteItem) => ({
+        id: 'item-' + raw.id,
+        contentType: ContentType.VIDEO,
+        provider: Provider.YOUTUBE,
+        providerId: raw.contentDetails?.videoId || raw.id,
+        canonicalUrl: `https://youtube.com/watch?v=${raw.contentDetails?.videoId}`,
+        title: 'Untitled',
+        creator: 'Unknown',
+        publishedAt: MOCK_NOW,
+        createdAt: MOCK_NOW,
+      });
+
+      await ingestBatchConsolidated(
+        'user123',
+        'sub123',
+        [incompleteItem],
+        Provider.YOUTUBE,
+        mockDbTracker.db as never,
+        transformFn,
+        (raw) => raw.contentDetails?.videoId || raw.id
+      );
+
+      // No YouTube creator should have been inserted (missing snippet.channelId)
+      const insertedCreators = mockDbTracker.getInsertedCreators();
+      const youtubeCreator = insertedCreators.find((c) => c.provider === 'YOUTUBE');
+      expect(youtubeCreator).toBeUndefined();
+    });
+  });
 });

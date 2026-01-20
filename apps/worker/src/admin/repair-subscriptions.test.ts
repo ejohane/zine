@@ -326,7 +326,7 @@ describe('generateRepairReport', () => {
         {
           id: 'sub_1',
           userId: 'user_1',
-          name: 'Dithering',
+          providerChannelId: 'show_dithering',
           provider: 'SPOTIFY',
           lastPublishedAt: new Date('2024-01-15T00:00:00Z').getTime(),
           newestItemAt: new Date('2024-01-01T00:00:00Z').getTime(),
@@ -336,7 +336,7 @@ describe('generateRepairReport', () => {
         {
           id: 'sub_2',
           userId: 'user_1',
-          name: 'Red Flags',
+          providerChannelId: 'show_red_flags',
           provider: 'SPOTIFY',
           lastPublishedAt: new Date('2024-01-10T00:00:00Z').getTime(),
           newestItemAt: null,
@@ -354,9 +354,9 @@ describe('generateRepairReport', () => {
     expect(report).toContain('CORRUPTED SUBSCRIPTIONS REPORT');
     expect(report).toContain('Total scanned: 10');
     expect(report).toContain('Corrupted: 2');
-    expect(report).toContain('Dithering');
+    expect(report).toContain('show_dithering');
     expect(report).toContain('14 days');
-    expect(report).toContain('Red Flags');
+    expect(report).toContain('show_red_flags');
     expect(report).toContain('NULL (no items)');
   });
 
@@ -686,7 +686,7 @@ describe('Integration Scenarios', () => {
       {
         id: 'dithering_sub',
         userId: 'user_erik',
-        name: 'Dithering',
+        providerChannelId: 'dithering_show_id',
         provider: 'SPOTIFY',
         lastPublishedAt: jan6,
         newestItemAt: dec19,
@@ -694,7 +694,7 @@ describe('Integration Scenarios', () => {
       {
         id: 'redflags_sub',
         userId: 'user_erik',
-        name: 'Red Flags',
+        providerChannelId: 'redflags_show_id',
         provider: 'SPOTIFY',
         lastPublishedAt: jan5,
         newestItemAt: null,
@@ -718,12 +718,12 @@ describe('Integration Scenarios', () => {
     expect(result.corrupted.length).toBe(2);
 
     // Dithering: 18 day gap
-    const dithering = result.corrupted.find((s) => s.name === 'Dithering');
+    const dithering = result.corrupted.find((s) => s.providerChannelId === 'dithering_show_id');
     expect(dithering).toBeDefined();
     expect(dithering!.gapDays).toBe(18);
 
     // Red Flags: no items
-    const redFlags = result.corrupted.find((s) => s.name === 'Red Flags');
+    const redFlags = result.corrupted.find((s) => s.providerChannelId === 'redflags_show_id');
     expect(redFlags).toBeDefined();
     expect(redFlags!.newestItemAt).toBeNull();
 

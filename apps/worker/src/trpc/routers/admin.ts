@@ -86,7 +86,7 @@ export const adminRouter = router({
         healthyCount: result.healthy + result.noWatermark,
         corrupted: result.corrupted.map((sub) => ({
           id: sub.id,
-          name: sub.name,
+          providerChannelId: sub.providerChannelId,
           provider: sub.provider,
           lastPublishedAt: sub.lastPublishedAt,
           newestItemAt: sub.newestItemAt,

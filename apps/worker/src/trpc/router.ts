@@ -5,6 +5,7 @@ import { sourcesRouter } from './routers/sources';
 import { subscriptionsRouter } from './routers/subscriptions';
 import { connectionsRouter } from './routers/connections';
 import { bookmarksRouter } from './routers/bookmarks';
+import { creatorsRouter } from './routers/creators';
 import { adminRouter } from './routers/admin';
 
 /**
@@ -58,6 +59,8 @@ export const appRouter = router({
   }),
   // Admin operations (data repair, diagnostics)
   admin: adminRouter,
+  // Creator view operations
+  creators: creatorsRouter,
 });
 
 export type AppRouter = typeof appRouter;

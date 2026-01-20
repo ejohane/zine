@@ -27,10 +27,15 @@ export type ItemView = {
   contentType: ContentType;
   provider: Provider;
   creator: string;
+  creatorImageUrl: string | null;
+  creatorId: string | null;
   publisher: string | null;
   summary: string | null;
   duration: number | null;
   publishedAt: string | null;
+  // Article-specific metadata
+  wordCount: number | null;
+  readingTimeMinutes: number | null;
   state: UserItemState;
   ingestedAt: string;
   bookmarkedAt: string | null;
@@ -58,11 +63,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Tiago Forte',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: null,
     summary:
       'A comprehensive guide to building a personal knowledge management system using the PARA method and progressive summarization.',
     duration: 3720, // 1h 2m
     publishedAt: '2024-01-15T10:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-10T08:30:00Z',
     bookmarkedAt: null,
@@ -79,11 +88,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Fireship',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: null,
     summary:
       'An exploration of how AI tools like GitHub Copilot and Claude are changing the way developers write code.',
     duration: 720, // 12m
     publishedAt: '2024-12-01T15:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-12T09:00:00Z',
     bookmarkedAt: null,
@@ -100,11 +113,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.ARTICLE,
     provider: Provider.SUBSTACK,
     creator: 'James Long',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Local First Dev',
     summary:
       'A deep dive into building offline-capable applications using Replicache for real-time sync.',
     duration: null,
     publishedAt: '2024-11-20T08:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-11T14:00:00Z',
     bookmarkedAt: null,
@@ -121,11 +138,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.PODCAST,
     provider: Provider.SPOTIFY,
     creator: 'Lex Fridman',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Lex Fridman Podcast',
     summary:
       'Andrej Karpathy discusses the fundamentals of neural networks, GPT, and the future of AI.',
     duration: 10800, // 3h
     publishedAt: '2024-12-05T06:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-12T18:00:00Z',
     bookmarkedAt: null,
@@ -146,11 +167,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.PODCAST,
     provider: Provider.SPOTIFY,
     creator: 'Tim Ferriss',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'The Tim Ferriss Show',
     summary:
       'Naval shares his mental models for wealth and happiness, discussing leverage, specific knowledge, and accountability.',
     duration: 7200, // 2h
     publishedAt: '2024-01-10T06:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-12-08T14:00:00Z',
     bookmarkedAt: '2024-12-09T09:15:00Z',
@@ -171,11 +196,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Theo Browne',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: null,
     summary:
       'Understanding how React Server Components work under the hood and best practices for Next.js 14 applications.',
     duration: 2700, // 45m
     publishedAt: '2024-11-15T14:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-16T10:00:00Z',
     bookmarkedAt: '2024-11-17T08:30:00Z',
@@ -196,11 +225,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.ARTICLE,
     provider: Provider.SUBSTACK,
     creator: 'Craig Kerstiens',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Postgres Weekly',
     summary:
       'Learn advanced PostgreSQL query optimization techniques including EXPLAIN ANALYZE, indexing strategies, and query planning.',
     duration: null,
     publishedAt: '2024-10-20T09:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-10-21T12:00:00Z',
     bookmarkedAt: '2024-10-22T15:00:00Z',
@@ -217,11 +250,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Andrew Huberman',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Huberman Lab',
     summary:
       'Dr. Huberman explains the neuroscience of sleep, circadian rhythms, and science-based tools for improving sleep quality.',
     duration: 5400, // 1h 30m
     publishedAt: '2024-09-10T06:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-09-11T08:00:00Z',
     bookmarkedAt: '2024-09-12T19:00:00Z',
@@ -242,11 +279,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Alex Xu',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'ByteByteGo',
     summary:
       'Essential concepts for system design interviews: CAP theorem, consistency models, partitioning, and replication strategies.',
     duration: 1800, // 30m
     publishedAt: '2024-11-01T10:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-02T07:00:00Z',
     bookmarkedAt: '2024-11-03T11:00:00Z',
@@ -263,11 +304,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.PODCAST,
     provider: Provider.SPOTIFY,
     creator: 'Ben Gilbert & David Rosenthal',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Acquired',
     summary:
       'The epic story of NVIDIA from gaming graphics cards to becoming the most valuable semiconductor company powering the AI revolution.',
     duration: 14400, // 4h
     publishedAt: '2024-08-15T05:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-08-16T09:00:00Z',
     bookmarkedAt: '2024-08-17T20:00:00Z',
@@ -288,11 +333,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.ARTICLE,
     provider: Provider.RSS,
     creator: 'Simon Willison',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: "Simon Willison's Weblog",
     summary:
       'Exploring why SQLite is becoming the database of choice for edge computing platforms like Cloudflare D1 and Turso.',
     duration: null,
     publishedAt: '2024-12-01T12:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-12-02T08:00:00Z',
     bookmarkedAt: '2024-12-03T10:00:00Z',
@@ -309,11 +358,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.POST,
     provider: Provider.RSS,
     creator: 'Matt Pocock',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: null,
     summary:
       'Quick thoughts on the new features in TypeScript 5.3 and what they mean for developers.',
     duration: null,
     publishedAt: '2024-11-25T16:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-26T09:00:00Z',
     bookmarkedAt: '2024-11-27T14:00:00Z',
@@ -334,11 +387,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.VIDEO,
     provider: Provider.YOUTUBE,
     creator: 'Cloudflare',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Cloudflare TV',
     summary:
       'Getting started with Cloudflare Workers: serverless computing at the edge with JavaScript and TypeScript.',
     duration: 1200, // 20m
     publishedAt: '2024-06-01T10:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-06-02T08:00:00Z',
     bookmarkedAt: '2024-06-03T09:00:00Z',
@@ -359,11 +416,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.PODCAST,
     provider: Provider.SPOTIFY,
     creator: 'Sam Parr & Shaan Puri',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'My First Million',
     summary:
       'Brainstorming session on finding million-dollar business ideas using trend analysis and market gaps.',
     duration: 3600, // 1h
     publishedAt: '2024-07-20T05:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-07-21T10:00:00Z',
     bookmarkedAt: '2024-07-22T08:00:00Z',
@@ -384,11 +445,15 @@ export const MOCK_ITEMS: ItemView[] = [
     contentType: ContentType.ARTICLE,
     provider: Provider.SUBSTACK,
     creator: 'Jarred Sumner',
+    creatorImageUrl: null,
+    creatorId: null,
     publisher: 'Bun Blog',
     summary:
       'A technical overview of the Bun runtime: how it achieves performance and Node.js compatibility.',
     duration: null,
     publishedAt: '2024-05-15T08:00:00Z',
+    wordCount: null,
+    readingTimeMinutes: null,
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-05-16T12:00:00Z',
     bookmarkedAt: '2024-05-17T10:00:00Z',

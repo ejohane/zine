@@ -34,7 +34,14 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, type AccessibilityActionEvent } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  UIManager,
+  Platform,
+  type AccessibilityActionEvent,
+} from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -50,21 +57,28 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import Constants from 'expo-constants';
 
 // ContextMenu requires native code - doesn't work in Expo Go
-// Use conditional require to avoid loading the native module in Expo Go
-const isExpoGo = Constants.appOwnership === 'expo';
+// Check if native component is actually registered before using it
+const isContextMenuAvailable =
+  Platform.OS === 'ios' && UIManager.getViewManagerConfig('ContextMenu') != null;
 
-const ContextMenu: React.ComponentType<{
+type ContextMenuProps = {
   actions?: { title: string; systemIcon?: string }[];
   onPress?: (e: { nativeEvent: { name: string } }) => void;
   previewBackgroundColor?: string;
   children: React.ReactNode;
-}> = isExpoGo
-  ? ({ children }) => <>{children}</>
-  : // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('react-native-context-menu-view').default;
+};
+
+// Fallback component that just renders children (for Expo Go)
+const ContextMenuFallback = ({ children }: ContextMenuProps) => <>{children}</>;
+
+// Only load native module if it's actually available
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ContextMenuNative = isContextMenuAvailable
+  ? require('react-native-context-menu-view').default
+  : null;
+const ContextMenu: React.ComponentType<ContextMenuProps> = ContextMenuNative ?? ContextMenuFallback;
 
 import { useRouter } from 'expo-router';
 

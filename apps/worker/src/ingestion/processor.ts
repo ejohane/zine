@@ -19,8 +19,8 @@
 
 import { ulid } from 'ulid';
 import { and, eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import { UserItemState } from '@zine/shared';
 import {
   items,
@@ -33,6 +33,12 @@ import type { NewItem } from './transformers';
 import { TransformError } from './transformers';
 import { serializeError } from '../utils/error-utils';
 import { validateCanonicalItem, isValidationError } from './validation';
+import {
+  extractCreatorFromMetadata,
+  findOrCreateCreator,
+  generateSyntheticCreatorId,
+  type CreatorParams,
+} from '../db/helpers/creators';
 
 // ============================================================================
 // Types
@@ -127,6 +133,151 @@ export function classifyError(error: unknown): DLQErrorType {
 }
 
 // ============================================================================
+// Creator Extraction Helpers
+// ============================================================================
+
+/**
+ * Providers that have native creator IDs from their APIs.
+ * For these, we use extractCreatorFromMetadata to parse the raw API response.
+ */
+const PROVIDERS_WITH_NATIVE_CREATOR_IDS = ['YOUTUBE', 'SPOTIFY', 'X'];
+
+/**
+ * Providers that require synthetic creator IDs.
+ * For these, we generate a deterministic ID from provider + creator name.
+ */
+const PROVIDERS_WITH_SYNTHETIC_CREATOR_IDS = ['RSS', 'WEB', 'SUBSTACK'];
+
+/**
+ * Extract or create creator parameters from a raw provider item.
+ *
+ * This function handles two cases:
+ * 1. Providers with native IDs (YouTube, Spotify, X): Extract from raw API metadata
+ * 2. Providers without native IDs (RSS, WEB, SUBSTACK): Generate synthetic ID from creator name
+ *
+ * @param provider - The provider type
+ * @param rawItem - Raw item data from the provider API
+ * @param transformedItem - The transformed NewItem (for fallback creator name)
+ * @returns CreatorParams if extraction succeeded, null otherwise
+ */
+function extractCreatorParams(
+  provider: string,
+  rawItem: unknown,
+  transformedItem: NewItem
+): CreatorParams | null {
+  // Case 1: Providers with native creator IDs
+  if (PROVIDERS_WITH_NATIVE_CREATOR_IDS.includes(provider)) {
+    return extractCreatorFromMetadata(provider, rawItem);
+  }
+
+  // Case 2: Providers with synthetic creator IDs
+  if (PROVIDERS_WITH_SYNTHETIC_CREATOR_IDS.includes(provider) && transformedItem.creator) {
+    const syntheticId = generateSyntheticCreatorId(provider, transformedItem.creator);
+    return {
+      provider,
+      providerCreatorId: syntheticId,
+      name: transformedItem.creator,
+      imageUrl: transformedItem.creatorImageUrl,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Find or create a creator from raw item data.
+ *
+ * Uses extractCreatorParams to get creator info, then calls findOrCreateCreator
+ * to get the internal creator ID.
+ *
+ * @param db - Database instance
+ * @param provider - Provider type
+ * @param rawItem - Raw item data from provider API
+ * @param transformedItem - Transformed item data (for fallback creator name)
+ * @returns Internal creator ID if successful, null otherwise
+ */
+async function getOrCreateCreator(
+  db: Database,
+  provider: string,
+  rawItem: unknown,
+  transformedItem: NewItem
+): Promise<string | null> {
+  try {
+    const creatorParams = extractCreatorParams(provider, rawItem, transformedItem);
+
+    if (!creatorParams) {
+      return null;
+    }
+
+    // findOrCreateCreator expects ctx with db property
+    const ctx = { db };
+    const creator = await findOrCreateCreator(ctx, creatorParams);
+    return creator.id;
+  } catch (error) {
+    // Log but don't fail ingestion if creator extraction fails
+    console.error('Failed to extract/create creator:', {
+      provider,
+      error: serializeError(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Backfill creatorId for an existing canonical item if it's missing.
+ * This handles items created before the schema normalization.
+ *
+ * Called when an item is "already seen" to ensure we still update
+ * the canonical item's creatorId even though we skip creating user_item.
+ */
+async function backfillCreatorIdIfMissing<T>(
+  db: Database,
+  provider: string,
+  rawItem: T,
+  transformedItem: NewItem
+): Promise<void> {
+  try {
+    // Check if canonical item exists and is missing creatorId
+    const existing = await db
+      .select({ id: items.id, creatorId: items.creatorId })
+      .from(items)
+      .where(and(eq(items.provider, provider), eq(items.providerId, transformedItem.providerId)))
+      .limit(1);
+
+    if (existing.length === 0 || existing[0].creatorId) {
+      // Item doesn't exist or already has creatorId - nothing to backfill
+      return;
+    }
+
+    // Extract creator from raw item
+    const creatorId = await getOrCreateCreator(db, provider, rawItem, transformedItem);
+    if (!creatorId) {
+      return;
+    }
+
+    // Update the canonical item with the creatorId
+    await db
+      .update(items)
+      .set({ creatorId, updatedAt: new Date().toISOString() })
+      .where(eq(items.id, existing[0].id));
+
+    console.log('Backfilled creatorId for item', {
+      itemId: existing[0].id,
+      provider,
+      providerId: transformedItem.providerId,
+      creatorId,
+    });
+  } catch (error) {
+    // Log but don't fail - backfill is best-effort
+    console.error('Failed to backfill creatorId:', {
+      provider,
+      providerId: transformedItem.providerId,
+      error: serializeError(error),
+    });
+  }
+}
+
+// ============================================================================
 // Timestamp Conversion Helpers
 // ============================================================================
 
@@ -189,7 +340,7 @@ export async function ingestItem<T>(
   subscriptionId: string,
   rawItem: T,
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem
 ): Promise<IngestResult> {
   // 1. Transform raw provider data to our item format
@@ -215,13 +366,19 @@ export async function ingestItem<T>(
     .limit(1);
 
   if (seen.length > 0) {
+    // Even though user already saw this item, we should still backfill creatorId
+    // if the canonical item is missing it (migration from denormalized schema)
+    await backfillCreatorIdIfMissing(db, provider, rawItem, transformedItem);
     return { created: false, skipped: 'already_seen' };
   }
 
-  // 4. Find or create canonical item (shared across users)
-  const item = await findOrCreateCanonicalItem(transformedItem, provider, db);
+  // 4. Extract or create creator from raw item metadata
+  const creatorId = await getOrCreateCreator(db, provider, rawItem, transformedItem);
 
-  // 5. Prepare all the insert statements for batch execution
+  // 5. Find or create canonical item (shared across users)
+  const item = await findOrCreateCanonicalItem(transformedItem, provider, db, creatorId);
+
+  // 6. Prepare all the insert statements for batch execution
   const userItemId = ulid();
   const nowISO = new Date().toISOString(); // ISO8601 for existing table
   const now = Date.now(); // Unix ms for new tables
@@ -298,27 +455,36 @@ export async function ingestItem<T>(
  * This function:
  * 1. Looks up existing item by provider + providerId
  * 2. If found, returns the existing item ID
- * 3. If not found, creates a new item with proper timestamp conversion
+ * 3. If not found, creates a new item with proper timestamp conversion and creatorId
  *
  * @param newItem - Transformed item data (with Unix ms timestamps)
  * @param provider - Provider type string
  * @param db - Database instance
+ * @param creatorId - Optional internal creator ID (from creators table)
  * @returns Object containing the item ID
  */
 async function findOrCreateCanonicalItem(
   newItem: NewItem,
   provider: string,
-  db: DrizzleD1Database
+  db: Database,
+  creatorId?: string | null
 ): Promise<{ id: string }> {
   // Check if item already exists (shared across users)
   const existing = await db
-    .select({ id: items.id })
+    .select({ id: items.id, creatorId: items.creatorId })
     .from(items)
     .where(and(eq(items.provider, provider), eq(items.providerId, newItem.providerId)))
     .limit(1);
 
   if (existing.length > 0) {
-    return existing[0];
+    // Backfill creatorId if the existing item doesn't have one but we have one now
+    if (!existing[0].creatorId && creatorId) {
+      await db
+        .update(items)
+        .set({ creatorId, updatedAt: new Date().toISOString() })
+        .where(eq(items.id, existing[0].id));
+    }
+    return { id: existing[0].id };
   }
 
   // Create new canonical item
@@ -329,6 +495,7 @@ async function findOrCreateCanonicalItem(
   // Use onConflictDoNothing() to handle race conditions where another worker
   // creates the same canonical item concurrently. The unique constraint on
   // (provider, providerId) ensures only one item is created.
+  // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
   await db
     .insert(items)
     .values({
@@ -339,8 +506,7 @@ async function findOrCreateCanonicalItem(
       canonicalUrl: newItem.canonicalUrl,
       title: newItem.title,
       summary: newItem.description,
-      creator: newItem.creator,
-      creatorImageUrl: newItem.creatorImageUrl,
+      creatorId: creatorId ?? null,
       thumbnailUrl: newItem.imageUrl,
       duration: newItem.durationSeconds,
       publishedAt: publishedAtISO,
@@ -427,7 +593,7 @@ export async function ingestBatch<T>(
   subscriptionId: string,
   rawItems: T[],
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem,
   getProviderId: (raw: T) => string
 ): Promise<BatchIngestResult> {
@@ -512,7 +678,7 @@ function chunk<T>(array: T[], size: number): T[][] {
 
 /**
  * Prepared item ready for batch insertion.
- * Contains all the data needed for the 3 insert statements.
+ * Contains all the data needed for the insert statements.
  */
 interface PreparedItem {
   /** Transformed item data */
@@ -527,6 +693,8 @@ interface PreparedItem {
   canonicalItemExists: boolean;
   /** User item ID for this ingestion */
   userItemId: string;
+  /** Internal creator ID (from creators table) */
+  creatorId: string | null;
 }
 
 /**
@@ -577,7 +745,7 @@ export async function ingestBatchConsolidated<T>(
   subscriptionId: string,
   rawItems: T[],
   provider: Provider,
-  db: DrizzleD1Database,
+  db: Database,
   transformFn: (raw: T) => NewItem,
   getProviderId: (raw: T) => string,
   chunkSize: number = DEFAULT_BATCH_CHUNK_SIZE
@@ -633,10 +801,21 @@ export async function ingestBatchConsolidated<T>(
 
       // Find or check canonical item existence
       const existingCanonical = await db
-        .select({ id: items.id })
+        .select({ id: items.id, creatorId: items.creatorId })
         .from(items)
         .where(and(eq(items.provider, provider), eq(items.providerId, newItem.providerId)))
         .limit(1);
+
+      // Extract or create creator from raw metadata
+      const creatorId = await getOrCreateCreator(db, provider, rawItem, newItem);
+
+      // Backfill creatorId if the existing item doesn't have one but we have one now
+      if (existingCanonical.length > 0 && !existingCanonical[0].creatorId && creatorId) {
+        await db
+          .update(items)
+          .set({ creatorId, updatedAt: new Date().toISOString() })
+          .where(eq(items.id, existingCanonical[0].id));
+      }
 
       preparedItems.push({
         newItem,
@@ -645,6 +824,7 @@ export async function ingestBatchConsolidated<T>(
         canonicalItemId: existingCanonical.length > 0 ? existingCanonical[0].id : newItem.id,
         canonicalItemExists: existingCanonical.length > 0,
         userItemId: ulid(),
+        creatorId,
       });
     } catch (error) {
       // Transformation or validation failed
@@ -731,7 +911,7 @@ async function executeChunkBatch(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: DrizzleD1Database
+  db: Database
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
@@ -745,6 +925,7 @@ async function executeChunkBatch(
       // 1. Create canonical item (if it doesn't exist)
       // Use onConflictDoNothing() to handle race conditions where another worker
       // creates the same canonical item concurrently.
+      // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
       if (!prepared.canonicalItemExists) {
         const publishedAtISO = prepared.newItem.publishedAt
           ? new Date(prepared.newItem.publishedAt).toISOString()
@@ -761,8 +942,7 @@ async function executeChunkBatch(
               canonicalUrl: prepared.newItem.canonicalUrl,
               title: prepared.newItem.title,
               summary: prepared.newItem.description,
-              creator: prepared.newItem.creator,
-              creatorImageUrl: prepared.newItem.creatorImageUrl,
+              creatorId: prepared.creatorId,
               thumbnailUrl: prepared.newItem.imageUrl,
               duration: prepared.newItem.durationSeconds,
               publishedAt: publishedAtISO,
@@ -847,7 +1027,7 @@ async function executeIndividualInsert(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: DrizzleD1Database
+  db: Database
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
@@ -858,6 +1038,7 @@ async function executeIndividualInsert(
 
     // 1. Create canonical item (if it doesn't exist)
     // Use onConflictDoNothing() to handle race conditions.
+    // Note: creator and creatorImageUrl are now sourced from creators table via creatorId join.
     if (!prepared.canonicalItemExists) {
       const publishedAtISO = prepared.newItem.publishedAt
         ? new Date(prepared.newItem.publishedAt).toISOString()
@@ -874,8 +1055,7 @@ async function executeIndividualInsert(
             canonicalUrl: prepared.newItem.canonicalUrl,
             title: prepared.newItem.title,
             summary: prepared.newItem.description,
-            creator: prepared.newItem.creator,
-            creatorImageUrl: prepared.newItem.creatorImageUrl,
+            creatorId: prepared.creatorId,
             thumbnailUrl: prepared.newItem.imageUrl,
             duration: prepared.newItem.durationSeconds,
             publishedAt: publishedAtISO,
@@ -951,7 +1131,7 @@ async function executeIndividualInsert(
  * Store a failed item in the dead-letter queue.
  */
 async function storeToDLQ(
-  db: DrizzleD1Database,
+  db: Database,
   subscriptionId: string,
   userId: string,
   provider: Provider,

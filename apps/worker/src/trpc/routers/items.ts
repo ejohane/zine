@@ -10,7 +10,7 @@ import {
   ProviderSchema,
   ContentTypeSchema,
 } from '@zine/shared';
-import { userItems, items } from '../../db/schema';
+import { userItems, items, creators } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
 
@@ -39,6 +39,7 @@ export type ItemView = {
   // Attribution
   creator: string;
   creatorImageUrl: string | null;
+  creatorId: string | null;
   publisher: string | null;
 
   // Metadata
@@ -83,14 +84,17 @@ function normalizeNullString(value: string | null): string | null {
 }
 
 /**
- * Transform a joined DB row (userItems + items) into an ItemView
+ * Transform a joined DB row (userItems + items + creators) into an ItemView.
+ * Creator data comes from the creators table (single source of truth).
  */
 function toItemView(row: {
   user_items: typeof userItems.$inferSelect;
   items: typeof items.$inferSelect;
+  creators: typeof creators.$inferSelect | null;
 }): ItemView {
   const userItem = row.user_items;
   const item = row.items;
+  const creator = row.creators;
 
   return {
     id: userItem.id,
@@ -100,8 +104,10 @@ function toItemView(row: {
     canonicalUrl: item.canonicalUrl,
     contentType: item.contentType as ContentType,
     provider: item.provider as Provider,
-    creator: item.creator,
-    creatorImageUrl: normalizeNullString(item.creatorImageUrl),
+    // Creator data from creators table (normalized)
+    creator: creator?.name ?? 'Unknown Creator',
+    creatorImageUrl: normalizeNullString(creator?.imageUrl ?? null),
+    creatorId: item.creatorId ?? null,
     publisher: item.publisher,
     summary: item.summary,
     duration: item.duration,
@@ -187,11 +193,12 @@ export const itemsRouter = router({
       conditions.push(eq(items.contentType, input.filter.contentType));
     }
 
-    // Execute query with join
+    // Execute query with joins (items + creators)
     const results = await ctx.db
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...conditions))
       .orderBy(sql`${sortField} DESC`, desc(userItems.id))
       .limit(limit + 1); // Fetch one extra to check for more
@@ -261,11 +268,12 @@ export const itemsRouter = router({
       conditions.push(eq(items.contentType, input.filter.contentType));
     }
 
-    // Execute query with join
+    // Execute query with joins (items + creators)
     const results = await ctx.db
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...conditions))
       .orderBy(sql`${librarySortField} DESC`, desc(userItems.id))
       .limit(limit + 1);
@@ -312,6 +320,7 @@ export const itemsRouter = router({
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...baseConditions))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
@@ -321,6 +330,7 @@ export const itemsRouter = router({
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(
         and(
           ...baseConditions,
@@ -336,6 +346,7 @@ export const itemsRouter = router({
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...baseConditions, eq(items.contentType, ContentType.VIDEO)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
@@ -345,6 +356,7 @@ export const itemsRouter = router({
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...baseConditions, eq(items.contentType, ContentType.PODCAST)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
@@ -354,6 +366,7 @@ export const itemsRouter = router({
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
+      .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...baseConditions, eq(items.contentType, ContentType.ARTICLE)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
@@ -393,6 +406,7 @@ export const itemsRouter = router({
         .select()
         .from(userItems)
         .innerJoin(items, eq(userItems.itemId, items.id))
+        .leftJoin(creators, eq(items.creatorId, creators.id))
         .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
         .limit(1);
 
@@ -634,5 +648,5 @@ export const itemsRouter = router({
 
 export type ItemsRouter = typeof itemsRouter;
 
-// Export helper for testing
-export { normalizeNullString };
+// Export helpers for testing and reuse
+export { normalizeNullString, toItemView };

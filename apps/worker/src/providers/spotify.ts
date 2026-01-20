@@ -314,10 +314,37 @@ export async function getLatestEpisode(
  * }
  * ```
  */
+/**
+ * Result of getEpisodeWithRaw - includes both transformed episode and raw API response.
+ */
+export interface EpisodeWithRaw {
+  episode: SpotifyEpisode;
+  /** Raw Spotify API response for creator extraction in bookmarks flow */
+  raw: Episode;
+}
+
 export async function getEpisode(
   accessToken: string,
   episodeId: string
 ): Promise<SpotifyEpisode | null> {
+  const result = await getEpisodeWithRaw(accessToken, episodeId);
+  return result?.episode ?? null;
+}
+
+/**
+ * Get a single episode by ID, returning both transformed and raw response.
+ *
+ * Use this when you need the raw API response for storing in rawMetadata
+ * (e.g., bookmarks flow for proper creator extraction).
+ *
+ * @param accessToken - Decrypted user access token
+ * @param episodeId - Spotify episode ID (22 alphanumeric characters)
+ * @returns Episode details with raw response, or null if episode not found
+ */
+export async function getEpisodeWithRaw(
+  accessToken: string,
+  episodeId: string
+): Promise<EpisodeWithRaw | null> {
   // Use fetch directly since we need to handle 404 gracefully
   // and the SDK doesn't expose episode.get() directly
   const response = await fetch(`https://api.spotify.com/v1/episodes/${episodeId}`, {
@@ -335,8 +362,11 @@ export async function getEpisode(
     throw new Error(`Spotify API error: ${response.status} ${response.statusText} - ${errorBody}`);
   }
 
-  const episode = (await response.json()) as Episode;
-  return transformFullEpisode(episode);
+  const raw = (await response.json()) as Episode;
+  return {
+    episode: transformFullEpisode(raw),
+    raw,
+  };
 }
 
 /**
@@ -619,6 +649,30 @@ export async function checkSavedShows(client: SpotifyApi, showIds: string[]): Pr
 // ============================================================================
 // Transform Helpers
 // ============================================================================
+
+/**
+ * Select the largest image from an array of images based on dimensions.
+ * Returns undefined if the array is empty or undefined.
+ *
+ * This is a defensive helper because Spotify's API documentation says images
+ * are returned "widest first", but we've observed cases where this isn't true.
+ */
+export function getLargestImage(
+  images: Array<{ url: string; height?: number | null; width?: number | null }> | undefined | null
+): string | undefined {
+  if (!images || images.length === 0) return undefined;
+
+  // Find image with largest dimensions (prefer width, fall back to height)
+  let largest = images[0];
+  for (const img of images) {
+    const currentSize = (largest.width ?? 0) * (largest.height ?? 0);
+    const imgSize = (img.width ?? 0) * (img.height ?? 0);
+    if (imgSize > currentSize) {
+      largest = img;
+    }
+  }
+  return largest?.url;
+}
 
 /**
  * Transform SDK's SimplifiedShow/Show to our SpotifyShow type

@@ -13,8 +13,8 @@
  */
 
 import { eq, inArray } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { Provider } from '@zine/shared';
+import type { Database } from '../db';
 import type { SpotifyApi } from '@spotify/web-api-ts-sdk';
 import pLimit from 'p-limit';
 import { subscriptions } from '../db/schema';
@@ -24,8 +24,10 @@ import {
   getSpotifyClientForConnection,
   getShowEpisodes,
   getMultipleShowsWithCache,
+  getShow,
   updateShowCache,
   invalidateShowCache,
+  getLargestImage,
   type SpotifyEpisode,
   type SpotifyShow,
 } from '../providers/spotify';
@@ -224,7 +226,6 @@ export async function pollSpotifySubscriptionsBatched(
       spotifyLogger.warn('Show not found in batch response - may be deleted from Spotify', {
         subscriptionId: sub.id,
         showId: sub.providerChannelId,
-        subscriptionName: sub.name,
       });
       subsMissing.push(sub);
       continue;
@@ -238,7 +239,7 @@ export async function pollSpotifySubscriptionsBatched(
       // New episodes exist - needs full polling
       spotifyLogger.info('Delta detected', {
         subscriptionId: sub.id,
-        name: sub.name,
+        showId: sub.providerChannelId,
         stored: storedCount,
         current: currentCount,
         delta: currentCount - storedCount,
@@ -303,7 +304,6 @@ export async function pollSpotifySubscriptionsBatched(
           spotifyLogger.error('Failed to fetch episodes for show', {
             subscriptionId: sub.id,
             showId: sub.providerChannelId,
-            showName: sub.name,
             error: serializeError(error),
           });
           return { sub, show, episodes: [] as SpotifyEpisode[], error: error as Error };
@@ -335,7 +335,6 @@ export async function pollSpotifySubscriptionsBatched(
     if (error) {
       const pollingError = createPollingError(sub.id, error, {
         showId: sub.providerChannelId,
-        showName: sub.name,
         userId,
         operation: 'getShowEpisodes',
       });
@@ -345,16 +344,16 @@ export async function pollSpotifySubscriptionsBatched(
 
     // No episodes found
     if (allEpisodes.length === 0) {
-      spotifyLogger.info('No episodes found', { name: sub.name });
+      spotifyLogger.info('No episodes found', { showId: sub.providerChannelId });
       await updateSubscriptionPolled(sub.id, db);
       continue;
     }
 
     // Filter out unplayable episodes first (geo-restricted, removed, etc.)
-    const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
+    const episodes = filterPlayableEpisodes(allEpisodes, sub.providerChannelId);
 
     if (episodes.length === 0) {
-      spotifyLogger.info('No playable episodes found', { name: sub.name });
+      spotifyLogger.info('No playable episodes found', { showId: sub.providerChannelId });
       await updateSubscriptionPolled(sub.id, db);
       continue;
     }
@@ -365,7 +364,7 @@ export async function pollSpotifySubscriptionsBatched(
     spotifyLogger.info('Found episodes', {
       total: episodes.length,
       new: newEpisodes.length,
-      name: sub.name,
+      showId: sub.providerChannelId,
     });
 
     try {
@@ -374,8 +373,7 @@ export async function pollSpotifySubscriptionsBatched(
         newEpisodes,
         userId,
         sub.id,
-        sub.name,
-        sub.imageUrl,
+        show,
         db
       );
       totalNewItems += newItemsCount;
@@ -411,7 +409,6 @@ export async function pollSpotifySubscriptionsBatched(
     } catch (ingestError) {
       const pollingError = createPollingError(sub.id, ingestError, {
         showId: sub.providerChannelId,
-        showName: sub.name,
         userId,
         operation: 'ingestEpisodes',
       });
@@ -501,25 +498,28 @@ export async function pollSingleSpotifySubscription(
 ): Promise<PollingResult> {
   spotifyLogger.info('Polling subscription', {
     subscriptionId: sub.id,
-    name: sub.name,
+    showId: sub.providerChannelId,
     lastPublishedAt: sub.lastPublishedAt,
     lastPublishedAtDate: sub.lastPublishedAt ? new Date(sub.lastPublishedAt).toISOString() : null,
   });
+
+  // Fetch show details for full metadata (needed for creator extraction)
+  const show = await getShow(client, sub.providerChannelId);
 
   // Fetch recent episodes from the show
   const allEpisodes = await getShowEpisodes(client, sub.providerChannelId, MAX_ITEMS_PER_POLL);
 
   if (allEpisodes.length === 0) {
-    spotifyLogger.info('No episodes found', { name: sub.name });
+    spotifyLogger.info('No episodes found', { showId: sub.providerChannelId });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
 
   // Filter out unplayable episodes first (geo-restricted, removed, etc.)
-  const episodes = filterPlayableEpisodes(allEpisodes, sub.name);
+  const episodes = filterPlayableEpisodes(allEpisodes, sub.providerChannelId);
 
   if (episodes.length === 0) {
-    spotifyLogger.info('No playable episodes found', { name: sub.name });
+    spotifyLogger.info('No playable episodes found', { showId: sub.providerChannelId });
     await updateSubscriptionPolled(sub.id, db);
     return { newItems: 0 };
   }
@@ -532,7 +532,7 @@ export async function pollSingleSpotifySubscription(
     const latestEpisode = episodes[0];
     const latestReleaseDate = parseSpotifyDate(latestEpisode.releaseDate);
     spotifyLogger.info('Found episodes', {
-      name: sub.name,
+      showId: sub.providerChannelId,
       total: episodes.length,
       new: newEpisodes.length,
       latestEpisodeTitle: latestEpisode.name,
@@ -548,8 +548,7 @@ export async function pollSingleSpotifySubscription(
     newEpisodes,
     userId,
     sub.id,
-    sub.name,
-    sub.imageUrl,
+    show,
     db
   );
 
@@ -567,7 +566,7 @@ export async function pollSingleSpotifySubscription(
     .where(eq(subscriptions.id, sub.id));
 
   spotifyLogger.info('Poll complete', {
-    name: sub.name,
+    showId: sub.providerChannelId,
     newItemsIngested: newItemsCount,
     updatedLastPublishedAt: newestIngestedAt ? new Date(newestIngestedAt).toISOString() : null,
   });
@@ -667,17 +666,20 @@ async function ingestNewEpisodes(
   episodes: SpotifyEpisode[],
   userId: string,
   subscriptionId: string,
-  showName: string,
-  showImageUrl: string | null,
+  show: SpotifyShow,
   db: DrizzleDB
 ): Promise<IngestResult> {
   let newItemsCount = 0;
   let skippedCount = 0;
   let newestIngestedAt: number | null = null;
 
+  const showImageUrl = getLargestImage(show.images) ?? null;
+
   for (const episode of episodes) {
     try {
       // Transform SpotifyEpisode to the format expected by transformSpotifyEpisode
+      // CRITICAL: Include full show metadata for creator extraction
+      // extractSpotifyCreator() expects rawItem.show to contain { id, name, description, publisher, images, external_urls }
       const rawEpisode = {
         id: episode.id,
         name: episode.name,
@@ -686,6 +688,15 @@ async function ingestNewEpisodes(
         duration_ms: episode.durationMs,
         external_urls: { spotify: episode.externalUrl },
         images: episode.images,
+        // Full show metadata for creator extraction (extractSpotifyCreator looks for this)
+        show: {
+          id: show.id,
+          name: show.name,
+          description: show.description,
+          publisher: show.publisher,
+          images: show.images,
+          external_urls: { spotify: show.externalUrl },
+        },
       };
 
       const result = await ingestItem(
@@ -693,9 +704,9 @@ async function ingestNewEpisodes(
         subscriptionId,
         rawEpisode,
         Provider.SPOTIFY,
-        db as unknown as DrizzleD1Database,
+        db as Database,
         (raw: typeof rawEpisode) =>
-          transformSpotifyEpisode(raw, showName, showImageUrl ?? undefined)
+          transformSpotifyEpisode(raw, show.name, showImageUrl ?? undefined)
       );
       if (result.created) {
         newItemsCount++;
@@ -707,7 +718,7 @@ async function ingestNewEpisodes(
         }
 
         spotifyLogger.info('Episode ingested', {
-          showName,
+          showName: show.name,
           episodeId: episode.id,
           episodeName: episode.name,
           releaseDate: episode.releaseDate,
@@ -717,7 +728,7 @@ async function ingestNewEpisodes(
       } else {
         skippedCount++;
         spotifyLogger.debug('Episode skipped (already seen)', {
-          showName,
+          showName: show.name,
           episodeId: episode.id,
           episodeName: episode.name,
           reason: result.skipped,
@@ -728,7 +739,7 @@ async function ingestNewEpisodes(
       // This ensures lastPublishedAt is only advanced for successful ingestions.
       const serialized = serializeError(ingestError);
       spotifyLogger.error('Failed to ingest episode', {
-        showName,
+        showName: show.name,
         episodeId: episode.id,
         episodeName: episode.name,
         error: serialized,
@@ -740,7 +751,7 @@ async function ingestNewEpisodes(
 
   if (skippedCount > 0) {
     spotifyLogger.info('Ingestion summary', {
-      showName,
+      showName: show.name,
       created: newItemsCount,
       skipped: skippedCount,
     });

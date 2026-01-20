@@ -32,9 +32,8 @@ export const items = sqliteTable(
     title: text('title').notNull(),
     thumbnailUrl: text('thumbnail_url'),
 
-    // Attribution
-    creator: text('creator').notNull(), // Channel/author/podcast name
-    creatorImageUrl: text('creator_image_url'), // Channel/show/podcast image (distinct from episode thumbnail)
+    // Attribution (normalized via creators table)
+    creatorId: text('creator_id').references(() => creators.id),
     publisher: text('publisher'), // Optional: network
 
     // Metadata
@@ -55,6 +54,8 @@ export const items = sqliteTable(
   (table) => [
     // Prevent duplicate content from same provider
     uniqueIndex('items_provider_provider_id_idx').on(table.provider, table.providerId),
+    // Fast lookups by creator
+    index('idx_items_creator_id').on(table.creatorId),
   ]
 );
 
@@ -187,11 +188,8 @@ export const subscriptions = sqliteTable(
     provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
     providerChannelId: text('provider_channel_id').notNull(), // YouTube channel ID or Spotify show ID
 
-    // Display info
-    name: text('name').notNull(), // Channel/show name
-    description: text('description'),
-    imageUrl: text('image_url'),
-    externalUrl: text('external_url'), // Link to channel/show on provider
+    // Creator relationship (normalized - use JOIN to get name, imageUrl, etc.)
+    creatorId: text('creator_id').references(() => creators.id),
 
     // Polling metadata
     totalItems: integer('total_items').default(0), // Total videos/episodes (cached)
@@ -218,6 +216,8 @@ export const subscriptions = sqliteTable(
     // Fast polling queries
     index('subscriptions_poll_idx').on(table.status, table.lastPolledAt),
     index('subscriptions_user_idx').on(table.userId, table.status),
+    // Fast creator lookups
+    index('subscriptions_creator_idx').on(table.creatorId),
   ]
 );
 
@@ -281,6 +281,34 @@ export const deadLetterQueue = sqliteTable(
     index('dlq_user_idx').on(table.userId),
     // Prevent duplicate entries for the same provider item
     index('dlq_provider_item_idx').on(table.provider, table.providerId, table.userId),
+  ]
+);
+
+// ============================================================================
+// Creators (Canonical Creator Entities)
+// ============================================================================
+// Stores creator entities across providers (YouTube channels, Spotify shows, X users, etc.)
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const creators = sqliteTable(
+  'creators',
+  {
+    id: text('id').primaryKey(), // ULID
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | RSS | SUBSTACK | WEB | X
+    providerCreatorId: text('provider_creator_id').notNull(), // Channel ID, show ID, etc.
+    name: text('name').notNull(), // Display name
+    normalizedName: text('normalized_name').notNull(), // Lowercase, trimmed for dedup
+    imageUrl: text('image_url'),
+    description: text('description'),
+    externalUrl: text('external_url'), // Link to creator's page
+    handle: text('handle'), // @username for X/YouTube
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
+  },
+  (table) => [
+    // Prevent duplicate creators from same provider
+    uniqueIndex('idx_creators_provider_creator').on(table.provider, table.providerCreatorId),
+    // Fast lookups by normalized name for deduplication
+    index('idx_creators_normalized_name').on(table.normalizedName),
   ]
 );
 

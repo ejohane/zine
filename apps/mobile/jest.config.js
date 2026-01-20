@@ -12,8 +12,12 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  // Match test files in lib/ and hooks/
-  testMatch: ['<rootDir>/lib/**/*.test.ts', '<rootDir>/hooks/**/*.test.ts'],
+  // Match test files in lib/, hooks/, and components/
+  testMatch: [
+    '<rootDir>/lib/**/*.test.ts',
+    '<rootDir>/hooks/**/*.test.ts',
+    '<rootDir>/components/**/*.test.ts',
+  ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transform: {
     '^.+\\.tsx?$': [
