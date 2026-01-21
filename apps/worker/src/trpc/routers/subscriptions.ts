@@ -52,6 +52,7 @@ import {
   getActiveSyncJob,
   RateLimitError,
 } from '../../sync/service';
+import { getDLQSummary, getDLQEntries, deleteDLQEntry } from '../../sync/dlq-consumer';
 
 // ============================================================================
 // Zod Schemas
@@ -725,6 +726,70 @@ export const subscriptionsRouter = router({
    */
   activeSyncJob: protectedProcedure.query(async ({ ctx }) => {
     return getActiveSyncJob(ctx.userId, ctx.env.OAUTH_STATE_KV);
+  }),
+
+  /**
+   * DLQ (Dead Letter Queue) monitoring endpoints.
+   *
+   * These endpoints provide visibility into sync messages that failed
+   * after exhausting all retries. Useful for:
+   * - Debugging persistent sync failures
+   * - Understanding error patterns
+   * - Manual investigation and resolution
+   *
+   * Note: These endpoints are available to all authenticated users,
+   * but only show aggregate DLQ data (not user-specific).
+   *
+   * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
+   */
+  dlq: router({
+    /**
+     * Get DLQ summary for monitoring dashboard.
+     *
+     * Returns count of DLQ entries and recent failures.
+     */
+    summary: protectedProcedure.query(async ({ ctx }) => {
+      return getDLQSummary(ctx.env.OAUTH_STATE_KV);
+    }),
+
+    /**
+     * List DLQ entries with optional limit.
+     *
+     * Returns detailed information about failed sync messages
+     * for investigation and potential replay.
+     */
+    list: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(100).default(20),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        return getDLQEntries(ctx.env.OAUTH_STATE_KV, input.limit);
+      }),
+
+    /**
+     * Delete a DLQ entry after investigation/resolution.
+     *
+     * Use this to clean up entries that have been manually resolved
+     * or are no longer relevant.
+     */
+    delete: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const deleted = await deleteDLQEntry(input.id, ctx.env.OAUTH_STATE_KV);
+        if (!deleted) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'DLQ entry not found',
+          });
+        }
+        return { success: true };
+      }),
   }),
 
   /**

@@ -55,6 +55,14 @@ max_batch_timeout = 30
 max_retries = 3
 dead_letter_queue = "zine-sync-dlq-dev"
 
+# DLQ consumer for monitoring failed sync messages
+# Messages that exhaust all retries (3) are moved here for investigation
+# Logs at ERROR level for Cloudflare dashboard alerts
+[[queues.consumers]]
+queue = "zine-sync-dlq-dev"
+max_batch_size = 10
+max_batch_timeout = 30
+
 # Observability settings
 [observability]
 [observability.logs]
@@ -108,6 +116,12 @@ max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 3
 dead_letter_queue = "zine-sync-dlq-staging"
+
+# DLQ consumer for monitoring failed sync messages (staging)
+[[env.staging.queues.consumers]]
+queue = "zine-sync-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
 [env.staging.observability]
 [env.staging.observability.logs]
 enabled = true
@@ -157,6 +171,12 @@ max_batch_size = 10
 max_batch_timeout = 30
 max_retries = 3
 dead_letter_queue = "zine-sync-dlq-prod"
+
+# DLQ consumer for monitoring failed sync messages (production)
+[[env.production.queues.consumers]]
+queue = "zine-sync-dlq-prod"
+max_batch_size = 10
+max_batch_timeout = 30
 [env.production.observability]
 [env.production.observability.logs]
 enabled = true
