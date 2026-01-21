@@ -37,6 +37,9 @@ const SUCCESS_DURATION = 3000;
 /** Default duration for error toasts (in milliseconds) */
 const ERROR_DURATION = 4000;
 
+/** Default duration for warning toasts (in milliseconds) */
+const WARNING_DURATION = 4000;
+
 // ============================================================================
 // Success Toasts
 // ============================================================================
@@ -60,6 +63,33 @@ export function showSuccess(toast: ToastManager, message: string, description?: 
     description,
     variant: 'success',
     duration: SUCCESS_DURATION,
+  });
+}
+
+// ============================================================================
+// Warning Toasts
+// ============================================================================
+
+/**
+ * Show a warning toast notification.
+ *
+ * Used for partial failures or situations that need attention but aren't errors.
+ *
+ * @param toast - The toast manager from useToast()
+ * @param message - The warning message to display
+ * @param description - Optional description for additional context
+ *
+ * @example
+ * ```tsx
+ * showWarning(toast, 'Synced 8 of 10 sources', '2 sources had issues');
+ * ```
+ */
+export function showWarning(toast: ToastManager, message: string, description?: string): void {
+  toast.show({
+    label: message,
+    description,
+    variant: 'warning',
+    duration: WARNING_DURATION,
   });
 }
 

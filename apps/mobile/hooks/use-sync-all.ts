@@ -54,10 +54,17 @@ export interface SyncProgress {
 }
 
 export interface SyncAllResult {
+  /** Whether all syncs succeeded (no failures) */
   success: boolean;
+  /** Number of subscriptions that synced successfully */
   synced: number;
+  /** Total number of subscriptions attempted */
+  total: number;
+  /** Number of new items found across all syncs */
   itemsFound: number;
+  /** Error messages from failed syncs */
   errors: string[];
+  /** Human-readable summary message */
   message: string;
 }
 
@@ -140,6 +147,7 @@ export function useSyncAll(): UseSyncAllReturn {
         setLastResult({
           success: status.failed === 0,
           synced: status.succeeded,
+          total: status.total,
           itemsFound: status.itemsFound,
           errors: status.errors.map((e) => e.error),
           message,
@@ -299,6 +307,7 @@ export function useSyncAll(): UseSyncAllReturn {
           setLastResult({
             success: true,
             synced: 0,
+            total: 0,
             itemsFound: 0,
             errors: [],
             message: 'No subscriptions to sync',
@@ -329,6 +338,7 @@ export function useSyncAll(): UseSyncAllReturn {
           setLastResult({
             success: false,
             synced: 0,
+            total: 0,
             itemsFound: 0,
             errors: [],
             message: `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
@@ -337,6 +347,7 @@ export function useSyncAll(): UseSyncAllReturn {
           setLastResult({
             success: false,
             synced: 0,
+            total: 0,
             itemsFound: 0,
             errors: [error.message ?? 'Sync failed'],
             message: error.message ?? 'Sync failed',
