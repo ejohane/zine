@@ -30,6 +30,10 @@ import {
   JOB_STATUS_TTL_SECONDS,
   ACTIVE_JOB_TTL_SECONDS,
 } from './types';
+// Note: Provider and polling imports are done dynamically in processSyncFallback
+// to avoid loading googleapis at module init time (breaks workerd test environment)
+import type { ProviderConnection } from '../lib/token-refresh';
+import type { Subscription as PollingSubscription, DrizzleDB } from '../polling/types';
 
 // ============================================================================
 // Constants
@@ -236,15 +240,16 @@ export async function initiateSyncJob(
       userId,
     });
 
-    // Mark as completed immediately since we can't queue
-    jobStatus.status = 'completed';
-    jobStatus.errors.push({
-      subscriptionId: 'system',
-      error: 'Queue not available - sync skipped',
-    });
-    await kv.put(getJobStatusKey(jobId), JSON.stringify(jobStatus), {
-      expirationTtl: JOB_STATUS_TTL_SECONDS,
-    });
+    // Process subscriptions synchronously
+    await processSyncFallback(
+      jobId,
+      userId,
+      syncableSubs,
+      connections as ProviderConnection[],
+      db,
+      env,
+      kv
+    );
   }
 
   return {
@@ -398,6 +403,168 @@ export async function updateJobProgress(
     completed: status.completed,
     total: status.total,
     status: status.status,
+  });
+}
+
+// ============================================================================
+// Synchronous Fallback (Local Development)
+// ============================================================================
+
+/**
+ * Process subscriptions synchronously when queue is not available.
+ * Used for local development without Cloudflare Queues.
+ *
+ * Note: Uses dynamic imports to avoid loading googleapis at module init time
+ * which breaks the workerd test environment.
+ */
+async function processSyncFallback(
+  jobId: string,
+  userId: string,
+  subs: Array<{ id: string; provider: string; providerChannelId: string }>,
+  connections: ProviderConnection[],
+  db: Database,
+  env: Bindings,
+  kv: KVNamespace
+): Promise<void> {
+  // Dynamic imports to avoid loading googleapis at module initialization
+  const [
+    { getYouTubeClientForConnection },
+    { getSpotifyClientForConnection },
+    { pollYouTubeSubscriptionsBatched },
+    { pollSpotifySubscriptionsBatched },
+  ] = await Promise.all([
+    import('../providers/youtube'),
+    import('../providers/spotify'),
+    import('../polling/youtube-poller'),
+    import('../polling/spotify-poller'),
+  ]);
+
+  const connectedProviders = new Map(connections.map((c) => [c.provider, c]));
+
+  // Group subscriptions by provider
+  const youtubeSubs = subs.filter((s) => s.provider === 'YOUTUBE');
+  const spotifySubs = subs.filter((s) => s.provider === 'SPOTIFY');
+
+  let totalSucceeded = 0;
+  let totalFailed = 0;
+  let totalItems = 0;
+  const errors: Array<{ subscriptionId: string; error: string }> = [];
+
+  // Process YouTube subscriptions
+  if (youtubeSubs.length > 0) {
+    const connection = connectedProviders.get('YOUTUBE');
+    if (connection) {
+      try {
+        const client = await getYouTubeClientForConnection(
+          connection as ProviderConnection,
+          env as Parameters<typeof getYouTubeClientForConnection>[1]
+        );
+
+        const result = await pollYouTubeSubscriptionsBatched(
+          youtubeSubs as PollingSubscription[],
+          client,
+          userId,
+          env,
+          db as unknown as DrizzleDB
+        );
+
+        totalSucceeded += result.processed - (result.errors?.length ?? 0);
+        totalFailed += result.errors?.length ?? 0;
+        totalItems += result.newItems;
+
+        if (result.errors) {
+          errors.push(...result.errors);
+        }
+
+        syncLogger.info('YouTube sync fallback completed', {
+          jobId,
+          processed: result.processed,
+          newItems: result.newItems,
+          errors: result.errors?.length ?? 0,
+        });
+      } catch (error) {
+        syncLogger.error('YouTube sync fallback failed', { jobId, error });
+        totalFailed += youtubeSubs.length;
+        errors.push({
+          subscriptionId: 'youtube-all',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // Process Spotify subscriptions
+  if (spotifySubs.length > 0) {
+    const connection = connectedProviders.get('SPOTIFY');
+    if (connection) {
+      try {
+        const client = await getSpotifyClientForConnection(
+          connection as ProviderConnection,
+          env as Parameters<typeof getSpotifyClientForConnection>[1]
+        );
+
+        const result = await pollSpotifySubscriptionsBatched(
+          spotifySubs as PollingSubscription[],
+          client,
+          userId,
+          env,
+          db as unknown as DrizzleDB
+        );
+
+        totalSucceeded += result.processed - (result.errors?.length ?? 0);
+        totalFailed += result.errors?.length ?? 0;
+        totalItems += result.newItems;
+
+        if (result.errors) {
+          errors.push(...result.errors);
+        }
+
+        syncLogger.info('Spotify sync fallback completed', {
+          jobId,
+          processed: result.processed,
+          newItems: result.newItems,
+          errors: result.errors?.length ?? 0,
+        });
+      } catch (error) {
+        syncLogger.error('Spotify sync fallback failed', { jobId, error });
+        totalFailed += spotifySubs.length;
+        errors.push({
+          subscriptionId: 'spotify-all',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  // Update final job status
+  const finalStatus: SyncJobStatus = {
+    jobId,
+    userId,
+    total: subs.length,
+    completed: subs.length,
+    succeeded: totalSucceeded,
+    failed: totalFailed,
+    itemsFound: totalItems,
+    status: 'completed',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    errors,
+  };
+
+  await kv.put(getJobStatusKey(jobId), JSON.stringify(finalStatus), {
+    expirationTtl: JOB_STATUS_TTL_SECONDS,
+  });
+
+  // Clear active job marker
+  await kv.delete(getActiveJobKey(userId));
+
+  syncLogger.info('Sync fallback completed', {
+    jobId,
+    userId,
+    total: subs.length,
+    succeeded: totalSucceeded,
+    failed: totalFailed,
+    itemsFound: totalItems,
   });
 }
 
