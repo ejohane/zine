@@ -23,6 +23,7 @@ import { parseSpotifyDate } from '../lib/timestamps';
 import {
   getSpotifyClientForConnection,
   getShowEpisodes,
+  getLatestEpisode,
   getMultipleShowsWithCache,
   getShow,
   updateShowCache,
@@ -274,10 +275,85 @@ export async function pollSpotifySubscriptionsBatched(
     });
   }
 
-  // Batch update lastPolledAt for unchanged subscriptions
+  // Secondary delta check: verify "unchanged" subscriptions by checking latest episode date
+  // This catches cases where Spotify's total_episodes count is stale/incorrect
+  // but new episodes actually exist (observed in production)
+  const trulyUnchanged: Subscription[] = [];
+
   if (subsUnchanged.length > 0) {
+    spotifyLogger.info('Starting secondary delta check for unchanged subscriptions', {
+      count: subsUnchanged.length,
+    });
+
+    // Fetch latest episode for each "unchanged" subscription in parallel
+    const secondaryCheckResults = await Promise.all(
+      subsUnchanged.map(async (sub) => {
+        try {
+          const latestEpisode = await getLatestEpisode(client, sub.providerChannelId);
+          return { sub, latestEpisode, error: undefined };
+        } catch (error) {
+          // If we can't fetch, assume unchanged to avoid blocking
+          spotifyLogger.warn('Failed to fetch latest episode for secondary check', {
+            subscriptionId: sub.id,
+            showId: sub.providerChannelId,
+            error: serializeError(error),
+          });
+          return { sub, latestEpisode: null, error };
+        }
+      })
+    );
+
+    let promotedCount = 0;
+
+    for (const { sub, latestEpisode } of secondaryCheckResults) {
+      if (!latestEpisode) {
+        // No episode found or fetch failed - treat as unchanged
+        trulyUnchanged.push(sub);
+        continue;
+      }
+
+      // Parse the episode's release date and compare against lastPublishedAt
+      const episodeDate = parseSpotifyDate(latestEpisode.releaseDate);
+      const lastPublishedAt = sub.lastPublishedAt ?? 0;
+
+      if (episodeDate > lastPublishedAt) {
+        // New episode found despite total_episodes not changing!
+        const show = showMap.get(sub.providerChannelId);
+        if (show) {
+          spotifyLogger.info(
+            'Secondary delta detected: new episode found despite stale total_episodes',
+            {
+              subscriptionId: sub.id,
+              showId: sub.providerChannelId,
+              episodeName: latestEpisode.name,
+              episodeDate: latestEpisode.releaseDate,
+              lastPublishedAt: new Date(lastPublishedAt).toISOString(),
+              totalEpisodes: show.totalEpisodes,
+              storedTotalItems: sub.totalItems,
+            }
+          );
+          subsNeedingUpdate.push({ sub, show });
+          promotedCount++;
+        } else {
+          // Shouldn't happen, but handle gracefully
+          trulyUnchanged.push(sub);
+        }
+      } else {
+        trulyUnchanged.push(sub);
+      }
+    }
+
+    spotifyLogger.info('Secondary delta check complete', {
+      checked: subsUnchanged.length,
+      promoted: promotedCount,
+      trulyUnchanged: trulyUnchanged.length,
+    });
+  }
+
+  // Batch update lastPolledAt for truly unchanged subscriptions
+  if (trulyUnchanged.length > 0) {
     await updateSubscriptionsPolled(
-      subsUnchanged.map((s) => s.id),
+      trulyUnchanged.map((s) => s.id),
       db
     );
   }
