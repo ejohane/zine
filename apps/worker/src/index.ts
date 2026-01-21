@@ -10,7 +10,7 @@ import { logger as honoLogger } from 'hono/logger';
 import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
-import { pollSubscriptions } from './polling/scheduler';
+import { pollProviderSubscriptions } from './polling/scheduler';
 import { logger } from './lib/logger';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
@@ -165,13 +165,22 @@ export default {
    * Scheduled handler for cron-triggered content polling.
    *
    * Configured in wrangler.toml with `[triggers]` section.
-   * Runs hourly to poll active subscriptions for new content.
+   * Two cron jobs run independently:
+   * - "0 * * * *"  → YouTube polling at top of hour
+   * - "30 * * * *" → Spotify polling at 30 minutes past
+   *
+   * Each provider has its own distributed lock for failure isolation.
    *
    * @see /features/subscriptions/backend-spec.md - Section 3: Polling Architecture
    */
-  async scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+    // Map cron expression to provider
+    // "0 * * * *" → YouTube (top of hour)
+    // "30 * * * *" → Spotify (mid-hour)
+    const provider = event.cron === '0 * * * *' ? 'YOUTUBE' : 'SPOTIFY';
+
     // Use waitUntil to ensure the polling completes even if the
     // scheduled handler returns early
-    ctx.waitUntil(pollSubscriptions(env, ctx));
+    ctx.waitUntil(pollProviderSubscriptions(provider, env, ctx));
   },
 };
