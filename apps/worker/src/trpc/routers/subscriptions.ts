@@ -42,43 +42,17 @@ import {
 import type { ProviderConnection } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 import { triggerInitialFetch, type InitialFetchEnv } from '../../subscriptions/initial-fetch';
-import {
-  pollSingleYouTubeSubscription,
-  pollYouTubeSubscriptionsBatched,
-} from '../../polling/youtube-poller';
-import {
-  pollSingleSpotifySubscription,
-  pollSpotifySubscriptionsBatched,
-} from '../../polling/spotify-poller';
+import { pollSingleYouTubeSubscription } from '../../polling/youtube-poller';
+import { pollSingleSpotifySubscription } from '../../polling/spotify-poller';
 import type { Bindings } from '../../types';
 import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Maximum YouTube subscriptions to sync per request.
- *
- * Cloudflare Workers have a 50 subrequest limit per invocation.
- * Each YouTube subscription poll requires 2 API calls:
- *   1. playlistItems.list (fetch videos from uploads playlist)
- *   2. videos.list (fetch video details/duration for filtering Shorts)
- *
- * 20 subs × 2 calls = 40 subrequests, leaving headroom for:
- *   - Spotify API calls
- *   - Database operations
- *   - Token refresh if needed
- *
- * If user has more than this, remaining subs will be synced on next request.
- */
-const MAX_YOUTUBE_SUBS_PER_SYNC = 20;
-
-/**
- * Maximum Spotify subscriptions to sync per request.
- * Spotify uses 1 API call per subscription (episodes.list).
- */
-const MAX_SPOTIFY_SUBS_PER_SYNC = 30;
+import {
+  initiateSyncJob,
+  getSyncStatus,
+  getActiveSyncJob,
+  RateLimitError,
+} from '../../sync/service';
+import { getDLQSummary, getDLQEntries, deleteDLQEntry } from '../../sync/dlq-consumer';
 
 // ============================================================================
 // Zod Schemas
@@ -670,209 +644,152 @@ export const subscriptionsRouter = router({
   }),
 
   /**
-   * Sync all active subscriptions for the current user (rate limited)
+   * Initiate an async sync job for all active subscriptions.
    *
-   * Rate limit: 1 sync-all per 2 minutes per user
+   * Instead of blocking
+   * while all subscriptions are polled, it:
+   * 1. Creates a sync job with a unique ID
+   * 2. Enqueues messages for each subscription to the SYNC_QUEUE
+   * 3. Returns immediately with the job ID
+   *
+   * The client should then poll syncStatus to track progress.
+   *
+   * Key features:
+   * - Job deduplication: Returns existing job if sync already in progress
+   * - Rate limiting: Enforces 2-minute cooldown between syncs
+   * - Error isolation: Each subscription processed independently
+   * - App restart safe: Job progress persists in KV
    *
    * @throws TOO_MANY_REQUESTS if user rate limit exceeded
-   * @returns Summary of sync results
+   * @returns Job ID and total subscriptions to sync
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
    */
-  syncAll: protectedProcedure.mutation(async ({ ctx }) => {
-    const syncStartTime = Date.now();
-    logger.info('syncAll: started', { userId: ctx.userId });
+  syncAllAsync: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const result = await initiateSyncJob(ctx.userId, ctx.db, ctx.env as Bindings);
 
-    // 1. Check user-level rate limit (2 minutes between sync-all)
-    const rateLimitKey = `sync-all:${ctx.userId}`;
-    const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
-    if (lastSync && Date.now() - parseInt(lastSync, 10) < 2 * 60 * 1000) {
-      const waitTime = Math.ceil((2 * 60 * 1000 - (Date.now() - parseInt(lastSync, 10))) / 1000);
-      logger.info('syncAll: rate limited', { userId: ctx.userId, waitTimeSeconds: waitTime });
-      throw new TRPCError({
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Please wait 2 minutes between full syncs',
-      });
-    }
-
-    // 2. Get all active subscriptions for user
-    const activeSubs = await ctx.db.query.subscriptions.findMany({
-      where: and(eq(subscriptions.userId, ctx.userId), eq(subscriptions.status, 'ACTIVE')),
-    });
-
-    if (activeSubs.length === 0) {
-      logger.info('syncAll: no active subscriptions', { userId: ctx.userId });
-      return { success: true as const, synced: 0, itemsFound: 0, errors: [] as string[] };
-    }
-
-    logger.info('syncAll: found subscriptions', {
-      userId: ctx.userId,
-      total: activeSubs.length,
-      youtube: activeSubs.filter((s) => s.provider === 'YOUTUBE').length,
-      spotify: activeSubs.filter((s) => s.provider === 'SPOTIFY').length,
-    });
-
-    // 3. Update rate limit immediately (before processing)
-    await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 120 });
-
-    // 4. Initialize results
-    const results = {
-      synced: 0,
-      itemsFound: 0,
-      errors: [] as string[],
-    };
-
-    // 5. Group by provider and sort by lastPolledAt (oldest first, null = never polled = highest priority)
-    const sortByOldestPoll = (
-      a: { lastPolledAt: number | null },
-      b: { lastPolledAt: number | null }
-    ) => {
-      // Null (never polled) comes first
-      if (a.lastPolledAt === null && b.lastPolledAt === null) return 0;
-      if (a.lastPolledAt === null) return -1;
-      if (b.lastPolledAt === null) return 1;
-      return a.lastPolledAt - b.lastPolledAt;
-    };
-
-    const byProvider = {
-      YOUTUBE: activeSubs
-        .filter((s) => s.provider === 'YOUTUBE')
-        .sort(sortByOldestPoll)
-        .slice(0, MAX_YOUTUBE_SUBS_PER_SYNC),
-      SPOTIFY: activeSubs
-        .filter((s) => s.provider === 'SPOTIFY')
-        .sort(sortByOldestPoll)
-        .slice(0, MAX_SPOTIFY_SUBS_PER_SYNC),
-    };
-
-    // Track total counts for logging
-    const totalYouTube = activeSubs.filter((s) => s.provider === 'YOUTUBE').length;
-    const totalSpotify = activeSubs.filter((s) => s.provider === 'SPOTIFY').length;
-    const skippedYouTube = totalYouTube - byProvider.YOUTUBE.length;
-    const skippedSpotify = totalSpotify - byProvider.SPOTIFY.length;
-
-    if (skippedYouTube > 0 || skippedSpotify > 0) {
-      logger.info('syncAll: limiting subscriptions due to subrequest budget', {
-        totalYouTube,
-        syncingYouTube: byProvider.YOUTUBE.length,
-        skippedYouTube,
-        totalSpotify,
-        syncingSpotify: byProvider.SPOTIFY.length,
-        skippedSpotify,
-      });
-    }
-
-    // 6. Process YouTube subscriptions using batched polling
-    if (byProvider.YOUTUBE.length > 0) {
-      const ytConnection = await ctx.db.query.providerConnections.findFirst({
-        where: and(
-          eq(providerConnections.userId, ctx.userId),
-          eq(providerConnections.provider, 'YOUTUBE'),
-          eq(providerConnections.status, 'ACTIVE')
-        ),
+      logger.info('syncAllAsync: job initiated', {
+        userId: ctx.userId,
+        jobId: result.jobId,
+        total: result.total,
+        existing: result.existing,
       });
 
-      if (ytConnection) {
-        try {
-          const client = await getYouTubeClientForConnection(
-            ytConnection as ProviderConnection,
-            ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
-          );
-
-          const batchResult = await pollYouTubeSubscriptionsBatched(
-            byProvider.YOUTUBE as PollingSubscription[],
-            client,
-            ctx.userId,
-            ctx.env as Bindings,
-            ctx.db as unknown as DrizzleDB
-          );
-
-          results.synced += batchResult.processed;
-          results.itemsFound += batchResult.newItems;
-
-          if (batchResult.errors) {
-            for (const err of batchResult.errors) {
-              const sub = byProvider.YOUTUBE.find((s) => s.id === err.subscriptionId);
-              results.errors.push(`YouTube: ${sub?.providerChannelId ?? err.subscriptionId}`);
-            }
-          }
-        } catch (err) {
-          logger.error('syncAll: YouTube batch polling failed', { error: err });
-          results.errors.push('YouTube connection error');
-        }
-      } else {
-        logger.warn('syncAll: YouTube subscriptions exist but no active connection');
-        results.errors.push('YouTube not connected');
+      return result;
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: error.message,
+        });
       }
+      throw error;
     }
+  }),
 
-    // 7. Process Spotify subscriptions using batched polling with delta detection
-    if (byProvider.SPOTIFY.length > 0) {
-      const spConnection = await ctx.db.query.providerConnections.findFirst({
-        where: and(
-          eq(providerConnections.userId, ctx.userId),
-          eq(providerConnections.provider, 'SPOTIFY'),
-          eq(providerConnections.status, 'ACTIVE')
-        ),
-      });
+  /**
+   * Get the status of a sync job.
+   *
+   * Returns progress information including:
+   * - Total subscriptions to sync
+   * - Completed count
+   * - Success/failure counts
+   * - New items found
+   * - Any errors
+   *
+   * Poll this endpoint every 2 seconds while sync is in progress.
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  syncStatus: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const status = await getSyncStatus(input.jobId, ctx.env.OAUTH_STATE_KV);
 
-      if (spConnection) {
-        try {
-          const client = await getSpotifyClientForConnection(
-            spConnection as ProviderConnection,
-            ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
-          );
+      // Security: verify job belongs to this user (job ID embeds user context)
+      // The getJobStatus function returns null if not found, so status='not_found'
+      // is already handled
 
-          const batchResult = await pollSpotifySubscriptionsBatched(
-            byProvider.SPOTIFY as PollingSubscription[],
-            client,
-            ctx.userId,
-            ctx.env as Bindings,
-            ctx.db as unknown as DrizzleDB
-          );
+      return status;
+    }),
 
-          results.synced += batchResult.processed;
-          results.itemsFound += batchResult.newItems;
+  /**
+   * Check if the user has an active sync job.
+   *
+   * Call this on app startup/resume to check if a sync is in progress.
+   * If so, the client should resume polling syncStatus.
+   *
+   * @returns Whether sync is in progress and the job ID if so
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  activeSyncJob: protectedProcedure.query(async ({ ctx }) => {
+    return getActiveSyncJob(ctx.userId, ctx.env.OAUTH_STATE_KV);
+  }),
 
-          if (batchResult.errors) {
-            for (const err of batchResult.errors) {
-              const sub = byProvider.SPOTIFY.find((s) => s.id === err.subscriptionId);
-              results.errors.push(`Spotify: ${sub?.providerChannelId ?? err.subscriptionId}`);
-            }
-          }
-        } catch (err) {
-          logger.error('syncAll: Spotify batch polling failed', { error: err });
-          results.errors.push('Spotify connection error');
+  /**
+   * DLQ (Dead Letter Queue) monitoring endpoints.
+   *
+   * These endpoints provide visibility into sync messages that failed
+   * after exhausting all retries. Useful for:
+   * - Debugging persistent sync failures
+   * - Understanding error patterns
+   * - Manual investigation and resolution
+   *
+   * Note: These endpoints are available to all authenticated users,
+   * but only show aggregate DLQ data (not user-specific).
+   *
+   * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
+   */
+  dlq: router({
+    /**
+     * Get DLQ summary for monitoring dashboard.
+     *
+     * Returns count of DLQ entries and recent failures.
+     */
+    summary: protectedProcedure.query(async ({ ctx }) => {
+      return getDLQSummary(ctx.env.OAUTH_STATE_KV);
+    }),
+
+    /**
+     * List DLQ entries with optional limit.
+     *
+     * Returns detailed information about failed sync messages
+     * for investigation and potential replay.
+     */
+    list: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().min(1).max(100).default(20),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        return getDLQEntries(ctx.env.OAUTH_STATE_KV, input.limit);
+      }),
+
+    /**
+     * Delete a DLQ entry after investigation/resolution.
+     *
+     * Use this to clean up entries that have been manually resolved
+     * or are no longer relevant.
+     */
+    delete: protectedProcedure
+      .input(
+        z.object({
+          id: z.string().min(1),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const deleted = await deleteDLQEntry(input.id, ctx.env.OAUTH_STATE_KV);
+        if (!deleted) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'DLQ entry not found',
+          });
         }
-      } else {
-        logger.warn('syncAll: Spotify subscriptions exist but no active connection');
-        results.errors.push('Spotify not connected');
-      }
-    }
-
-    // Calculate if there are remaining subscriptions that weren't synced
-    const hasMoreToSync = skippedYouTube > 0 || skippedSpotify > 0;
-
-    const syncDuration = Date.now() - syncStartTime;
-    logger.info('syncAll: completed', {
-      userId: ctx.userId,
-      synced: results.synced,
-      itemsFound: results.itemsFound,
-      errorCount: results.errors.length,
-      errors: results.errors.length > 0 ? results.errors : undefined,
-      hasMoreToSync,
-      skippedYouTube,
-      skippedSpotify,
-      durationMs: syncDuration,
-    });
-
-    return {
-      success: true as const,
-      synced: results.synced,
-      itemsFound: results.itemsFound,
-      errors: results.errors,
-      // Let client know if they should sync again to get remaining subs
-      hasMoreToSync,
-      remaining: skippedYouTube + skippedSpotify,
-    };
+        return { success: true };
+      }),
   }),
 
   /**

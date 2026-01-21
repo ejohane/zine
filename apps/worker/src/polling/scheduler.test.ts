@@ -1168,6 +1168,204 @@ describe('Polling Scheduler', () => {
       expect(mockDbUpdate).toHaveBeenCalled();
     });
   });
+
+  // ==========================================================================
+  // Provider-Specific Cron Polling Tests
+  // ==========================================================================
+
+  describe('pollProviderSubscriptions', () => {
+    it('should use YouTube-specific lock key for YouTube polling', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      await pollProviderSubscriptions('YOUTUBE', env as never, ctx);
+
+      expect(mockTryAcquireLock).toHaveBeenCalledWith(
+        env.OAUTH_STATE_KV,
+        'cron:poll-youtube:lock',
+        900
+      );
+    });
+
+    it('should use Spotify-specific lock key for Spotify polling', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      await pollProviderSubscriptions('SPOTIFY', env as never, ctx);
+
+      expect(mockTryAcquireLock).toHaveBeenCalledWith(
+        env.OAUTH_STATE_KV,
+        'cron:poll-spotify:lock',
+        900
+      );
+    });
+
+    it('should skip polling if provider-specific lock is held', async () => {
+      mockTryAcquireLock.mockResolvedValue(false);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      const result = await pollProviderSubscriptions('YOUTUBE', env as never, ctx);
+
+      expect(result.skipped).toBe(true);
+      expect(result.reason).toBe('lock_held');
+      expect(mockDbQuerySubscriptions.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should only poll YouTube subscriptions when called with YOUTUBE', async () => {
+      const youtubeSubscription = createMockSubscription({
+        id: 'sub_youtube_1',
+        provider: 'YOUTUBE',
+      });
+      const connection = createMockConnection({ provider: 'YOUTUBE' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([youtubeSubscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockFetchRecentVideos.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      const result = await pollProviderSubscriptions('YOUTUBE', env as never, ctx);
+
+      expect(result.skipped).toBe(false);
+      expect(result.processed).toBe(1);
+      // Verify YouTube client was called, not Spotify
+      expect(mockGetYouTubeClientForConnection).toHaveBeenCalled();
+      expect(mockGetSpotifyClientForConnection).not.toHaveBeenCalled();
+    });
+
+    it('should only poll Spotify subscriptions when called with SPOTIFY', async () => {
+      const spotifySubscription = createMockSubscription({
+        id: 'sub_spotify_1',
+        provider: 'SPOTIFY',
+        providerChannelId: '0testshow123456789012',
+      });
+      const connection = createMockConnection({ provider: 'SPOTIFY' });
+
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([spotifySubscription]);
+      mockDbQueryConnections.findFirst.mockResolvedValue(connection);
+      mockGetShow.mockResolvedValue({
+        id: '0testshow123456789012',
+        name: 'Test Show',
+        description: 'A test podcast',
+        publisher: 'Test Publisher',
+        images: [],
+        externalUrl: 'https://open.spotify.com/show/0testshow123456789012',
+        totalEpisodes: 10,
+      });
+      mockGetShowEpisodes.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      const result = await pollProviderSubscriptions('SPOTIFY', env as never, ctx);
+
+      expect(result.skipped).toBe(false);
+      expect(result.processed).toBe(1);
+      // Verify Spotify client was called, not YouTube
+      expect(mockGetSpotifyClientForConnection).toHaveBeenCalled();
+      expect(mockGetYouTubeClientForConnection).not.toHaveBeenCalled();
+    });
+
+    it('should release provider-specific lock after YouTube polling', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      await pollProviderSubscriptions('YOUTUBE', env as never, ctx);
+
+      expect(mockReleaseLock).toHaveBeenCalledWith(env.OAUTH_STATE_KV, 'cron:poll-youtube:lock');
+    });
+
+    it('should release provider-specific lock after Spotify polling', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      await pollProviderSubscriptions('SPOTIFY', env as never, ctx);
+
+      expect(mockReleaseLock).toHaveBeenCalledWith(env.OAUTH_STATE_KV, 'cron:poll-spotify:lock');
+    });
+
+    it('should release lock even if polling fails', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockRejectedValue(new Error('Database error'));
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+
+      await expect(pollProviderSubscriptions('YOUTUBE', env as never, ctx)).rejects.toThrow(
+        'Database error'
+      );
+      expect(mockReleaseLock).toHaveBeenCalledWith(env.OAUTH_STATE_KV, 'cron:poll-youtube:lock');
+    });
+
+    it('should return no_due_subscriptions when no subscriptions are due', async () => {
+      mockTryAcquireLock.mockResolvedValue(true);
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+      const result = await pollProviderSubscriptions('SPOTIFY', env as never, ctx);
+
+      expect(result.skipped).toBe(false);
+      expect(result.processed).toBe(0);
+      expect(result.reason).toBe('no_due_subscriptions');
+    });
+
+    it('should allow YouTube and Spotify polling to run concurrently (different locks)', async () => {
+      // This test simulates that YouTube and Spotify use different locks,
+      // so they can run at the same time without blocking each other
+      const lockAcquisitions: string[] = [];
+
+      mockTryAcquireLock.mockImplementation(async (_kv: unknown, key: string) => {
+        lockAcquisitions.push(key);
+        return true;
+      });
+      mockDbQuerySubscriptions.findMany.mockResolvedValue([]);
+
+      const env = createMockEnv();
+      const ctx = createMockExecutionContext();
+
+      const { pollProviderSubscriptions } = await import('./scheduler');
+
+      // Run both polling operations
+      await Promise.all([
+        pollProviderSubscriptions('YOUTUBE', env as never, ctx),
+        pollProviderSubscriptions('SPOTIFY', env as never, ctx),
+      ]);
+
+      // Both should have acquired their own locks
+      expect(lockAcquisitions).toContain('cron:poll-youtube:lock');
+      expect(lockAcquisitions).toContain('cron:poll-spotify:lock');
+      expect(lockAcquisitions.length).toBe(2);
+    });
+  });
 });
 
 // ============================================================================

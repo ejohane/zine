@@ -10,7 +10,10 @@ import { logger as honoLogger } from 'hono/logger';
 import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
-import { pollSubscriptions } from './polling/scheduler';
+import { pollProviderSubscriptions } from './polling/scheduler';
+import { handleSyncQueue } from './sync/consumer';
+import { handleSyncDLQ } from './sync/dlq-consumer';
+import type { SyncQueueMessage } from './sync/types';
 import { logger } from './lib/logger';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
@@ -165,13 +168,55 @@ export default {
    * Scheduled handler for cron-triggered content polling.
    *
    * Configured in wrangler.toml with `[triggers]` section.
-   * Runs hourly to poll active subscriptions for new content.
+   * Two cron jobs run independently:
+   * - "0 * * * *"  → YouTube polling at top of hour
+   * - "30 * * * *" → Spotify polling at 30 minutes past
+   *
+   * Each provider has its own distributed lock for failure isolation.
    *
    * @see /features/subscriptions/backend-spec.md - Section 3: Polling Architecture
    */
-  async scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+    // Map cron expression to provider
+    // "0 * * * *" → YouTube (top of hour)
+    // "30 * * * *" → Spotify (mid-hour)
+    const provider = event.cron === '0 * * * *' ? 'YOUTUBE' : 'SPOTIFY';
+
     // Use waitUntil to ensure the polling completes even if the
     // scheduled handler returns early
-    ctx.waitUntil(pollSubscriptions(env, ctx));
+    ctx.waitUntil(pollProviderSubscriptions(provider, env, ctx));
+  },
+
+  /**
+   * Queue handler for async pull-to-refresh sync and DLQ monitoring.
+   *
+   * Handles two queues:
+   * 1. SYNC_QUEUE: Primary sync queue for processing subscriptions
+   *    - Non-blocking pull-to-refresh (< 500ms response time)
+   *    - Error isolation (one subscription failing doesn't affect others)
+   *    - Automatic retries (3 attempts before DLQ)
+   *
+   * 2. SYNC_DLQ: Dead Letter Queue for failed messages
+   *    - Captures messages that exhausted all retries
+   *    - Logs at ERROR level for Cloudflare dashboard alerts
+   *    - Stores entries in KV for investigation and potential replay
+   *
+   * The queue name is available in batch.queue to differentiate handlers.
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
+   */
+  async queue(
+    batch: MessageBatch<SyncQueueMessage>,
+    env: Bindings,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    // Route to appropriate handler based on queue name
+    // DLQ queue names end with '-dlq-{env}'
+    if (batch.queue.includes('-dlq-')) {
+      await handleSyncDLQ(batch, env);
+    } else {
+      await handleSyncQueue(batch, env);
+    }
   },
 };

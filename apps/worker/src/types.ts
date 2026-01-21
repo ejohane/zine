@@ -3,6 +3,7 @@
  */
 
 import type { Context } from 'hono';
+import type { SyncQueueMessage } from './sync/types';
 
 /**
  * Environment bindings available to the Worker
@@ -50,6 +51,8 @@ export interface Bindings {
   SPOTIFY_MAX_SAFE_BATCH_SIZE?: string;
   /** Critical batch size threshold before logging error (default: 1000) */
   SPOTIFY_CRITICAL_BATCH_SIZE?: string;
+  /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
+  SYNC_QUEUE?: Queue<SyncQueueMessage>;
 }
 
 /**

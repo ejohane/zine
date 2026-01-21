@@ -36,8 +36,32 @@ database_id = "2ce5331a-233c-48ec-9265-d04ecb539599"
 migrations_dir = "src/db/migrations"
 
 # Cron triggers for scheduled ingestion
+# YouTube polls at :00 (top of hour), Spotify polls at :30 (mid-hour)
+# Each provider has its own distributed lock for failure isolation
 [triggers]
-crons = ["0 * * * *"]  # Run every hour
+crons = ["0 * * * *", "30 * * * *"]
+
+# Queue for async pull-to-refresh sync
+# Producer: subscriptions.syncAllAsync tRPC procedure
+# Consumer: handleSyncQueue in src/sync/consumer.ts
+[[queues.producers]]
+queue = "zine-sync-queue-dev"
+binding = "SYNC_QUEUE"
+
+[[queues.consumers]]
+queue = "zine-sync-queue-dev"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-dev"
+
+# DLQ consumer for monitoring failed sync messages
+# Messages that exhaust all retries (3) are moved here for investigation
+# Logs at ERROR level for Cloudflare dashboard alerts
+[[queues.consumers]]
+queue = "zine-sync-dlq-dev"
+max_batch_size = 10
+max_batch_timeout = 30
 
 # Observability settings
 [observability]
@@ -82,7 +106,22 @@ ENVIRONMENT = "staging"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
-crons = ["0 * * * *"]  # Run every hour
+crons = ["0 * * * *", "30 * * * *"]
+[[env.staging.queues.producers]]
+queue = "zine-sync-queue-staging"
+binding = "SYNC_QUEUE"
+[[env.staging.queues.consumers]]
+queue = "zine-sync-queue-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-staging"
+
+# DLQ consumer for monitoring failed sync messages (staging)
+[[env.staging.queues.consumers]]
+queue = "zine-sync-dlq-staging"
+max_batch_size = 10
+max_batch_timeout = 30
 [env.staging.observability]
 [env.staging.observability.logs]
 enabled = true
@@ -122,7 +161,22 @@ ENVIRONMENT = "production"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
-crons = ["0 * * * *"]  # Run every hour
+crons = ["0 * * * *", "30 * * * *"]
+[[env.production.queues.producers]]
+queue = "zine-sync-queue-prod"
+binding = "SYNC_QUEUE"
+[[env.production.queues.consumers]]
+queue = "zine-sync-queue-prod"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-prod"
+
+# DLQ consumer for monitoring failed sync messages (production)
+[[env.production.queues.consumers]]
+queue = "zine-sync-dlq-prod"
+max_batch_size = 10
+max_batch_timeout = 30
 [env.production.observability]
 [env.production.observability.logs]
 enabled = true

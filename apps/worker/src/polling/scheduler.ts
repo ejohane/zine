@@ -38,7 +38,13 @@ import { spotifyProviderConfig } from './spotify-poller';
 // Constants
 // ============================================================================
 
-/** Distributed lock key for polling cron */
+/** Distributed lock key for YouTube polling cron */
+const YOUTUBE_POLL_LOCK_KEY = 'cron:poll-youtube:lock';
+
+/** Distributed lock key for Spotify polling cron */
+const SPOTIFY_POLL_LOCK_KEY = 'cron:poll-spotify:lock';
+
+/** @deprecated Use provider-specific lock keys instead */
 const POLL_LOCK_KEY = 'cron:poll-subscriptions:lock';
 
 /** Lock TTL in seconds (15 minutes) - should cover worst case polling time */
@@ -295,6 +301,95 @@ export async function pollSubscriptions(
   } finally {
     // Always release the lock
     await releaseLock(env.OAUTH_STATE_KV, POLL_LOCK_KEY);
+  }
+}
+
+/**
+ * Poll due subscriptions for a specific provider.
+ *
+ * This function is called by the scheduled handler with provider-specific cron jobs.
+ * Each provider has its own lock key for failure isolation:
+ * - YouTube: cron:poll-youtube:lock
+ * - Spotify: cron:poll-spotify:lock
+ *
+ * Benefits of provider-specific polling:
+ * - Independent failure isolation (Spotify issues don't affect YouTube)
+ * - Cleaner logs (temporally separated by provider)
+ * - Foundation for per-provider schedule tuning
+ *
+ * @param provider - The provider to poll ('YOUTUBE' or 'SPOTIFY')
+ * @param env - Cloudflare Worker environment bindings
+ * @param _ctx - Execution context (for waitUntil if needed)
+ * @returns PollResult with processing statistics
+ */
+export async function pollProviderSubscriptions(
+  provider: 'YOUTUBE' | 'SPOTIFY',
+  env: Bindings,
+  _ctx: ExecutionContext
+): Promise<PollResult> {
+  const startTime = Date.now();
+  const providerLower = provider.toLowerCase();
+  const lockKey = provider === 'YOUTUBE' ? YOUTUBE_POLL_LOCK_KEY : SPOTIFY_POLL_LOCK_KEY;
+
+  pollLogger.info(`Starting ${providerLower} polling`);
+
+  // 1. Try to acquire provider-specific distributed lock
+  const lockAcquired = await tryAcquireLock(env.OAUTH_STATE_KV, lockKey, POLL_LOCK_TTL);
+  if (!lockAcquired) {
+    pollLogger.info(`Skipped ${providerLower}: lock held by another worker`);
+    return { skipped: true, reason: 'lock_held' };
+  }
+
+  try {
+    const db = drizzle(env.DB, { schema });
+    const now = Date.now();
+
+    // 2. Find due subscriptions for this provider only
+    const dueSubscriptions = await db.query.subscriptions.findMany({
+      where: and(
+        eq(subscriptions.status, 'ACTIVE'),
+        eq(subscriptions.provider, provider),
+        or(
+          isNull(subscriptions.lastPolledAt),
+          sql`${subscriptions.lastPolledAt} < ${now} - (${subscriptions.pollIntervalSeconds} * 1000)`
+        )
+      ),
+      orderBy: [asc(subscriptions.lastPolledAt)],
+      limit: BATCH_SIZE,
+    });
+
+    if (dueSubscriptions.length === 0) {
+      pollLogger.info(`No ${providerLower} subscriptions due for polling`);
+      return { skipped: false, processed: 0, reason: 'no_due_subscriptions' };
+    }
+
+    pollLogger.info(`Found due ${providerLower} subscriptions`, { count: dueSubscriptions.length });
+
+    // 3. Process the provider's batch
+    // Use explicit provider checks to maintain type safety
+    const result =
+      provider === 'YOUTUBE'
+        ? await processProviderBatch(dueSubscriptions, youtubeProviderConfig, env, db)
+        : await processProviderBatch(dueSubscriptions, spotifyProviderConfig, env, db);
+
+    const durationMs = Date.now() - startTime;
+
+    // 4. Log metrics
+    pollLogger.info(`${providerLower} polling complete`, {
+      processed: result.processed,
+      newItems: result.newItems,
+      skipped: result.skipped ?? 0,
+      durationMs,
+    });
+
+    return {
+      skipped: false,
+      processed: result.processed,
+      newItems: result.newItems,
+    };
+  } finally {
+    // Always release the lock
+    await releaseLock(env.OAUTH_STATE_KV, lockKey);
   }
 }
 

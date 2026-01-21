@@ -54,7 +54,9 @@ export const appRouter = router({
     pause: subscriptionsRouter.pause,
     resume: subscriptionsRouter.resume,
     syncNow: subscriptionsRouter.syncNow,
-    syncAll: subscriptionsRouter.syncAll,
+    syncAllAsync: subscriptionsRouter.syncAllAsync,
+    syncStatus: subscriptionsRouter.syncStatus,
+    activeSyncJob: subscriptionsRouter.activeSyncJob,
     discover: subscriptionsRouter.discover,
   }),
   // Admin operations (data repair, diagnostics)

@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InboxArrowIcon, SubscriptionsIcon } from '@/components/icons';
@@ -21,7 +21,7 @@ import {
 } from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import { useNetworkStatus } from '@/hooks/use-network-status';
-import { showSuccess, showError } from '@/lib/toast-utils';
+import { showSuccess, showWarning, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
@@ -124,7 +124,7 @@ export default function InboxScreen() {
   );
 
   // Sync hooks
-  const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
+  const { syncAll, isLoading: isSyncing, progress: syncProgress, lastResult } = useSyncAll();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const isOffline = !isConnected || isInternetReachable === false;
 
@@ -137,6 +137,10 @@ export default function InboxScreen() {
   }, [syncAll, isOffline, toast]);
 
   // Toast for sync results - use ref to prevent duplicate toasts
+  // Handles partial failures gracefully with nuanced messaging:
+  // - Full success: green success toast
+  // - Partial success (some failures): yellow warning toast
+  // - Complete failure: red error toast
   const lastToastResultRef = useRef<typeof lastResult>(null);
   useEffect(() => {
     if (!lastResult) return;
@@ -144,14 +148,43 @@ export default function InboxScreen() {
     if (lastResult === lastToastResultRef.current) return;
     lastToastResultRef.current = lastResult;
 
-    if (lastResult.success && lastResult.itemsFound > 0) {
-      showSuccess(toast, lastResult.message);
-    } else if (lastResult.success && lastResult.synced > 0 && lastResult.itemsFound === 0) {
-      showSuccess(toast, lastResult.message); // "All caught up!"
-    } else if (!lastResult.success) {
-      showError(toast, new Error(lastResult.message || 'Sync failed'), 'Sync failed', 'sync');
+    const { success, synced, total, itemsFound, errors, message } = lastResult;
+    const failedCount = errors.length;
+
+    // No subscriptions to sync - don't show toast
+    if (total === 0 && synced === 0) {
+      return;
     }
-    // Don't show toast for "No subscriptions to sync"
+
+    // Full success (no failures)
+    if (success) {
+      if (itemsFound > 0) {
+        showSuccess(toast, message);
+      } else if (synced > 0) {
+        showSuccess(toast, message); // "All caught up!"
+      }
+      return;
+    }
+
+    // Partial success: some synced, some failed
+    // Use warning tone - lead with success, mention failures
+    if (synced > 0 && failedCount > 0) {
+      const failedText =
+        failedCount === 1 ? '1 source had issues' : `${failedCount} sources had issues`;
+      showWarning(toast, `Synced ${synced} of ${total} sources`, failedText);
+      return;
+    }
+
+    // Complete failure: nothing synced
+    if (synced === 0 && total > 0) {
+      showError(toast, new Error(message || 'Sync failed'), 'Sync failed', 'sync');
+      return;
+    }
+
+    // Fallback for edge cases (e.g., rate limit errors before sync started)
+    if (!success) {
+      showError(toast, new Error(message || 'Sync failed'), 'Sync failed', 'sync');
+    }
   }, [lastResult, toast]);
 
   // Transform API response to ItemCardData format
@@ -188,11 +221,19 @@ export default function InboxScreen() {
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              {inboxItems.length > 0
-                ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
-                : 'Decide what to keep'}
-            </Text>
+            {syncProgress && syncProgress.total > 0 ? (
+              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
+                <Text style={[styles.headerSubtitle, { color: colors.primary }]}>
+                  Syncing {syncProgress.completed}/{syncProgress.total}...
+                </Text>
+              </Animated.View>
+            ) : (
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                {inboxItems.length > 0
+                  ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
+                  : 'Decide what to keep'}
+              </Text>
+            )}
           </View>
           <Pressable
             style={[styles.subscriptionsButton, { backgroundColor: colors.backgroundSecondary }]}
