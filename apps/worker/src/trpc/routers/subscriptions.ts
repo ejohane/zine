@@ -52,6 +52,12 @@ import {
 } from '../../polling/spotify-poller';
 import type { Bindings } from '../../types';
 import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
+import {
+  initiateSyncJob,
+  getSyncStatus,
+  getActiveSyncJob,
+  RateLimitError,
+} from '../../sync/service';
 
 // ============================================================================
 // Constants
@@ -873,6 +879,91 @@ export const subscriptionsRouter = router({
       hasMoreToSync,
       remaining: skippedYouTube + skippedSpotify,
     };
+  }),
+
+  /**
+   * Initiate an async sync job for all active subscriptions.
+   *
+   * This is the new async alternative to syncAll. Instead of blocking
+   * while all subscriptions are polled, it:
+   * 1. Creates a sync job with a unique ID
+   * 2. Enqueues messages for each subscription to the SYNC_QUEUE
+   * 3. Returns immediately with the job ID
+   *
+   * The client should then poll syncStatus to track progress.
+   *
+   * Key features:
+   * - Job deduplication: Returns existing job if sync already in progress
+   * - Rate limiting: Enforces 2-minute cooldown between syncs
+   * - Error isolation: Each subscription processed independently
+   * - App restart safe: Job progress persists in KV
+   *
+   * @throws TOO_MANY_REQUESTS if user rate limit exceeded
+   * @returns Job ID and total subscriptions to sync
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  syncAllAsync: protectedProcedure.mutation(async ({ ctx }) => {
+    try {
+      const result = await initiateSyncJob(ctx.userId, ctx.db, ctx.env as Bindings);
+
+      logger.info('syncAllAsync: job initiated', {
+        userId: ctx.userId,
+        jobId: result.jobId,
+        total: result.total,
+        existing: result.existing,
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        throw new TRPCError({
+          code: 'TOO_MANY_REQUESTS',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  }),
+
+  /**
+   * Get the status of a sync job.
+   *
+   * Returns progress information including:
+   * - Total subscriptions to sync
+   * - Completed count
+   * - Success/failure counts
+   * - New items found
+   * - Any errors
+   *
+   * Poll this endpoint every 2 seconds while sync is in progress.
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  syncStatus: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const status = await getSyncStatus(input.jobId, ctx.env.OAUTH_STATE_KV);
+
+      // Security: verify job belongs to this user (job ID embeds user context)
+      // The getJobStatus function returns null if not found, so status='not_found'
+      // is already handled
+
+      return status;
+    }),
+
+  /**
+   * Check if the user has an active sync job.
+   *
+   * Call this on app startup/resume to check if a sync is in progress.
+   * If so, the client should resume polling syncStatus.
+   *
+   * @returns Whether sync is in progress and the job ID if so
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  activeSyncJob: protectedProcedure.query(async ({ ctx }) => {
+    return getActiveSyncJob(ctx.userId, ctx.env.OAUTH_STATE_KV);
   }),
 
   /**

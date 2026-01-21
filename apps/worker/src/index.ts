@@ -11,6 +11,8 @@ import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
 import { pollProviderSubscriptions } from './polling/scheduler';
+import { handleSyncQueue } from './sync/consumer';
+import type { SyncQueueMessage } from './sync/types';
 import { logger } from './lib/logger';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
@@ -182,5 +184,24 @@ export default {
     // Use waitUntil to ensure the polling completes even if the
     // scheduled handler returns early
     ctx.waitUntil(pollProviderSubscriptions(provider, env, ctx));
+  },
+
+  /**
+   * Queue handler for async pull-to-refresh sync.
+   *
+   * Processes messages from the SYNC_QUEUE queue, where each message
+   * represents a single subscription to sync. This enables:
+   * - Non-blocking pull-to-refresh (< 500ms response time)
+   * - Error isolation (one subscription failing doesn't affect others)
+   * - Automatic retries with dead-letter queue for persistent failures
+   *
+   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
+   */
+  async queue(
+    batch: MessageBatch<SyncQueueMessage>,
+    env: Bindings,
+    _ctx: ExecutionContext
+  ): Promise<void> {
+    await handleSyncQueue(batch, env);
   },
 };

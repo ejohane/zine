@@ -41,6 +41,20 @@ migrations_dir = "src/db/migrations"
 [triggers]
 crons = ["0 * * * *", "30 * * * *"]
 
+# Queue for async pull-to-refresh sync
+# Producer: subscriptions.syncAllAsync tRPC procedure
+# Consumer: handleSyncQueue in src/sync/consumer.ts
+[[queues.producers]]
+queue = "zine-sync-queue-dev"
+binding = "SYNC_QUEUE"
+
+[[queues.consumers]]
+queue = "zine-sync-queue-dev"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-dev"
+
 # Observability settings
 [observability]
 [observability.logs]
@@ -85,6 +99,15 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *", "30 * * * *"]
+[[env.staging.queues.producers]]
+queue = "zine-sync-queue-staging"
+binding = "SYNC_QUEUE"
+[[env.staging.queues.consumers]]
+queue = "zine-sync-queue-staging"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-staging"
 [env.staging.observability]
 [env.staging.observability.logs]
 enabled = true
@@ -125,6 +148,15 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "30 * * * *"]
+[[env.production.queues.producers]]
+queue = "zine-sync-queue-prod"
+binding = "SYNC_QUEUE"
+[[env.production.queues.consumers]]
+queue = "zine-sync-queue-prod"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-prod"
 [env.production.observability]
 [env.production.observability.logs]
 enabled = true

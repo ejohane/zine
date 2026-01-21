@@ -1,18 +1,25 @@
 /**
  * useSyncAll Hook
  *
- * Triggers sync across all active subscriptions.
- * Handles rate limiting (2-minute cooldown) and provides aggregated feedback.
+ * Triggers async sync across all active subscriptions using Cloudflare Queues.
+ * Provides real-time progress tracking with a non-blocking UX.
  *
- * Designed for pull-to-refresh on Inbox screen where users want to
- * check ALL their subscriptions for new content at once.
+ * New async architecture:
+ * 1. syncAllAsync: Returns immediately after enqueuing messages
+ * 2. Poll syncStatus every 2s for progress updates
+ * 3. activeSyncJob: Check on app resume if sync is in progress
  *
- * Note: Due to Cloudflare Workers subrequest limits, large subscription counts
- * may require multiple sync calls. The hook automatically continues syncing
- * when the backend indicates more subscriptions remain (hasMoreToSync flag).
+ * Benefits over the old blocking approach:
+ * - Instant response (< 500ms) vs 30+ seconds blocking
+ * - Error isolation (one failure doesn't affect others)
+ * - App restart safe (progress persists in KV)
+ * - No subrequest limit issues
+ *
+ * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { trpc } from '../lib/trpc';
 
 // ============================================================================
@@ -20,7 +27,31 @@ import { trpc } from '../lib/trpc';
 // ============================================================================
 
 const DEFAULT_COOLDOWN_SECONDS = 120; // 2 minutes (matches backend)
-const BATCH_DELAY_MS = 500; // Small delay between batch syncs to avoid overwhelming the backend
+const STATUS_POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
+
+/**
+ * Response from syncStatus tRPC query
+ */
+interface SyncStatusResponse {
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'not_found';
+  total: number;
+  completed: number;
+  succeeded: number;
+  failed: number;
+  itemsFound: number;
+  progress: number;
+  errors: Array<{ subscriptionId: string; error: string }>;
+}
+
+export interface SyncProgress {
+  /** Total subscriptions to sync */
+  total: number;
+  /** Completed syncs (success + failure) */
+  completed: number;
+  /** Progress percentage (0-100) */
+  percentage: number;
+}
 
 export interface SyncAllResult {
   success: boolean;
@@ -31,9 +62,15 @@ export interface SyncAllResult {
 }
 
 export interface UseSyncAllReturn {
+  /** Trigger a sync */
   syncAll: () => void;
+  /** Whether sync is currently in progress */
   isLoading: boolean;
+  /** Progress info when syncing */
+  progress: SyncProgress | null;
+  /** Cooldown remaining in seconds */
   cooldownSeconds: number;
+  /** Result of the last completed sync */
   lastResult: SyncAllResult | null;
 }
 
@@ -43,120 +80,184 @@ export interface UseSyncAllReturn {
 
 export function useSyncAll(): UseSyncAllReturn {
   const utils = trpc.useUtils();
+
+  // UI state
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [lastResult, setLastResult] = useState<SyncAllResult | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [progress, setProgress] = useState<SyncProgress | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Track cumulative results across batch syncs
-  const cumulativeResultsRef = useRef({ synced: 0, itemsFound: 0, errors: [] as string[] });
-  const isBatchSyncingRef = useRef(false);
+  // Refs for cleanup and tracking
+  const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const activeJobIdRef = useRef<string | null>(null);
 
-  const mutation = trpc.subscriptions.syncAll.useMutation({
-    onSuccess: (data) => {
-      // Accumulate results across batches
-      cumulativeResultsRef.current.synced += data.synced;
-      cumulativeResultsRef.current.itemsFound += data.itemsFound;
-      cumulativeResultsRef.current.errors.push(...data.errors);
+  // tRPC mutations/queries
+  const syncAsyncMutation = trpc.subscriptions.syncAllAsync.useMutation();
 
-      // If there are more subscriptions to sync, continue syncing after a short delay
-      if (data.hasMoreToSync && data.remaining > 0) {
-        isBatchSyncingRef.current = true;
-        setTimeout(() => {
-          mutation.mutate();
-        }, BATCH_DELAY_MS);
-        return; // Don't update UI yet - wait for all batches to complete
+  /**
+   * Handle sync status update
+   */
+  const handleStatusUpdate = useCallback(
+    (status: SyncStatusResponse) => {
+      if (status.status === 'not_found') {
+        // Job expired or not found - clean up
+        stopStatusPolling();
+        setIsLoading(false);
+        setProgress(null);
+        activeJobIdRef.current = null;
+        return;
       }
 
-      // All batches complete - now update UI with cumulative results
-      isBatchSyncingRef.current = false;
-      const cumulative = cumulativeResultsRef.current;
-
-      // Format user-friendly message
-      let message: string;
-      if (cumulative.itemsFound > 0) {
-        message = `Found ${cumulative.itemsFound} new item${cumulative.itemsFound === 1 ? '' : 's'}`;
-      } else if (cumulative.synced > 0) {
-        message = 'All caught up!';
-      } else {
-        message = 'No subscriptions to sync';
-      }
-
-      if (cumulative.errors.length > 0) {
-        message = `${message} (${cumulative.errors.length} failed)`;
-      }
-
-      setLastResult({
-        success: true,
-        synced: cumulative.synced,
-        itemsFound: cumulative.itemsFound,
-        errors: cumulative.errors,
-        message,
+      // Update progress
+      setProgress({
+        total: status.total,
+        completed: status.completed,
+        percentage: status.progress,
       });
 
-      // Reset cumulative tracking for next sync
-      cumulativeResultsRef.current = { synced: 0, itemsFound: 0, errors: [] };
+      // Check if completed
+      if (status.status === 'completed') {
+        stopStatusPolling();
+        setIsLoading(false);
+        setProgress(null);
+        activeJobIdRef.current = null;
 
-      setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
-
-      // Invalidate inbox cache to show new items
-      utils.items.inbox.invalidate();
-    },
-    onError: (error) => {
-      // Reset batch state on error
-      isBatchSyncingRef.current = false;
-      const cumulative = cumulativeResultsRef.current;
-
-      if (error.data?.code === 'TOO_MANY_REQUESTS') {
-        const match = error.message?.match(/(\d+)\s*(minutes?|seconds?)/i);
-        let seconds = DEFAULT_COOLDOWN_SECONDS;
-        if (match) {
-          const value = parseInt(match[1], 10);
-          seconds = match[2].toLowerCase().startsWith('minute') ? value * 60 : value;
+        // Format result message
+        let message: string;
+        if (status.itemsFound > 0) {
+          message = `Found ${status.itemsFound} new item${status.itemsFound === 1 ? '' : 's'}`;
+        } else if (status.succeeded > 0) {
+          message = 'All caught up!';
+        } else {
+          message = 'No subscriptions to sync';
         }
 
-        setCooldownSeconds(seconds);
+        if (status.failed > 0) {
+          message = `${message} (${status.failed} failed)`;
+        }
+
         setLastResult({
-          success: cumulative.synced > 0, // Partial success if some batches completed
-          synced: cumulative.synced,
-          itemsFound: cumulative.itemsFound,
-          errors: cumulative.errors,
-          message:
-            cumulative.synced > 0
-              ? `Synced ${cumulative.synced}, try again in ${Math.ceil(seconds / 60)} min for the rest`
-              : `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
+          success: status.failed === 0,
+          synced: status.succeeded,
+          itemsFound: status.itemsFound,
+          errors: status.errors.map((e) => e.error),
+          message,
         });
-      } else {
-        const errorMessage = error.message ?? 'Sync failed';
-        setLastResult({
-          success: cumulative.synced > 0, // Partial success if some batches completed
-          synced: cumulative.synced,
-          itemsFound: cumulative.itemsFound,
-          errors: [...cumulative.errors, errorMessage],
-          message:
-            cumulative.synced > 0
-              ? `Synced ${cumulative.synced}, then: ${errorMessage}`
-              : errorMessage,
-        });
+
+        // Start cooldown
+        setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
+
+        // Invalidate inbox cache to show new items
+        utils.items.inbox.invalidate();
+      }
+    },
+    [utils.items.inbox]
+  );
+
+  /**
+   * Start polling for sync status
+   */
+  const startStatusPolling = useCallback(
+    (jobId: string) => {
+      // Stop any existing polling
+      if (statusPollRef.current) {
+        clearInterval(statusPollRef.current);
       }
 
-      // Reset cumulative tracking
-      cumulativeResultsRef.current = { synced: 0, itemsFound: 0, errors: [] };
-    },
-  });
+      activeJobIdRef.current = jobId;
 
-  // Countdown timer for cooldown
+      // Poll immediately and then every 2 seconds
+      const pollStatus = async () => {
+        if (!activeJobIdRef.current) return;
+
+        try {
+          const result = await utils.client.subscriptions.syncStatus.query({
+            jobId: activeJobIdRef.current,
+          });
+          handleStatusUpdate(result);
+        } catch {
+          // Ignore query errors during polling
+        }
+      };
+
+      pollStatus(); // Initial poll
+      statusPollRef.current = setInterval(pollStatus, STATUS_POLL_INTERVAL_MS);
+    },
+    [utils.client.subscriptions.syncStatus, handleStatusUpdate]
+  );
+
+  /**
+   * Stop status polling
+   */
+  const stopStatusPolling = useCallback(() => {
+    if (statusPollRef.current) {
+      clearInterval(statusPollRef.current);
+      statusPollRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Check for active sync job on app resume
+   */
+  const checkActiveJob = useCallback(async () => {
+    try {
+      const result = await utils.client.subscriptions.activeSyncJob.query();
+
+      if (result.inProgress && result.jobId) {
+        setIsLoading(true);
+        if (result.progress) {
+          setProgress({
+            total: result.progress.total,
+            completed: result.progress.completed,
+            percentage:
+              result.progress.total > 0
+                ? Math.round((result.progress.completed / result.progress.total) * 100)
+                : 0,
+          });
+        }
+        startStatusPolling(result.jobId);
+      }
+    } catch {
+      // Ignore errors during resume check
+    }
+  }, [utils.client.subscriptions.activeSyncJob, startStatusPolling]);
+
+  /**
+   * Handle app state changes - check for active job on resume
+   */
   useEffect(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        checkActiveJob();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Check on mount as well
+    checkActiveJob();
+
+    return () => {
+      subscription.remove();
+    };
+  }, [checkActiveJob]);
+
+  /**
+   * Countdown timer for cooldown
+   */
+  useEffect(() => {
+    if (cooldownIntervalRef.current) {
+      clearInterval(cooldownIntervalRef.current);
+      cooldownIntervalRef.current = null;
     }
 
     if (cooldownSeconds <= 0) return;
 
-    intervalRef.current = setInterval(() => {
+    cooldownIntervalRef.current = setInterval(() => {
       setCooldownSeconds((prev) => {
         if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
           return 0;
         }
         return prev - 1;
@@ -164,21 +265,91 @@ export function useSyncAll(): UseSyncAllReturn {
     }, 1000);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);
     };
   }, [cooldownSeconds > 0]);
 
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      stopStatusPolling();
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current);
+      }
+    };
+  }, [stopStatusPolling]);
+
+  /**
+   * Trigger sync
+   */
   const syncAll = useCallback(() => {
-    if (cooldownSeconds > 0 || mutation.isPending || isBatchSyncingRef.current) return;
-    // Reset cumulative tracking for new sync
-    cumulativeResultsRef.current = { synced: 0, itemsFound: 0, errors: [] };
-    mutation.mutate();
-  }, [cooldownSeconds, mutation]);
+    if (cooldownSeconds > 0 || isLoading) return;
+
+    setIsLoading(true);
+    setProgress({ total: 0, completed: 0, percentage: 0 });
+
+    syncAsyncMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        if (data.total === 0) {
+          // No subscriptions to sync
+          setIsLoading(false);
+          setProgress(null);
+          setLastResult({
+            success: true,
+            synced: 0,
+            itemsFound: 0,
+            errors: [],
+            message: 'No subscriptions to sync',
+          });
+          setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
+          return;
+        }
+
+        // Update initial progress
+        setProgress({ total: data.total, completed: 0, percentage: 0 });
+
+        // Start polling for status
+        startStatusPolling(data.jobId);
+      },
+      onError: (error) => {
+        setIsLoading(false);
+        setProgress(null);
+
+        if (error.data?.code === 'TOO_MANY_REQUESTS') {
+          const match = error.message?.match(/(\d+)\s*(minutes?|seconds?)/i);
+          let seconds = DEFAULT_COOLDOWN_SECONDS;
+          if (match) {
+            const value = parseInt(match[1], 10);
+            seconds = match[2].toLowerCase().startsWith('minute') ? value * 60 : value;
+          }
+
+          setCooldownSeconds(seconds);
+          setLastResult({
+            success: false,
+            synced: 0,
+            itemsFound: 0,
+            errors: [],
+            message: `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
+          });
+        } else {
+          setLastResult({
+            success: false,
+            synced: 0,
+            itemsFound: 0,
+            errors: [error.message ?? 'Sync failed'],
+            message: error.message ?? 'Sync failed',
+          });
+        }
+      },
+    });
+  }, [cooldownSeconds, isLoading, syncAsyncMutation, startStatusPolling]);
 
   return {
     syncAll,
-    // Show loading during mutation AND during batch continuation
-    isLoading: mutation.isPending || isBatchSyncingRef.current,
+    isLoading,
+    progress,
     cooldownSeconds,
     lastResult,
   };

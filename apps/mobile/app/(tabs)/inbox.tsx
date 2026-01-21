@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InboxArrowIcon, SubscriptionsIcon } from '@/components/icons';
@@ -124,7 +124,7 @@ export default function InboxScreen() {
   );
 
   // Sync hooks
-  const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
+  const { syncAll, isLoading: isSyncing, progress: syncProgress, lastResult } = useSyncAll();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const isOffline = !isConnected || isInternetReachable === false;
 
@@ -188,11 +188,19 @@ export default function InboxScreen() {
         <View style={styles.header}>
           <View style={styles.headerTextContainer}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              {inboxItems.length > 0
-                ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
-                : 'Decide what to keep'}
-            </Text>
+            {syncProgress && syncProgress.total > 0 ? (
+              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
+                <Text style={[styles.headerSubtitle, { color: colors.primary }]}>
+                  Syncing {syncProgress.completed}/{syncProgress.total}...
+                </Text>
+              </Animated.View>
+            ) : (
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                {inboxItems.length > 0
+                  ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
+                  : 'Decide what to keep'}
+              </Text>
+            )}
           </View>
           <Pressable
             style={[styles.subscriptionsButton, { backgroundColor: colors.backgroundSecondary }]}
