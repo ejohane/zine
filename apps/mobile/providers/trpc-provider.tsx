@@ -7,11 +7,13 @@
 
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { getQueryKey } from '@trpc/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
+import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
 import { trpcLogger } from '@/lib/logger';
 
 // ============================================================================
@@ -68,6 +70,24 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
         },
       })
   );
+
+  // ---------------------------------------------------------------------------
+  // Offline Queue Cache Invalidation
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    setQueueProcessedCallback(() => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.subscriptions.list) }),
+        queryClient.invalidateQueries({
+          queryKey: getQueryKey(trpc.subscriptions.connections.list),
+        }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.inbox) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.library) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.home) }),
+      ]);
+    });
+  }, [queryClient]);
 
   // ---------------------------------------------------------------------------
   // tRPC Client Configuration
