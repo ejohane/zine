@@ -293,7 +293,24 @@ export function useLibraryItems(options?: {
   };
   limit?: number;
 }) {
-  return trpc.items.library.useQuery(options);
+  const filter = options?.filter
+    ? {
+        ...(options.filter.provider !== undefined ? { provider: options.filter.provider } : {}),
+        ...(options.filter.contentType !== undefined
+          ? { contentType: options.filter.contentType }
+          : {}),
+        ...(options.filter.isFinished ? { isFinished: true } : {}),
+      }
+    : undefined;
+
+  const input = options
+    ? {
+        ...options,
+        ...(filter && Object.keys(filter).length > 0 ? { filter } : {}),
+      }
+    : undefined;
+
+  return trpc.items.library.useQuery(input);
 }
 
 /**

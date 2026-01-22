@@ -27,6 +27,9 @@ export interface FilterChipProps {
   /** Optional dot color (shown when not selected) */
   dotColor?: string;
 
+  /** Optional selected background/border color */
+  selectedColor?: string;
+
   /** Optional count badge (e.g., "12") */
   count?: number;
 
@@ -65,11 +68,13 @@ export function FilterChip({
   isSelected,
   onPress,
   dotColor,
+  selectedColor,
   count,
   size = 'medium',
 }: FilterChipProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const activeColor = selectedColor ?? colors.primary;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
@@ -81,8 +86,8 @@ export function FilterChip({
         styles.chip,
         sizeStyles,
         {
-          backgroundColor: isSelected ? colors.primary : colors.backgroundSecondary,
-          borderColor: isSelected ? colors.primary : colors.border,
+          backgroundColor: isSelected ? activeColor : colors.backgroundSecondary,
+          borderColor: isSelected ? activeColor : colors.border,
         },
         pressed && { opacity: 0.8 },
       ]}
