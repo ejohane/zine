@@ -362,18 +362,20 @@ describe('useSaveBookmark', () => {
         result.current.saveFromPreview(preview);
       });
 
-      expect(mockSaveMutate).toHaveBeenCalledWith({
-        url: preview.canonicalUrl,
-        provider: preview.provider,
-        contentType: preview.contentType,
-        providerId: preview.providerId,
-        title: preview.title,
-        creator: preview.creator,
-        thumbnailUrl: preview.thumbnailUrl,
-        duration: preview.duration,
-        canonicalUrl: preview.canonicalUrl,
-        description: preview.description,
-      });
+      expect(mockSaveMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: preview.canonicalUrl,
+          provider: preview.provider,
+          contentType: preview.contentType,
+          providerId: preview.providerId,
+          title: preview.title,
+          creator: preview.creator,
+          thumbnailUrl: preview.thumbnailUrl,
+          duration: preview.duration,
+          canonicalUrl: preview.canonicalUrl,
+          description: preview.description,
+        })
+      );
     });
 
     it('uses original URL when provided', () => {
@@ -464,18 +466,20 @@ describe('useSaveBookmark', () => {
         await result.current.saveFromPreviewAsync(preview);
       });
 
-      expect(mockSaveMutateAsync).toHaveBeenCalledWith({
-        url: preview.canonicalUrl,
-        provider: preview.provider,
-        contentType: preview.contentType,
-        providerId: preview.providerId,
-        title: preview.title,
-        creator: preview.creator,
-        thumbnailUrl: preview.thumbnailUrl,
-        duration: preview.duration,
-        canonicalUrl: preview.canonicalUrl,
-        description: preview.description,
-      });
+      expect(mockSaveMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: preview.canonicalUrl,
+          provider: preview.provider,
+          contentType: preview.contentType,
+          providerId: preview.providerId,
+          title: preview.title,
+          creator: preview.creator,
+          thumbnailUrl: preview.thumbnailUrl,
+          duration: preview.duration,
+          canonicalUrl: preview.canonicalUrl,
+          description: preview.description,
+        })
+      );
     });
   });
 

@@ -84,6 +84,7 @@ export default function LibraryScreen() {
 
   // Filter state
   const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null);
+  const [showCompletedOnly, setShowCompletedOnly] = useState(false);
 
   // Handle add bookmark
   const handleAddBookmark = useCallback(() => {
@@ -95,8 +96,9 @@ export default function LibraryScreen() {
   const filter = useMemo(
     () => ({
       contentType: contentTypeFilter ?? undefined,
+      ...(showCompletedOnly ? { isFinished: true } : {}),
     }),
-    [contentTypeFilter]
+    [contentTypeFilter, showCompletedOnly]
   );
 
   // Fetch library items from tRPC with memoized filter
@@ -169,6 +171,13 @@ export default function LibraryScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterContainer}
           >
+            <FilterChip
+              label="Completed"
+              isSelected={showCompletedOnly}
+              onPress={() => setShowCompletedOnly((prev) => !prev)}
+              dotColor={colors.success}
+              selectedColor={colors.success}
+            />
             {filterOptions.map((option) => (
               <FilterChip
                 key={option.id}

@@ -308,14 +308,20 @@ describe('getRedirectUri', () => {
     const result = getRedirectUri('SPOTIFY');
 
     // Should call makeRedirectUri
-    expect(AuthSession.makeRedirectUri).toHaveBeenCalledWith({ scheme: 'zine' });
+    expect(AuthSession.makeRedirectUri).toHaveBeenCalledWith({
+      scheme: 'zine',
+      path: 'oauth/callback',
+    });
     expect(result).toBe('zine://oauth/callback');
   });
 
   it('returns dev redirect URI when no provider specified in __DEV__ mode', () => {
     const result = getRedirectUri();
 
-    expect(AuthSession.makeRedirectUri).toHaveBeenCalledWith({ scheme: 'zine' });
+    expect(AuthSession.makeRedirectUri).toHaveBeenCalledWith({
+      scheme: 'zine',
+      path: 'oauth/callback',
+    });
     expect(result).toBe('zine://oauth/callback');
   });
 

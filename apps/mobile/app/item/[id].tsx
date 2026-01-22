@@ -36,6 +36,7 @@ import {
   useItem,
   useBookmarkItem,
   useUnbookmarkItem,
+  useToggleFinished,
   UserItemState,
   ContentType,
 } from '@/hooks/use-items-trpc';
@@ -194,9 +195,15 @@ function XPostBookmarkView({
   onBack,
   onOpenLink,
   onShare,
-  onToggleBookmark,
+  onBookmarkToggle,
+  onComplete,
   onCreatorPress,
-  isBookmarked,
+  bookmarkActionIcon,
+  bookmarkActionColor,
+  isBookmarkActionDisabled,
+  completeActionIcon,
+  completeActionColor,
+  isCompleteActionDisabled,
   creatorData,
 }: {
   item: {
@@ -216,9 +223,15 @@ function XPostBookmarkView({
   onBack: () => void;
   onOpenLink: () => void;
   onShare: () => void;
-  onToggleBookmark: () => void;
+  onBookmarkToggle: () => void;
+  onComplete: () => void;
   onCreatorPress?: () => void;
-  isBookmarked: boolean;
+  bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
+  bookmarkActionColor: string;
+  isBookmarkActionDisabled: boolean;
+  completeActionIcon: keyof typeof Ionicons.glyphMap;
+  completeActionColor: string;
+  isCompleteActionDisabled: boolean;
   creatorData?: { handle?: string | null } | null;
 }) {
   // Extract @handle from URL as fallback if creatorData.handle not available
@@ -306,9 +319,16 @@ function XPostBookmarkView({
       <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
         <View style={styles.actionRowLeft}>
           <IconActionButton
-            icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-            color={isBookmarked ? colors.primary : colors.textSecondary}
-            onPress={onToggleBookmark}
+            icon={bookmarkActionIcon}
+            color={bookmarkActionColor}
+            onPress={onBookmarkToggle}
+            disabled={isBookmarkActionDisabled}
+          />
+          <IconActionButton
+            icon={completeActionIcon}
+            color={completeActionColor}
+            onPress={onComplete}
+            disabled={isCompleteActionDisabled}
           />
           <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
           <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
@@ -460,10 +480,12 @@ function IconActionButton({
   icon,
   color,
   onPress,
+  disabled = false,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
   onPress?: () => void;
+  disabled?: boolean;
 }) {
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -471,7 +493,11 @@ function IconActionButton({
   };
 
   return (
-    <Pressable onPress={handlePress} style={styles.iconActionButton}>
+    <Pressable
+      onPress={handlePress}
+      disabled={disabled}
+      style={[styles.iconActionButton, disabled ? { opacity: 0.5 } : null]}
+    >
       <Ionicons name={icon} size={24} color={color} style={{ fontWeight: '700' }} />
     </Pressable>
   );
@@ -525,6 +551,7 @@ export default function ItemDetailScreen() {
   // Mutations
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
+  const toggleFinishedMutation = useToggleFinished();
 
   // Fetch creator data for description (when creatorId is available)
   const { creator: creatorData } = useCreator(item?.creatorId ?? '');
@@ -577,15 +604,19 @@ export default function ItemDetailScreen() {
     }
   };
 
-  // Handle bookmark toggle
   const handleToggleBookmark = () => {
     if (!item) return;
-    const isBookmarked = item.state === UserItemState.BOOKMARKED;
-    if (isBookmarked) {
+    if (item.state === UserItemState.BOOKMARKED) {
       unbookmarkMutation.mutate({ id: item.id });
     } else {
       bookmarkMutation.mutate({ id: item.id });
     }
+  };
+
+  const handleToggleFinished = () => {
+    if (!item) return;
+    if (item.state !== UserItemState.BOOKMARKED) return;
+    toggleFinishedMutation.mutate({ id: item.id });
   };
 
   // Render loading state
@@ -648,6 +679,19 @@ export default function ItemDetailScreen() {
 
   // Check if item is bookmarked
   const isBookmarked = item.state === UserItemState.BOOKMARKED;
+  const isBookmarkActionDisabled = isBookmarked
+    ? unbookmarkMutation.isPending
+    : bookmarkMutation.isPending;
+  const isFinished = item.isFinished;
+  const bookmarkActionIcon: keyof typeof Ionicons.glyphMap = isBookmarked
+    ? 'bookmark'
+    : 'bookmark-outline';
+  const bookmarkActionColor = isBookmarked ? colors.primary : colors.textSecondary;
+  const completeActionIcon: keyof typeof Ionicons.glyphMap = isFinished
+    ? 'checkmark-circle'
+    : 'checkmark-circle-outline';
+  const completeActionColor = isBookmarked && isFinished ? colors.success : colors.textSecondary;
+  const isCompleteActionDisabled = !isBookmarked || toggleFinishedMutation.isPending;
 
   // Check if this is an X post - affects title and description rendering
   const isXPost = item.provider === 'X' && item.contentType === 'POST';
@@ -666,11 +710,17 @@ export default function ItemDetailScreen() {
         onBack={() => router.back()}
         onOpenLink={handleOpenLink}
         onShare={handleShare}
-        onToggleBookmark={handleToggleBookmark}
+        onBookmarkToggle={handleToggleBookmark}
+        onComplete={handleToggleFinished}
         onCreatorPress={
           item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
         }
-        isBookmarked={isBookmarked}
+        bookmarkActionIcon={bookmarkActionIcon}
+        bookmarkActionColor={bookmarkActionColor}
+        isBookmarkActionDisabled={isBookmarkActionDisabled}
+        completeActionIcon={completeActionIcon}
+        completeActionColor={completeActionColor}
+        isCompleteActionDisabled={isCompleteActionDisabled}
         creatorData={creatorData}
       />
     );
@@ -816,9 +866,16 @@ export default function ItemDetailScreen() {
             <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
               <View style={styles.actionRowLeft}>
                 <IconActionButton
-                  icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-                  color={isBookmarked ? colors.primary : colors.textSecondary}
+                  icon={bookmarkActionIcon}
+                  color={bookmarkActionColor}
                   onPress={handleToggleBookmark}
+                  disabled={isBookmarkActionDisabled}
+                />
+                <IconActionButton
+                  icon={completeActionIcon}
+                  color={completeActionColor}
+                  onPress={handleToggleFinished}
+                  disabled={isCompleteActionDisabled}
                 />
                 <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
                 <IconActionButton
@@ -988,9 +1045,16 @@ export default function ItemDetailScreen() {
           <View style={styles.actionRow}>
             <View style={styles.actionRowLeft}>
               <IconActionButton
-                icon={isBookmarked ? 'bookmark' : 'bookmark-outline'}
-                color={isBookmarked ? colors.primary : colors.textSecondary}
+                icon={bookmarkActionIcon}
+                color={bookmarkActionColor}
                 onPress={handleToggleBookmark}
+                disabled={isBookmarkActionDisabled}
+              />
+              <IconActionButton
+                icon={completeActionIcon}
+                color={completeActionColor}
+                onPress={handleToggleFinished}
+                disabled={isCompleteActionDisabled}
               />
               <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
               <IconActionButton

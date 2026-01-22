@@ -120,7 +120,7 @@ Expo Go provides a pre-built native runtime that loads JavaScript bundles over t
 
 ```bash
 cd apps/mobile
-pnpm dev           # Start Metro with Expo Go
+bun run dev           # Start Metro with Expo Go
 ```
 
 Then open Expo Go on the simulator and scan the QR code or enter the URL.
@@ -128,8 +128,8 @@ Then open Expo Go on the simulator and scan the QR code or enter the URL.
 ### Testing
 
 ```bash
-pnpm test          # Run unit tests
-pnpm lint          # Run ESLint
+bun run test          # Run unit tests
+bun run lint          # Run ESLint
 ```
 
 ## Project Structure
