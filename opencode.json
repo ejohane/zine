@@ -10,6 +10,14 @@
         "D1_DATABASE_ID": "{env:D1_DATABASE_ID}",
         "CLOUDFLARE_API_TOKEN": "{env:CLOUDFLARE_API_TOKEN}"
       }
+    },
+    "ios-simulator": {
+      "type": "local",
+      "command": ["npx", "-y", "ios-simulator-mcp"],
+      "enabled": true,
+      "environment": {
+        "IOS_SIMULATOR_MCP_DEFAULT_OUTPUT_DIR": "./apps/mobile/tmp"
+      }
     }
   }
 }

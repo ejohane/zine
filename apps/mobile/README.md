@@ -25,6 +25,29 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## iOS Simulator setup
+
+1. Install Xcode and iOS simulator runtimes
+
+   ```bash
+   xcode-select --install
+   ```
+
+2. Install IDB (required for simulator automation tooling)
+
+   ```bash
+   brew install idb-companion
+   pip3 install fb-idb
+   ```
+
+3. If you use opencode, the MCP server is already configured in `opencode.json` under `mcp.ios-simulator` and writes artifacts to `apps/mobile/tmp`.
+
+4. Start the app and open it in Expo Go on the simulator
+
+   ```bash
+   bun run dev
+   ```
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:
