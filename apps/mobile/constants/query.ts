@@ -48,10 +48,12 @@ export const ONE_SECOND_MS = 1000;
  *
  * - staleTime: 5 minutes - data is "fresh" for 5 minutes
  * - gcTime: 24 hours - unused queries stay in cache for a day
+ * - retry: 2 - retry failed requests twice
  */
 export const DEFAULT_QUERY_OPTIONS = {
   staleTime: FIVE_MINUTES_MS,
   gcTime: TWENTY_FOUR_HOURS_MS,
+  retry: 2,
 } as const;
 
 // ============================================================================

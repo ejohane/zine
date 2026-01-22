@@ -247,7 +247,9 @@ export function useInboxItems(options?: {
   };
   limit?: number;
 }) {
-  return trpc.items.inbox.useQuery(options);
+  return trpc.items.inbox.useQuery(options, {
+    placeholderData: (previousData) => previousData,
+  });
 }
 
 /**
@@ -310,7 +312,9 @@ export function useLibraryItems(options?: {
       }
     : undefined;
 
-  return trpc.items.library.useQuery(input);
+  return trpc.items.library.useQuery(input, {
+    placeholderData: (previousData) => previousData,
+  });
 }
 
 /**
@@ -337,7 +341,9 @@ export function useLibraryItems(options?: {
  * }
  */
 export function useHomeData() {
-  return trpc.items.home.useQuery();
+  return trpc.items.home.useQuery(undefined, {
+    placeholderData: (previousData) => previousData,
+  });
 }
 
 /**
