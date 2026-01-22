@@ -6,6 +6,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { View, Text, Image, Pressable, Linking, StyleSheet } from 'react-native';
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
@@ -30,6 +31,8 @@ export interface LatestContentItem {
   publishedAt: string | null;
   /** External URL to open in browser/app */
   url: string;
+  /** Internal item ID when available */
+  itemId?: string | null;
   /** Whether this content is already bookmarked */
   isBookmarked?: boolean;
 }
@@ -69,19 +72,29 @@ export interface LatestContentCardProps {
  * ```
  */
 export function LatestContentCard({ item, creatorId, provider }: LatestContentCardProps) {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   const handlePress = () => {
-    if (item.url) {
-      // Track content opened
-      analytics.track('creator_content_opened', {
-        creatorId,
-        contentType: 'latest',
-        provider,
-        externalUrl: item.url,
-      });
+    const hasInternalItem = !!item.itemId;
 
+    // Track content opened
+    analytics.track('creator_content_opened', {
+      creatorId,
+      contentType: 'latest',
+      provider,
+      itemId: item.itemId ?? null,
+      destination: hasInternalItem ? 'internal' : 'external',
+      externalUrl: hasInternalItem ? undefined : item.url,
+    });
+
+    if (hasInternalItem) {
+      router.push(`/item/${item.itemId}` as any);
+      return;
+    }
+
+    if (item.url) {
       Linking.openURL(item.url);
     }
   };
@@ -102,7 +115,7 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
       style={({ pressed }) => [styles.container, { opacity: pressed ? 0.7 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.title}`}
-      accessibilityHint="Opens content in external app"
+      accessibilityHint="Opens content"
     >
       {/* Thumbnail */}
       {item.thumbnailUrl ? (

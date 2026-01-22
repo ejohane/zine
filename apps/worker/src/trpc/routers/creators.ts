@@ -77,6 +77,7 @@ export interface LatestContentItem {
   publishedAt: number; // Unix ms
   externalUrl: string;
   duration: number | null; // seconds for videos/podcasts
+  itemId?: string | null;
   isBookmarked: boolean;
 }
 
@@ -495,7 +496,7 @@ export const creatorsRouter = router({
       const cacheKey = `${LATEST_CONTENT_CACHE_CONFIG.KEY_PREFIX}${creatorId}`;
       const cached = await ctx.env.CREATOR_CONTENT_CACHE.get<CachedLatestContent>(cacheKey, 'json');
 
-      let contentItems: Omit<LatestContentItem, 'isBookmarked'>[];
+      let contentItems: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[];
 
       if (cached) {
         // Use cached items
@@ -735,7 +736,7 @@ export type CreatorsRouter = typeof creatorsRouter;
  * Cached latest content structure
  */
 interface CachedLatestContent {
-  items: Omit<LatestContentItem, 'isBookmarked'>[];
+  items: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[];
   fetchedAt: number;
 }
 
@@ -780,7 +781,7 @@ async function fetchFromProvider(
   providerCreatorId: string,
   connection: ProviderConnection,
   env: ProviderFetchEnv
-): Promise<Omit<LatestContentItem, 'isBookmarked'>[]> {
+): Promise<Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[]> {
   if (provider === 'YOUTUBE') {
     return fetchYouTubeContent(providerCreatorId, connection, env);
   } else if (provider === 'SPOTIFY') {
@@ -802,7 +803,7 @@ async function fetchYouTubeContent(
   channelId: string,
   connection: ProviderConnection,
   env: ProviderFetchEnv
-): Promise<Omit<LatestContentItem, 'isBookmarked'>[]> {
+): Promise<Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[]> {
   const client = await getYouTubeClientForConnection(
     connection,
     env as Parameters<typeof getYouTubeClientForConnection>[1]
@@ -829,7 +830,7 @@ async function fetchYouTubeContent(
 
   // Transform and filter (exclude Shorts)
   const now = Date.now();
-  const contentItems: Omit<LatestContentItem, 'isBookmarked'>[] = [];
+  const contentItems: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[] = [];
 
   for (const video of videos) {
     if (contentItems.length >= LATEST_CONTENT_CACHE_CONFIG.MAX_ITEMS) {
@@ -880,7 +881,7 @@ async function fetchSpotifyContent(
   showId: string,
   connection: ProviderConnection,
   env: ProviderFetchEnv
-): Promise<Omit<LatestContentItem, 'isBookmarked'>[]> {
+): Promise<Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[]> {
   const client = await getSpotifyClientForConnection(
     connection,
     env as Parameters<typeof getSpotifyClientForConnection>[1]
@@ -940,7 +941,7 @@ function parseSpotifyDate(dateStr: string): number {
  * @returns Array of content items with isBookmarked populated
  */
 async function populateIsBookmarked(
-  contentItems: Omit<LatestContentItem, 'isBookmarked'>[],
+  contentItems: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[],
   provider: string,
   userId: string,
   db: Database
@@ -954,27 +955,40 @@ async function populateIsBookmarked(
 
   // Query items table to find which provider IDs exist as items
   // Then check if user has bookmarked them via userItems
-  const bookmarkedItems = await db
+  const itemMetadata = await db
     .select({
       providerId: items.providerId,
+      itemId: items.id,
+      bookmarkedItemId: userItems.id,
     })
     .from(items)
-    .innerJoin(userItems, eq(userItems.itemId, items.id))
-    .where(
+    .leftJoin(
+      userItems,
       and(
-        eq(items.provider, provider),
-        inArray(items.providerId, providerIds),
+        eq(userItems.itemId, items.id),
         eq(userItems.userId, userId),
         eq(userItems.state, UserItemState.BOOKMARKED)
       )
-    );
+    )
+    .where(and(eq(items.provider, provider), inArray(items.providerId, providerIds)));
 
-  // Create a set of bookmarked provider IDs for fast lookup
-  const bookmarkedProviderIds = new Set(bookmarkedItems.map((item) => item.providerId));
+  const metadataByProviderId = new Map(
+    itemMetadata.map((item) => [
+      item.providerId,
+      {
+        itemId: item.itemId,
+        isBookmarked: !!item.bookmarkedItemId,
+      },
+    ])
+  );
 
-  // Add isBookmarked flag to each content item
-  return contentItems.map((item) => ({
-    ...item,
-    isBookmarked: bookmarkedProviderIds.has(item.id),
-  }));
+  // Add isBookmarked + itemId to each content item
+  return contentItems.map((item) => {
+    const metadata = metadataByProviderId.get(item.id);
+    return {
+      ...item,
+      itemId: metadata?.itemId ?? null,
+      isBookmarked: metadata?.isBookmarked ?? false,
+    };
+  });
 }
