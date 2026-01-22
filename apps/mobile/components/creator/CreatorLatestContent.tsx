@@ -280,6 +280,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
     duration: item.duration,
     publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,
     url: item.externalUrl,
+    itemId: item.itemId ?? null,
     isBookmarked: false, // TODO: Cross-reference with bookmarks when needed
   }));
 

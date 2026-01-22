@@ -133,6 +133,7 @@ interface MockContentItem {
   publishedAt: number;
   externalUrl: string;
   duration: number | null;
+  itemId?: string | null;
   isBookmarked: boolean;
 }
 
@@ -854,6 +855,7 @@ describe('Creators Router', () => {
           publishedAt: Date.now() - 86400000,
           externalUrl: 'https://www.youtube.com/watch?v=video_123',
           duration: 600,
+          itemId: 'item_123',
           isBookmarked: false,
         },
         {
@@ -864,6 +866,7 @@ describe('Creators Router', () => {
           publishedAt: Date.now() - 172800000,
           externalUrl: 'https://www.youtube.com/watch?v=video_456',
           duration: 1200,
+          itemId: null,
           isBookmarked: true,
         },
       ];
@@ -883,8 +886,10 @@ describe('Creators Router', () => {
       expect(result.items[0].id).toBe('video_123');
       expect(result.items[0].title).toBe('Test Video');
       expect(result.items[0].isBookmarked).toBe(false);
+      expect(result.items[0].itemId).toBe('item_123');
       expect(result.items[1].id).toBe('video_456');
       expect(result.items[1].isBookmarked).toBe(true);
+      expect(result.items[1].itemId).toBeNull();
     });
 
     it('should return content items for Spotify creator when connected', async () => {
@@ -1044,6 +1049,7 @@ describe('Creators Router', () => {
           publishedAt: Date.now(),
           externalUrl: 'https://www.youtube.com/watch?v=video_123',
           duration: 600,
+          itemId: 'item_456',
           isBookmarked: false,
         },
       ];
@@ -1072,6 +1078,7 @@ describe('Creators Router', () => {
       expect(item).toHaveProperty('publishedAt');
       expect(item).toHaveProperty('externalUrl');
       expect(item).toHaveProperty('duration');
+      expect(item).toHaveProperty('itemId');
       expect(item).toHaveProperty('isBookmarked');
     });
 

@@ -44,6 +44,11 @@ export type ConnectionPromptReason = 'NOT_CONNECTED' | 'TOKEN_EXPIRED';
 export type CreatorContentType = 'bookmark' | 'latest';
 
 /**
+ * Destination of content navigation
+ */
+export type CreatorContentDestination = 'internal' | 'external';
+
+/**
  * Analytics event definitions
  */
 export interface AnalyticsEvents {
@@ -84,6 +89,8 @@ export interface AnalyticsEvents {
     creatorId: string;
     contentType: CreatorContentType;
     provider: string;
+    destination: CreatorContentDestination;
+    itemId?: string | null;
     externalUrl?: string;
   };
 

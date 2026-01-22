@@ -44,6 +44,7 @@ export interface CreatorContentItem {
   duration: number | null;
   publishedAt: number | null;
   externalUrl: string;
+  itemId?: string | null;
 }
 
 /**

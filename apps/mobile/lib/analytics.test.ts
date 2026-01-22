@@ -121,6 +121,8 @@ describe('analytics.track', () => {
         creatorId: 'creator-123',
         contentType: 'bookmark',
         provider: 'YOUTUBE',
+        destination: 'internal',
+        itemId: 'item-123',
       });
 
       expect(mockConsoleLog).toHaveBeenCalledWith(
@@ -136,6 +138,8 @@ describe('analytics.track', () => {
         creatorId: 'creator-123',
         contentType: 'latest',
         provider: 'YOUTUBE',
+        destination: 'external',
+        itemId: null,
         externalUrl: 'https://youtube.com/watch?v=abc123',
       });
 
