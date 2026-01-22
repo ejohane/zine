@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 
 import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -79,12 +79,41 @@ const filterOptions = [
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
+  const contentTypeParam = useMemo(() => {
+    const rawContentType = Array.isArray(params.contentType)
+      ? params.contentType[0]
+      : params.contentType;
+    if (typeof rawContentType !== 'string' || rawContentType.length === 0) {
+      return undefined;
+    }
+
+    return rawContentType.toLowerCase();
+  }, [params.contentType]);
+
+  const preselectedContentType = useMemo(() => {
+    if (!contentTypeParam) {
+      return undefined;
+    }
+
+    const matchedOption = filterOptions.find((option) => option.id === contentTypeParam);
+    return matchedOption ? matchedOption.contentType : undefined;
+  }, [contentTypeParam]);
+
   // Filter state
-  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(null);
+  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(
+    () => preselectedContentType ?? null
+  );
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
+
+  useEffect(() => {
+    if (preselectedContentType !== undefined) {
+      setContentTypeFilter(preselectedContentType);
+    }
+  }, [preselectedContentType]);
 
   // Handle add bookmark
   const handleAddBookmark = useCallback(() => {

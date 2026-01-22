@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
-import type { ContentType, Provider } from '@/lib/content-utils';
+import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -177,6 +177,13 @@ export default function HomeScreen() {
     };
   }, [libraryData?.items]);
 
+  const handleCategoryPress = useCallback(
+    (contentType: UIContentType) => {
+      router.push({ pathname: '/(tabs)/library', params: { contentType } });
+    },
+    [router]
+  );
+
   const isLoading = isInboxLoading || isHomeLoading;
 
   return (
@@ -273,28 +280,28 @@ export default function HomeScreen() {
                     count={categoryCounts.podcast}
                     color={ContentColors.podcast}
                     colors={colors}
-                    onPress={() => router.push('/(tabs)/library')}
+                    onPress={() => handleCategoryPress('podcast')}
                   />
                   <CategoryPill
                     label="Videos"
                     count={categoryCounts.video}
                     color={ContentColors.video}
                     colors={colors}
-                    onPress={() => router.push('/(tabs)/library')}
+                    onPress={() => handleCategoryPress('video')}
                   />
                   <CategoryPill
                     label="Articles"
                     count={categoryCounts.article}
                     color={ContentColors.article}
                     colors={colors}
-                    onPress={() => router.push('/(tabs)/library')}
+                    onPress={() => handleCategoryPress('article')}
                   />
                   <CategoryPill
                     label="Posts"
                     count={categoryCounts.post}
                     color={ContentColors.post}
                     colors={colors}
-                    onPress={() => router.push('/(tabs)/library')}
+                    onPress={() => handleCategoryPress('post')}
                   />
                 </ScrollView>
               </Animated.View>
