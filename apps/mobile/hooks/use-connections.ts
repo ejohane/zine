@@ -46,6 +46,13 @@ export interface Connection {
 }
 
 /**
+ * Payload for disconnecting a provider connection.
+ */
+export interface DisconnectConnectionInput {
+  provider: ConnectionProvider;
+}
+
+/**
  * Individual provider connection data from backend
  */
 interface ProviderConnectionData {
@@ -190,6 +197,54 @@ export function useConnection(provider: ConnectionProvider) {
     select: (response: ConnectionsListResponse) => {
       const providerData = response[provider];
       return providerData ? transformConnection(provider, providerData) : undefined;
+    },
+  });
+}
+
+/**
+ * Hook to disconnect a provider connection with optimistic updates.
+ */
+export function useDisconnectConnection(options?: {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+  onSettled?: () => void;
+}) {
+  type DisconnectContext = {
+    previousConnections?: Connection[];
+  };
+
+  // Using type assertion until router types are updated
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const utils = trpc.useUtils() as any;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (trpc as any).subscriptions.connections.disconnect.useMutation({
+    onMutate: async ({ provider }: DisconnectConnectionInput): Promise<DisconnectContext> => {
+      await utils.subscriptions?.connections?.list?.cancel?.();
+
+      const previousConnections = utils.subscriptions?.connections?.list?.getData?.();
+
+      utils.subscriptions?.connections?.list?.setData?.(
+        undefined,
+        (old: Connection[] | undefined) =>
+          old ? old.filter((connection) => connection.provider !== provider) : old
+      );
+
+      return { previousConnections };
+    },
+    onError: (error: Error, _input: DisconnectConnectionInput, context?: DisconnectContext) => {
+      if (context?.previousConnections !== undefined) {
+        utils.subscriptions?.connections?.list?.setData?.(undefined, context.previousConnections);
+      }
+      options?.onError?.(error);
+    },
+    onSuccess: () => {
+      utils.subscriptions?.connections?.list?.invalidate?.();
+      utils.subscriptions?.list?.invalidate?.();
+      options?.onSuccess?.();
+    },
+    onSettled: () => {
+      options?.onSettled?.();
     },
   });
 }

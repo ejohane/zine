@@ -24,7 +24,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useConnections, type Connection } from '@/hooks/use-connections';
+import { useConnections, useDisconnectConnection, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
 import { validateAndConvertProvider } from '@/lib/route-validation';
@@ -347,7 +347,6 @@ export default function ProviderDetailScreen() {
   const isConnected = connection?.status === 'ACTIVE';
 
   // Fetch available channels from provider
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const discoverQuery = (trpc as any).subscriptions?.discover?.available?.useQuery(
     { provider },
     {
@@ -356,18 +355,8 @@ export default function ProviderDetailScreen() {
     }
   ) ?? { data: undefined, isLoading: false, error: null, refetch: () => {} };
 
-  // tRPC utils for cache invalidation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const utils = trpc.useUtils() as any;
-
-  // Disconnect mutation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const disconnectMutation = (trpc as any).subscriptions.connections.disconnect.useMutation({
-    onSuccess: () => {
-      utils.subscriptions?.connections?.list?.invalidate?.();
-      utils.subscriptions?.list?.invalidate?.();
-    },
-    onError: (error: Error) => {
+  const disconnectMutation = useDisconnectConnection({
+    onError: (error) => {
       Alert.alert('Disconnect Failed', error.message || 'Failed to disconnect. Please try again.');
     },
     onSettled: () => {

@@ -9,7 +9,7 @@
  */
 
 import { trpc } from '../lib/trpc';
-import { ContentType, Provider } from '@zine/shared';
+import { ContentType, Provider, UserItemState } from '@zine/shared';
 
 // ============================================================================
 // Types
@@ -75,6 +75,30 @@ export interface SaveBookmarkInput {
 }
 
 // ============================================================================
+// Optimistic Update Types
+// ============================================================================
+
+type TrpcUtils = ReturnType<typeof trpc.useUtils>;
+
+/** Library query data type */
+type LibraryData = ReturnType<TrpcUtils['items']['library']['getData']>;
+
+/** Home query data type */
+type HomeData = ReturnType<TrpcUtils['items']['home']['getData']>;
+
+/** Extract item type from library data */
+type LibraryItem = NonNullable<LibraryData>['items'][number];
+
+/** Context for optimistic bookmark save rollback */
+type OptimisticSaveContext = {
+  previousLibrary?: LibraryData;
+  previousContentTypeLibrary?: LibraryData;
+  previousHome?: HomeData;
+};
+
+const HOME_SECTION_LIMIT = 5;
+
+// ============================================================================
 // Validation
 // ============================================================================
 
@@ -101,6 +125,39 @@ export function isValidUrl(urlString: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Build a temporary ItemView for optimistic bookmark saves.
+ */
+function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
+  const now = new Date().toISOString();
+  const timestamp = Date.now();
+
+  return {
+    id: `temp-user-item-${timestamp}`,
+    itemId: `temp-item-${timestamp}`,
+    title: input.title,
+    thumbnailUrl: input.thumbnailUrl,
+    canonicalUrl: input.canonicalUrl,
+    contentType: input.contentType,
+    provider: input.provider,
+    creator: input.creator,
+    creatorImageUrl: input.creatorImageUrl ?? null,
+    creatorId: null,
+    publisher: input.siteName ?? null,
+    summary: input.description ?? null,
+    duration: input.duration,
+    publishedAt: input.publishedAt ?? null,
+    wordCount: input.wordCount ?? null,
+    readingTimeMinutes: input.readingTimeMinutes ?? null,
+    state: UserItemState.BOOKMARKED,
+    ingestedAt: now,
+    bookmarkedAt: now,
+    progress: null,
+    isFinished: false,
+    finishedAt: null,
+  };
 }
 
 // ============================================================================
@@ -232,6 +289,98 @@ export function useSaveBookmark() {
   const utils = trpc.useUtils();
 
   const mutation = trpc.bookmarks.save.useMutation({
+    onMutate: async (input: SaveBookmarkInput): Promise<OptimisticSaveContext> => {
+      const optimisticItem = createOptimisticItem(input);
+
+      const cancellations: Promise<void>[] = [
+        utils.items.library.cancel(),
+        utils.items.home.cancel(),
+      ];
+      if (input.contentType) {
+        cancellations.push(
+          utils.items.library.cancel({ filter: { contentType: input.contentType } })
+        );
+      }
+      await Promise.all(cancellations);
+
+      const previousLibrary = utils.items.library.getData();
+      const previousContentTypeLibrary = input.contentType
+        ? utils.items.library.getData({ filter: { contentType: input.contentType } })
+        : undefined;
+      const previousHome = utils.items.home.getData();
+
+      utils.items.library.setData(undefined, (old) => {
+        if (!old) {
+          return { items: [optimisticItem], nextCursor: null };
+        }
+
+        return {
+          ...old,
+          items: [optimisticItem, ...old.items],
+        };
+      });
+
+      if (input.contentType) {
+        utils.items.library.setData({ filter: { contentType: input.contentType } }, (old) => {
+          if (!old) {
+            return { items: [optimisticItem], nextCursor: null };
+          }
+
+          return {
+            ...old,
+            items: [optimisticItem, ...old.items],
+          };
+        });
+      }
+
+      utils.items.home.setData(undefined, (old) => {
+        if (!old) return old;
+
+        const recentBookmarks = [optimisticItem, ...old.recentBookmarks].slice(
+          0,
+          HOME_SECTION_LIMIT
+        );
+        const byContentType = {
+          ...old.byContentType,
+          videos:
+            input.contentType === ContentType.VIDEO
+              ? [optimisticItem, ...old.byContentType.videos].slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.videos,
+          podcasts:
+            input.contentType === ContentType.PODCAST
+              ? [optimisticItem, ...old.byContentType.podcasts].slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.podcasts,
+          articles:
+            input.contentType === ContentType.ARTICLE
+              ? [optimisticItem, ...old.byContentType.articles].slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.articles,
+        };
+
+        return {
+          ...old,
+          recentBookmarks,
+          byContentType,
+        };
+      });
+
+      return {
+        previousLibrary,
+        previousContentTypeLibrary,
+        previousHome,
+      };
+    },
+    onError: (_error, input, context) => {
+      if (!context) return;
+
+      utils.items.library.setData(undefined, context.previousLibrary);
+      if (input.contentType) {
+        utils.items.library.setData(
+          { filter: { contentType: input.contentType } },
+          context.previousContentTypeLibrary
+        );
+      }
+      utils.items.home.setData(undefined, context.previousHome);
+    },
     onSuccess: () => {
       // Invalidate library and inbox caches to reflect the new bookmark
       utils.items.library.invalidate();
