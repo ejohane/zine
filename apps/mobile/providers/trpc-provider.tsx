@@ -7,7 +7,7 @@
 
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, useIsRestoring, type QueryStatus } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { getQueryKey } from '@trpc/react-query';
@@ -32,6 +32,16 @@ import {
 
 interface TRPCProviderProps {
   children: ReactNode;
+}
+
+function HydrationGate({ children, shouldBlock }: { children: ReactNode; shouldBlock: boolean }) {
+  const isRestoring = useIsRestoring();
+
+  if (isRestoring && shouldBlock) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
 
 /**
@@ -97,12 +107,41 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
       maxAge: PERSISTENCE_MAX_AGE_MS,
       buster: persistenceBuster,
       dehydrateOptions: {
-        shouldDehydrateQuery: ({ queryKey, state }) =>
-          shouldPersistQuery({ queryKey, status: state.status }),
+        shouldDehydrateQuery: ({
+          queryKey,
+          state,
+        }: {
+          queryKey: unknown;
+          state: { status: QueryStatus };
+        }) => shouldPersistQuery({ queryKey, status: state.status }),
       },
     }),
     [persister, persistenceBuster]
   );
+
+  const [hasPersistedClient, setHasPersistedClient] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setHasPersistedClient(null);
+
+    AsyncStorage.getItem(persistenceKey)
+      .then((storedValue) => {
+        if (isActive) {
+          setHasPersistedClient(Boolean(storedValue));
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setHasPersistedClient(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [persistenceKey]);
 
   const previousPersisterRef = useRef(persister);
 
@@ -166,10 +205,12 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
   // ---------------------------------------------------------------------------
   // Note: QueryClientProvider must be inside trpc.Provider for proper integration
 
+  const shouldBlockHydration = hasPersistedClient === true;
+
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        {children}
+        <HydrationGate shouldBlock={shouldBlockHydration}>{children}</HydrationGate>
       </PersistQueryClientProvider>
     </trpc.Provider>
   );

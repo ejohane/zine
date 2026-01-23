@@ -30,10 +30,19 @@ describe('Cache UX Acceptance Criteria (gh-64)', () => {
 
     it('persists only successful allowlisted queries', () => {
       expect(shouldPersistQuery({ queryKey: [['items', 'home']], status: 'success' })).toBe(true);
+      expect(shouldPersistQuery({ queryKey: [['subscriptions', 'list']], status: 'success' })).toBe(
+        true
+      );
       expect(shouldPersistQuery({ queryKey: [['items', 'home']], status: 'error' })).toBe(false);
       expect(shouldPersistQuery({ queryKey: [['bookmarks', 'preview']], status: 'success' })).toBe(
         false
       );
+      expect(
+        shouldPersistQuery({
+          queryKey: [['creators', 'fetchLatestContent']],
+          status: 'success',
+        })
+      ).toBe(false);
     });
 
     it('uses cache-first defaults to avoid loading flashes', () => {

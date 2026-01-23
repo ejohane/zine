@@ -143,12 +143,8 @@ describe('useDisconnectConnection', () => {
     expect(queryKey).toBeUndefined();
 
     const updated = updater([createConnection('YOUTUBE'), createConnection('SPOTIFY')]);
-    expect(updated).toHaveLength(2);
-
-    const youtubeConnection = updated.find(
-      (connection: Connection) => connection.provider === 'YOUTUBE'
-    );
-    expect(youtubeConnection?.status).toBe('REVOKED');
+    expect(updated).toHaveLength(1);
+    expect(updated[0].provider).toBe('SPOTIFY');
 
     const defaultCall = mockSubscriptionsSetData.mock.calls.find(
       ([input]) => input && Object.keys(input).length === 0

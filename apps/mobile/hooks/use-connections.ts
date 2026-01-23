@@ -236,18 +236,7 @@ export function useDisconnectConnection(options?: {
       utils.subscriptions?.connections?.list?.setData?.(
         undefined,
         (old: Connection[] | undefined) =>
-          old
-            ? old.map((connection) =>
-                connection.provider === provider
-                  ? {
-                      ...connection,
-                      status: 'REVOKED',
-                      providerUserId: null,
-                      lastSyncAt: null,
-                    }
-                  : connection
-              )
-            : old
+          old ? old.filter((connection) => connection.provider !== provider) : old
       );
 
       const updateSubscriptions = (old: SubscriptionsResponse | undefined) => {

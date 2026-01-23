@@ -6,6 +6,8 @@
  */
 
 import React from 'react';
+import { Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { getQueryKey } from '@trpc/react-query';
 import { trpc } from '@/lib/trpc';
@@ -30,6 +32,13 @@ type PersistOptions = {
 let mockUserId = 'user-123';
 let latestPersistOptions: PersistOptions | null = null;
 const mockRemoveClient = jest.fn(async () => undefined);
+const mockUseIsRestoring = jest.fn(() => false);
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+}));
+
+const mockGetItem = AsyncStorage.getItem as jest.Mock;
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
@@ -37,7 +46,7 @@ jest.mock('@tanstack/react-query', () => {
   return {
     ...actual,
     QueryClient: jest.fn(() => mockQueryClient),
-    useIsRestoring: jest.fn(() => false),
+    useIsRestoring: mockUseIsRestoring,
   };
 });
 
@@ -84,6 +93,8 @@ describe('TRPCProvider offline queue invalidation', () => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
     latestPersistOptions = null;
+    mockUseIsRestoring.mockReturnValue(false);
+    mockGetItem.mockResolvedValue(null);
   });
 
   it('registers offline queue callback with query invalidations', () => {
@@ -126,6 +137,8 @@ describe('TRPCProvider cache persistence', () => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
     latestPersistOptions = null;
+    mockUseIsRestoring.mockReturnValue(false);
+    mockGetItem.mockResolvedValue(null);
   });
 
   it('configures a user-scoped persister with allowlisted queries', () => {
@@ -150,9 +163,81 @@ describe('TRPCProvider cache persistence', () => {
     expect(shouldDehydrate?.({ queryKey: [['items', 'home']], state: { status: 'success' } })).toBe(
       true
     );
+    expect(
+      shouldDehydrate?.({
+        queryKey: [['subscriptions', 'connections', 'list']],
+        state: { status: 'success' },
+      })
+    ).toBe(true);
     expect(shouldDehydrate?.({ queryKey: [['items', 'home']], state: { status: 'error' } })).toBe(
       false
     );
+    expect(
+      shouldDehydrate?.({
+        queryKey: [['subscriptions', 'syncStatus']],
+        state: { status: 'success' },
+      })
+    ).toBe(false);
+    expect(
+      shouldDehydrate?.({
+        queryKey: [['creators', 'fetchLatestContent']],
+        state: { status: 'success' },
+      })
+    ).toBe(false);
+    expect(
+      shouldDehydrate?.({ queryKey: [['bookmarks', 'preview']], state: { status: 'success' } })
+    ).toBe(false);
+  });
+
+  it('hides children while restoring persisted cache', async () => {
+    mockUseIsRestoring.mockReturnValue(true);
+    mockGetItem.mockResolvedValueOnce('cached');
+
+    const MockChild = () => <Text>content</Text>;
+
+    let renderer: ReturnType<typeof create> | null = null;
+
+    await act(async () => {
+      renderer = create(
+        <TRPCProvider>
+          <MockChild />
+        </TRPCProvider>
+      );
+      await Promise.resolve();
+    });
+
+    const getChild = () => {
+      if (!renderer) {
+        throw new Error('Renderer not set');
+      }
+      return renderer.root.findByType(MockChild);
+    };
+
+    expect(getChild).toThrow();
+  });
+
+  it('renders children during restore when no cache exists', async () => {
+    mockUseIsRestoring.mockReturnValue(true);
+    mockGetItem.mockResolvedValueOnce(null);
+
+    const MockChild = () => <Text>content</Text>;
+
+    let renderer: ReturnType<typeof create> | null = null;
+
+    await act(async () => {
+      renderer = create(
+        <TRPCProvider>
+          <MockChild />
+        </TRPCProvider>
+      );
+      await Promise.resolve();
+    });
+
+    if (!renderer) {
+      throw new Error('Renderer not set');
+    }
+
+    expect(renderer.root.findByType(MockChild)).toBeTruthy();
   });
 
   it('clears cache and persisted data on user switch', () => {
