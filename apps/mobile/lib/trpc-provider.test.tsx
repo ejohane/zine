@@ -6,16 +6,30 @@
  */
 
 import React from 'react';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { getQueryKey } from '@trpc/react-query';
 import { trpc } from '@/lib/trpc';
 import { TRPCProvider } from '@/providers/trpc-provider';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
+import { PERSISTENCE_MAX_AGE_MS, PERSISTENCE_STORAGE_PREFIX } from '@/lib/query-persistence';
 import { act, create } from 'react-test-renderer';
 
 let mockQueryClient: {
   invalidateQueries: jest.Mock;
   clear: jest.Mock;
 };
+type PersistOptions = {
+  buster: string;
+  maxAge: number;
+  persister: { removeClient: jest.Mock };
+  dehydrateOptions: {
+    shouldDehydrateQuery: (query: { queryKey: unknown; state: { status: string } }) => boolean;
+  };
+};
+
+let mockUserId = 'user-123';
+let latestPersistOptions: PersistOptions | null = null;
+const mockRemoveClient = jest.fn(async () => undefined);
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
@@ -28,17 +42,28 @@ jest.mock('@tanstack/react-query', () => {
 });
 
 jest.mock('@tanstack/react-query-persist-client', () => ({
-  PersistQueryClientProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PersistQueryClientProvider: ({
+    children,
+    persistOptions,
+  }: {
+    children: React.ReactNode;
+    persistOptions: PersistOptions;
+  }) => {
+    latestPersistOptions = persistOptions;
+    return <>{children}</>;
+  },
 }));
 
 jest.mock('@tanstack/query-async-storage-persister', () => ({
-  createAsyncStoragePersister: jest.fn(() => ({})),
+  createAsyncStoragePersister: jest.fn(() => ({
+    removeClient: mockRemoveClient,
+  })),
 }));
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
     getToken: jest.fn(async () => 'token'),
-    userId: 'user-123',
+    userId: mockUserId,
   }),
 }));
 
@@ -57,6 +82,8 @@ jest.mock('@/lib/trpc-offline-client', () => ({
 describe('TRPCProvider offline queue invalidation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUserId = 'user-123';
+    latestPersistOptions = null;
   });
 
   it('registers offline queue callback with query invalidations', () => {
@@ -91,5 +118,69 @@ describe('TRPCProvider offline queue invalidation', () => {
     expectedQueryKeys.forEach((queryKey) => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey });
     });
+  });
+});
+
+describe('TRPCProvider cache persistence', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUserId = 'user-123';
+    latestPersistOptions = null;
+  });
+
+  it('configures a user-scoped persister with allowlisted queries', () => {
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    expect(latestPersistOptions).not.toBeNull();
+    expect(latestPersistOptions?.maxAge).toBe(PERSISTENCE_MAX_AGE_MS);
+
+    const persisterArgs = (createAsyncStoragePersister as jest.Mock).mock.calls[0][0] as {
+      key: string;
+    };
+
+    expect(persisterArgs.key).toContain(`${PERSISTENCE_STORAGE_PREFIX}user-123:`);
+
+    const shouldDehydrate = latestPersistOptions?.dehydrateOptions.shouldDehydrateQuery;
+    expect(shouldDehydrate?.({ queryKey: [['items', 'home']], state: { status: 'success' } })).toBe(
+      true
+    );
+    expect(shouldDehydrate?.({ queryKey: [['items', 'home']], state: { status: 'error' } })).toBe(
+      false
+    );
+  });
+
+  it('clears cache and persisted data on user switch', () => {
+    const clearSpy = jest.spyOn(mockQueryClient, 'clear');
+
+    const renderer = create(
+      <TRPCProvider>
+        <></>
+      </TRPCProvider>
+    );
+
+    expect(mockRemoveClient).not.toHaveBeenCalled();
+
+    mockUserId = 'user-456';
+
+    act(() => {
+      renderer.update(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    expect(mockRemoveClient).toHaveBeenCalledTimes(1);
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+
+    const persisterCalls = (createAsyncStoragePersister as jest.Mock).mock.calls;
+    expect(persisterCalls.length).toBeGreaterThanOrEqual(2);
+    expect(persisterCalls[1][0].key).toContain(`${PERSISTENCE_STORAGE_PREFIX}user-456:`);
   });
 });
