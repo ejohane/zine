@@ -96,6 +96,17 @@ describe('Manual Testing Checklist', () => {
     expect(steps.length).toBe(4);
   });
 
+  it('documents provider disconnect flow', () => {
+    const steps = [
+      '1. Open Settings > Connections',
+      '2. Disconnect a provider and confirm prompt',
+      '3. Verify UI switches to Not connected immediately',
+      '4. Confirm subscriptions list updates after sync',
+    ];
+
+    expect(steps.length).toBe(4);
+  });
+
   it('documents user switch cache isolation', () => {
     const steps = [
       '1. Sign in as User A',

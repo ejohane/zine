@@ -21,7 +21,7 @@ import { trpc } from '../lib/trpc';
 /**
  * Subscription status values
  */
-export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'UNSUBSCRIBED';
+export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'UNSUBSCRIBED' | 'DISCONNECTED';
 
 /**
  * Supported subscription providers
