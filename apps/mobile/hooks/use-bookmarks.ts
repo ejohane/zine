@@ -10,6 +10,7 @@
 
 import { trpc } from '../lib/trpc';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
+import * as Crypto from 'expo-crypto';
 
 // ============================================================================
 // Types
@@ -86,14 +87,21 @@ type LibraryData = ReturnType<TrpcUtils['items']['library']['getData']>;
 /** Home query data type */
 type HomeData = ReturnType<TrpcUtils['items']['home']['getData']>;
 
+/** Inbox query data type */
+type InboxData = ReturnType<TrpcUtils['items']['inbox']['getData']>;
+
 /** Extract item type from library data */
 type LibraryItem = NonNullable<LibraryData>['items'][number];
+
+/** Extract item type from inbox data */
+type InboxItem = NonNullable<InboxData>['items'][number];
 
 /** Context for optimistic bookmark save rollback */
 type OptimisticSaveContext = {
   previousLibrary?: LibraryData;
   previousContentTypeLibrary?: LibraryData;
   previousHome?: HomeData;
+  previousInbox?: InboxData;
 };
 
 const HOME_SECTION_LIMIT = 5;
@@ -132,11 +140,12 @@ export function isValidUrl(urlString: string): boolean {
  */
 function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
   const now = new Date().toISOString();
-  const timestamp = Date.now();
+  const tempUserItemId = `temp-${Crypto.randomUUID()}`;
+  const tempItemId = `temp-${Crypto.randomUUID()}`;
 
   return {
-    id: `temp-user-item-${timestamp}`,
-    itemId: `temp-item-${timestamp}`,
+    id: tempUserItemId,
+    itemId: tempItemId,
     title: input.title,
     thumbnailUrl: input.thumbnailUrl,
     canonicalUrl: input.canonicalUrl,
@@ -295,6 +304,7 @@ export function useSaveBookmark() {
       const cancellations: Promise<void>[] = [
         utils.items.library.cancel(),
         utils.items.home.cancel(),
+        utils.items.inbox.cancel(),
       ];
       if (input.contentType) {
         cancellations.push(
@@ -308,6 +318,7 @@ export function useSaveBookmark() {
         ? utils.items.library.getData({ filter: { contentType: input.contentType } })
         : undefined;
       const previousHome = utils.items.home.getData();
+      const previousInbox = utils.items.inbox.getData();
 
       utils.items.library.setData(undefined, (old) => {
         if (!old) {
@@ -363,10 +374,24 @@ export function useSaveBookmark() {
         };
       });
 
+      const shouldRemoveInboxItem = (item: InboxItem) =>
+        item.itemId === input.providerId || item.id === input.providerId;
+
+      utils.items.inbox.setData(undefined, (old) => {
+        if (!old) return old;
+        const filteredItems = old.items.filter((item) => !shouldRemoveInboxItem(item));
+        if (filteredItems.length === old.items.length) return old;
+        return {
+          ...old,
+          items: filteredItems,
+        };
+      });
+
       return {
         previousLibrary,
         previousContentTypeLibrary,
         previousHome,
+        previousInbox,
       };
     },
     onError: (_error, input, context) => {
@@ -380,6 +405,7 @@ export function useSaveBookmark() {
         );
       }
       utils.items.home.setData(undefined, context.previousHome);
+      utils.items.inbox.setData(undefined, context.previousInbox);
     },
     onSuccess: () => {
       // Invalidate library and inbox caches to reflect the new bookmark

@@ -28,9 +28,16 @@ const mockHomeCancel = jest.fn();
 const mockHomeGetData = jest.fn();
 const mockHomeSetData = jest.fn();
 const mockHomeInvalidate = jest.fn();
+const mockInboxCancel = jest.fn();
+const mockInboxGetData = jest.fn();
+const mockInboxSetData = jest.fn();
 const mockInboxInvalidate = jest.fn();
 const mockReset = jest.fn();
 let shouldSaveError = false;
+
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(() => 'test-uuid'),
+}));
 
 jest.mock('../lib/trpc', () => ({
   trpc: {
@@ -87,7 +94,12 @@ jest.mock('../lib/trpc', () => ({
           setData: mockLibrarySetData,
           invalidate: mockLibraryInvalidate,
         },
-        inbox: { invalidate: mockInboxInvalidate },
+        inbox: {
+          cancel: mockInboxCancel,
+          getData: mockInboxGetData,
+          setData: mockInboxSetData,
+          invalidate: mockInboxInvalidate,
+        },
         home: {
           cancel: mockHomeCancel,
           getData: mockHomeGetData,
@@ -156,6 +168,7 @@ beforeEach(() => {
 
   mockLibraryGetData.mockReturnValue(undefined);
   mockHomeGetData.mockReturnValue(undefined);
+  mockInboxGetData.mockReturnValue(undefined);
 
   // Default query response
   mockPreviewUseQuery.mockReturnValue({
@@ -586,6 +599,7 @@ describe('useSaveBookmark', () => {
 
       expect(updatedLibrary.items[0].title).toBe(preview.title);
       expect(updatedLibrary.items[0].state).toBe(UserItemState.BOOKMARKED);
+      expect(updatedLibrary.items[0].id.startsWith('temp-')).toBe(true);
 
       const homeUpdater = mockHomeSetData.mock.calls[0][1];
       const updatedHome = homeUpdater({
@@ -602,6 +616,26 @@ describe('useSaveBookmark', () => {
       expect(updatedHome.byContentType.videos[0].title).toBe(preview.title);
     });
 
+    it('removes matching inbox items during optimistic update', async () => {
+      const preview = createMockPreview();
+      const inboxItem = createMockLibraryItem({ itemId: preview.providerId, id: 'user-item-9' });
+
+      mockInboxGetData.mockReturnValue({ items: [inboxItem], nextCursor: null });
+
+      const { result } = renderHook(() => useSaveBookmark());
+
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview);
+      });
+
+      const inboxCall = mockInboxSetData.mock.calls.find((call) => call[0] === undefined);
+      expect(inboxCall).toBeDefined();
+      const inboxUpdater = inboxCall?.[1];
+      const updatedInbox = inboxUpdater({ items: [inboxItem], nextCursor: null });
+
+      expect(updatedInbox.items).toHaveLength(0);
+    });
+
     it('rolls back optimistic updates on error', async () => {
       shouldSaveError = true;
       const preview = createMockPreview();
@@ -616,9 +650,11 @@ describe('useSaveBookmark', () => {
           articles: [],
         },
       };
+      const previousInbox = { items: [existingItem], nextCursor: null };
 
       mockLibraryGetData.mockReturnValue(previousLibrary);
       mockHomeGetData.mockReturnValue(previousHome);
+      mockInboxGetData.mockReturnValue(previousInbox);
 
       const { result } = renderHook(() => useSaveBookmark());
 
@@ -635,6 +671,9 @@ describe('useSaveBookmark', () => {
 
       const rollbackHomeCall = mockHomeSetData.mock.calls[mockHomeSetData.mock.calls.length - 1];
       expect(rollbackHomeCall[1]).toBe(previousHome);
+
+      const rollbackInboxCall = mockInboxSetData.mock.calls[mockInboxSetData.mock.calls.length - 1];
+      expect(rollbackInboxCall[1]).toBe(previousInbox);
     });
   });
 
