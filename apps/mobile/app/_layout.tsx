@@ -9,11 +9,17 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider } from '@/providers/auth-provider';
 import { TRPCProvider } from '@/providers/trpc-provider';
+import { useBaselinePrefetchOnFocus } from '@/hooks/use-prefetch';
 import '../global.css';
 
 export const unstable_settings = {
   anchor: '(tabs)',
 };
+
+function PrefetchManager() {
+  useBaselinePrefetchOnFocus();
+  return null;
+}
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -22,6 +28,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <AuthProvider>
         <TRPCProvider>
+          <PrefetchManager />
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <HeroUINativeProvider>
               <ToastProvider defaultProps={{ placement: 'bottom' }} maxVisibleToasts={3}>

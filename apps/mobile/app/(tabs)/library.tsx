@@ -14,6 +14,7 @@ import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
 import type { ContentType as UIContentType, Provider } from '@/lib/content-utils';
 
@@ -82,6 +83,8 @@ export default function LibraryScreen() {
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+
+  useTabPrefetch('library');
 
   const contentTypeParam = useMemo(() => {
     const rawContentType = Array.isArray(params.contentType)

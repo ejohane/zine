@@ -17,6 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInboxItems,
   useHomeData,
@@ -111,6 +112,8 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const greeting = useMemo(() => getGreeting(), []);
+
+  useTabPrefetch('home');
 
   // Data hooks
   const { data: inboxData, isLoading: isInboxLoading } = useInboxItems();
