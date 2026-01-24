@@ -47,6 +47,7 @@ function createMockItemView(overrides: Partial<ItemView> = {}): ItemView {
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-01T10:00:00Z',
     bookmarkedAt: null,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -139,9 +140,14 @@ function createMockItemsCaller(options: {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
       const bookmarked = libraryItems.filter((item) => item.state === UserItemState.BOOKMARKED);
+      const jumpBackIn = bookmarked
+        .filter((item) => item.lastOpenedAt !== null)
+        .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? ''))
+        .slice(0, 10);
+
       return {
         recentBookmarks: bookmarked.slice(0, 5),
-        jumpBackIn: bookmarked.filter((item) => item.progress !== null).slice(0, 5),
+        jumpBackIn,
         byContentType: {
           videos: bookmarked.filter((item) => item.contentType === ContentType.VIDEO).slice(0, 5),
           podcasts: bookmarked
@@ -195,6 +201,20 @@ function createMockItemsCaller(options: {
         });
       }
       return { success: true as const };
+    },
+
+    markOpened: async (input: { id: string }) => {
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED' });
+      }
+      const item = allItems.get(input.id);
+      if (!item) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+      return { success: true as const, updated: item.state === UserItemState.BOOKMARKED };
     },
 
     updateProgress: async (input: { id: string; position: number; duration: number }) => {
@@ -273,6 +293,15 @@ describe('Items Router', () => {
 
       await expect(caller.archive({ id: 'ui-001' })).rejects.toThrow(TRPCError);
       await expect(caller.archive({ id: 'ui-001' })).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('should reject unauthenticated requests to mark opened', async () => {
+      const caller = createMockItemsCaller({ userId: null });
+
+      await expect(caller.markOpened({ id: 'ui-001' })).rejects.toThrow(TRPCError);
+      await expect(caller.markOpened({ id: 'ui-001' })).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
       });
     });
@@ -799,26 +828,26 @@ describe('Items Router', () => {
       expect(Array.isArray(result.byContentType.articles)).toBe(true);
     });
 
-    it('should populate jumpBackIn with items that have progress', async () => {
-      const itemWithProgress = createMockItemView({
-        id: 'ui-progress',
+    it('should populate jumpBackIn with recently opened bookmarks', async () => {
+      const openedItem = createMockItemView({
+        id: 'ui-opened',
         state: UserItemState.BOOKMARKED,
-        progress: { position: 300, duration: 600, percent: 50 },
+        lastOpenedAt: '2024-12-20T10:00:00Z',
       });
-      const itemWithoutProgress = createMockItemView({
-        id: 'ui-no-progress',
+      const unopenedItem = createMockItemView({
+        id: 'ui-unopened',
         state: UserItemState.BOOKMARKED,
-        progress: null,
+        lastOpenedAt: null,
       });
 
       const caller = createMockItemsCaller({
         userId: TEST_USER_ID,
-        libraryItems: [itemWithProgress, itemWithoutProgress],
+        libraryItems: [openedItem, unopenedItem],
       });
       const result = await caller.home();
 
       expect(result.jumpBackIn).toHaveLength(1);
-      expect(result.jumpBackIn[0].id).toBe('ui-progress');
+      expect(result.jumpBackIn[0].id).toBe('ui-opened');
     });
 
     it('should group items by content type', async () => {
@@ -953,6 +982,58 @@ describe('Items Router', () => {
   });
 
   // ==========================================================================
+  // items.markOpened Tests
+  // ==========================================================================
+
+  describe('items.markOpened', () => {
+    it('should return updated true for bookmarked items', async () => {
+      const item = createMockItemView({
+        id: 'ui-001',
+        state: UserItemState.BOOKMARKED,
+      });
+      const itemsMap = new Map<string, ItemView>();
+      itemsMap.set('ui-001', item);
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: itemsMap,
+      });
+      const result = await caller.markOpened({ id: 'ui-001' });
+
+      expect(result).toEqual({ success: true, updated: true });
+    });
+
+    it('should return updated false for non-bookmarked items', async () => {
+      const item = createMockItemView({
+        id: 'ui-002',
+        state: UserItemState.INBOX,
+      });
+      const itemsMap = new Map<string, ItemView>();
+      itemsMap.set('ui-002', item);
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: itemsMap,
+      });
+      const result = await caller.markOpened({ id: 'ui-002' });
+
+      expect(result).toEqual({ success: true, updated: false });
+    });
+
+    it('should throw NOT_FOUND when item does not exist', async () => {
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: new Map(),
+      });
+
+      await expect(caller.markOpened({ id: 'nonexistent' })).rejects.toThrow(TRPCError);
+      await expect(caller.markOpened({ id: 'nonexistent' })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    });
+  });
+
+  // ==========================================================================
   // items.updateProgress Tests
   // ==========================================================================
 
@@ -1017,6 +1098,7 @@ describe('ItemView Type', () => {
       state: UserItemState.INBOX,
       ingestedAt: '2024-12-01T00:00:00Z',
       bookmarkedAt: null,
+      lastOpenedAt: null,
       progress: null,
       isFinished: false,
       finishedAt: null,
@@ -1049,6 +1131,7 @@ describe('ItemView Type', () => {
       state: UserItemState.BOOKMARKED,
       ingestedAt: '2024-12-01T00:00:00Z',
       bookmarkedAt: '2024-12-02T00:00:00Z',
+      lastOpenedAt: '2024-12-03T10:00:00Z',
       progress: {
         position: 1800,
         duration: 7200,

@@ -121,6 +121,18 @@ export default function HomeScreen() {
   const { data: libraryData } = useLibraryItems();
 
   // Transform to ItemCardData format for use with ItemCard component
+  const jumpBackInItems = useMemo((): ItemCardData[] => {
+    return (homeData?.jumpBackIn ?? []).slice(0, 10).map((item) => ({
+      id: item.id,
+      title: item.title,
+      creator: item.publisher ?? item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: mapContentType(item.contentType) as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
+    }));
+  }, [homeData?.jumpBackIn]);
+
   const recentlyBookmarked = useMemo((): ItemCardData[] => {
     return (homeData?.recentBookmarks ?? []).slice(0, 6).map((item) => ({
       id: item.id,
@@ -210,9 +222,30 @@ export default function HomeScreen() {
             </View>
           ) : (
             <>
+              {/* Jump Back In - Recently Opened Bookmarks */}
+              {jumpBackInItems.length >= 4 && (
+                <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                  <SectionHeader
+                    title="Jump Back In"
+                    count={jumpBackInItems.length}
+                    colors={colors}
+                  />
+                  <FlatList
+                    horizontal
+                    data={jumpBackInItems}
+                    renderItem={({ item, index }) => (
+                      <ItemCard item={item} variant="horizontal" index={index} />
+                    )}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
+                  />
+                </Animated.View>
+              )}
+
               {/* Recently Bookmarked - Horizontal Cards */}
               {recentlyBookmarked.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                <Animated.View entering={FadeInDown.delay(200).duration(400)}>
                   <SectionHeader
                     title="Recently Bookmarked"
                     count={recentlyBookmarked.length}
@@ -234,7 +267,7 @@ export default function HomeScreen() {
               {/* Inbox Section - Condensed List using compact ItemCard */}
               {inboxItems.length > 0 && (
                 <Animated.View
-                  entering={FadeInDown.delay(200).duration(400)}
+                  entering={FadeInDown.delay(300).duration(400)}
                   style={styles.section}
                 >
                   <SectionHeader
@@ -255,7 +288,7 @@ export default function HomeScreen() {
 
               {/* Category Collection - Large Cards with overlay */}
               {podcasts.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(300).duration(400)}>
+                <Animated.View entering={FadeInDown.delay(400).duration(400)}>
                   <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
                   <FlatList
                     horizontal
@@ -271,7 +304,7 @@ export default function HomeScreen() {
               )}
 
               {/* Categories */}
-              <Animated.View entering={FadeInDown.delay(400).duration(400)} style={styles.section}>
+              <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
                 <SectionHeader title="Categories" colors={colors} />
                 <ScrollView
                   horizontal
@@ -311,7 +344,7 @@ export default function HomeScreen() {
 
               {/* Videos - Horizontal Cards */}
               {videos.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(500).duration(400)}>
+                <Animated.View entering={FadeInDown.delay(600).duration(400)}>
                   <SectionHeader title="Videos" count={videos.length} colors={colors} />
                   <FlatList
                     horizontal

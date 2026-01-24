@@ -323,7 +323,7 @@ export function useLibraryItems(options?: {
  *
  * Returns curated sections for the home screen:
  * - recentBookmarks: Latest bookmarked items
- * - jumpBackIn: Items with playback progress
+ * - jumpBackIn: Recently opened bookmarks
  * - byContentType: Items grouped by video/podcast/article
  *
  * @returns tRPC query result with home data sections
@@ -626,14 +626,28 @@ export function useToggleFinished() {
 }
 
 /**
+ * Hook for marking a bookmarked item as opened
+ *
+ * Used to power the "Jump Back In" section on home.
+ */
+export function useMarkItemOpened() {
+  const utils = trpc.useUtils();
+
+  return trpc.items.markOpened.useMutation({
+    onSettled: (_data, _err, { id }) => {
+      utils.items.home.invalidate();
+      utils.items.get.invalidate({ id });
+    },
+  });
+}
+
+/**
  * Hook for updating playback/reading progress
  *
  * Updates the progress position for video/podcast/article consumption.
- * Used for "Jump Back In" feature on home screen.
  *
  * No optimistic update is performed since progress updates are typically
  * fire-and-forget operations that don't need immediate UI feedback.
- * Invalidates home data on completion to refresh "Jump Back In" section.
  *
  * @returns tRPC mutation with mutate/mutateAsync functions
  *
@@ -657,7 +671,6 @@ export function useUpdateProgress() {
 
   return trpc.items.updateProgress.useMutation({
     onSettled: () => {
-      // Invalidate home data to refresh "Jump Back In" section
       utils.items.home.invalidate();
     },
   });

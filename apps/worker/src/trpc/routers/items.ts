@@ -55,8 +55,9 @@ export type ItemView = {
   state: UserItemState;
   ingestedAt: string;
   bookmarkedAt: string | null;
+  lastOpenedAt: string | null;
 
-  // Progress (for "Jump Back In")
+  // Progress
   progress: {
     position: number;
     duration: number;
@@ -117,6 +118,7 @@ function toItemView(row: {
     state: userItem.state as UserItemState,
     ingestedAt: userItem.ingestedAt,
     bookmarkedAt: userItem.bookmarkedAt,
+    lastOpenedAt: userItem.lastOpenedAt,
     progress:
       userItem.progressPosition !== null && userItem.progressDuration !== null
         ? {
@@ -303,10 +305,11 @@ export const itemsRouter = router({
 
   /**
    * Get curated home sections.
-   * Returns recent bookmarks, items with progress ("Jump Back In"), and items by content type.
+   * Returns recent bookmarks, recently opened bookmarks ("Jump Back In"), and items by content type.
    */
   home: protectedProcedure.query(async ({ ctx }) => {
     const SECTION_LIMIT = 5;
+    const RECENTLY_OPENED_LIMIT = 10;
 
     // Base query for bookmarked items
     const baseConditions = [
@@ -325,21 +328,15 @@ export const itemsRouter = router({
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 
-    // Fetch items with progress ("Jump Back In")
+    // Fetch recently opened bookmarks ("Jump Back In")
     const jumpBackInQuery = ctx.db
       .select()
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(
-        and(
-          ...baseConditions,
-          // Has progress but not finished
-          isNotNull(userItems.progressPosition)
-        )
-      )
-      .orderBy(desc(userItems.progressUpdatedAt))
-      .limit(SECTION_LIMIT);
+      .where(and(...baseConditions, isNotNull(userItems.lastOpenedAt)))
+      .orderBy(desc(userItems.lastOpenedAt))
+      .limit(RECENTLY_OPENED_LIMIT);
 
     // Fetch videos
     const videosQuery = ctx.db
@@ -380,14 +377,9 @@ export const itemsRouter = router({
       articlesQuery,
     ]);
 
-    // Filter jumpBackIn to only include items with actual progress
-    const jumpBackInFiltered = jumpBackIn.filter(
-      (row) => row.user_items.progressPosition !== null && row.user_items.progressPosition > 0
-    );
-
     return {
       recentBookmarks: recentBookmarks.map(toItemView),
-      jumpBackIn: jumpBackInFiltered.map(toItemView),
+      jumpBackIn: jumpBackIn.map(toItemView),
       byContentType: {
         videos: videos.map(toItemView),
         podcasts: podcasts.map(toItemView),
@@ -601,6 +593,42 @@ export const itemsRouter = router({
         isFinished: newIsFinished,
         finishedAt: newFinishedAt,
       };
+    }),
+
+  /**
+   * Record that a bookmarked item was opened via the FAB.
+   */
+  markOpened: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const now = new Date().toISOString();
+
+      const existing = await ctx.db
+        .select({ id: userItems.id, state: userItems.state })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      if (existing[0].state !== UserItemState.BOOKMARKED) {
+        return { success: true as const, updated: false };
+      }
+
+      await ctx.db
+        .update(userItems)
+        .set({
+          lastOpenedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return { success: true as const, updated: true, lastOpenedAt: now };
     }),
 
   /**

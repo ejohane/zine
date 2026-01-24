@@ -39,6 +39,7 @@ export type ItemView = {
   state: UserItemState;
   ingestedAt: string;
   bookmarkedAt: string | null;
+  lastOpenedAt: string | null;
   progress: { position: number; duration: number; percent: number } | null;
   /** Whether user has finished/consumed this item */
   isFinished: boolean;
@@ -75,6 +76,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-10T08:30:00Z',
     bookmarkedAt: null,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -100,6 +102,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-12T09:00:00Z',
     bookmarkedAt: null,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -125,6 +128,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-11T14:00:00Z',
     bookmarkedAt: null,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -150,6 +154,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.INBOX,
     ingestedAt: '2024-12-12T18:00:00Z',
     bookmarkedAt: null,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -179,6 +184,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-12-08T14:00:00Z',
     bookmarkedAt: '2024-12-09T09:15:00Z',
+    lastOpenedAt: '2024-12-22T09:30:00Z',
     progress: {
       position: 2400,
       duration: 7200,
@@ -208,6 +214,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-16T10:00:00Z',
     bookmarkedAt: '2024-11-17T08:30:00Z',
+    lastOpenedAt: '2024-12-21T14:05:00Z',
     progress: {
       position: 1200,
       duration: 2700,
@@ -237,6 +244,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-10-21T12:00:00Z',
     bookmarkedAt: '2024-10-22T15:00:00Z',
+    lastOpenedAt: '2024-12-20T11:45:00Z',
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -262,6 +270,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-09-11T08:00:00Z',
     bookmarkedAt: '2024-09-12T19:00:00Z',
+    lastOpenedAt: '2024-12-19T07:20:00Z',
     progress: {
       position: 4500,
       duration: 5400,
@@ -291,6 +300,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-02T07:00:00Z',
     bookmarkedAt: '2024-11-03T11:00:00Z',
+    lastOpenedAt: '2024-12-18T18:10:00Z',
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -316,6 +326,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-08-16T09:00:00Z',
     bookmarkedAt: '2024-08-17T20:00:00Z',
+    lastOpenedAt: null,
     progress: {
       position: 7200,
       duration: 14400,
@@ -345,6 +356,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-12-02T08:00:00Z',
     bookmarkedAt: '2024-12-03T10:00:00Z',
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -370,6 +382,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.BOOKMARKED,
     ingestedAt: '2024-11-26T09:00:00Z',
     bookmarkedAt: '2024-11-27T14:00:00Z',
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -399,6 +412,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-06-02T08:00:00Z',
     bookmarkedAt: '2024-06-03T09:00:00Z',
+    lastOpenedAt: null,
     progress: {
       position: 1200,
       duration: 1200,
@@ -428,6 +442,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-07-21T10:00:00Z',
     bookmarkedAt: '2024-07-22T08:00:00Z',
+    lastOpenedAt: null,
     progress: {
       position: 3600,
       duration: 3600,
@@ -457,6 +472,7 @@ export const MOCK_ITEMS: ItemView[] = [
     state: UserItemState.ARCHIVED,
     ingestedAt: '2024-05-16T12:00:00Z',
     bookmarkedAt: '2024-05-17T10:00:00Z',
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,
@@ -495,8 +511,11 @@ export function getMockHomeData() {
     /** Most recently bookmarked items */
     recentBookmarks: bookmarked.slice(0, 5),
 
-    /** Items with progress (for "Jump Back In" feature) */
-    jumpBackIn: bookmarked.filter((item) => item.progress !== null).slice(0, 5),
+    /** Recently opened bookmarks ("Jump Back In") */
+    jumpBackIn: bookmarked
+      .filter((item) => item.lastOpenedAt !== null)
+      .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? ''))
+      .slice(0, 10),
 
     /** Items grouped by content type */
     byContentType: {
