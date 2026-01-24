@@ -10,7 +10,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react-hooks';
-import { ContentType, Provider } from '@zine/shared';
+import { ContentType, Provider, UserItemState } from '@zine/shared';
 
 // ============================================================================
 // Module-level Mocks
@@ -20,8 +20,24 @@ import { ContentType, Provider } from '@zine/shared';
 const mockPreviewUseQuery = jest.fn();
 const mockSaveMutate = jest.fn();
 const mockSaveMutateAsync = jest.fn();
-const mockInvalidate = jest.fn();
+const mockLibraryCancel = jest.fn();
+const mockLibraryGetData = jest.fn();
+const mockLibrarySetData = jest.fn();
+const mockLibraryInvalidate = jest.fn();
+const mockHomeCancel = jest.fn();
+const mockHomeGetData = jest.fn();
+const mockHomeSetData = jest.fn();
+const mockHomeInvalidate = jest.fn();
+const mockInboxCancel = jest.fn();
+const mockInboxGetData = jest.fn();
+const mockInboxSetData = jest.fn();
+const mockInboxInvalidate = jest.fn();
 const mockReset = jest.fn();
+let shouldSaveError = false;
+
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(() => 'test-uuid'),
+}));
 
 jest.mock('../lib/trpc', () => ({
   trpc: {
@@ -31,22 +47,29 @@ jest.mock('../lib/trpc', () => ({
       },
       save: {
         useMutation: jest.fn((options) => {
-          // Store the onSuccess callback for testing
-          const onSuccess = options?.onSuccess;
+          const runMutation = async (input: unknown) => {
+            const context = await options?.onMutate?.(input);
+            if (shouldSaveError) {
+              const error = new Error('Failed to save');
+              options?.onError?.(error, input, context);
+              throw error;
+            }
+            options?.onSuccess?.(undefined, input, context);
+            return {
+              itemId: 'item-123',
+              userItemId: 'user-item-123',
+              status: 'created',
+            };
+          };
+
           return {
             mutate: (input: unknown) => {
               mockSaveMutate(input);
-              // Simulate success callback
-              onSuccess?.();
+              void runMutation(input).catch(() => undefined);
             },
             mutateAsync: async (input: unknown) => {
               mockSaveMutateAsync(input);
-              onSuccess?.();
-              return {
-                itemId: 'item-123',
-                userItemId: 'user-item-123',
-                status: 'created',
-              };
+              return runMutation(input);
             },
             isPending: false,
             isSuccess: false,
@@ -59,15 +82,30 @@ jest.mock('../lib/trpc', () => ({
       },
     },
     items: {
-      library: { invalidate: mockInvalidate },
-      inbox: { invalidate: mockInvalidate },
-      home: { invalidate: mockInvalidate },
+      library: { invalidate: mockLibraryInvalidate },
+      inbox: { invalidate: mockInboxInvalidate },
+      home: { invalidate: mockHomeInvalidate },
     },
     useUtils: jest.fn(() => ({
       items: {
-        library: { invalidate: mockInvalidate },
-        inbox: { invalidate: mockInvalidate },
-        home: { invalidate: mockInvalidate },
+        library: {
+          cancel: mockLibraryCancel,
+          getData: mockLibraryGetData,
+          setData: mockLibrarySetData,
+          invalidate: mockLibraryInvalidate,
+        },
+        inbox: {
+          cancel: mockInboxCancel,
+          getData: mockInboxGetData,
+          setData: mockInboxSetData,
+          invalidate: mockInboxInvalidate,
+        },
+        home: {
+          cancel: mockHomeCancel,
+          getData: mockHomeGetData,
+          setData: mockHomeSetData,
+          invalidate: mockHomeInvalidate,
+        },
       },
     })),
   },
@@ -95,9 +133,42 @@ function createMockPreview(overrides: Partial<LinkPreview> = {}): LinkPreview {
   };
 }
 
+function createMockLibraryItem(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'user-item-1',
+    itemId: 'item-1',
+    title: 'Existing Item',
+    thumbnailUrl: null,
+    canonicalUrl: 'https://example.com/item',
+    contentType: ContentType.VIDEO,
+    provider: Provider.YOUTUBE,
+    creator: 'Existing Creator',
+    creatorImageUrl: null,
+    creatorId: null,
+    publisher: null,
+    summary: null,
+    duration: null,
+    publishedAt: null,
+    wordCount: null,
+    readingTimeMinutes: null,
+    state: UserItemState.BOOKMARKED,
+    ingestedAt: new Date('2024-01-01').toISOString(),
+    bookmarkedAt: new Date('2024-01-02').toISOString(),
+    progress: null,
+    isFinished: false,
+    finishedAt: null,
+    ...overrides,
+  };
+}
+
 // Reset mocks before each test
 beforeEach(() => {
   jest.clearAllMocks();
+  shouldSaveError = false;
+
+  mockLibraryGetData.mockReturnValue(undefined);
+  mockHomeGetData.mockReturnValue(undefined);
+  mockInboxGetData.mockReturnValue(undefined);
 
   // Default query response
   mockPreviewUseQuery.mockReturnValue({
@@ -484,16 +555,125 @@ describe('useSaveBookmark', () => {
   });
 
   describe('cache invalidation', () => {
-    it('invalidates library cache on success', () => {
+    it('invalidates library cache on success', async () => {
       const { result } = renderHook(() => useSaveBookmark());
       const preview = createMockPreview();
 
-      act(() => {
-        result.current.saveFromPreview(preview);
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview);
       });
 
       // The mock calls onSuccess which should trigger invalidation
-      expect(mockInvalidate).toHaveBeenCalled();
+      expect(mockLibraryInvalidate).toHaveBeenCalled();
+      expect(mockInboxInvalidate).toHaveBeenCalled();
+      expect(mockHomeInvalidate).toHaveBeenCalled();
+    });
+  });
+
+  describe('optimistic updates', () => {
+    it('applies optimistic updates to library and home', async () => {
+      const preview = createMockPreview();
+      const existingItem = createMockLibraryItem();
+
+      mockLibraryGetData.mockReturnValue({ items: [existingItem], nextCursor: null });
+      mockHomeGetData.mockReturnValue({
+        recentBookmarks: [existingItem],
+        jumpBackIn: [],
+        byContentType: {
+          videos: [existingItem],
+          podcasts: [],
+          articles: [],
+        },
+      });
+
+      const { result } = renderHook(() => useSaveBookmark());
+
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview);
+      });
+
+      const libraryCall = mockLibrarySetData.mock.calls.find((call) => call[0] === undefined);
+      expect(libraryCall).toBeDefined();
+      const libraryUpdater = libraryCall?.[1];
+      const updatedLibrary = libraryUpdater({ items: [existingItem], nextCursor: null });
+
+      expect(updatedLibrary.items[0].title).toBe(preview.title);
+      expect(updatedLibrary.items[0].state).toBe(UserItemState.BOOKMARKED);
+      expect(updatedLibrary.items[0].id.startsWith('temp-')).toBe(true);
+
+      const homeUpdater = mockHomeSetData.mock.calls[0][1];
+      const updatedHome = homeUpdater({
+        recentBookmarks: [existingItem],
+        jumpBackIn: [],
+        byContentType: {
+          videos: [existingItem],
+          podcasts: [],
+          articles: [],
+        },
+      });
+
+      expect(updatedHome.recentBookmarks[0].title).toBe(preview.title);
+      expect(updatedHome.byContentType.videos[0].title).toBe(preview.title);
+    });
+
+    it('removes matching inbox items during optimistic update', async () => {
+      const preview = createMockPreview();
+      const inboxItem = createMockLibraryItem({ itemId: preview.providerId, id: 'user-item-9' });
+
+      mockInboxGetData.mockReturnValue({ items: [inboxItem], nextCursor: null });
+
+      const { result } = renderHook(() => useSaveBookmark());
+
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview);
+      });
+
+      const inboxCall = mockInboxSetData.mock.calls.find((call) => call[0] === undefined);
+      expect(inboxCall).toBeDefined();
+      const inboxUpdater = inboxCall?.[1];
+      const updatedInbox = inboxUpdater({ items: [inboxItem], nextCursor: null });
+
+      expect(updatedInbox.items).toHaveLength(0);
+    });
+
+    it('rolls back optimistic updates on error', async () => {
+      shouldSaveError = true;
+      const preview = createMockPreview();
+      const existingItem = createMockLibraryItem();
+      const previousLibrary = { items: [existingItem], nextCursor: null };
+      const previousHome = {
+        recentBookmarks: [existingItem],
+        jumpBackIn: [],
+        byContentType: {
+          videos: [existingItem],
+          podcasts: [],
+          articles: [],
+        },
+      };
+      const previousInbox = { items: [existingItem], nextCursor: null };
+
+      mockLibraryGetData.mockReturnValue(previousLibrary);
+      mockHomeGetData.mockReturnValue(previousHome);
+      mockInboxGetData.mockReturnValue(previousInbox);
+
+      const { result } = renderHook(() => useSaveBookmark());
+
+      await act(async () => {
+        await expect(result.current.saveFromPreviewAsync(preview)).rejects.toThrow(
+          'Failed to save'
+        );
+      });
+
+      const rollbackLibraryCall = mockLibrarySetData.mock.calls
+        .filter((call) => call[0] === undefined)
+        .pop();
+      expect(rollbackLibraryCall?.[1]).toBe(previousLibrary);
+
+      const rollbackHomeCall = mockHomeSetData.mock.calls[mockHomeSetData.mock.calls.length - 1];
+      expect(rollbackHomeCall[1]).toBe(previousHome);
+
+      const rollbackInboxCall = mockInboxSetData.mock.calls[mockInboxSetData.mock.calls.length - 1];
+      expect(rollbackInboxCall[1]).toBe(previousInbox);
     });
   });
 

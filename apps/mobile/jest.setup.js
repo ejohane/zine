@@ -63,6 +63,11 @@ jest.mock('react-native-svg', () => ({
   default: 'Svg',
 }));
 
+// Mock react-navigation hooks
+jest.mock('@react-navigation/native', () => ({
+  useFocusEffect: (callback) => callback(),
+}));
+
 // Mock expo-secure-store
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(() => Promise.resolve(null)),

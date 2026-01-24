@@ -5,6 +5,7 @@
  * This replaces the Replicache-based hooks in use-items.ts.
  */
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
@@ -247,7 +248,9 @@ export function useInboxItems(options?: {
   };
   limit?: number;
 }) {
-  return trpc.items.inbox.useQuery(options);
+  return trpc.items.inbox.useQuery(options, {
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**
@@ -310,7 +313,9 @@ export function useLibraryItems(options?: {
       }
     : undefined;
 
-  return trpc.items.library.useQuery(input);
+  return trpc.items.library.useQuery(input, {
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**
@@ -337,7 +342,9 @@ export function useLibraryItems(options?: {
  * }
  */
 export function useHomeData() {
-  return trpc.items.home.useQuery();
+  return trpc.items.home.useQuery(undefined, {
+    placeholderData: keepPreviousData,
+  });
 }
 
 /**

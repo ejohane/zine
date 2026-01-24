@@ -21,6 +21,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 
 import { Colors, Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
 import {
   getContentIcon,
@@ -113,6 +114,7 @@ export function ItemCard({
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const prefetchItemDetail = usePrefetchItemDetail();
 
   // Map API types to UI types
   const contentType = mapContentType(item.contentType);
@@ -131,11 +133,14 @@ export function ItemCard({
   const handlePress = () => {
     if (onPress) {
       onPress();
-    } else {
-      // Navigate to item detail page (route: /item/[id])
-      // Type assertion needed until the route is created
-      router.push(`/item/${item.id}` as any);
+      return;
     }
+
+    prefetchItemDetail(item.id);
+
+    // Navigate to item detail page (route: /item/[id])
+    // Type assertion needed until the route is created
+    router.push(`/item/${item.id}` as any);
   };
 
   // Handle action button press with event stopping

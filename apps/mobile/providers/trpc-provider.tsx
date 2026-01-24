@@ -5,14 +5,26 @@
  * type-safe API calls with automatic caching and auth integration.
  */
 
-import { useState, useRef, useEffect, type ReactNode } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient, useIsRestoring, type QueryStatus } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { getQueryKey } from '@trpc/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
+import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
 import { trpcLogger } from '@/lib/logger';
+import { DEFAULT_QUERY_OPTIONS } from '@/constants/query';
+import {
+  buildQueryPersistenceBuster,
+  buildQueryPersistenceKey,
+  PERSISTENCE_MAX_AGE_MS,
+  shouldPersistQuery,
+} from '@/lib/query-persistence';
 
 // ============================================================================
 // Provider Component
@@ -20,6 +32,16 @@ import { trpcLogger } from '@/lib/logger';
 
 interface TRPCProviderProps {
   children: ReactNode;
+}
+
+function HydrationGate({ children, shouldBlock }: { children: ReactNode; shouldBlock: boolean }) {
+  const isRestoring = useIsRestoring();
+
+  if (isRestoring && shouldBlock) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
 
 /**
@@ -36,7 +58,7 @@ interface TRPCProviderProps {
  * ```
  */
 export function TRPCProvider({ children }: TRPCProviderProps) {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
 
   // Store getToken in a ref to avoid recreating the tRPC client when auth changes
   const getTokenRef = useRef(getToken);
@@ -61,13 +83,93 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: {
-            staleTime: 1000 * 60 * 5, // 5 minutes - data considered fresh
-            retry: 2, // Retry failed requests twice before giving up
-          },
+          queries: DEFAULT_QUERY_OPTIONS,
         },
       })
   );
+
+  // ---------------------------------------------------------------------------
+  // Persistence Configuration
+  // ---------------------------------------------------------------------------
+
+  const persistenceBuster = useMemo(() => buildQueryPersistenceBuster(), []);
+  const persistenceKey = useMemo(
+    () => buildQueryPersistenceKey(userId, persistenceBuster),
+    [userId, persistenceBuster]
+  );
+  const persister = useMemo(
+    () => createAsyncStoragePersister({ storage: AsyncStorage, key: persistenceKey }),
+    [persistenceKey]
+  );
+  const persistOptions = useMemo(
+    () => ({
+      persister,
+      maxAge: PERSISTENCE_MAX_AGE_MS,
+      buster: persistenceBuster,
+      dehydrateOptions: {
+        shouldDehydrateQuery: ({
+          queryKey,
+          state,
+        }: {
+          queryKey: unknown;
+          state: { status: QueryStatus };
+        }) => shouldPersistQuery({ queryKey, status: state.status }),
+      },
+    }),
+    [persister, persistenceBuster]
+  );
+
+  const [hasPersistedClient, setHasPersistedClient] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    setHasPersistedClient(null);
+
+    AsyncStorage.getItem(persistenceKey)
+      .then((storedValue) => {
+        if (isActive) {
+          setHasPersistedClient(Boolean(storedValue));
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setHasPersistedClient(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [persistenceKey]);
+
+  const previousPersisterRef = useRef(persister);
+
+  useEffect(() => {
+    if (previousPersisterRef.current !== persister) {
+      void previousPersisterRef.current.removeClient();
+      queryClient.clear();
+      previousPersisterRef.current = persister;
+    }
+  }, [persister, queryClient]);
+
+  // ---------------------------------------------------------------------------
+  // Offline Queue Cache Invalidation
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    setQueueProcessedCallback(() => {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.subscriptions.list) }),
+        queryClient.invalidateQueries({
+          queryKey: getQueryKey(trpc.subscriptions.connections.list),
+        }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.inbox) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.library) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.home) }),
+      ]);
+    });
+  }, [queryClient]);
 
   // ---------------------------------------------------------------------------
   // tRPC Client Configuration
@@ -103,9 +205,13 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
   // ---------------------------------------------------------------------------
   // Note: QueryClientProvider must be inside trpc.Provider for proper integration
 
+  const shouldBlockHydration = hasPersistedClient === true;
+
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+        <HydrationGate shouldBlock={shouldBlockHydration}>{children}</HydrationGate>
+      </PersistQueryClientProvider>
     </trpc.Provider>
   );
 }

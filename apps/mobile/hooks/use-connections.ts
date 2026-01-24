@@ -11,6 +11,7 @@
  */
 
 import { trpc } from '../lib/trpc';
+import type { SubscriptionsResponse, Subscription } from './use-subscriptions-query';
 
 // ============================================================================
 // Types
@@ -43,6 +44,13 @@ export interface Connection {
   createdAt: string;
   /** When the last sync occurred (ISO 8601 string or null if never) */
   lastSyncAt: string | null;
+}
+
+/**
+ * Payload for disconnecting a provider connection.
+ */
+export interface DisconnectConnectionInput {
+  provider: ConnectionProvider;
 }
 
 /**
@@ -190,6 +198,96 @@ export function useConnection(provider: ConnectionProvider) {
     select: (response: ConnectionsListResponse) => {
       const providerData = response[provider];
       return providerData ? transformConnection(provider, providerData) : undefined;
+    },
+  });
+}
+
+/**
+ * Hook to disconnect a provider connection with optimistic updates.
+ */
+export function useDisconnectConnection(options?: {
+  onSuccess?: () => void;
+  onError?: (error: Error) => void;
+  onSettled?: () => void;
+}) {
+  type DisconnectContext = {
+    previousConnections?: Connection[];
+    previousSubscriptions?: {
+      defaultList?: SubscriptionsResponse;
+      limitedList?: SubscriptionsResponse;
+    };
+  };
+
+  // Using type assertion until router types are updated
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const utils = trpc.useUtils() as any;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (trpc as any).subscriptions.connections.disconnect.useMutation({
+    onMutate: async ({ provider }: DisconnectConnectionInput): Promise<DisconnectContext> => {
+      await utils.subscriptions?.connections?.list?.cancel?.();
+      await utils.subscriptions?.list?.cancel?.({});
+      await utils.subscriptions?.list?.cancel?.({ limit: 50 });
+
+      const previousConnections = utils.subscriptions?.connections?.list?.getData?.();
+      const previousSubscriptionsDefault = utils.subscriptions?.list?.getData?.({});
+      const previousSubscriptionsLimited = utils.subscriptions?.list?.getData?.({ limit: 50 });
+
+      utils.subscriptions?.connections?.list?.setData?.(
+        undefined,
+        (old: Connection[] | undefined) =>
+          old ? old.filter((connection) => connection.provider !== provider) : old
+      );
+
+      const updateSubscriptions = (old: SubscriptionsResponse | undefined) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          items: old.items.map((subscription: Subscription) =>
+            subscription.provider === provider
+              ? { ...subscription, status: 'DISCONNECTED' }
+              : subscription
+          ),
+        };
+      };
+
+      utils.subscriptions?.list?.setData?.({}, updateSubscriptions);
+      utils.subscriptions?.list?.setData?.({ limit: 50 }, updateSubscriptions);
+
+      return {
+        previousConnections,
+        previousSubscriptions: {
+          defaultList: previousSubscriptionsDefault,
+          limitedList: previousSubscriptionsLimited,
+        },
+      };
+    },
+    onError: (error: Error, _input: DisconnectConnectionInput, context?: DisconnectContext) => {
+      if (context?.previousConnections !== undefined) {
+        utils.subscriptions?.connections?.list?.setData?.(undefined, context.previousConnections);
+      }
+
+      if (context?.previousSubscriptions?.defaultList !== undefined) {
+        utils.subscriptions?.list?.setData?.({}, context.previousSubscriptions.defaultList);
+      }
+
+      if (context?.previousSubscriptions?.limitedList !== undefined) {
+        utils.subscriptions?.list?.setData?.(
+          { limit: 50 },
+          context.previousSubscriptions.limitedList
+        );
+      }
+
+      options?.onError?.(error);
+    },
+    onSuccess: () => {
+      utils.subscriptions?.connections?.list?.invalidate?.();
+      utils.subscriptions?.list?.invalidate?.();
+      options?.onSuccess?.();
+    },
+    onSettled: () => {
+      options?.onSettled?.();
     },
   });
 }

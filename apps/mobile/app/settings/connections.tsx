@@ -26,8 +26,12 @@ import { useRouter, type Href } from 'expo-router';
 
 import { Colors, Typography, Spacing, Radius, ProviderColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useConnections, type Connection, type ConnectionProvider } from '@/hooks/use-connections';
-import { trpc } from '@/lib/trpc';
+import {
+  useConnections,
+  useDisconnectConnection,
+  type Connection,
+  type ConnectionProvider,
+} from '@/hooks/use-connections';
 
 // ============================================================================
 // Types
@@ -190,21 +194,8 @@ export default function ConnectionsScreen() {
     null
   );
 
-  // Get the tRPC utils for cache invalidation
-  // Using type assertion until subscriptions router types are properly exported
-
-  const utils = trpc.useUtils() as any;
-
-  // Disconnect mutation - using type assertion until router types are updated
-
-  const disconnectMutation = (trpc as any).subscriptions.connections.disconnect.useMutation({
-    onSuccess: () => {
-      // Invalidate connections query to refresh the list
-      utils.subscriptions?.connections?.list?.invalidate?.();
-      // Also invalidate subscriptions since disconnect marks them as DISCONNECTED
-      utils.subscriptions?.list?.invalidate?.();
-    },
-    onError: (error: Error) => {
+  const disconnectMutation = useDisconnectConnection({
+    onError: (error) => {
       Alert.alert('Disconnect Failed', error.message || 'Failed to disconnect. Please try again.');
     },
     onSettled: () => {

@@ -12,6 +12,7 @@
  * @see features/subscriptions/frontend-spec.md Section 3.1.2
  */
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { trpc } from '../lib/trpc';
 
 // ============================================================================
@@ -21,7 +22,7 @@ import { trpc } from '../lib/trpc';
 /**
  * Subscription status values
  */
-export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'UNSUBSCRIBED';
+export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'UNSUBSCRIBED' | 'DISCONNECTED';
 
 /**
  * Supported subscription providers
@@ -116,6 +117,7 @@ export function useSubscriptions() {
       staleTime: 5 * 60 * 1000,
       // Keep in cache for 24 hours for offline access
       gcTime: 24 * 60 * 60 * 1000,
+      placeholderData: keepPreviousData,
     }
   );
 }
@@ -163,5 +165,6 @@ export function useSubscriptionsFiltered(options?: {
   return (trpc as any).subscriptions.list.useQuery(options ?? {}, {
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }

@@ -12,6 +12,7 @@
  * @see Frontend Spec Section 10.3 for API contract
  */
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { trpc } from '../lib/trpc';
 import { useOfflineMutation } from './use-offline-mutation';
 import type {
@@ -187,6 +188,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
       staleTime: 5 * 60 * 1000,
       // Keep in cache for 24 hours for offline access
       gcTime: 24 * 60 * 60 * 1000,
+      placeholderData: keepPreviousData,
     }
   );
 

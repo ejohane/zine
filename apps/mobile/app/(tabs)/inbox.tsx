@@ -12,6 +12,7 @@ import { LoadingState, ErrorState } from '@/components/list-states';
 import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInboxItems,
   useArchiveItem,
@@ -64,6 +65,8 @@ export default function InboxScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
+
+  useTabPrefetch('inbox');
 
   const { data, isLoading, error } = useInboxItems();
 
