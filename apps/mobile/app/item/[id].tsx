@@ -37,6 +37,7 @@ import {
   useBookmarkItem,
   useUnbookmarkItem,
   useToggleFinished,
+  useMarkItemOpened,
   UserItemState,
   ContentType,
 } from '@/hooks/use-items-trpc';
@@ -552,6 +553,7 @@ export default function ItemDetailScreen() {
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
   const toggleFinishedMutation = useToggleFinished();
+  const markOpenedMutation = useMarkItemOpened();
 
   // Fetch creator data for description (when creatorId is available)
   const { creator: creatorData } = useCreator(item?.creatorId ?? '');
@@ -583,6 +585,9 @@ export default function ItemDetailScreen() {
       const supported = await Linking.canOpenURL(item.canonicalUrl);
       if (supported) {
         await Linking.openURL(item.canonicalUrl);
+        if (item.state === UserItemState.BOOKMARKED) {
+          markOpenedMutation.mutate({ id: item.id });
+        }
       }
     } catch (err) {
       logger.error('Failed to open URL', { error: err });

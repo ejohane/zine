@@ -82,6 +82,7 @@ export const userItems = sqliteTable(
     ingestedAt: text('ingested_at').notNull(), // ISO8601 (legacy)
     bookmarkedAt: text('bookmarked_at'), // ISO8601 (legacy)
     archivedAt: text('archived_at'), // ISO8601 (legacy)
+    lastOpenedAt: text('last_opened_at'), // ISO8601 (legacy)
 
     // Progress tracking
     progressPosition: integer('progress_position'), // Seconds
@@ -105,6 +106,9 @@ export const userItems = sqliteTable(
 
     // Fast library queries: WHERE userId = ? AND state = 'BOOKMARKED' ORDER BY bookmarkedAt DESC
     index('user_items_library_idx').on(table.userId, table.state, table.bookmarkedAt),
+
+    // Fast recently opened queries: WHERE userId = ? AND state = 'BOOKMARKED' ORDER BY lastOpenedAt DESC
+    index('user_items_recent_opened_idx').on(table.userId, table.state, table.lastOpenedAt),
   ]
 );
 
