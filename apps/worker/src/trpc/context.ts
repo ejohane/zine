@@ -1,4 +1,4 @@
-import { createDb } from '../db';
+import { createDb, ensureUserItemsLastOpenedAt } from '../db';
 import type { Context } from 'hono';
 import type { Env } from '../types';
 
@@ -12,6 +12,7 @@ import type { Env } from '../types';
  */
 export async function createContext(c: Context<Env>) {
   const userId = c.get('userId');
+  await ensureUserItemsLastOpenedAt(c.env.DB);
   const db = createDb(c.env.DB);
   return { userId, db, env: c.env };
 }
