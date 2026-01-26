@@ -26,12 +26,13 @@ export async function ensureUserItemsLastOpenedAt(d1: D1Database) {
 
     if (!hasColumn) {
       await d1.prepare('ALTER TABLE user_items ADD COLUMN last_opened_at text').run();
-      await d1
-        .prepare(
-          'CREATE INDEX IF NOT EXISTS user_items_recent_opened_idx ON user_items (user_id, state, last_opened_at)'
-        )
-        .run();
     }
+
+    await d1
+      .prepare(
+        'CREATE INDEX IF NOT EXISTS user_items_recent_opened_idx ON user_items (user_id, state, last_opened_at)'
+      )
+      .run();
 
     userItemsLastOpenedAtReady = true;
   })().catch((error) => {

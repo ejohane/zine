@@ -9,7 +9,7 @@
 -- ============================================================================
 -- Users
 -- ============================================================================
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
   `id` text PRIMARY KEY NOT NULL,
   `email` text,
   `created_at` text NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE `users` (
 -- Creators (Canonical Creator Entities)
 -- ============================================================================
 -- Must be created before items and subscriptions due to foreign key references
-CREATE TABLE `creators` (
+CREATE TABLE IF NOT EXISTS `creators` (
   `id` text PRIMARY KEY NOT NULL,
   `provider` text NOT NULL,
   `provider_creator_id` text NOT NULL,
@@ -34,13 +34,13 @@ CREATE TABLE `creators` (
   `updated_at` integer NOT NULL
 );
 
-CREATE UNIQUE INDEX `idx_creators_provider_creator` ON `creators` (`provider`, `provider_creator_id`);
-CREATE INDEX `idx_creators_normalized_name` ON `creators` (`normalized_name`);
+CREATE UNIQUE INDEX IF NOT EXISTS `idx_creators_provider_creator` ON `creators` (`provider`, `provider_creator_id`);
+CREATE INDEX IF NOT EXISTS `idx_creators_normalized_name` ON `creators` (`normalized_name`);
 
 -- ============================================================================
 -- Items (Canonical Content)
 -- ============================================================================
-CREATE TABLE `items` (
+CREATE TABLE IF NOT EXISTS `items` (
   `id` text PRIMARY KEY NOT NULL,
   `content_type` text NOT NULL,
   `provider` text NOT NULL,
@@ -61,13 +61,13 @@ CREATE TABLE `items` (
   `updated_at` text NOT NULL
 );
 
-CREATE UNIQUE INDEX `items_provider_provider_id_idx` ON `items` (`provider`, `provider_id`);
-CREATE INDEX `idx_items_creator_id` ON `items` (`creator_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `items_provider_provider_id_idx` ON `items` (`provider`, `provider_id`);
+CREATE INDEX IF NOT EXISTS `idx_items_creator_id` ON `items` (`creator_id`);
 
 -- ============================================================================
 -- User Items (User's relationship to content)
 -- ============================================================================
-CREATE TABLE `user_items` (
+CREATE TABLE IF NOT EXISTS `user_items` (
   `id` text PRIMARY KEY NOT NULL,
   `user_id` text NOT NULL REFERENCES `users`(`id`),
   `item_id` text NOT NULL REFERENCES `items`(`id`),
@@ -84,14 +84,14 @@ CREATE TABLE `user_items` (
   `updated_at` text NOT NULL
 );
 
-CREATE UNIQUE INDEX `user_items_user_id_item_id_idx` ON `user_items` (`user_id`, `item_id`);
-CREATE INDEX `user_items_inbox_idx` ON `user_items` (`user_id`, `state`, `ingested_at`);
-CREATE INDEX `user_items_library_idx` ON `user_items` (`user_id`, `state`, `bookmarked_at`);
+CREATE UNIQUE INDEX IF NOT EXISTS `user_items_user_id_item_id_idx` ON `user_items` (`user_id`, `item_id`);
+CREATE INDEX IF NOT EXISTS `user_items_inbox_idx` ON `user_items` (`user_id`, `state`, `ingested_at`);
+CREATE INDEX IF NOT EXISTS `user_items_library_idx` ON `user_items` (`user_id`, `state`, `bookmarked_at`);
 
 -- ============================================================================
 -- Sources (Legacy user subscriptions - being phased out)
 -- ============================================================================
-CREATE TABLE `sources` (
+CREATE TABLE IF NOT EXISTS `sources` (
   `id` text PRIMARY KEY NOT NULL,
   `user_id` text NOT NULL REFERENCES `users`(`id`),
   `provider` text NOT NULL,
@@ -103,13 +103,13 @@ CREATE TABLE `sources` (
   `deleted_at` text
 );
 
-CREATE UNIQUE INDEX `sources_user_provider_feed_idx` ON `sources` (`user_id`, `provider`, `feed_url`);
-CREATE INDEX `sources_user_id_idx` ON `sources` (`user_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `sources_user_provider_feed_idx` ON `sources` (`user_id`, `provider`, `feed_url`);
+CREATE INDEX IF NOT EXISTS `sources_user_id_idx` ON `sources` (`user_id`);
 
 -- ============================================================================
 -- Provider Connections (OAuth tokens per provider)
 -- ============================================================================
-CREATE TABLE `provider_connections` (
+CREATE TABLE IF NOT EXISTS `provider_connections` (
   `id` text PRIMARY KEY NOT NULL,
   `user_id` text NOT NULL REFERENCES `users`(`id`),
   `provider` text NOT NULL,
@@ -123,13 +123,13 @@ CREATE TABLE `provider_connections` (
   `last_refreshed_at` integer
 );
 
-CREATE UNIQUE INDEX `provider_connections_user_provider_idx` ON `provider_connections` (`user_id`, `provider`);
-CREATE INDEX `provider_connections_status_idx` ON `provider_connections` (`status`);
+CREATE UNIQUE INDEX IF NOT EXISTS `provider_connections_user_provider_idx` ON `provider_connections` (`user_id`, `provider`);
+CREATE INDEX IF NOT EXISTS `provider_connections_status_idx` ON `provider_connections` (`status`);
 
 -- ============================================================================
 -- Subscriptions (User subscriptions to specific channels/shows)
 -- ============================================================================
-CREATE TABLE `subscriptions` (
+CREATE TABLE IF NOT EXISTS `subscriptions` (
   `id` text PRIMARY KEY NOT NULL,
   `user_id` text NOT NULL REFERENCES `users`(`id`),
   `provider` text NOT NULL,
@@ -146,15 +146,15 @@ CREATE TABLE `subscriptions` (
   `updated_at` integer NOT NULL
 );
 
-CREATE UNIQUE INDEX `subscriptions_user_provider_channel_idx` ON `subscriptions` (`user_id`, `provider`, `provider_channel_id`);
-CREATE INDEX `subscriptions_poll_idx` ON `subscriptions` (`status`, `last_polled_at`);
-CREATE INDEX `subscriptions_user_idx` ON `subscriptions` (`user_id`, `status`);
-CREATE INDEX `subscriptions_creator_idx` ON `subscriptions` (`creator_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `subscriptions_user_provider_channel_idx` ON `subscriptions` (`user_id`, `provider`, `provider_channel_id`);
+CREATE INDEX IF NOT EXISTS `subscriptions_poll_idx` ON `subscriptions` (`status`, `last_polled_at`);
+CREATE INDEX IF NOT EXISTS `subscriptions_user_idx` ON `subscriptions` (`user_id`, `status`);
+CREATE INDEX IF NOT EXISTS `subscriptions_creator_idx` ON `subscriptions` (`creator_id`);
 
 -- ============================================================================
 -- Subscription Items (Track which items came from which subscription)
 -- ============================================================================
-CREATE TABLE `subscription_items` (
+CREATE TABLE IF NOT EXISTS `subscription_items` (
   `id` text PRIMARY KEY NOT NULL,
   `subscription_id` text NOT NULL REFERENCES `subscriptions`(`id`),
   `item_id` text NOT NULL REFERENCES `items`(`id`),
@@ -163,13 +163,13 @@ CREATE TABLE `subscription_items` (
   `fetched_at` integer NOT NULL
 );
 
-CREATE UNIQUE INDEX `subscription_items_sub_provider_item_idx` ON `subscription_items` (`subscription_id`, `provider_item_id`);
-CREATE INDEX `subscription_items_item_idx` ON `subscription_items` (`item_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `subscription_items_sub_provider_item_idx` ON `subscription_items` (`subscription_id`, `provider_item_id`);
+CREATE INDEX IF NOT EXISTS `subscription_items_item_idx` ON `subscription_items` (`item_id`);
 
 -- ============================================================================
 -- Dead Letter Queue (Failed Ingestion Tracking)
 -- ============================================================================
-CREATE TABLE `dead_letter_queue` (
+CREATE TABLE IF NOT EXISTS `dead_letter_queue` (
   `id` text PRIMARY KEY NOT NULL,
   `subscription_id` text REFERENCES `subscriptions`(`id`),
   `user_id` text NOT NULL REFERENCES `users`(`id`),
@@ -185,14 +185,14 @@ CREATE TABLE `dead_letter_queue` (
   `created_at` integer NOT NULL
 );
 
-CREATE INDEX `dlq_status_idx` ON `dead_letter_queue` (`status`);
-CREATE INDEX `dlq_user_idx` ON `dead_letter_queue` (`user_id`);
-CREATE INDEX `dlq_provider_item_idx` ON `dead_letter_queue` (`provider`, `provider_id`, `user_id`);
+CREATE INDEX IF NOT EXISTS `dlq_status_idx` ON `dead_letter_queue` (`status`);
+CREATE INDEX IF NOT EXISTS `dlq_user_idx` ON `dead_letter_queue` (`user_id`);
+CREATE INDEX IF NOT EXISTS `dlq_provider_item_idx` ON `dead_letter_queue` (`provider`, `provider_id`, `user_id`);
 
 -- ============================================================================
 -- Provider Items Seen (Ingestion Idempotency)
 -- ============================================================================
-CREATE TABLE `provider_items_seen` (
+CREATE TABLE IF NOT EXISTS `provider_items_seen` (
   `id` text PRIMARY KEY NOT NULL,
   `user_id` text NOT NULL REFERENCES `users`(`id`),
   `provider` text NOT NULL,
@@ -201,4 +201,4 @@ CREATE TABLE `provider_items_seen` (
   `first_seen_at` text NOT NULL
 );
 
-CREATE UNIQUE INDEX `provider_items_seen_user_provider_item_idx` ON `provider_items_seen` (`user_id`, `provider`, `provider_item_id`);
+CREATE UNIQUE INDEX IF NOT EXISTS `provider_items_seen_user_provider_item_idx` ON `provider_items_seen` (`user_id`, `provider`, `provider_item_id`);
