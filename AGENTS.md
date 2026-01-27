@@ -35,6 +35,10 @@ Common pitfalls
 - "FILE_RESERVATION_CONFLICT": adjust patterns, wait for expiry, or use a non-exclusive reservation when appropriate.
 - Auth errors: if JWT+JWKS is enabled, include a bearer token with a `kid` that matches server JWKS; static bearer is used only when JWT is disabled.
 
+## Production logs (Cloudflare Logpull)
+
+When asked to read production logs, use the `cloudflare-logpull` skill and run the helper script at `.opencode/skill/cloudflare-logpull/logpull-logs.py`. Do not use `wrangler tail` unless explicitly requested.
+
 ## Integrating with Beads (dependency-aware task planning)
 
 Beads provides a lightweight, dependency-aware issue database and a CLI (`bd`) for selecting "ready work," setting priorities, and tracking status. It complements MCP Agent Mail's messaging, audit trail, and file-reservation signals. Project: [steveyegge/beads](https://github.com/steveyegge/beads)
