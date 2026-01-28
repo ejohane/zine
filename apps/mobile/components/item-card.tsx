@@ -11,13 +11,19 @@
  * - Provider color dots for source identification
  * - Optional action buttons (bookmark, archive)
  * - Built-in navigation to item detail
- * - Entry animations with stagger support
  */
 
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useRouter, type Href } from 'expo-router';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  type GestureResponderEvent,
+} from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { Colors, Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -85,7 +91,7 @@ export interface ItemCardProps {
   /** Whether archive mutation is pending */
   isArchiving?: boolean;
 
-  /** Animation delay index for staggered entry */
+  /** Optional list index for parent list ordering */
   index?: number;
 
   /** Custom press handler (default: navigate to detail) */
@@ -107,7 +113,6 @@ export function ItemCard({
   onArchive,
   isBookmarking = false,
   isArchiving = false,
-  index = 0,
   onPress,
   overlay = false,
 }: ItemCardProps) {
@@ -140,11 +145,11 @@ export function ItemCard({
 
     // Navigate to item detail page (route: /item/[id])
     // Type assertion needed until the route is created
-    router.push(`/item/${item.id}` as any);
+    router.push(`/item/${item.id}` as Href);
   };
 
   // Handle action button press with event stopping
-  const handleActionPress = (action: () => void) => (event: any) => {
+  const handleActionPress = (action: () => void) => (event: GestureResponderEvent) => {
     event?.stopPropagation?.();
     action();
   };
@@ -164,7 +169,7 @@ export function ItemCard({
     }
 
     return (
-      <Animated.View entering={FadeInDown.delay(index * 30).duration(200)}>
+      <Animated.View>
         <Pressable
           onPress={handlePress}
           style={({ pressed }) => [styles.compactRow, pressed && { opacity: 0.7 }]}
@@ -209,10 +214,7 @@ export function ItemCard({
 
   if (variant === 'full') {
     return (
-      <Animated.View
-        entering={FadeInDown.delay(index * 50).duration(300)}
-        style={styles.fullWrapper}
-      >
+      <Animated.View style={styles.fullWrapper}>
         <Pressable
           onPress={handlePress}
           style={({ pressed }) => [
@@ -322,7 +324,7 @@ export function ItemCard({
   // Horizontal variant (for home "Recently Bookmarked" and "Videos" sections)
   if (variant === 'horizontal') {
     return (
-      <Animated.View entering={FadeInDown.delay(index * 50).duration(300)}>
+      <Animated.View>
         <Pressable
           onPress={handlePress}
           style={({ pressed }) => [
@@ -370,7 +372,7 @@ export function ItemCard({
   // Large variant with overlay (for home "Podcasts" section with text over image)
   if (variant === 'large' && overlay) {
     return (
-      <Animated.View entering={FadeInDown.delay(index * 100).duration(400)}>
+      <Animated.View>
         <Pressable
           onPress={handlePress}
           style={({ pressed }) => [styles.largeOverlayCard, pressed && { opacity: 0.95 }]}
@@ -404,7 +406,7 @@ export function ItemCard({
 
   // Large variant (for home "Jump Back In" section)
   return (
-    <Animated.View entering={FadeInDown.delay(index * 100).duration(400)}>
+    <Animated.View>
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [

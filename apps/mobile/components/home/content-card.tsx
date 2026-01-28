@@ -35,7 +35,6 @@ export interface ContentItem {
 export interface ContentCardProps {
   item: ContentItem;
   colors: typeof Colors.light;
-  index: number;
   variant?: 'default' | 'square' | 'wide';
   onPress?: () => void;
 }
@@ -56,23 +55,13 @@ export function getContentIcon(type: LocalContentType, size = 16, color = '#fff'
   }
 }
 
-export function ContentCard({
-  item,
-  colors,
-  index,
-  variant = 'default',
-  onPress,
-}: ContentCardProps) {
+export function ContentCard({ item, colors, variant = 'default', onPress }: ContentCardProps) {
   const cardWidth = variant === 'wide' ? CARD_WIDTH * 1.3 : CARD_WIDTH;
   // Use consistent 16:10 aspect ratio for all content types
   const aspectRatio = 16 / 10;
 
   return (
-    <PressableScale
-      delay={index * 50}
-      style={[styles.contentCard, { width: cardWidth }]}
-      onPress={onPress}
-    >
+    <PressableScale style={[styles.contentCard, { width: cardWidth }]} onPress={onPress}>
       <View
         style={[
           styles.contentThumbnail,

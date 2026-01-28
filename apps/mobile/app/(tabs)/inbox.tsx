@@ -3,7 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
-import Animated, { FadeInDown, FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { InboxArrowIcon, SubscriptionsIcon } from '@/components/icons';
@@ -38,7 +38,7 @@ const REENTRY_CLEANUP_DELAY = 500;
 
 function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
   return (
-    <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.emptyState}>
+    <Animated.View style={styles.emptyState}>
       <View style={[styles.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
         <InboxArrowIcon size={48} color={colors.primary} />
       </View>
@@ -225,7 +225,7 @@ export default function InboxScreen() {
           <View style={styles.headerTextContainer}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
             {syncProgress && syncProgress.total > 0 ? (
-              <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
+              <Animated.View exiting={FadeOut.duration(200)}>
                 <Text style={[styles.headerSubtitle, { color: colors.primary }]}>
                   Syncing {syncProgress.completed}/{syncProgress.total}...
                 </Text>

@@ -53,8 +53,6 @@ const FRAME_BUDGET_MS = 1000 / TARGET_FPS; // ~16.67ms
 
 /** Animation durations configured in SwipeableInboxItem */
 const EXIT_ANIMATION_DURATION = 250;
-const REENTRY_ANIMATION_DURATION = 300;
-const REENTRY_CLEANUP_DELAY = 500;
 
 /** Swipeable configuration */
 const SWIPE_FRICTION = 2;
@@ -82,11 +80,6 @@ describe('SwipeableInboxItem Performance Configuration', () => {
       const exitFrames = (EXIT_ANIMATION_DURATION / 1000) * TARGET_FPS;
       expect(exitFrames).toBeGreaterThan(10); // Enough frames for smooth animation
       expect(exitFrames).toBeLessThan(30); // Not too long
-
-      // Reentry animation: 300ms = ~18 frames at 60 FPS
-      const reentryFrames = (REENTRY_ANIMATION_DURATION / 1000) * TARGET_FPS;
-      expect(reentryFrames).toBeGreaterThan(10);
-      expect(reentryFrames).toBeLessThan(30);
     });
   });
 
@@ -287,31 +280,10 @@ describe('SwipeableInboxItem Performance Configuration', () => {
     });
   });
 
-  describe('reentry animation performance', () => {
-    it('reentry animation duration is 300ms', () => {
-      // Per issue zine-iln: Rollback animation at 60 FPS
-      // 300ms is ~18 frames - smooth but not too long
-      expect(REENTRY_ANIMATION_DURATION).toBe(300);
-    });
-
-    it('reentry cleanup delay exceeds animation duration', () => {
-      // Per issue zine-iln: State cleanup happens after animation
-      // Prevents premature state changes that could cause jank
-      expect(REENTRY_CLEANUP_DELAY).toBeGreaterThan(REENTRY_ANIMATION_DURATION);
-    });
-
-    it('uses SlideIn animations for reentry (hardware accelerated)', () => {
-      // Per issue zine-iln: SlideInLeft/SlideInRight are transform-based
-      const reentryAnimations = ['SlideInLeft', 'SlideInRight', 'FadeIn'];
-      expect(reentryAnimations).toContain('SlideInLeft');
-      expect(reentryAnimations).toContain('SlideInRight');
-    });
-  });
-
   describe('memory management', () => {
     it('reappearingItems Map is cleaned up after animation', () => {
       // Per issue zine-iln: Prevents memory leaks from accumulated state
-      // setTimeout clears entries after REENTRY_CLEANUP_DELAY
+      // setTimeout clears entries after the rollback delay
       const hasCleanupMechanism = true;
       expect(hasCleanupMechanism).toBe(true);
     });

@@ -31,7 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { useToast } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
@@ -126,7 +126,7 @@ function LinkIcon({ size = 48, color = '#94A3B8' }: { size?: number; color?: str
 
 function EmptyState({ colors }: { colors: typeof Colors.light }) {
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.stateContainer}>
+    <Animated.View style={styles.stateContainer}>
       <LinkIcon size={48} color={colors.textTertiary} />
       <Text style={[styles.stateTitle, { color: colors.textSecondary }]}>
         Paste a link to get started
@@ -144,7 +144,7 @@ function EmptyState({ colors }: { colors: typeof Colors.light }) {
 
 function LoadingState({ colors }: { colors: typeof Colors.light }) {
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.stateContainer}>
+    <Animated.View style={styles.stateContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
       <Text style={[styles.stateTitle, { color: colors.textSecondary }]}>Fetching preview...</Text>
     </Animated.View>
@@ -165,7 +165,7 @@ function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.stateContainer}>
+    <Animated.View style={styles.stateContainer}>
       <AlertCircleIcon size={48} color={colors.error} />
       <Text style={[styles.stateTitle, { color: colors.text }]}>{"Couldn't load preview"}</Text>
       <Text style={[styles.stateMessage, { color: colors.textSecondary }]}>{message}</Text>
@@ -340,7 +340,7 @@ export default function AddLinkScreen() {
             showsVerticalScrollIndicator={false}
           >
             {/* URL Input */}
-            <Animated.View entering={FadeInDown.duration(300)} style={styles.inputSection}>
+            <Animated.View style={styles.inputSection}>
               <View
                 style={[
                   styles.inputContainer,
@@ -398,10 +398,7 @@ export default function AddLinkScreen() {
 
               {/* Invalid URL hint */}
               {hasInput && !isUrlValid && (
-                <Animated.Text
-                  entering={FadeIn.duration(200)}
-                  style={[styles.hintText, { color: colors.error }]}
-                >
+                <Animated.Text style={[styles.hintText, { color: colors.error }]}>
                   Please enter a valid URL (http:// or https://)
                 </Animated.Text>
               )}
@@ -419,7 +416,7 @@ export default function AddLinkScreen() {
                 />
               )}
               {showPreview && (
-                <Animated.View entering={FadeInDown.duration(400)}>
+                <Animated.View>
                   <LinkPreviewCard preview={preview} isLoading={isFetchingPreview} />
                 </Animated.View>
               )}

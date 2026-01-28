@@ -8,12 +8,12 @@
 import { useRouter, type Href } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useConnections } from '@/hooks/use-connections';
+import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { getStatusDisplay, type ConnectionStatus } from '@/lib/connection-status';
 
@@ -137,8 +137,12 @@ export default function SubscriptionsScreen() {
   const isLoading = connectionsLoading || subscriptionsLoading;
 
   // Get connection status for each provider
-  const youtubeConnection = connections?.find((c) => c.provider === 'YOUTUBE');
-  const spotifyConnection = connections?.find((c) => c.provider === 'SPOTIFY');
+  const youtubeConnection = connections?.find(
+    (connection: Connection) => connection.provider === 'YOUTUBE'
+  );
+  const spotifyConnection = connections?.find(
+    (connection: Connection) => connection.provider === 'SPOTIFY'
+  );
   const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
   const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
 
@@ -165,7 +169,7 @@ export default function SubscriptionsScreen() {
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+        <Animated.View>
           <ProviderCard
             provider="YOUTUBE"
             connectionStatus={youtubeStatus}
@@ -175,7 +179,7 @@ export default function SubscriptionsScreen() {
           />
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+        <Animated.View>
           <ProviderCard
             provider="SPOTIFY"
             connectionStatus={spotifyStatus}

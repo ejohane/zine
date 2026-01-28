@@ -154,6 +154,7 @@ function createMockLibraryItem(overrides: Record<string, unknown> = {}) {
     state: UserItemState.BOOKMARKED,
     ingestedAt: new Date('2024-01-01').toISOString(),
     bookmarkedAt: new Date('2024-01-02').toISOString(),
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,

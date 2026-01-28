@@ -19,8 +19,10 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter, type Href } from 'expo-router';
 import { Surface } from 'heroui-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+
+import type { Provider as SharedProvider } from '@zine/shared';
 
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -29,10 +31,6 @@ import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
 import { validateAndConvertProvider } from '@/lib/route-validation';
 import { ErrorState, LoadingState } from '@/components/list-states';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 type Provider = 'YOUTUBE' | 'SPOTIFY';
 
@@ -155,7 +153,7 @@ function ConnectionStatusCard({
   const Icon = config.icon;
 
   return (
-    <Animated.View entering={FadeInDown.duration(400)}>
+    <Animated.View>
       <View style={[styles.connectionCard, { backgroundColor: colors.card }]}>
         <View style={styles.connectionHeader}>
           <View style={[styles.connectionIcon, { backgroundColor: config.brandColor }]}>
@@ -227,7 +225,6 @@ interface ChannelItemProps {
   onRemove: () => void;
   isProcessing: boolean;
   colors: typeof Colors.dark;
-  index: number;
 }
 
 function ChannelItem({
@@ -237,10 +234,9 @@ function ChannelItem({
   onRemove,
   isProcessing,
   colors,
-  index,
 }: ChannelItemProps) {
   return (
-    <Animated.View entering={FadeInDown.delay(100 + index * 30).duration(300)}>
+    <Animated.View>
       <View style={styles.channelItem}>
         {channel.imageUrl ? (
           <Image source={{ uri: channel.imageUrl }} style={styles.channelImage} />
@@ -343,17 +339,19 @@ export default function ProviderDetailScreen() {
   } = useSubscriptions();
 
   // Get connection for this provider
-  const connection = connections?.find((c) => c.provider === provider);
+  const connection = connections?.find(
+    (connectionItem: Connection) => connectionItem.provider === provider
+  );
   const isConnected = connection?.status === 'ACTIVE';
 
   // Fetch available channels from provider
-  const discoverQuery = (trpc as any).subscriptions?.discover?.available?.useQuery(
-    { provider },
+  const discoverQuery = trpc.subscriptions.discover.available.useQuery(
+    { provider: provider as SharedProvider },
     {
       staleTime: 5 * 60 * 1000,
       enabled: providerValidation.success && isConnected,
     }
-  ) ?? { data: undefined, isLoading: false, error: null, refetch: () => {} };
+  );
 
   const disconnectMutation = useDisconnectConnection({
     onError: (error) => {
@@ -479,7 +477,7 @@ export default function ProviderDetailScreen() {
 
   // Render item
   const renderItem = useCallback(
-    ({ item, index }: { item: UnifiedChannel; index: number }) => (
+    ({ item }: { item: UnifiedChannel }) => (
       <ChannelItem
         channel={item}
         provider={provider}
@@ -487,7 +485,6 @@ export default function ProviderDetailScreen() {
         onRemove={() => handleRemove(item)}
         isProcessing={processingChannels.has(item.providerChannelId)}
         colors={colors}
-        index={index}
       />
     ),
     [provider, handleAdd, handleRemove, processingChannels, colors]
@@ -541,10 +538,7 @@ export default function ProviderDetailScreen() {
 
                 {/* Search and count */}
                 {isConnected && unifiedChannels.length > 0 && (
-                  <Animated.View
-                    entering={FadeInDown.delay(100).duration(400)}
-                    style={styles.searchSection}
-                  >
+                  <Animated.View style={styles.searchSection}>
                     <View style={styles.sectionHeader}>
                       <Text style={[styles.sectionTitle, { color: colors.text }]}>
                         {config.contentName.charAt(0).toUpperCase() + config.contentName.slice(1)}

@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, Linking, Share } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SourceBadge, TypeBadge } from '@/components/badges';
@@ -248,7 +248,7 @@ function XPostBookmarkView({
   const renderContent = () => (
     <>
       {/* Content Section */}
-      <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.contentContainer}>
+      <Animated.View style={styles.contentContainer}>
         {/* Badges Row */}
         <View style={styles.badgeRow}>
           <SourceBadge provider={item.provider as Provider} />
@@ -317,7 +317,7 @@ function XPostBookmarkView({
       </Animated.View>
 
       {/* Icon Action Row */}
-      <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
+      <Animated.View style={styles.actionRow}>
         <View style={styles.actionRowLeft}>
           <IconActionButton
             icon={bookmarkActionIcon}
@@ -344,10 +344,7 @@ function XPostBookmarkView({
       </Animated.View>
 
       {/* Tweet Content Section - Twitter-like layout */}
-      <Animated.View
-        entering={FadeInDown.delay(400).duration(400)}
-        style={xPostStyles.tweetContentSection}
-      >
+      <Animated.View style={xPostStyles.tweetContentSection}>
         <View style={xPostStyles.tweetRow}>
           {/* Avatar on the left */}
           {item.creatorImageUrl ? (
@@ -422,7 +419,7 @@ function XPostBookmarkView({
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
 
-        <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+        <Animated.View style={styles.animatedContainer}>
           <ParallaxScrollView
             headerImage={
               <Image
@@ -440,7 +437,7 @@ function XPostBookmarkView({
 
         {/* Floating Back Button */}
         <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-          <Animated.View entering={FadeIn.duration(300)}>
+          <Animated.View>
             <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
           </Animated.View>
         </View>
@@ -453,7 +450,7 @@ function XPostBookmarkView({
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
-      <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+      <Animated.View style={styles.animatedContainer}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 56 }]}
@@ -465,7 +462,7 @@ function XPostBookmarkView({
 
       {/* Floating Back Button */}
       <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Animated.View entering={FadeIn.duration(300)}>
+        <Animated.View>
           <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
         </Animated.View>
       </View>
@@ -737,7 +734,7 @@ export default function ItemDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
 
-        <Animated.View entering={FadeIn.delay(300)} style={styles.animatedContainer}>
+        <Animated.View style={styles.animatedContainer}>
           <ParallaxScrollView
             headerImage={
               <Image
@@ -750,10 +747,7 @@ export default function ItemDetailScreen() {
             headerAspectRatio={headerAspectRatio}
           >
             {/* Content */}
-            <Animated.View
-              entering={FadeInDown.delay(200).duration(400)}
-              style={styles.contentContainer}
-            >
+            <Animated.View style={styles.contentContainer}>
               {/* Badges Row */}
               <View style={styles.badgeRow}>
                 <SourceBadge provider={item.provider} />
@@ -868,7 +862,7 @@ export default function ItemDetailScreen() {
             </Animated.View>
 
             {/* Icon Action Row */}
-            <Animated.View entering={FadeInDown.delay(300).duration(400)} style={styles.actionRow}>
+            <Animated.View style={styles.actionRow}>
               <View style={styles.actionRowLeft}>
                 <IconActionButton
                   icon={bookmarkActionIcon}
@@ -905,10 +899,7 @@ export default function ItemDetailScreen() {
 
             {/* Description */}
             {item.summary && (
-              <Animated.View
-                entering={FadeInDown.delay(400).duration(400)}
-                style={styles.descriptionContainer}
-              >
+              <Animated.View style={styles.descriptionContainer}>
                 <Text style={[styles.descriptionLabel, { color: colors.text }]}>
                   {getDescriptionLabel()}
                 </Text>
@@ -925,7 +916,7 @@ export default function ItemDetailScreen() {
 
         {/* Floating Back Button */}
         <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-          <Animated.View entering={FadeIn.duration(300)}>
+          <Animated.View>
             <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
           </Animated.View>
         </View>
@@ -944,10 +935,7 @@ export default function ItemDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Content */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(400)}
-          style={styles.contentContainer}
-        >
+        <Animated.View style={styles.contentContainer}>
           {/* Badges Row */}
           <View style={styles.badgeRow}>
             <SourceBadge provider={item.provider} />
@@ -1101,7 +1089,7 @@ export default function ItemDetailScreen() {
 
       {/* Floating Back Button */}
       <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Animated.View entering={FadeIn.duration(300)}>
+        <Animated.View>
           <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
         </Animated.View>
       </View>

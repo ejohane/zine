@@ -5,7 +5,7 @@
  */
 
 import { View, Text, StyleSheet } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { BookmarkIcon, PlayIcon, SparklesIcon } from '@/components/icons';
 import type { Colors } from '@/constants/theme';
@@ -43,10 +43,7 @@ export function QuickStats({ colors, stats, isLoading = false }: QuickStatsProps
   ];
 
   return (
-    <Animated.View
-      entering={FadeInDown.delay(200).duration(400)}
-      style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}
-    >
+    <Animated.View style={[styles.container, { backgroundColor: colors.backgroundSecondary }]}>
       {displayStats.map((stat) => (
         <View key={stat.label} style={styles.statItem}>
           <View style={[styles.statIcon, { backgroundColor: colors.background }]}>{stat.icon}</View>
