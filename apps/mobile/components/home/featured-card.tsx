@@ -6,7 +6,7 @@
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { ArticleIcon, SparklesIcon } from '@/components/icons';
 import type { Colors } from '@/constants/theme';
@@ -30,7 +30,7 @@ export interface FeaturedCardProps {
 
 export function FeaturedCard({ item, colors, onPress }: FeaturedCardProps) {
   return (
-    <Animated.View entering={FadeInDown.delay(100).duration(500)}>
+    <Animated.View>
       <Pressable style={styles.featuredCard} onPress={onPress}>
         <LinearGradient
           colors={item.gradient || [colors.primary, colors.primaryDark]}

@@ -1061,14 +1061,14 @@ describe('SwipeableInboxItem Platform Abstraction Tests', () => {
     });
 
     it('layout animations work on both platforms', () => {
-      // Layout animations (entering/exiting) are cross-platform
+      // Layout animations (exiting) are cross-platform
       const layoutAnimationsSupported = true;
       expect(layoutAnimationsSupported).toBe(true);
     });
 
-    it('SlideIn/SlideOut animations are cross-platform', () => {
-      const animations = ['SlideInLeft', 'SlideInRight', 'SlideOutLeft', 'SlideOutRight'];
-      expect(animations.length).toBe(4);
+    it('SlideOut animations are cross-platform', () => {
+      const animations = ['SlideOutLeft', 'SlideOutRight'];
+      expect(animations.length).toBe(2);
     });
   });
 });

@@ -17,7 +17,7 @@
  * Performance Considerations (see zine-iln):
  * - ReanimatedSwipeable runs gesture handling on UI thread (not JS thread)
  * - All interpolations use useAnimatedStyle worklets (UI thread)
- * - Exit/entry animations use hardware-accelerated transforms (SlideOut/SlideIn)
+ * - Exit animations use hardware-accelerated transforms (SlideOut)
  * - Layout animation uses spring physics with controlled damping (no bounce)
  * - Haptics are fire-and-forget (async, non-blocking)
  * - Callbacks wrapped in useCallback to prevent re-renders
@@ -51,9 +51,6 @@ import Animated, {
   type SharedValue,
   SlideOutLeft,
   SlideOutRight,
-  FadeIn,
-  SlideInLeft,
-  SlideInRight,
   Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -74,9 +71,9 @@ type ContextMenuProps = {
 const ContextMenuFallback = ({ children }: ContextMenuProps) => <>{children}</>;
 
 // Only load native module if it's actually available
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const ContextMenuNative = isContextMenuAvailable
-  ? require('react-native-context-menu-view').default
+  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('react-native-context-menu-view').default
   : null;
 const ContextMenu: React.ComponentType<ContextMenuProps> = ContextMenuNative ?? ContextMenuFallback;
 
@@ -139,9 +136,6 @@ const SWIPE_FRICTION = 2;
 
 /** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
 const EXIT_ANIMATION_DURATION = 250;
-
-/** Re-entry animation duration in milliseconds (after rollback) */
-const REENTRY_ANIMATION_DURATION = 300;
 
 // ============================================================================
 // Action Panel Components
@@ -236,7 +230,6 @@ export function SwipeableInboxItem({
   onArchive,
   onBookmark,
   index = 0,
-  enterFrom = null,
 }: SwipeableInboxItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
@@ -390,17 +383,6 @@ export function SwipeableInboxItem({
         ? SlideOutRight.duration(EXIT_ANIMATION_DURATION)
         : undefined;
 
-  // Determine entering animation for items reappearing after rollback
-  // Item slides back in from the direction it exited (tracked by parent)
-  const enteringAnimation =
-    enterFrom === 'left'
-      ? SlideInLeft.duration(REENTRY_ANIMATION_DURATION)
-      : enterFrom === 'right'
-        ? SlideInRight.duration(REENTRY_ANIMATION_DURATION)
-        : enterFrom === 'fade'
-          ? FadeIn.duration(REENTRY_ANIMATION_DURATION)
-          : undefined;
-
   // Context menu actions - native iOS menu with system icons
   const contextMenuActions = [
     {
@@ -423,7 +405,6 @@ export function SwipeableInboxItem({
   // The exiting prop triggers Reanimated's exit animation before removal
   return (
     <Animated.View
-      entering={enteringAnimation}
       exiting={exitAnimation}
       layout={Layout.springify().damping(15).stiffness(100)}
       accessible={true}

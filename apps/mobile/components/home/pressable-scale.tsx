@@ -6,12 +6,7 @@
  */
 
 import { Pressable } from 'react-native';
-import Animated, {
-  FadeInRight,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -19,8 +14,6 @@ export interface PressableScaleProps {
   children: React.ReactNode;
   onPress?: () => void;
   style?: React.ComponentProps<typeof Pressable>['style'];
-  /** Animation delay in ms for stagger effects */
-  delay?: number;
 }
 
 /**
@@ -28,12 +21,12 @@ export interface PressableScaleProps {
  *
  * @example
  * ```tsx
- * <PressableScale onPress={handlePress} delay={100}>
+ * <PressableScale onPress={handlePress}>
  *   <Card />
  * </PressableScale>
  * ```
  */
-export function PressableScale({ children, onPress, style, delay = 0 }: PressableScaleProps) {
+export function PressableScale({ children, onPress, style }: PressableScaleProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -49,7 +42,7 @@ export function PressableScale({ children, onPress, style, delay = 0 }: Pressabl
   };
 
   return (
-    <Animated.View entering={FadeInRight.delay(delay).duration(400)}>
+    <Animated.View>
       <AnimatedPressable
         onPress={onPress}
         onPressIn={handlePressIn}

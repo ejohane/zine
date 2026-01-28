@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
-import Animated, { FadeInDown, FadeInRight } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { ContentType } from '@zine/shared';
@@ -174,10 +174,7 @@ export default function LibraryScreen() {
         </View>
 
         {/* Search Bar */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(400)}
-          style={styles.searchContainer}
-        >
+        <Animated.View style={styles.searchContainer}>
           <View
             style={[
               styles.searchBar,
@@ -197,7 +194,7 @@ export default function LibraryScreen() {
         </Animated.View>
 
         {/* Filter Chips */}
-        <Animated.View entering={FadeInRight.delay(150).duration(400)}>
+        <Animated.View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}

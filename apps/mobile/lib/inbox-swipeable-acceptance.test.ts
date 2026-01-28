@@ -609,11 +609,11 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
       expect(animatedProperties.length).toBe(2);
     });
 
-    it('exit/entry animations use hardware-accelerated transforms', () => {
-      const animations = ['SlideOutLeft', 'SlideOutRight', 'SlideInLeft', 'SlideInRight'];
+    it('exit animations use hardware-accelerated transforms', () => {
+      const animations = ['SlideOutLeft', 'SlideOutRight'];
       const usesTransform = true;
 
-      expect(animations.length).toBe(4);
+      expect(animations.length).toBe(2);
       expect(usesTransform).toBe(true);
     });
 

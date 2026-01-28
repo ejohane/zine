@@ -10,7 +10,7 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -211,7 +211,7 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <Animated.View style={styles.header}>
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
           </Animated.View>
@@ -224,7 +224,7 @@ export default function HomeScreen() {
             <>
               {/* Jump Back In - Recently Opened Bookmarks */}
               {jumpBackInItems.length >= 4 && (
-                <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+                <Animated.View>
                   <SectionHeader
                     title="Jump Back In"
                     count={jumpBackInItems.length}
@@ -245,7 +245,7 @@ export default function HomeScreen() {
 
               {/* Recently Bookmarked - Horizontal Cards */}
               {recentlyBookmarked.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+                <Animated.View>
                   <SectionHeader
                     title="Recently Bookmarked"
                     count={recentlyBookmarked.length}
@@ -266,10 +266,7 @@ export default function HomeScreen() {
 
               {/* Inbox Section - Condensed List using compact ItemCard */}
               {inboxItems.length > 0 && (
-                <Animated.View
-                  entering={FadeInDown.delay(300).duration(400)}
-                  style={styles.section}
-                >
+                <Animated.View style={styles.section}>
                   <SectionHeader
                     title="Inbox"
                     count={inboxData?.items.length ?? 0}
@@ -288,7 +285,7 @@ export default function HomeScreen() {
 
               {/* Category Collection - Large Cards with overlay */}
               {podcasts.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(400).duration(400)}>
+                <Animated.View>
                   <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
                   <FlatList
                     horizontal
@@ -304,7 +301,7 @@ export default function HomeScreen() {
               )}
 
               {/* Categories */}
-              <Animated.View entering={FadeInDown.delay(500).duration(400)} style={styles.section}>
+              <Animated.View style={styles.section}>
                 <SectionHeader title="Categories" colors={colors} />
                 <ScrollView
                   horizontal
@@ -344,7 +341,7 @@ export default function HomeScreen() {
 
               {/* Videos - Horizontal Cards */}
               {videos.length > 0 && (
-                <Animated.View entering={FadeInDown.delay(600).duration(400)}>
+                <Animated.View>
                   <SectionHeader title="Videos" count={videos.length} colors={colors} />
                   <FlatList
                     horizontal

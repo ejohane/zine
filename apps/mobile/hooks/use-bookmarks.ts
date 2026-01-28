@@ -163,6 +163,7 @@ function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
     state: UserItemState.BOOKMARKED,
     ingestedAt: now,
     bookmarkedAt: now,
+    lastOpenedAt: null,
     progress: null,
     isFinished: false,
     finishedAt: null,

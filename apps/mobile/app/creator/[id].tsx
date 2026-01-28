@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CreatorHeader, CreatorBookmarks, CreatorLatestContent } from '@/components/creator';
@@ -155,7 +155,7 @@ export default function CreatorScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen options={{ title: '', headerShown: false }} />
 
-        <Animated.View entering={FadeIn.duration(300)} style={styles.animatedContainer}>
+        <Animated.View style={styles.animatedContainer}>
           <ParallaxScrollView
             headerImage={
               <Image
@@ -170,7 +170,7 @@ export default function CreatorScreen() {
             }
             headerHeightFraction={0.35}
           >
-            <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+            <Animated.View>
               <CreatorHeader creator={creator} />
               <CreatorBookmarks creatorId={id ?? ''} />
               <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
@@ -180,7 +180,7 @@ export default function CreatorScreen() {
 
         {/* Floating Back Button */}
         <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-          <Animated.View entering={FadeIn.duration(300)}>
+          <Animated.View>
             <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
           </Animated.View>
         </View>
@@ -193,7 +193,7 @@ export default function CreatorScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
-      <Animated.View entering={FadeIn.duration(300)} style={styles.animatedContainer}>
+      <Animated.View style={styles.animatedContainer}>
         <ParallaxScrollView
           headerImage={
             <View
@@ -206,7 +206,7 @@ export default function CreatorScreen() {
           }
           headerHeightFraction={0.45}
         >
-          <Animated.View entering={FadeInDown.delay(200).duration(400)}>
+          <Animated.View>
             <CreatorHeader creator={creator} />
             <CreatorBookmarks creatorId={id ?? ''} />
             <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
@@ -216,7 +216,7 @@ export default function CreatorScreen() {
 
       {/* Floating Back Button */}
       <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Animated.View entering={FadeIn.duration(300)}>
+        <Animated.View>
           <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
         </Animated.View>
       </View>

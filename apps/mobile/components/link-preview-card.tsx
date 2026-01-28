@@ -6,7 +6,6 @@
  * duration badge (for video/audio), and "Connected" badge when source is provider_api.
  *
  * Features:
- * - FadeIn animation on mount
  * - 16:9 aspect ratio thumbnail with placeholder
  * - Content type color coding
  * - Provider color dot
@@ -19,7 +18,7 @@
 
 import { Image } from 'expo-image';
 import { View, Text, StyleSheet, Linking, type ViewStyle } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -147,7 +146,6 @@ function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200)}
       style={[styles.container, { backgroundColor: colors.card }, Shadows.md, style]}
       accessible={true}
       accessibilityLabel="Loading preview"
@@ -232,7 +230,6 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
 
   return (
     <Animated.View
-      entering={FadeIn.duration(300)}
       style={[styles.container, { backgroundColor: colors.card }, Shadows.md, style]}
       accessible={true}
       accessibilityLabel={accessibilityLabel}
