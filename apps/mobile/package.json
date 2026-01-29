@@ -1,6 +1,6 @@
 {
   "name": "@zine/mobile",
-  "main": "expo-router/entry",
+  "main": "index.js",
   "version": "1.0.0",
   "scripts": {
     "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
@@ -39,6 +39,7 @@
     "expo-linear-gradient": "^15.0.8",
     "expo-linking": "^8.0.11",
     "expo-router": "~6.0.21",
+    "expo-share-extension": "^5.0.5",
     "expo-secure-store": "^15.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",

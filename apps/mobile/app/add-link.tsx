@@ -14,7 +14,7 @@
  * @see features/subscriptions/spec.md - Manual Link Saving feature
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useToast } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
@@ -187,6 +187,7 @@ function ErrorState({
 
 export default function AddLinkScreen() {
   const router = useRouter();
+  const { url: sharedUrlParam } = useLocalSearchParams<{ url?: string | string[] }>();
   const { toast } = useToast();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -195,6 +196,25 @@ export default function AddLinkScreen() {
   const [url, setUrl] = useState('');
   const [debouncedUrl, setDebouncedUrl] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const didSetSharedUrl = useRef(false);
+
+  const sharedUrl = useMemo(() => {
+    if (!sharedUrlParam) return '';
+    const raw = Array.isArray(sharedUrlParam) ? sharedUrlParam[0] : sharedUrlParam;
+    if (!raw) return '';
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }, [sharedUrlParam]);
+
+  useEffect(() => {
+    if (didSetSharedUrl.current || !sharedUrl) return;
+    setUrl(sharedUrl);
+    setDebouncedUrl(sharedUrl.trim());
+    didSetSharedUrl.current = true;
+  }, [sharedUrl]);
 
   // Debounce URL input
   useEffect(() => {
