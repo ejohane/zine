@@ -1,4 +1,5 @@
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, type Href } from 'expo-router';
+import { Image } from 'expo-image';
 import { Surface } from 'heroui-native';
 import { useCallback, useMemo } from 'react';
 import {
@@ -17,7 +18,7 @@ import Svg, { Path } from 'react-native-svg';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useTabPrefetch } from '@/hooks/use-prefetch';
+import { usePrefetchItemDetail, useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInboxItems,
   useHomeData,
@@ -25,6 +26,7 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
+import { getContentIcon } from '@/lib/content-utils';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 // =============================================================================
@@ -103,6 +105,47 @@ function CategoryPill({
   );
 }
 
+function JumpBackInCard({ item, colors }: { item: ItemCardData; colors: typeof Colors.dark }) {
+  const router = useRouter();
+  const prefetchItemDetail = usePrefetchItemDetail();
+
+  const handlePress = () => {
+    prefetchItemDetail(item.id);
+    router.push(`/item/${item.id}` as Href);
+  };
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [
+        styles.jumpBackInCard,
+        { backgroundColor: colors.card, borderColor: colors.border },
+        pressed && { opacity: 0.75 },
+      ]}
+    >
+      <View style={styles.jumpBackInRow}>
+        <View style={[styles.jumpBackInThumbnail, { backgroundColor: colors.backgroundTertiary }]}>
+          {item.thumbnailUrl ? (
+            <Image
+              source={{ uri: item.thumbnailUrl }}
+              style={styles.jumpBackInThumbnailImage}
+              contentFit="cover"
+              transition={200}
+            />
+          ) : (
+            getContentIcon(item.contentType, 20, colors.textTertiary)
+          )}
+        </View>
+        <View style={styles.jumpBackInTitleWrap}>
+          <Text style={[styles.jumpBackInTitle, { color: colors.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 // =============================================================================
 // Main Screen
 // =============================================================================
@@ -122,7 +165,7 @@ export default function HomeScreen() {
 
   // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
-    return (homeData?.jumpBackIn ?? []).slice(0, 10).map((item) => ({
+    return (homeData?.jumpBackIn ?? []).slice(0, 6).map((item) => ({
       id: item.id,
       title: item.title,
       creator: item.publisher ?? item.creator,
@@ -223,23 +266,18 @@ export default function HomeScreen() {
           ) : (
             <>
               {/* Jump Back In - Recently Opened Bookmarks */}
-              {jumpBackInItems.length >= 4 && (
+              {jumpBackInItems.length > 0 && (
                 <Animated.View>
                   <SectionHeader
                     title="Jump Back In"
                     count={jumpBackInItems.length}
                     colors={colors}
                   />
-                  <FlatList
-                    horizontal
-                    data={jumpBackInItems}
-                    renderItem={({ item, index }) => (
-                      <ItemCard item={item} variant="horizontal" index={index} />
-                    )}
-                    keyExtractor={(item) => item.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalList}
-                  />
+                  <View style={styles.jumpBackInGrid}>
+                    {jumpBackInItems.map((item) => (
+                      <JumpBackInCard key={item.id} item={item} colors={colors} />
+                    ))}
+                  </View>
                 </Animated.View>
               )}
 
@@ -426,6 +464,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
     marginBottom: Spacing.xl,
+  },
+
+  // Jump Back In Grid
+  jumpBackInGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
+  },
+  jumpBackInCard: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    height: 72,
+    overflow: 'hidden',
+  },
+  jumpBackInRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    alignItems: 'center',
+    height: '100%',
+  },
+  jumpBackInThumbnail: {
+    width: 64,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  jumpBackInThumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  jumpBackInTitleWrap: {
+    flex: 1,
+    paddingVertical: 2,
+    paddingRight: Spacing.xs,
+    justifyContent: 'center',
+  },
+  jumpBackInTitle: {
+    ...Typography.bodySmall,
+    fontWeight: '600',
+    lineHeight: 14,
   },
 
   // Inbox Container

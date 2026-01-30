@@ -11,6 +11,9 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.zine.mobile",
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.app.zine.mobile"]
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
