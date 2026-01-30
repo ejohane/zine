@@ -2,7 +2,7 @@
  * Unified ItemCard Component
  *
  * A flexible card component that displays item content in various layouts.
- * Supports three variants: compact (library), full (inbox), and large (home featured).
+ * Supports variants for compact lists, full cards, grids, and large featured layouts.
  *
  * Features:
  * - Adaptive thumbnail aspect ratios (1:1 for podcasts, 16:9 for videos)
@@ -47,7 +47,7 @@ import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
 /**
  * Visual variant of the card
  */
-export type ItemCardVariant = 'compact' | 'full' | 'large' | 'horizontal';
+export type ItemCardVariant = 'compact' | 'full' | 'large' | 'horizontal' | 'grid';
 
 /**
  * Item data required for the card
@@ -73,7 +73,7 @@ export interface ItemCardProps {
   /** The item data to display */
   item: ItemCardData;
 
-  /** Visual variant: compact (library), full (inbox), large (home) */
+  /** Visual variant: compact (library), full (inbox), grid (home), large (home) */
   variant?: ItemCardVariant;
 
   /** Whether to show inline action buttons */
@@ -206,6 +206,46 @@ export function ItemCard({
                 {metaParts.join(' · ')}
               </Text>
             </View>
+          </View>
+        </Pressable>
+      </Animated.View>
+    );
+  }
+
+  if (variant === 'grid') {
+    return (
+      <Animated.View>
+        <Pressable
+          onPress={handlePress}
+          style={({ pressed }) => [
+            styles.gridCard,
+            { backgroundColor: colors.backgroundSecondary },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <View style={[styles.gridThumbnailContainer, { aspectRatio }]}>
+            {item.thumbnailUrl ? (
+              <Image
+                source={{ uri: item.thumbnailUrl }}
+                style={styles.gridThumbnail}
+                contentFit="cover"
+                transition={200}
+              />
+            ) : (
+              <View
+                style={[
+                  styles.gridThumbnailPlaceholder,
+                  { backgroundColor: colors.backgroundTertiary },
+                ]}
+              >
+                {getContentIcon(item.contentType, 28, colors.textTertiary)}
+              </View>
+            )}
+          </View>
+          <View style={styles.gridContent}>
+            <Text style={[styles.gridTitle, { color: colors.text }]} numberOfLines={2}>
+              {item.title}
+            </Text>
           </View>
         </Pressable>
       </Animated.View>
@@ -568,6 +608,35 @@ const styles = StyleSheet.create({
     paddingTop: 0,
     gap: Spacing.sm,
     justifyContent: 'flex-end',
+  },
+
+  // Grid variant (home "Jump Back In")
+  gridCard: {
+    borderRadius: Radius.lg,
+    overflow: 'hidden',
+    flexBasis: '48%',
+    flexGrow: 1,
+  },
+  gridThumbnailContainer: {
+    width: '100%',
+  },
+  gridThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  gridThumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gridContent: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  gridTitle: {
+    ...Typography.bodySmall,
+    fontWeight: '600',
   },
 
   // Large variant (home)
