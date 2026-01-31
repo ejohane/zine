@@ -30,9 +30,9 @@ import {
 } from '../lib/token-refresh';
 import type { Database } from '../db';
 
-// NOTE: User notifications are not yet implemented. Functions in this file
-// log messages but don't persist to database. When implementing notifications,
-// add a userNotifications table to schema and update these functions.
+// NOTE: User notifications are intentionally log-only in the worker. There is
+// no user_notifications table yet, so health polling records are not persisted.
+// See zine-jomd for adding persistence and resolution semantics.
 
 // ============================================================================
 // Types
@@ -313,9 +313,8 @@ export async function markConnectionRevoked(connectionId: string, db: Database):
  * Prevents duplicate active notifications of the same type/provider combo.
  * If an active notification exists, it won't create a new one.
  *
- * NOTE: User notifications table is not yet implemented. This is a stub
- * that logs the notification. Implement userNotifications table in schema
- * and update this function when notifications feature is built.
+ * NOTE: Notifications are log-only until persistence is implemented.
+ * See zine-jomd for the table + dedupe implementation plan.
  *
  * @param userId - User ID to notify
  * @param params - Notification parameters (type, provider, reason)
@@ -329,8 +328,7 @@ async function createUserNotification(
   const title = NOTIFICATION_TITLES[params.type];
   const message = NOTIFICATION_MESSAGES[params.type](params.provider);
 
-  // TODO: Implement userNotifications table and persist notifications
-  // For now, just log the notification
+  // Log-only until persistence exists (zine-jomd)
   healthLogger.info('NOTIFICATION created', {
     userId,
     title,
@@ -360,8 +358,7 @@ export async function resolveConnectionNotifications(
   provider: string,
   _db: Database
 ): Promise<void> {
-  // TODO: Implement userNotifications table and update notifications
-  // For now, just log the resolution
+  // Log-only until persistence exists (zine-jomd)
   healthLogger.info('Would resolve connection notifications', { userId, provider });
 }
 
@@ -467,7 +464,6 @@ export async function resolvePollFailureNotifications(
   provider: string,
   _db: Database
 ): Promise<void> {
-  // TODO: Implement userNotifications table and update notifications
-  // For now, just log the resolution
+  // Log-only until persistence exists (zine-jomd)
   healthLogger.info('Would resolve poll failure notifications', { userId, provider });
 }
