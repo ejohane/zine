@@ -643,6 +643,11 @@ GitHub build triggers are deprecated in favor of EAS Workflows:
 | **ESLint**   | Code linting    |
 | **Prettier** | Code formatting |
 
+### Build Artifact Guardrail
+
+- Pre-commit hook blocks staged build outputs in `dist/`, `build/`, `.next/`, `out/`, and `web-build/`.
+- For approved exceptions, bypass with `HUSKY=0 git commit ...` and document why.
+
 ---
 
 ## Deferred Decisions

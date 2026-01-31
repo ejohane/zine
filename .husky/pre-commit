@@ -1,7 +1,10 @@
 #!/bin/sh
 
-if git diff --cached --name-only | grep -E '^(apps/worker/dist/|apps/mobile/dist/)' >/dev/null; then
-  echo "Error: build artifacts in dist/ are not allowed. Remove them from staging."
+artifact_pattern='(^|/)(dist|build|web-build|out)/|(^|/)\.next/'
+
+if git diff --cached --name-only --diff-filter=ACM | grep -E "$artifact_pattern" >/dev/null; then
+  echo "Error: build artifacts are not allowed in commits (dist/, build/, .next/, out/, web-build/)."
+  echo "Remove them from staging or bypass with HUSKY=0 for approved exceptions."
   exit 1
 fi
 
