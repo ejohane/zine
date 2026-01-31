@@ -1,1 +1,8 @@
+#!/bin/sh
+
+if git diff --cached --name-only | grep -E '^(apps/worker/dist/|apps/mobile/dist/)' >/dev/null; then
+  echo "Error: build artifacts in dist/ are not allowed. Remove them from staging."
+  exit 1
+fi
+
 bunx lint-staged
