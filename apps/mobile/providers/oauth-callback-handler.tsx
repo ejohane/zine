@@ -157,12 +157,12 @@ export function OAuthCallbackHandler({ onSuccess, onError, children }: OAuthCall
       if (result.success) {
         onSuccess?.(params.provider);
         // Navigate to home/index on success
-        // TODO: Update to '/settings/connections' when subscriptions routes are added
+        // TODO(zine-x4x3): Update to '/settings/connections' when subscriptions routes are added
         router.replace('/');
       } else {
         onError?.(result.error || 'OAuth failed');
         // Navigate to home with error state
-        // TODO: Update to '/subscriptions/connect/error' when that route exists
+        // TODO(zine-x4x3): Update to '/subscriptions/connect/error' when that route exists
         router.replace('/');
       }
     } catch (error) {

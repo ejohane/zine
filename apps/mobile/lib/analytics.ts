@@ -172,7 +172,7 @@ class Analytics {
       );
     }
 
-    // TODO: In production, send to analytics service
+    // TODO(zine-x5ut.4.3): In production, send to analytics service
     // Example with Segment:
     // if (!isDev()) {
     //   SegmentClient.track(event, properties);
@@ -194,7 +194,7 @@ class Analytics {
       console.log(`[Analytics] Identify user | userId="${userId}"${traitsStr}`);
     }
 
-    // TODO: In production, identify to analytics service
+    // TODO(zine-x5ut.4.3): In production, identify to analytics service
     // if (!IS_DEV) {
     //   SegmentClient.identify(userId, traits);
     // }
@@ -208,7 +208,7 @@ class Analytics {
       console.log('[Analytics] Analytics reset');
     }
 
-    // TODO: In production, reset analytics service state
+    // TODO(zine-x5ut.4.3): In production, reset analytics service state
     // if (!isDev()) {
     //   SegmentClient.reset();
     // }

@@ -192,7 +192,7 @@ class Logger {
   error(msg: string, data?: Record<string, unknown>): void {
     this.log('error', msg, data);
 
-    // TODO: In production, send to error tracking service like Sentry
+    // TODO(zine-x5ut.4.4): In production, send to error tracking service like Sentry
     // if (!IS_DEV && data?.error) {
     //   Sentry.captureException(data.error);
     // }

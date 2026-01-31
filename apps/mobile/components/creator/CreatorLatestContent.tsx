@@ -183,7 +183,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
         creatorId,
         provider,
         contentCount: content.length,
-        hadCache: false, // TODO: Expose cache status from hook if needed
+        hadCache: false, // TODO(zine-gmmo): Expose cache status from hook if needed
       });
     }
   }, [isLoading, error, content.length, creatorId, provider]);
@@ -281,7 +281,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
     publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,
     url: item.externalUrl,
     itemId: item.itemId ?? null,
-    isBookmarked: false, // TODO: Cross-reference with bookmarks when needed
+    isBookmarked: false, // TODO(zine-0t8d): Cross-reference with bookmarks when needed
   }));
 
   // Success state with items

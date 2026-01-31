@@ -75,7 +75,7 @@ function SpotifyConnectContent() {
       // Invalidate connections cache so UI shows updated state immediately
       await (utils as any).subscriptions?.connections?.list?.invalidate?.();
       // On success, navigate back to subscriptions screen
-      // TODO: Navigate to /subscriptions/discover/spotify when discover screen is implemented
+      // TODO(zine-6sx8): Navigate to /subscriptions/discover/spotify when discover screen is implemented
       router.replace('/subscriptions' as never);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed';
