@@ -15,6 +15,10 @@ The canonical location for skill documentation is:
 ## Migration Plan
 
 1. Ensure each skill's full documentation lives only in `.opencode/skill/<skill-name>/SKILL.md`.
-2. Keep `.claude/skills/<skill-name>/SKILL.md` and `.github/skills/<skill-name>/SKILL.md` as short placeholders that point to the canonical file.
-3. When updating a skill, edit only the canonical file and verify any placeholders still point to it.
-4. As skills are touched, migrate any remaining full copies into `.opencode/skill/` and replace them with placeholders.
+2. Remove any duplicate copies or placeholder directories under `.claude/skills/` and `.github/skills/` once references are migrated.
+3. When updating a skill, edit only the canonical file.
+4. As skills are touched, migrate any remaining full copies into `.opencode/skill/` and remove legacy locations.
+
+## Legacy Locations
+
+Legacy skill-doc paths under `.claude/skills/` and `.github/skills/` are deprecated. Use `.opencode/skill/<skill-name>/SKILL.md` as the single source of truth.
