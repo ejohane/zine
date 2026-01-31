@@ -74,9 +74,8 @@ function SpotifyConnectContent() {
       await connectProvider('SPOTIFY');
       // Invalidate connections cache so UI shows updated state immediately
       await (utils as any).subscriptions?.connections?.list?.invalidate?.();
-      // On success, navigate back to subscriptions screen
-      // TODO(zine-6sx8): Navigate to /subscriptions/discover/spotify when discover screen is implemented
-      router.replace('/subscriptions' as never);
+      // On success, navigate to subscriptions discover screen
+      router.replace('/subscriptions/discover/spotify' as const);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connection failed';
       // Handle user cancellation gracefully

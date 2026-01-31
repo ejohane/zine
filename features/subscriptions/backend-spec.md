@@ -28,6 +28,7 @@ Before implementing the subscriptions feature, we must understand the existing d
 | `users`               | User accounts (Clerk IDs)               | FK target for all subscription tables            |
 | `items`               | Canonical content (shared across users) | Subscription items write here                    |
 | `user_items`          | User's relationship to content          | New inbox items created here                     |
+| `creators`            | Canonical creator records               | Source of name/image/description metadata        |
 | `sources`             | Legacy subscriptions (RSS, etc.)        | **NOT USED** - new `subscriptions` table instead |
 | `provider_items_seen` | Ingestion idempotency                   | **REUSED** for subscription deduplication        |
 
@@ -42,13 +43,13 @@ CREATE TABLE provider_items_seen (
   user_id TEXT NOT NULL,
   provider TEXT NOT NULL,
   provider_item_id TEXT NOT NULL,
-  source_id TEXT,                -- Will store subscription.id going forward
+  source_id TEXT,                -- Legacy FK to sources.id (NULL for subscriptions)
   first_seen_at TEXT NOT NULL,   -- ISO8601 (existing convention)
   UNIQUE(user_id, provider, provider_item_id)
 );
 ```
 
-**Migration Strategy**: No schema changes needed. The `source_id` column will store `subscriptions.id` values instead of the legacy `sources.id`.
+**Migration Strategy**: No schema changes needed. The `source_id` column remains a legacy reference to `sources.id` and is left NULL for subscriptions.
 
 #### Why Not Use the Existing `sources` Table?
 
@@ -66,6 +67,8 @@ A new `subscriptions` table better models these requirements.
 users (1) ─────┬──── (N) provider_connections
                │
                ├──── (N) subscriptions ──── (N) subscription_items
+               │                 │
+               │                 └──── (1) creators
                │
                ├──── (N) user_items ──── (N) items
                │
@@ -94,27 +97,46 @@ Stores OAuth credentials for connected providers (Spotify, YouTube).
 
 **Unique constraint**: `(user_id, provider)`
 
+#### `creators`
+
+Canonical creator records (channels/shows) normalized across providers. Subscriptions reference this table via `creator_id`.
+
+| Column                | Type        | Description                      |
+| --------------------- | ----------- | -------------------------------- |
+| `id`                  | TEXT (ULID) | Primary key                      |
+| `provider`            | TEXT        | `YOUTUBE`, `SPOTIFY`             |
+| `provider_creator_id` | TEXT        | Channel/show ID from provider    |
+| `name`                | TEXT        | Display name                     |
+| `normalized_name`     | TEXT        | Lowercase + trimmed for deduping |
+| `image_url`           | TEXT        | Thumbnail/artwork URL            |
+| `description`         | TEXT        | Creator description              |
+| `external_url`        | TEXT        | Link to channel/show on provider |
+| `handle`              | TEXT        | @handle (when available)         |
+| `created_at`          | INTEGER     | Unix ms                          |
+| `updated_at`          | INTEGER     | Unix ms                          |
+
+**Unique constraint**: `(provider, provider_creator_id)`
+
 #### `subscriptions`
 
 Represents a user's subscription to a specific channel/show.
 
-| Column                  | Type        | Description                           |
-| ----------------------- | ----------- | ------------------------------------- |
-| `id`                    | TEXT (ULID) | Primary key                           |
-| `user_id`               | TEXT        | FK to users                           |
-| `provider`              | TEXT        | `YOUTUBE`, `SPOTIFY`                  |
-| `provider_channel_id`   | TEXT        | YouTube channel ID or Spotify show ID |
-| `name`                  | TEXT        | Channel/show name                     |
-| `description`           | TEXT        | Channel/show description              |
-| `image_url`             | TEXT        | Thumbnail/artwork URL                 |
-| `external_url`          | TEXT        | Link to channel/show on provider      |
-| `total_items`           | INTEGER     | Total videos/episodes (cached)        |
-| `last_published_at`     | INTEGER     | Timestamp of newest item              |
-| `last_polled_at`        | INTEGER     | Last successful poll                  |
-| `poll_interval_seconds` | INTEGER     | Polling frequency (default: 3600)     |
-| `status`                | TEXT        | `ACTIVE`, `PAUSED`, `DISCONNECTED`    |
-| `created_at`            | INTEGER     | When user subscribed                  |
-| `updated_at`            | INTEGER     | Last update                           |
+| Column                  | Type        | Description                                        |
+| ----------------------- | ----------- | -------------------------------------------------- |
+| `id`                    | TEXT (ULID) | Primary key                                        |
+| `user_id`               | TEXT        | FK to users                                        |
+| `provider`              | TEXT        | `YOUTUBE`, `SPOTIFY`                               |
+| `provider_channel_id`   | TEXT        | YouTube channel ID or Spotify show ID              |
+| `creator_id`            | TEXT        | FK to creators (name/image via JOIN)               |
+| `total_items`           | INTEGER     | Total videos/episodes (cached)                     |
+| `last_published_at`     | INTEGER     | Timestamp of newest item                           |
+| `last_polled_at`        | INTEGER     | Last successful poll                               |
+| `poll_interval_seconds` | INTEGER     | Polling frequency (default: 3600)                  |
+| `status`                | TEXT        | `ACTIVE`, `PAUSED`, `DISCONNECTED`, `UNSUBSCRIBED` |
+| `disconnected_at`       | INTEGER     | When subscription disconnected                     |
+| `disconnected_reason`   | TEXT        | Reason for disconnection                           |
+| `created_at`            | INTEGER     | When user subscribed                               |
+| `updated_at`            | INTEGER     | Last update                                        |
 
 **Unique constraint**: `(user_id, provider, provider_channel_id)`
 
@@ -176,10 +198,10 @@ System notifications for connection health, poll failures, and other alerts.
 
 #### Format Comparison
 
-| Tables                                                                              | Format            | Example                      | Why                                            |
-| ----------------------------------------------------------------------------------- | ----------------- | ---------------------------- | ---------------------------------------------- |
-| `items`, `user_items`, `sources`, `provider_items_seen`                             | ISO8601 strings   | `"2024-01-15T10:00:00.000Z"` | Legacy format, human-readable                  |
-| `provider_connections`, `subscriptions`, `subscription_items`, `user_notifications` | Unix milliseconds | `1705312800000`              | Matches JS `Date.now()`, efficient comparisons |
+| Tables                                                                                          | Format            | Example                      | Why                                            |
+| ----------------------------------------------------------------------------------------------- | ----------------- | ---------------------------- | ---------------------------------------------- |
+| `items`, `user_items`, `sources`, `provider_items_seen`                                         | ISO8601 strings   | `"2024-01-15T10:00:00.000Z"` | Legacy format, human-readable                  |
+| `provider_connections`, `subscriptions`, `subscription_items`, `user_notifications`, `creators` | Unix milliseconds | `1705312800000`              | Matches JS `Date.now()`, efficient comparisons |
 
 #### Conversion Guidelines
 
@@ -737,7 +759,7 @@ async function ingestItem(userId, subscriptionId, rawItem, provider, db) {
       .values({ subscriptionId, itemId: item.id, providerItemId: rawItem.id });
     await tx
       .insert(providerItemsSeen)
-      .values({ userId, provider, providerItemId: rawItem.id, sourceId: subscriptionId });
+      .values({ userId, provider, providerItemId: rawItem.id, sourceId: null });
 
     return { created: true, userItemId };
   });
@@ -849,16 +871,23 @@ export const ListSubscriptionsResponse = z.object({
 
 export const SubscriptionSchema = z.object({
   id: z.string(),
+  userId: z.string(),
   provider: z.enum(['YOUTUBE', 'SPOTIFY']),
   providerChannelId: z.string(),
+  creatorId: z.string().nullable(),
   name: z.string(),
   description: z.string().nullable(),
   imageUrl: z.string().nullable(),
   externalUrl: z.string().nullable(),
-  status: z.enum(['ACTIVE', 'PAUSED', 'DISCONNECTED', 'UNSUBSCRIBED']),
+  totalItems: z.number().nullable(),
+  lastPublishedAt: z.number().nullable(),
   lastPolledAt: z.number().nullable(),
   pollIntervalSeconds: z.number(),
+  status: z.enum(['ACTIVE', 'PAUSED', 'DISCONNECTED', 'UNSUBSCRIBED']),
+  disconnectedAt: z.number().nullable(),
+  disconnectedReason: z.string().nullable(),
   createdAt: z.number(),
+  updatedAt: z.number(),
 });
 
 // subscriptions.add

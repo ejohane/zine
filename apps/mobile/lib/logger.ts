@@ -25,6 +25,8 @@
  * ```
  */
 
+import { captureError } from '@/lib/error-tracking';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -187,15 +189,18 @@ class Logger {
   /**
    * Log an error message.
    * Outputs in both development and production.
-   * In production, consider sending to error tracking service.
+   * In production, forwards to error tracking when configured.
    */
   error(msg: string, data?: Record<string, unknown>): void {
     this.log('error', msg, data);
 
-    // TODO(zine-x5ut.4.4): In production, send to error tracking service like Sentry
-    // if (!IS_DEV && data?.error) {
-    //   Sentry.captureException(data.error);
-    // }
+    const { error, ...rest } = data ?? {};
+    captureError(error ?? msg, {
+      message: msg,
+      tags: this.module ? { module: this.module } : undefined,
+      extra: rest,
+      logger: 'logger',
+    });
   }
 
   /**

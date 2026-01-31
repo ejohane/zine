@@ -20,8 +20,9 @@
  * @see /features/subscriptions/backend-spec.md - Section 6.4: Connection Health & Recovery
  */
 
-import { eq, and } from 'drizzle-orm';
-import { providerConnections, subscriptions } from '../db/schema';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { ulid } from 'ulid';
+import { providerConnections, subscriptions, userNotifications } from '../db/schema';
 import { healthLogger } from '../lib/logger';
 import {
   getValidAccessToken,
@@ -30,9 +31,7 @@ import {
 } from '../lib/token-refresh';
 import type { Database } from '../db';
 
-// NOTE: User notifications are intentionally log-only in the worker. There is
-// no user_notifications table yet, so health polling records are not persisted.
-// See zine-jomd for adding persistence and resolution semantics.
+// NOTE: User notifications persist in D1 to support dedupe and resolution.
 
 // ============================================================================
 // Types
@@ -313,22 +312,51 @@ export async function markConnectionRevoked(connectionId: string, db: Database):
  * Prevents duplicate active notifications of the same type/provider combo.
  * If an active notification exists, it won't create a new one.
  *
- * NOTE: Notifications are log-only until persistence is implemented.
- * See zine-jomd for the table + dedupe implementation plan.
- *
  * @param userId - User ID to notify
  * @param params - Notification parameters (type, provider, reason)
- * @param _db - Database instance (unused until notifications table exists)
+ * @param db - Database instance
  */
 async function createUserNotification(
   userId: string,
   params: NotificationParams,
-  _db: Database
+  db: Database
 ): Promise<void> {
   const title = NOTIFICATION_TITLES[params.type];
   const message = NOTIFICATION_MESSAGES[params.type](params.provider);
 
-  // Log-only until persistence exists (zine-jomd)
+  const existing = await db.query.userNotifications.findFirst({
+    where: and(
+      eq(userNotifications.userId, userId),
+      eq(userNotifications.type, params.type),
+      eq(userNotifications.provider, params.provider),
+      isNull(userNotifications.resolvedAt)
+    ),
+    columns: { id: true },
+  });
+
+  if (existing) {
+    healthLogger.info('NOTIFICATION deduped (active already exists)', {
+      userId,
+      type: params.type,
+      provider: params.provider,
+    });
+    return;
+  }
+
+  const now = Date.now();
+  const data = params.reason ? JSON.stringify({ reason: params.reason }) : null;
+
+  await db.insert(userNotifications).values({
+    id: ulid(),
+    userId,
+    type: params.type,
+    provider: params.provider,
+    title,
+    message,
+    data,
+    createdAt: now,
+  });
+
   healthLogger.info('NOTIFICATION created', {
     userId,
     title,
@@ -356,10 +384,23 @@ async function createUserNotification(
 export async function resolveConnectionNotifications(
   userId: string,
   provider: string,
-  _db: Database
+  db: Database
 ): Promise<void> {
-  // Log-only until persistence exists (zine-jomd)
-  healthLogger.info('Would resolve connection notifications', { userId, provider });
+  const now = Date.now();
+
+  await db
+    .update(userNotifications)
+    .set({ resolvedAt: now })
+    .where(
+      and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.provider, provider),
+        inArray(userNotifications.type, ['connection_expired', 'connection_revoked']),
+        isNull(userNotifications.resolvedAt)
+      )
+    );
+
+  healthLogger.info('Resolved connection notifications', { userId, provider });
 }
 
 // ============================================================================
@@ -462,8 +503,21 @@ export async function clearPollFailures(
 export async function resolvePollFailureNotifications(
   userId: string,
   provider: string,
-  _db: Database
+  db: Database
 ): Promise<void> {
-  // Log-only until persistence exists (zine-jomd)
-  healthLogger.info('Would resolve poll failure notifications', { userId, provider });
+  const now = Date.now();
+
+  await db
+    .update(userNotifications)
+    .set({ resolvedAt: now })
+    .where(
+      and(
+        eq(userNotifications.userId, userId),
+        eq(userNotifications.provider, provider),
+        eq(userNotifications.type, 'poll_failures'),
+        isNull(userNotifications.resolvedAt)
+      )
+    );
+
+  healthLogger.info('Resolved poll failure notifications', { userId, provider });
 }

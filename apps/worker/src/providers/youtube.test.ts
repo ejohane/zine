@@ -3,7 +3,7 @@
  *
  * Tests the YouTube Data API v3 client factory and helper functions:
  * - Client creation and authentication
- * - Channel operations (getChannelDetails, getChannelUploadsPlaylistId)
+ * - Channel operations (getChannelDetails, getUploadsPlaylistId)
  * - Video operations (fetchRecentVideos, fetchVideoDetails)
  * - User subscriptions
  * - Channel search
@@ -425,56 +425,20 @@ describe('getUploadsPlaylistId', () => {
 // ============================================================================
 
 describe('getChannelUploadsPlaylistId (deprecated)', () => {
-  it('should return uploads playlist ID via API', async () => {
+  it('should return uploads playlist ID via deterministic mapping', async () => {
     const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel();
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
 
     const result = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
 
     expect(result).toBe('UUxxxxxx');
-    expect(mockChannelsList).toHaveBeenCalledWith({
-      part: ['contentDetails'],
-      id: ['UCxxxxxx'],
-    });
+    expect(mockChannelsList).not.toHaveBeenCalled();
   });
 
-  it('should throw when channel not found', async () => {
+  it('should throw for invalid channel ID', async () => {
     const client = createMockYouTubeClient();
-    mockChannelsList.mockResolvedValue({
-      data: { items: [] },
-    });
 
-    await expect(getChannelUploadsPlaylistId(client, 'UCnonexistent')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCnonexistent'
-    );
-  });
-
-  it('should throw when uploads playlist missing', async () => {
-    const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel({
-      contentDetails: { relatedPlaylists: {} },
-    });
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
-
-    await expect(getChannelUploadsPlaylistId(client, 'UCxxxxxx')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCxxxxxx'
-    );
-  });
-
-  it('should throw when contentDetails missing', async () => {
-    const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel({ contentDetails: undefined });
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
-
-    await expect(getChannelUploadsPlaylistId(client, 'UCxxxxxx')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCxxxxxx'
+    await expect(getChannelUploadsPlaylistId(client, 'invalid123')).rejects.toThrow(
+      'Invalid YouTube channel ID: invalid123. Expected UC prefix.'
     );
   });
 });
@@ -1562,11 +1526,7 @@ describe('integration scenarios', () => {
     expect(channel?.snippet?.title).toBe('Test Channel');
 
     // Step 2: Get uploads playlist ID
-    mockChannelsList.mockResolvedValueOnce({
-      data: { items: [mockChannel] },
-    });
-
-    const playlistId = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
+    const playlistId = getUploadsPlaylistId('UCxxxxxx');
     expect(playlistId).toBe('UUxxxxxx');
 
     // Step 3: Fetch recent videos

@@ -109,6 +109,8 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
   }
   const metaLine = metaParts.join(' · ');
 
+  const showMetaRow = metaLine.length > 0 || item.isBookmarked;
+
   return (
     <Pressable
       onPress={handlePress}
@@ -135,7 +137,25 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
           {item.title}
         </Text>
-        {metaLine && <Text style={[styles.meta, { color: colors.textSecondary }]}>{metaLine}</Text>}
+        {showMetaRow && (
+          <View style={styles.metaRow}>
+            {metaLine ? (
+              <Text style={[styles.meta, { color: colors.textSecondary }]}>{metaLine}</Text>
+            ) : null}
+            {item.isBookmarked ? (
+              <View
+                style={[
+                  styles.savedBadge,
+                  { backgroundColor: colors.success, marginLeft: metaLine ? Spacing.sm : 0 },
+                ]}
+                accessibilityLabel="Saved"
+              >
+                <Ionicons name="bookmark" size={12} color="#FFFFFF" />
+                <Text style={styles.savedText}>Saved</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
 
       {/* Chevron */}
@@ -187,6 +207,24 @@ const styles = StyleSheet.create({
   meta: {
     ...Typography.bodySmall,
     marginTop: Spacing.xs,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: Spacing.xs,
+    flexWrap: 'wrap',
+  },
+  savedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.full,
+  },
+  savedText: {
+    ...Typography.labelSmall,
+    marginLeft: Spacing.xs,
+    color: '#FFFFFF',
   },
   chevronContainer: {
     paddingLeft: Spacing.sm,

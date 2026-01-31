@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 // ============================================================================
@@ -250,6 +251,34 @@ export const subscriptionItems = sqliteTable(
       table.providerItemId
     ),
     index('subscription_items_item_idx').on(table.itemId),
+  ]
+);
+
+// ============================================================================
+// User Notifications (System alerts and connection health)
+// ============================================================================
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userNotifications = sqliteTable(
+  'user_notifications',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    type: text('type').notNull(), // connection_expired | connection_revoked | poll_failures | quota_warning
+    provider: text('provider'), // YOUTUBE | SPOTIFY | null
+    title: text('title').notNull(),
+    message: text('message').notNull(),
+    data: text('data'), // JSON string for extra context
+    readAt: integer('read_at'), // Unix ms
+    resolvedAt: integer('resolved_at'), // Unix ms
+    createdAt: integer('created_at').notNull(), // Unix ms
+  },
+  (table) => [
+    uniqueIndex('user_notifications_active_unique')
+      .on(table.userId, table.type, table.provider)
+      .where(sql`${table.resolvedAt} IS NULL`),
+    index('user_notifications_inbox_idx').on(table.userId, table.resolvedAt, table.createdAt),
   ]
 );
 
