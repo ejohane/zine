@@ -36,7 +36,7 @@ This project has ios-simulator-mcp configured for visual debugging and testing.
 
 ### ios-simulator-skill
 
-Located at `~/.claude/skills/ios-simulator-skill/`, this skill provides optimized scripts for simulator automation with significant token savings.
+Documentation lives at `.opencode/skill/ios-simulator-skill/SKILL.md`. The skill is installed at `~/.claude/skills/ios-simulator-skill/` and provides optimized scripts for simulator automation with significant token savings.
 
 **Key Scripts**:
 
