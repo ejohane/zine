@@ -45,7 +45,10 @@ export interface CreatorContentItem {
   publishedAt: number | null;
   externalUrl: string;
   itemId?: string | null;
+  isBookmarked?: boolean;
 }
+
+export type LatestContentCacheStatus = 'HIT' | 'MISS';
 
 /**
  * Response from creators.fetchLatestContent
@@ -53,6 +56,7 @@ export interface CreatorContentItem {
 export interface LatestContentResponse {
   items: CreatorContentItem[];
   provider?: string;
+  cacheStatus?: LatestContentCacheStatus;
   reason?: string;
   connectUrl?: string;
 }
@@ -184,6 +188,7 @@ export function useCreatorBookmarks(creatorId: string, options?: { limit?: numbe
  * The response includes:
  * - items: Array of latest content
  * - provider: Content provider name
+ * - cacheStatus: Whether content came from cache
  * - reason: If content can't be fetched, explains why
  * - connectUrl: URL to connect account if needed
  *
@@ -237,6 +242,7 @@ export function useCreatorLatestContent(creatorId: string) {
   return {
     content: data?.items ?? [],
     provider: data?.provider,
+    cacheStatus: data?.cacheStatus,
     reason: data?.reason,
     connectUrl: data?.connectUrl,
     isLoading: contentQuery.isLoading,

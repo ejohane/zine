@@ -166,35 +166,21 @@ export function getUploadsPlaylistId(channelId: string): string {
 }
 
 /**
- * Get the uploads playlist ID for a YouTube channel via API call
+ * Get the uploads playlist ID for a YouTube channel via legacy API signature.
  *
  * @deprecated Use getUploadsPlaylistId() instead - it's deterministic and requires no API call.
- * This function is kept for backwards compatibility and edge cases where the channel ID
- * format might differ.
+ * This wrapper now avoids the deprecated API call and uses the deterministic mapping.
  *
- * YouTube API Cost: 1 quota unit
- *
- * @param client - Authenticated YouTube client
+ * @param _client - Unused (kept for backward compatibility)
  * @param channelId - YouTube channel ID (starts with UC)
  * @returns Uploads playlist ID (starts with UU)
- * @throws Error if channel not found or has no uploads playlist
+ * @throws Error if channelId doesn't start with UC
  */
 export async function getChannelUploadsPlaylistId(
-  client: YouTubeClient,
+  _client: YouTubeClient,
   channelId: string
 ): Promise<string> {
-  const response = await client.api.channels.list({
-    part: ['contentDetails'],
-    id: [channelId],
-  });
-
-  const playlist = response.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-
-  if (!playlist) {
-    throw new Error(`Could not find uploads playlist for channel ${channelId}`);
-  }
-
-  return playlist;
+  return getUploadsPlaylistId(channelId);
 }
 
 /**

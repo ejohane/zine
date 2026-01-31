@@ -66,6 +66,8 @@ export type FetchLatestContentReason =
   | 'TOKEN_EXPIRED'
   | 'RATE_LIMITED';
 
+export type LatestContentCacheStatus = 'HIT' | 'MISS';
+
 /**
  * Individual content item from latest content fetch
  */
@@ -87,6 +89,7 @@ export interface LatestContentItem {
 export interface FetchLatestContentResponse {
   items: LatestContentItem[];
   provider: string;
+  cacheStatus?: LatestContentCacheStatus;
   reason?: FetchLatestContentReason;
   connectUrl?: string;
 }
@@ -497,10 +500,12 @@ export const creatorsRouter = router({
       const cached = await ctx.env.CREATOR_CONTENT_CACHE.get<CachedLatestContent>(cacheKey, 'json');
 
       let contentItems: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[];
+      let cacheStatus: LatestContentCacheStatus | undefined;
 
       if (cached) {
         // Use cached items
         contentItems = cached.items;
+        cacheStatus = 'HIT';
       } else {
         // 6. Fetch from provider
         try {
@@ -510,6 +515,7 @@ export const creatorsRouter = router({
             connection as ProviderConnection,
             ctx.env
           );
+          cacheStatus = 'MISS';
 
           // 7. Cache the result
           await ctx.env.CREATOR_CONTENT_CACHE.put(
@@ -556,6 +562,7 @@ export const creatorsRouter = router({
       return {
         items: itemsWithBookmarkStatus,
         provider: creator.provider,
+        cacheStatus,
       };
     }),
 

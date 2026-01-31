@@ -3,7 +3,7 @@
  *
  * Tests the YouTube Data API v3 client factory and helper functions:
  * - Client creation and authentication
- * - Channel operations (getChannelDetails, getChannelUploadsPlaylistId)
+ * - Channel operations (getChannelDetails, getUploadsPlaylistId)
  * - Video operations (fetchRecentVideos, fetchVideoDetails)
  * - User subscriptions
  * - Channel search
@@ -13,12 +13,15 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { youtube_v3 } from 'googleapis';
+import { google } from 'googleapis';
 import type { YouTubeClient } from './youtube';
+import { getValidAccessToken } from '../lib/token-refresh';
+import { decrypt } from '../lib/crypto';
 import {
+  createYouTubeClient,
   getChannelDetails,
   getUploadsPlaylistId,
   getChannelUploadsPlaylistId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getYouTubeClientForConnection,
   fetchRecentVideos,
   fetchVideoDetails,
@@ -193,7 +196,6 @@ function createMockSearchResult(
   };
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function createMockEnv() {
   return {
     DB: {} as D1Database,
@@ -222,6 +224,23 @@ function createYouTubeApiError(status: number, message: string) {
 beforeEach(() => {
   // Reset all mocks before each test to clear any queued mockResolvedValueOnce calls
   vi.resetAllMocks();
+  vi.mocked(google.auth.OAuth2).mockImplementation(
+    () => mockOAuth2Client as unknown as InstanceType<typeof google.auth.OAuth2>
+  );
+  vi.mocked(google.youtube).mockImplementation(
+    () =>
+      ({
+        channels: { list: mockChannelsList },
+        playlistItems: { list: mockPlaylistItemsList },
+        videos: { list: mockVideosList },
+        subscriptions: { list: mockSubscriptionsList },
+        search: { list: mockSearchList },
+      }) as unknown as youtube_v3.Youtube
+  );
+  vi.mocked(getValidAccessToken).mockResolvedValue('valid-access-token');
+  vi.mocked(decrypt).mockImplementation((value: string) =>
+    Promise.resolve(value.replace('encrypted:', ''))
+  );
 });
 
 // ============================================================================
@@ -229,19 +248,37 @@ beforeEach(() => {
 // ============================================================================
 
 describe('createYouTubeClient', () => {
-  // Note: These tests are skipped in the Cloudflare Workers test environment
-  // because the googleapis library uses Node.js modules (child_process, fs)
-  // that aren't available in Workers. The client creation is tested indirectly
-  // through the helper function tests that use mocked clients.
+  it('should create client with OAuth2 credentials', () => {
+    const env = createMockEnv();
 
-  it.skip('should create client with OAuth2 credentials', async () => {
-    // This test would verify OAuth2 client creation, but googleapis
-    // cannot be imported in the Workers environment
+    const client = createYouTubeClient('access-token', 'refresh-token', env);
+
+    expect(google.auth.OAuth2).toHaveBeenCalledWith(
+      env.GOOGLE_CLIENT_ID,
+      env.GOOGLE_CLIENT_SECRET,
+      env.OAUTH_REDIRECT_URI
+    );
+    expect(mockOAuth2Client.setCredentials).toHaveBeenCalledWith({
+      access_token: 'access-token',
+      refresh_token: 'refresh-token',
+    });
+    expect(google.youtube).toHaveBeenCalledWith({
+      version: 'v3',
+      auth: mockOAuth2Client,
+    });
+    expect(client.api.channels.list).toBe(mockChannelsList);
   });
 
-  it.skip('should handle missing client secret (PKCE flow)', async () => {
-    // This test would verify PKCE flow handling, but googleapis
-    // cannot be imported in the Workers environment
+  it('should handle missing client secret (PKCE flow)', () => {
+    const env = { ...createMockEnv(), GOOGLE_CLIENT_SECRET: undefined };
+
+    createYouTubeClient('access-token', 'refresh-token', env);
+
+    expect(google.auth.OAuth2).toHaveBeenCalledWith(
+      env.GOOGLE_CLIENT_ID,
+      undefined,
+      env.OAUTH_REDIRECT_URI
+    );
   });
 
   it('should be tested indirectly via helper functions', () => {
@@ -265,10 +302,29 @@ describe('getYouTubeClientForConnection', () => {
   // Since createYouTubeClient can't be fully tested in Workers environment,
   // we test the token refresh flow indirectly.
 
-  it.skip('should get valid access token and create client', async () => {
-    // This test would verify token refresh and client creation,
-    // but googleapis cannot be imported in the Workers environment.
-    // The token refresh logic is tested in token-refresh.test.ts
+  it('should get valid access token and create client', async () => {
+    const env = createMockEnv();
+    const connection = {
+      accessToken: 'access-token',
+      refreshToken: 'encrypted:refresh-token',
+    } as unknown as Parameters<typeof getYouTubeClientForConnection>[0];
+
+    const client = await getYouTubeClientForConnection(connection, env);
+
+    expect(google.auth.OAuth2).toHaveBeenCalledWith(
+      env.GOOGLE_CLIENT_ID,
+      env.GOOGLE_CLIENT_SECRET,
+      env.OAUTH_REDIRECT_URI
+    );
+    expect(mockOAuth2Client.setCredentials).toHaveBeenCalledWith({
+      access_token: 'valid-access-token',
+      refresh_token: 'refresh-token',
+    });
+    expect(google.youtube).toHaveBeenCalledWith({
+      version: 'v3',
+      auth: mockOAuth2Client,
+    });
+    expect(client.api.channels.list).toBe(mockChannelsList);
   });
 
   it('should be tested via token-refresh and integration tests', () => {
@@ -369,56 +425,20 @@ describe('getUploadsPlaylistId', () => {
 // ============================================================================
 
 describe('getChannelUploadsPlaylistId (deprecated)', () => {
-  it('should return uploads playlist ID via API', async () => {
+  it('should return uploads playlist ID via deterministic mapping', async () => {
     const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel();
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
 
     const result = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
 
     expect(result).toBe('UUxxxxxx');
-    expect(mockChannelsList).toHaveBeenCalledWith({
-      part: ['contentDetails'],
-      id: ['UCxxxxxx'],
-    });
+    expect(mockChannelsList).not.toHaveBeenCalled();
   });
 
-  it('should throw when channel not found', async () => {
+  it('should throw for invalid channel ID', async () => {
     const client = createMockYouTubeClient();
-    mockChannelsList.mockResolvedValue({
-      data: { items: [] },
-    });
 
-    await expect(getChannelUploadsPlaylistId(client, 'UCnonexistent')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCnonexistent'
-    );
-  });
-
-  it('should throw when uploads playlist missing', async () => {
-    const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel({
-      contentDetails: { relatedPlaylists: {} },
-    });
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
-
-    await expect(getChannelUploadsPlaylistId(client, 'UCxxxxxx')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCxxxxxx'
-    );
-  });
-
-  it('should throw when contentDetails missing', async () => {
-    const client = createMockYouTubeClient();
-    const mockChannel = createMockChannel({ contentDetails: undefined });
-    mockChannelsList.mockResolvedValue({
-      data: { items: [mockChannel] },
-    });
-
-    await expect(getChannelUploadsPlaylistId(client, 'UCxxxxxx')).rejects.toThrow(
-      'Could not find uploads playlist for channel UCxxxxxx'
+    await expect(getChannelUploadsPlaylistId(client, 'invalid123')).rejects.toThrow(
+      'Invalid YouTube channel ID: invalid123. Expected UC prefix.'
     );
   });
 });
@@ -1506,11 +1526,7 @@ describe('integration scenarios', () => {
     expect(channel?.snippet?.title).toBe('Test Channel');
 
     // Step 2: Get uploads playlist ID
-    mockChannelsList.mockResolvedValueOnce({
-      data: { items: [mockChannel] },
-    });
-
-    const playlistId = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
+    const playlistId = getUploadsPlaylistId('UCxxxxxx');
     expect(playlistId).toBe('UUxxxxxx');
 
     // Step 3: Fetch recent videos

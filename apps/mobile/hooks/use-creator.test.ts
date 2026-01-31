@@ -137,6 +137,7 @@ function createMockContentItem(overrides: Partial<CreatorContentItem> = {}): Cre
     duration: 600,
     publishedAt: 1705276800000, // 2024-01-15T00:00:00.000Z as Unix ms
     externalUrl: 'https://youtube.com/watch?v=vid-123',
+    isBookmarked: false,
     ...overrides,
   };
 }
@@ -525,6 +526,22 @@ describe('useCreatorLatestContent', () => {
       const { result } = renderHook(() => useCreatorLatestContent('creator-123'));
 
       expect(result.current.provider).toBe('YOUTUBE');
+    });
+
+    it('returns cache status when provided', () => {
+      mockLatestContentUseQuery.mockReturnValue({
+        data: {
+          items: [],
+          cacheStatus: 'HIT',
+        },
+        isLoading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useCreatorLatestContent('creator-123'));
+
+      expect(result.current.cacheStatus).toBe('HIT');
     });
 
     it('returns reason and connectUrl when content unavailable', () => {

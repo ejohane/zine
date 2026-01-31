@@ -172,7 +172,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
 
   // Always call hook to avoid conditional hook error
   // The hook will only fetch when enabled
-  const { content, reason, connectUrl, isLoading, error } = useCreatorLatestContent(creatorId);
+  const { content, reason, connectUrl, cacheStatus, isLoading, error } =
+    useCreatorLatestContent(creatorId);
 
   // Track content loaded once
   const hasTrackedContentLoaded = useRef(false);
@@ -183,10 +184,10 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
         creatorId,
         provider,
         contentCount: content.length,
-        hadCache: false, // TODO: Expose cache status from hook if needed
+        hadCache: cacheStatus === 'HIT',
       });
     }
-  }, [isLoading, error, content.length, creatorId, provider]);
+  }, [isLoading, error, content.length, creatorId, provider, cacheStatus]);
 
   // Track connect prompt shown once
   const hasTrackedConnectPrompt = useRef(false);
@@ -281,7 +282,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
     publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,
     url: item.externalUrl,
     itemId: item.itemId ?? null,
-    isBookmarked: false, // TODO: Cross-reference with bookmarks when needed
+    isBookmarked: item.isBookmarked ?? false,
   }));
 
   // Success state with items

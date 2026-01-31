@@ -536,6 +536,15 @@ export default defineWorkersConfig({
 - Test cron-triggered ingestion flows
 - Consider snapshot testing for complex tRPC responses
 
+#### Flaky Tests Log
+
+No known flaky tests as of 2026-01-30. If a test shows instability, add a row
+with an owner and next steps, and open a follow-up Beads issue.
+
+| Test | Area | Owner | Symptoms | Next steps | Issue |
+| ---- | ---- | ----- | -------- | ---------- | ----- |
+| -    | -    | -     | -        | -          | -     |
+
 ---
 
 ## CI/CD
@@ -642,6 +651,11 @@ GitHub build triggers are deprecated in favor of EAS Workflows:
 | ------------ | --------------- |
 | **ESLint**   | Code linting    |
 | **Prettier** | Code formatting |
+
+### Build Artifact Guardrail
+
+- Pre-commit hook blocks staged build outputs in `dist/`, `build/`, `.next/`, `out/`, and `web-build/`.
+- For approved exceptions, bypass with `HUSKY=0 git commit ...` and document why.
 
 ---
 

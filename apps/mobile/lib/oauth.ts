@@ -464,9 +464,9 @@ export interface OAuthFlowResult {
  * // Called from OAuthCallbackHandler after redirect
  * const result = await completeOAuthFlow(code, state, 'YOUTUBE');
  * if (result.success) {
- *   router.replace('/subscriptions');
+ *   router.replace('/subscriptions/discover/youtube');
  * } else {
- *   showError(result.error);
+ *   router.replace('/subscriptions/connect/youtube');
  * }
  * ```
  */

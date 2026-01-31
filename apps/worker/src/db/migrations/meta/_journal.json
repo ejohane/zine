@@ -15,6 +15,13 @@
       "when": 1769282819000,
       "tag": "0001_add_user_items_last_opened_at",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1769731200000,
+      "tag": "0002_add_user_notifications",
+      "breakpoints": true
     }
   ]
 }

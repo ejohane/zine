@@ -717,22 +717,25 @@ describe('useSyncAll (async pattern)', () => {
 
   describe('app resume with active job', () => {
     // This test verifies app resume with an active job triggers polling.
-    // Skipped because the combination of:
-    // 1. setInterval-based polling started by checkActiveJob
-    // 2. async useEffect on app state change
-    // 3. @testing-library/react-hooks with fake timers
-    // causes the test to hang. The functionality is verified manually and by
-    // integration tests. See zine-edv2 epic for full async sync implementation.
-    it.skip('should resume polling for active job on app resume', async () => {
-      mockActiveJobQuery.mockResolvedValue({
-        inProgress: true,
-        jobId: 'active_job',
-        progress: {
-          total: 5,
-          completed: 3,
-          status: 'processing',
-        },
-      });
+    it('should resume polling for active job on app resume', async () => {
+      const setIntervalSpy = jest
+        .spyOn(global, 'setInterval')
+        .mockImplementation(() => 0 as unknown as ReturnType<typeof setInterval>);
+
+      mockActiveJobQuery
+        .mockResolvedValueOnce({
+          inProgress: false,
+          jobId: null,
+        })
+        .mockResolvedValueOnce({
+          inProgress: true,
+          jobId: 'active_job',
+          progress: {
+            total: 5,
+            completed: 3,
+            status: 'processing',
+          },
+        });
 
       mockStatusQuery.mockResolvedValue({
         jobId: 'active_job',
@@ -748,11 +751,18 @@ describe('useSyncAll (async pattern)', () => {
 
       const { result } = renderHook(() => useSyncAll());
 
+      await act(async () => {
+        await Promise.resolve();
+      });
+
       // Simulate app coming to foreground
       await act(async () => {
         appStateCallback?.('active');
         await Promise.resolve();
+        await Promise.resolve();
       });
+
+      setIntervalSpy.mockRestore();
 
       expect(result.current.isLoading).toBe(true);
       expect(result.current.progress).toEqual({

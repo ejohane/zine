@@ -272,6 +272,7 @@ function createMockCreatorsCaller(options: {
       return {
         items: mockContentItems,
         provider: creator.provider,
+        cacheStatus: 'MISS',
       };
     },
 
@@ -1066,8 +1067,10 @@ describe('Creators Router', () => {
       // Verify response shape
       expect(result).toHaveProperty('items');
       expect(result).toHaveProperty('provider');
+      expect(result).toHaveProperty('cacheStatus');
       expect(Array.isArray(result.items)).toBe(true);
       expect(typeof result.provider).toBe('string');
+      expect(['HIT', 'MISS']).toContain(result.cacheStatus);
 
       // Verify item shape
       const item = result.items[0];

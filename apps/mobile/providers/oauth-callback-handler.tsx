@@ -156,19 +156,15 @@ export function OAuthCallbackHandler({ onSuccess, onError, children }: OAuthCall
 
       if (result.success) {
         onSuccess?.(params.provider);
-        // Navigate to home/index on success
-        // TODO: Update to '/settings/connections' when subscriptions routes are added
-        router.replace('/');
+        router.replace(`/subscriptions/discover/${params.provider.toLowerCase()}`);
       } else {
         onError?.(result.error || 'OAuth failed');
-        // Navigate to home with error state
-        // TODO: Update to '/subscriptions/connect/error' when that route exists
-        router.replace('/');
+        router.replace(`/subscriptions/connect/${params.provider.toLowerCase()}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       onError?.(message);
-      router.replace('/');
+      router.replace(`/subscriptions/connect/${params.provider.toLowerCase()}`);
     }
   };
 

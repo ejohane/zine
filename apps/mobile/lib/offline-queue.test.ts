@@ -42,6 +42,9 @@ jest.mock('ulid', () => ({
   ulid: jest.fn(() => 'TEST_ULID_' + Math.random().toString(36).substr(2, 9)),
 }));
 
+// Ensure Clerk publishable key is set before module import
+process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'test-clerk-key';
+
 // ============================================================================
 // Test Setup
 // ============================================================================
@@ -56,6 +59,7 @@ import {
   type ErrorClassification,
 } from './offline-queue';
 import { getOfflineTRPCClient, notifyQueueProcessed } from './trpc-offline-client';
+import { getClerkInstance } from '@clerk/clerk-expo';
 
 // Helper to reset queue state between tests
 async function resetQueue(): Promise<void> {
@@ -116,6 +120,12 @@ describe('OfflineActionQueue', () => {
     (NetInfo.fetch as jest.Mock).mockResolvedValue({
       isConnected: true,
       isInternetReachable: true,
+    });
+
+    (getClerkInstance as jest.Mock).mockReturnValue({
+      session: {
+        getToken: jest.fn().mockResolvedValue('refreshed-token'),
+      },
     });
   });
 
@@ -590,11 +600,44 @@ describe('Queue Processing', () => {
     });
 
     describe('AUTH errors (401)', () => {
-      it('retries after auth refresh attempt', async () => {
+      it('refreshes auth token and retries action', async () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        // First call fails with 401, auth refresh will fail (not implemented)
+        const mockSessionGetToken = jest.fn().mockResolvedValue('refreshed-token');
+        (getClerkInstance as jest.Mock).mockReturnValue({
+          session: {
+            getToken: mockSessionGetToken,
+          },
+        });
+
+        // First call fails with 401, second succeeds after refresh
+        mockTrpcClient.sources.add.mutate
+          .mockRejectedValueOnce({
+            data: { httpStatus: 401, code: 'UNAUTHORIZED' },
+            message: 'Token expired',
+          })
+          .mockResolvedValueOnce({});
+
+        await offlineQueue.processQueue();
+
+        const savedQueue = getSavedQueue();
+        expect(savedQueue).toHaveLength(0);
+        expect(mockSessionGetToken).toHaveBeenCalled();
+        expect(notifyQueueProcessed).toHaveBeenCalled();
+      });
+
+      it('keeps action when auth refresh fails', async () => {
+        const action = createTestAction();
+        mockQueueContents([action]);
+
+        const mockSessionGetToken = jest.fn().mockRejectedValue(new Error('Refresh failed'));
+        (getClerkInstance as jest.Mock).mockReturnValue({
+          session: {
+            getToken: mockSessionGetToken,
+          },
+        });
+
         mockTrpcClient.sources.add.mutate.mockRejectedValue({
           data: { httpStatus: 401, code: 'UNAUTHORIZED' },
           message: 'Token expired',
@@ -603,9 +646,9 @@ describe('Queue Processing', () => {
         await offlineQueue.processQueue();
 
         const savedQueue = getSavedQueue();
-        // Action should still be in queue with incremented authRetryCount
         expect(savedQueue).toHaveLength(1);
         expect(savedQueue[0].authRetryCount).toBe(1);
+        expect(savedQueue[0].lastError).toBe('Refresh failed');
       });
 
       it('removes after AUTH_RETRY_LIMIT (1)', async () => {

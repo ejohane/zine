@@ -9,6 +9,11 @@ build/
 .next/
 out/
 
+# App build artifacts
+apps/worker/dist/
+apps/mobile/dist/
+apps/mobile/dist/_expo/static/
+
 # Turborepo
 .turbo/
 

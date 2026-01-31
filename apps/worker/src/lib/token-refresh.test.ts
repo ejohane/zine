@@ -344,8 +344,7 @@ describe('distributed locking behavior', () => {
     expect(mockReleaseLock).toHaveBeenCalledWith(env.OAUTH_STATE_KV, 'token:refresh:conn-123');
   });
 
-  // Skip: vi.advanceTimersByTimeAsync not compatible with Workers vitest pool
-  it.skip('should wait and read updated token when lock held by another', async () => {
+  it('should wait and read updated token when lock held by another', async () => {
     const connection = createMockConnection({
       id: 'conn-456',
       tokenExpiresAt: MOCK_NOW - 1000,
@@ -363,17 +362,13 @@ describe('distributed locking behavior', () => {
     });
     mockSelectResult.push(updatedConnection);
 
-    // Start the operation and advance timers
-    const resultPromise = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500); // LOCK_WAIT_MS is 2000ms
-    const result = await resultPromise;
+    const result = await getValidAccessToken(connection, env);
 
     expect(result).toBe('refreshed-by-other');
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  // Skip: vi.advanceTimersByTimeAsync not compatible with Workers vitest pool
-  it.skip('should throw REFRESH_IN_PROGRESS after wait if still locked and token not updated', async () => {
+  it('should throw REFRESH_IN_PROGRESS after wait if still locked and token not updated', async () => {
     const connection = createMockConnection({
       id: 'conn-789',
       tokenExpiresAt: MOCK_NOW - 1000,
@@ -391,25 +386,17 @@ describe('distributed locking behavior', () => {
     });
     mockSelectResult.push(stillExpiredConnection);
 
-    // Start the operation and advance timers
-    const resultPromise = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500);
-
-    await expect(resultPromise).rejects.toThrow(TokenRefreshError);
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
 
     // Reset mocks and test again for the error code
     mockSelectResult.length = 0;
     mockSelectResult.push(stillExpiredConnection);
-    const resultPromise2 = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500);
-
-    await expect(resultPromise2).rejects.toMatchObject({
+    await expect(getValidAccessToken(connection, env)).rejects.toMatchObject({
       code: 'REFRESH_IN_PROGRESS',
     });
   });
 
-  // Skip: vi.advanceTimersByTimeAsync not compatible with Workers vitest pool
-  it.skip('should throw REFRESH_IN_PROGRESS when connection not found after wait', async () => {
+  it('should throw REFRESH_IN_PROGRESS when connection not found after wait', async () => {
     const connection = createMockConnection({
       id: 'conn-deleted',
       tokenExpiresAt: MOCK_NOW - 1000,
@@ -422,17 +409,10 @@ describe('distributed locking behavior', () => {
     // Connection was deleted
     // mockSelectResult is empty - no connection found
 
-    // Start the operation and advance timers
-    const resultPromise = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500);
-
-    await expect(resultPromise).rejects.toThrow(TokenRefreshError);
+    await expect(getValidAccessToken(connection, env)).rejects.toThrow(TokenRefreshError);
 
     // Reset and test again for the error code
-    const resultPromise2 = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500);
-
-    await expect(resultPromise2).rejects.toMatchObject({
+    await expect(getValidAccessToken(connection, env)).rejects.toMatchObject({
       code: 'REFRESH_IN_PROGRESS',
     });
   });
@@ -891,8 +871,7 @@ describe('integration scenarios', () => {
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
-  // Skip: vi.advanceTimersByTimeAsync not compatible with Workers vitest pool
-  it.skip('should handle multiple rapid refresh requests with locking', async () => {
+  it('should handle multiple rapid refresh requests with locking', async () => {
     const connection = createMockConnection({
       tokenExpiresAt: MOCK_NOW - 1000,
     });
@@ -916,10 +895,7 @@ describe('integration scenarios', () => {
     const result1 = await getValidAccessToken(connection, env);
     expect(result1).toBe('new-access-token');
 
-    // Second request (concurrent) - advance timers for the sleep
-    const resultPromise2 = getValidAccessToken(connection, env);
-    await vi.advanceTimersByTimeAsync(2500);
-    const result2 = await resultPromise2;
+    const result2 = await getValidAccessToken(connection, env);
     expect(result2).toBe('concurrent-refreshed-token');
   });
 });
