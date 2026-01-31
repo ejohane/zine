@@ -26,6 +26,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { ulid } from 'ulid';
 import { offlineLogger } from './logger';
 import { classifyErrorLegacy, type ErrorClassification } from './error-utils';
+import { CLERK_PUBLISHABLE_KEY, tokenCache } from './auth';
 
 // Re-export for backward compatibility
 export type { ErrorClassification } from './error-utils';
@@ -456,14 +457,30 @@ class OfflineActionQueue {
    * @throws Error if auth refresh fails
    */
   private async refreshAuth(): Promise<void> {
-    // TODO: Implement token refresh when Clerk integration is complete
-    // For now, we'll import and call refreshAuthToken when available
-    // const { refreshAuthToken } = await import('./auth');
-    // await refreshAuthToken();
+    if (!CLERK_PUBLISHABLE_KEY) {
+      offlineLogger.warn('Auth refresh skipped: missing Clerk publishable key');
+      throw new Error('Auth refresh unavailable');
+    }
 
-    // Placeholder: throw to indicate refresh not available
-    offlineLogger.warn('Auth refresh not yet implemented');
-    throw new Error('Auth refresh not available');
+    const { getClerkInstance } = await import('@clerk/clerk-expo');
+    const clerk = getClerkInstance({ publishableKey: CLERK_PUBLISHABLE_KEY, tokenCache });
+    const session = clerk.session;
+
+    if (!session || typeof session.getToken !== 'function') {
+      offlineLogger.warn('Auth refresh skipped: no active Clerk session');
+      throw new Error('No active session for auth refresh');
+    }
+
+    const refreshedToken = await (
+      session as {
+        getToken: (options?: { skipCache?: boolean }) => Promise<string | null>;
+      }
+    ).getToken({ skipCache: true });
+
+    if (!refreshedToken) {
+      offlineLogger.warn('Auth refresh returned empty token');
+      throw new Error('Auth refresh returned empty token');
+    }
   }
 
   /**

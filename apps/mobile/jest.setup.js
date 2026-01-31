@@ -151,4 +151,9 @@ jest.mock('@clerk/clerk-expo', () => ({
     },
   }),
   ClerkProvider: ({ children }) => children,
+  getClerkInstance: jest.fn(() => ({
+    session: {
+      getToken: jest.fn(() => Promise.resolve('test-token')),
+    },
+  })),
 }));
