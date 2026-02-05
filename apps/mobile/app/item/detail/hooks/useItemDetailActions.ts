@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import { useCallback } from 'react';
 import { Linking, Share } from 'react-native';
 
@@ -7,6 +8,7 @@ import {
   useMarkItemOpened,
   useToggleFinished,
   useUnbookmarkItem,
+  ContentType,
   UserItemState,
 } from '@/hooks/use-items-trpc';
 import { logger } from '@/lib/logger';
@@ -25,12 +27,21 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const supported = await Linking.canOpenURL(item.canonicalUrl);
-      if (supported) {
-        await Linking.openURL(item.canonicalUrl);
-        if (item.state === UserItemState.BOOKMARKED) {
-          markOpenedMutation.mutate({ id: item.id });
+      const isArticle = item.contentType === ContentType.ARTICLE;
+
+      if (isArticle) {
+        await WebBrowser.openBrowserAsync(item.canonicalUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        });
+      } else {
+        const supported = await Linking.canOpenURL(item.canonicalUrl);
+        if (supported) {
+          await Linking.openURL(item.canonicalUrl);
         }
+      }
+
+      if (item.state === UserItemState.BOOKMARKED) {
+        markOpenedMutation.mutate({ id: item.id });
       }
     } catch (err) {
       logger.error('Failed to open URL', { error: err });
