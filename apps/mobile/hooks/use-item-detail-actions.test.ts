@@ -21,11 +21,20 @@ const mockMarkOpenedMutation = { mutate: jest.fn(), isPending: false };
 
 const mockCanOpenURL = jest.fn();
 const mockOpenURL = jest.fn();
+const mockOpenBrowserAsync = jest.fn();
 const mockShare = jest.fn();
 
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
   ImpactFeedbackStyle: { Medium: 'Medium' },
+}));
+
+jest.mock('expo-web-browser', () => ({
+  openBrowserAsync: (...args: [string, { presentationStyle: string }]) =>
+    mockOpenBrowserAsync(...args),
+  WebBrowserPresentationStyle: {
+    FULL_SCREEN: 'FULL_SCREEN',
+  },
 }));
 
 jest.mock('react-native', () => ({
@@ -45,6 +54,12 @@ jest.mock('@/lib/logger', () => ({
 }));
 
 jest.mock('@/hooks/use-items-trpc', () => ({
+  ContentType: {
+    ARTICLE: 'ARTICLE',
+    VIDEO: 'VIDEO',
+    PODCAST: 'PODCAST',
+    POST: 'POST',
+  },
   UserItemState: {
     BOOKMARKED: 'BOOKMARKED',
     INBOX: 'INBOX',
@@ -64,6 +79,7 @@ const baseItem = {
   title: 'Test Item',
   canonicalUrl: 'https://example.com/item',
   state: UserItemState.INBOX,
+  contentType: 'ARTICLE',
 } as unknown as ItemDetailItem;
 
 describe('useItemDetailActions', () => {
@@ -71,6 +87,7 @@ describe('useItemDetailActions', () => {
     jest.clearAllMocks();
     mockCanOpenURL.mockResolvedValue(true);
     mockOpenURL.mockResolvedValue(undefined);
+    mockOpenBrowserAsync.mockResolvedValue({});
     mockShare.mockResolvedValue({});
   });
 
@@ -91,8 +108,26 @@ describe('useItemDetailActions', () => {
     expect(mockToggleFinishedMutation.mutate).not.toHaveBeenCalled();
   });
 
-  it('opens links and marks opened for bookmarked items', async () => {
+  it('opens in-app browser for articles and marks opened for bookmarked items', async () => {
     const item = { ...baseItem, state: UserItemState.BOOKMARKED } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
+      presentationStyle: 'FULL_SCREEN',
+    });
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
+  });
+
+  it('opens external links for non-article content', async () => {
+    const item = {
+      ...baseItem,
+      contentType: 'VIDEO',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
 
     await act(async () => {
@@ -101,7 +136,7 @@ describe('useItemDetailActions', () => {
 
     expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
     expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
   });
 
   it('does not mark opened when item is not bookmarked', async () => {
@@ -116,7 +151,7 @@ describe('useItemDetailActions', () => {
 
   it('logs errors when link opening fails', async () => {
     const error = new Error('offline');
-    mockCanOpenURL.mockRejectedValueOnce(error);
+    mockOpenBrowserAsync.mockRejectedValueOnce(error);
     const { result } = renderHook(() => useItemDetailActions(baseItem));
 
     await act(async () => {
@@ -124,7 +159,7 @@ describe('useItemDetailActions', () => {
     });
 
     expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
-    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenBrowserAsync).toHaveBeenCalled();
   });
 
   it('shares item details', async () => {
