@@ -14,7 +14,7 @@
  */
 
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
@@ -96,6 +96,7 @@ export default function ItemDetailScreen() {
         onShare={handleShare}
         onBookmarkToggle={handleToggleBookmark}
         onComplete={handleToggleFinished}
+        onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
         onCreatorPress={
           item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
         }
@@ -146,6 +147,7 @@ export default function ItemDetailScreen() {
           isCompleteActionDisabled={viewState.isCompleteActionDisabled}
           onBookmarkToggle={handleToggleBookmark}
           onComplete={handleToggleFinished}
+          onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
           onShare={handleShare}
           onOpenLink={handleOpenLink}
           useAnimatedActions
@@ -174,6 +176,7 @@ export default function ItemDetailScreen() {
         isCompleteActionDisabled={viewState.isCompleteActionDisabled}
         onBookmarkToggle={handleToggleBookmark}
         onComplete={handleToggleFinished}
+        onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
         onShare={handleShare}
         onOpenLink={handleOpenLink}
         useAnimatedActions={false}

@@ -339,7 +339,7 @@ export const creatorsRouter = router({
         const pageResults = hasMore ? results.slice(0, limit) : results;
 
         // Transform to ItemView
-        const itemViews = pageResults.map(toItemView);
+        const itemViews = pageResults.map((row) => toItemView(row));
 
         // Generate next cursor
         let nextCursor: string | null = null;

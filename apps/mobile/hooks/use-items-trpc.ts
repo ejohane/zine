@@ -367,6 +367,13 @@ export function useItem(id: string) {
   return trpc.items.get.useQuery({ id }, { enabled: !!id });
 }
 
+/**
+ * Hook for fetching the current user's tags.
+ */
+export function useUserTags() {
+  return trpc.items.listTags.useQuery();
+}
+
 // ============================================================================
 // Mutation Hooks
 // ============================================================================
@@ -637,6 +644,22 @@ export function useMarkItemOpened() {
     onSettled: (_data, _err, { id }) => {
       utils.items.home.invalidate();
       utils.items.get.invalidate({ id });
+    },
+  });
+}
+
+/**
+ * Hook for replacing tags on a bookmarked item.
+ */
+export function useSetItemTags() {
+  const utils = trpc.useUtils();
+
+  return trpc.items.setTags.useMutation({
+    onSuccess: (_data, { id }) => {
+      utils.items.get.invalidate({ id });
+      utils.items.library.invalidate();
+      utils.items.home.invalidate();
+      utils.items.listTags.invalidate();
     },
   });
 }

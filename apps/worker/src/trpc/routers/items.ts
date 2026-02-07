@@ -1,7 +1,8 @@
 // apps/worker/src/trpc/routers/items.ts
 import { z } from 'zod';
+import { ulid } from 'ulid';
 import { TRPCError } from '@trpc/server';
-import { eq, and, desc, or, lt, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, desc, or, lt, isNotNull, sql, inArray } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
@@ -10,13 +11,19 @@ import {
   ProviderSchema,
   ContentTypeSchema,
 } from '@zine/shared';
-import { userItems, items, creators } from '../../db/schema';
+import { userItems, items, creators, tags, userItemTags } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
+import type { Database } from '../../db';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+export type ItemTag = {
+  id: string;
+  name: string;
+};
 
 /**
  * Combined view of Item + UserItem for API responses.
@@ -67,6 +74,9 @@ export type ItemView = {
   // Consumption tracking
   isFinished: boolean;
   finishedAt: string | null;
+
+  // Optional user-defined organization
+  tags: ItemTag[];
 };
 
 // ============================================================================
@@ -88,11 +98,14 @@ function normalizeNullString(value: string | null): string | null {
  * Transform a joined DB row (userItems + items + creators) into an ItemView.
  * Creator data comes from the creators table (single source of truth).
  */
-function toItemView(row: {
-  user_items: typeof userItems.$inferSelect;
-  items: typeof items.$inferSelect;
-  creators: typeof creators.$inferSelect | null;
-}): ItemView {
+function toItemView(
+  row: {
+    user_items: typeof userItems.$inferSelect;
+    items: typeof items.$inferSelect;
+    creators: typeof creators.$inferSelect | null;
+  },
+  itemTags: ItemTag[] = []
+): ItemView {
   const userItem = row.user_items;
   const item = row.items;
   const creator = row.creators;
@@ -131,7 +144,60 @@ function toItemView(row: {
         : null,
     isFinished: userItem.isFinished,
     finishedAt: userItem.finishedAt,
+    tags: itemTags,
   };
+}
+
+function normalizeTagName(value: string): string {
+  return value.trim().replace(/\s+/g, ' ');
+}
+
+function normalizeTagKey(value: string): string {
+  return normalizeTagName(value).toLowerCase();
+}
+
+async function getTagsForUserItems(
+  ctx: { db: Database; userId: string },
+  userItemIds: string[]
+): Promise<Map<string, ItemTag[]>> {
+  const map = new Map<string, ItemTag[]>();
+
+  if (userItemIds.length === 0) {
+    return map;
+  }
+
+  const rows = await ctx.db
+    .select({
+      userItemId: userItemTags.userItemId,
+      tagId: tags.id,
+      tagName: tags.name,
+    })
+    .from(userItemTags)
+    .innerJoin(tags, eq(userItemTags.tagId, tags.id))
+    .where(and(inArray(userItemTags.userItemId, userItemIds), eq(tags.userId, ctx.userId)))
+    .orderBy(desc(userItemTags.createdAt));
+
+  for (const row of rows) {
+    const existing = map.get(row.userItemId) ?? [];
+    existing.push({ id: row.tagId, name: row.tagName });
+    map.set(row.userItemId, existing);
+  }
+
+  return map;
+}
+
+async function toItemViewsWithTags(
+  ctx: { db: Database; userId: string },
+  rows: Array<{
+    user_items: typeof userItems.$inferSelect;
+    items: typeof items.$inferSelect;
+    creators: typeof creators.$inferSelect | null;
+  }>
+): Promise<ItemView[]> {
+  const userItemIds = rows.map((row) => row.user_items.id);
+  const tagsByItemId = await getTagsForUserItems(ctx, userItemIds);
+
+  return rows.map((row) => toItemView(row, tagsByItemId.get(row.user_items.id) ?? []));
 }
 
 // ============================================================================
@@ -210,7 +276,7 @@ export const itemsRouter = router({
     const pageResults = hasMore ? results.slice(0, limit) : results;
 
     // Transform to ItemView
-    const itemViews = pageResults.map(toItemView);
+    const itemViews = await toItemViewsWithTags(ctx, pageResults);
 
     // Generate next cursor
     let nextCursor: string | null = null;
@@ -285,7 +351,7 @@ export const itemsRouter = router({
     const pageResults = hasMore ? results.slice(0, limit) : results;
 
     // Transform to ItemView
-    const itemViews = pageResults.map(toItemView);
+    const itemViews = await toItemViewsWithTags(ctx, pageResults);
 
     // Generate next cursor
     let nextCursor: string | null = null;
@@ -377,13 +443,22 @@ export const itemsRouter = router({
       articlesQuery,
     ]);
 
+    const [recentBookmarksViews, jumpBackInViews, videosViews, podcastsViews, articlesViews] =
+      await Promise.all([
+        toItemViewsWithTags(ctx, recentBookmarks),
+        toItemViewsWithTags(ctx, jumpBackIn),
+        toItemViewsWithTags(ctx, videos),
+        toItemViewsWithTags(ctx, podcasts),
+        toItemViewsWithTags(ctx, articles),
+      ]);
+
     return {
-      recentBookmarks: recentBookmarks.map(toItemView),
-      jumpBackIn: jumpBackIn.map(toItemView),
+      recentBookmarks: recentBookmarksViews,
+      jumpBackIn: jumpBackInViews,
       byContentType: {
-        videos: videos.map(toItemView),
-        podcasts: podcasts.map(toItemView),
-        articles: articles.map(toItemView),
+        videos: videosViews,
+        podcasts: podcastsViews,
+        articles: articlesViews,
       },
     };
   }),
@@ -409,7 +484,166 @@ export const itemsRouter = router({
         });
       }
 
-      return toItemView(result[0]);
+      const itemViews = await toItemViewsWithTags(ctx, result);
+      return itemViews[0];
+    }),
+
+  /**
+   * List all tags for the current user.
+   * Used by the bookmark detail tagging flow.
+   */
+  listTags: protectedProcedure.query(async ({ ctx }) => {
+    const userTags = await ctx.db
+      .select({
+        id: tags.id,
+        name: tags.name,
+      })
+      .from(tags)
+      .where(eq(tags.userId, ctx.userId))
+      .orderBy(desc(tags.updatedAt), desc(tags.createdAt));
+
+    return { tags: userTags };
+  }),
+
+  /**
+   * Replace all tags on a bookmarked item.
+   * Tag names are normalized (trim + collapse spaces) and deduplicated case-insensitively.
+   */
+  setTags: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        tags: z.array(z.string().min(1).max(64)).max(20),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const nowMs = Date.now();
+      const nowIso = new Date().toISOString();
+
+      const existingItem = await ctx.db
+        .select({ id: userItems.id, state: userItems.state })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (existingItem.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      if (existingItem[0].state !== UserItemState.BOOKMARKED) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Only bookmarked items can be tagged',
+        });
+      }
+
+      const normalizedMap = new Map<string, string>();
+      for (const rawTag of input.tags) {
+        const normalizedName = normalizeTagName(rawTag);
+        const normalizedKey = normalizeTagKey(rawTag);
+
+        if (!normalizedName) {
+          continue;
+        }
+        if (normalizedName.length > 32) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Tag "${normalizedName}" exceeds 32 characters`,
+          });
+        }
+
+        if (!normalizedMap.has(normalizedKey)) {
+          normalizedMap.set(normalizedKey, normalizedName);
+        }
+      }
+
+      const desiredTags = Array.from(normalizedMap.entries()).map(([normalizedName, name]) => ({
+        normalizedName,
+        name,
+      }));
+
+      const existingTags =
+        desiredTags.length > 0
+          ? await ctx.db
+              .select({
+                id: tags.id,
+                name: tags.name,
+                normalizedName: tags.normalizedName,
+              })
+              .from(tags)
+              .where(
+                and(
+                  eq(tags.userId, ctx.userId),
+                  inArray(
+                    tags.normalizedName,
+                    desiredTags.map((tag) => tag.normalizedName)
+                  )
+                )
+              )
+          : [];
+
+      const existingTagsByNormalized = new Map(
+        existingTags.map((tag) => [tag.normalizedName, { id: tag.id, name: tag.name }])
+      );
+
+      const finalTags: ItemTag[] = [];
+
+      for (const desiredTag of desiredTags) {
+        const existingTag = existingTagsByNormalized.get(desiredTag.normalizedName);
+
+        if (existingTag) {
+          await ctx.db
+            .update(tags)
+            .set({
+              name: desiredTag.name,
+              updatedAt: nowMs,
+            })
+            .where(eq(tags.id, existingTag.id));
+
+          finalTags.push({ id: existingTag.id, name: desiredTag.name });
+          continue;
+        }
+
+        const tagId = ulid();
+        await ctx.db.insert(tags).values({
+          id: tagId,
+          userId: ctx.userId,
+          name: desiredTag.name,
+          normalizedName: desiredTag.normalizedName,
+          createdAt: nowMs,
+          updatedAt: nowMs,
+        });
+
+        finalTags.push({ id: tagId, name: desiredTag.name });
+      }
+
+      await ctx.db.delete(userItemTags).where(eq(userItemTags.userItemId, input.id));
+
+      if (finalTags.length > 0) {
+        await ctx.db.insert(userItemTags).values(
+          finalTags.map((tag) => ({
+            id: ulid(),
+            userItemId: input.id,
+            tagId: tag.id,
+            createdAt: nowMs,
+          }))
+        );
+      }
+
+      await ctx.db
+        .update(userItems)
+        .set({
+          updatedAt: nowIso,
+        })
+        .where(eq(userItems.id, input.id));
+
+      return {
+        success: true as const,
+        tags: finalTags,
+      };
     }),
 
   /**

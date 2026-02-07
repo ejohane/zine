@@ -114,6 +114,57 @@ export const userItems = sqliteTable(
 );
 
 // ============================================================================
+// Tags (User-defined collections)
+// ============================================================================
+// Stores optional user-defined tags for organizing bookmarked items.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const tags = sqliteTable(
+  'tags',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    name: text('name').notNull(), // Display name
+    normalizedName: text('normalized_name').notNull(), // Lowercase, trimmed for dedup
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
+  },
+  (table) => [
+    // Prevent duplicate tag names per user (case-insensitive via normalizedName)
+    uniqueIndex('tags_user_normalized_name_idx').on(table.userId, table.normalizedName),
+    // Fast list queries for a user's tags
+    index('tags_user_idx').on(table.userId, table.updatedAt),
+  ]
+);
+
+// ============================================================================
+// User Item Tags (Tag assignments)
+// ============================================================================
+// Join table between user_items and tags for many-to-many assignment.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userItemTags = sqliteTable(
+  'user_item_tags',
+  {
+    id: text('id').primaryKey(), // ULID
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id),
+    createdAt: integer('created_at').notNull(), // Unix ms
+  },
+  (table) => [
+    // Prevent duplicate assignment of the same tag to a user item
+    uniqueIndex('user_item_tags_unique_idx').on(table.userItemId, table.tagId),
+    // Fast lookups by item and tag
+    index('user_item_tags_user_item_idx').on(table.userItemId),
+    index('user_item_tags_tag_idx').on(table.tagId),
+  ]
+);
+
+// ============================================================================
 // Sources (User subscriptions)
 // ============================================================================
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
