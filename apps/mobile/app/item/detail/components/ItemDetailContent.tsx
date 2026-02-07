@@ -25,6 +25,7 @@ type ItemDetailContentProps = {
   isCompleteActionDisabled: boolean;
   onBookmarkToggle: () => void;
   onComplete: () => void;
+  onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
   useAnimatedDescription: boolean;
@@ -46,6 +47,7 @@ export function ItemDetailContent({
   isCompleteActionDisabled,
   onBookmarkToggle,
   onComplete,
+  onManageTags,
   onShare,
   onOpenLink,
   useAnimatedActions,
@@ -77,6 +79,7 @@ export function ItemDetailContent({
         isCompleteActionDisabled={isCompleteActionDisabled}
         onBookmarkToggle={onBookmarkToggle}
         onComplete={onComplete}
+        onManageTags={onManageTags}
         onShare={onShare}
         onOpenLink={onOpenLink}
         useAnimatedContainer={useAnimatedActions}

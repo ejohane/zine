@@ -10,7 +10,7 @@ import ParallaxScrollView from '@/components/ParallaxScrollView';
 import type { Colors } from '@/constants/theme';
 import { Spacing } from '@/constants/theme';
 import type { Provider } from '@/hooks/use-items-trpc';
-import { ContentType } from '@/hooks/use-items-trpc';
+import { ContentType, UserItemState } from '@/hooks/use-items-trpc';
 import { formatRelativeTime } from '@/lib/format';
 import { logger } from '@/lib/logger';
 
@@ -145,6 +145,7 @@ export function XPostBookmarkView({
   onShare,
   onBookmarkToggle,
   onComplete,
+  onManageTags,
   onCreatorPress,
   bookmarkActionIcon,
   bookmarkActionColor,
@@ -165,6 +166,7 @@ export function XPostBookmarkView({
     publishedAt?: string | null;
     canonicalUrl: string;
     provider: string;
+    state: UserItemState;
   };
   colors: typeof Colors.dark;
   insets: { top: number; bottom: number };
@@ -173,6 +175,7 @@ export function XPostBookmarkView({
   onShare: () => void;
   onBookmarkToggle: () => void;
   onComplete: () => void;
+  onManageTags: () => void;
   onCreatorPress?: () => void;
   bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
   bookmarkActionColor: string;
@@ -182,6 +185,8 @@ export function XPostBookmarkView({
   isCompleteActionDisabled: boolean;
   creatorData?: { handle?: string | null } | null;
 }) {
+  const canManageTags = item.state === UserItemState.BOOKMARKED;
+
   // Extract @handle from URL as fallback if creatorData.handle not available
   const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
 
@@ -278,7 +283,12 @@ export function XPostBookmarkView({
             onPress={onComplete}
             disabled={isCompleteActionDisabled}
           />
-          <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
+          <IconActionButton
+            icon="add-circle-outline"
+            color={colors.textSecondary}
+            onPress={onManageTags}
+            disabled={!canManageTags}
+          />
           <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
           <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
         </View>

@@ -53,6 +53,7 @@ function createMockItemView(overrides: Partial<ItemView> = {}): ItemView {
     finishedAt: null,
     wordCount: null,
     readingTimeMinutes: null,
+    tags: [],
   };
 
   return { ...defaults, ...overrides };
@@ -1104,6 +1105,7 @@ describe('ItemView Type', () => {
       finishedAt: null,
       wordCount: null,
       readingTimeMinutes: null,
+      tags: [],
     };
 
     expect(itemView.id).toBe('ui-001');
@@ -1141,6 +1143,7 @@ describe('ItemView Type', () => {
       finishedAt: null,
       wordCount: null,
       readingTimeMinutes: null,
+      tags: [],
     };
 
     expect(itemWithProgress.progress).not.toBeNull();

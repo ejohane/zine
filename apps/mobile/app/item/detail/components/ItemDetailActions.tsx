@@ -2,6 +2,8 @@ import type { Ionicons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { UserItemState } from '@/hooks/use-items-trpc';
+
 import { IconActionButton } from '../../item-detail-components';
 import { getFabConfig } from '../../item-detail-helpers';
 import { styles } from '../../item-detail-styles';
@@ -18,6 +20,7 @@ type ItemDetailActionsProps = {
   isCompleteActionDisabled: boolean;
   onBookmarkToggle: () => void;
   onComplete: () => void;
+  onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
   useAnimatedContainer: boolean;
@@ -34,11 +37,13 @@ export function ItemDetailActions({
   isCompleteActionDisabled,
   onBookmarkToggle,
   onComplete,
+  onManageTags,
   onShare,
   onOpenLink,
   useAnimatedContainer,
 }: ItemDetailActionsProps) {
   const fabConfig = getFabConfig(item.provider);
+  const canManageTags = item.state === UserItemState.BOOKMARKED;
   const Container = useAnimatedContainer ? Animated.View : View;
 
   return (
@@ -56,7 +61,12 @@ export function ItemDetailActions({
           onPress={onComplete}
           disabled={isCompleteActionDisabled}
         />
-        <IconActionButton icon="add-circle-outline" color={colors.textSecondary} />
+        <IconActionButton
+          icon="add-circle-outline"
+          color={colors.textSecondary}
+          onPress={onManageTags}
+          disabled={!canManageTags}
+        />
         <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
         <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
       </View>

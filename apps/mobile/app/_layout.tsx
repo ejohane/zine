@@ -55,6 +55,14 @@ export default function RootLayout() {
                       title: 'Add Link',
                     }}
                   />
+                  <Stack.Screen
+                    name="item-tags/[id]"
+                    options={{
+                      presentation: 'modal',
+                      headerShown: true,
+                      title: 'Tags',
+                    }}
+                  />
                 </Stack>
                 <StatusBar style="auto" />
               </ToastProvider>
