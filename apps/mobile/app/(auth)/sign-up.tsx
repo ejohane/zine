@@ -182,7 +182,7 @@ export default function SignUpScreen() {
               disabled={isLoading || verificationCode.length < 6}
             >
               {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.buttonPrimaryText} />
               ) : (
                 <Text style={styles.primaryButtonText}>Verify Email</Text>
               )}
@@ -263,7 +263,7 @@ export default function SignUpScreen() {
             disabled={isLoading || !email || password.length < 8}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.buttonPrimaryText} />
             ) : (
               <Text style={styles.primaryButtonText}>Create Account</Text>
             )}
@@ -377,7 +377,7 @@ function createStyles(colors: typeof Colors.light) {
       marginTop: Spacing.xs,
     },
     primaryButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.buttonPrimary,
       borderRadius: Radius.md,
       paddingVertical: Spacing.lg,
       alignItems: 'center',
@@ -389,7 +389,7 @@ function createStyles(colors: typeof Colors.light) {
     },
     primaryButtonText: {
       ...Typography.titleMedium,
-      color: '#FFFFFF',
+      color: colors.buttonPrimaryText,
     },
     secondaryButton: {
       backgroundColor: 'transparent',
