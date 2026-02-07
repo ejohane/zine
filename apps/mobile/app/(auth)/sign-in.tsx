@@ -172,7 +172,7 @@ export default function SignInScreen() {
             disabled={isLoading || !email || !password}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.buttonPrimaryText} />
             ) : (
               <Text style={styles.primaryButtonText}>Sign In</Text>
             )}
@@ -281,7 +281,7 @@ function createStyles(colors: typeof Colors.light) {
       color: colors.text,
     },
     primaryButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.buttonPrimary,
       borderRadius: Radius.md,
       paddingVertical: Spacing.lg,
       alignItems: 'center',
@@ -293,7 +293,7 @@ function createStyles(colors: typeof Colors.light) {
     },
     primaryButtonText: {
       ...Typography.titleMedium,
-      color: '#FFFFFF',
+      color: colors.buttonPrimaryText,
     },
     divider: {
       flexDirection: 'row',
