@@ -359,6 +359,89 @@ describe('link-preview', () => {
         expect(result!.source).toBe('fxtwitter');
       });
 
+      it('uses article metadata when a link-only tweet has empty text', async () => {
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '2014377766498795895',
+            url: 'https://x.com/hnshah/status/2014377766498795895',
+            text: '',
+            raw_text: {
+              text: 'https://t.co/fPb9u5OuJc',
+              facets: [],
+            },
+            created_at: 'Thu Jan 22 16:40:59 +0000 2026',
+            created_timestamp: 1769100059,
+            author: {
+              name: 'Hiten Shah',
+              screen_name: 'hnshah',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 107,
+            retweets: 17,
+            replies: 5,
+            views: 30253,
+            lang: 'en',
+            source: 'Twitter Web App',
+            article: {
+              title: 'A Codebase by an Agent for an Agent - Amp',
+              preview_text: 'A deep dive into an AI-driven codebase workflow.',
+              cover_media: {
+                media_info: {
+                  original_img_url: 'https://pbs.twimg.com/media/G_SBznlbAAYarI6.jpg',
+                },
+              },
+            },
+          },
+        });
+
+        const result = await fetchLinkPreview(
+          'https://x.com/hnshah/status/2014377766498795895?s=46'
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.title).toBe('A Codebase by an Agent for an Agent - Amp');
+        expect(result!.thumbnailUrl).toBe('https://pbs.twimg.com/media/G_SBznlbAAYarI6.jpg');
+        expect(result!.description).toBe('A deep dive into an AI-driven codebase workflow.');
+      });
+
+      it('provides a non-empty fallback title when FxTwitter text fields are empty', async () => {
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '2013316676637294890',
+            url: 'https://x.com/ian_dot_so/status/2013316676637294890',
+            text: '',
+            raw_text: {
+              text: 'https://t.co/6aIhogx6xt',
+              facets: [],
+            },
+            created_at: 'Mon Jan 19 18:24:35 +0000 2026',
+            created_timestamp: 1768847075,
+            author: {
+              name: 'Ian Tracey',
+              screen_name: 'ian_dot_so',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 28,
+            retweets: 4,
+            replies: 2,
+            views: 9252,
+            lang: 'en',
+            source: 'Twitter Web App',
+          },
+        });
+
+        const result = await fetchLinkPreview(
+          'https://x.com/ian_dot_so/status/2013316676637294890?s=46'
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.title).toBe('Post by Ian Tracey (@ian_dot_so)');
+      });
+
       it('falls back to oEmbed if FxTwitter fails', async () => {
         mockFetchFxTwitterByUrl.mockResolvedValue(null);
         mockFetchTwitterOEmbed.mockResolvedValue({

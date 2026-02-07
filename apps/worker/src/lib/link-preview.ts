@@ -444,25 +444,74 @@ async function fetchTwitterViaOEmbed(parsedLink: ParsedLink): Promise<LinkPrevie
   };
 }
 
+function isTwitterOrXUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return hostname === 'twitter.com' || hostname === 'x.com';
+  } catch {
+    return false;
+  }
+}
+
+function isTwitterShortenerUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return hostname === 't.co';
+  } catch {
+    return false;
+  }
+}
+
+function extractUrlsFromText(text: string): string[] {
+  if (!text) return [];
+  const matches = text.match(/https?:\/\/[^\s]+/gi) ?? [];
+  return matches.map((match) => match.trim());
+}
+
 /**
- * Extract the first external URL from tweet facets
+ * Extract the first external URL from tweet facets or raw text
  * Filters out Twitter/X URLs (we don't want to scrape Twitter pages)
  */
 function getFirstExternalUrl(tweet: FxTwitterTweet): string | null {
   const facets = tweet.raw_text?.facets;
-  if (!facets || facets.length === 0) return null;
 
-  for (const facet of facets) {
-    if (facet.type === 'url' && facet.replacement) {
-      // Skip Twitter/X URLs - we don't want to scrape those
-      const url = facet.replacement.toLowerCase();
-      if (!url.includes('twitter.com') && !url.includes('x.com') && !url.includes('t.co')) {
-        return facet.replacement;
+  if (facets && facets.length > 0) {
+    for (const facet of facets) {
+      if (facet.type === 'url' && facet.replacement) {
+        if (!isTwitterOrXUrl(facet.replacement) && !isTwitterShortenerUrl(facet.replacement)) {
+          return facet.replacement;
+        }
       }
     }
   }
 
+  // Some FxTwitter responses don't include facets even when a URL exists in raw_text.
+  for (const url of extractUrlsFromText(tweet.raw_text?.text ?? '')) {
+    if (!isTwitterOrXUrl(url) && !isTwitterShortenerUrl(url)) {
+      return url;
+    }
+  }
+
   return null;
+}
+
+function getTweetTitle(tweet: FxTwitterTweet, creator: string): string {
+  const textTitle = tweet.text?.trim();
+  if (textTitle) return textTitle;
+
+  const articleTitle = tweet.article?.title?.trim();
+  if (articleTitle) return articleTitle;
+
+  const articlePreview = tweet.article?.preview_text?.trim();
+  if (articlePreview) return articlePreview;
+
+  const rawText = tweet.raw_text?.text?.trim();
+  if (rawText && !/^https?:\/\/[^\s]+$/i.test(rawText)) {
+    return rawText;
+  }
+
+  // Save mutation requires a non-empty title.
+  return `Post by ${creator}`;
 }
 
 /**
@@ -488,6 +537,11 @@ async function mapFxTwitterToPreview(
   // Get thumbnail from attached media first
   let thumbnailUrl: string | null =
     tweet.media?.photos?.[0]?.url ?? tweet.media?.videos?.[0]?.thumbnail_url ?? null;
+
+  // Some link-only posts expose preview imagery on the article payload.
+  if (!thumbnailUrl) {
+    thumbnailUrl = tweet.article?.cover_media?.media_info?.original_img_url ?? null;
+  }
 
   // If no attached media, try to fetch OG image from embedded URL
   if (!thumbnailUrl && !hasAttachedMedia) {
@@ -525,6 +579,7 @@ async function mapFxTwitterToPreview(
 
   // Format creator as "Display Name (@handle)"
   const creator = `${tweet.author.name} (@${tweet.author.screen_name})`;
+  const title = getTweetTitle(tweet, creator);
 
   // Convert Unix timestamp to ISO8601
   const publishedAt = new Date(tweet.created_timestamp * 1000).toISOString();
@@ -536,13 +591,13 @@ async function mapFxTwitterToPreview(
     provider: parsedLink.provider,
     contentType: parsedLink.contentType,
     providerId: tweet.id,
-    title: tweet.text,
+    title,
     creator,
     creatorImageUrl: tweet.author.avatar_url,
     thumbnailUrl,
     duration,
     canonicalUrl: tweet.url,
-    description: undefined,
+    description: tweet.article?.preview_text ?? undefined,
     source: 'fxtwitter',
     publishedAt,
     rawMetadata: JSON.stringify(response),
