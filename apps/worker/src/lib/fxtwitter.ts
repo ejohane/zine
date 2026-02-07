@@ -142,6 +142,24 @@ export interface FxTwitterRawText {
 }
 
 /**
+ * Article cover image metadata
+ */
+export interface FxTwitterArticleCoverMedia {
+  media_info?: {
+    original_img_url?: string;
+  };
+}
+
+/**
+ * Long-form article metadata embedded in a tweet
+ */
+export interface FxTwitterArticle {
+  title?: string;
+  preview_text?: string;
+  cover_media?: FxTwitterArticleCoverMedia;
+}
+
+/**
  * Full tweet data from FxTwitter
  */
 export interface FxTwitterTweet {
@@ -177,6 +195,10 @@ export interface FxTwitterTweet {
   poll?: FxTwitterPoll;
   /** Quoted tweet (optional) */
   quote?: FxTwitterTweet;
+  /** Long-form article metadata (optional) */
+  article?: FxTwitterArticle;
+  /** Card metadata from X (shape varies by card type) */
+  twitter_card?: unknown;
 }
 
 /**
