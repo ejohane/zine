@@ -280,6 +280,7 @@ function getProviderConfig(
 ): { tokenUrl: string; clientId: string; clientSecret?: string } {
   switch (provider) {
     case 'YOUTUBE':
+    case 'GMAIL':
       return {
         tokenUrl: 'https://oauth2.googleapis.com/token',
         clientId: env.GOOGLE_CLIENT_ID,

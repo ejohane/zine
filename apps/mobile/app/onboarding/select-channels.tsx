@@ -26,7 +26,7 @@ import { showSuccess, showError } from '@/lib/toast-utils';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions, type SubscribePayload } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
-import { validateAndConvertProvider } from '@/lib/route-validation';
+import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import {
   ChannelSelectionList,
   ChannelSelectionActionBar,
@@ -93,7 +93,7 @@ export default function SelectChannelsScreen() {
   const params = useLocalSearchParams<{ provider: string }>();
 
   // Validate and normalize provider to uppercase
-  const providerValidation = validateAndConvertProvider(params.provider);
+  const providerValidation = validateAndConvertDiscoverProvider(params.provider);
 
   // Use validated provider or default to YOUTUBE for hook consistency
   // (hooks must be called unconditionally)

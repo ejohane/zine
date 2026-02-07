@@ -54,6 +54,8 @@ import {
 } from '../../sync/service';
 import { getDLQSummary, getDLQEntries, deleteDLQEntry } from '../../sync/dlq-consumer';
 
+const SubscriptionProviderSchema = z.enum([Provider.YOUTUBE, Provider.SPOTIFY]);
+
 // ============================================================================
 // Zod Schemas
 // ============================================================================
@@ -72,7 +74,7 @@ const ListSubscriptionsInputSchema = z.object({
  * Input schema for adding a subscription
  */
 const AddSubscriptionInputSchema = z.object({
-  provider: ProviderSchema,
+  provider: SubscriptionProviderSchema,
   providerChannelId: z.string().min(1),
   name: z.string().optional(),
   imageUrl: z.string().url().optional(),
@@ -103,14 +105,14 @@ const SyncNowInputSchema = z.object({
  * Input schema for discovering available subscriptions from provider
  */
 const DiscoverAvailableInputSchema = z.object({
-  provider: ProviderSchema,
+  provider: SubscriptionProviderSchema,
 });
 
 /**
  * Input schema for searching channels/shows on a provider
  */
 const SearchInputSchema = z.object({
-  provider: ProviderSchema,
+  provider: SubscriptionProviderSchema,
   query: z.string().min(2).max(100),
   limit: z.number().min(1).max(20).default(10),
 });

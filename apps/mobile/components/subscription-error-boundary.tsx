@@ -64,7 +64,7 @@ function isAuthError(error: Error | null): boolean {
 }
 
 interface SubscriptionErrorFallbackProps {
-  provider?: 'YOUTUBE' | 'SPOTIFY';
+  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   onRetry?: () => void;
 }
 
@@ -81,6 +81,8 @@ function SubscriptionErrorFallback({ provider, onRetry }: SubscriptionErrorFallb
     // Navigate to provider connect screen
     if (provider === 'SPOTIFY') {
       router.push('/subscriptions/connect/spotify');
+    } else if (provider === 'GMAIL') {
+      router.push('/subscriptions/connect/gmail');
     } else {
       router.push('/subscriptions/connect/youtube');
     }
@@ -128,7 +130,7 @@ interface SubscriptionErrorBoundaryProps {
   /** Subscription ID for logging and reset key */
   subscriptionId?: string;
   /** Provider type for reconnection navigation */
-  provider?: 'YOUTUBE' | 'SPOTIFY';
+  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   /** Callback when retry is clicked */
   onRetry?: () => void;
 }

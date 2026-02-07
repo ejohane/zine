@@ -100,6 +100,7 @@ export default function SettingsScreen() {
   // Extract connection status
   const youtubeConnection = connections?.find((c: Connection) => c.provider === 'YOUTUBE');
   const spotifyConnection = connections?.find((c: Connection) => c.provider === 'SPOTIFY');
+  const gmailConnection = connections?.find((c: Connection) => c.provider === 'GMAIL');
 
   // Get subscription count from items array
   const activeSubscriptionCount = subscriptionsData?.items?.length ?? 0;
@@ -169,6 +170,22 @@ export default function SettingsScreen() {
             }
             onPress={() =>
               router.push({ pathname: '/settings/connections', params: { provider: 'spotify' } })
+            }
+          />
+
+          {/* Gmail */}
+          <SettingsRow
+            icon="📬"
+            title="Gmail"
+            subtitle={
+              gmailConnection?.status === 'ACTIVE'
+                ? gmailConnection.providerUserId || 'Connected'
+                : 'Not connected'
+            }
+            rightText={gmailConnection?.status === 'ACTIVE' ? 'Connected' : 'Add'}
+            rightTextColor={gmailConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary}
+            onPress={() =>
+              router.push({ pathname: '/settings/connections', params: { provider: 'gmail' } })
             }
           />
         </View>

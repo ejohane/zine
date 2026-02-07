@@ -92,6 +92,12 @@ function ProviderCard({
       color: ProviderColors.spotify,
       description: 'Import podcasts from your Spotify account',
     },
+    GMAIL: {
+      icon: '📬',
+      name: 'Gmail',
+      color: '#1A73E8',
+      description: 'Import newsletters from your Gmail inbox',
+    },
   };
 
   const config = providerConfig[provider];
@@ -206,6 +212,7 @@ export default function ConnectionsScreen() {
   // Get individual provider connections
   const youtubeConnection = connections?.find((c: Connection) => c.provider === 'YOUTUBE');
   const spotifyConnection = connections?.find((c: Connection) => c.provider === 'SPOTIFY');
+  const gmailConnection = connections?.find((c: Connection) => c.provider === 'GMAIL');
 
   // Navigation handlers
   const handleConnectYouTube = useCallback(() => {
@@ -214,6 +221,10 @@ export default function ConnectionsScreen() {
 
   const handleConnectSpotify = useCallback(() => {
     router.push('/subscriptions/connect/spotify' as Href);
+  }, [router]);
+
+  const handleConnectGmail = useCallback(() => {
+    router.push('/subscriptions/connect/gmail' as Href);
   }, [router]);
 
   // Disconnect handlers with confirmation
@@ -247,6 +258,24 @@ export default function ConnectionsScreen() {
           onPress: () => {
             setDisconnectingProvider('SPOTIFY');
             disconnectMutation.mutate({ provider: 'SPOTIFY' });
+          },
+        },
+      ]
+    );
+  }, [disconnectMutation]);
+
+  const handleDisconnectGmail = useCallback(() => {
+    Alert.alert(
+      'Disconnect Gmail',
+      'Are you sure you want to disconnect Gmail? Newsletter sync will stop until you reconnect.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: () => {
+            setDisconnectingProvider('GMAIL');
+            disconnectMutation.mutate({ provider: 'GMAIL' });
           },
         },
       ]
@@ -293,6 +322,15 @@ export default function ConnectionsScreen() {
           onConnect={handleConnectSpotify}
           onDisconnect={handleDisconnectSpotify}
           isDisconnecting={disconnectingProvider === 'SPOTIFY'}
+        />
+
+        <ProviderCard
+          provider="GMAIL"
+          connection={gmailConnection}
+          colors={colors}
+          onConnect={handleConnectGmail}
+          onDisconnect={handleDisconnectGmail}
+          isDisconnecting={disconnectingProvider === 'GMAIL'}
         />
 
         {/* Privacy Note */}

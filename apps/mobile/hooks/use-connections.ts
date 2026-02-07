@@ -25,7 +25,7 @@ export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 /**
  * Supported OAuth providers
  */
-export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY';
+export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
 
 /**
  * Connection type returned from the backend.
@@ -70,6 +70,7 @@ interface ProviderConnectionData {
 interface ConnectionsListResponse {
   YOUTUBE: ProviderConnectionData | null;
   SPOTIFY: ProviderConnectionData | null;
+  GMAIL: ProviderConnectionData | null;
 }
 
 // ============================================================================
@@ -111,6 +112,10 @@ function transformConnectionsResponse(response: ConnectionsListResponse): Connec
 
   if (response.SPOTIFY) {
     connections.push(transformConnection('SPOTIFY', response.SPOTIFY));
+  }
+
+  if (response.GMAIL) {
+    connections.push(transformConnection('GMAIL', response.GMAIL));
   }
 
   return connections;

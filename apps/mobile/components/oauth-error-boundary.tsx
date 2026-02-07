@@ -21,7 +21,7 @@ import { parseOAuthError, getOAuthErrorDisplay, type OAuthError } from '@/lib/oa
 import { oauthLogger } from '@/lib/logger';
 
 interface OAuthErrorFallbackProps {
-  provider: 'YOUTUBE' | 'SPOTIFY';
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   error: OAuthError;
   onRetry?: () => void;
 }
@@ -29,8 +29,10 @@ interface OAuthErrorFallbackProps {
 /**
  * Get provider display name for user-facing messages.
  */
-function getProviderName(provider: 'YOUTUBE' | 'SPOTIFY'): string {
-  return provider === 'YOUTUBE' ? 'YouTube' : 'Spotify';
+function getProviderName(provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'): string {
+  if (provider === 'YOUTUBE') return 'YouTube';
+  if (provider === 'SPOTIFY') return 'Spotify';
+  return 'Gmail';
 }
 
 /**
@@ -73,7 +75,7 @@ function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProp
 
 interface OAuthErrorBoundaryProps {
   children: ReactNode;
-  provider: 'YOUTUBE' | 'SPOTIFY';
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   onRetry?: () => void;
   /** Optional error to display directly (for non-React error flows) */
   error?: Error | string | null;

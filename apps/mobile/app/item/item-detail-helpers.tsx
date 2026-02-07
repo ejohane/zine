@@ -23,6 +23,11 @@ export function getFabConfig(provider: string): FabConfig {
         providerIcon: <Ionicons name="logo-youtube" size={22} color="#FFFFFF" />,
         backgroundColor: '#FF0000',
       };
+    case 'GMAIL':
+      return {
+        providerIcon: <Ionicons name="mail-outline" size={22} color="#FFFFFF" />,
+        backgroundColor: '#1A73E8',
+      };
     case 'X':
     case 'TWITTER':
       return {

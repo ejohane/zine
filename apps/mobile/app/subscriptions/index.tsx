@@ -16,6 +16,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { getStatusDisplay, type ConnectionStatus } from '@/lib/connection-status';
+import { trpc } from '@/lib/trpc';
 
 // ============================================================================
 // Icons
@@ -37,6 +38,14 @@ function SpotifyIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: 
   );
 }
 
+function GmailIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M12 13.4L2 6.75V18h20V6.75L12 13.4zm10-9.4H2l10 6.65L22 4z" />
+    </Svg>
+  );
+}
+
 function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
@@ -50,7 +59,7 @@ function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; col
 // ============================================================================
 
 interface ProviderCardProps {
-  provider: 'YOUTUBE' | 'SPOTIFY';
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   connectionStatus: ConnectionStatus;
   subscriptionCount: number;
   onPress: () => void;
@@ -78,6 +87,11 @@ function ProviderCard({
       name: 'Spotify',
       icon: SpotifyIcon,
       brandColor: '#1DB954',
+    },
+    GMAIL: {
+      name: 'Newsletters',
+      icon: GmailIcon,
+      brandColor: '#1A73E8',
     },
   }[provider];
 
@@ -133,8 +147,11 @@ export default function SubscriptionsScreen() {
 
   const { data: connections, isLoading: connectionsLoading } = useConnections();
   const { subscriptions, isLoading: subscriptionsLoading } = useSubscriptions();
+  const newsletterStatsQuery = (trpc as any).subscriptions.newsletters.stats.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
 
-  const isLoading = connectionsLoading || subscriptionsLoading;
+  const isLoading = connectionsLoading || subscriptionsLoading || newsletterStatsQuery.isLoading;
 
   // Get connection status for each provider
   const youtubeConnection = connections?.find(
@@ -143,14 +160,17 @@ export default function SubscriptionsScreen() {
   const spotifyConnection = connections?.find(
     (connection: Connection) => connection.provider === 'SPOTIFY'
   );
+  const gmailConnection = connections?.find((connection: Connection) => connection.provider === 'GMAIL');
   const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
   const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
+  const gmailStatus = (gmailConnection?.status as ConnectionStatus) ?? null;
 
   // Count subscriptions per provider
   const youtubeCount = subscriptions.filter((s) => s.provider === 'YOUTUBE').length;
   const spotifyCount = subscriptions.filter((s) => s.provider === 'SPOTIFY').length;
+  const gmailCount = newsletterStatsQuery.data?.active ?? 0;
 
-  const handleProviderPress = (provider: 'YOUTUBE' | 'SPOTIFY') => {
+  const handleProviderPress = (provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL') => {
     router.push(`/subscriptions/${provider.toLowerCase()}` as Href);
   };
 
@@ -185,6 +205,16 @@ export default function SubscriptionsScreen() {
             connectionStatus={spotifyStatus}
             subscriptionCount={spotifyCount}
             onPress={() => handleProviderPress('SPOTIFY')}
+            colors={colors}
+          />
+        </Animated.View>
+
+        <Animated.View>
+          <ProviderCard
+            provider="GMAIL"
+            connectionStatus={gmailStatus}
+            subscriptionCount={gmailCount}
+            onPress={() => handleProviderPress('GMAIL')}
             colors={colors}
           />
         </Animated.View>

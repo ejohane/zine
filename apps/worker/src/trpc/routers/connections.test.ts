@@ -103,7 +103,7 @@ function createMockContext(userId: string | null = TEST_USER_ID) {
  */
 function createMockConnectionsCaller(ctx: ReturnType<typeof createMockContext>) {
   return {
-    registerState: async (input: { provider: 'YOUTUBE' | 'SPOTIFY'; state: string }) => {
+    registerState: async (input: { provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'; state: string }) => {
       if (!ctx.userId) {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
@@ -120,7 +120,7 @@ function createMockConnectionsCaller(ctx: ReturnType<typeof createMockContext>) 
     },
 
     callback: async (input: {
-      provider: 'YOUTUBE' | 'SPOTIFY';
+      provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
       code: string;
       state: string;
       codeVerifier: string;
@@ -187,10 +187,11 @@ function createMockConnectionsCaller(ctx: ReturnType<typeof createMockContext>) 
       return {
         YOUTUBE: connections?.find((c: { provider: string }) => c.provider === 'YOUTUBE') ?? null,
         SPOTIFY: connections?.find((c: { provider: string }) => c.provider === 'SPOTIFY') ?? null,
+        GMAIL: connections?.find((c: { provider: string }) => c.provider === 'GMAIL') ?? null,
       };
     },
 
-    disconnect: async (_input: { provider: 'YOUTUBE' | 'SPOTIFY' }) => {
+    disconnect: async (_input: { provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' }) => {
       if (!ctx.userId) {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
@@ -581,6 +582,7 @@ describe('Connections Router', () => {
       expect(result).toEqual({
         YOUTUBE: null,
         SPOTIFY: null,
+        GMAIL: null,
       });
     });
 
@@ -603,6 +605,7 @@ describe('Connections Router', () => {
       expect(result.YOUTUBE?.provider).toBe('YOUTUBE');
       expect(result.YOUTUBE?.status).toBe('ACTIVE');
       expect(result.SPOTIFY).toBeNull();
+      expect(result.GMAIL).toBeNull();
     });
 
     it('should return connection info for both providers', async () => {
@@ -623,6 +626,7 @@ describe('Connections Router', () => {
       expect(result.SPOTIFY).not.toBeNull();
       expect(result.YOUTUBE?.provider).toBe('YOUTUBE');
       expect(result.SPOTIFY?.provider).toBe('SPOTIFY');
+      expect(result.GMAIL).toBeNull();
     });
 
     it('should return EXPIRED status for expired connections', async () => {

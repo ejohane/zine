@@ -496,24 +496,30 @@ class OfflineActionQueue {
    */
   private async executeAction(action: OfflineAction): Promise<void> {
     const { getOfflineTRPCClient } = await import('./trpc-offline-client');
-    const client = getOfflineTRPCClient();
+    const client = getOfflineTRPCClient() as any;
 
     // Map action types to tRPC mutations
     // Note: Current router uses 'sources' not 'subscriptions'
     // The action payload structure should match the mutation input
     switch (action.type) {
       case 'SUBSCRIBE':
-        // payload: { provider, feedUrl, name? }
-        await client.sources.add.mutate(
-          action.payload as Parameters<typeof client.sources.add.mutate>[0]
-        );
+        if (client.sources?.add?.mutate) {
+          // Legacy router path
+          await client.sources.add.mutate(action.payload);
+        } else {
+          // Current router path
+          await client.subscriptions.add.mutate(action.payload);
+        }
         break;
 
       case 'UNSUBSCRIBE':
-        // payload: { id }
-        await client.sources.remove.mutate(
-          action.payload as Parameters<typeof client.sources.remove.mutate>[0]
-        );
+        if (client.sources?.remove?.mutate) {
+          // Legacy router path
+          await client.sources.remove.mutate(action.payload);
+        } else {
+          // Current router path
+          await client.subscriptions.remove.mutate(action.payload);
+        }
         break;
     }
   }

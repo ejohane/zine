@@ -24,7 +24,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
-import { validateAndConvertProvider } from '@/lib/route-validation';
+import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import { ErrorState } from '@/components/list-states';
 import { ChannelSelectionList, type Channel, type Provider } from '@/components/subscriptions';
 
@@ -56,7 +56,7 @@ export default function ProviderDiscoverScreen() {
   const params = useLocalSearchParams<{ provider: string }>();
 
   // Validate and normalize provider to uppercase
-  const providerValidation = validateAndConvertProvider(params.provider);
+  const providerValidation = validateAndConvertDiscoverProvider(params.provider);
 
   // Use validated provider or default to YOUTUBE for hook consistency
   // (hooks must be called unconditionally)

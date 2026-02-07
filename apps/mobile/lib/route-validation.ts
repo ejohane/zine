@@ -17,10 +17,17 @@ import type { Provider } from '@zine/shared';
 
 /**
  * Valid lowercase provider values for route parameters.
- * Routes use lowercase (youtube/spotify), backend uses uppercase (YOUTUBE/SPOTIFY).
+ * Routes use lowercase (youtube/spotify/gmail), backend uses uppercase.
  */
-export const VALID_PROVIDER_ROUTES = ['youtube', 'spotify'] as const;
+export const VALID_PROVIDER_ROUTES = ['youtube', 'spotify', 'gmail'] as const;
 export type ProviderRoute = (typeof VALID_PROVIDER_ROUTES)[number];
+
+/**
+ * Provider routes supported by channel discovery flows.
+ * Gmail uses newsletter detection instead of creator discovery.
+ */
+export const VALID_DISCOVER_PROVIDER_ROUTES = ['youtube', 'spotify'] as const;
+export type DiscoverProviderRoute = (typeof VALID_DISCOVER_PROVIDER_ROUTES)[number];
 
 // ============================================================================
 // Validation Result Types
@@ -176,11 +183,36 @@ export function validateProviderRoute(value: unknown): ValidationResult<Provider
  */
 export function validateAndConvertProvider(
   value: unknown
+): ValidationResult<'YOUTUBE' | 'SPOTIFY' | 'GMAIL'> {
+  const routeResult = validateProviderRoute(value);
+  if (!routeResult.success) {
+    return routeResult;
+  }
+
+  return {
+    success: true,
+    data: toBackendProvider(routeResult.data) as 'YOUTUBE' | 'SPOTIFY' | 'GMAIL',
+  };
+}
+
+/**
+ * Validates and converts a provider route parameter for discovery screens.
+ * Discovery only supports providers with creator/channel browsing (YouTube/Spotify).
+ */
+export function validateAndConvertDiscoverProvider(
+  value: unknown
 ): ValidationResult<'YOUTUBE' | 'SPOTIFY'> {
   const routeResult = validateProviderRoute(value);
   if (!routeResult.success) {
     return routeResult;
   }
 
-  return { success: true, data: toBackendProvider(routeResult.data) as 'YOUTUBE' | 'SPOTIFY' };
+  if (!VALID_DISCOVER_PROVIDER_ROUTES.includes(routeResult.data as DiscoverProviderRoute)) {
+    return {
+      success: false,
+      message: `Provider \"${routeResult.data}\" is not supported for discovery.`,
+    };
+  }
+
+  return { success: true, data: routeResult.data.toUpperCase() as 'YOUTUBE' | 'SPOTIFY' };
 }

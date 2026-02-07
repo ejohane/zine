@@ -11,6 +11,7 @@ import { trpcServer } from '@hono/trpc-server';
 import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
 import { pollProviderSubscriptions } from './polling/scheduler';
+import { pollGmailNewsletters } from './newsletters/gmail';
 import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
@@ -168,8 +169,9 @@ export default {
    * Scheduled handler for cron-triggered content polling.
    *
    * Configured in wrangler.toml with `[triggers]` section.
-   * Two cron jobs run independently:
+   * Three cron jobs run independently:
    * - "0 * * * *"  → YouTube polling at top of hour
+   * - "15 * * * *" → Gmail newsletter polling at quarter past
    * - "30 * * * *" → Spotify polling at 30 minutes past
    *
    * Each provider has its own distributed lock for failure isolation.
@@ -177,14 +179,22 @@ export default {
    * @see /features/subscriptions/backend-spec.md - Section 3: Polling Architecture
    */
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
-    // Map cron expression to provider
-    // "0 * * * *" → YouTube (top of hour)
-    // "30 * * * *" → Spotify (mid-hour)
-    const provider = event.cron === '0 * * * *' ? 'YOUTUBE' : 'SPOTIFY';
+    if (event.cron === '0 * * * *') {
+      ctx.waitUntil(pollProviderSubscriptions('YOUTUBE', env, ctx));
+      return;
+    }
 
-    // Use waitUntil to ensure the polling completes even if the
-    // scheduled handler returns early
-    ctx.waitUntil(pollProviderSubscriptions(provider, env, ctx));
+    if (event.cron === '30 * * * *') {
+      ctx.waitUntil(pollProviderSubscriptions('SPOTIFY', env, ctx));
+      return;
+    }
+
+    if (event.cron === '15 * * * *') {
+      ctx.waitUntil(pollGmailNewsletters(env, ctx));
+      return;
+    }
+
+    logger.warn('Received scheduled event with unknown cron expression', { cron: event.cron });
   },
 
   /**

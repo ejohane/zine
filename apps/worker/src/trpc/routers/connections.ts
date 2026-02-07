@@ -13,11 +13,13 @@ import { router, protectedProcedure } from '../trpc';
 import { registerOAuthState, validateOAuthState } from '../../lib/oauth-state';
 import { exchangeCodeForTokens, getProviderUserInfo } from '../../lib/auth';
 import { encrypt, decrypt } from '../../lib/crypto';
-import { providerConnections, subscriptions, users } from '../../db/schema';
+import { providerConnections, subscriptions, users, gmailMailboxes } from '../../db/schema';
 import type { Bindings } from '../../types';
 import { authLogger } from '../../lib/logger';
 import type { Provider } from '@zine/shared';
 import { ProviderSchema } from '@zine/shared';
+import { ensureGmailMailboxForConnection, syncGmailNewslettersForUser } from '../../newsletters/gmail';
+import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 
 // ============================================================================
 // Zod Schemas
@@ -216,6 +218,37 @@ export const connectionsRouter = router({
           userId: ctx.userId,
         });
 
+        // 9. Gmail-specific mailbox setup + initial newsletter sync
+        if (input.provider === 'GMAIL') {
+          const gmailConnection = await ctx.db.query.providerConnections.findFirst({
+            where: and(
+              eq(providerConnections.userId, ctx.userId),
+              eq(providerConnections.provider, 'GMAIL'),
+              eq(providerConnections.status, 'ACTIVE')
+            ),
+          });
+
+          if (gmailConnection) {
+            await ensureGmailMailboxForConnection({
+              db: ctx.db,
+              userId: ctx.userId,
+              connection: gmailConnection as ProviderConnection,
+              env: ctx.env as TokenRefreshEnv,
+            });
+
+            try {
+              await syncGmailNewslettersForUser(ctx.userId, ctx.db, ctx.env as TokenRefreshEnv, {
+                forceFull: true,
+              });
+            } catch (error) {
+              authLogger.warn('Initial Gmail newsletter sync failed after OAuth callback', {
+                userId: ctx.userId,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+          }
+        }
+
         return { success: true };
       } catch (error) {
         // Log the actual error for debugging
@@ -235,7 +268,7 @@ export const connectionsRouter = router({
    * Useful for the mobile app to show which providers are connected
    * and their current status (ACTIVE, EXPIRED, REVOKED).
    *
-   * @returns Object with YOUTUBE and SPOTIFY keys, each containing connection info or null
+   * @returns Object with OAuth provider keys, each containing connection info or null
    */
   list: protectedProcedure.query(async ({ ctx }) => {
     const connections = await ctx.db.query.providerConnections.findMany({
@@ -253,6 +286,7 @@ export const connectionsRouter = router({
     return {
       YOUTUBE: connections.find((c) => c.provider === 'YOUTUBE') ?? null,
       SPOTIFY: connections.find((c) => c.provider === 'SPOTIFY') ?? null,
+      GMAIL: connections.find((c) => c.provider === 'GMAIL') ?? null,
     };
   }),
 
@@ -311,6 +345,13 @@ export const connectionsRouter = router({
       // 2. Delete connection from database
       await ctx.db.delete(providerConnections).where(eq(providerConnections.id, connection.id));
 
+      // Gmail-specific cleanup: remove mailbox sync cursor rows so scheduler skips disconnected accounts
+      if (input.provider === 'GMAIL') {
+        await ctx.db
+          .delete(gmailMailboxes)
+          .where(eq(gmailMailboxes.providerConnectionId, connection.id));
+      }
+
       // 3. Mark related subscriptions as DISCONNECTED
       // We don't change UNSUBSCRIBED subscriptions since those were explicitly removed by the user
       await ctx.db
@@ -341,7 +382,7 @@ export const connectionsRouter = router({
  * This is a best-effort operation - if it fails, the token will still be
  * deleted from our database and will eventually expire naturally.
  *
- * @param provider - The OAuth provider (YOUTUBE or SPOTIFY)
+ * @param provider - The OAuth provider (YOUTUBE, SPOTIFY, or GMAIL)
  * @param encryptedAccessToken - The encrypted access token from the database
  * @param env - Environment bindings with ENCRYPTION_KEY
  */
@@ -356,7 +397,7 @@ async function revokeProviderToken(
 
   const token = await decrypt(encryptedAccessToken, env.ENCRYPTION_KEY);
 
-  if (provider === 'YOUTUBE') {
+  if (provider === 'YOUTUBE' || provider === 'GMAIL') {
     // Google supports token revocation
     const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
       method: 'POST',
