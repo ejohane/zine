@@ -38,10 +38,10 @@
       "breakpoints": true
     },
     {
-      "idx": 4,
+      "idx": 5,
       "version": "7",
       "when": 1770519000000,
-      "tag": "0004_newsletter_opt_in_defaults",
+      "tag": "0005_newsletter_opt_in_defaults",
       "breakpoints": true
     }
   ]

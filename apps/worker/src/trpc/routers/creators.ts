@@ -15,7 +15,15 @@ import { TRPCError } from '@trpc/server';
 import { eq, and, desc, lt, or, sql, inArray } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { router, protectedProcedure } from '../trpc';
-import { creators, items, userItems, subscriptions, providerConnections } from '../../db/schema';
+import {
+  creators,
+  items,
+  userItems,
+  subscriptions,
+  providerConnections,
+  newsletterFeeds,
+  newsletterFeedMessages,
+} from '../../db/schema';
 import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
 import { toItemView, type ItemView } from './items';
@@ -28,7 +36,8 @@ import {
   getChannelDetails,
 } from '../../providers/youtube';
 import { getSpotifyClientForConnection, getShowEpisodes, getShow } from '../../providers/spotify';
-import type { ProviderConnection } from '../../lib/token-refresh';
+import { backfillNewsletterItemsForFeed } from '../../newsletters/gmail';
+import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 
@@ -116,6 +125,12 @@ const GetInputSchema = z.object({
 });
 
 const ListBookmarksInputSchema = z.object({
+  creatorId: z.string().min(1, 'Creator ID is required'),
+  cursor: z.string().optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+
+const ListPublicationsInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(50).default(20),
@@ -292,7 +307,11 @@ export const creatorsRouter = router({
 
         // Verify creator exists
         const creator = await ctx.db
-          .select({ id: creators.id })
+          .select({
+            id: creators.id,
+            provider: creators.provider,
+            providerCreatorId: creators.providerCreatorId,
+          })
           .from(creators)
           .where(eq(creators.id, creatorId))
           .limit(1);
@@ -347,6 +366,143 @@ export const creatorsRouter = router({
           const lastResult = pageResults[pageResults.length - 1];
           nextCursor = encodeCursor({
             sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
+            id: lastResult.user_items.id,
+          });
+        }
+
+        return {
+          items: itemViews,
+          nextCursor,
+          hasMore,
+        };
+      }
+    ),
+
+  /**
+   * List publications for a creator
+   *
+   * Returns a paginated list of all items for this creator that exist in the
+   * current user's collection (INBOX, BOOKMARKED, and ARCHIVED).
+   * This powers full publication history views (e.g., newsletter author pages).
+   *
+   * @param creatorId - The unique identifier of the creator
+   * @param cursor - Optional cursor for pagination
+   * @param limit - Number of items to return (default 20, max 50)
+   * @returns Paginated list of creator publications
+   */
+  listPublications: protectedProcedure
+    .input(ListPublicationsInputSchema)
+    .query(
+      async ({
+        ctx,
+        input,
+      }): Promise<{ items: ItemView[]; nextCursor: string | null; hasMore: boolean }> => {
+        const { creatorId, limit } = input;
+        const cursor = input.cursor ? decodeCursor(input.cursor) : null;
+
+        // Verify creator exists
+        const creator = await ctx.db
+          .select({
+            id: creators.id,
+            provider: creators.provider,
+            providerCreatorId: creators.providerCreatorId,
+          })
+          .from(creators)
+          .where(eq(creators.id, creatorId))
+          .limit(1);
+
+        if (creator.length === 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Creator not found',
+          });
+        }
+
+        const creatorRecord = creator[0];
+
+        // Opportunistic backfill for Gmail creators so author pages can show
+        // historical newsletter issues (not just the most recent seeded item).
+        if (!cursor && creatorRecord.provider === 'GMAIL') {
+          const feed = await ctx.db.query.newsletterFeeds.findFirst({
+            where: and(
+              eq(newsletterFeeds.userId, ctx.userId),
+              eq(newsletterFeeds.canonicalKey, creatorRecord.providerCreatorId)
+            ),
+            columns: {
+              id: true,
+              status: true,
+            },
+          });
+
+          if (feed?.status === 'ACTIVE') {
+            const [feedMessageCountRow] = await ctx.db
+              .select({ count: sql<number>`count(*)` })
+              .from(newsletterFeedMessages)
+              .where(
+                and(
+                  eq(newsletterFeedMessages.userId, ctx.userId),
+                  eq(newsletterFeedMessages.newsletterFeedId, feed.id)
+                )
+              );
+
+            const feedMessageCount = Number(feedMessageCountRow?.count ?? 0);
+
+            if (feedMessageCount < limit) {
+              try {
+                await backfillNewsletterItemsForFeed({
+                  db: ctx.db,
+                  userId: ctx.userId,
+                  feedId: feed.id,
+                  env: ctx.env as TokenRefreshEnv,
+                  maxItems: limit,
+                  maxResultsPerQuery: Math.max(30, Math.min(100, limit * 3)),
+                });
+              } catch {
+                // Backfill is best-effort and should not block creator page rendering.
+              }
+            }
+          }
+        }
+
+        // Build WHERE conditions
+        const conditions = [eq(items.creatorId, creatorId), eq(userItems.userId, ctx.userId)];
+
+        // Use publishedAt when available, otherwise fall back to ingestedAt.
+        const sortField = sql`COALESCE(${items.publishedAt}, ${userItems.ingestedAt})`;
+
+        // Apply cursor-based pagination (fetch items before cursor)
+        if (cursor) {
+          conditions.push(
+            or(
+              sql`${sortField} < ${cursor.sortValue}`,
+              and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
+            )!
+          );
+        }
+
+        // Execute query with joins (items + creators)
+        const results = await ctx.db
+          .select()
+          .from(userItems)
+          .innerJoin(items, eq(userItems.itemId, items.id))
+          .leftJoin(creators, eq(items.creatorId, creators.id))
+          .where(and(...conditions))
+          .orderBy(sql`${sortField} DESC`, desc(userItems.id))
+          .limit(limit + 1); // Fetch one extra to check for more
+
+        // Check if there are more results
+        const hasMore = results.length > limit;
+        const pageResults = hasMore ? results.slice(0, limit) : results;
+
+        // Transform to ItemView
+        const itemViews = pageResults.map((row) => toItemView(row));
+
+        // Generate next cursor
+        let nextCursor: string | null = null;
+        if (hasMore && pageResults.length > 0) {
+          const lastResult = pageResults[pageResults.length - 1];
+          nextCursor = encodeCursor({
+            sortValue: lastResult.items.publishedAt ?? lastResult.user_items.ingestedAt,
             id: lastResult.user_items.id,
           });
         }

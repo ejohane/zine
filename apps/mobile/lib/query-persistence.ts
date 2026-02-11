@@ -18,6 +18,7 @@ const ALLOWLISTED_QUERY_PATHS = new Set([
   'subscriptions.connections.list',
   'creators.get',
   'creators.listBookmarks',
+  'creators.listPublications',
   'creators.checkSubscription',
 ]);
 

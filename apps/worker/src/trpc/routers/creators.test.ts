@@ -5,6 +5,7 @@
  * - Router structure verification (all endpoints defined)
  * - creators.get - Get creator by ID
  * - creators.listBookmarks - List bookmarked items for creator
+ * - creators.listPublications - List all publications for creator
  * - creators.fetchLatestContent - Fetch latest content from creator
  * - creators.checkSubscription - Check subscription status
  * - creators.subscribe - Subscribe to creator
@@ -186,6 +187,26 @@ function createMockCreatorsCaller(options: {
     },
 
     listBookmarks: async (input: { creatorId: string; cursor?: string; limit?: number }) => {
+      requireAuth();
+
+      // Throw NOT_FOUND if creator doesn't exist
+      const creator = creators.get(input.creatorId);
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      // Returns empty list for mock implementation
+      return {
+        items: [] as unknown[],
+        nextCursor: null as string | null,
+        hasMore: false,
+      };
+    },
+
+    listPublications: async (input: { creatorId: string; cursor?: string; limit?: number }) => {
       requireAuth();
 
       // Throw NOT_FOUND if creator doesn't exist
@@ -433,6 +454,17 @@ describe('Creators Router', () => {
 
       await expect(caller.listBookmarks({ creatorId: TEST_CREATOR_ID })).rejects.toThrow(TRPCError);
       await expect(caller.listBookmarks({ creatorId: TEST_CREATOR_ID })).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('should reject unauthenticated requests to listPublications', async () => {
+      const caller = createMockCreatorsCaller({ userId: null });
+
+      await expect(caller.listPublications({ creatorId: TEST_CREATOR_ID })).rejects.toThrow(
+        TRPCError
+      );
+      await expect(caller.listPublications({ creatorId: TEST_CREATOR_ID })).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
       });
     });
@@ -1868,6 +1900,7 @@ describe('Creators Router', () => {
       // Verify all endpoints exist as functions
       expect(typeof caller.get).toBe('function');
       expect(typeof caller.listBookmarks).toBe('function');
+      expect(typeof caller.listPublications).toBe('function');
       expect(typeof caller.fetchLatestContent).toBe('function');
       expect(typeof caller.checkSubscription).toBe('function');
       expect(typeof caller.subscribe).toBe('function');

@@ -27,12 +27,12 @@ export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
 /**
  * API provider types (uppercase, from backend)
  */
-export type Provider = 'YOUTUBE' | 'SPOTIFY' | 'RSS' | 'SUBSTACK' | 'WEB' | 'X';
+export type Provider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'RSS' | 'SUBSTACK' | 'WEB' | 'X';
 
 /**
  * UI provider types (lowercase, for display/styling)
  */
-export type UIProvider = 'youtube' | 'spotify' | 'rss' | 'substack' | 'web' | 'x';
+export type UIProvider = 'youtube' | 'spotify' | 'gmail' | 'rss' | 'substack' | 'web' | 'x';
 
 // ============================================================================
 // Type Mapping
@@ -75,6 +75,7 @@ export function mapContentType(apiType: ContentType): UIContentType {
  * @example
  * mapProvider('YOUTUBE') // 'youtube'
  * mapProvider('SPOTIFY') // 'spotify'
+ * mapProvider('GMAIL')   // 'gmail'
  */
 export function mapProvider(apiProvider: Provider): UIProvider {
   return apiProvider.toLowerCase() as UIProvider;
@@ -165,6 +166,8 @@ export function getProviderColor(provider: Provider | UIProvider): string {
       return ProviderColors.youtube;
     case 'spotify':
       return ProviderColors.spotify;
+    case 'gmail':
+      return ProviderColors.gmail;
     case 'substack':
       return ProviderColors.substack;
     case 'web':
@@ -227,6 +230,8 @@ export function getProviderLabel(provider: Provider | UIProvider): string {
       return 'YouTube';
     case 'spotify':
       return 'Spotify';
+    case 'gmail':
+      return 'Gmail';
     case 'substack':
       return 'Substack';
     case 'x':

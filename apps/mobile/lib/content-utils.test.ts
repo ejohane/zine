@@ -21,6 +21,7 @@ jest.mock('@/constants/theme', () => ({
   ProviderColors: {
     youtube: '#FF0000',
     spotify: '#1DB954',
+    gmail: '#1A73E8',
     substack: '#FF6719',
   },
 }));
@@ -80,6 +81,10 @@ describe('mapProvider', () => {
     expect(mapProvider(Provider.SPOTIFY)).toBe('spotify');
   });
 
+  it('maps GMAIL to gmail', () => {
+    expect(mapProvider(Provider.GMAIL)).toBe('gmail');
+  });
+
   it('maps RSS to rss', () => {
     expect(mapProvider(Provider.RSS)).toBe('rss');
   });
@@ -128,6 +133,10 @@ describe('getProviderColor', () => {
     expect(getProviderColor('spotify')).toBe('#1DB954');
   });
 
+  it('returns correct color for gmail', () => {
+    expect(getProviderColor('gmail')).toBe('#1A73E8');
+  });
+
   it('returns correct color for substack', () => {
     expect(getProviderColor('substack')).toBe('#FF6719');
   });
@@ -170,6 +179,10 @@ describe('getProviderLabel', () => {
 
   it('returns "Spotify" for spotify', () => {
     expect(getProviderLabel('spotify')).toBe('Spotify');
+  });
+
+  it('returns "Gmail" for gmail', () => {
+    expect(getProviderLabel('gmail')).toBe('Gmail');
   });
 
   it('returns "Substack" for substack', () => {
