@@ -181,6 +181,13 @@ interface FeedSeedResult {
     | 'no_search_query';
 }
 
+export interface FeedBackfillResult {
+  createdCount: number;
+  restoredCount: number;
+  matchedCount: number;
+  reason: 'completed' | 'no_matching_message' | 'no_search_query';
+}
+
 class GmailApiError extends Error {
   readonly status: number;
 
@@ -811,6 +818,23 @@ async function maybeUpgradeExistingNewsletterItem(params: {
     itemUpdates.rawMetadata = rawMetadata;
   }
 
+  let creatorId = existingItem.creatorId;
+  if (!creatorId) {
+    const creator = await findOrCreateCreator(
+      { db: params.db },
+      {
+        provider: Provider.GMAIL,
+        providerCreatorId: params.parsed.canonicalKey,
+        name: params.parsed.fromDisplayName,
+        handle: params.parsed.fromAddress,
+        externalUrl: canonicalUrl,
+        imageUrl: newsletterAvatarUrl ?? undefined,
+      }
+    );
+    creatorId = creator.id;
+    itemUpdates.creatorId = creator.id;
+  }
+
   if (!existingItem.thumbnailUrl && newsletterAvatarUrl) {
     itemUpdates.thumbnailUrl = newsletterAvatarUrl;
   }
@@ -820,9 +844,9 @@ async function maybeUpgradeExistingNewsletterItem(params: {
     await params.db.update(items).set(itemUpdates).where(eq(items.id, existingItem.id));
   }
 
-  if (newsletterAvatarUrl && existingItem.creatorId) {
+  if (newsletterAvatarUrl && creatorId) {
     const creator = await params.db.query.creators.findFirst({
-      where: eq(creators.id, existingItem.creatorId),
+      where: eq(creators.id, creatorId),
       columns: {
         id: true,
         imageUrl: true,
@@ -1611,6 +1635,63 @@ export async function seedLatestNewsletterItemForFeed(params: {
   feedId: string;
   env: TokenRefreshEnv;
 }): Promise<FeedSeedResult> {
+  const result = await backfillNewsletterItemsForFeedInternal({
+    ...params,
+    maxItems: 1,
+    maxResultsPerQuery: 12,
+  });
+
+  if (result.reason === 'no_search_query') {
+    return { created: false, reason: 'no_search_query' };
+  }
+
+  if (result.reason === 'no_matching_message') {
+    return { created: false, reason: 'no_matching_message' };
+  }
+
+  if (result.restoredCount > 0) {
+    return {
+      created: true,
+      reason: 'restored_from_archive',
+    };
+  }
+
+  if (result.createdCount > 0) {
+    return {
+      created: true,
+      reason: 'created',
+    };
+  }
+
+  return {
+    created: false,
+    reason: 'already_exists',
+  };
+}
+
+export async function backfillNewsletterItemsForFeed(params: {
+  db: Database;
+  userId: string;
+  feedId: string;
+  env: TokenRefreshEnv;
+  maxItems?: number;
+  maxResultsPerQuery?: number;
+}): Promise<FeedBackfillResult> {
+  return backfillNewsletterItemsForFeedInternal({
+    ...params,
+    maxItems: params.maxItems ?? 20,
+    maxResultsPerQuery: params.maxResultsPerQuery ?? 60,
+  });
+}
+
+async function backfillNewsletterItemsForFeedInternal(params: {
+  db: Database;
+  userId: string;
+  feedId: string;
+  env: TokenRefreshEnv;
+  maxItems: number;
+  maxResultsPerQuery: number;
+}): Promise<FeedBackfillResult> {
   const connection = await getGmailConnection(params.userId, params.db);
   if (!connection) {
     throw new Error('No active Gmail connection found');
@@ -1653,18 +1734,32 @@ export async function seedLatestNewsletterItemForFeed(params: {
   });
 
   if (searchQueries.length === 0) {
-    return { created: false, reason: 'no_search_query' };
+    return {
+      createdCount: 0,
+      restoredCount: 0,
+      matchedCount: 0,
+      reason: 'no_search_query',
+    };
   }
 
   const candidateMessageIds: string[] = [];
+  const maxResultsPerQuery = Math.max(1, Math.min(100, params.maxResultsPerQuery));
   for (const query of searchQueries) {
-    const ids = await fetchMessageIdsForQuery(accessToken, query, 12);
+    const ids = await fetchMessageIdsForQuery(accessToken, query, maxResultsPerQuery);
     candidateMessageIds.push(...ids);
   }
 
   const uniqueCandidateIds = Array.from(new Set(candidateMessageIds));
+  let createdCount = 0;
+  let restoredCount = 0;
+  let matchedCount = 0;
+  const maxItems = Math.max(1, params.maxItems);
 
   for (const messageId of uniqueCandidateIds) {
+    if (createdCount + restoredCount >= maxItems) {
+      break;
+    }
+
     let metadata: GmailMessageMetadata;
     try {
       metadata = await fetchMessageMetadata(accessToken, messageId);
@@ -1688,6 +1783,8 @@ export async function seedLatestNewsletterItemForFeed(params: {
       continue;
     }
 
+    matchedCount += 1;
+
     const created = await ingestNewsletterMessage({
       db: params.db,
       userId: params.userId,
@@ -1697,6 +1794,11 @@ export async function seedLatestNewsletterItemForFeed(params: {
       feedId: feed.id,
       accessToken,
     });
+
+    if (created) {
+      createdCount += 1;
+      continue;
+    }
 
     // If this item already existed in ARCHIVED state from prior experimentation,
     // bring it back into INBOX when the user explicitly subscribes.
@@ -1723,21 +1825,26 @@ export async function seedLatestNewsletterItemForFeed(params: {
             updatedAt: nowIso,
           })
           .where(eq(userItems.id, userItem.id));
-
-        return {
-          created: true,
-          reason: 'restored_from_archive',
-        };
+        restoredCount += 1;
       }
     }
+  }
 
+  if (matchedCount === 0) {
     return {
-      created,
-      reason: created ? 'created' : 'already_exists',
+      createdCount,
+      restoredCount,
+      matchedCount,
+      reason: 'no_matching_message',
     };
   }
 
-  return { created: false, reason: 'no_matching_message' };
+  return {
+    createdCount,
+    restoredCount,
+    matchedCount,
+    reason: 'completed',
+  };
 }
 
 async function runWithConcurrency<T, R>(

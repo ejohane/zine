@@ -4,6 +4,7 @@
  * Tests the creator hooks including:
  * - useCreator hook behavior
  * - useCreatorBookmarks hook behavior with pagination
+ * - useCreatorPublications hook behavior with pagination
  * - useCreatorLatestContent hook behavior
  * - useCreatorSubscription hook behavior with optimistic updates
  *
@@ -19,6 +20,7 @@ import { renderHook, act } from '@testing-library/react-hooks';
 // Mock tRPC query and mutation hooks
 const mockCreatorUseQuery = jest.fn();
 const mockBookmarksUseInfiniteQuery = jest.fn();
+const mockPublicationsUseInfiniteQuery = jest.fn();
 const mockLatestContentUseQuery = jest.fn();
 const mockCheckSubscriptionUseQuery = jest.fn();
 const mockSubscribeMutation = jest.fn();
@@ -35,6 +37,9 @@ jest.mock('../lib/trpc', () => ({
       },
       listBookmarks: {
         useInfiniteQuery: mockBookmarksUseInfiniteQuery,
+      },
+      listPublications: {
+        useInfiniteQuery: mockPublicationsUseInfiniteQuery,
       },
       fetchLatestContent: {
         useQuery: mockLatestContentUseQuery,
@@ -88,6 +93,7 @@ jest.mock('../lib/trpc', () => ({
 import {
   useCreator,
   useCreatorBookmarks,
+  useCreatorPublications,
   useCreatorLatestContent,
   useCreatorSubscription,
   type Creator,
@@ -155,6 +161,16 @@ beforeEach(() => {
   });
 
   mockBookmarksUseInfiniteQuery.mockReturnValue({
+    data: null,
+    isLoading: false,
+    isFetchingNextPage: false,
+    hasNextPage: false,
+    fetchNextPage: jest.fn(),
+    error: null,
+    refetch: jest.fn(),
+  });
+
+  mockPublicationsUseInfiniteQuery.mockReturnValue({
     data: null,
     isLoading: false,
     isFetchingNextPage: false,
@@ -431,6 +447,115 @@ describe('useCreatorBookmarks', () => {
       });
 
       const { result } = renderHook(() => useCreatorBookmarks('creator-123'));
+
+      expect(result.current.error).toBe(mockError);
+    });
+  });
+});
+
+// ============================================================================
+// useCreatorPublications Tests
+// ============================================================================
+
+describe('useCreatorPublications', () => {
+  describe('query configuration', () => {
+    it('enables query when creatorId is provided', () => {
+      renderHook(() => useCreatorPublications('creator-123'));
+
+      expect(mockPublicationsUseInfiniteQuery).toHaveBeenCalledWith(
+        { creatorId: 'creator-123', limit: 20 },
+        expect.objectContaining({ enabled: true })
+      );
+    });
+
+    it('disables query when creatorId is empty', () => {
+      renderHook(() => useCreatorPublications(''));
+
+      expect(mockPublicationsUseInfiniteQuery).toHaveBeenCalledWith(
+        { creatorId: '', limit: 20 },
+        expect.objectContaining({ enabled: false })
+      );
+    });
+
+    it('uses custom limit when provided', () => {
+      renderHook(() => useCreatorPublications('creator-123', { limit: 10 }));
+
+      expect(mockPublicationsUseInfiniteQuery).toHaveBeenCalledWith(
+        { creatorId: 'creator-123', limit: 10 },
+        expect.any(Object)
+      );
+    });
+
+    it('provides getNextPageParam function', () => {
+      renderHook(() => useCreatorPublications('creator-123'));
+
+      const callArgs = mockPublicationsUseInfiniteQuery.mock.calls[0][1];
+      expect(callArgs.getNextPageParam).toBeDefined();
+
+      const result = callArgs.getNextPageParam({ nextCursor: 'cursor-abc', items: [] });
+      expect(result).toBe('cursor-abc');
+    });
+  });
+
+  describe('return value', () => {
+    it('returns loading state', () => {
+      mockPublicationsUseInfiniteQuery.mockReturnValue({
+        data: null,
+        isLoading: true,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: jest.fn(),
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useCreatorPublications('creator-123'));
+
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.publications).toEqual([]);
+    });
+
+    it('returns flattened publications from pages', () => {
+      const publication1 = createMockBookmark({ userItemId: 'ui-1', state: 'INBOX' });
+      const publication2 = createMockBookmark({ userItemId: 'ui-2', state: 'BOOKMARKED' });
+      const publication3 = createMockBookmark({ userItemId: 'ui-3', state: 'ARCHIVED' });
+
+      mockPublicationsUseInfiniteQuery.mockReturnValue({
+        data: {
+          pages: [
+            { items: [publication1, publication2], nextCursor: 'cursor-1', hasMore: true },
+            { items: [publication3], nextCursor: null, hasMore: false },
+          ],
+        },
+        isLoading: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: jest.fn(),
+        error: null,
+        refetch: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useCreatorPublications('creator-123'));
+
+      expect(result.current.publications).toHaveLength(3);
+      expect(result.current.publications[0]).toEqual(publication1);
+      expect(result.current.publications[1]).toEqual(publication2);
+      expect(result.current.publications[2]).toEqual(publication3);
+    });
+
+    it('returns error state', () => {
+      const mockError = new Error('Failed to fetch publications');
+      mockPublicationsUseInfiniteQuery.mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetchingNextPage: false,
+        hasNextPage: false,
+        fetchNextPage: jest.fn(),
+        error: mockError,
+        refetch: jest.fn(),
+      });
+
+      const { result } = renderHook(() => useCreatorPublications('creator-123'));
 
       expect(result.current.error).toBe(mockError);
     });

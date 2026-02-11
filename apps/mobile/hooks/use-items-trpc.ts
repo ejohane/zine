@@ -21,7 +21,7 @@ export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
 /**
  * UI-friendly provider type (lowercase for styling/display)
  */
-export type UIProvider = 'youtube' | 'spotify' | 'rss' | 'substack';
+export type UIProvider = 'youtube' | 'spotify' | 'gmail' | 'rss' | 'substack' | 'web' | 'x';
 
 // ============================================================================
 // Optimistic Update Types

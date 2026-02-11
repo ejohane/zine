@@ -5,6 +5,7 @@
  * Encapsulates all TRPC calls related to creator data:
  * - useCreator: Get creator profile info
  * - useCreatorBookmarks: Paginated bookmarks from a creator
+ * - useCreatorPublications: Paginated publications from a creator (all states)
  * - useCreatorLatestContent: Latest content from provider
  * - useCreatorSubscription: Subscription status and actions
  *
@@ -176,6 +177,45 @@ export function useCreatorBookmarks(creatorId: string, options?: { limit?: numbe
     fetchNextPage: bookmarksQuery.fetchNextPage,
     error: bookmarksQuery.error,
     refetch: bookmarksQuery.refetch,
+  };
+}
+
+/**
+ * Hook for fetching paginated publications from a creator.
+ *
+ * Returns all items for this creator in the user's collection, including:
+ * - INBOX (not yet bookmarked)
+ * - BOOKMARKED
+ * - ARCHIVED
+ *
+ * Supports infinite scroll pagination.
+ *
+ * @param creatorId - The unique identifier of the creator
+ * @param options - Optional configuration
+ * @param options.limit - Number of items per page (default: 20)
+ * @returns Object with publications array, pagination controls, and states
+ */
+export function useCreatorPublications(creatorId: string, options?: { limit?: number }) {
+  const limit = options?.limit ?? 20;
+
+  const publicationsQuery = trpc.creators.listPublications.useInfiniteQuery(
+    { creatorId, limit },
+    {
+      enabled: !!creatorId,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      staleTime: 60 * 1000, // 1 minute
+      gcTime: 10 * 60 * 1000, // 10 minutes
+    }
+  );
+
+  return {
+    publications: publicationsQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    isLoading: publicationsQuery.isLoading,
+    isFetchingNextPage: publicationsQuery.isFetchingNextPage,
+    hasNextPage: publicationsQuery.hasNextPage ?? false,
+    fetchNextPage: publicationsQuery.fetchNextPage,
+    error: publicationsQuery.error,
+    refetch: publicationsQuery.refetch,
   };
 }
 

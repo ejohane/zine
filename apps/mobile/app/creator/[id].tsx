@@ -19,7 +19,12 @@ import { View, Text, ActivityIndicator, StyleSheet, Pressable } from 'react-nati
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CreatorHeader, CreatorBookmarks, CreatorLatestContent } from '@/components/creator';
+import {
+  CreatorHeader,
+  CreatorBookmarks,
+  CreatorLatestContent,
+  CreatorPublications,
+} from '@/components/creator';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -173,7 +178,11 @@ export default function CreatorScreen() {
             <Animated.View>
               <CreatorHeader creator={creator} />
               <CreatorBookmarks creatorId={id ?? ''} />
-              <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+              {creator.provider === 'GMAIL' ? (
+                <CreatorPublications creatorId={id ?? ''} />
+              ) : (
+                <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+              )}
             </Animated.View>
           </ParallaxScrollView>
         </Animated.View>
@@ -209,7 +218,11 @@ export default function CreatorScreen() {
           <Animated.View>
             <CreatorHeader creator={creator} />
             <CreatorBookmarks creatorId={id ?? ''} />
-            <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+            {creator.provider === 'GMAIL' ? (
+              <CreatorPublications creatorId={id ?? ''} />
+            ) : (
+              <CreatorLatestContent creatorId={id ?? ''} provider={creator.provider} />
+            )}
           </Animated.View>
         </ParallaxScrollView>
       </Animated.View>
