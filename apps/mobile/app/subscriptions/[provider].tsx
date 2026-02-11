@@ -5,7 +5,7 @@
  * Users can connect/disconnect the provider and add/remove subscriptions.
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import { validateAndConvertProvider } from '@/lib/route-validation';
 import { ErrorState, LoadingState } from '@/components/list-states';
 
 type Provider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+const SUBSTACK_FALLBACK_ICON_URL = 'https://substack.com/favicon.ico';
 
 interface UnifiedChannel {
   providerChannelId: string;
@@ -46,6 +47,9 @@ interface NewsletterFeed {
   id: string;
   displayName: string;
   fromAddress: string | null;
+  listId?: string | null;
+  unsubscribeUrl?: string | null;
+  imageUrl: string | null;
   status: 'ACTIVE' | 'HIDDEN' | 'UNSUBSCRIBED';
   lastSeenAt: number;
 }
@@ -138,6 +142,52 @@ function getProviderConfig(provider: Provider) {
       contentName: 'newsletters',
     },
   }[provider];
+}
+
+function getNewsletterAvatarUrl(feed: NewsletterFeed): string | null {
+  if (feed.imageUrl) {
+    return feed.imageUrl;
+  }
+
+  const candidates: string[] = [];
+
+  if (feed.unsubscribeUrl) {
+    try {
+      const domainFromUnsubscribe = new URL(feed.unsubscribeUrl).hostname.toLowerCase();
+      if (domainFromUnsubscribe) {
+        candidates.push(domainFromUnsubscribe);
+      }
+    } catch {
+      // Ignore malformed URLs and continue fallback chain.
+    }
+  }
+
+  if (feed.listId) {
+    const matches = feed.listId.toLowerCase().match(/[a-z0-9.-]+\.[a-z]{2,}/g);
+    if (matches && matches.length > 0) {
+      candidates.push(matches[matches.length - 1]);
+    }
+  }
+
+  const domainFromAddress = feed.fromAddress?.split('@')[1]?.trim().toLowerCase();
+  if (domainFromAddress) {
+    candidates.push(domainFromAddress);
+  }
+
+  const domain = candidates.find(Boolean);
+  if (!domain) {
+    return null;
+  }
+
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+}
+
+function isSubstackNewsletter(feed: NewsletterFeed): boolean {
+  return Boolean(
+    feed.fromAddress?.toLowerCase().endsWith('@substack.com') ||
+    feed.listId?.toLowerCase().includes('substack.com') ||
+    feed.unsubscribeUrl?.toLowerCase().includes('substack.com')
+  );
 }
 
 function formatDate(dateString: string): string {
@@ -323,22 +373,74 @@ function NewsletterItem({
   colors,
 }: NewsletterItemProps) {
   const isActive = feed.status === 'ACTIVE';
+  const isUnsubscribed = feed.status === 'UNSUBSCRIBED';
+  const statusLabel = isUnsubscribed ? 'Not subscribed' : isActive ? 'Subscribed' : 'Hidden';
+  const primaryLabel = isUnsubscribed ? 'Subscribe' : isActive ? 'Hide' : 'Show';
+  const avatarUrl = getNewsletterAvatarUrl(feed);
+  const fallbackAvatarUrl = isSubstackNewsletter(feed) ? SUBSTACK_FALLBACK_ICON_URL : null;
+  const [primaryImageFailed, setPrimaryImageFailed] = useState(false);
+  const [fallbackImageFailed, setFallbackImageFailed] = useState(false);
+  const primaryBackgroundColor = isUnsubscribed
+    ? colors.buttonPrimary
+    : isActive
+      ? colors.backgroundTertiary
+      : colors.success;
+  const primaryTextColor = isUnsubscribed
+    ? colors.buttonPrimaryText
+    : isActive
+      ? colors.text
+      : '#FFFFFF';
+  const shownAvatarUrl = primaryImageFailed ? fallbackAvatarUrl : (avatarUrl ?? fallbackAvatarUrl);
+
+  useEffect(() => {
+    setPrimaryImageFailed(false);
+    setFallbackImageFailed(false);
+  }, [feed.id, avatarUrl, fallbackAvatarUrl]);
 
   return (
     <Animated.View>
       <View style={styles.channelItem}>
-        <View style={[styles.channelImagePlaceholder, { backgroundColor: colors.backgroundTertiary }]}>
-          <Text style={[styles.channelImagePlaceholderText, { color: colors.textSecondary }]}>✉️</Text>
-        </View>
+        {shownAvatarUrl && !fallbackImageFailed ? (
+          <Image
+            source={{ uri: shownAvatarUrl }}
+            style={styles.channelImage}
+            onError={() => {
+              if (
+                !primaryImageFailed &&
+                avatarUrl &&
+                fallbackAvatarUrl &&
+                avatarUrl !== fallbackAvatarUrl
+              ) {
+                setPrimaryImageFailed(true);
+                return;
+              }
+              setFallbackImageFailed(true);
+            }}
+          />
+        ) : (
+          <View
+            style={[styles.channelImagePlaceholder, { backgroundColor: colors.backgroundTertiary }]}
+          >
+            <Text style={[styles.channelImagePlaceholderText, { color: colors.textSecondary }]}>
+              ✉️
+            </Text>
+          </View>
+        )}
         <View style={styles.channelContent}>
           <Text style={[styles.channelName, { color: colors.text }]} numberOfLines={1}>
             {feed.displayName}
           </Text>
           {feed.fromAddress && (
-            <Text style={[styles.connectionDetail, { color: colors.textSecondary }]} numberOfLines={1}>
+            <Text
+              style={[styles.connectionDetail, { color: colors.textSecondary }]}
+              numberOfLines={1}
+            >
               {feed.fromAddress}
             </Text>
           )}
+          <Text style={[styles.newsletterStatus, { color: colors.textTertiary }]}>
+            {statusLabel}
+          </Text>
         </View>
 
         <View style={styles.newsletterActions}>
@@ -348,29 +450,26 @@ function NewsletterItem({
             style={({ pressed }) => [
               styles.newsletterButton,
               {
-                backgroundColor: isActive ? colors.backgroundTertiary : colors.success,
+                backgroundColor: primaryBackgroundColor,
               },
               pressed && { opacity: 0.8 },
               isProcessing && { opacity: 0.5 },
             ]}
           >
             {isProcessing ? (
-              <ActivityIndicator size="small" color={isActive ? colors.text : '#FFFFFF'} />
+              <ActivityIndicator size="small" color={primaryTextColor} />
             ) : (
-              <Text
-                style={[
-                  styles.newsletterButtonText,
-                  { color: isActive ? colors.text : '#FFFFFF' },
-                ]}
-              >
-                {isActive ? 'Hide' : 'Show'}
+              <Text style={[styles.newsletterButtonText, { color: primaryTextColor }]}>
+                {primaryLabel}
               </Text>
             )}
           </Pressable>
 
-          <Pressable onPress={onUnsubscribe} disabled={isProcessing}>
-            <Text style={[styles.disconnectText, { color: colors.error }]}>Unsubscribe</Text>
-          </Pressable>
+          {!isUnsubscribed && (
+            <Pressable onPress={onUnsubscribe} disabled={isProcessing}>
+              <Text style={[styles.disconnectText, { color: colors.error }]}>Unsubscribe</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </Animated.View>
@@ -437,8 +536,7 @@ export default function ProviderDetailScreen() {
   );
   const isConnected = connection?.status === 'ACTIVE';
 
-  const discoverProvider: 'YOUTUBE' | 'SPOTIFY' =
-    provider === 'SPOTIFY' ? 'SPOTIFY' : 'YOUTUBE';
+  const discoverProvider: 'YOUTUBE' | 'SPOTIFY' = provider === 'SPOTIFY' ? 'SPOTIFY' : 'YOUTUBE';
 
   // Fetch available channels from provider
   const discoverQuery = trpc.subscriptions.discover.available.useQuery(
@@ -467,17 +565,23 @@ export default function ProviderDetailScreen() {
     },
   });
 
-  const updateNewsletterStatusMutation = (trpc as any).subscriptions.newsletters.updateStatus.useMutation({
+  const updateNewsletterStatusMutation = (
+    trpc as any
+  ).subscriptions.newsletters.updateStatus.useMutation({
     onError: (error: Error) => {
       Alert.alert('Update failed', error.message || 'Failed to update newsletter status.');
     },
     onSuccess: () => {
       utils.subscriptions?.newsletters?.list?.invalidate?.();
       utils.subscriptions?.newsletters?.stats?.invalidate?.();
+      utils.items?.inbox?.invalidate?.();
+      utils.items?.home?.invalidate?.();
     },
   });
 
-  const unsubscribeNewsletterMutation = (trpc as any).subscriptions.newsletters.unsubscribe.useMutation({
+  const unsubscribeNewsletterMutation = (
+    trpc as any
+  ).subscriptions.newsletters.unsubscribe.useMutation({
     onError: (error: Error) => {
       Alert.alert('Unsubscribe failed', error.message || 'Failed to unsubscribe from newsletter.');
     },
@@ -503,9 +607,17 @@ export default function ProviderDetailScreen() {
   );
 
   const newsletterFeeds: NewsletterFeed[] = useMemo(() => {
+    if (!isConnected) return [];
     const data = newslettersQuery.data as { items?: NewsletterFeed[] } | undefined;
-    return (data?.items ?? []).filter((feed) => feed.status !== 'UNSUBSCRIBED');
-  }, [newslettersQuery.data]);
+    return data?.items ?? [];
+  }, [isConnected, newslettersQuery.data]);
+
+  const updatingNewsletterFeedId: string | null = updateNewsletterStatusMutation.isPending
+    ? (updateNewsletterStatusMutation.variables?.feedId ?? null)
+    : null;
+  const unsubscribingNewsletterFeedId: string | null = unsubscribeNewsletterMutation.isPending
+    ? (unsubscribeNewsletterMutation.variables?.feedId ?? null)
+    : null;
 
   // Build unified channel list
   const unifiedChannels: UnifiedChannel[] = useMemo(() => {
@@ -574,22 +686,37 @@ export default function ProviderDetailScreen() {
   }, [config.name, provider, disconnectMutation]);
 
   const handleNewslettersSync = useCallback(() => {
+    if (!isConnected) {
+      Alert.alert('Gmail not connected', 'Connect Gmail before syncing newsletters.');
+      return;
+    }
+
     newslettersSyncMutation.mutate();
-  }, [newslettersSyncMutation]);
+  }, [isConnected, newslettersSyncMutation]);
 
   const handleNewsletterToggleStatus = useCallback(
     (feed: NewsletterFeed) => {
+      if (!isConnected) {
+        Alert.alert('Gmail not connected', 'Connect Gmail before managing newsletters.');
+        return;
+      }
+
       const nextStatus = feed.status === 'ACTIVE' ? 'HIDDEN' : 'ACTIVE';
       updateNewsletterStatusMutation.mutate({
         feedId: feed.id,
         status: nextStatus,
       });
     },
-    [updateNewsletterStatusMutation]
+    [isConnected, updateNewsletterStatusMutation]
   );
 
   const handleNewsletterUnsubscribe = useCallback(
     (feed: NewsletterFeed) => {
+      if (!isConnected) {
+        Alert.alert('Gmail not connected', 'Connect Gmail before managing newsletters.');
+        return;
+      }
+
       Alert.alert(
         `Unsubscribe from ${feed.displayName}?`,
         'This will mark the newsletter as unsubscribed in Zine.',
@@ -605,7 +732,7 @@ export default function ProviderDetailScreen() {
         ]
       );
     },
-    [unsubscribeNewsletterMutation]
+    [isConnected, unsubscribeNewsletterMutation]
   );
 
   const handleAdd = useCallback(
@@ -676,7 +803,7 @@ export default function ProviderDetailScreen() {
         onToggleStatus={() => handleNewsletterToggleStatus(item)}
         onUnsubscribe={() => handleNewsletterUnsubscribe(item)}
         isProcessing={
-          updateNewsletterStatusMutation.isPending || unsubscribeNewsletterMutation.isPending
+          updatingNewsletterFeedId === item.id || unsubscribingNewsletterFeedId === item.id
         }
         colors={colors}
       />
@@ -685,8 +812,8 @@ export default function ProviderDetailScreen() {
       colors,
       handleNewsletterToggleStatus,
       handleNewsletterUnsubscribe,
-      unsubscribeNewsletterMutation.isPending,
-      updateNewsletterStatusMutation.isPending,
+      unsubscribingNewsletterFeedId,
+      updatingNewsletterFeedId,
     ]
   );
 
@@ -710,7 +837,7 @@ export default function ProviderDetailScreen() {
     (provider === 'GMAIL' && isConnected && newslettersQuery.isLoading);
 
   const isGmailProvider = provider === 'GMAIL';
-  const listData = isGmailProvider ? newsletterFeeds : filteredChannels;
+  const listData = isGmailProvider ? (isConnected ? newsletterFeeds : []) : filteredChannels;
   const listRenderItem = isGmailProvider ? renderNewsletterItem : renderItem;
   const listKeyExtractor = isGmailProvider ? newsletterKeyExtractor : keyExtractor;
 
@@ -769,7 +896,9 @@ export default function ProviderDetailScreen() {
                         {newslettersSyncMutation.isPending ? (
                           <ActivityIndicator size="small" color={colors.text} />
                         ) : (
-                          <Text style={[styles.syncButtonText, { color: colors.text }]}>Sync now</Text>
+                          <Text style={[styles.syncButtonText, { color: colors.text }]}>
+                            Sync now
+                          </Text>
                         )}
                       </Pressable>
                     )}
@@ -980,6 +1109,10 @@ const styles = StyleSheet.create({
   newsletterActions: {
     alignItems: 'flex-end',
     gap: Spacing.sm,
+  },
+  newsletterStatus: {
+    ...Typography.bodySmall,
+    marginTop: Spacing.xs,
   },
   newsletterButton: {
     paddingHorizontal: Spacing.md,

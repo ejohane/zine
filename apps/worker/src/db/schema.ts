@@ -284,7 +284,7 @@ export const newsletterFeeds = sqliteTable(
     unsubscribeUrl: text('unsubscribe_url'),
     unsubscribePostHeader: text('unsubscribe_post_header'),
     detectionScore: real('detection_score').notNull(),
-    status: text('status').notNull().default('ACTIVE'), // ACTIVE | HIDDEN | UNSUBSCRIBED
+    status: text('status').notNull().default('ACTIVE'), // ACTIVE | HIDDEN | UNSUBSCRIBED (ingestion path sets UNSUBSCRIBED by default)
     firstSeenAt: integer('first_seen_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     createdAt: integer('created_at').notNull(),
@@ -292,7 +292,11 @@ export const newsletterFeeds = sqliteTable(
   },
   (table) => [
     uniqueIndex('newsletter_feeds_user_canonical_key_idx').on(table.userId, table.canonicalKey),
-    index('newsletter_feeds_mailbox_status_idx').on(table.gmailMailboxId, table.status, table.lastSeenAt),
+    index('newsletter_feeds_mailbox_status_idx').on(
+      table.gmailMailboxId,
+      table.status,
+      table.lastSeenAt
+    ),
   ]
 );
 

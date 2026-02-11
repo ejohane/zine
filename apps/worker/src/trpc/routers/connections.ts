@@ -8,17 +8,28 @@
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { ulid } from 'ulid';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, inArray } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { registerOAuthState, validateOAuthState } from '../../lib/oauth-state';
 import { exchangeCodeForTokens, getProviderUserInfo } from '../../lib/auth';
 import { encrypt, decrypt } from '../../lib/crypto';
-import { providerConnections, subscriptions, users, gmailMailboxes } from '../../db/schema';
+import {
+  providerConnections,
+  subscriptions,
+  users,
+  gmailMailboxes,
+  newsletterFeeds,
+  newsletterFeedMessages,
+  newsletterUnsubscribeEvents,
+} from '../../db/schema';
 import type { Bindings } from '../../types';
 import { authLogger } from '../../lib/logger';
 import type { Provider } from '@zine/shared';
 import { ProviderSchema } from '@zine/shared';
-import { ensureGmailMailboxForConnection, syncGmailNewslettersForUser } from '../../newsletters/gmail';
+import {
+  ensureGmailMailboxForConnection,
+  syncGmailNewslettersForUser,
+} from '../../newsletters/gmail';
 import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 
 // ============================================================================
@@ -229,12 +240,67 @@ export const connectionsRouter = router({
           });
 
           if (gmailConnection) {
-            await ensureGmailMailboxForConnection({
-              db: ctx.db,
-              userId: ctx.userId,
-              connection: gmailConnection as ProviderConnection,
-              env: ctx.env as TokenRefreshEnv,
-            });
+            try {
+              await ensureGmailMailboxForConnection({
+                db: ctx.db,
+                userId: ctx.userId,
+                connection: gmailConnection as ProviderConnection,
+                env: ctx.env as TokenRefreshEnv,
+              });
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const lower = errorMessage.toLowerCase();
+
+              authLogger.error('Gmail mailbox setup failed after OAuth callback', {
+                userId: ctx.userId,
+                error: errorMessage,
+              });
+
+              try {
+                await ctx.db
+                  .delete(gmailMailboxes)
+                  .where(eq(gmailMailboxes.providerConnectionId, gmailConnection.id));
+                await ctx.db
+                  .delete(providerConnections)
+                  .where(eq(providerConnections.id, gmailConnection.id));
+              } catch (rollbackError) {
+                authLogger.error('Failed to rollback Gmail connection after setup failure', {
+                  userId: ctx.userId,
+                  providerConnectionId: gmailConnection.id,
+                  error:
+                    rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+                });
+              }
+
+              if (
+                lower.includes('insufficient authentication scopes') ||
+                lower.includes('insufficient permission') ||
+                lower.includes('insufficientpermissions') ||
+                lower.includes('access_token_scope_insufficient')
+              ) {
+                throw new TRPCError({
+                  code: 'PRECONDITION_FAILED',
+                  message:
+                    'Gmail permissions are missing required scopes. Reconnect Gmail and approve read-only Gmail access.',
+                });
+              }
+
+              if (
+                lower.includes('accessnotconfigured') ||
+                lower.includes('gmail api has not been used in project')
+              ) {
+                throw new TRPCError({
+                  code: 'PRECONDITION_FAILED',
+                  message:
+                    'Gmail API is not enabled for this Google Cloud project. Enable Gmail API in Google Cloud Console, wait a few minutes, then try connecting again.',
+                });
+              }
+
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'Unable to verify Gmail mailbox access. Please try connecting again.',
+              });
+            }
 
             try {
               await syncGmailNewslettersForUser(ctx.userId, ctx.db, ctx.env as TokenRefreshEnv, {
@@ -342,17 +408,78 @@ export const connectionsRouter = router({
         });
       }
 
-      // 2. Delete connection from database
-      await ctx.db.delete(providerConnections).where(eq(providerConnections.id, connection.id));
-
-      // Gmail-specific cleanup: remove mailbox sync cursor rows so scheduler skips disconnected accounts
+      // 2. Gmail-specific cleanup: delete mailbox/newsletter metadata before removing connection.
+      // Foreign keys are non-cascading, so dependency order matters.
       if (input.provider === 'GMAIL') {
-        await ctx.db
-          .delete(gmailMailboxes)
-          .where(eq(gmailMailboxes.providerConnectionId, connection.id));
+        const mailboxRows = await ctx.db.query.gmailMailboxes.findMany({
+          where: and(
+            eq(gmailMailboxes.userId, ctx.userId),
+            eq(gmailMailboxes.providerConnectionId, connection.id)
+          ),
+          columns: { id: true },
+        });
+
+        const mailboxIds = mailboxRows.map((row) => row.id);
+
+        if (mailboxIds.length > 0) {
+          const feedRows = await ctx.db.query.newsletterFeeds.findMany({
+            where: and(
+              eq(newsletterFeeds.userId, ctx.userId),
+              inArray(newsletterFeeds.gmailMailboxId, mailboxIds)
+            ),
+            columns: { id: true },
+          });
+
+          const feedIds = feedRows.map((row) => row.id);
+
+          if (feedIds.length > 0) {
+            await ctx.db
+              .delete(newsletterUnsubscribeEvents)
+              .where(
+                and(
+                  eq(newsletterUnsubscribeEvents.userId, ctx.userId),
+                  inArray(newsletterUnsubscribeEvents.newsletterFeedId, feedIds)
+                )
+              );
+
+            await ctx.db
+              .delete(newsletterFeedMessages)
+              .where(
+                and(
+                  eq(newsletterFeedMessages.userId, ctx.userId),
+                  inArray(newsletterFeedMessages.newsletterFeedId, feedIds)
+                )
+              );
+
+            await ctx.db
+              .delete(newsletterFeeds)
+              .where(
+                and(eq(newsletterFeeds.userId, ctx.userId), inArray(newsletterFeeds.id, feedIds))
+              );
+          }
+
+          // Defensive cleanup for any rows tied to mailbox IDs directly.
+          await ctx.db
+            .delete(newsletterFeedMessages)
+            .where(
+              and(
+                eq(newsletterFeedMessages.userId, ctx.userId),
+                inArray(newsletterFeedMessages.gmailMailboxId, mailboxIds)
+              )
+            );
+
+          await ctx.db
+            .delete(gmailMailboxes)
+            .where(
+              and(eq(gmailMailboxes.userId, ctx.userId), inArray(gmailMailboxes.id, mailboxIds))
+            );
+        }
       }
 
-      // 3. Mark related subscriptions as DISCONNECTED
+      // 3. Delete connection from database
+      await ctx.db.delete(providerConnections).where(eq(providerConnections.id, connection.id));
+
+      // 4. Mark related subscriptions as DISCONNECTED
       // We don't change UNSUBSCRIBED subscriptions since those were explicitly removed by the user
       await ctx.db
         .update(subscriptions)

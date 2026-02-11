@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { OAuthErrorBoundary } from '@/components/oauth-error-boundary';
+import { OAuthErrorCode, parseOAuthError } from '@/lib/oauth-errors';
 import { connectProvider } from '@/lib/oauth';
 import { trpc } from '@/lib/trpc';
 
@@ -55,11 +56,13 @@ function GmailConnectContent() {
       await (utils as any).subscriptions?.newsletters?.list?.invalidate?.();
       router.replace('/subscriptions/gmail' as const);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Connection failed';
-      if (message.includes('cancelled') || message.includes('cancel')) {
+      const rawMessage = err instanceof Error ? err.message : 'Connection failed';
+      const parsed = parseOAuthError(rawMessage);
+
+      if (parsed.code === OAuthErrorCode.USER_CANCELLED) {
         setError(null);
       } else {
-        setError(message);
+        setError(parsed.message);
       }
     } finally {
       setIsConnecting(false);
@@ -67,14 +70,14 @@ function GmailConnectContent() {
   }, [router, utils]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <View style={[styles.iconContainer, { backgroundColor: `${GMAIL_BLUE}15` }]}>
             <Text style={styles.providerIcon}>📬</Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Connect Gmail</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}> 
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Import newsletters from your inbox into Zine
           </Text>
         </View>
@@ -85,7 +88,9 @@ function GmailConnectContent() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>WHAT WE&apos;LL ACCESS</Text>
+          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>
+            WHAT WE&apos;LL ACCESS
+          </Text>
           <View style={styles.permissionsList}>
             <PermissionItem
               icon="📰"
@@ -102,8 +107,15 @@ function GmailConnectContent() {
           </View>
         </View>
 
-        <View style={[styles.permissionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>WHAT WE WON&apos;T DO</Text>
+        <View
+          style={[
+            styles.permissionsCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>
+            WHAT WE WON&apos;T DO
+          </Text>
           <View style={styles.permissionsList}>
             <PermissionItem
               icon="✉️"
@@ -121,7 +133,7 @@ function GmailConnectContent() {
         </View>
 
         {error && (
-          <View style={[styles.errorContainer, { backgroundColor: `${colors.error}15` }]}> 
+          <View style={[styles.errorContainer, { backgroundColor: `${colors.error}15` }]}>
             <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
           </View>
         )}
@@ -146,12 +158,15 @@ function GmailConnectContent() {
         </Pressable>
 
         {isConnecting && (
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Opening Gmail authorization...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Opening Gmail authorization...
+          </Text>
         )}
 
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.textTertiary }]}> 
-            You can disconnect anytime from Connections. Newsletter items render like standard web articles.
+          <Text style={[styles.footerText, { color: colors.textTertiary }]}>
+            You can disconnect anytime from Connections. Newsletter items render like standard web
+            articles.
           </Text>
         </View>
       </ScrollView>

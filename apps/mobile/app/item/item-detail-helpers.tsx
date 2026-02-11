@@ -25,7 +25,7 @@ export function getFabConfig(provider: string): FabConfig {
       };
     case 'GMAIL':
       return {
-        providerIcon: <Ionicons name="mail-outline" size={22} color="#FFFFFF" />,
+        providerIcon: <Ionicons name="newspaper-outline" size={22} color="#FFFFFF" />,
         backgroundColor: '#1A73E8',
       };
     case 'X':

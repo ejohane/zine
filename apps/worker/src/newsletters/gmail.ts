@@ -1,10 +1,12 @@
 import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { ContentType, Provider } from '@zine/shared';
+import { parseHTML } from 'linkedom/worker';
 
 import { createDb, type Database } from '../db';
 import { findOrCreateCreator } from '../db/helpers/creators';
 import {
+  creators,
   gmailMailboxes,
   newsletterFeeds,
   newsletterFeedMessages,
@@ -12,11 +14,13 @@ import {
   providerConnections,
   userItems,
 } from '../db/schema';
+import { parseLink } from '../lib/link-parser';
 import { tryAcquireLock, releaseLock } from '../lib/locks';
 import { logger } from '../lib/logger';
 import type { ProviderConnection, TokenRefreshEnv } from '../lib/token-refresh';
 import { getValidAccessToken } from '../lib/token-refresh';
 import type { Bindings } from '../types';
+import { buildNewsletterAvatarUrl } from './avatar';
 
 const gmailLogger = logger.child('gmail-newsletters');
 
@@ -25,9 +29,46 @@ const DEFAULT_INITIAL_DAYS = 30;
 const MAX_INITIAL_PAGES = 2;
 const MAX_INCREMENTAL_PAGES = 3;
 const MESSAGE_FETCH_CONCURRENCY = 5;
-const NEWSLETTER_SCORE_THRESHOLD = 0.55;
+const NEWSLETTER_SCORE_THRESHOLD = 0.78;
 const GMAIL_POLL_LOCK_KEY = 'cron:poll-gmail-newsletters:lock';
 const GMAIL_POLL_LOCK_TTL = 900;
+
+const NEWSLETTER_KEYWORD_PATTERN =
+  /\b(newsletter|digest|briefing|roundup|edition|weekly|daily|issue|dispatch|substack)\b/i;
+const NEWSLETTER_PLATFORM_PATTERN = /\b(substack|beehiiv|convertkit|mailchimp|ghost)\b/i;
+const TRANSACTIONAL_SENDER_PATTERN =
+  /\b(no-?reply|do-?not-?reply|notifications?|billing|receipts?|support|help|security|alerts?|accounts?)\b/i;
+const TRANSACTIONAL_SUBJECT_PATTERN =
+  /\b(receipt|invoice|statement|verification|verify|security|password|order|booking|reservation|tracking|shipment|shipped|delivery|refund|payment|bill|otp|one-time code|alert|login|sign[\s-]?in|pull request|mentioned|commented)\b/i;
+const PROMOTIONAL_SUBJECT_PATTERN = /\b(sale|discount|coupon|deal|promo)\b/i;
+const CONTENT_HINT_PATH_PATTERN =
+  /\/(p|posts?|article|articles|blog|blogs?|stories?|issues?|newsletter|dispatch|edition|episode|watch|status)\b/i;
+const NON_CONTENT_URL_PATTERN =
+  /\b(unsubscribe|subscription|preferences?|manage|settings|account|billing|privacy|terms|login|sign[\s-]?in|view[\s_-]*in[\s_-]*browser|webview|support|help|feedback)\b/i;
+const NON_CONTENT_ANCHOR_PATTERN =
+  /\b(unsubscribe|manage|preferences?|privacy|terms|view\s+in\s+browser|login|sign[\s-]?in|support|help|share|follow)\b/i;
+const EXCLUDED_HOST_PATTERN =
+  /(^|\.)mail\.google\.com$|(^|\.)accounts\.google\.com$|(^|\.)googleusercontent\.com$/i;
+const SUBSTACK_REDIRECT_HOST_PATTERN = /(^|\.)substack\.com$/i;
+const OPEN_SUBSTACK_HOST_PATTERN = /(^|\.)open\.substack\.com$/i;
+const URL_PATTERN = /https?:\/\/[^\s<>"')\]]+/gi;
+const REDIRECT_PARAM_NAMES = [
+  'url',
+  'u',
+  'q',
+  'target',
+  'to',
+  'destination',
+  'dest',
+  'redirect',
+  'redirect_url',
+  'redirect_uri',
+  'redirecturl',
+  'link',
+  'href',
+];
+
+type NewsletterUrlCandidateSource = 'html_anchor' | 'text' | 'snippet';
 
 type GmailHeader = {
   name?: string;
@@ -57,9 +98,18 @@ type GmailMessageMetadata = {
   historyId?: string;
   internalDate?: string;
   snippet?: string;
-  payload?: {
-    headers?: GmailHeader[];
+  payload?: GmailMessagePayloadPart;
+};
+
+type GmailMessagePayloadPart = {
+  mimeType?: string;
+  headers?: GmailHeader[];
+  body?: {
+    data?: string;
+    size?: number;
+    attachmentId?: string;
   };
+  parts?: GmailMessagePayloadPart[];
 };
 
 type GmailProfile = {
@@ -108,10 +158,27 @@ type ParsedMessage = {
   issueUrl: string | null;
 };
 
+type NewsletterUrlCandidate = {
+  url: string;
+  anchorText: string | null;
+  source: NewsletterUrlCandidateSource;
+  index: number;
+};
+
 interface MessageIdFetchResult {
   mode: 'initial' | 'incremental';
   ids: string[];
   latestHistoryId: string | null;
+}
+
+interface FeedSeedResult {
+  created: boolean;
+  reason:
+    | 'created'
+    | 'already_exists'
+    | 'restored_from_archive'
+    | 'no_matching_message'
+    | 'no_search_query';
 }
 
 class GmailApiError extends Error {
@@ -195,38 +262,732 @@ function extractFirstUrl(snippet: string): string | null {
   return match?.[0] ?? null;
 }
 
-function computeNewsletterScore(params: {
-  listId: string | null;
-  listUnsubscribe: string | null;
-  unsubscribePostHeader: string | null;
-  fromAddress: string;
-  subject: string;
-}): NewsletterDetection {
+function decodeBase64Url(input: string | null | undefined): string | null {
+  if (!input) {
+    return null;
+  }
+
+  try {
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeCandidateUrl(rawUrl: string): string | null {
+  const trimmed = rawUrl
+    .trim()
+    .replace(/^[<("'[]+/, '')
+    .replace(/[>"')\].,;!?]+$/, '');
+
+  if (!trimmed) {
+    return null;
+  }
+
+  let current = trimmed;
+
+  for (let depth = 0; depth < 3; depth += 1) {
+    let parsed: URL;
+    try {
+      parsed = new URL(current);
+    } catch {
+      return null;
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    let redirected: string | null = null;
+    for (const key of REDIRECT_PARAM_NAMES) {
+      const value = parsed.searchParams.get(key);
+      if (!value) {
+        continue;
+      }
+
+      const candidates = [value];
+      try {
+        candidates.push(decodeURIComponent(value));
+      } catch {
+        // Keep best-effort raw value when URL decoding fails.
+      }
+
+      redirected =
+        candidates.find((candidate) => /^https?:\/\//i.test(candidate)) ??
+        candidates.find((candidate) => /^https?%3A%2F%2F/i.test(candidate)) ??
+        null;
+      if (redirected) {
+        break;
+      }
+    }
+
+    if (!redirected) {
+      break;
+    }
+
+    try {
+      current = redirected.startsWith('http')
+        ? redirected
+        : decodeURIComponent(redirected.replace(/\+/g, '%20'));
+    } catch {
+      current = redirected;
+    }
+  }
+
+  if (!/^https?:\/\//i.test(current)) {
+    return null;
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(current);
+  } catch {
+    return null;
+  }
+
+  // Convert Substack "open" share URLs to direct publication article URLs.
+  if (OPEN_SUBSTACK_HOST_PATTERN.test(parsedUrl.hostname)) {
+    const pathSegments = parsedUrl.pathname.split('/').filter(Boolean);
+    if (pathSegments.length >= 4 && pathSegments[0] === 'pub' && pathSegments[2] === 'p') {
+      const publication = pathSegments[1];
+      const slug = pathSegments[3];
+      if (publication && slug) {
+        current = `https://${publication}.substack.com/p/${slug}`;
+      }
+    }
+  }
+
+  const parsed = parseLink(current);
+  return parsed?.canonicalUrl ?? current;
+}
+
+function extractRootDomain(value: string | null | undefined): string | null {
+  const raw = (value ?? '').trim().toLowerCase();
+  if (!raw) {
+    return null;
+  }
+
+  const hostLike = raw.includes('@') ? (raw.split('@').pop() ?? '') : raw;
+  const normalized = hostLike.replace(/^www\./, '').replace(/[<>]/g, '');
+  const parts = normalized.split('.').filter(Boolean);
+  if (parts.length < 2) {
+    return normalized || null;
+  }
+
+  return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
+}
+
+function isNonContentUrl(url: string, unsubscribeUrl: string | null): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return true;
+  }
+
+  if (EXCLUDED_HOST_PATTERN.test(parsed.hostname)) {
+    return true;
+  }
+
+  const text = `${parsed.pathname} ${parsed.search}`.toLowerCase();
+  if (NON_CONTENT_URL_PATTERN.test(text)) {
+    return true;
+  }
+
+  if (unsubscribeUrl) {
+    const normalizedUnsubscribeUrl = normalizeCandidateUrl(unsubscribeUrl);
+    if (normalizedUnsubscribeUrl && normalizedUnsubscribeUrl === url) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function scoreNewsletterCandidate(
+  candidate: NewsletterUrlCandidate,
+  params: {
+    unsubscribeUrl: string | null;
+    fromAddress: string;
+    listId: string | null;
+  }
+): number {
+  const normalizedUrl = normalizeCandidateUrl(candidate.url);
+  if (!normalizedUrl || isNonContentUrl(normalizedUrl, params.unsubscribeUrl)) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
   let score = 0;
 
-  if (params.listId) {
-    score += 0.65;
+  if (candidate.source === 'html_anchor') {
+    score += 1.3;
+  } else if (candidate.source === 'text') {
+    score += 1;
+  } else {
+    score += 0.7;
   }
 
-  if (params.listUnsubscribe) {
-    score += 0.35;
+  const anchorText = (candidate.anchorText ?? '').trim().toLowerCase();
+  if (anchorText) {
+    if (NON_CONTENT_ANCHOR_PATTERN.test(anchorText)) {
+      score -= 1.1;
+    } else if (anchorText.length > 8) {
+      score += 0.35;
+    }
   }
 
-  if (params.unsubscribePostHeader?.toLowerCase().includes('one-click')) {
+  try {
+    const url = new URL(normalizedUrl);
+    const path = url.pathname.toLowerCase();
+    const rootDomain = extractRootDomain(url.hostname);
+    const senderRootDomain = extractRootDomain(params.fromAddress);
+    const listRootDomain = extractRootDomain(params.listId);
+
+    if (CONTENT_HINT_PATH_PATTERN.test(path)) {
+      score += 1.35;
+    }
+
+    if (url.hostname.endsWith('.substack.com')) {
+      score += 0.75;
+      if (path.startsWith('/p/')) {
+        score += 1.1;
+      }
+    }
+
+    if (rootDomain && senderRootDomain && rootDomain === senderRootDomain) {
+      score += 0.5;
+    }
+
+    if (rootDomain && listRootDomain && rootDomain === listRootDomain) {
+      score += 0.35;
+    }
+  } catch {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  score -= candidate.index * 0.015;
+
+  return score;
+}
+
+export function selectBestNewsletterIssueUrl(params: {
+  candidates: NewsletterUrlCandidate[];
+  unsubscribeUrl: string | null;
+  fromAddress: string;
+  listId: string | null;
+}): string | null {
+  let bestUrl: string | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let bestIndex = Number.MAX_SAFE_INTEGER;
+  const seen = new Set<string>();
+
+  for (const candidate of params.candidates) {
+    const normalizedUrl = normalizeCandidateUrl(candidate.url);
+    if (!normalizedUrl || seen.has(normalizedUrl)) {
+      continue;
+    }
+    seen.add(normalizedUrl);
+
+    const score = scoreNewsletterCandidate(
+      {
+        ...candidate,
+        url: normalizedUrl,
+      },
+      {
+        unsubscribeUrl: params.unsubscribeUrl,
+        fromAddress: params.fromAddress,
+        listId: params.listId,
+      }
+    );
+
+    if (!Number.isFinite(score)) {
+      continue;
+    }
+
+    if (score > bestScore || (score === bestScore && candidate.index < bestIndex)) {
+      bestScore = score;
+      bestIndex = candidate.index;
+      bestUrl = normalizedUrl;
+    }
+  }
+
+  return bestUrl;
+}
+
+function collectDecodedBodies(
+  part: GmailMessagePayloadPart | undefined,
+  buffers: { htmlBodies: string[]; textBodies: string[] }
+): void {
+  if (!part) {
+    return;
+  }
+
+  const decoded = decodeBase64Url(part.body?.data);
+  if (decoded) {
+    const mimeType = (part.mimeType ?? '').toLowerCase();
+    if (mimeType.includes('text/html')) {
+      buffers.htmlBodies.push(decoded);
+    } else if (mimeType.includes('text/plain')) {
+      buffers.textBodies.push(decoded);
+    }
+  }
+
+  for (const nestedPart of part.parts ?? []) {
+    collectDecodedBodies(nestedPart, buffers);
+  }
+}
+
+function extractAnchorCandidatesFromHtml(
+  html: string,
+  startIndex: number
+): NewsletterUrlCandidate[] {
+  try {
+    const { document } = parseHTML(html);
+    const anchors = Array.from(document.querySelectorAll('a[href]'));
+    const candidates: NewsletterUrlCandidate[] = [];
+
+    for (const [index, anchor] of anchors.entries()) {
+      const href = anchor.getAttribute('href');
+      if (!href) {
+        continue;
+      }
+
+      candidates.push({
+        url: href,
+        anchorText: anchor.textContent ? anchor.textContent.trim() : null,
+        source: 'html_anchor',
+        index: startIndex + index,
+      });
+    }
+
+    return candidates;
+  } catch {
+    return [];
+  }
+}
+
+function extractTextCandidates(
+  text: string,
+  source: NewsletterUrlCandidateSource,
+  startIndex: number
+) {
+  const matches = Array.from(text.matchAll(URL_PATTERN));
+  return matches.map((match, index) => ({
+    url: match[0],
+    anchorText: null,
+    source,
+    index: startIndex + index,
+  }));
+}
+
+async function fetchMessageFull(
+  accessToken: string,
+  messageId: string
+): Promise<GmailMessageMetadata> {
+  const params = new URLSearchParams({
+    format: 'full',
+  });
+
+  return gmailGet<GmailMessageMetadata>(
+    accessToken,
+    `messages/${encodeURIComponent(messageId)}?${params.toString()}`
+  );
+}
+
+function isSubstackRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      SUBSTACK_REDIRECT_HOST_PATTERN.test(parsed.hostname) &&
+      parsed.pathname.startsWith('/redirect/')
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function resolveRedirectTarget(url: string): Promise<string | null> {
+  for (const method of ['HEAD', 'GET'] as const) {
+    try {
+      const response = await fetch(url, {
+        method,
+        redirect: 'manual',
+      });
+      const location = response.headers.get('location');
+      if (location) {
+        return new URL(location, url).toString();
+      }
+    } catch {
+      // Best effort only.
+    }
+  }
+
+  return null;
+}
+
+async function resolveKnownRedirectUrl(url: string): Promise<string> {
+  let current = url;
+
+  for (let depth = 0; depth < 2; depth += 1) {
+    if (!isSubstackRedirectUrl(current)) {
+      break;
+    }
+
+    const target = await resolveRedirectTarget(current);
+    if (!target) {
+      break;
+    }
+
+    const normalizedTarget = normalizeCandidateUrl(target);
+    if (!normalizedTarget || normalizedTarget === current) {
+      break;
+    }
+
+    current = normalizedTarget;
+  }
+
+  return current;
+}
+
+async function resolveIssueUrl(params: {
+  accessToken: string | null;
+  parsed: ParsedMessage;
+}): Promise<{ url: string; source: 'full_message' | 'snippet' | 'gmail_fallback' }> {
+  const snippetCandidates: NewsletterUrlCandidate[] = params.parsed.issueUrl
+    ? [
+        {
+          url: params.parsed.issueUrl,
+          anchorText: null,
+          source: 'snippet',
+          index: 0,
+        },
+      ]
+    : [];
+
+  if (params.accessToken) {
+    try {
+      const fullMessage = await fetchMessageFull(params.accessToken, params.parsed.messageId);
+      const buffers = { htmlBodies: [] as string[], textBodies: [] as string[] };
+      collectDecodedBodies(fullMessage.payload, buffers);
+
+      const allCandidates: NewsletterUrlCandidate[] = [];
+      let runningIndex = 0;
+
+      for (const htmlBody of buffers.htmlBodies) {
+        const anchorCandidates = extractAnchorCandidatesFromHtml(htmlBody, runningIndex);
+        runningIndex += anchorCandidates.length;
+        allCandidates.push(...anchorCandidates);
+
+        const textCandidates = extractTextCandidates(htmlBody, 'text', runningIndex);
+        runningIndex += textCandidates.length;
+        allCandidates.push(...textCandidates);
+      }
+
+      for (const textBody of buffers.textBodies) {
+        const textCandidates = extractTextCandidates(textBody, 'text', runningIndex);
+        runningIndex += textCandidates.length;
+        allCandidates.push(...textCandidates);
+      }
+
+      allCandidates.push(...snippetCandidates.map((candidate, index) => ({ ...candidate, index })));
+
+      const bestFromFullMessage = selectBestNewsletterIssueUrl({
+        candidates: allCandidates,
+        unsubscribeUrl: params.parsed.unsubscribeUrl,
+        fromAddress: params.parsed.fromAddress,
+        listId: params.parsed.listId,
+      });
+
+      if (bestFromFullMessage) {
+        return {
+          url: await resolveKnownRedirectUrl(bestFromFullMessage),
+          source: 'full_message',
+        };
+      }
+    } catch (error) {
+      gmailLogger.warn('Failed to resolve newsletter issue URL from full Gmail message', {
+        messageId: params.parsed.messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const bestFromSnippet = selectBestNewsletterIssueUrl({
+    candidates: snippetCandidates,
+    unsubscribeUrl: params.parsed.unsubscribeUrl,
+    fromAddress: params.parsed.fromAddress,
+    listId: params.parsed.listId,
+  });
+
+  if (bestFromSnippet) {
+    return {
+      url: await resolveKnownRedirectUrl(bestFromSnippet),
+      source: 'snippet',
+    };
+  }
+
+  return {
+    url: buildGmailFallbackUrl(params.parsed.threadId),
+    source: 'gmail_fallback',
+  };
+}
+
+async function maybeUpgradeExistingNewsletterItem(params: {
+  db: Database;
+  itemId: string;
+  parsed: ParsedMessage;
+  accessToken: string | null;
+}): Promise<void> {
+  const existingItem = await params.db.query.items.findFirst({
+    where: eq(items.id, params.itemId),
+    columns: {
+      id: true,
+      canonicalUrl: true,
+      creatorId: true,
+      thumbnailUrl: true,
+      rawMetadata: true,
+    },
+  });
+
+  if (!existingItem) {
+    return;
+  }
+
+  let canonicalUrl = existingItem.canonicalUrl;
+  let rawMetadata = existingItem.rawMetadata;
+  let shouldPersistCanonicalUpdate = false;
+
+  const shouldAttemptUpgrade =
+    isGmailFallbackUrl(existingItem.canonicalUrl) ||
+    isSubstackRedirectUrl(existingItem.canonicalUrl) ||
+    isOpenSubstackUrl(existingItem.canonicalUrl);
+
+  if (shouldAttemptUpgrade) {
+    const resolved = await resolveIssueUrl({
+      accessToken: params.accessToken,
+      parsed: params.parsed,
+    });
+
+    if (shouldUpgradeNewsletterIssueUrl(existingItem.canonicalUrl, resolved.url)) {
+      let metadata: Record<string, unknown> = {};
+      if (existingItem.rawMetadata) {
+        try {
+          const parsedMetadata = JSON.parse(existingItem.rawMetadata);
+          if (
+            parsedMetadata &&
+            typeof parsedMetadata === 'object' &&
+            !Array.isArray(parsedMetadata)
+          ) {
+            metadata = parsedMetadata as Record<string, unknown>;
+          }
+        } catch {
+          metadata = {};
+        }
+      }
+
+      metadata.issueUrlSource = resolved.source;
+      metadata.previousCanonicalUrl = existingItem.canonicalUrl;
+      metadata.issueUrlUpgradedAt = new Date().toISOString();
+
+      canonicalUrl = resolved.url;
+      rawMetadata = JSON.stringify(metadata);
+      shouldPersistCanonicalUpdate = true;
+    }
+  }
+
+  const newsletterAvatarUrl = buildNewsletterAvatarUrl({
+    canonicalUrl,
+    listId: params.parsed.listId,
+    fromAddress: params.parsed.fromAddress,
+    unsubscribeUrl: params.parsed.unsubscribeUrl,
+    creatorHandle: params.parsed.fromAddress,
+  });
+
+  const itemUpdates: Partial<typeof items.$inferInsert> = {};
+  if (shouldPersistCanonicalUpdate) {
+    itemUpdates.canonicalUrl = canonicalUrl;
+    itemUpdates.rawMetadata = rawMetadata;
+  }
+
+  if (!existingItem.thumbnailUrl && newsletterAvatarUrl) {
+    itemUpdates.thumbnailUrl = newsletterAvatarUrl;
+  }
+
+  if (Object.keys(itemUpdates).length > 0) {
+    itemUpdates.updatedAt = new Date().toISOString();
+    await params.db.update(items).set(itemUpdates).where(eq(items.id, existingItem.id));
+  }
+
+  if (newsletterAvatarUrl && existingItem.creatorId) {
+    const creator = await params.db.query.creators.findFirst({
+      where: eq(creators.id, existingItem.creatorId),
+      columns: {
+        id: true,
+        imageUrl: true,
+      },
+    });
+
+    if (creator && !creator.imageUrl) {
+      await params.db
+        .update(creators)
+        .set({
+          imageUrl: newsletterAvatarUrl,
+          updatedAt: Date.now(),
+        })
+        .where(eq(creators.id, creator.id));
+    }
+  }
+}
+
+function containsPattern(pattern: RegExp, ...values: Array<string | null | undefined>): boolean {
+  return values.some((value) => !!value && pattern.test(value));
+}
+
+export function isLikelyNewsletterFeedIdentity(params: {
+  listId: string | null;
+  unsubscribeMailto: string | null;
+  unsubscribeUrl: string | null;
+  fromAddress: string | null;
+  displayName: string | null;
+}): boolean {
+  const hasListId = !!params.listId;
+  const hasListUnsubscribe = !!params.unsubscribeMailto || !!params.unsubscribeUrl;
+  const hasNewsletterKeywords = containsPattern(
+    NEWSLETTER_KEYWORD_PATTERN,
+    params.fromAddress,
+    params.displayName,
+    params.listId
+  );
+  const hasPlatformSignal = containsPattern(
+    NEWSLETTER_PLATFORM_PATTERN,
+    params.fromAddress,
+    params.listId,
+    params.unsubscribeMailto,
+    params.unsubscribeUrl
+  );
+  const hasSemanticNewsletterSignal = hasNewsletterKeywords || hasPlatformSignal;
+  const isTransactionalSender = containsPattern(
+    TRANSACTIONAL_SENDER_PATTERN,
+    params.fromAddress,
+    params.displayName
+  );
+
+  if (isTransactionalSender && !hasNewsletterKeywords && !hasPlatformSignal) {
+    return false;
+  }
+
+  if (!hasListId && !hasListUnsubscribe && !hasPlatformSignal) {
+    return false;
+  }
+
+  // Structural headers alone are too noisy (e.g., transactional brands like Uber/GitHub).
+  // Require at least one semantic newsletter signal for feed-level visibility.
+  if (!hasSemanticNewsletterSignal) {
+    return false;
+  }
+
+  return hasListId || hasListUnsubscribe || hasSemanticNewsletterSignal;
+}
+
+export function computeNewsletterScore(params: {
+  listId: string | null;
+  listUnsubscribe: string | null;
+  unsubscribeMailto: string | null;
+  unsubscribeUrl: string | null;
+  unsubscribePostHeader: string | null;
+  fromAddress: string;
+  fromDisplayName: string;
+  subject: string;
+}): NewsletterDetection {
+  const hasListId = !!params.listId;
+  const hasListUnsubscribe =
+    !!params.listUnsubscribe || !!params.unsubscribeMailto || !!params.unsubscribeUrl;
+  const hasOneClick = params.unsubscribePostHeader?.toLowerCase().includes('one-click') ?? false;
+  const hasNewsletterKeywords = containsPattern(
+    NEWSLETTER_KEYWORD_PATTERN,
+    params.subject,
+    params.fromAddress,
+    params.fromDisplayName,
+    params.listId
+  );
+  const hasPlatformSignal = containsPattern(
+    NEWSLETTER_PLATFORM_PATTERN,
+    params.fromAddress,
+    params.listId,
+    params.unsubscribeMailto,
+    params.unsubscribeUrl
+  );
+  const isTransactionalSender = containsPattern(
+    TRANSACTIONAL_SENDER_PATTERN,
+    params.fromAddress,
+    params.fromDisplayName
+  );
+  const isTransactionalSubject = containsPattern(TRANSACTIONAL_SUBJECT_PATTERN, params.subject);
+  const isPromotionalSubject = containsPattern(PROMOTIONAL_SUBJECT_PATTERN, params.subject);
+
+  let score = 0;
+
+  if (hasListId) {
+    score += 0.33;
+  }
+
+  if (hasListUnsubscribe) {
+    score += 0.22;
+  }
+
+  if (hasOneClick) {
     score += 0.1;
   }
 
-  if (/newsletter|digest|updates|weekly|daily/i.test(params.fromAddress)) {
-    score += 0.1;
+  if (hasNewsletterKeywords) {
+    score += 0.24;
   }
 
-  if (/receipt|invoice|statement|verification|security|password|order/i.test(params.subject)) {
-    score -= 0.5;
+  if (hasPlatformSignal) {
+    score += 0.2;
+  }
+
+  if (hasListId && hasListUnsubscribe) {
+    score += 0.12;
+  }
+
+  if (isTransactionalSender) {
+    score -= 0.45;
+  }
+
+  if (isTransactionalSubject) {
+    score -= 0.65;
+  }
+
+  if (isPromotionalSubject) {
+    score -= 0.2;
+  }
+
+  if (!hasListId && !hasPlatformSignal) {
+    score -= 0.2;
+  }
+
+  if (!hasListUnsubscribe && !hasNewsletterKeywords) {
+    score -= 0.2;
   }
 
   const clamped = Math.max(0, Math.min(1, score));
+  const transactionalReject =
+    (isTransactionalSender || isTransactionalSubject) &&
+    !hasNewsletterKeywords &&
+    !hasPlatformSignal;
+  const identityReject = !isLikelyNewsletterFeedIdentity({
+    listId: params.listId,
+    unsubscribeMailto: params.unsubscribeMailto,
+    unsubscribeUrl: params.unsubscribeUrl,
+    fromAddress: params.fromAddress,
+    displayName: params.fromDisplayName,
+  });
+
   return {
-    isNewsletter: clamped >= NEWSLETTER_SCORE_THRESHOLD,
+    isNewsletter: clamped >= NEWSLETTER_SCORE_THRESHOLD && !transactionalReject && !identityReject,
     score: clamped,
   };
 }
@@ -256,6 +1017,50 @@ function buildGmailFallbackUrl(threadId: string): string {
   return `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
 }
 
+function isGmailFallbackUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === 'mail.google.com' && parsed.pathname.startsWith('/mail/u/');
+  } catch {
+    return false;
+  }
+}
+
+function isOpenSubstackUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return OPEN_SUBSTACK_HOST_PATTERN.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function shouldUpgradeNewsletterIssueUrl(currentUrl: string, nextUrl: string): boolean {
+  if (!currentUrl || !nextUrl || currentUrl === nextUrl) {
+    return false;
+  }
+
+  const currentIsGmailFallback = isGmailFallbackUrl(currentUrl);
+  const nextIsGmailFallback = isGmailFallbackUrl(nextUrl);
+  if (currentIsGmailFallback && !nextIsGmailFallback) {
+    return true;
+  }
+
+  const currentIsSubstackRedirect = isSubstackRedirectUrl(currentUrl);
+  const nextIsSubstackRedirect = isSubstackRedirectUrl(nextUrl);
+  if (currentIsSubstackRedirect && !nextIsSubstackRedirect) {
+    return true;
+  }
+
+  const currentIsOpenSubstack = isOpenSubstackUrl(currentUrl);
+  const nextIsOpenSubstack = isOpenSubstackUrl(nextUrl);
+  if (currentIsOpenSubstack && !nextIsOpenSubstack) {
+    return true;
+  }
+
+  return false;
+}
+
 async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
   const response = await fetch(`${GMAIL_API_BASE}/${path}`, {
     headers: {
@@ -265,7 +1070,10 @@ async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
 
   if (!response.ok) {
     const body = await response.text();
-    throw new GmailApiError(response.status, `Gmail API request failed (${response.status}): ${body}`);
+    throw new GmailApiError(
+      response.status,
+      `Gmail API request failed (${response.status}): ${body}`
+    );
   }
 
   return (await response.json()) as T;
@@ -310,6 +1118,28 @@ async function fetchMessageIdsInitial(accessToken: string): Promise<MessageIdFet
     ids: Array.from(new Set(messageIds)),
     latestHistoryId: profile.historyId ?? null,
   };
+}
+
+async function fetchMessageIdsForQuery(
+  accessToken: string,
+  query: string,
+  maxResults: number = 10
+): Promise<string[]> {
+  const params = new URLSearchParams({
+    maxResults: String(Math.max(1, Math.min(100, maxResults))),
+    q: query,
+  });
+
+  const response = await gmailGet<GmailMessageListResponse>(
+    accessToken,
+    `messages?${params.toString()}`
+  );
+
+  return Array.from(
+    new Set(
+      (response.messages ?? []).map((message) => message.id).filter((id): id is string => !!id)
+    )
+  );
 }
 
 async function fetchMessageIdsIncremental(
@@ -405,8 +1235,11 @@ function parseMessage(metadata: GmailMessageMetadata): ParsedMessage | null {
   const detection = computeNewsletterScore({
     listId,
     listUnsubscribe,
+    unsubscribeMailto: parsedUnsubscribe.mailto,
+    unsubscribeUrl: parsedUnsubscribe.url,
     unsubscribePostHeader,
     fromAddress,
+    fromDisplayName: displayName,
     subject,
   });
 
@@ -590,7 +1423,7 @@ async function upsertNewsletterFeed(
     unsubscribeUrl: parsed.unsubscribeUrl,
     unsubscribePostHeader: parsed.unsubscribePostHeader,
     detectionScore: parsed.detection.score,
-    status: 'ACTIVE',
+    status: 'UNSUBSCRIBED',
     firstSeenAt: parsed.internalDateMs,
     lastSeenAt: parsed.internalDateMs,
     createdAt: now,
@@ -599,7 +1432,7 @@ async function upsertNewsletterFeed(
 
   return {
     id: feedId,
-    status: 'ACTIVE' as NewsletterFeedStatus,
+    status: 'UNSUBSCRIBED' as NewsletterFeedStatus,
   };
 }
 
@@ -610,21 +1443,39 @@ async function ingestNewsletterMessage(params: {
   googleSub: string;
   parsed: ParsedMessage;
   feedId: string;
+  accessToken: string | null;
 }): Promise<boolean> {
   const existingMapping = await params.db.query.newsletterFeedMessages.findFirst({
     where: and(
       eq(newsletterFeedMessages.userId, params.userId),
       eq(newsletterFeedMessages.gmailMessageId, params.parsed.messageId)
     ),
-    columns: { id: true },
+    columns: { id: true, itemId: true },
   });
 
   if (existingMapping) {
+    await maybeUpgradeExistingNewsletterItem({
+      db: params.db,
+      itemId: existingMapping.itemId,
+      parsed: params.parsed,
+      accessToken: params.accessToken,
+    });
     return false;
   }
 
   const providerId = `${params.googleSub}:${params.parsed.messageId}`;
-  const issueUrl = params.parsed.issueUrl ?? buildGmailFallbackUrl(params.parsed.threadId);
+  const issueUrlResolution = await resolveIssueUrl({
+    accessToken: params.accessToken,
+    parsed: params.parsed,
+  });
+  const issueUrl = issueUrlResolution.url;
+  const newsletterAvatarUrl = buildNewsletterAvatarUrl({
+    canonicalUrl: issueUrl,
+    listId: params.parsed.listId,
+    fromAddress: params.parsed.fromAddress,
+    unsubscribeUrl: params.parsed.unsubscribeUrl,
+    creatorHandle: params.parsed.fromAddress,
+  });
   const publishedAtIso = new Date(params.parsed.internalDateMs).toISOString();
   const nowIso = new Date().toISOString();
 
@@ -636,6 +1487,7 @@ async function ingestNewsletterMessage(params: {
       name: params.parsed.fromDisplayName,
       handle: params.parsed.fromAddress,
       externalUrl: issueUrl,
+      imageUrl: newsletterAvatarUrl ?? undefined,
     }
   );
 
@@ -648,7 +1500,7 @@ async function ingestNewsletterMessage(params: {
       providerId,
       canonicalUrl: issueUrl,
       title: params.parsed.subject,
-      thumbnailUrl: null,
+      thumbnailUrl: newsletterAvatarUrl,
       creatorId: creator.id,
       publisher: params.parsed.fromDisplayName,
       summary: params.parsed.snippet || null,
@@ -660,6 +1512,7 @@ async function ingestNewsletterMessage(params: {
         listId: params.parsed.listId,
         fromAddress: params.parsed.fromAddress,
         unsubscribeUrl: params.parsed.unsubscribeUrl,
+        issueUrlSource: issueUrlResolution.source,
       }),
       wordCount: null,
       readingTimeMinutes: null,
@@ -721,6 +1574,170 @@ async function ingestNewsletterMessage(params: {
     });
 
   return true;
+}
+
+function normalizeListIdForSearch(listId: string | null): string | null {
+  if (!listId) {
+    return null;
+  }
+
+  return listId.replace(/[<>]/g, '').trim() || null;
+}
+
+function buildFeedSearchQueries(feed: {
+  listId: string | null;
+  fromAddress: string | null;
+}): string[] {
+  const queries: string[] = [];
+  const normalizedListId = normalizeListIdForSearch(feed.listId);
+
+  if (normalizedListId) {
+    queries.push(`in:inbox list:${normalizedListId}`);
+  }
+
+  if (feed.fromAddress) {
+    const normalizedFromAddress = feed.fromAddress.trim().toLowerCase();
+    if (normalizedFromAddress) {
+      queries.push(`in:inbox from:${normalizedFromAddress}`);
+    }
+  }
+
+  return Array.from(new Set(queries));
+}
+
+export async function seedLatestNewsletterItemForFeed(params: {
+  db: Database;
+  userId: string;
+  feedId: string;
+  env: TokenRefreshEnv;
+}): Promise<FeedSeedResult> {
+  const connection = await getGmailConnection(params.userId, params.db);
+  if (!connection) {
+    throw new Error('No active Gmail connection found');
+  }
+
+  const feed = await params.db.query.newsletterFeeds.findFirst({
+    where: and(eq(newsletterFeeds.id, params.feedId), eq(newsletterFeeds.userId, params.userId)),
+    columns: {
+      id: true,
+      gmailMailboxId: true,
+      canonicalKey: true,
+      listId: true,
+      fromAddress: true,
+    },
+  });
+
+  if (!feed) {
+    throw new Error('Newsletter feed not found');
+  }
+
+  const mailbox = await params.db.query.gmailMailboxes.findFirst({
+    where: and(
+      eq(gmailMailboxes.id, feed.gmailMailboxId),
+      eq(gmailMailboxes.userId, params.userId)
+    ),
+    columns: {
+      id: true,
+      googleSub: true,
+    },
+  });
+
+  if (!mailbox) {
+    throw new Error('Gmail mailbox not found for newsletter feed');
+  }
+
+  const accessToken = await getValidAccessToken(connection, params.env);
+  const searchQueries = buildFeedSearchQueries({
+    listId: feed.listId,
+    fromAddress: feed.fromAddress,
+  });
+
+  if (searchQueries.length === 0) {
+    return { created: false, reason: 'no_search_query' };
+  }
+
+  const candidateMessageIds: string[] = [];
+  for (const query of searchQueries) {
+    const ids = await fetchMessageIdsForQuery(accessToken, query, 12);
+    candidateMessageIds.push(...ids);
+  }
+
+  const uniqueCandidateIds = Array.from(new Set(candidateMessageIds));
+
+  for (const messageId of uniqueCandidateIds) {
+    let metadata: GmailMessageMetadata;
+    try {
+      metadata = await fetchMessageMetadata(accessToken, messageId);
+    } catch (error) {
+      gmailLogger.warn('Failed to fetch candidate newsletter message while seeding latest item', {
+        userId: params.userId,
+        feedId: feed.id,
+        messageId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
+
+    const parsed = parseMessage(metadata);
+
+    if (!parsed || !parsed.detection.isNewsletter) {
+      continue;
+    }
+
+    if (parsed.canonicalKey !== feed.canonicalKey) {
+      continue;
+    }
+
+    const created = await ingestNewsletterMessage({
+      db: params.db,
+      userId: params.userId,
+      mailboxId: mailbox.id,
+      googleSub: mailbox.googleSub,
+      parsed,
+      feedId: feed.id,
+      accessToken,
+    });
+
+    // If this item already existed in ARCHIVED state from prior experimentation,
+    // bring it back into INBOX when the user explicitly subscribes.
+    const providerId = `${mailbox.googleSub}:${parsed.messageId}`;
+    const existingItem = await params.db.query.items.findFirst({
+      where: and(eq(items.provider, Provider.GMAIL), eq(items.providerId, providerId)),
+      columns: { id: true },
+    });
+
+    if (existingItem) {
+      const userItem = await params.db.query.userItems.findFirst({
+        where: and(eq(userItems.userId, params.userId), eq(userItems.itemId, existingItem.id)),
+        columns: { id: true, state: true },
+      });
+
+      if (userItem?.state === 'ARCHIVED') {
+        const nowIso = new Date().toISOString();
+        await params.db
+          .update(userItems)
+          .set({
+            state: 'INBOX',
+            archivedAt: null,
+            ingestedAt: nowIso,
+            updatedAt: nowIso,
+          })
+          .where(eq(userItems.id, userItem.id));
+
+        return {
+          created: true,
+          reason: 'restored_from_archive',
+        };
+      }
+    }
+
+    return {
+      created,
+      reason: created ? 'created' : 'already_exists',
+    };
+  }
+
+  return { created: false, reason: 'no_matching_message' };
 }
 
 async function runWithConcurrency<T, R>(
@@ -861,6 +1878,7 @@ export async function syncGmailNewslettersForUser(
         googleSub: mailbox.googleSub,
         parsed,
         feedId: feed.id,
+        accessToken,
       });
 
       if (created) {
@@ -919,7 +1937,11 @@ export async function pollGmailNewsletters(
   env: Bindings,
   _ctx: ExecutionContext
 ): Promise<GmailPollResult> {
-  const lockAcquired = await tryAcquireLock(env.OAUTH_STATE_KV, GMAIL_POLL_LOCK_KEY, GMAIL_POLL_LOCK_TTL);
+  const lockAcquired = await tryAcquireLock(
+    env.OAUTH_STATE_KV,
+    GMAIL_POLL_LOCK_KEY,
+    GMAIL_POLL_LOCK_TTL
+  );
   if (!lockAcquired) {
     gmailLogger.info('Skipped Gmail newsletter polling: lock held');
     return { skipped: true, reason: 'lock_held' };
@@ -940,9 +1962,14 @@ export async function pollGmailNewsletters(
 
     for (const mailbox of mailboxes) {
       try {
-        const result = await syncGmailNewslettersForUser(mailbox.userId, db, env as TokenRefreshEnv, {
-          mailboxId: mailbox.id,
-        });
+        const result = await syncGmailNewslettersForUser(
+          mailbox.userId,
+          db,
+          env as TokenRefreshEnv,
+          {
+            mailboxId: mailbox.id,
+          }
+        );
         processedMailboxes += 1;
         newItems += result.newItems;
       } catch (error) {

@@ -36,6 +36,13 @@
       "when": 1770422401000,
       "tag": "0004_add_gmail_newsletters",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770519000000,
+      "tag": "0004_newsletter_opt_in_defaults",
+      "breakpoints": true
     }
   ]
 }

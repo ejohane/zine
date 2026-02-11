@@ -15,6 +15,7 @@ import { userItems, items, creators, tags, userItemTags } from '../../db/schema'
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
+import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
 
 // ============================================================================
 // Types
@@ -94,6 +95,56 @@ function normalizeNullString(value: string | null): string | null {
   return value;
 }
 
+function normalizeCanonicalUrlForResponse(url: string): string {
+  if (!url) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const isOpenSubstack =
+      parsed.hostname === 'open.substack.com' || parsed.hostname.endsWith('.open.substack.com');
+    if (!isOpenSubstack) {
+      return url;
+    }
+
+    const pathSegments = parsed.pathname.split('/').filter(Boolean);
+    if (pathSegments.length >= 4 && pathSegments[0] === 'pub' && pathSegments[2] === 'p') {
+      const publication = pathSegments[1];
+      const slug = pathSegments[3];
+      if (publication && slug) {
+        return `https://${publication}.substack.com/p/${slug}`;
+      }
+    }
+
+    return url;
+  } catch {
+    return url;
+  }
+}
+
+function parseRawMetadata(rawMetadata: string | null): Record<string, unknown> {
+  if (!rawMetadata) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(rawMetadata);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Ignore parse errors and fallback to an empty metadata object.
+  }
+
+  return {};
+}
+
+function getStringMetadataField(metadata: Record<string, unknown>, key: string): string | null {
+  const value = metadata[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
 /**
  * Transform a joined DB row (userItems + items + creators) into an ItemView.
  * Creator data comes from the creators table (single source of truth).
@@ -109,18 +160,41 @@ function toItemView(
   const userItem = row.user_items;
   const item = row.items;
   const creator = row.creators;
+  const normalizedCreatorImageUrl = normalizeNullString(creator?.imageUrl ?? null);
+  const metadata = parseRawMetadata(item.rawMetadata);
+  const newsletterAvatarUrl =
+    item.provider === 'GMAIL'
+      ? buildNewsletterAvatarUrl({
+          canonicalUrl: item.canonicalUrl,
+          listId: getStringMetadataField(metadata, 'listId'),
+          fromAddress:
+            getStringMetadataField(metadata, 'fromAddress') ??
+            getStringMetadataField(metadata, 'sender') ??
+            creator?.handle ??
+            null,
+          unsubscribeUrl: getStringMetadataField(metadata, 'unsubscribeUrl'),
+          creatorHandle: creator?.handle ?? null,
+        })
+      : null;
+  const thumbnailUrl =
+    item.thumbnailUrl ??
+    (item.provider === 'GMAIL' ? (normalizedCreatorImageUrl ?? newsletterAvatarUrl) : null);
+  const creatorImageUrl =
+    item.provider === 'GMAIL'
+      ? (normalizedCreatorImageUrl ?? newsletterAvatarUrl)
+      : normalizedCreatorImageUrl;
 
   return {
     id: userItem.id,
     itemId: item.id,
     title: item.title,
-    thumbnailUrl: item.thumbnailUrl,
-    canonicalUrl: item.canonicalUrl,
+    thumbnailUrl,
+    canonicalUrl: normalizeCanonicalUrlForResponse(item.canonicalUrl),
     contentType: item.contentType as ContentType,
     provider: item.provider as Provider,
     // Creator data from creators table (normalized)
     creator: creator?.name ?? 'Unknown Creator',
-    creatorImageUrl: normalizeNullString(creator?.imageUrl ?? null),
+    creatorImageUrl,
     creatorId: item.creatorId ?? null,
     publisher: item.publisher,
     summary: item.summary,
