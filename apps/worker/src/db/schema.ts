@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 // ============================================================================
 // Users
@@ -200,7 +200,7 @@ export const sources = sqliteTable(
 // ============================================================================
 // Provider Connections (OAuth tokens per provider)
 // ============================================================================
-// Stores encrypted OAuth credentials for connected providers (YouTube, Spotify)
+// Stores encrypted OAuth credentials for connected providers (YouTube, Spotify, Gmail)
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const providerConnections = sqliteTable(
   'provider_connections',
@@ -209,7 +209,7 @@ export const providerConnections = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY
+    provider: text('provider').notNull(), // YOUTUBE | SPOTIFY | GMAIL
     providerUserId: text('provider_user_id'), // Provider's user ID
 
     // Encrypted OAuth tokens (AES-256-GCM encrypted)
@@ -227,6 +227,136 @@ export const providerConnections = sqliteTable(
     // One connection per provider per user
     uniqueIndex('provider_connections_user_provider_idx').on(table.userId, table.provider),
     index('provider_connections_status_idx').on(table.status),
+  ]
+);
+
+// ============================================================================
+// Gmail Mailboxes
+// ============================================================================
+// One connected Gmail mailbox per user/provider connection.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const gmailMailboxes = sqliteTable(
+  'gmail_mailboxes',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    providerConnectionId: text('provider_connection_id')
+      .notNull()
+      .references(() => providerConnections.id),
+    googleSub: text('google_sub').notNull(), // Stable Google user ID
+    email: text('email').notNull(),
+    historyId: text('history_id'), // Gmail incremental sync cursor
+    watchExpirationAt: integer('watch_expiration_at'), // Reserved for future watch/push support
+    lastSyncAt: integer('last_sync_at'),
+    lastSyncStatus: text('last_sync_status').notNull().default('IDLE'), // IDLE | RUNNING | SUCCESS | ERROR
+    lastSyncError: text('last_sync_error'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('gmail_mailboxes_user_connection_idx').on(table.userId, table.providerConnectionId),
+    index('gmail_mailboxes_sync_idx').on(table.lastSyncStatus, table.updatedAt),
+  ]
+);
+
+// ============================================================================
+// Newsletter Feeds
+// ============================================================================
+// Canonical newsletter identities detected from Gmail metadata.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const newsletterFeeds = sqliteTable(
+  'newsletter_feeds',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    gmailMailboxId: text('gmail_mailbox_id')
+      .notNull()
+      .references(() => gmailMailboxes.id),
+    canonicalKey: text('canonical_key').notNull(), // Stable identity (list-id/unsub/from fallback)
+    listId: text('list_id'),
+    fromAddress: text('from_address'),
+    displayName: text('display_name'),
+    unsubscribeMailto: text('unsubscribe_mailto'),
+    unsubscribeUrl: text('unsubscribe_url'),
+    unsubscribePostHeader: text('unsubscribe_post_header'),
+    detectionScore: real('detection_score').notNull(),
+    status: text('status').notNull().default('ACTIVE'), // ACTIVE | HIDDEN | UNSUBSCRIBED (ingestion path sets UNSUBSCRIBED by default)
+    firstSeenAt: integer('first_seen_at').notNull(),
+    lastSeenAt: integer('last_seen_at').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('newsletter_feeds_user_canonical_key_idx').on(table.userId, table.canonicalKey),
+    index('newsletter_feeds_mailbox_status_idx').on(
+      table.gmailMailboxId,
+      table.status,
+      table.lastSeenAt
+    ),
+  ]
+);
+
+// ============================================================================
+// Newsletter Feed Messages
+// ============================================================================
+// Maps Gmail messages to detected newsletter feeds and ingested items.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const newsletterFeedMessages = sqliteTable(
+  'newsletter_feed_messages',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    gmailMailboxId: text('gmail_mailbox_id')
+      .notNull()
+      .references(() => gmailMailboxes.id),
+    newsletterFeedId: text('newsletter_feed_id')
+      .notNull()
+      .references(() => newsletterFeeds.id),
+    gmailMessageId: text('gmail_message_id').notNull(),
+    gmailThreadId: text('gmail_thread_id'),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    internalDate: integer('internal_date'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('newsletter_feed_messages_user_message_idx').on(table.userId, table.gmailMessageId),
+    index('newsletter_feed_messages_feed_date_idx').on(table.newsletterFeedId, table.internalDate),
+  ]
+);
+
+// ============================================================================
+// Newsletter Unsubscribe Events
+// ============================================================================
+// Audit trail for unsubscribe attempts from newsletter feeds.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const newsletterUnsubscribeEvents = sqliteTable(
+  'newsletter_unsubscribe_events',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    newsletterFeedId: text('newsletter_feed_id')
+      .notNull()
+      .references(() => newsletterFeeds.id),
+    method: text('method').notNull(), // URL | MAILTO | ONE_CLICK_POST
+    target: text('target').notNull(),
+    status: text('status').notNull(), // REQUESTED | COMPLETED | FAILED
+    error: text('error'),
+    requestedAt: integer('requested_at').notNull(),
+    completedAt: integer('completed_at'),
+  },
+  (table) => [
+    index('newsletter_unsubscribe_feed_idx').on(table.newsletterFeedId, table.requestedAt),
+    index('newsletter_unsubscribe_user_idx').on(table.userId, table.requestedAt),
   ]
 );
 

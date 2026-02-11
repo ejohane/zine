@@ -2,7 +2,7 @@
  * Layout for OAuth connect screens.
  *
  * Provides a Stack navigator for provider-specific connect screens
- * (YouTube, Spotify) with consistent styling and navigation.
+ * (YouTube, Spotify, Gmail) with consistent styling and navigation.
  */
 
 import { Stack } from 'expo-router';
@@ -39,6 +39,13 @@ export default function ConnectLayout() {
         name="spotify"
         options={{
           title: 'Connect Spotify',
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="gmail"
+        options={{
+          title: 'Connect Gmail',
           presentation: 'card',
         }}
       />

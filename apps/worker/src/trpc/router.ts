@@ -3,6 +3,7 @@ import { router } from './trpc';
 import { itemsRouter } from './routers/items';
 import { subscriptionsRouter } from './routers/subscriptions';
 import { connectionsRouter } from './routers/connections';
+import { newslettersRouter } from './routers/newsletters';
 import { bookmarksRouter } from './routers/bookmarks';
 import { creatorsRouter } from './routers/creators';
 import { adminRouter } from './routers/admin';
@@ -53,6 +54,7 @@ export const appRouter = router({
     syncStatus: subscriptionsRouter.syncStatus,
     activeSyncJob: subscriptionsRouter.activeSyncJob,
     discover: subscriptionsRouter.discover,
+    newsletters: newslettersRouter,
   }),
   // Admin operations (data repair, diagnostics)
   admin: adminRouter,

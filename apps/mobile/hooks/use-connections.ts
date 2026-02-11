@@ -25,7 +25,7 @@ export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
 /**
  * Supported OAuth providers
  */
-export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY';
+export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
 
 /**
  * Connection type returned from the backend.
@@ -70,6 +70,23 @@ interface ProviderConnectionData {
 interface ConnectionsListResponse {
   YOUTUBE: ProviderConnectionData | null;
   SPOTIFY: ProviderConnectionData | null;
+  GMAIL: ProviderConnectionData | null;
+}
+
+interface NewslettersListResponse {
+  items: unknown[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+interface NewsletterStatsResponse {
+  total: number;
+  active: number;
+  hidden: number;
+  unsubscribed: number;
+  lastSyncAt: number | null;
+  lastSyncStatus: string;
+  lastSyncError: string | null;
 }
 
 // ============================================================================
@@ -111,6 +128,10 @@ function transformConnectionsResponse(response: ConnectionsListResponse): Connec
 
   if (response.SPOTIFY) {
     connections.push(transformConnection('SPOTIFY', response.SPOTIFY));
+  }
+
+  if (response.GMAIL) {
+    connections.push(transformConnection('GMAIL', response.GMAIL));
   }
 
   return connections;
@@ -211,10 +232,16 @@ export function useDisconnectConnection(options?: {
   onSettled?: () => void;
 }) {
   type DisconnectContext = {
-    previousConnections?: Connection[];
+    previousConnections?: ConnectionsListResponse | Connection[];
     previousSubscriptions?: {
       defaultList?: SubscriptionsResponse;
       limitedList?: SubscriptionsResponse;
+    };
+    previousNewsletters?: {
+      listDefault?: NewslettersListResponse;
+      listNoSearch?: NewslettersListResponse;
+      listUnscoped?: NewslettersListResponse;
+      stats?: NewsletterStatsResponse;
     };
   };
 
@@ -228,16 +255,52 @@ export function useDisconnectConnection(options?: {
       await utils.subscriptions?.connections?.list?.cancel?.();
       await utils.subscriptions?.list?.cancel?.({});
       await utils.subscriptions?.list?.cancel?.({ limit: 50 });
+      if (provider === 'GMAIL') {
+        await utils.subscriptions?.newsletters?.list?.cancel?.({
+          limit: 100,
+          search: undefined,
+        });
+        await utils.subscriptions?.newsletters?.list?.cancel?.({
+          limit: 100,
+        });
+        await utils.subscriptions?.newsletters?.list?.cancel?.(undefined);
+        await utils.subscriptions?.newsletters?.stats?.cancel?.();
+      }
 
       const previousConnections = utils.subscriptions?.connections?.list?.getData?.();
       const previousSubscriptionsDefault = utils.subscriptions?.list?.getData?.({});
       const previousSubscriptionsLimited = utils.subscriptions?.list?.getData?.({ limit: 50 });
+      const previousNewslettersList =
+        provider === 'GMAIL'
+          ? utils.subscriptions?.newsletters?.list?.getData?.({ limit: 100, search: undefined })
+          : undefined;
+      const previousNewslettersListNoSearch =
+        provider === 'GMAIL'
+          ? utils.subscriptions?.newsletters?.list?.getData?.({ limit: 100 })
+          : undefined;
+      const previousNewslettersListDefault =
+        provider === 'GMAIL'
+          ? utils.subscriptions?.newsletters?.list?.getData?.(undefined)
+          : undefined;
+      const previousNewslettersStats =
+        provider === 'GMAIL' ? utils.subscriptions?.newsletters?.stats?.getData?.() : undefined;
 
-      utils.subscriptions?.connections?.list?.setData?.(
-        undefined,
-        (old: Connection[] | undefined) =>
-          old ? old.filter((connection) => connection.provider !== provider) : old
-      );
+      const updateConnections = (
+        old: ConnectionsListResponse | Connection[] | undefined
+      ): ConnectionsListResponse | Connection[] | undefined => {
+        if (!old) return old;
+
+        if (Array.isArray(old)) {
+          return old.filter((connection) => connection.provider !== provider);
+        }
+
+        return {
+          ...old,
+          [provider]: null,
+        };
+      };
+
+      utils.subscriptions?.connections?.list?.setData?.(undefined, updateConnections);
 
       const updateSubscriptions = (old: SubscriptionsResponse | undefined) => {
         if (!old) return old;
@@ -255,11 +318,58 @@ export function useDisconnectConnection(options?: {
       utils.subscriptions?.list?.setData?.({}, updateSubscriptions);
       utils.subscriptions?.list?.setData?.({ limit: 50 }, updateSubscriptions);
 
+      if (provider === 'GMAIL') {
+        utils.subscriptions?.newsletters?.list?.setData?.(
+          { limit: 100, search: undefined },
+          {
+            items: [],
+            nextCursor: null,
+            hasMore: false,
+          }
+        );
+        utils.subscriptions?.newsletters?.list?.setData?.(
+          { limit: 100 },
+          {
+            items: [],
+            nextCursor: null,
+            hasMore: false,
+          }
+        );
+        utils.subscriptions?.newsletters?.list?.setData?.(undefined, {
+          items: [],
+          nextCursor: null,
+          hasMore: false,
+        });
+
+        utils.subscriptions?.newsletters?.stats?.setData?.(
+          undefined,
+          (old: NewsletterStatsResponse | undefined) => {
+            if (!old) return old;
+            return {
+              ...old,
+              total: 0,
+              active: 0,
+              hidden: 0,
+              unsubscribed: 0,
+              lastSyncAt: null,
+              lastSyncStatus: 'IDLE',
+              lastSyncError: null,
+            };
+          }
+        );
+      }
+
       return {
         previousConnections,
         previousSubscriptions: {
           defaultList: previousSubscriptionsDefault,
           limitedList: previousSubscriptionsLimited,
+        },
+        previousNewsletters: {
+          listDefault: previousNewslettersList,
+          listNoSearch: previousNewslettersListNoSearch,
+          listUnscoped: previousNewslettersListDefault,
+          stats: previousNewslettersStats,
         },
       };
     },
@@ -279,11 +389,41 @@ export function useDisconnectConnection(options?: {
         );
       }
 
+      if (context?.previousNewsletters?.listDefault !== undefined) {
+        utils.subscriptions?.newsletters?.list?.setData?.(
+          { limit: 100, search: undefined },
+          context.previousNewsletters.listDefault
+        );
+      }
+      if (context?.previousNewsletters?.listNoSearch !== undefined) {
+        utils.subscriptions?.newsletters?.list?.setData?.(
+          { limit: 100 },
+          context.previousNewsletters.listNoSearch
+        );
+      }
+      if (context?.previousNewsletters?.listUnscoped !== undefined) {
+        utils.subscriptions?.newsletters?.list?.setData?.(
+          undefined,
+          context.previousNewsletters.listUnscoped
+        );
+      }
+
+      if (context?.previousNewsletters?.stats !== undefined) {
+        utils.subscriptions?.newsletters?.stats?.setData?.(
+          undefined,
+          context.previousNewsletters.stats
+        );
+      }
+
       options?.onError?.(error);
     },
-    onSuccess: () => {
+    onSuccess: (_data: unknown, input: DisconnectConnectionInput) => {
       utils.subscriptions?.connections?.list?.invalidate?.();
       utils.subscriptions?.list?.invalidate?.();
+      if (input.provider === 'GMAIL') {
+        utils.subscriptions?.newsletters?.list?.invalidate?.();
+        utils.subscriptions?.newsletters?.stats?.invalidate?.();
+      }
       options?.onSuccess?.();
     },
     onSettled: () => {

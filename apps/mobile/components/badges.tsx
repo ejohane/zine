@@ -13,7 +13,7 @@ import { ContentColors, ProviderColors, Typography, Spacing, Radius } from '@/co
 // Types
 // =============================================================================
 
-export type ProviderType = 'YOUTUBE' | 'SPOTIFY' | 'SUBSTACK' | 'X' | 'TWITTER' | 'WEB';
+export type ProviderType = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'SUBSTACK' | 'X' | 'TWITTER' | 'WEB';
 export type ContentTypeValue = 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST';
 
 // =============================================================================
@@ -28,6 +28,7 @@ function getProviderConfig(provider: string): { color: string; label: string } {
   const map: Record<string, { color: string; label: string }> = {
     YOUTUBE: { color: ProviderColors.youtube, label: 'YouTube' },
     SPOTIFY: { color: ProviderColors.spotify, label: 'Spotify' },
+    GMAIL: { color: ProviderColors.gmail, label: 'Gmail' },
     SUBSTACK: { color: ProviderColors.substack, label: 'Substack' },
     X: { color: ProviderColors.x, label: 'X' },
     TWITTER: { color: ProviderColors.x, label: 'X' },

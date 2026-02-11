@@ -10,7 +10,9 @@ import {
   toBackendProvider,
   validateProviderRoute,
   validateAndConvertProvider,
+  validateAndConvertDiscoverProvider,
   VALID_PROVIDER_ROUTES,
+  VALID_DISCOVER_PROVIDER_ROUTES,
 } from './route-validation';
 
 describe('route-validation', () => {
@@ -84,16 +86,19 @@ describe('route-validation', () => {
     it('returns true for valid lowercase providers', () => {
       expect(isValidProviderRoute('youtube')).toBe(true);
       expect(isValidProviderRoute('spotify')).toBe(true);
+      expect(isValidProviderRoute('gmail')).toBe(true);
     });
 
     it('returns true for valid uppercase providers (case-insensitive)', () => {
       expect(isValidProviderRoute('YOUTUBE')).toBe(true);
       expect(isValidProviderRoute('SPOTIFY')).toBe(true);
+      expect(isValidProviderRoute('GMAIL')).toBe(true);
     });
 
     it('returns true for mixed case providers', () => {
       expect(isValidProviderRoute('YouTube')).toBe(true);
       expect(isValidProviderRoute('Spotify')).toBe(true);
+      expect(isValidProviderRoute('Gmail')).toBe(true);
     });
 
     it('returns false for invalid providers', () => {
@@ -116,6 +121,7 @@ describe('route-validation', () => {
       expect(normalizeProviderRoute('YouTube')).toBe('youtube');
       expect(normalizeProviderRoute('spotify')).toBe('spotify');
       expect(normalizeProviderRoute('SPOTIFY')).toBe('spotify');
+      expect(normalizeProviderRoute('GMAIL')).toBe('gmail');
     });
 
     it('returns undefined for invalid providers', () => {
@@ -134,6 +140,7 @@ describe('route-validation', () => {
     it('converts lowercase route to uppercase backend format', () => {
       expect(toBackendProvider('youtube')).toBe('YOUTUBE');
       expect(toBackendProvider('spotify')).toBe('SPOTIFY');
+      expect(toBackendProvider('gmail')).toBe('GMAIL');
     });
   });
 
@@ -178,6 +185,12 @@ describe('route-validation', () => {
       if (spotifyResult.success) {
         expect(spotifyResult.data).toBe('SPOTIFY');
       }
+
+      const gmailResult = validateAndConvertProvider('gmail');
+      expect(gmailResult.success).toBe(true);
+      if (gmailResult.success) {
+        expect(gmailResult.data).toBe('GMAIL');
+      }
     });
 
     it('returns error for invalid provider', () => {
@@ -189,11 +202,37 @@ describe('route-validation', () => {
     });
   });
 
+  describe('validateAndConvertDiscoverProvider', () => {
+    it('allows youtube and spotify', () => {
+      expect(validateAndConvertDiscoverProvider('youtube')).toEqual({
+        success: true,
+        data: 'YOUTUBE',
+      });
+      expect(validateAndConvertDiscoverProvider('spotify')).toEqual({
+        success: true,
+        data: 'SPOTIFY',
+      });
+    });
+
+    it('rejects gmail for discovery', () => {
+      const result = validateAndConvertDiscoverProvider('gmail');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.message).toContain('not supported for discovery');
+      }
+    });
+  });
+
   describe('VALID_PROVIDER_ROUTES', () => {
     it('contains expected providers', () => {
       expect(VALID_PROVIDER_ROUTES).toContain('youtube');
       expect(VALID_PROVIDER_ROUTES).toContain('spotify');
-      expect(VALID_PROVIDER_ROUTES.length).toBe(2);
+      expect(VALID_PROVIDER_ROUTES).toContain('gmail');
+      expect(VALID_PROVIDER_ROUTES.length).toBe(3);
+    });
+
+    it('keeps discovery providers limited to youtube/spotify', () => {
+      expect(VALID_DISCOVER_PROVIDER_ROUTES).toEqual(['youtube', 'spotify']);
     });
   });
 });

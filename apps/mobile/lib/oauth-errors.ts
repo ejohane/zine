@@ -260,6 +260,36 @@ export function parseOAuthError(error: unknown): OAuthError {
       };
     }
 
+    // Gmail OAuth granted token is missing required read scope
+    if (
+      errorLower.includes('insufficient authentication scopes') ||
+      errorLower.includes('insufficient permission') ||
+      errorLower.includes('insufficientpermissions') ||
+      errorLower.includes('access_token_scope_insufficient')
+    ) {
+      return {
+        code: OAuthErrorCode.INVALID_SCOPE,
+        message:
+          'Gmail permissions are missing required scopes. Reconnect and allow read-only Gmail access.',
+        recoverable: true,
+        action: 'retry',
+      };
+    }
+
+    // Gmail API not enabled in Google Cloud project
+    if (
+      errorLower.includes('accessnotconfigured') ||
+      errorLower.includes('gmail api has not been used in project')
+    ) {
+      return {
+        code: OAuthErrorCode.PROVIDER_ERROR,
+        message:
+          'Gmail API is not enabled for this app configuration. Enable Gmail API in Google Cloud Console, then try again.',
+        recoverable: true,
+        action: 'retry',
+      };
+    }
+
     // State validation errors
     if (errorLower.includes('state') && errorLower.includes('mismatch')) {
       return {

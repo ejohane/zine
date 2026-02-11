@@ -36,6 +36,7 @@ export const ContentColors = {
 export const ProviderColors = {
   youtube: '#2A2A2A',
   spotify: '#1A1A1A',
+  gmail: '#1A73E8',
   substack: '#3A3A3A',
   twitter: '#2A2A2A',
   x: '#2A2A2A',

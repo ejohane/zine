@@ -24,6 +24,7 @@ export enum ContentType {
 export enum Provider {
   YOUTUBE = 'YOUTUBE',
   SPOTIFY = 'SPOTIFY',
+  GMAIL = 'GMAIL',
   RSS = 'RSS',
   SUBSTACK = 'SUBSTACK',
   WEB = 'WEB',

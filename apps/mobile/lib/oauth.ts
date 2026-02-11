@@ -92,6 +92,16 @@ export const OAUTH_CONFIG = {
       'https://www.googleapis.com/auth/userinfo.profile',
     ],
   },
+  GMAIL: {
+    clientId:
+      process.env.EXPO_PUBLIC_GMAIL_CLIENT_ID ?? process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '',
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    scopes: [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  },
   SPOTIFY: {
     clientId: process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID ?? '',
     authUrl: 'https://accounts.spotify.com/authorize',
@@ -127,10 +137,10 @@ export const REDIRECT_URI = 'zine://oauth/callback';
  * @returns The redirect URI to use for OAuth flows
  */
 export function getRedirectUri(provider?: OAuthProvider): string {
-  // For Google/YouTube, always use the reversed client ID scheme
+  // For Google providers, always use the reversed client ID scheme
   // This is required by Google for iOS apps (both dev and production)
-  if (provider === 'YOUTUBE') {
-    const clientId = process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '';
+  if (provider === 'YOUTUBE' || provider === 'GMAIL') {
+    const clientId = OAUTH_CONFIG[provider].clientId;
     if (clientId) {
       // Extract the part before .apps.googleusercontent.com and reverse it
       // e.g., "123456789-abcdef.apps.googleusercontent.com" -> "com.googleusercontent.apps.123456789-abcdef"
@@ -348,9 +358,9 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   authUrl.searchParams.set('code_challenge', challenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
 
-  // YouTube-specific: request offline access for refresh token
+  // Google-specific: request offline access for refresh token
   // Without these params, Google may not issue a refresh token
-  if (provider === 'YOUTUBE') {
+  if (provider === 'YOUTUBE' || provider === 'GMAIL') {
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
   }
@@ -436,7 +446,7 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
  */
 export interface OAuthFlowResult {
   success: boolean;
-  provider?: 'YOUTUBE' | 'SPOTIFY';
+  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   error?: string;
 }
 
@@ -473,7 +483,7 @@ export interface OAuthFlowResult {
 export async function completeOAuthFlow(
   code: string,
   state: string,
-  provider: 'YOUTUBE' | 'SPOTIFY'
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'
 ): Promise<OAuthFlowResult> {
   const providerKey = provider.toLowerCase();
 

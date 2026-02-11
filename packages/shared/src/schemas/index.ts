@@ -23,7 +23,7 @@ export const ContentTypeSchema = z
 /** Schema for content provider platforms */
 export const ProviderSchema = z
   .nativeEnum(Provider)
-  .describe('Content provider platforms supported by Zine (YOUTUBE, SPOTIFY)');
+  .describe('Content provider platforms supported by Zine (YOUTUBE, SPOTIFY, GMAIL, etc.)');
 
 /** Schema for subscription lifecycle status */
 export const SubscriptionStatusSchema = z

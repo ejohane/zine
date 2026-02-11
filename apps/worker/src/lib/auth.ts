@@ -159,6 +159,10 @@ const OAUTH_CONFIG = {
     tokenUrl: 'https://oauth2.googleapis.com/token',
     userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
   },
+  GMAIL: {
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+  },
   SPOTIFY: {
     tokenUrl: 'https://accounts.spotify.com/api/token',
     userInfoUrl: 'https://api.spotify.com/v1/me',
@@ -168,13 +172,15 @@ const OAUTH_CONFIG = {
 /**
  * OAuth-enabled providers (subset of all providers)
  */
-type OAuthProvider = Provider.YOUTUBE | Provider.SPOTIFY;
+type OAuthProvider = Provider.YOUTUBE | Provider.SPOTIFY | Provider.GMAIL;
 
 /**
  * Check if a provider supports OAuth
  */
 function isOAuthProvider(provider: Provider): provider is OAuthProvider {
-  return provider === Provider.YOUTUBE || provider === Provider.SPOTIFY;
+  return (
+    provider === Provider.YOUTUBE || provider === Provider.SPOTIFY || provider === Provider.GMAIL
+  );
 }
 
 /**
@@ -200,9 +206,9 @@ export async function exchangeCodeForTokens(
   const config = OAUTH_CONFIG[provider];
 
   // Get client credentials from environment
-  const clientId = provider === 'YOUTUBE' ? env.GOOGLE_CLIENT_ID : env.SPOTIFY_CLIENT_ID;
-  const clientSecret =
-    provider === 'YOUTUBE' ? env.GOOGLE_CLIENT_SECRET : env.SPOTIFY_CLIENT_SECRET;
+  const isGoogleProvider = provider === 'YOUTUBE' || provider === 'GMAIL';
+  const clientId = isGoogleProvider ? env.GOOGLE_CLIENT_ID : env.SPOTIFY_CLIENT_ID;
+  const clientSecret = isGoogleProvider ? env.GOOGLE_CLIENT_SECRET : env.SPOTIFY_CLIENT_SECRET;
   const redirectUri = overrideRedirectUri || env.OAUTH_REDIRECT_URI || 'zine://oauth/callback';
 
   if (!clientId) {
@@ -292,7 +298,7 @@ export async function getProviderUserInfo(
   const data = (await response.json()) as Record<string, unknown>;
 
   // Map provider-specific response to common format
-  if (provider === 'YOUTUBE') {
+  if (provider === 'YOUTUBE' || provider === 'GMAIL') {
     return {
       id: data.id as string,
       email: data.email as string | undefined,

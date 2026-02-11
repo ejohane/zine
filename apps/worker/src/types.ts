@@ -33,9 +33,9 @@ export interface Bindings {
   CLERK_WEBHOOK_SECRET?: string;
   /** AES-256 encryption key for OAuth tokens (hex string) */
   ENCRYPTION_KEY?: string;
-  /** Google OAuth client ID for YouTube */
+  /** Google OAuth client ID for YouTube/Gmail */
   GOOGLE_CLIENT_ID?: string;
-  /** Google OAuth client secret for YouTube */
+  /** Google OAuth client secret for YouTube/Gmail */
   GOOGLE_CLIENT_SECRET?: string;
   /** Spotify OAuth client ID */
   SPOTIFY_CLIENT_ID?: string;

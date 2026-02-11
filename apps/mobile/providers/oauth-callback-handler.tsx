@@ -25,7 +25,7 @@ import { oauthLogger } from '../lib/logger';
 interface OAuthCallbackHandlerProps {
   /**
    * Called when OAuth flow completes successfully.
-   * @param provider - The provider that was connected (YOUTUBE or SPOTIFY)
+   * @param provider - The provider that was connected (YOUTUBE, SPOTIFY, or GMAIL)
    */
   onSuccess?: (provider: string) => void;
 
@@ -55,7 +55,7 @@ interface ParsedOAuthCallback {
  * Parse OAuth callback URL and extract provider from state.
  *
  * The state parameter format is "PROVIDER:uuid" where:
- * - PROVIDER is 'YOUTUBE' or 'SPOTIFY' (used to retrieve correct SecureStore keys)
+ * - PROVIDER is 'YOUTUBE', 'SPOTIFY', or 'GMAIL' (used to retrieve correct SecureStore keys)
  * - uuid is the random component for CSRF protection
  *
  * This design allows the cold-start handler to know which provider's
@@ -79,7 +79,7 @@ function parseOAuthCallback(url: string): ParsedOAuthCallback | null {
 
     // Extract provider from state (format: "PROVIDER:uuid")
     const [provider] = state.split(':') as [OAuthProvider, string];
-    if (!['YOUTUBE', 'SPOTIFY'].includes(provider)) {
+    if (!['YOUTUBE', 'SPOTIFY', 'GMAIL'].includes(provider)) {
       oauthLogger.error('Invalid provider in state', { provider });
       return null;
     }
@@ -156,7 +156,11 @@ export function OAuthCallbackHandler({ onSuccess, onError, children }: OAuthCall
 
       if (result.success) {
         onSuccess?.(params.provider);
-        router.replace(`/subscriptions/discover/${params.provider.toLowerCase()}`);
+        if (params.provider === 'GMAIL') {
+          router.replace('/subscriptions/gmail');
+        } else {
+          router.replace(`/subscriptions/discover/${params.provider.toLowerCase()}`);
+        }
       } else {
         onError?.(result.error || 'OAuth failed');
         router.replace(`/subscriptions/connect/${params.provider.toLowerCase()}`);

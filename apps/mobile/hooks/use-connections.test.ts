@@ -18,6 +18,14 @@ const mockSubscriptionsCancel = jest.fn();
 const mockSubscriptionsGetData = jest.fn();
 const mockSubscriptionsSetData = jest.fn();
 const mockSubscriptionsInvalidate = jest.fn();
+const mockNewslettersListCancel = jest.fn();
+const mockNewslettersListGetData = jest.fn();
+const mockNewslettersListSetData = jest.fn();
+const mockNewslettersListInvalidate = jest.fn();
+const mockNewslettersStatsCancel = jest.fn();
+const mockNewslettersStatsGetData = jest.fn();
+const mockNewslettersStatsSetData = jest.fn();
+const mockNewslettersStatsInvalidate = jest.fn();
 let shouldDisconnectError = false;
 
 jest.mock('../lib/trpc', () => ({
@@ -34,7 +42,7 @@ jest.mock('../lib/trpc', () => ({
                 options?.onSettled?.();
                 throw error;
               }
-              options?.onSuccess?.();
+              options?.onSuccess?.(undefined, input, context);
               options?.onSettled?.();
               return undefined;
             };
@@ -62,6 +70,20 @@ jest.mock('../lib/trpc', () => ({
           getData: mockSubscriptionsGetData,
           setData: mockSubscriptionsSetData,
           invalidate: mockSubscriptionsInvalidate,
+        },
+        newsletters: {
+          list: {
+            cancel: mockNewslettersListCancel,
+            getData: mockNewslettersListGetData,
+            setData: mockNewslettersListSetData,
+            invalidate: mockNewslettersListInvalidate,
+          },
+          stats: {
+            cancel: mockNewslettersStatsCancel,
+            getData: mockNewslettersStatsGetData,
+            setData: mockNewslettersStatsSetData,
+            invalidate: mockNewslettersStatsInvalidate,
+          },
         },
       },
     })),
@@ -107,6 +129,41 @@ function createSubscriptionsResponse(): SubscriptionsResponse {
   };
 }
 
+function createConnectionsMap() {
+  return {
+    YOUTUBE: {
+      provider: 'YOUTUBE',
+      status: 'ACTIVE',
+      connectedAt: Date.now(),
+      lastRefreshedAt: null,
+    },
+    SPOTIFY: {
+      provider: 'SPOTIFY',
+      status: 'ACTIVE',
+      connectedAt: Date.now(),
+      lastRefreshedAt: null,
+    },
+    GMAIL: {
+      provider: 'GMAIL',
+      status: 'ACTIVE',
+      connectedAt: Date.now(),
+      lastRefreshedAt: null,
+    },
+  };
+}
+
+function createNewsletterStats() {
+  return {
+    total: 10,
+    active: 4,
+    hidden: 2,
+    unsubscribed: 4,
+    lastSyncAt: Date.now(),
+    lastSyncStatus: 'SUCCESS',
+    lastSyncError: null,
+  };
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   shouldDisconnectError = false;
@@ -125,6 +182,12 @@ beforeEach(() => {
 
     return undefined;
   });
+  mockNewslettersListGetData.mockReturnValue({
+    items: [{ id: 'feed-1' }],
+    nextCursor: null,
+    hasMore: false,
+  });
+  mockNewslettersStatsGetData.mockReturnValue(createNewsletterStats());
 });
 
 // ============================================================================
@@ -163,6 +226,22 @@ describe('useDisconnectConnection', () => {
     expect(
       updatedLimited.items.find((item: Subscription) => item.provider === 'YOUTUBE')?.status
     ).toBe('DISCONNECTED');
+  });
+
+  it('handles object-shaped connections cache during optimistic update', async () => {
+    const { result } = renderHook(() => useDisconnectConnection());
+
+    await act(async () => {
+      await result.current.mutate({ provider: 'GMAIL' });
+    });
+
+    const [queryKey, updater] = mockConnectionsSetData.mock.calls[0];
+    expect(queryKey).toBeUndefined();
+
+    const updated = updater(createConnectionsMap());
+    expect(updated.GMAIL).toBeNull();
+    expect(updated.YOUTUBE).not.toBeNull();
+    expect(updated.SPOTIFY).not.toBeNull();
   });
 
   it('rolls back to previous connections on error', async () => {
@@ -204,5 +283,38 @@ describe('useDisconnectConnection', () => {
 
     expect(mockConnectionsInvalidate).toHaveBeenCalled();
     expect(mockSubscriptionsInvalidate).toHaveBeenCalled();
+  });
+
+  it('clears and invalidates newsletter caches for Gmail disconnect', async () => {
+    const { result } = renderHook(() => useDisconnectConnection());
+
+    await act(async () => {
+      await result.current.mutate({ provider: 'GMAIL' });
+    });
+
+    expect(mockNewslettersListCancel).toHaveBeenCalledWith({ limit: 100, search: undefined });
+    expect(mockNewslettersStatsCancel).toHaveBeenCalled();
+
+    const listClearCall = mockNewslettersListSetData.mock.calls.find(
+      ([input]) => input?.limit === 100 && input?.search === undefined
+    );
+    expect(listClearCall).toBeDefined();
+    expect(listClearCall?.[1]).toEqual({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    });
+
+    const statsUpdateCall = mockNewslettersStatsSetData.mock.calls.find(
+      ([input]) => input === undefined
+    );
+    expect(statsUpdateCall).toBeDefined();
+    const updatedStats = statsUpdateCall?.[1](createNewsletterStats());
+    expect(updatedStats.total).toBe(0);
+    expect(updatedStats.active).toBe(0);
+    expect(updatedStats.lastSyncStatus).toBe('IDLE');
+
+    expect(mockNewslettersListInvalidate).toHaveBeenCalled();
+    expect(mockNewslettersStatsInvalidate).toHaveBeenCalled();
   });
 });
