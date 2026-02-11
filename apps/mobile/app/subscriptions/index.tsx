@@ -160,7 +160,9 @@ export default function SubscriptionsScreen() {
   const spotifyConnection = connections?.find(
     (connection: Connection) => connection.provider === 'SPOTIFY'
   );
-  const gmailConnection = connections?.find((connection: Connection) => connection.provider === 'GMAIL');
+  const gmailConnection = connections?.find(
+    (connection: Connection) => connection.provider === 'GMAIL'
+  );
   const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
   const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
   const gmailStatus = (gmailConnection?.status as ConnectionStatus) ?? null;

@@ -178,7 +178,9 @@ type OAuthProvider = Provider.YOUTUBE | Provider.SPOTIFY | Provider.GMAIL;
  * Check if a provider supports OAuth
  */
 function isOAuthProvider(provider: Provider): provider is OAuthProvider {
-  return provider === Provider.YOUTUBE || provider === Provider.SPOTIFY || provider === Provider.GMAIL;
+  return (
+    provider === Provider.YOUTUBE || provider === Provider.SPOTIFY || provider === Provider.GMAIL
+  );
 }
 
 /**

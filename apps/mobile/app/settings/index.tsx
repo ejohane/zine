@@ -183,7 +183,9 @@ export default function SettingsScreen() {
                 : 'Not connected'
             }
             rightText={gmailConnection?.status === 'ACTIVE' ? 'Connected' : 'Add'}
-            rightTextColor={gmailConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary}
+            rightTextColor={
+              gmailConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary
+            }
             onPress={() =>
               router.push({ pathname: '/settings/connections', params: { provider: 'gmail' } })
             }
