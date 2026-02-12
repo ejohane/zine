@@ -167,6 +167,7 @@ function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
     progress: null,
     isFinished: false,
     finishedAt: null,
+    tags: [],
   };
 }
 

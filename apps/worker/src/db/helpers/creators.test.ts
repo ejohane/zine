@@ -389,7 +389,7 @@ describe('extractCreatorFromMetadata', () => {
 
 describe('findOrCreateCreator', () => {
   // Create mock database context
-  function createMockContext(): any {
+  function createMockContext() {
     const mockDb = {
       query: {
         creators: {

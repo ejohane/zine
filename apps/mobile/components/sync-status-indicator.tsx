@@ -64,7 +64,7 @@ export function SyncStatusIndicator() {
         animationRef.current = null;
       }
     };
-  }, [pendingCount]); // pulseAnim is a ref.current, stable - not needed in deps
+  }, [pendingCount, pulseAnim]);
 
   if (pendingCount === 0) return null;
 
