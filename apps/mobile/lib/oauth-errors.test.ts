@@ -18,4 +18,18 @@ describe('parseOAuthError', () => {
     expect(error.code).toBe(OAuthErrorCode.PROVIDER_ERROR);
     expect(error.message).toContain('Gmail API is not enabled');
   });
+
+  it('classifies redirect URI mismatch errors correctly', () => {
+    const error = parseOAuthError('Token exchange failed: redirect_uri_mismatch');
+
+    expect(error.code).toBe(OAuthErrorCode.INVALID_REDIRECT);
+    expect(error.message).toContain('OAuth redirect mismatch');
+  });
+
+  it('classifies invalid client mismatch errors correctly', () => {
+    const error = parseOAuthError('Token exchange failed: invalid_client');
+
+    expect(error.code).toBe(OAuthErrorCode.PROVIDER_ERROR);
+    expect(error.message).toContain('OAuth client configuration mismatch');
+  });
 });

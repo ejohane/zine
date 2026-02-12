@@ -81,10 +81,15 @@ const vanillaClient = createTRPCClient<AppRouter>({
 /**
  * OAuth configuration for supported providers.
  * Client IDs are loaded from environment variables.
+ *
+ * Note: Google OAuth currently uses one shared client ID across YouTube and Gmail
+ * so mobile, iOS URL schemes, and worker token exchange stay aligned.
  */
+const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '';
+
 export const OAUTH_CONFIG = {
   YOUTUBE: {
-    clientId: process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '',
+    clientId: GOOGLE_CLIENT_ID,
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     scopes: [
       'https://www.googleapis.com/auth/youtube.readonly',
@@ -93,8 +98,7 @@ export const OAUTH_CONFIG = {
     ],
   },
   GMAIL: {
-    clientId:
-      process.env.EXPO_PUBLIC_GMAIL_CLIENT_ID ?? process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '',
+    clientId: GOOGLE_CLIENT_ID,
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     scopes: [
       'https://www.googleapis.com/auth/gmail.readonly',
@@ -113,6 +117,10 @@ export const OAUTH_CONFIG = {
  * Supported OAuth provider types.
  */
 export type OAuthProvider = keyof typeof OAUTH_CONFIG;
+
+function isGoogleProvider(provider: OAuthProvider): provider is 'YOUTUBE' | 'GMAIL' {
+  return provider === 'YOUTUBE' || provider === 'GMAIL';
+}
 
 // ============================================================================
 // Redirect URI Configuration
@@ -304,7 +312,9 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
 
   // Validate client ID is configured
   if (!config.clientId) {
-    const error = `${provider} client ID not configured. Check EXPO_PUBLIC_${provider}_CLIENT_ID.`;
+    const error = isGoogleProvider(provider)
+      ? 'Google client ID not configured. Set EXPO_PUBLIC_YOUTUBE_CLIENT_ID.'
+      : `${provider} client ID not configured. Check EXPO_PUBLIC_${provider}_CLIENT_ID.`;
     oauthLogger.error('Client ID not configured', { provider });
     throw new Error(error);
   }
