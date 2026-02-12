@@ -786,8 +786,8 @@ describe('ingestBatchConsolidated', () => {
   describe('creator linking', () => {
     // Helper to create a mock DB that tracks inserts
     const createCreatorTrackingMockDb = () => {
-      const insertedCreators: any[] = [];
-      const insertedItems: any[] = [];
+      const insertedCreators: Array<Record<string, unknown>> = [];
+      const insertedItems: Array<Record<string, unknown>> = [];
       let creatorQueryCount = 0;
 
       const mockQuery = {
@@ -935,7 +935,7 @@ describe('ingestBatchConsolidated', () => {
         'user123',
         'sub123',
         [rssItem],
-        Provider.RSS as any, // RSS is a valid provider
+        Provider.RSS,
         mockDbTracker.db as never,
         transformFnRss,
         getProviderId

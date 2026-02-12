@@ -7,7 +7,6 @@ import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { ContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
@@ -16,7 +15,7 @@ import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import type { ContentType as UIContentType, Provider } from '@/lib/content-utils';
+import type { ContentType as ApiContentType, UIContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -46,31 +45,36 @@ function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: str
 // Filter Options
 // =============================================================================
 
-const filterOptions = [
+const filterOptions: {
+  id: string;
+  label: string;
+  color: string | undefined;
+  contentType: ApiContentType | null;
+}[] = [
   { id: 'all', label: 'All', color: undefined, contentType: null },
   {
     id: 'article',
     label: 'Articles',
     color: ContentColors.article,
-    contentType: ContentType.ARTICLE,
+    contentType: 'ARTICLE',
   },
   {
     id: 'podcast',
     label: 'Podcasts',
     color: ContentColors.podcast,
-    contentType: ContentType.PODCAST,
+    contentType: 'PODCAST',
   },
   {
     id: 'video',
     label: 'Videos',
     color: ContentColors.video,
-    contentType: ContentType.VIDEO,
+    contentType: 'VIDEO',
   },
   {
     id: 'post',
     label: 'Posts',
     color: ContentColors.post,
-    contentType: ContentType.POST,
+    contentType: 'POST',
   },
 ];
 
@@ -107,7 +111,7 @@ export default function LibraryScreen() {
   }, [contentTypeParam]);
 
   // Filter state
-  const [contentTypeFilter, setContentTypeFilter] = useState<ContentType | null>(
+  const [contentTypeFilter, setContentTypeFilter] = useState<ApiContentType | null>(
     () => preselectedContentType ?? null
   );
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);

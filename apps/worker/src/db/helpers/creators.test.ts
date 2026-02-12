@@ -15,6 +15,7 @@ import {
   findOrCreateCreator,
   extractCreatorFromMetadata,
   type CreatorParams,
+  type DbContext,
 } from './creators';
 
 // ============================================================================
@@ -389,7 +390,7 @@ describe('extractCreatorFromMetadata', () => {
 
 describe('findOrCreateCreator', () => {
   // Create mock database context
-  function createMockContext(): any {
+  function createMockContext() {
     const mockDb = {
       query: {
         creators: {
@@ -415,7 +416,7 @@ describe('findOrCreateCreator', () => {
       }),
     });
 
-    return { db: mockDb };
+    return { db: mockDb } as { db: typeof mockDb } & DbContext;
   }
 
   const baseParams: CreatorParams = {

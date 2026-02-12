@@ -303,6 +303,12 @@ describe('getRedirectUri', () => {
     expect(result).toBe('com.googleusercontent.apps.test-client:/oauth2redirect');
   });
 
+  it('returns Google reversed client ID format for GMAIL', () => {
+    const result = getRedirectUri('GMAIL');
+
+    expect(result).toBe('com.googleusercontent.apps.test-client:/oauth2redirect');
+  });
+
   it('returns dev redirect URI for SPOTIFY in __DEV__ mode', () => {
     // __DEV__ is set to true in jest.setup.js
     const result = getRedirectUri('SPOTIFY');
@@ -360,7 +366,7 @@ describe('connectProvider', () => {
     // @ts-expect-error - modifying readonly for test
     OAUTH_CONFIG.YOUTUBE.clientId = '';
 
-    await expect(connectProvider('YOUTUBE')).rejects.toThrow('YOUTUBE client ID not configured');
+    await expect(connectProvider('YOUTUBE')).rejects.toThrow('Google client ID not configured');
 
     // Restore
     // @ts-expect-error - modifying readonly for test
@@ -731,6 +737,13 @@ describe('OAUTH_CONFIG', () => {
     expect(OAUTH_CONFIG.YOUTUBE.scopes).toContain(
       'https://www.googleapis.com/auth/youtube.readonly'
     );
+  });
+
+  it('uses shared Google client ID for Gmail', () => {
+    expect(OAUTH_CONFIG.GMAIL).toBeDefined();
+    expect(OAUTH_CONFIG.GMAIL.authUrl).toBe('https://accounts.google.com/o/oauth2/v2/auth');
+    expect(OAUTH_CONFIG.GMAIL.clientId).toBe(OAUTH_CONFIG.YOUTUBE.clientId);
+    expect(OAUTH_CONFIG.GMAIL.scopes).toContain('https://www.googleapis.com/auth/gmail.readonly');
   });
 
   it('has Spotify configuration', () => {

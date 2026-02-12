@@ -328,21 +328,49 @@ export function parseOAuthError(error: unknown): OAuthError {
       };
     }
 
-    // Token exchange errors
-    if (errorLower.includes('token') && errorLower.includes('exchange')) {
-      return {
-        code: OAuthErrorCode.TOKEN_EXCHANGE_FAILED,
-        message: 'Failed to complete authentication. Please try again.',
-        recoverable: true,
-        action: 'retry',
-      };
-    }
-
     // Invalid grant
     if (errorLower.includes('invalid_grant') || errorLower.includes('invalid grant')) {
       return {
         code: OAuthErrorCode.INVALID_GRANT,
         message: 'Authorization code expired. Please try again.',
+        recoverable: true,
+        action: 'retry',
+      };
+    }
+
+    // OAuth redirect/client mismatch during token exchange
+    if (
+      errorLower.includes('redirect_uri_mismatch') ||
+      errorLower.includes('redirect uri mismatch')
+    ) {
+      return {
+        code: OAuthErrorCode.INVALID_REDIRECT,
+        message:
+          'OAuth redirect mismatch. Verify the mobile Google client ID and API OAuth client settings match for this build.',
+        recoverable: true,
+        action: 'retry',
+      };
+    }
+
+    if (
+      errorLower.includes('invalid_client') ||
+      errorLower.includes('unauthorized_client') ||
+      errorLower.includes('client id mismatch')
+    ) {
+      return {
+        code: OAuthErrorCode.PROVIDER_ERROR,
+        message:
+          'OAuth client configuration mismatch. Verify mobile Google client IDs and backend GOOGLE_CLIENT_ID use the same project credentials.',
+        recoverable: true,
+        action: 'retry',
+      };
+    }
+
+    // Token exchange errors (generic fallback)
+    if (errorLower.includes('token') && errorLower.includes('exchange')) {
+      return {
+        code: OAuthErrorCode.TOKEN_EXCHANGE_FAILED,
+        message: 'Failed to complete authentication. Please try again.',
         recoverable: true,
         action: 'retry',
       };

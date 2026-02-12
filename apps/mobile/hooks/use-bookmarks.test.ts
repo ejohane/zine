@@ -158,6 +158,7 @@ function createMockLibraryItem(overrides: Record<string, unknown> = {}) {
     progress: null,
     isFinished: false,
     finishedAt: null,
+    tags: [],
     ...overrides,
   };
 }

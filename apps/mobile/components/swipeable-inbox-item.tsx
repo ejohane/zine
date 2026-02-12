@@ -54,6 +54,12 @@ import Animated, {
   Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+
+import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
+import { Colors, Spacing, Typography } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // ContextMenu requires native code - doesn't work in Expo Go
 // Check if native component is actually registered before using it
@@ -76,13 +82,6 @@ const ContextMenuNative = isContextMenuAvailable
     require('react-native-context-menu-view').default
   : null;
 const ContextMenu: React.ComponentType<ContextMenuProps> = ContextMenuNative ?? ContextMenuFallback;
-
-import { useRouter } from 'expo-router';
-
-import { ItemCard, type ItemCardData } from '@/components/item-card';
-import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
-import { Colors, Spacing, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // ============================================================================
 // Types
@@ -336,8 +335,7 @@ export function SwipeableInboxItem({
       return;
     }
     // Navigate to item detail page
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
-    router.push(`/item/${item.id}` as any);
+    router.push(`/item/${item.id}` as never);
   }, [router, item.id]);
 
   /**
