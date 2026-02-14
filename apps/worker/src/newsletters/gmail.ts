@@ -25,8 +25,8 @@ import { buildNewsletterAvatarUrl } from './avatar';
 const gmailLogger = logger.child('gmail-newsletters');
 
 const GMAIL_API_BASE = 'https://gmail.googleapis.com/gmail/v1/users/me';
-const DEFAULT_INITIAL_DAYS = 30;
-const MAX_INITIAL_PAGES = 2;
+const DEFAULT_INITIAL_DAYS = 60;
+const MAX_INITIAL_PAGES = 6;
 const MAX_INCREMENTAL_PAGES = 3;
 const MESSAGE_FETCH_CONCURRENCY = 5;
 const NEWSLETTER_SCORE_THRESHOLD = 0.78;
