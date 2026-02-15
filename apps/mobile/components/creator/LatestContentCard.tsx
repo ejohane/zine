@@ -52,7 +52,8 @@ export interface LatestContentCardProps {
 
 /**
  * LatestContentCard displays a single content item in a horizontal carousel.
- * Tapping the card opens the external URL in the appropriate app.
+ * Tapping the card opens the in-app content detail when an internal ID exists,
+ * and falls back to the external URL when the item is not yet in-app.
  *
  * @example
  * ```tsx
