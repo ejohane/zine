@@ -1095,7 +1095,11 @@ function parseSpotifyDate(dateStr: string): number {
 }
 
 /**
- * Populate isBookmarked flag for content items by checking the database
+ * Populate bookmark status and user item id for content items.
+ *
+ * We resolve the user's associated user item whenever it exists, regardless of
+ * current state, so creator pages can route taps into the in-app content view.
+ * The isBookmarked flag specifically tracks whether the saved state is BOOKMARKED.
  *
  * @param contentItems - Array of content items without isBookmarked
  * @param provider - Provider type
@@ -1122,17 +1126,10 @@ async function populateIsBookmarked(
     .select({
       providerId: items.providerId,
       itemId: items.id,
-      bookmarkedItemId: userItems.id,
+      userItemState: userItems.state,
     })
     .from(items)
-    .leftJoin(
-      userItems,
-      and(
-        eq(userItems.itemId, items.id),
-        eq(userItems.userId, userId),
-        eq(userItems.state, UserItemState.BOOKMARKED)
-      )
-    )
+    .leftJoin(userItems, and(eq(userItems.itemId, items.id), eq(userItems.userId, userId)))
     .where(and(eq(items.provider, provider), inArray(items.providerId, providerIds)));
 
   const metadataByProviderId = new Map(
@@ -1140,7 +1137,7 @@ async function populateIsBookmarked(
       item.providerId,
       {
         itemId: item.itemId,
-        isBookmarked: !!item.bookmarkedItemId,
+        isBookmarked: item.userItemState === UserItemState.BOOKMARKED,
       },
     ])
   );
