@@ -28,8 +28,9 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
 
     try {
       const isArticle = item.contentType === ContentType.ARTICLE;
+      const isSubstack = item.provider === 'SUBSTACK' || item.provider === 'substack';
 
-      if (isArticle) {
+      if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
@@ -37,6 +38,10 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
         const supported = await Linking.canOpenURL(item.canonicalUrl);
         if (supported) {
           await Linking.openURL(item.canonicalUrl);
+        } else if (isSubstack) {
+          await WebBrowser.openBrowserAsync(item.canonicalUrl, {
+            presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+          });
         }
       }
 

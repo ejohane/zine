@@ -139,6 +139,46 @@ describe('useItemDetailActions', () => {
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
   });
 
+  it('opens substack articles with Linking instead of in-app browser', async () => {
+    const item = {
+      ...baseItem,
+      provider: 'SUBSTACK',
+      contentType: 'ARTICLE',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+  });
+
+  it('falls back to browser when substack can not be opened', async () => {
+    mockCanOpenURL.mockResolvedValueOnce(false);
+
+    const item = {
+      ...baseItem,
+      provider: 'SUBSTACK',
+      contentType: 'ARTICLE',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
+      presentationStyle: 'FULL_SCREEN',
+    });
+  });
+
   it('does not mark opened when item is not bookmarked', async () => {
     const { result } = renderHook(() => useItemDetailActions(baseItem));
 
