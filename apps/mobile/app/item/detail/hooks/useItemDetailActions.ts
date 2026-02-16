@@ -32,6 +32,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
 
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
+          enableBarCollapsing: true,
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
       } else {
@@ -40,6 +41,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
           await Linking.openURL(item.canonicalUrl);
         } else if (isSubstack) {
           await WebBrowser.openBrowserAsync(item.canonicalUrl, {
+            enableBarCollapsing: true,
             presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
           });
         }
