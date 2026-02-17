@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { ulid } from 'ulid';
 import { TRPCError } from '@trpc/server';
-import { eq, and, desc, or, lt, isNotNull, sql, inArray } from 'drizzle-orm';
+import { eq, and, desc, or, lt, isNotNull, sql, inArray, type SQL } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
@@ -230,6 +230,23 @@ function normalizeTagKey(value: string): string {
   return normalizeTagName(value).toLowerCase();
 }
 
+function toCompactSearchTerm(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function stripVowels(value: string): string {
+  return value.replace(/[aeiou]/g, '');
+}
+
+function toCompactSql(value: unknown): SQL {
+  return sql`replace(replace(replace(replace(replace(replace(lower(coalesce(${value}, '')), ' ', ''), '-', ''), '_', ''), '.', ''), '/', ''), '&', '')`;
+}
+
+function toConsonantSql(value: unknown): SQL {
+  const compact = toCompactSql(value);
+  return sql`replace(replace(replace(replace(replace(${compact}, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', '')`;
+}
+
 async function getTagsForUserItems(
   ctx: { db: Database; userId: string },
   userItemIds: string[]
@@ -288,6 +305,7 @@ const FilterSchema = z
 
 const PaginationSchema = z.object({
   filter: FilterSchema,
+  search: z.string().trim().min(1).max(100).optional(),
   cursor: z.string().optional(),
   limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
@@ -370,7 +388,7 @@ export const itemsRouter = router({
 
   /**
    * Get bookmarked items (BOOKMARKED state).
-   * Supports filtering by provider and content type.
+   * Supports filtering by provider/content type and search by title/creator.
    * Uses cursor-based pagination sorted by bookmarkedAt DESC.
    */
   library: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
@@ -408,6 +426,38 @@ export const itemsRouter = router({
     }
     if (input?.filter?.contentType) {
       conditions.push(eq(items.contentType, input.filter.contentType));
+    }
+
+    // Apply search (case-insensitive + punctuation-insensitive + consonant fallback)
+    const search = input?.search?.trim();
+    if (search) {
+      const loweredSearch = search.toLowerCase();
+      const compactSearch = toCompactSearchTerm(search);
+      const consonantSearch = stripVowels(compactSearch);
+
+      const titleLower = sql`lower(${items.title})`;
+      const creatorLower = sql`lower(coalesce(${creators.name}, ''))`;
+      const titleCompact = toCompactSql(items.title);
+      const creatorCompact = toCompactSql(creators.name);
+
+      const searchConditions: SQL[] = [
+        sql`${titleLower} LIKE ${`%${loweredSearch}%`}`,
+        sql`${creatorLower} LIKE ${`%${loweredSearch}%`}`,
+      ];
+
+      if (compactSearch.length > 0) {
+        searchConditions.push(sql`${titleCompact} LIKE ${`%${compactSearch}%`}`);
+        searchConditions.push(sql`${creatorCompact} LIKE ${`%${compactSearch}%`}`);
+      }
+
+      if (consonantSearch.length >= 3) {
+        const titleConsonants = toConsonantSql(items.title);
+        const creatorConsonants = toConsonantSql(creators.name);
+        searchConditions.push(sql`${titleConsonants} LIKE ${`%${consonantSearch}%`}`);
+        searchConditions.push(sql`${creatorConsonants} LIKE ${`%${consonantSearch}%`}`);
+      }
+
+      conditions.push(or(...searchConditions)!);
     }
 
     // Execute query with joins (items + creators)

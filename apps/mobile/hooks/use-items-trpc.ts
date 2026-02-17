@@ -258,6 +258,7 @@ export function useInboxItems(options?: {
  *
  * Returns items that have been saved for later consumption.
  * Supports filtering by provider, content type, and completion status.
+ * Supports optional search by item title or creator.
  *
  * @param options - Optional filter and pagination options
  * @param options.filter.provider - Filter by content provider (YOUTUBE, SPOTIFY, etc.)
@@ -265,6 +266,7 @@ export function useInboxItems(options?: {
  * @param options.filter.isFinished - Filter by completion status
  *   - undefined/false: show only unfinished items (default)
  *   - true: show only finished items
+ * @param options.search - Optional search query (title/creator)
  * @param options.limit - Maximum number of items to return
  * @returns tRPC query result with items array and pagination cursor
  *
@@ -294,6 +296,7 @@ export function useLibraryItems(options?: {
     contentType?: ContentType;
     isFinished?: boolean;
   };
+  search?: string;
   limit?: number;
 }) {
   const filter = options?.filter
@@ -306,10 +309,12 @@ export function useLibraryItems(options?: {
       }
     : undefined;
 
+  const search = options?.search?.trim();
   const input = options
     ? {
-        ...options,
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
         ...(filter && Object.keys(filter).length > 0 ? { filter } : {}),
+        ...(search ? { search } : {}),
       }
     : undefined;
 
