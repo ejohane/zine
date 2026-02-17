@@ -115,12 +115,21 @@ export default function LibraryScreen() {
     () => preselectedContentType ?? null
   );
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
   useEffect(() => {
     if (preselectedContentType !== undefined) {
       setContentTypeFilter(preselectedContentType);
     }
   }, [preselectedContentType]);
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
 
   // Handle add bookmark
   const handleAddBookmark = useCallback(() => {
@@ -138,7 +147,10 @@ export default function LibraryScreen() {
   );
 
   // Fetch library items from tRPC with memoized filter
-  const { data, isLoading, error } = useLibraryItems({ filter });
+  const { data, isLoading, error } = useLibraryItems({
+    filter,
+    search: debouncedSearchQuery || undefined,
+  });
 
   // Transform API response to ItemCardData format
   const libraryItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
@@ -193,6 +205,8 @@ export default function LibraryScreen() {
               placeholder="Search your library..."
               placeholderTextColor={colors.textTertiary}
               style={[styles.searchInput, { color: colors.text }]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
             />
           </View>
         </Animated.View>
@@ -230,8 +244,12 @@ export default function LibraryScreen() {
           <ErrorState message={error.message} />
         ) : libraryItems.length === 0 ? (
           <EmptyState
-            title="No bookmarked items"
-            message="Bookmark content from your inbox to save it here for later."
+            title={searchQuery.trim() ? 'No matches found' : 'No bookmarked items'}
+            message={
+              searchQuery.trim()
+                ? 'Try a different title or creator name.'
+                : 'Bookmark content from your inbox to save it here for later.'
+            }
           />
         ) : (
           <ScrollView

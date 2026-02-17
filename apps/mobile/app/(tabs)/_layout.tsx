@@ -46,6 +46,10 @@ export default function TabLayout() {
           <Icon sf={{ default: 'tray', selected: 'tray.fill' }} drawable="ic_inbox" />
         </NativeTabs.Trigger>
 
+        <NativeTabs.Trigger name="search" role="search">
+          <Label>Search</Label>
+        </NativeTabs.Trigger>
+
         <NativeTabs.Trigger name="library">
           <Label>Library</Label>
           <Icon

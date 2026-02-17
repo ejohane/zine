@@ -79,6 +79,19 @@ describe('useItems list queries', () => {
     );
   });
 
+  it('trims library search query before requesting data', () => {
+    renderHook(() =>
+      useLibraryItems({
+        search: '  all in  ',
+      })
+    );
+
+    expect(mockLibraryUseQuery).toHaveBeenCalledWith(
+      { search: 'all in' },
+      expect.objectContaining({ placeholderData: expect.any(Function) })
+    );
+  });
+
   it('uses placeholderData for home data', () => {
     renderHook(() => useHomeData());
 

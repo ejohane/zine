@@ -59,6 +59,43 @@ function createMockItemView(overrides: Partial<ItemView> = {}): ItemView {
   return { ...defaults, ...overrides };
 }
 
+function toCompactSearchTerm(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function stripVowels(value: string): string {
+  return value.replace(/[aeiou]/g, '');
+}
+
+function matchesSearch(value: string | null | undefined, query: string): boolean {
+  if (!value) return false;
+
+  const loweredValue = value.toLowerCase();
+  const loweredQuery = query.toLowerCase();
+  if (loweredValue.includes(loweredQuery)) {
+    return true;
+  }
+
+  const compactValue = toCompactSearchTerm(value);
+  const compactQuery = toCompactSearchTerm(query);
+
+  if (compactQuery.length > 0 && compactValue.includes(compactQuery)) {
+    return true;
+  }
+
+  const consonantQuery = stripVowels(compactQuery);
+  if (consonantQuery.length < 3) {
+    return false;
+  }
+
+  const consonantValue = stripVowels(compactValue);
+  return consonantValue.includes(consonantQuery);
+}
+
+function matchesLibrarySearch(item: ItemView, query: string): boolean {
+  return matchesSearch(item.title, query) || matchesSearch(item.creator, query);
+}
+
 // ============================================================================
 // Mock Router Implementation for Testing
 // ============================================================================
@@ -105,6 +142,7 @@ function createMockItemsCaller(options: {
 
     library: async (input?: {
       filter?: { provider?: string; contentType?: string; isFinished?: boolean };
+      search?: string;
       cursor?: string;
       limit?: number;
     }) => {
@@ -123,6 +161,10 @@ function createMockItemsCaller(options: {
       }
       if (input?.filter?.contentType) {
         items = items.filter((item) => item.contentType === input.filter!.contentType);
+      }
+      if (input?.search?.trim()) {
+        const query = input.search.trim();
+        items = items.filter((item) => matchesLibrarySearch(item, query));
       }
 
       const limit = input?.limit ?? 20;
@@ -469,6 +511,83 @@ describe('Items Router', () => {
         bookmarkedAt: '2024-12-05T15:00:00Z',
         contentType: ContentType.ARTICLE,
         provider: Provider.SUBSTACK,
+      });
+    });
+
+    describe('search', () => {
+      it('should match partial title search across punctuation differences', async () => {
+        const target = createMockItemView({
+          id: 'ui-all-in',
+          title: 'All-in with X',
+          creator: 'Chamath and crew',
+          state: UserItemState.BOOKMARKED,
+        });
+        const other = createMockItemView({
+          id: 'ui-other',
+          title: 'Another Podcast',
+          creator: 'Someone else',
+          state: UserItemState.BOOKMARKED,
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [target, other],
+        });
+
+        const result = await caller.library({ search: 'all in' });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-all-in');
+      });
+
+      it('should match creator/author names', async () => {
+        const target = createMockItemView({
+          id: 'ui-creator-match',
+          title: 'Tech Podcast',
+          creator: 'Marques Brownlee',
+          state: UserItemState.BOOKMARKED,
+        });
+        const other = createMockItemView({
+          id: 'ui-creator-other',
+          title: 'Different Show',
+          creator: 'Unknown Host',
+          state: UserItemState.BOOKMARKED,
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [target, other],
+        });
+
+        const result = await caller.library({ search: 'marques' });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-creator-match');
+      });
+
+      it('should match vowel-stripped fuzzy search (waveform -> WVFRM)', async () => {
+        const target = createMockItemView({
+          id: 'ui-wvfrm',
+          title: 'WVFRM',
+          creator: 'MKBHD',
+          state: UserItemState.BOOKMARKED,
+        });
+        const other = createMockItemView({
+          id: 'ui-wrong',
+          title: 'The Daily Tech',
+          creator: 'Some Host',
+          state: UserItemState.BOOKMARKED,
+        });
+
+        const caller = createMockItemsCaller({
+          userId: TEST_USER_ID,
+          libraryItems: [target, other],
+        });
+
+        const result = await caller.library({ search: 'waveform' });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.items[0].id).toBe('ui-wvfrm');
       });
     });
 
