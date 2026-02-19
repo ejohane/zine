@@ -28,7 +28,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
 
     try {
       const isArticle = item.contentType === ContentType.ARTICLE;
-      const isSubstack = item.provider === 'SUBSTACK' || item.provider === 'substack';
+      const isSubstack = item.provider === 'SUBSTACK';
 
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {

@@ -1,0 +1,24 @@
+# TODO
+
+These are future feature enhancements and planning placeholders.
+Do not implement anything in this file unless directly and explicitly asked by the user.
+
+- [ ] RSS V1 foundation (feed-only model)
+  Context: Implement RSS as a feed-managed data source, not a creator-managed subscription.
+  Scope guard: Do not add RSS support to `creators.subscribe` or `creators.checkSubscription` in V1.
+  Primary references: `docs/rss-data-source-plan.md` sections "Architecture Decision" and "Data Model Changes".
+
+- [ ] `subscriptions.rss` management API and app flow
+  Context: Add a parallel tRPC namespace similar to `subscriptions.newsletters` with `list/add/remove/pause/resume/syncNow`.
+  UX intent: Users can paste a feed URL, manage feed status, and manually sync a feed from mobile.
+  Primary references: `docs/rss-data-source-plan.md` section "API Design (`subscriptions.rss`)".
+
+- [ ] RSS scheduled polling and ingestion integration
+  Context: Add RSS cron polling with per-provider lock, conditional requests (`ETag` / `Last-Modified`), and ingestion into `items` + `user_items`.
+  Success condition: New RSS entries reliably appear in Inbox without duplicate ingestion.
+  Primary references: `docs/rss-data-source-plan.md` sections "Polling and Scheduling" and "RSS Parsing and Transformation".
+
+- [ ] OPML import/export (deferred, post-MVP)
+  Context: Keep OPML out of the initial RSS milestone; revisit only after single-feed add/poll/ingest is stable in staging/production.
+  Activation criteria: Core RSS flow has proven reliability, error handling, and observability.
+  Primary references: `docs/rss-data-source-plan.md` section "Open Questions".

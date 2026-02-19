@@ -52,6 +52,22 @@ function decodeHtmlEntities(text: string): string {
   return decoded;
 }
 
+function stripHtmlTags(text: string): string {
+  return text
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeSummaryText(summary?: string): string | undefined {
+  if (!summary) return undefined;
+  const decoded = decodeHtmlEntities(summary);
+  const stripped = stripHtmlTags(decoded);
+  return stripped.length > 0 ? stripped : undefined;
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -230,6 +246,51 @@ export function transformSpotifyEpisode(
     imageUrl: episode.images?.[0]?.url,
     durationSeconds: Math.floor(episode.duration_ms / 1000),
     publishedAt,
+    createdAt: now,
+  };
+}
+
+// ============================================================================
+// RSS Transformer
+// ============================================================================
+
+export interface RssEntryForTransform {
+  providerId: string;
+  canonicalUrl: string;
+  title: string;
+  summary?: string;
+  creator?: string;
+  creatorImageUrl?: string;
+  imageUrl?: string;
+  publishedAt?: number;
+}
+
+/**
+ * Transform a normalized RSS entry into a canonical Zine item.
+ */
+export function transformRssEntry(entry: RssEntryForTransform): NewItem {
+  if (!entry.providerId) {
+    throw new TransformError('RSS entry missing providerId');
+  }
+
+  if (!entry.canonicalUrl) {
+    throw new TransformError('RSS entry missing canonicalUrl');
+  }
+
+  const now = Date.now();
+
+  return {
+    id: ulid(),
+    contentType: ContentType.ARTICLE,
+    provider: Provider.RSS,
+    providerId: entry.providerId,
+    canonicalUrl: entry.canonicalUrl,
+    title: decodeHtmlEntities(entry.title || 'Untitled'),
+    description: normalizeSummaryText(entry.summary),
+    creator: decodeHtmlEntities(entry.creator || 'Unknown'),
+    creatorImageUrl: entry.creatorImageUrl,
+    imageUrl: entry.imageUrl,
+    publishedAt: entry.publishedAt ?? now,
     createdAt: now,
   };
 }
