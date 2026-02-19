@@ -10,7 +10,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ContentType, Provider } from '@zine/shared';
-import { transformYouTubeVideo, transformSpotifyEpisode, TransformError } from './transformers';
+import {
+  transformYouTubeVideo,
+  transformSpotifyEpisode,
+  transformRssEntry,
+  TransformError,
+} from './transformers';
 
 // ============================================================================
 // Test Helpers
@@ -72,6 +77,46 @@ const originalDateNow = Date.now;
 beforeEach(() => {
   // Mock Date.now directly (vi.setSystemTime not available in Workers pool)
   Date.now = vi.fn(() => MOCK_NOW);
+});
+
+// ============================================================================
+// transformRssEntry Tests
+// ============================================================================
+
+describe('transformRssEntry', () => {
+  it('strips HTML and decodes entities in RSS summaries', () => {
+    const result = transformRssEntry({
+      providerId: 'https://example.com/posts/final-bottleneck',
+      canonicalUrl: 'https://example.com/posts/final-bottleneck',
+      title: 'The Final Bottleneck',
+      summary:
+        '<p>AI speeds up writing code, but accountability &amp; review capacity still impose hard limits.</p>',
+      creator: 'Armin Ronacher',
+      creatorImageUrl: 'https://example.com/avatar.jpg',
+      imageUrl: 'https://example.com/cover.jpg',
+      publishedAt: 1705320000000,
+    });
+
+    expect(result.provider).toBe(Provider.RSS);
+    expect(result.contentType).toBe(ContentType.ARTICLE);
+    expect(result.description).toBe(
+      'AI speeds up writing code, but accountability & review capacity still impose hard limits.'
+    );
+    expect(result.creatorImageUrl).toBe('https://example.com/avatar.jpg');
+    expect(result.imageUrl).toBe('https://example.com/cover.jpg');
+  });
+
+  it('handles plain-text summaries without modification', () => {
+    const result = transformRssEntry({
+      providerId: 'https://example.com/posts/plain',
+      canonicalUrl: 'https://example.com/posts/plain',
+      title: 'Plain',
+      summary: 'Plain summary',
+      creator: 'Author',
+    });
+
+    expect(result.description).toBe('Plain summary');
+  });
 });
 
 afterEach(() => {

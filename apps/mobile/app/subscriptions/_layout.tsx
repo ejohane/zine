@@ -23,6 +23,13 @@ export default function SubscriptionsLayout() {
         }}
       />
       <Stack.Screen
+        name="rss"
+        options={{
+          title: 'RSS Feeds',
+          headerLargeTitle: true,
+        }}
+      />
+      <Stack.Screen
         name="[provider]"
         options={{
           headerLargeTitle: true,

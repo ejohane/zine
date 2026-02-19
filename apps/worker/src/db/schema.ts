@@ -361,6 +361,71 @@ export const newsletterUnsubscribeEvents = sqliteTable(
 );
 
 // ============================================================================
+// RSS Feeds
+// ============================================================================
+// User-managed RSS/Atom feed subscriptions with polling metadata.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const rssFeeds = sqliteTable(
+  'rss_feeds',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    feedUrl: text('feed_url').notNull(), // Normalized canonical feed URL
+    feedUrlHash: text('feed_url_hash').notNull(), // Deterministic hash for fast lookups
+    title: text('title'),
+    description: text('description'),
+    siteUrl: text('site_url'),
+    imageUrl: text('image_url'),
+    etag: text('etag'),
+    lastModified: text('last_modified'),
+    lastPolledAt: integer('last_polled_at'), // Unix ms
+    lastSuccessAt: integer('last_success_at'), // Unix ms
+    lastErrorAt: integer('last_error_at'), // Unix ms
+    lastError: text('last_error'),
+    errorCount: integer('error_count').notNull().default(0),
+    status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | UNSUBSCRIBED | ERROR
+    pollIntervalSeconds: integer('poll_interval_seconds').notNull().default(3600),
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
+  },
+  (table) => [
+    uniqueIndex('rss_feeds_user_feed_url_idx').on(table.userId, table.feedUrl),
+    index('rss_feeds_poll_idx').on(table.status, table.lastPolledAt),
+    index('rss_feeds_user_status_idx').on(table.userId, table.status, table.updatedAt),
+    index('rss_feeds_url_hash_idx').on(table.feedUrlHash),
+  ]
+);
+
+// ============================================================================
+// RSS Feed Items
+// ============================================================================
+// Tracks mapping between an RSS feed and canonical items.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const rssFeedItems = sqliteTable(
+  'rss_feed_items',
+  {
+    id: text('id').primaryKey(), // ULID
+    rssFeedId: text('rss_feed_id')
+      .notNull()
+      .references(() => rssFeeds.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    entryId: text('entry_id').notNull(), // Feed-local stable item identity (guid/link/hash)
+    entryUrl: text('entry_url'),
+    publishedAt: integer('published_at'), // Unix ms
+    fetchedAt: integer('fetched_at').notNull(), // Unix ms
+  },
+  (table) => [
+    uniqueIndex('rss_feed_items_feed_entry_idx').on(table.rssFeedId, table.entryId),
+    index('rss_feed_items_feed_published_idx').on(table.rssFeedId, table.publishedAt),
+    index('rss_feed_items_item_idx').on(table.itemId),
+  ]
+);
+
+// ============================================================================
 // Subscriptions (User subscriptions to specific channels/shows)
 // ============================================================================
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

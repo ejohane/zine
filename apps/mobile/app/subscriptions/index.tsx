@@ -46,6 +46,16 @@ function GmailIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: st
   );
 }
 
+function RssIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
+      <Path d="M4 11a9 9 0 0 1 9 9" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M4 4a16 16 0 0 1 16 16" strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M5 19a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" fill={color} stroke={color} />
+    </Svg>
+  );
+}
+
 function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
@@ -59,7 +69,7 @@ function ChevronRightIcon({ size = 20, color = '#6A6A6A' }: { size?: number; col
 // ============================================================================
 
 interface ProviderCardProps {
-  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'RSS';
   connectionStatus: ConnectionStatus;
   subscriptionCount: number;
   onPress: () => void;
@@ -93,12 +103,25 @@ function ProviderCard({
       icon: GmailIcon,
       brandColor: '#1A73E8',
     },
+    RSS: {
+      name: 'RSS Feeds',
+      icon: RssIcon,
+      brandColor: '#F08C2B',
+    },
   }[provider];
 
   const Icon = config.icon;
 
   // Get display state based on connection status
-  const statusDisplay = getStatusDisplay(connectionStatus, colors);
+  const statusDisplay =
+    provider === 'RSS'
+      ? {
+          dotColor: colors.primary,
+          text: 'Feed source',
+          textColor: colors.textSecondary,
+          showCount: true,
+        }
+      : getStatusDisplay(connectionStatus, colors);
 
   return (
     <Pressable
@@ -150,8 +173,15 @@ export default function SubscriptionsScreen() {
   const newsletterStatsQuery = (trpc as any).subscriptions.newsletters.stats.useQuery(undefined, {
     staleTime: 60 * 1000,
   });
+  const rssStatsQuery = (trpc as any).subscriptions.rss.stats.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
 
-  const isLoading = connectionsLoading || subscriptionsLoading || newsletterStatsQuery.isLoading;
+  const isLoading =
+    connectionsLoading ||
+    subscriptionsLoading ||
+    newsletterStatsQuery.isLoading ||
+    rssStatsQuery.isLoading;
 
   // Get connection status for each provider
   const youtubeConnection = connections?.find(
@@ -166,13 +196,20 @@ export default function SubscriptionsScreen() {
   const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
   const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
   const gmailStatus = (gmailConnection?.status as ConnectionStatus) ?? null;
+  const rssStatus: ConnectionStatus = 'ACTIVE';
 
   // Count subscriptions per provider
   const youtubeCount = subscriptions.filter((s) => s.provider === 'YOUTUBE').length;
   const spotifyCount = subscriptions.filter((s) => s.provider === 'SPOTIFY').length;
   const gmailCount = newsletterStatsQuery.data?.active ?? 0;
+  const rssCount = rssStatsQuery.data?.active ?? 0;
 
-  const handleProviderPress = (provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL') => {
+  const handleProviderPress = (provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'RSS') => {
+    if (provider === 'RSS') {
+      router.push('/subscriptions/rss' as Href);
+      return;
+    }
+
     router.push(`/subscriptions/${provider.toLowerCase()}` as Href);
   };
 
@@ -217,6 +254,16 @@ export default function SubscriptionsScreen() {
             connectionStatus={gmailStatus}
             subscriptionCount={gmailCount}
             onPress={() => handleProviderPress('GMAIL')}
+            colors={colors}
+          />
+        </Animated.View>
+
+        <Animated.View>
+          <ProviderCard
+            provider="RSS"
+            connectionStatus={rssStatus}
+            subscriptionCount={rssCount}
+            onPress={() => handleProviderPress('RSS')}
             colors={colors}
           />
         </Animated.View>

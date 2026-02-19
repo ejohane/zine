@@ -30,8 +30,9 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('expo-web-browser', () => ({
-  openBrowserAsync: (...args: [string, { presentationStyle: string }]) =>
-    mockOpenBrowserAsync(...args),
+  openBrowserAsync: (
+    ...args: [string, { presentationStyle: string; enableBarCollapsing?: boolean }]
+  ) => mockOpenBrowserAsync(...args),
   WebBrowserPresentationStyle: {
     FULL_SCREEN: 'FULL_SCREEN',
   },
@@ -117,6 +118,7 @@ describe('useItemDetailActions', () => {
     });
 
     expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
+      enableBarCollapsing: true,
       presentationStyle: 'FULL_SCREEN',
     });
     expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
@@ -175,6 +177,7 @@ describe('useItemDetailActions', () => {
     expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
     expect(mockOpenURL).not.toHaveBeenCalled();
     expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
+      enableBarCollapsing: true,
       presentationStyle: 'FULL_SCREEN',
     });
   });

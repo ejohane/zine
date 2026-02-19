@@ -4,6 +4,7 @@ import { itemsRouter } from './routers/items';
 import { subscriptionsRouter } from './routers/subscriptions';
 import { connectionsRouter } from './routers/connections';
 import { newslettersRouter } from './routers/newsletters';
+import { rssRouter } from './routers/rss';
 import { bookmarksRouter } from './routers/bookmarks';
 import { creatorsRouter } from './routers/creators';
 import { adminRouter } from './routers/admin';
@@ -55,6 +56,7 @@ export const appRouter = router({
     activeSyncJob: subscriptionsRouter.activeSyncJob,
     discover: subscriptionsRouter.discover,
     newsletters: newslettersRouter,
+    rss: rssRouter,
   }),
   // Admin operations (data repair, diagnostics)
   admin: adminRouter,

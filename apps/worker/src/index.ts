@@ -12,6 +12,7 @@ import { ZINE_VERSION } from '@zine/shared';
 import type { Bindings, Env } from './types';
 import { pollProviderSubscriptions } from './polling/scheduler';
 import { pollGmailNewsletters } from './newsletters/gmail';
+import { pollRssFeeds } from './rss/service';
 import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
@@ -173,6 +174,7 @@ export default {
    * - "0 * * * *"  → YouTube polling at top of hour
    * - "15 * * * *" → Gmail newsletter polling at quarter past
    * - "30 * * * *" → Spotify polling at 30 minutes past
+   * - "45 * * * *" → RSS feed polling at 45 minutes past
    *
    * Each provider has its own distributed lock for failure isolation.
    *
@@ -191,6 +193,11 @@ export default {
 
     if (event.cron === '15 * * * *') {
       ctx.waitUntil(pollGmailNewsletters(env, ctx));
+      return;
+    }
+
+    if (event.cron === '45 * * * *') {
+      ctx.waitUntil(pollRssFeeds(env, ctx));
       return;
     }
 
