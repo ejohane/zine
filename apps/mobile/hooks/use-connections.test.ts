@@ -5,6 +5,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react-hooks';
+import { Provider } from '@zine/shared';
 
 // ============================================================================
 // Module-level Mocks
@@ -199,15 +200,15 @@ describe('useDisconnectConnection', () => {
     const { result } = renderHook(() => useDisconnectConnection());
 
     await act(async () => {
-      await result.current.mutate({ provider: 'YOUTUBE' });
+      await result.current.mutate({ provider: Provider.YOUTUBE });
     });
 
     const [queryKey, updater] = mockConnectionsSetData.mock.calls[0];
     expect(queryKey).toBeUndefined();
 
-    const updated = updater([createConnection('YOUTUBE'), createConnection('SPOTIFY')]);
-    expect(updated).toHaveLength(1);
-    expect(updated[0].provider).toBe('SPOTIFY');
+    const updated = updater(createConnectionsMap());
+    expect(updated.YOUTUBE).toBeNull();
+    expect(updated.SPOTIFY).not.toBeNull();
 
     const defaultCall = mockSubscriptionsSetData.mock.calls.find(
       ([input]) => input && Object.keys(input).length === 0
@@ -232,7 +233,7 @@ describe('useDisconnectConnection', () => {
     const { result } = renderHook(() => useDisconnectConnection());
 
     await act(async () => {
-      await result.current.mutate({ provider: 'GMAIL' });
+      await result.current.mutate({ provider: Provider.GMAIL });
     });
 
     const [queryKey, updater] = mockConnectionsSetData.mock.calls[0];
@@ -254,7 +255,7 @@ describe('useDisconnectConnection', () => {
     const { result } = renderHook(() => useDisconnectConnection());
 
     await act(async () => {
-      await expect(result.current.mutate({ provider: 'YOUTUBE' })).rejects.toThrow(
+      await expect(result.current.mutate({ provider: Provider.YOUTUBE })).rejects.toThrow(
         'Failed to disconnect'
       );
     });
@@ -278,7 +279,7 @@ describe('useDisconnectConnection', () => {
     const { result } = renderHook(() => useDisconnectConnection());
 
     await act(async () => {
-      await result.current.mutate({ provider: 'YOUTUBE' });
+      await result.current.mutate({ provider: Provider.YOUTUBE });
     });
 
     expect(mockConnectionsInvalidate).toHaveBeenCalled();
@@ -289,7 +290,7 @@ describe('useDisconnectConnection', () => {
     const { result } = renderHook(() => useDisconnectConnection());
 
     await act(async () => {
-      await result.current.mutate({ provider: 'GMAIL' });
+      await result.current.mutate({ provider: Provider.GMAIL });
     });
 
     expect(mockNewslettersListCancel).toHaveBeenCalledWith({ limit: 100, search: undefined });

@@ -73,7 +73,7 @@ function SpotifyConnectContent() {
     try {
       await connectProvider('SPOTIFY');
       // Invalidate connections cache so UI shows updated state immediately
-      await (utils as any).subscriptions?.connections?.list?.invalidate?.();
+      await utils.subscriptions.connections.list.invalidate();
       // On success, navigate to subscriptions discover screen
       router.replace('/subscriptions/discover/spotify' as const);
     } catch (err) {

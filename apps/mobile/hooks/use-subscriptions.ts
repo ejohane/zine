@@ -14,12 +14,18 @@
 
 import { keepPreviousData } from '@tanstack/react-query';
 import { trpc } from '../lib/trpc';
+import type {
+  AddSubscriptionInput,
+  RemoveSubscriptionInput,
+  SubscriptionsListOutput,
+} from '../lib/trpc-types';
 import { useOfflineMutation } from './use-offline-mutation';
 import type {
   Subscription,
   SubscriptionsResponse,
   SubscriptionProvider,
 } from './use-subscriptions-query';
+import { mapSubscriptionsResponse } from './use-subscriptions-query';
 
 // Re-export types for convenience
 export type { Subscription, SubscriptionsResponse, SubscriptionProvider };
@@ -36,7 +42,7 @@ export type { Subscription, SubscriptionsResponse, SubscriptionProvider };
  */
 export interface SubscribePayload {
   /** The content provider */
-  provider: SubscriptionProvider;
+  provider: AddSubscriptionInput['provider'];
   /** Provider-specific channel/show ID */
   providerChannelId: string;
   /** Display name of the channel/show */
@@ -55,7 +61,7 @@ export interface SubscribePayload {
  */
 export interface UnsubscribePayload {
   /** The subscription ID to remove */
-  subscriptionId: string;
+  subscriptionId: RemoveSubscriptionInput['subscriptionId'];
   /** Index signature for Record<string, unknown> compatibility */
   [key: string]: unknown;
 }
@@ -179,9 +185,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
   // Query
   // ============================================================================
 
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const subscriptionsQuery = (trpc as any).subscriptions.list.useQuery(
+  const subscriptionsQuery = trpc.subscriptions.list.useQuery(
     { limit: 50 }, // Use default limit from API contract
     {
       // Cache for 5 minutes - subscriptions don't change frequently
@@ -205,9 +209,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Execute the actual mutation when online
     mutationFn: async (payload) => {
-      // Using type assertion until router is updated with proper typing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (utils as any).client.subscriptions.add.mutate({
+      await utils.client.subscriptions.add.mutate({
         provider: payload.provider,
         providerChannelId: payload.providerChannelId,
         name: payload.name,
@@ -217,14 +219,12 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Apply optimistic update to cache immediately
     onOptimisticUpdate: (payload) => {
-      // Response shape: { items: Subscription[], nextCursor, hasMore }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).subscriptions.list.setData(
+      utils.subscriptions.list.setData(
         { limit: 50 },
-        (old: SubscriptionsResponse | undefined) => {
+        (old: SubscriptionsListOutput | undefined) => {
           if (!old) {
             return {
-              items: [createTempSubscription(payload)],
+              items: [createTempSubscriptionRow(payload)],
               nextCursor: null,
               hasMore: false,
             };
@@ -232,7 +232,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
           return {
             ...old,
-            items: [...old.items, createTempSubscription(payload)],
+            items: [...old.items, createTempSubscriptionRow(payload)],
           };
         }
       );
@@ -240,10 +240,9 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Rollback optimistic update on failure
     onRollback: (payload) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).subscriptions.list.setData(
+      utils.subscriptions.list.setData(
         { limit: 50 },
-        (old: SubscriptionsResponse | undefined) => {
+        (old: SubscriptionsListOutput | undefined) => {
           if (!old) {
             return { items: [], nextCursor: null, hasMore: false };
           }
@@ -251,7 +250,8 @@ export function useSubscriptions(): UseSubscriptionsReturn {
           return {
             ...old,
             items: old.items.filter(
-              (s: Subscription) => s.providerChannelId !== payload.providerChannelId
+              (s: SubscriptionsListOutput['items'][number]) =>
+                s.providerChannelId !== payload.providerChannelId
             ),
           };
         }
@@ -260,13 +260,10 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Invalidate cache to get fresh data from server
     onSuccess: () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).subscriptions.list.invalidate();
+      utils.subscriptions.list.invalidate();
       // Also invalidate items queries - new subscription triggers ingestion of latest episode
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).items.inbox.invalidate();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).items.library.invalidate();
+      utils.items.inbox.invalidate();
+      utils.items.library.invalidate();
     },
   });
 
@@ -283,26 +280,25 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Execute the actual mutation when online
     mutationFn: async (payload) => {
-      // Using type assertion until router is updated with proper typing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (utils as any).client.subscriptions.remove.mutate({
+      await utils.client.subscriptions.remove.mutate({
         subscriptionId: payload.subscriptionId,
       });
     },
 
     // Apply optimistic update to cache immediately
     onOptimisticUpdate: (payload) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).subscriptions.list.setData(
+      utils.subscriptions.list.setData(
         { limit: 50 },
-        (old: SubscriptionsResponse | undefined) => {
+        (old: SubscriptionsListOutput | undefined) => {
           if (!old) {
             return { items: [], nextCursor: null, hasMore: false };
           }
 
           return {
             ...old,
-            items: old.items.filter((s: Subscription) => s.id !== payload.subscriptionId),
+            items: old.items.filter(
+              (s: SubscriptionsListOutput['items'][number]) => s.id !== payload.subscriptionId
+            ),
           };
         }
       );
@@ -310,8 +306,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
     // Rollback by invalidating cache (let it refetch the actual state)
     onRollback: () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (utils as any).subscriptions.list.invalidate();
+      utils.subscriptions.list.invalidate();
     },
   });
 
@@ -321,8 +316,12 @@ export function useSubscriptions(): UseSubscriptionsReturn {
 
   return {
     // Query
-    subscriptions: subscriptionsQuery.data?.items ?? [],
-    subscriptionsResponse: subscriptionsQuery.data,
+    subscriptions: subscriptionsQuery.data
+      ? mapSubscriptionsResponse(subscriptionsQuery.data).items
+      : [],
+    subscriptionsResponse: subscriptionsQuery.data
+      ? mapSubscriptionsResponse(subscriptionsQuery.data)
+      : undefined,
     isLoading: subscriptionsQuery.isLoading,
     refetch: async () => {
       await subscriptionsQuery.refetch();
@@ -350,16 +349,28 @@ export function useSubscriptions(): UseSubscriptionsReturn {
  * Uses a temp ID prefix so we can identify and update it later.
  * All nullable fields are set to null, and status is ACTIVE.
  */
-function createTempSubscription(payload: SubscribePayload): Subscription {
+function createTempSubscriptionRow(
+  payload: SubscribePayload
+): SubscriptionsListOutput['items'][number] {
   return {
     id: `temp-${Date.now()}`,
+    userId: 'temp-user',
     provider: payload.provider,
     providerChannelId: payload.providerChannelId,
+    creatorId: null,
     name: payload.name,
     imageUrl: payload.imageUrl ?? null,
+    description: null,
+    externalUrl: null,
+    totalItems: 0,
+    lastPublishedAt: null,
+    lastPolledAt: null,
+    pollIntervalSeconds: 3600,
     status: 'ACTIVE',
+    disconnectedAt: null,
+    disconnectedReason: null,
     createdAt: Date.now(),
-    lastItemAt: null,
+    updatedAt: Date.now(),
   };
 }
 
@@ -404,12 +415,14 @@ function createTempSubscription(payload: SubscribePayload): Subscription {
  * ```
  */
 export function useInfiniteSubscriptions(options?: { limit?: number }) {
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.list.useInfiniteQuery(
+  return trpc.subscriptions.list.useInfiniteQuery(
     { limit: options?.limit ?? 20 },
     {
-      getNextPageParam: (lastPage: SubscriptionsResponse) => lastPage.nextCursor,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      select: (data) => ({
+        ...data,
+        pages: data.pages.map(mapSubscriptionsResponse),
+      }),
       staleTime: 5 * 60 * 1000,
       gcTime: 24 * 60 * 60 * 1000,
     }

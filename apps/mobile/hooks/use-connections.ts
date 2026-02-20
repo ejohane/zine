@@ -1,135 +1,71 @@
 /**
  * useConnections Hook
  *
- * Fetches the user's OAuth connection status for each provider (YouTube, Spotify).
- * Used by the Settings screen to display provider connection status.
- *
- * Backend API: subscriptions.connections.list
- * Note: The backend router needs to wire connectionsRouter under subscriptions router.
- *
- * @see features/subscriptions/frontend-spec.md Section 3.1.1
+ * Fetches the user's OAuth connection status for each provider (YouTube, Spotify, Gmail).
+ * Used by subscriptions/settings screens to display provider connection status.
  */
 
 import { trpc } from '../lib/trpc';
-import type { SubscriptionsResponse, Subscription } from './use-subscriptions-query';
+import type {
+  ConnectionsListOutput,
+  NewslettersListOutput,
+  NewslettersStatsOutput,
+  SubscriptionsListOutput,
+} from '../lib/trpc-types';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * Connection status values
- */
 export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
-
-/**
- * Supported OAuth providers
- */
 export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
 
-/**
- * Connection type returned from the backend.
- * Represents an OAuth connection to a provider (YouTube, Spotify).
- */
 export interface Connection {
-  /** Unique connection identifier */
   id: string;
-  /** The OAuth provider */
   provider: ConnectionProvider;
-  /** Current connection status */
   status: ConnectionStatus;
-  /** Provider-specific user ID (e.g., YouTube channel ID) */
   providerUserId: string | null;
-  /** When the connection was established (ISO 8601 string) */
   createdAt: string;
-  /** When the last sync occurred (ISO 8601 string or null if never) */
   lastSyncAt: string | null;
 }
 
-/**
- * Payload for disconnecting a provider connection.
- */
 export interface DisconnectConnectionInput {
   provider: ConnectionProvider;
 }
 
-/**
- * Individual provider connection data from backend
- */
-interface ProviderConnectionData {
-  provider: string;
-  status: string;
-  connectedAt: number;
-  lastRefreshedAt: number | null;
-}
-
-/**
- * Backend response shape from connections.list
- * Returns a map with provider keys containing connection info or null
- */
-interface ConnectionsListResponse {
-  YOUTUBE: ProviderConnectionData | null;
-  SPOTIFY: ProviderConnectionData | null;
-  GMAIL: ProviderConnectionData | null;
-}
-
-interface NewslettersListResponse {
-  items: unknown[];
-  nextCursor: string | null;
-  hasMore: boolean;
-}
-
-interface NewsletterStatsResponse {
-  total: number;
-  active: number;
-  hidden: number;
-  unsubscribed: number;
-  lastSyncAt: number | null;
-  lastSyncStatus: string;
-  lastSyncError: string | null;
-}
+type ProviderConnectionData = NonNullable<ConnectionsListOutput[ConnectionProvider]>;
 
 // ============================================================================
-// Helper Functions
+// Helpers
 // ============================================================================
 
-/**
- * Transform backend connection response to Connection interface
- *
- * The backend returns timestamps as numbers (epoch ms), while the
- * frontend spec expects ISO 8601 strings.
- */
+function isConnectionProvider(value: string): value is ConnectionProvider {
+  return value === 'YOUTUBE' || value === 'SPOTIFY' || value === 'GMAIL';
+}
+
 function transformConnection(
   provider: ConnectionProvider,
   data: ProviderConnectionData
 ): Connection {
   return {
-    // Backend doesn't return an ID, generate a stable one from provider
     id: `connection-${provider.toLowerCase()}`,
     provider,
     status: data.status as ConnectionStatus,
-    // Backend doesn't return providerUserId in list endpoint
     providerUserId: null,
-    // Convert epoch ms to ISO 8601
     createdAt: new Date(data.connectedAt).toISOString(),
     lastSyncAt: data.lastRefreshedAt ? new Date(data.lastRefreshedAt).toISOString() : null,
   };
 }
 
-/**
- * Transform backend response map to Connection array
- */
-function transformConnectionsResponse(response: ConnectionsListResponse): Connection[] {
+function transformConnectionsResponse(response: ConnectionsListOutput): Connection[] {
   const connections: Connection[] = [];
 
   if (response.YOUTUBE) {
     connections.push(transformConnection('YOUTUBE', response.YOUTUBE));
   }
-
   if (response.SPOTIFY) {
     connections.push(transformConnection('SPOTIFY', response.SPOTIFY));
   }
-
   if (response.GMAIL) {
     connections.push(transformConnection('GMAIL', response.GMAIL));
   }
@@ -138,176 +74,102 @@ function transformConnectionsResponse(response: ConnectionsListResponse): Connec
 }
 
 // ============================================================================
-// Hook
+// Hooks
 // ============================================================================
 
-/**
- * Hook to fetch the user's connected provider accounts.
- *
- * Returns a React Query result with an array of connections for all
- * providers the user has connected (YouTube, Spotify).
- *
- * The data is cached for 5 minutes (staleTime) and garbage collected
- * after 24 hours (gcTime) to minimize API calls while ensuring
- * reasonably fresh connection status.
- *
- * @returns Query result with connections array
- *
- * @example
- * ```tsx
- * function SettingsScreen() {
- *   const { data: connections, isLoading, error } = useConnections();
- *
- *   if (isLoading) return <LoadingSpinner />;
- *   if (error) return <ErrorMessage error={error} />;
- *
- *   const youtubeConnection = connections?.find(c => c.provider === 'YOUTUBE');
- *   const spotifyConnection = connections?.find(c => c.provider === 'SPOTIFY');
- *
- *   return (
- *     <View>
- *       <Text>YouTube: {youtubeConnection?.status ?? 'Not connected'}</Text>
- *       <Text>Spotify: {spotifyConnection?.status ?? 'Not connected'}</Text>
- *     </View>
- *   );
- * }
- * ```
- */
 export function useConnections() {
-  // API path: subscriptions.connections.list
-  // Note: Backend router needs connectionsRouter wired under subscriptions
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.connections.list.useQuery(undefined, {
-    // Cache for 5 minutes - connection status doesn't change frequently
+  return trpc.subscriptions.connections.list.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
-    // Keep in cache for 24 hours
     gcTime: 24 * 60 * 60 * 1000,
-    // Transform the backend response to match the expected Connection[] format
     select: transformConnectionsResponse,
   });
 }
 
-/**
- * Hook to get connection for a specific provider
- *
- * Convenience wrapper around useConnections for cases where
- * you only need one provider's connection status.
- *
- * @param provider - The provider to get connection for
- * @returns Query result with connection or undefined if not connected
- *
- * @example
- * ```tsx
- * function YouTubeSettings() {
- *   const { data: connection, isLoading } = useConnection('YOUTUBE');
- *
- *   if (connection?.status === 'ACTIVE') {
- *     return <Text>Connected to YouTube</Text>;
- *   }
- *
- *   return <Button onPress={connectYouTube}>Connect YouTube</Button>;
- * }
- * ```
- */
 export function useConnection(provider: ConnectionProvider) {
-  // API path: subscriptions.connections.list
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.connections.list.useQuery(undefined, {
+  return trpc.subscriptions.connections.list.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
-    select: (response: ConnectionsListResponse) => {
+    select: (response) => {
       const providerData = response[provider];
       return providerData ? transformConnection(provider, providerData) : undefined;
     },
   });
 }
 
-/**
- * Hook to disconnect a provider connection with optimistic updates.
- */
 export function useDisconnectConnection(options?: {
   onSuccess?: () => void;
   onError?: (error: Error) => void;
   onSettled?: () => void;
 }) {
   type DisconnectContext = {
-    previousConnections?: ConnectionsListResponse | Connection[];
+    previousConnections?: ConnectionsListOutput;
     previousSubscriptions?: {
-      defaultList?: SubscriptionsResponse;
-      limitedList?: SubscriptionsResponse;
+      defaultList?: SubscriptionsListOutput;
+      limitedList?: SubscriptionsListOutput;
     };
     previousNewsletters?: {
-      listDefault?: NewslettersListResponse;
-      listNoSearch?: NewslettersListResponse;
-      listUnscoped?: NewslettersListResponse;
-      stats?: NewsletterStatsResponse;
+      listDefault?: NewslettersListOutput;
+      listNoSearch?: NewslettersListOutput;
+      listUnscoped?: NewslettersListOutput;
+      stats?: NewslettersStatsOutput;
     };
   };
 
-  // Using type assertion until router types are updated
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const utils = trpc.useUtils() as any;
+  const utils = trpc.useUtils();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.connections.disconnect.useMutation({
-    onMutate: async ({ provider }: DisconnectConnectionInput): Promise<DisconnectContext> => {
-      await utils.subscriptions?.connections?.list?.cancel?.();
-      await utils.subscriptions?.list?.cancel?.({});
-      await utils.subscriptions?.list?.cancel?.({ limit: 50 });
+  return trpc.subscriptions.connections.disconnect.useMutation({
+    onMutate: async (input): Promise<DisconnectContext> => {
+      if (!isConnectionProvider(input.provider)) {
+        return {};
+      }
+      const provider = input.provider;
+
+      await utils.subscriptions.connections.list.cancel();
+      await utils.subscriptions.list.cancel({});
+      await utils.subscriptions.list.cancel({ limit: 50 });
+
       if (provider === 'GMAIL') {
-        await utils.subscriptions?.newsletters?.list?.cancel?.({
+        await utils.subscriptions.newsletters.list.cancel({
           limit: 100,
           search: undefined,
         });
-        await utils.subscriptions?.newsletters?.list?.cancel?.({
+        await utils.subscriptions.newsletters.list.cancel({
           limit: 100,
         });
-        await utils.subscriptions?.newsletters?.list?.cancel?.(undefined);
-        await utils.subscriptions?.newsletters?.stats?.cancel?.();
+        await utils.subscriptions.newsletters.list.cancel();
+        await utils.subscriptions.newsletters.stats.cancel();
       }
 
-      const previousConnections = utils.subscriptions?.connections?.list?.getData?.();
-      const previousSubscriptionsDefault = utils.subscriptions?.list?.getData?.({});
-      const previousSubscriptionsLimited = utils.subscriptions?.list?.getData?.({ limit: 50 });
+      const previousConnections = utils.subscriptions.connections.list.getData();
+      const previousSubscriptionsDefault = utils.subscriptions.list.getData({});
+      const previousSubscriptionsLimited = utils.subscriptions.list.getData({ limit: 50 });
       const previousNewslettersList =
         provider === 'GMAIL'
-          ? utils.subscriptions?.newsletters?.list?.getData?.({ limit: 100, search: undefined })
+          ? utils.subscriptions.newsletters.list.getData({ limit: 100, search: undefined })
           : undefined;
       const previousNewslettersListNoSearch =
         provider === 'GMAIL'
-          ? utils.subscriptions?.newsletters?.list?.getData?.({ limit: 100 })
+          ? utils.subscriptions.newsletters.list.getData({ limit: 100 })
           : undefined;
       const previousNewslettersListDefault =
-        provider === 'GMAIL'
-          ? utils.subscriptions?.newsletters?.list?.getData?.(undefined)
-          : undefined;
+        provider === 'GMAIL' ? utils.subscriptions.newsletters.list.getData() : undefined;
       const previousNewslettersStats =
-        provider === 'GMAIL' ? utils.subscriptions?.newsletters?.stats?.getData?.() : undefined;
+        provider === 'GMAIL' ? utils.subscriptions.newsletters.stats.getData() : undefined;
 
-      const updateConnections = (
-        old: ConnectionsListResponse | Connection[] | undefined
-      ): ConnectionsListResponse | Connection[] | undefined => {
+      utils.subscriptions.connections.list.setData(undefined, (old) => {
         if (!old) return old;
-
-        if (Array.isArray(old)) {
-          return old.filter((connection) => connection.provider !== provider);
-        }
-
         return {
           ...old,
           [provider]: null,
         };
-      };
+      });
 
-      utils.subscriptions?.connections?.list?.setData?.(undefined, updateConnections);
-
-      const updateSubscriptions = (old: SubscriptionsResponse | undefined) => {
+      const updateSubscriptions = (old: SubscriptionsListOutput | undefined) => {
         if (!old) return old;
 
         return {
           ...old,
-          items: old.items.map((subscription: Subscription) =>
+          items: old.items.map((subscription: SubscriptionsListOutput['items'][number]) =>
             subscription.provider === provider
               ? { ...subscription, status: 'DISCONNECTED' }
               : subscription
@@ -315,48 +177,36 @@ export function useDisconnectConnection(options?: {
         };
       };
 
-      utils.subscriptions?.list?.setData?.({}, updateSubscriptions);
-      utils.subscriptions?.list?.setData?.({ limit: 50 }, updateSubscriptions);
+      utils.subscriptions.list.setData({}, updateSubscriptions);
+      utils.subscriptions.list.setData({ limit: 50 }, updateSubscriptions);
 
       if (provider === 'GMAIL') {
-        utils.subscriptions?.newsletters?.list?.setData?.(
-          { limit: 100, search: undefined },
-          {
-            items: [],
-            nextCursor: null,
-            hasMore: false,
-          }
-        );
-        utils.subscriptions?.newsletters?.list?.setData?.(
-          { limit: 100 },
-          {
-            items: [],
-            nextCursor: null,
-            hasMore: false,
-          }
-        );
-        utils.subscriptions?.newsletters?.list?.setData?.(undefined, {
+        const emptyNewsletters: NewslettersListOutput = {
           items: [],
           nextCursor: null,
           hasMore: false,
-        });
+        };
 
-        utils.subscriptions?.newsletters?.stats?.setData?.(
-          undefined,
-          (old: NewsletterStatsResponse | undefined) => {
-            if (!old) return old;
-            return {
-              ...old,
-              total: 0,
-              active: 0,
-              hidden: 0,
-              unsubscribed: 0,
-              lastSyncAt: null,
-              lastSyncStatus: 'IDLE',
-              lastSyncError: null,
-            };
-          }
+        utils.subscriptions.newsletters.list.setData(
+          { limit: 100, search: undefined },
+          emptyNewsletters
         );
+        utils.subscriptions.newsletters.list.setData({ limit: 100 }, emptyNewsletters);
+        utils.subscriptions.newsletters.list.setData(undefined, emptyNewsletters);
+
+        utils.subscriptions.newsletters.stats.setData(undefined, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            total: 0,
+            active: 0,
+            hidden: 0,
+            unsubscribed: 0,
+            lastSyncAt: null,
+            lastSyncStatus: 'IDLE',
+            lastSyncError: null,
+          };
+        });
       }
 
       return {
@@ -373,56 +223,50 @@ export function useDisconnectConnection(options?: {
         },
       };
     },
-    onError: (error: Error, _input: DisconnectConnectionInput, context?: DisconnectContext) => {
+    onError: (error, _input, context) => {
       if (context?.previousConnections !== undefined) {
-        utils.subscriptions?.connections?.list?.setData?.(undefined, context.previousConnections);
+        utils.subscriptions.connections.list.setData(undefined, context.previousConnections);
       }
 
       if (context?.previousSubscriptions?.defaultList !== undefined) {
-        utils.subscriptions?.list?.setData?.({}, context.previousSubscriptions.defaultList);
+        utils.subscriptions.list.setData({}, context.previousSubscriptions.defaultList);
       }
-
       if (context?.previousSubscriptions?.limitedList !== undefined) {
-        utils.subscriptions?.list?.setData?.(
-          { limit: 50 },
-          context.previousSubscriptions.limitedList
-        );
+        utils.subscriptions.list.setData({ limit: 50 }, context.previousSubscriptions.limitedList);
       }
 
       if (context?.previousNewsletters?.listDefault !== undefined) {
-        utils.subscriptions?.newsletters?.list?.setData?.(
+        utils.subscriptions.newsletters.list.setData(
           { limit: 100, search: undefined },
           context.previousNewsletters.listDefault
         );
       }
       if (context?.previousNewsletters?.listNoSearch !== undefined) {
-        utils.subscriptions?.newsletters?.list?.setData?.(
+        utils.subscriptions.newsletters.list.setData(
           { limit: 100 },
           context.previousNewsletters.listNoSearch
         );
       }
       if (context?.previousNewsletters?.listUnscoped !== undefined) {
-        utils.subscriptions?.newsletters?.list?.setData?.(
+        utils.subscriptions.newsletters.list.setData(
           undefined,
           context.previousNewsletters.listUnscoped
         );
       }
-
       if (context?.previousNewsletters?.stats !== undefined) {
-        utils.subscriptions?.newsletters?.stats?.setData?.(
-          undefined,
-          context.previousNewsletters.stats
-        );
+        utils.subscriptions.newsletters.stats.setData(undefined, context.previousNewsletters.stats);
       }
 
-      options?.onError?.(error);
+      const normalizedError =
+        error instanceof Error ? error : new Error('Failed to disconnect provider');
+      options?.onError?.(normalizedError);
     },
-    onSuccess: (_data: unknown, input: DisconnectConnectionInput) => {
-      utils.subscriptions?.connections?.list?.invalidate?.();
-      utils.subscriptions?.list?.invalidate?.();
-      if (input.provider === 'GMAIL') {
-        utils.subscriptions?.newsletters?.list?.invalidate?.();
-        utils.subscriptions?.newsletters?.stats?.invalidate?.();
+    onSuccess: (_data, input) => {
+      utils.subscriptions.connections.list.invalidate();
+      utils.subscriptions.list.invalidate();
+      if (isConnectionProvider(input.provider) && input.provider === 'GMAIL') {
+        utils.subscriptions.newsletters.list.invalidate();
+        utils.subscriptions.newsletters.stats.invalidate();
       }
       options?.onSuccess?.();
     },

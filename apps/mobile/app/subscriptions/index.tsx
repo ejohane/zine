@@ -170,10 +170,10 @@ export default function SubscriptionsScreen() {
 
   const { data: connections, isLoading: connectionsLoading } = useConnections();
   const { subscriptions, isLoading: subscriptionsLoading } = useSubscriptions();
-  const newsletterStatsQuery = (trpc as any).subscriptions.newsletters.stats.useQuery(undefined, {
+  const newsletterStatsQuery = trpc.subscriptions.newsletters.stats.useQuery(undefined, {
     staleTime: 60 * 1000,
   });
-  const rssStatsQuery = (trpc as any).subscriptions.rss.stats.useQuery(undefined, {
+  const rssStatsQuery = trpc.subscriptions.rss.stats.useQuery(undefined, {
     staleTime: 60 * 1000,
   });
 
@@ -193,9 +193,9 @@ export default function SubscriptionsScreen() {
   const gmailConnection = connections?.find(
     (connection: Connection) => connection.provider === 'GMAIL'
   );
-  const youtubeStatus = (youtubeConnection?.status as ConnectionStatus) ?? null;
-  const spotifyStatus = (spotifyConnection?.status as ConnectionStatus) ?? null;
-  const gmailStatus = (gmailConnection?.status as ConnectionStatus) ?? null;
+  const youtubeStatus = youtubeConnection?.status ?? null;
+  const spotifyStatus = spotifyConnection?.status ?? null;
+  const gmailStatus = gmailConnection?.status ?? null;
   const rssStatus: ConnectionStatus = 'ACTIVE';
 
   // Count subscriptions per provider

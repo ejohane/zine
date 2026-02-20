@@ -49,8 +49,8 @@ export function useBaselinePrefetchOnFocus() {
     if (isRestoring) return;
 
     prefetchListQueries(utils, ['home', 'inbox', 'library']);
-    prefetchSafely(() => (utils as any).subscriptions.list.prefetch({}));
-    prefetchSafely(() => (utils as any).subscriptions.connections.list.prefetch(undefined));
+    prefetchSafely(() => utils.subscriptions.list.prefetch({}));
+    prefetchSafely(() => utils.subscriptions.connections.list.prefetch());
   }, [isRestoring, utils]);
 
   useEffect(() => {

@@ -19,6 +19,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { trpc } from '../lib/trpc';
+import type { SyncSubscriptionOutput } from '../lib/trpc-types';
 
 // ============================================================================
 // Types
@@ -108,10 +109,8 @@ export function useSyncNow(subscriptionId: string): UseSyncNowReturn {
   // Track the interval ID for cleanup
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mutation = (trpc as any).subscriptions.syncNow.useMutation({
-    onSuccess: (data: { success: boolean; itemsFound: number }) => {
+  const mutation = trpc.subscriptions.syncNow.useMutation({
+    onSuccess: (data: SyncSubscriptionOutput) => {
       const itemsFound = data.itemsFound ?? 0;
 
       setLastResult({
@@ -126,7 +125,7 @@ export function useSyncNow(subscriptionId: string): UseSyncNowReturn {
       // Start cooldown after successful sync
       setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
     },
-    onError: (error: { data?: { code?: string }; message?: string }) => {
+    onError: (error) => {
       if (error.data?.code === 'TOO_MANY_REQUESTS') {
         // Parse cooldown from error message or use default
         // Server message format: "Please wait X minutes between manual syncs"

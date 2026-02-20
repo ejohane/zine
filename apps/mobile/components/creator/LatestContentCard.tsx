@@ -90,8 +90,11 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
       externalUrl: hasInternalItem ? undefined : item.url,
     });
 
-    if (hasInternalItem) {
-      router.push(`/item/${item.itemId}` as any);
+    if (hasInternalItem && item.itemId) {
+      router.push({
+        pathname: '/item/[id]',
+        params: { id: item.itemId },
+      });
       return;
     }
 

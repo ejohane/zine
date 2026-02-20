@@ -15,42 +15,26 @@
  * @see features/subscriptions/frontend-spec.md Section 5 (Channel Selection)
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useToast } from 'heroui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Provider as SharedProvider } from '@zine/shared';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { showSuccess, showError } from '@/lib/toast-utils';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions, type SubscribePayload } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
+import type { DiscoverAvailableInput, DiscoverAvailableOutput } from '@/lib/trpc-types';
 import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import {
   ChannelSelectionList,
   ChannelSelectionActionBar,
   type Channel,
-  type Provider,
+  type Provider as ChannelProvider,
 } from '@/components/subscriptions';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * Channel data from the provider.
- * Matches the backend sources.list response shape.
- */
-interface SourceChannel {
-  id: string;
-  provider: Provider;
-  providerId: string;
-  feedUrl: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 // ============================================================================
 // Helper Functions
@@ -59,7 +43,7 @@ interface SourceChannel {
 /**
  * Get provider display name
  */
-function getProviderDisplayName(provider: Provider): string {
+function getProviderDisplayName(provider: ChannelProvider): string {
   switch (provider) {
     case 'YOUTUBE':
       return 'YouTube';
@@ -68,18 +52,6 @@ function getProviderDisplayName(provider: Provider): string {
     default:
       return 'Provider';
   }
-}
-
-/**
- * Transform SourceChannel to Channel for the shared component
- */
-function transformToChannel(source: SourceChannel): Channel {
-  return {
-    providerChannelId: source.providerId,
-    name: source.name,
-    description: null,
-    imageUrl: null,
-  };
 }
 
 // ============================================================================
@@ -97,7 +69,11 @@ export default function SelectChannelsScreen() {
 
   // Use validated provider or default to YOUTUBE for hook consistency
   // (hooks must be called unconditionally)
-  const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
+  const provider: ChannelProvider = providerValidation.success
+    ? providerValidation.data
+    : 'YOUTUBE';
+  const discoverProvider: DiscoverAvailableInput['provider'] =
+    provider === 'YOUTUBE' ? SharedProvider.YOUTUBE : SharedProvider.SPOTIFY;
   const providerDisplayName = getProviderDisplayName(provider);
 
   // Selected channels state (set of provider IDs)
@@ -112,23 +88,33 @@ export default function SelectChannelsScreen() {
   // Toast for user feedback
   const { toast } = useToast();
 
-  // Fetch channels from provider using sources.list
-  const sourcesQuery = (trpc as any).sources?.list?.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  }) ?? {
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  };
+  // Fetch channels from provider
+  const discoverQuery = trpc.subscriptions.discover.available.useQuery(
+    { provider: discoverProvider },
+    {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      enabled: providerValidation.success && !!provider,
+    }
+  );
 
-  // Filter and transform channels by provider
+  // Transform channels for the shared component
   const channels: Channel[] = useMemo(() => {
-    if (!sourcesQuery.data) return [];
-    return (sourcesQuery.data as SourceChannel[])
-      .filter((source) => source.provider === provider)
-      .map(transformToChannel);
-  }, [sourcesQuery.data, provider]);
+    const data = discoverQuery.data as DiscoverAvailableOutput | undefined;
+    return (data?.items ?? []).map((item: DiscoverAvailableOutput['items'][number]) => ({
+      providerChannelId: item.id,
+      name: item.name,
+      description: null,
+      imageUrl: item.imageUrl ?? null,
+    }));
+  }, [discoverQuery.data]);
+
+  const isLoading = discoverQuery.isLoading;
+  const error = discoverQuery.error;
+  const normalizedError = error ? new Error(error.message) : null;
+
+  const handleRetry = useCallback(() => {
+    void discoverQuery.refetch();
+  }, [discoverQuery]);
 
   // Handle subscribe to selected channels
   const handleSubscribe = useCallback(async () => {
@@ -145,7 +131,7 @@ export default function SelectChannelsScreen() {
       // Subscribe to each selected channel
       for (const channel of selectedChannelObjects) {
         const payload: SubscribePayload = {
-          provider,
+          provider: discoverProvider,
           providerChannelId: channel.providerChannelId,
           name: channel.name,
         };
@@ -169,7 +155,7 @@ export default function SelectChannelsScreen() {
     } finally {
       setIsSubscribing(false);
     }
-  }, [selectedChannels, channels, provider, subscribe, router, toast]);
+  }, [selectedChannels, channels, discoverProvider, subscribe, router, toast]);
 
   // Skip and go to tabs without subscribing
   const handleSkip = useCallback(() => {
@@ -177,9 +163,14 @@ export default function SelectChannelsScreen() {
   }, [router]);
 
   // If provider is invalid, redirect to onboarding connect screen
-  // (checked after all hooks to follow Rules of Hooks)
+  // (triggered in an effect to avoid navigation state updates during render)
+  useEffect(() => {
+    if (!providerValidation.success) {
+      router.replace('/onboarding/connect');
+    }
+  }, [providerValidation.success, router]);
+
   if (!providerValidation.success) {
-    router.replace('/onboarding/connect');
     return null;
   }
 
@@ -209,9 +200,9 @@ export default function SelectChannelsScreen() {
         <ChannelSelectionList
           provider={provider}
           channels={channels}
-          isLoading={sourcesQuery.isLoading}
-          error={sourcesQuery.error}
-          onRetry={sourcesQuery.refetch}
+          isLoading={isLoading}
+          error={normalizedError}
+          onRetry={handleRetry}
           selectedIds={selectedChannels}
           onSelectionChange={setSelectedChannels}
           mode="multi"

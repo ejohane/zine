@@ -24,6 +24,7 @@ import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
+import type { DiscoverAvailableOutput } from '@/lib/trpc-types';
 import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import { ErrorState } from '@/components/list-states';
 import { ChannelSelectionList, type Channel, type Provider } from '@/components/subscriptions';
@@ -70,72 +71,30 @@ export default function ProviderDiscoverScreen() {
   const { subscriptions, subscribe, subscribeQueued } = useSubscriptions();
 
   // Fetch discoverable channels from provider
-  const discoverQuery = (trpc as any).subscriptions?.discover?.available?.useQuery(
+  const discoverQuery = trpc.subscriptions.discover.available.useQuery(
     { provider },
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       enabled: providerValidation.success && !!provider,
     }
-  ) ?? {
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  };
+  );
 
-  // If the discover endpoint doesn't exist, fall back to sources.list
-  const sourcesQuery = (trpc as any).sources?.list?.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-    enabled: providerValidation.success && !discoverQuery.data && !!provider,
-  }) ?? {
-    data: undefined,
-    isLoading: false,
-    error: null,
-    refetch: () => Promise.resolve(),
-  };
-
-  // Determine which data source to use
-  const isLoading = discoverQuery.isLoading || sourcesQuery.isLoading;
-  const error = discoverQuery.error || sourcesQuery.error;
-  const refetch = discoverQuery.refetch || sourcesQuery.refetch;
+  const isLoading = discoverQuery.isLoading;
+  const error = discoverQuery.error;
+  const refetch = discoverQuery.refetch;
 
   // Transform data to Channel shape
   const channels: Channel[] = useMemo(() => {
-    if (discoverQuery.data) {
-      // Backend returns { items: [...], connectionRequired: boolean }
-      const data = discoverQuery.data as {
-        items?: { id: string; name: string; imageUrl?: string; isSubscribed: boolean }[];
-        connectionRequired?: boolean;
-      };
-      if (data.items) {
-        return data.items.map((item) => ({
-          providerChannelId: item.id,
-          name: item.name,
-          description: null,
-          imageUrl: item.imageUrl ?? null,
-          subscriberCount: null,
-          isSubscribed: item.isSubscribed,
-        }));
-      }
-      return [];
-    }
-
-    // Transform sources data if discover endpoint not available
-    if (sourcesQuery.data) {
-      return (sourcesQuery.data as any[])
-        .filter((source) => source.provider === provider)
-        .map((source) => ({
-          providerChannelId: source.providerId,
-          name: source.name,
-          description: null,
-          imageUrl: null,
-          subscriberCount: null,
-          isSubscribed: true, // If it's in sources, it's already subscribed
-        }));
-    }
-
-    return [];
-  }, [discoverQuery.data, sourcesQuery.data, provider]);
+    const data = discoverQuery.data as DiscoverAvailableOutput | undefined;
+    return (data?.items ?? []).map((item) => ({
+      providerChannelId: item.id,
+      name: item.name,
+      description: null,
+      imageUrl: item.imageUrl ?? null,
+      subscriberCount: null,
+      isSubscribed: item.isSubscribed,
+    }));
+  }, [discoverQuery.data]);
 
   // Check if a channel is already in user's subscriptions
   const isChannelSubscribed = useCallback(
