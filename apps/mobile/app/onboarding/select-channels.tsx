@@ -15,24 +15,25 @@
  * @see features/subscriptions/frontend-spec.md Section 5 (Channel Selection)
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useToast } from 'heroui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Provider as SharedProvider } from '@zine/shared';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { showSuccess, showError } from '@/lib/toast-utils';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSubscriptions, type SubscribePayload } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
-import type { DiscoverAvailableOutput } from '@/lib/trpc-types';
+import type { DiscoverAvailableInput, DiscoverAvailableOutput } from '@/lib/trpc-types';
 import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import {
   ChannelSelectionList,
   ChannelSelectionActionBar,
   type Channel,
-  type Provider,
+  type Provider as ChannelProvider,
 } from '@/components/subscriptions';
 
 // ============================================================================
@@ -42,7 +43,7 @@ import {
 /**
  * Get provider display name
  */
-function getProviderDisplayName(provider: Provider): string {
+function getProviderDisplayName(provider: ChannelProvider): string {
   switch (provider) {
     case 'YOUTUBE':
       return 'YouTube';
@@ -68,7 +69,11 @@ export default function SelectChannelsScreen() {
 
   // Use validated provider or default to YOUTUBE for hook consistency
   // (hooks must be called unconditionally)
-  const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
+  const provider: ChannelProvider = providerValidation.success
+    ? providerValidation.data
+    : 'YOUTUBE';
+  const discoverProvider: DiscoverAvailableInput['provider'] =
+    provider === 'YOUTUBE' ? SharedProvider.YOUTUBE : SharedProvider.SPOTIFY;
   const providerDisplayName = getProviderDisplayName(provider);
 
   // Selected channels state (set of provider IDs)
@@ -85,7 +90,7 @@ export default function SelectChannelsScreen() {
 
   // Fetch channels from provider
   const discoverQuery = trpc.subscriptions.discover.available.useQuery(
-    { provider },
+    { provider: discoverProvider },
     {
       staleTime: 5 * 60 * 1000, // 5 minutes
       enabled: providerValidation.success && !!provider,
@@ -95,7 +100,7 @@ export default function SelectChannelsScreen() {
   // Transform channels for the shared component
   const channels: Channel[] = useMemo(() => {
     const data = discoverQuery.data as DiscoverAvailableOutput | undefined;
-    return (data?.items ?? []).map((item) => ({
+    return (data?.items ?? []).map((item: DiscoverAvailableOutput['items'][number]) => ({
       providerChannelId: item.id,
       name: item.name,
       description: null,
@@ -105,6 +110,7 @@ export default function SelectChannelsScreen() {
 
   const isLoading = discoverQuery.isLoading;
   const error = discoverQuery.error;
+  const normalizedError = error ? new Error(error.message) : null;
 
   const handleRetry = useCallback(() => {
     void discoverQuery.refetch();
@@ -125,7 +131,7 @@ export default function SelectChannelsScreen() {
       // Subscribe to each selected channel
       for (const channel of selectedChannelObjects) {
         const payload: SubscribePayload = {
-          provider,
+          provider: discoverProvider,
           providerChannelId: channel.providerChannelId,
           name: channel.name,
         };
@@ -149,7 +155,7 @@ export default function SelectChannelsScreen() {
     } finally {
       setIsSubscribing(false);
     }
-  }, [selectedChannels, channels, provider, subscribe, router, toast]);
+  }, [selectedChannels, channels, discoverProvider, subscribe, router, toast]);
 
   // Skip and go to tabs without subscribing
   const handleSkip = useCallback(() => {
@@ -195,7 +201,7 @@ export default function SelectChannelsScreen() {
           provider={provider}
           channels={channels}
           isLoading={isLoading}
-          error={error}
+          error={normalizedError}
           onRetry={handleRetry}
           selectedIds={selectedChannels}
           onSelectionChange={setSelectedChannels}
