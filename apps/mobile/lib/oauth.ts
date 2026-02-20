@@ -18,6 +18,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
+import { Provider } from '@zine/shared';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
 import { oauthLogger } from './logger';
@@ -120,6 +121,17 @@ export type OAuthProvider = keyof typeof OAUTH_CONFIG;
 
 function isGoogleProvider(provider: OAuthProvider): provider is 'YOUTUBE' | 'GMAIL' {
   return provider === 'YOUTUBE' || provider === 'GMAIL';
+}
+
+function toProviderEnum(provider: OAuthProvider): Provider {
+  switch (provider) {
+    case 'YOUTUBE':
+      return Provider.YOUTUBE;
+    case 'GMAIL':
+      return Provider.GMAIL;
+    case 'SPOTIFY':
+      return Provider.SPOTIFY;
+  }
 }
 
 // ============================================================================
@@ -336,15 +348,10 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
 
   // STEP 3: Register state with server (CSRF protection only)
   // The server stores state → userId mapping with TTL for validation on callback
-  //
-  // Note: Using type assertion because the subscriptions.connections router
-  // is not yet integrated into AppRouter. This will be fixed when the
-  // backend router is updated to include: subscriptions: { connections: connectionsRouter }
   oauthLogger.debug('Registering state with server');
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (vanillaClient as any).subscriptions.connections.registerState.mutate({
-      provider,
+    await vanillaClient.subscriptions.connections.registerState.mutate({
+      provider: toProviderEnum(provider),
       state,
     });
     oauthLogger.debug('State registered successfully');
@@ -402,6 +409,12 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw new Error(`OAuth error: ${errorDescription || errorParam}`);
   }
 
+  if (!returnedState) {
+    await SecureStore.deleteItemAsync(getVerifierKey(provider));
+    await SecureStore.deleteItemAsync(getStateKey(provider));
+    throw new Error('OAuth failed: No state returned');
+  }
+
   // Validate state matches (client-side check - server also validates)
   const storedState = await SecureStore.getItemAsync(getStateKey(provider));
   if (returnedState !== storedState) {
@@ -428,9 +441,8 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   // NOTE: redirectUri must be sent to server because it must match the one used in auth request
   oauthLogger.debug('Exchanging code for tokens');
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (vanillaClient as any).subscriptions.connections.callback.mutate({
-      provider,
+    await vanillaClient.subscriptions.connections.callback.mutate({
+      provider: toProviderEnum(provider),
       code,
       state: returnedState,
       codeVerifier: storedVerifier,
@@ -519,9 +531,8 @@ export async function completeOAuthFlow(
     // 3. Exchange code for tokens via tRPC
     // The server validates the state, exchanges the code using PKCE,
     // and stores encrypted tokens in the database
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (vanillaClient as any).subscriptions.connections.callback.mutate({
-      provider,
+    await vanillaClient.subscriptions.connections.callback.mutate({
+      provider: toProviderEnum(provider),
       code,
       state, // Full state string (PROVIDER:uuid format)
       codeVerifier: verifier,

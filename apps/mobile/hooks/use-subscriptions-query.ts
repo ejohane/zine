@@ -14,6 +14,11 @@
 
 import { keepPreviousData } from '@tanstack/react-query';
 import { trpc } from '../lib/trpc';
+import type {
+  SubscriptionsListInput,
+  SubscriptionsListOutput,
+  SubscriptionListItemOutput,
+} from '../lib/trpc-types';
 
 // ============================================================================
 // Types
@@ -64,6 +69,29 @@ export interface SubscriptionsResponse {
   hasMore: boolean;
 }
 
+type ListInput = Exclude<SubscriptionsListInput, undefined>;
+
+export function mapSubscription(item: SubscriptionListItemOutput): Subscription {
+  return {
+    id: item.id,
+    provider: item.provider as SubscriptionProvider,
+    providerChannelId: item.providerChannelId,
+    name: item.name,
+    imageUrl: item.imageUrl,
+    status: item.status as SubscriptionStatus,
+    createdAt: item.createdAt,
+    lastItemAt: item.lastPublishedAt ?? null,
+  };
+}
+
+export function mapSubscriptionsResponse(response: SubscriptionsListOutput): SubscriptionsResponse {
+  return {
+    items: response.items.map(mapSubscription),
+    nextCursor: response.nextCursor,
+    hasMore: response.hasMore,
+  };
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -107,10 +135,7 @@ export interface SubscriptionsResponse {
  * ```
  */
 export function useSubscriptions() {
-  // API path: subscriptions.list
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.list.useQuery(
+  return trpc.subscriptions.list.useQuery(
     {}, // Empty input uses defaults (limit: 50, no filters)
     {
       // Cache for 5 minutes - subscriptions don't change frequently
@@ -118,6 +143,7 @@ export function useSubscriptions() {
       // Keep in cache for 24 hours for offline access
       gcTime: 24 * 60 * 60 * 1000,
       placeholderData: keepPreviousData,
+      select: mapSubscriptionsResponse,
     }
   );
 }
@@ -151,20 +177,18 @@ export function useSubscriptions() {
  */
 export function useSubscriptionsFiltered(options?: {
   /** Filter by provider */
-  provider?: SubscriptionProvider;
+  provider?: ListInput['provider'];
   /** Filter by status */
-  status?: SubscriptionStatus;
+  status?: ListInput['status'];
   /** Number of items per page (1-100, default 50) */
   limit?: number;
   /** Pagination cursor */
   cursor?: string;
 }) {
-  // API path: subscriptions.list
-  // Using type assertion until router is updated with proper typing
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (trpc as any).subscriptions.list.useQuery(options ?? {}, {
+  return trpc.subscriptions.list.useQuery(options ?? {}, {
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     placeholderData: keepPreviousData,
+    select: mapSubscriptionsResponse,
   });
 }

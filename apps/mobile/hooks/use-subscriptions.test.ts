@@ -319,7 +319,7 @@ describe('useSubscriptions', () => {
       expect(newSub.imageUrl).toBe('https://example.com/thumb.jpg');
       expect(newSub.status).toBe('ACTIVE');
       expect(typeof newSub.createdAt).toBe('number');
-      expect(newSub.lastItemAt).toBeNull();
+      expect(newSub.lastPublishedAt).toBeNull();
     });
 
     it('handles subscribe when cache is empty (undefined)', () => {

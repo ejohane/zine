@@ -22,13 +22,12 @@ import { Surface } from 'heroui-native';
 import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
-import type { Provider as SharedProvider } from '@zine/shared';
-
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, useDisconnectConnection, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { trpc } from '@/lib/trpc';
+import type { NewslettersListOutput } from '@/lib/trpc-types';
 import { validateAndConvertProvider } from '@/lib/route-validation';
 import { ErrorState, LoadingState } from '@/components/list-states';
 
@@ -43,16 +42,7 @@ interface UnifiedChannel {
   subscriptionId?: string;
 }
 
-interface NewsletterFeed {
-  id: string;
-  displayName: string;
-  fromAddress: string | null;
-  listId?: string | null;
-  unsubscribeUrl?: string | null;
-  imageUrl: string | null;
-  status: 'ACTIVE' | 'HIDDEN' | 'UNSUBSCRIBED';
-  lastSeenAt: number;
-}
+type NewsletterFeed = NewslettersListOutput['items'][number];
 
 // ============================================================================
 // Icons
@@ -509,7 +499,7 @@ export default function ProviderDetailScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const params = useLocalSearchParams<{ provider: string }>();
-  const utils = trpc.useUtils() as any;
+  const utils = trpc.useUtils();
 
   // Validate provider param
   const providerValidation = validateAndConvertProvider(params.provider);
@@ -540,14 +530,14 @@ export default function ProviderDetailScreen() {
 
   // Fetch available channels from provider
   const discoverQuery = trpc.subscriptions.discover.available.useQuery(
-    { provider: discoverProvider as SharedProvider },
+    { provider: discoverProvider },
     {
       staleTime: 5 * 60 * 1000,
       enabled: providerValidation.success && isConnected && provider !== 'GMAIL',
     }
   );
 
-  const newslettersQuery = (trpc as any).subscriptions.newsletters.list.useQuery(
+  const newslettersQuery = trpc.subscriptions.newsletters.list.useQuery(
     { limit: 100, search: searchQuery || undefined },
     {
       staleTime: 60 * 1000,
@@ -555,39 +545,35 @@ export default function ProviderDetailScreen() {
     }
   );
 
-  const newslettersSyncMutation = (trpc as any).subscriptions.newsletters.syncNow.useMutation({
+  const newslettersSyncMutation = trpc.subscriptions.newsletters.syncNow.useMutation({
     onSuccess: () => {
-      utils.subscriptions?.newsletters?.list?.invalidate?.();
-      utils.subscriptions?.newsletters?.stats?.invalidate?.();
+      utils.subscriptions.newsletters.list.invalidate();
+      utils.subscriptions.newsletters.stats.invalidate();
     },
     onError: (error: Error) => {
       Alert.alert('Sync failed', error.message || 'Failed to sync newsletters. Please try again.');
     },
   });
 
-  const updateNewsletterStatusMutation = (
-    trpc as any
-  ).subscriptions.newsletters.updateStatus.useMutation({
+  const updateNewsletterStatusMutation = trpc.subscriptions.newsletters.updateStatus.useMutation({
     onError: (error: Error) => {
       Alert.alert('Update failed', error.message || 'Failed to update newsletter status.');
     },
     onSuccess: () => {
-      utils.subscriptions?.newsletters?.list?.invalidate?.();
-      utils.subscriptions?.newsletters?.stats?.invalidate?.();
-      utils.items?.inbox?.invalidate?.();
-      utils.items?.home?.invalidate?.();
+      utils.subscriptions.newsletters.list.invalidate();
+      utils.subscriptions.newsletters.stats.invalidate();
+      utils.items.inbox.invalidate();
+      utils.items.home.invalidate();
     },
   });
 
-  const unsubscribeNewsletterMutation = (
-    trpc as any
-  ).subscriptions.newsletters.unsubscribe.useMutation({
+  const unsubscribeNewsletterMutation = trpc.subscriptions.newsletters.unsubscribe.useMutation({
     onError: (error: Error) => {
       Alert.alert('Unsubscribe failed', error.message || 'Failed to unsubscribe from newsletter.');
     },
     onSuccess: () => {
-      utils.subscriptions?.newsletters?.list?.invalidate?.();
-      utils.subscriptions?.newsletters?.stats?.invalidate?.();
+      utils.subscriptions.newsletters.list.invalidate();
+      utils.subscriptions.newsletters.stats.invalidate();
     },
   });
 
@@ -608,8 +594,7 @@ export default function ProviderDetailScreen() {
 
   const newsletterFeeds: NewsletterFeed[] = useMemo(() => {
     if (!isConnected) return [];
-    const data = newslettersQuery.data as { items?: NewsletterFeed[] } | undefined;
-    return data?.items ?? [];
+    return newslettersQuery.data?.items ?? [];
   }, [isConnected, newslettersQuery.data]);
 
   const updatingNewsletterFeedId: string | null = updateNewsletterStatusMutation.isPending
@@ -633,13 +618,7 @@ export default function ProviderDetailScreen() {
     }));
 
     // Available channels from provider (not yet added)
-    const availableData = discoverQuery.data as
-      | {
-          items?: { id: string; name: string; imageUrl?: string }[];
-        }
-      | undefined;
-
-    const available: UnifiedChannel[] = (availableData?.items ?? [])
+    const available: UnifiedChannel[] = (discoverQuery.data?.items ?? [])
       .filter((item) => !providerSubscriptions.some((s) => s.providerChannelId === item.id))
       .map((item) => ({
         providerChannelId: item.id,
@@ -837,9 +816,6 @@ export default function ProviderDetailScreen() {
     (provider === 'GMAIL' && isConnected && newslettersQuery.isLoading);
 
   const isGmailProvider = provider === 'GMAIL';
-  const listData = isGmailProvider ? (isConnected ? newsletterFeeds : []) : filteredChannels;
-  const listRenderItem = isGmailProvider ? renderNewsletterItem : renderItem;
-  const listKeyExtractor = isGmailProvider ? newsletterKeyExtractor : keyExtractor;
 
   return (
     <>
@@ -851,11 +827,11 @@ export default function ProviderDetailScreen() {
       <Surface style={[styles.container, { backgroundColor: colors.background }]}>
         {isLoading ? (
           <LoadingState />
-        ) : (
+        ) : isGmailProvider ? (
           <FlatList
-            data={listData}
-            renderItem={listRenderItem as any}
-            keyExtractor={listKeyExtractor as any}
+            data={isConnected ? newsletterFeeds : []}
+            renderItem={renderNewsletterItem}
+            keyExtractor={newsletterKeyExtractor}
             contentContainerStyle={styles.listContent}
             contentInsetAdjustmentBehavior="automatic"
             showsVerticalScrollIndicator={false}
@@ -879,29 +855,27 @@ export default function ProviderDetailScreen() {
                         {config.contentName.charAt(0).toUpperCase() + config.contentName.slice(1)}
                       </Text>
                       <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>
-                        {isGmailProvider ? newsletterFeeds.length : unifiedChannels.length}
+                        {newsletterFeeds.length}
                       </Text>
                     </View>
-                    {isGmailProvider && (
-                      <Pressable
-                        onPress={handleNewslettersSync}
-                        disabled={newslettersSyncMutation.isPending}
-                        style={({ pressed }) => [
-                          styles.syncButton,
-                          { backgroundColor: colors.backgroundTertiary },
-                          pressed && { opacity: 0.8 },
-                          newslettersSyncMutation.isPending && { opacity: 0.5 },
-                        ]}
-                      >
-                        {newslettersSyncMutation.isPending ? (
-                          <ActivityIndicator size="small" color={colors.text} />
-                        ) : (
-                          <Text style={[styles.syncButtonText, { color: colors.text }]}>
-                            Sync now
-                          </Text>
-                        )}
-                      </Pressable>
-                    )}
+                    <Pressable
+                      onPress={handleNewslettersSync}
+                      disabled={newslettersSyncMutation.isPending}
+                      style={({ pressed }) => [
+                        styles.syncButton,
+                        { backgroundColor: colors.backgroundTertiary },
+                        pressed && { opacity: 0.8 },
+                        newslettersSyncMutation.isPending && { opacity: 0.5 },
+                      ]}
+                    >
+                      {newslettersSyncMutation.isPending ? (
+                        <ActivityIndicator size="small" color={colors.text} />
+                      ) : (
+                        <Text style={[styles.syncButtonText, { color: colors.text }]}>
+                          Sync now
+                        </Text>
+                      )}
+                    </Pressable>
                     <View
                       style={[
                         styles.searchBar,
@@ -924,7 +898,72 @@ export default function ProviderDetailScreen() {
               </View>
             }
             ListEmptyComponent={
-              !(isGmailProvider ? newslettersQuery.isLoading : discoverQuery.isLoading) ? (
+              !newslettersQuery.isLoading ? (
+                <EmptyChannelsState provider={provider} isConnected={isConnected} colors={colors} />
+              ) : (
+                <View style={styles.loadingChannels}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                    Loading {config.contentName}...
+                  </Text>
+                </View>
+              )
+            }
+          />
+        ) : (
+          <FlatList
+            data={filteredChannels}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={styles.listContent}
+            contentInsetAdjustmentBehavior="automatic"
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                {/* Connection Status */}
+                <ConnectionStatusCard
+                  provider={provider}
+                  connection={connection}
+                  onConnect={handleConnect}
+                  onDisconnect={handleDisconnect}
+                  isDisconnecting={disconnectingProvider === provider}
+                  colors={colors}
+                />
+
+                {/* Search and count */}
+                {isConnected && (
+                  <Animated.View style={styles.searchSection}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                        {config.contentName.charAt(0).toUpperCase() + config.contentName.slice(1)}
+                      </Text>
+                      <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>
+                        {unifiedChannels.length}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.searchBar,
+                        { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                      ]}
+                    >
+                      <SearchIcon size={18} color={colors.textTertiary} />
+                      <TextInput
+                        placeholder={`Search ${config.contentName}...`}
+                        placeholderTextColor={colors.textTertiary}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        style={[styles.searchInput, { color: colors.text }]}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                      />
+                    </View>
+                  </Animated.View>
+                )}
+              </View>
+            }
+            ListEmptyComponent={
+              !discoverQuery.isLoading ? (
                 <EmptyChannelsState provider={provider} isConnected={isConnected} colors={colors} />
               ) : (
                 <View style={styles.loadingChannels}>

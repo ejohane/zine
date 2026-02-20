@@ -24,9 +24,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { ulid } from 'ulid';
+import type { createOfflineTRPCClient } from './trpc-offline-client';
 import { offlineLogger } from './logger';
 import { classifyErrorLegacy, type ErrorClassification } from './error-utils';
 import { CLERK_PUBLISHABLE_KEY, tokenCache } from './auth';
+import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
 
 // Re-export for backward compatibility
 export type { ErrorClassification } from './error-utils';
@@ -75,6 +77,15 @@ export interface OfflineAction {
  * Callback type for queue change listeners.
  */
 type QueueListener = () => void;
+
+type LegacySourcesMutations = {
+  sources?: {
+    add?: { mutate: (input: AddSubscriptionInput) => Promise<unknown> };
+    remove?: { mutate: (input: RemoveSubscriptionInput) => Promise<unknown> };
+  };
+};
+
+type OfflineQueueTRPCClient = ReturnType<typeof createOfflineTRPCClient> & LegacySourcesMutations;
 
 /**
  * Result of processing a single action.
@@ -496,31 +507,34 @@ class OfflineActionQueue {
    */
   private async executeAction(action: OfflineAction): Promise<void> {
     const { getOfflineTRPCClient } = await import('./trpc-offline-client');
-    const client = getOfflineTRPCClient() as any;
+    const client = getOfflineTRPCClient() as OfflineQueueTRPCClient;
 
-    // Map action types to tRPC mutations
-    // Note: Current router uses 'sources' not 'subscriptions'
-    // The action payload structure should match the mutation input
+    // Map action types to tRPC mutations. Legacy `sources` route is kept as
+    // a fallback for older test/mocked clients.
     switch (action.type) {
-      case 'SUBSCRIBE':
+      case 'SUBSCRIBE': {
+        const payload = action.payload as AddSubscriptionInput;
         if (client.sources?.add?.mutate) {
           // Legacy router path
-          await client.sources.add.mutate(action.payload);
+          await client.sources.add.mutate(payload);
         } else {
           // Current router path
-          await client.subscriptions.add.mutate(action.payload);
+          await client.subscriptions.add.mutate(payload);
         }
         break;
+      }
 
-      case 'UNSUBSCRIBE':
+      case 'UNSUBSCRIBE': {
+        const payload = action.payload as RemoveSubscriptionInput;
         if (client.sources?.remove?.mutate) {
           // Legacy router path
-          await client.sources.remove.mutate(action.payload);
+          await client.sources.remove.mutate(payload);
         } else {
           // Current router path
-          await client.subscriptions.remove.mutate(action.payload);
+          await client.subscriptions.remove.mutate(payload);
         }
         break;
+      }
     }
   }
 }

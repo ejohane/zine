@@ -51,9 +51,9 @@ function GmailConnectContent() {
 
     try {
       await connectProvider('GMAIL');
-      await (utils as any).subscriptions?.connections?.list?.invalidate?.();
-      await (utils as any).subscriptions?.newsletters?.stats?.invalidate?.();
-      await (utils as any).subscriptions?.newsletters?.list?.invalidate?.();
+      await utils.subscriptions.connections.list.invalidate();
+      await utils.subscriptions.newsletters.stats.invalidate();
+      await utils.subscriptions.newsletters.list.invalidate();
       router.replace('/subscriptions/gmail' as const);
     } catch (err) {
       const rawMessage = err instanceof Error ? err.message : 'Connection failed';
