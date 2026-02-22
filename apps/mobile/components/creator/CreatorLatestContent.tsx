@@ -421,6 +421,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   const items: LatestContentItem[] = content.map((item: CreatorContentItem) => ({
     providerId: item.id,
     title: item.title,
+    description: item.description,
     thumbnailUrl: item.thumbnailUrl ?? resolvedThumbnailUrls[item.externalUrl] ?? null,
     duration: item.duration,
     publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,

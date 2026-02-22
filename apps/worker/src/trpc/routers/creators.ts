@@ -6,8 +6,9 @@
  * 1. get - Get a single creator by ID
  * 2. listBookmarks - List bookmarked items for a creator
  * 3. fetchLatestContent - Fetch latest content from a creator
- * 4. checkSubscription - Check if user is subscribed to a creator
- * 5. subscribe - Subscribe to a creator
+ * 4. ensureLatestContentItem - Resolve latest-content item to a user item
+ * 5. checkSubscription - Check if user is subscribed to a creator
+ * 6. subscribe - Subscribe to a creator
  */
 
 import { z } from 'zod';
@@ -25,7 +26,7 @@ import {
   newsletterFeeds,
   newsletterFeedMessages,
 } from '../../db/schema';
-import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
+import { ContentType, UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
 import { toItemView, type ItemView } from './items';
 import {
@@ -164,6 +165,17 @@ const FetchLatestContentInputSchema = z.object({
 const ResolveLatestContentThumbnailsInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
   urls: z.array(z.string().url('Invalid URL format')).min(1).max(THUMBNAIL_ENRICHMENT_MAX_URLS),
+});
+
+const EnsureLatestContentItemInputSchema = z.object({
+  creatorId: z.string().min(1, 'Creator ID is required'),
+  providerId: z.string().min(1, 'Provider item ID is required'),
+  title: z.string().min(1, 'Title is required'),
+  externalUrl: z.string().url('External URL must be valid'),
+  thumbnailUrl: z.string().url('Thumbnail URL must be valid').nullable(),
+  duration: z.number().int().positive().nullable(),
+  publishedAt: z.number().int().nonnegative().nullable(),
+  description: z.string().nullable().optional(),
 });
 
 const CheckSubscriptionInputSchema = z.object({
@@ -816,6 +828,115 @@ export const creatorsRouter = router({
 
       return {
         items,
+      };
+    }),
+
+  /**
+   * Ensure a latest-content item has a corresponding user item.
+   *
+   * Creator latest-content rows can include provider items the user has not
+   * interacted with yet. This mutation materializes the canonical item and the
+   * user item in INBOX state when needed, then returns a user item ID that can
+   * be used to open the in-app item detail screen.
+   */
+  ensureLatestContentItem: protectedProcedure
+    .input(EnsureLatestContentItemInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const creator = await ctx.db.query.creators.findFirst({
+        where: eq(creators.id, input.creatorId),
+      });
+
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Provider not supported for latest content',
+        });
+      }
+
+      const now = new Date().toISOString();
+      const contentType = creator.provider === 'YOUTUBE' ? ContentType.VIDEO : ContentType.PODCAST;
+      const publishedAtIso = input.publishedAt ? new Date(input.publishedAt).toISOString() : null;
+
+      const existingItem = await ctx.db
+        .select({
+          id: items.id,
+          summary: items.summary,
+        })
+        .from(items)
+        .where(and(eq(items.provider, creator.provider), eq(items.providerId, input.providerId)))
+        .limit(1);
+
+      const itemId = existingItem[0]?.id ?? ulid();
+
+      if (existingItem.length === 0) {
+        await ctx.db.insert(items).values({
+          id: itemId,
+          contentType,
+          provider: creator.provider,
+          providerId: input.providerId,
+          canonicalUrl: input.externalUrl,
+          title: input.title,
+          thumbnailUrl: input.thumbnailUrl,
+          creatorId: creator.id,
+          publisher: null,
+          summary: input.description ?? null,
+          duration: input.duration,
+          publishedAt: publishedAtIso,
+          rawMetadata: null,
+          wordCount: null,
+          readingTimeMinutes: null,
+          articleContentKey: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else if (!existingItem[0].summary && input.description) {
+        await ctx.db
+          .update(items)
+          .set({
+            summary: input.description,
+            updatedAt: now,
+          })
+          .where(eq(items.id, itemId));
+      }
+
+      const existingUserItem = await ctx.db
+        .select({ id: userItems.id, state: userItems.state })
+        .from(userItems)
+        .where(and(eq(userItems.userId, ctx.userId), eq(userItems.itemId, itemId)))
+        .limit(1);
+
+      const userItemId = existingUserItem[0]?.id ?? ulid();
+
+      if (existingUserItem.length === 0) {
+        await ctx.db.insert(userItems).values({
+          id: userItemId,
+          userId: ctx.userId,
+          itemId,
+          state: UserItemState.INBOX,
+          ingestedAt: now,
+          bookmarkedAt: null,
+          archivedAt: null,
+          lastOpenedAt: null,
+          progressPosition: null,
+          progressDuration: null,
+          progressUpdatedAt: null,
+          isFinished: false,
+          finishedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      return {
+        userItemId,
+        state: (existingUserItem[0]?.state as UserItemState | undefined) ?? UserItemState.INBOX,
       };
     }),
 

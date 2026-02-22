@@ -41,6 +41,7 @@ export interface Creator {
 export interface CreatorContentItem {
   id: string;
   title: string;
+  description: string | null;
   thumbnailUrl: string | null;
   duration: number | null;
   publishedAt: number | null;

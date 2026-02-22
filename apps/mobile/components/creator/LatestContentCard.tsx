@@ -7,12 +7,14 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { View, Text, Image, Pressable, Linking, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { analytics } from '@/lib/analytics';
 import { formatRelativeTime, formatDuration } from '@/lib/format';
+import { logger } from '@/lib/logger';
+import { trpc } from '@/lib/trpc';
 
 // ============================================================================
 // Types
@@ -23,6 +25,8 @@ export interface LatestContentItem {
   providerId: string;
   /** Content title */
   title: string;
+  /** Content description when available */
+  description?: string | null;
   /** Thumbnail URL (optional) */
   thumbnailUrl: string | null;
   /** Duration in seconds (for videos/podcasts) */
@@ -76,31 +80,46 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const ensureLatestContentItemMutation = trpc.creators.ensureLatestContentItem.useMutation();
 
-  const handlePress = () => {
-    const hasInternalItem = !!item.itemId;
+  const handlePress = async () => {
+    let userItemId = item.itemId ?? null;
 
-    // Track content opened
+    try {
+      const publishedAtMs = item.publishedAt ? Date.parse(item.publishedAt) : null;
+      const result = await ensureLatestContentItemMutation.mutateAsync({
+        creatorId,
+        providerId: item.providerId,
+        title: item.title,
+        externalUrl: item.url,
+        thumbnailUrl: item.thumbnailUrl,
+        duration: item.duration,
+        publishedAt: Number.isFinite(publishedAtMs) ? publishedAtMs : null,
+        description: item.description ?? null,
+      });
+      userItemId = result.userItemId;
+    } catch (error) {
+      logger.error('Failed to resolve latest creator content item', {
+        error,
+        creatorId,
+        provider,
+        providerId: item.providerId,
+      });
+
+      if (!userItemId) {
+        return;
+      }
+    }
+
     analytics.track('creator_content_opened', {
       creatorId,
       contentType: 'latest',
       provider,
-      itemId: item.itemId ?? null,
-      destination: hasInternalItem ? 'internal' : 'external',
-      externalUrl: hasInternalItem ? undefined : item.url,
+      itemId: userItemId,
+      destination: 'internal',
     });
 
-    if (hasInternalItem && item.itemId) {
-      router.push({
-        pathname: '/item/[id]',
-        params: { id: item.itemId },
-      });
-      return;
-    }
-
-    if (item.url) {
-      Linking.openURL(item.url);
-    }
+    router.push(`/item/${userItemId}` as any);
   };
 
   // Build metadata line (date · duration)
@@ -118,6 +137,7 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
   return (
     <Pressable
       onPress={handlePress}
+      disabled={ensureLatestContentItemMutation.isPending}
       style={({ pressed }) => [styles.container, { opacity: pressed ? 0.7 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.title}`}
