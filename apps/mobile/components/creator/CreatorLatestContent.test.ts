@@ -124,6 +124,8 @@ describe('CreatorLatestContent', () => {
     mockUseColorScheme.mockReturnValue('light');
   });
 
+  const supportedProviders = ['YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK'];
+
   describe('provider filtering', () => {
     it('shows for YOUTUBE provider', () => {
       mockUseCreatorLatestContent.mockReturnValue({
@@ -137,7 +139,7 @@ describe('CreatorLatestContent', () => {
       // Component should render for YOUTUBE
       // Verified by checking the hook is called
       const provider = 'YOUTUBE';
-      expect(['YOUTUBE', 'SPOTIFY'].includes(provider)).toBe(true);
+      expect(supportedProviders.includes(provider)).toBe(true);
     });
 
     it('shows for SPOTIFY provider', () => {
@@ -150,22 +152,32 @@ describe('CreatorLatestContent', () => {
       });
 
       const provider = 'SPOTIFY';
-      expect(['YOUTUBE', 'SPOTIFY'].includes(provider)).toBe(true);
+      expect(supportedProviders.includes(provider)).toBe(true);
     });
 
-    it('returns null for SUBSTACK provider', () => {
+    it('shows for SUBSTACK provider', () => {
       const provider = 'SUBSTACK';
-      expect(['YOUTUBE', 'SPOTIFY'].includes(provider)).toBe(false);
+      expect(supportedProviders.includes(provider)).toBe(true);
+    });
+
+    it('shows for RSS provider', () => {
+      const provider = 'RSS';
+      expect(supportedProviders.includes(provider)).toBe(true);
+    });
+
+    it('shows for WEB provider', () => {
+      const provider = 'WEB';
+      expect(supportedProviders.includes(provider)).toBe(true);
     });
 
     it('returns null for TWITTER provider', () => {
       const provider = 'TWITTER';
-      expect(['YOUTUBE', 'SPOTIFY'].includes(provider)).toBe(false);
+      expect(supportedProviders.includes(provider)).toBe(false);
     });
 
     it('returns null for POCKET provider', () => {
       const provider = 'POCKET';
-      expect(['YOUTUBE', 'SPOTIFY'].includes(provider)).toBe(false);
+      expect(supportedProviders.includes(provider)).toBe(false);
     });
   });
 

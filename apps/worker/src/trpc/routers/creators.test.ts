@@ -259,11 +259,20 @@ function createMockCreatorsCaller(options: {
       }
 
       // Check provider support
-      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+      if (!['YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK'].includes(creator.provider)) {
         return {
           items: [],
           provider: creator.provider,
           reason: 'PROVIDER_NOT_SUPPORTED',
+        };
+      }
+
+      // RSS-like creator previews do not require provider connections.
+      if (['RSS', 'WEB', 'SUBSTACK'].includes(creator.provider)) {
+        return {
+          items: mockContentItems,
+          provider: creator.provider,
+          cacheStatus: 'MISS',
         };
       }
 
@@ -739,7 +748,7 @@ describe('Creators Router', () => {
       });
     });
 
-    it('should return PROVIDER_NOT_SUPPORTED for RSS creator', async () => {
+    it('should return content items for RSS creator without requiring connection', async () => {
       const rssCreator = createMockCreator({
         id: 'rss_creator',
         provider: 'RSS',
@@ -752,16 +761,28 @@ describe('Creators Router', () => {
       const caller = createMockCreatorsCaller({
         userId: TEST_USER_ID,
         creators: creatorsMap,
+        mockContentItems: [
+          {
+            id: 'rss-entry-1',
+            title: 'Latest post',
+            description: 'From source feed',
+            thumbnailUrl: null,
+            publishedAt: Date.now() - 1000,
+            externalUrl: 'https://example.com/post-1',
+            duration: null,
+            isBookmarked: false,
+          },
+        ],
       });
 
       const result = await caller.fetchLatestContent({ creatorId: 'rss_creator' });
 
-      expect(result.items).toEqual([]);
+      expect(result.items).toHaveLength(1);
       expect(result.provider).toBe('RSS');
-      expect(result.reason).toBe('PROVIDER_NOT_SUPPORTED');
+      expect(result.reason).toBeUndefined();
     });
 
-    it('should return PROVIDER_NOT_SUPPORTED for SUBSTACK creator', async () => {
+    it('should return content items for SUBSTACK creator without requiring connection', async () => {
       const substackCreator = createMockCreator({
         id: 'substack_creator',
         provider: 'SUBSTACK',
@@ -774,12 +795,46 @@ describe('Creators Router', () => {
       const caller = createMockCreatorsCaller({
         userId: TEST_USER_ID,
         creators: creatorsMap,
+        mockContentItems: [
+          {
+            id: 'substack-entry-1',
+            title: 'Substack post',
+            description: 'From source feed',
+            thumbnailUrl: null,
+            publishedAt: Date.now() - 2000,
+            externalUrl: 'https://newsletter.example.com/p/post-1',
+            duration: null,
+            isBookmarked: false,
+          },
+        ],
       });
 
       const result = await caller.fetchLatestContent({ creatorId: 'substack_creator' });
 
-      expect(result.items).toEqual([]);
+      expect(result.items).toHaveLength(1);
       expect(result.provider).toBe('SUBSTACK');
+      expect(result.reason).toBeUndefined();
+    });
+
+    it('should return PROVIDER_NOT_SUPPORTED for unsupported providers', async () => {
+      const xCreator = createMockCreator({
+        id: 'x_creator',
+        provider: 'X',
+        providerCreatorId: 'x-creator-123',
+      });
+
+      const creatorsMap = new Map<string, Creator>();
+      creatorsMap.set('x_creator', xCreator);
+
+      const caller = createMockCreatorsCaller({
+        userId: TEST_USER_ID,
+        creators: creatorsMap,
+      });
+
+      const result = await caller.fetchLatestContent({ creatorId: 'x_creator' });
+
+      expect(result.items).toEqual([]);
+      expect(result.provider).toBe('X');
       expect(result.reason).toBe('PROVIDER_NOT_SUPPORTED');
     });
 

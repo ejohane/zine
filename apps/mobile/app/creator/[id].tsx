@@ -32,6 +32,39 @@ import { useCreator, useCreatorBookmarks } from '@/hooks/use-creator';
 import { analytics, type CreatorViewSource } from '@/lib/analytics';
 import { upgradeYouTubeImageUrl, upgradeSpotifyImageUrl } from '@/lib/content-utils';
 
+function isHttpUrl(value: string | null | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function getSourceUrlForDiscovery(
+  externalUrl: string | null,
+  providerCreatorId: string,
+  bookmarkCanonicalUrl: string | undefined
+): string | null {
+  if (isHttpUrl(externalUrl)) {
+    return externalUrl;
+  }
+
+  if (isHttpUrl(providerCreatorId)) {
+    return providerCreatorId;
+  }
+
+  if (isHttpUrl(bookmarkCanonicalUrl)) {
+    return bookmarkCanonicalUrl;
+  }
+
+  return null;
+}
+
 // ============================================================================
 // Floating Header Button
 // ============================================================================
@@ -153,6 +186,11 @@ export default function CreatorScreen() {
 
   // Success state with creator data
   const hasImage = !!creator.imageUrl;
+  const sourceUrlForDiscovery = getSourceUrlForDiscovery(
+    creator.externalUrl,
+    creator.providerCreatorId,
+    bookmarks[0]?.canonicalUrl
+  );
 
   // Render with parallax if creator has an image
   if (hasImage) {
@@ -176,7 +214,7 @@ export default function CreatorScreen() {
             headerHeightFraction={0.35}
           >
             <Animated.View>
-              <CreatorHeader creator={creator} />
+              <CreatorHeader creator={creator} sourceUrlForDiscovery={sourceUrlForDiscovery} />
               <CreatorBookmarks creatorId={id ?? ''} />
               {creator.provider === 'GMAIL' ? (
                 <CreatorPublications creatorId={id ?? ''} />
@@ -216,7 +254,7 @@ export default function CreatorScreen() {
           headerHeightFraction={0.45}
         >
           <Animated.View>
-            <CreatorHeader creator={creator} />
+            <CreatorHeader creator={creator} sourceUrlForDiscovery={sourceUrlForDiscovery} />
             <CreatorBookmarks creatorId={id ?? ''} />
             {creator.provider === 'GMAIL' ? (
               <CreatorPublications creatorId={id ?? ''} />

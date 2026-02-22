@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { eq, and, desc, lt, or, sql, inArray } from 'drizzle-orm';
 import { ulid } from 'ulid';
+import pLimit from 'p-limit';
 import { router, protectedProcedure } from '../trpc';
 import {
   creators,
@@ -36,7 +37,14 @@ import {
   getChannelDetails,
 } from '../../providers/youtube';
 import { getSpotifyClientForConnection, getShowEpisodes, getShow } from '../../providers/spotify';
-import { backfillNewsletterItemsForFeed } from '../../newsletters/gmail';
+import {
+  backfillNewsletterItemsForFeed,
+  seedLatestNewsletterItemForFeed,
+} from '../../newsletters/gmail';
+import { fetchLinkPreview } from '../../lib/link-preview';
+import { discoverFeedsForUrl } from '../../rss/discovery';
+import { parseRssFeedXml } from '../../rss/parser';
+import { hashString } from '../../rss/url';
 import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
@@ -52,7 +60,7 @@ export interface CheckSubscriptionResponse {
   isSubscribed: boolean;
   subscriptionId?: string;
   canSubscribe: boolean;
-  reason?: 'PROVIDER_NOT_SUPPORTED' | 'NOT_CONNECTED';
+  reason?: 'PROVIDER_NOT_SUPPORTED' | 'NOT_CONNECTED' | 'SOURCE_NOT_FOUND';
 }
 
 /**
@@ -112,9 +120,22 @@ const LATEST_CONTENT_CACHE_CONFIG = {
   TTL_SECONDS: 600,
   /** Key prefix for latest content in KV */
   KEY_PREFIX: 'creator-content:',
-  /** Number of items to fetch from provider */
-  MAX_ITEMS: 10,
+  /** Number of items to fetch from OAuth providers */
+  MAX_OAUTH_ITEMS: 10,
+  /** Number of items to fetch from source RSS previews */
+  MAX_RSS_ITEMS: 20,
 } as const;
+
+const OAUTH_LATEST_CONTENT_PROVIDERS = new Set(['YOUTUBE', 'SPOTIFY']);
+const RSS_LATEST_CONTENT_PROVIDERS = new Set(['RSS', 'WEB', 'SUBSTACK']);
+const RSS_PREVIEW_ACCEPT_HEADER =
+  'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8';
+const RSS_PREVIEW_FETCH_TIMEOUT_MS = 10_000;
+const RSS_PREVIEW_MAX_FEED_BYTES = 1_500_000;
+const THUMBNAIL_ENRICHMENT_CACHE_PREFIX = 'creator-thumbnail:';
+const THUMBNAIL_ENRICHMENT_CACHE_TTL_SECONDS = 24 * 60 * 60;
+const THUMBNAIL_ENRICHMENT_CONCURRENCY = 3;
+const THUMBNAIL_ENRICHMENT_MAX_URLS = 8;
 
 // ============================================================================
 // Zod Schemas
@@ -138,6 +159,11 @@ const ListPublicationsInputSchema = z.object({
 
 const FetchLatestContentInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
+});
+
+const ResolveLatestContentThumbnailsInputSchema = z.object({
+  creatorId: z.string().min(1, 'Creator ID is required'),
+  urls: z.array(z.string().url('Invalid URL format')).min(1).max(THUMBNAIL_ENRICHMENT_MAX_URLS),
 });
 
 const CheckSubscriptionInputSchema = z.object({
@@ -550,8 +576,11 @@ export const creatorsRouter = router({
         });
       }
 
-      // 2. Only YOUTUBE and SPOTIFY are supported
-      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+      const isOAuthProvider = OAUTH_LATEST_CONTENT_PROVIDERS.has(creator.provider);
+      const isRssProvider = RSS_LATEST_CONTENT_PROVIDERS.has(creator.provider);
+
+      // 2. Only connected providers and RSS-like creators are supported.
+      if (!isOAuthProvider && !isRssProvider) {
         return {
           items: [],
           provider: creator.provider,
@@ -559,32 +588,40 @@ export const creatorsRouter = router({
         };
       }
 
-      // 3. Check if user is connected to the provider
-      const connection = await ctx.db.query.providerConnections.findFirst({
-        where: and(
-          eq(providerConnections.userId, ctx.userId),
-          eq(providerConnections.provider, creator.provider),
-          eq(providerConnections.status, 'ACTIVE')
-        ),
-      });
+      // 3. OAuth providers require an active connection.
+      let connection: ProviderConnection | undefined;
+      if (isOAuthProvider) {
+        connection =
+          (await ctx.db.query.providerConnections.findFirst({
+            where: and(
+              eq(providerConnections.userId, ctx.userId),
+              eq(providerConnections.provider, creator.provider),
+              eq(providerConnections.status, 'ACTIVE')
+            ),
+          })) ?? undefined;
 
-      if (!connection) {
-        return {
-          items: [],
-          provider: creator.provider,
-          reason: 'NOT_CONNECTED',
-          connectUrl: getConnectUrl(creator.provider),
-        };
+        if (!connection) {
+          return {
+            items: [],
+            provider: creator.provider,
+            reason: 'NOT_CONNECTED',
+            connectUrl: getConnectUrl(creator.provider),
+          };
+        }
       }
 
-      // 4. Enrich creator metadata if missing (background, non-blocking)
-      // This runs regardless of cache status to ensure existing creators get updated
-      if (creator.provider === 'YOUTUBE' && (!creator.description || !creator.handle)) {
+      // 4. Enrich OAuth creator metadata if missing (background, non-blocking).
+      // This runs regardless of cache status to ensure existing creators get updated.
+      if (
+        isOAuthProvider &&
+        creator.provider === 'YOUTUBE' &&
+        (!creator.description || !creator.handle)
+      ) {
         // Fire-and-forget: don't block the response
         (async () => {
           try {
             const youtubeClient = await getYouTubeClientForConnection(
-              connection as ProviderConnection,
+              connection!,
               ctx.env as Parameters<typeof getYouTubeClientForConnection>[1]
             );
             const channelDetails = await getChannelDetails(
@@ -618,12 +655,16 @@ export const creatorsRouter = router({
         })();
       }
 
-      if (creator.provider === 'SPOTIFY' && (!creator.description || !creator.handle)) {
+      if (
+        isOAuthProvider &&
+        creator.provider === 'SPOTIFY' &&
+        (!creator.description || !creator.handle)
+      ) {
         // Fire-and-forget: don't block the response
         (async () => {
           try {
             const spotifyClient = await getSpotifyClientForConnection(
-              connection as ProviderConnection,
+              connection!,
               ctx.env as Parameters<typeof getSpotifyClientForConnection>[1]
             );
             const showDetails = await getShow(spotifyClient, creator.providerCreatorId);
@@ -663,14 +704,22 @@ export const creatorsRouter = router({
         contentItems = cached.items;
         cacheStatus = 'HIT';
       } else {
-        // 6. Fetch from provider
+        // 6. Fetch from provider/source.
         try {
-          contentItems = await fetchFromProvider(
-            creator.provider,
-            creator.providerCreatorId,
-            connection as ProviderConnection,
-            ctx.env
-          );
+          if (isOAuthProvider) {
+            contentItems = await fetchFromProvider(
+              creator.provider,
+              creator.providerCreatorId,
+              connection!,
+              ctx.env
+            );
+          } else {
+            contentItems = await fetchRssPreviewContent({
+              db: ctx.db,
+              userId: ctx.userId,
+              creator,
+            });
+          }
           cacheStatus = 'MISS';
 
           // 7. Cache the result
@@ -683,31 +732,37 @@ export const creatorsRouter = router({
             { expirationTtl: LATEST_CONTENT_CACHE_CONFIG.TTL_SECONDS }
           );
         } catch (error) {
-          // Handle token refresh failures
-          if (error instanceof TokenRefreshError && error.code === 'REFRESH_FAILED_PERMANENT') {
-            return {
-              items: [],
-              provider: creator.provider,
-              reason: 'TOKEN_EXPIRED',
-              connectUrl: getConnectUrl(creator.provider),
-            };
+          if (isOAuthProvider) {
+            // Handle token refresh failures
+            if (error instanceof TokenRefreshError && error.code === 'REFRESH_FAILED_PERMANENT') {
+              return {
+                items: [],
+                provider: creator.provider,
+                reason: 'TOKEN_EXPIRED',
+                connectUrl: getConnectUrl(creator.provider),
+              };
+            }
+
+            // Handle rate limiting (usually 429 status)
+            if (error instanceof Error && error.message.includes('429')) {
+              return {
+                items: [],
+                provider: creator.provider,
+                reason: 'RATE_LIMITED',
+              };
+            }
+
+            // Re-throw other OAuth provider errors
+            throw error;
           }
 
-          // Handle rate limiting (usually 429 status)
-          if (error instanceof Error && error.message.includes('429')) {
-            return {
-              items: [],
-              provider: creator.provider,
-              reason: 'RATE_LIMITED',
-            };
-          }
-
-          // Re-throw other errors
-          throw error;
+          // RSS/source previews fail gracefully to empty list.
+          contentItems = [];
+          cacheStatus = 'MISS';
         }
       }
 
-      // 7. Look up which items are bookmarked by this user
+      // 8. Look up which items are bookmarked by this user
       const itemsWithBookmarkStatus = await populateIsBookmarked(
         contentItems,
         creator.provider,
@@ -719,6 +774,48 @@ export const creatorsRouter = router({
         items: itemsWithBookmarkStatus,
         provider: creator.provider,
         cacheStatus,
+      };
+    }),
+
+  /**
+   * Resolve missing thumbnails for creator latest content entries.
+   *
+   * Intended for progressive/lazy image enhancement on the creator page:
+   * the UI can render fast with existing feed/provider metadata, then request
+   * thumbnails for visible entries in follow-up batches.
+   *
+   * @param creatorId - Creator context (for authorization and analytics scope)
+   * @param urls - Canonical content URLs missing thumbnails
+   * @returns URL -> thumbnail mappings (nullable when not found)
+   */
+  resolveLatestContentThumbnails: protectedProcedure
+    .input(ResolveLatestContentThumbnailsInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const creator = await ctx.db.query.creators.findFirst({
+        where: eq(creators.id, input.creatorId),
+      });
+
+      if (!creator) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Creator not found',
+        });
+      }
+
+      const urls = Array.from(new Set(input.urls.filter((url) => isHttpUrl(url))));
+      if (urls.length === 0) {
+        return {
+          items: [] as Array<{ url: string; thumbnailUrl: string | null }>,
+        };
+      }
+
+      const limit = pLimit(THUMBNAIL_ENRICHMENT_CONCURRENCY);
+      const items = await Promise.all(
+        urls.map((url) => limit(() => resolveLatestContentThumbnail(ctx.env, url)))
+      );
+
+      return {
+        items,
       };
     }),
 
@@ -753,8 +850,8 @@ export const creatorsRouter = router({
         });
       }
 
-      // 2. Only YOUTUBE and SPOTIFY support subscriptions
-      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+      // 2. Only supported providers expose creator-level subscriptions
+      if (!['YOUTUBE', 'SPOTIFY', 'GMAIL'].includes(creator.provider)) {
         return {
           isSubscribed: false,
           canSubscribe: false,
@@ -762,16 +859,7 @@ export const creatorsRouter = router({
         };
       }
 
-      // 3. Check if subscription exists for this user + provider + creator
-      const subscription = await ctx.db.query.subscriptions.findFirst({
-        where: and(
-          eq(subscriptions.userId, ctx.userId),
-          eq(subscriptions.provider, creator.provider),
-          eq(subscriptions.providerChannelId, creator.providerCreatorId)
-        ),
-      });
-
-      // 4. Check if user is connected to the provider
+      // 3. Check if user is connected to the provider
       const connection = await ctx.db.query.providerConnections.findFirst({
         where: and(
           eq(providerConnections.userId, ctx.userId),
@@ -780,11 +868,51 @@ export const creatorsRouter = router({
         ),
       });
 
+      if (!connection) {
+        return {
+          isSubscribed: false,
+          canSubscribe: false,
+          reason: 'NOT_CONNECTED',
+        };
+      }
+
+      // 4. GMAIL subscriptions map to newsletter feed status by canonical key.
+      if (creator.provider === 'GMAIL') {
+        const newsletterFeed = await ctx.db.query.newsletterFeeds.findFirst({
+          where: and(
+            eq(newsletterFeeds.userId, ctx.userId),
+            eq(newsletterFeeds.canonicalKey, creator.providerCreatorId)
+          ),
+        });
+
+        if (!newsletterFeed) {
+          return {
+            isSubscribed: false,
+            canSubscribe: false,
+            reason: 'SOURCE_NOT_FOUND',
+          };
+        }
+
+        return {
+          isSubscribed: newsletterFeed.status === 'ACTIVE',
+          subscriptionId: newsletterFeed.id,
+          canSubscribe: true,
+        };
+      }
+
+      // 5. YOUTUBE / SPOTIFY subscriptions use subscriptions table.
+      const subscription = await ctx.db.query.subscriptions.findFirst({
+        where: and(
+          eq(subscriptions.userId, ctx.userId),
+          eq(subscriptions.provider, creator.provider),
+          eq(subscriptions.providerChannelId, creator.providerCreatorId)
+        ),
+      });
+
       return {
         isSubscribed: !!subscription && subscription.status === 'ACTIVE',
         subscriptionId: subscription?.id,
-        canSubscribe: !!connection,
-        reason: connection ? undefined : 'NOT_CONNECTED',
+        canSubscribe: true,
       };
     }),
 
@@ -820,8 +948,8 @@ export const creatorsRouter = router({
         });
       }
 
-      // 2. Only YOUTUBE and SPOTIFY support subscriptions
-      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+      // 2. Only supported providers expose creator-level subscriptions.
+      if (!['YOUTUBE', 'SPOTIFY', 'GMAIL'].includes(creator.provider)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Subscriptions not supported for this provider',
@@ -844,7 +972,54 @@ export const creatorsRouter = router({
         });
       }
 
-      // 4. Check if subscription already exists (idempotent)
+      // 4. GMAIL subscriptions map to newsletter feed status by canonical key.
+      if (creator.provider === 'GMAIL') {
+        const feed = await ctx.db.query.newsletterFeeds.findFirst({
+          where: and(
+            eq(newsletterFeeds.userId, ctx.userId),
+            eq(newsletterFeeds.canonicalKey, creator.providerCreatorId)
+          ),
+        });
+
+        if (!feed) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Newsletter source not found for this creator',
+          });
+        }
+
+        if (feed.status !== 'ACTIVE') {
+          await ctx.db
+            .update(newsletterFeeds)
+            .set({
+              status: 'ACTIVE',
+              updatedAt: Date.now(),
+            })
+            .where(eq(newsletterFeeds.id, feed.id));
+
+          // Best-effort: seed latest issue when enabling a previously inactive feed.
+          try {
+            await seedLatestNewsletterItemForFeed({
+              db: ctx.db,
+              userId: ctx.userId,
+              feedId: feed.id,
+              env: ctx.env as TokenRefreshEnv,
+            });
+          } catch {
+            // Do not fail subscription activation when seed fails.
+          }
+        }
+
+        return {
+          id: feed.id,
+          provider: creator.provider,
+          name: creator.name,
+          imageUrl: creator.imageUrl ?? null,
+          enabled: true,
+        };
+      }
+
+      // 5. Check if subscription already exists (idempotent)
       const existing = await ctx.db.query.subscriptions.findFirst({
         where: and(
           eq(subscriptions.userId, ctx.userId),
@@ -864,7 +1039,7 @@ export const creatorsRouter = router({
         };
       }
 
-      // 5. Create new subscription with creatorId (normalized)
+      // 6. Create new subscription with creatorId (normalized)
       const now = Date.now();
       const subscriptionId = ulid();
 
@@ -979,7 +1154,7 @@ async function fetchYouTubeContent(
   const videos = await fetchRecentVideos(
     client,
     uploadsPlaylistId,
-    LATEST_CONTENT_CACHE_CONFIG.MAX_ITEMS + 5 // Fetch extra to account for Shorts filtering
+    LATEST_CONTENT_CACHE_CONFIG.MAX_OAUTH_ITEMS + 5 // Fetch extra to account for Shorts filtering
   );
 
   if (videos.length === 0) {
@@ -996,7 +1171,7 @@ async function fetchYouTubeContent(
   const contentItems: Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[] = [];
 
   for (const video of videos) {
-    if (contentItems.length >= LATEST_CONTENT_CACHE_CONFIG.MAX_ITEMS) {
+    if (contentItems.length >= LATEST_CONTENT_CACHE_CONFIG.MAX_OAUTH_ITEMS) {
       break;
     }
 
@@ -1051,7 +1226,11 @@ async function fetchSpotifyContent(
   );
 
   // Fetch recent episodes
-  const episodes = await getShowEpisodes(client, showId, LATEST_CONTENT_CACHE_CONFIG.MAX_ITEMS);
+  const episodes = await getShowEpisodes(
+    client,
+    showId,
+    LATEST_CONTENT_CACHE_CONFIG.MAX_OAUTH_ITEMS
+  );
 
   // Transform to content items
   const now = Date.now();
@@ -1142,13 +1321,204 @@ async function populateIsBookmarked(
     ])
   );
 
+  // Fallback matching by canonical URL helps cross-provider previews
+  // (e.g. WEB/SUBSTACK creator pages using RSS feed entries).
+  const unresolvedCanonicalUrls = Array.from(
+    new Set(
+      contentItems
+        .filter((item) => !metadataByProviderId.has(item.id))
+        .map((item) => item.externalUrl)
+        .filter((url): url is string => url.length > 0)
+    )
+  );
+
+  const canonicalMetadataByUrl = new Map<
+    string,
+    {
+      itemId: string;
+      isBookmarked: boolean;
+    }
+  >();
+
+  if (unresolvedCanonicalUrls.length > 0) {
+    const metadataByCanonicalUrl = await db
+      .select({
+        canonicalUrl: items.canonicalUrl,
+        itemId: items.id,
+        userItemState: userItems.state,
+      })
+      .from(items)
+      .leftJoin(userItems, and(eq(userItems.itemId, items.id), eq(userItems.userId, userId)))
+      .where(inArray(items.canonicalUrl, unresolvedCanonicalUrls));
+
+    for (const row of metadataByCanonicalUrl) {
+      const existing = canonicalMetadataByUrl.get(row.canonicalUrl);
+      const candidate = {
+        itemId: row.itemId,
+        isBookmarked: row.userItemState === UserItemState.BOOKMARKED,
+      };
+
+      // Prefer bookmarked rows when multiple canonical matches exist.
+      if (!existing || (!existing.isBookmarked && candidate.isBookmarked)) {
+        canonicalMetadataByUrl.set(row.canonicalUrl, candidate);
+      }
+    }
+  }
+
   // Add isBookmarked + itemId to each content item
   return contentItems.map((item) => {
-    const metadata = metadataByProviderId.get(item.id);
+    const metadata =
+      metadataByProviderId.get(item.id) ?? canonicalMetadataByUrl.get(item.externalUrl);
     return {
       ...item,
       itemId: metadata?.itemId ?? null,
       isBookmarked: metadata?.isBookmarked ?? false,
     };
   });
+}
+
+type CreatorRecord = typeof creators.$inferSelect;
+
+function isHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+async function resolveCreatorSourceUrl(
+  db: Database,
+  userId: string,
+  creator: CreatorRecord
+): Promise<string | null> {
+  if (isHttpUrl(creator.externalUrl)) {
+    return creator.externalUrl;
+  }
+
+  if (isHttpUrl(creator.providerCreatorId)) {
+    return creator.providerCreatorId;
+  }
+
+  const latestCreatorItem = await db
+    .select({
+      canonicalUrl: items.canonicalUrl,
+    })
+    .from(items)
+    .innerJoin(userItems, and(eq(userItems.itemId, items.id), eq(userItems.userId, userId)))
+    .where(eq(items.creatorId, creator.id))
+    .orderBy(desc(userItems.ingestedAt))
+    .limit(1);
+
+  const canonicalUrl = latestCreatorItem[0]?.canonicalUrl;
+  if (isHttpUrl(canonicalUrl)) {
+    return canonicalUrl;
+  }
+
+  return null;
+}
+
+async function fetchAndParseRssFeed(feedUrl: string) {
+  const response = await fetch(feedUrl, {
+    method: 'GET',
+    headers: {
+      Accept: RSS_PREVIEW_ACCEPT_HEADER,
+      'User-Agent': 'ZineCreatorPreviewBot/1.0 (+https://myzine.app)',
+    },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(RSS_PREVIEW_FETCH_TIMEOUT_MS),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Feed request failed (${response.status})`);
+  }
+
+  const payload = await response.arrayBuffer();
+  if (payload.byteLength > RSS_PREVIEW_MAX_FEED_BYTES) {
+    throw new Error(`Feed payload too large (${payload.byteLength} bytes)`);
+  }
+
+  const xml = new TextDecoder().decode(payload);
+  return parseRssFeedXml(xml, feedUrl);
+}
+
+async function fetchRssPreviewContent(params: {
+  db: Database;
+  userId: string;
+  creator: CreatorRecord;
+}): Promise<Omit<LatestContentItem, 'isBookmarked' | 'itemId'>[]> {
+  const sourceUrl = await resolveCreatorSourceUrl(params.db, params.userId, params.creator);
+  if (!sourceUrl) {
+    return [];
+  }
+
+  const discovery = await discoverFeedsForUrl(params.db, sourceUrl);
+  const candidateFeed = discovery.candidates[0]?.feedUrl;
+  if (!candidateFeed) {
+    return [];
+  }
+
+  const parsedFeed = await fetchAndParseRssFeed(candidateFeed);
+  const sortedEntries = [...parsedFeed.entries]
+    .sort((a, b) => (b.publishedAt ?? 0) - (a.publishedAt ?? 0))
+    .slice(0, LATEST_CONTENT_CACHE_CONFIG.MAX_RSS_ITEMS);
+
+  return sortedEntries.map((entry) => ({
+    id: entry.providerId,
+    title: entry.title,
+    description: entry.summary ?? null,
+    thumbnailUrl: entry.imageUrl ?? null,
+    publishedAt: entry.publishedAt ?? 0,
+    externalUrl: entry.canonicalUrl,
+    duration: null,
+  }));
+}
+
+interface CachedResolvedThumbnail {
+  thumbnailUrl: string | null;
+  checkedAt: number;
+}
+
+function getThumbnailCacheKey(url: string): string {
+  return `${THUMBNAIL_ENRICHMENT_CACHE_PREFIX}${hashString(url)}`;
+}
+
+async function resolveLatestContentThumbnail(
+  env: ProviderFetchEnv,
+  url: string
+): Promise<{ url: string; thumbnailUrl: string | null }> {
+  const cacheKey = getThumbnailCacheKey(url);
+  const cached = await env.CREATOR_CONTENT_CACHE.get<CachedResolvedThumbnail>(cacheKey, 'json');
+
+  if (cached) {
+    return {
+      url,
+      thumbnailUrl: cached.thumbnailUrl ?? null,
+    };
+  }
+
+  let thumbnailUrl: string | null = null;
+
+  try {
+    const preview = await fetchLinkPreview(url);
+    thumbnailUrl = preview?.thumbnailUrl ?? null;
+  } catch {
+    thumbnailUrl = null;
+  }
+
+  const cacheValue: CachedResolvedThumbnail = {
+    thumbnailUrl,
+    checkedAt: Date.now(),
+  };
+
+  await env.CREATOR_CONTENT_CACHE.put(cacheKey, JSON.stringify(cacheValue), {
+    expirationTtl: THUMBNAIL_ENRICHMENT_CACHE_TTL_SECONDS,
+  });
+
+  return {
+    url,
+    thumbnailUrl,
+  };
 }
