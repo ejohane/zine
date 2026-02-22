@@ -1,10 +1,11 @@
 import { TRPCError } from '@trpc/server';
-import { and, desc, eq, like, lt, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, lt, or } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { z } from 'zod';
 
 import type { Database } from '../../db';
 import { rssFeeds } from '../../db/schema';
+import { discoverFeedsForUrl } from '../../rss/discovery';
 import { syncRssFeed, syncRssFeedById } from '../../rss/service';
 import { hashString, normalizeFeedUrl } from '../../rss/url';
 import { protectedProcedure, router } from '../trpc';
@@ -20,10 +21,16 @@ const ListRssFeedsInputSchema = z.object({
 
 const AddRssFeedInputSchema = z.object({
   feedUrl: z.string().min(1),
+  seedMode: z.enum(['latest', 'none']).optional(),
 });
 
 const RssFeedActionInputSchema = z.object({
   feedId: z.string().min(1),
+});
+
+const DiscoverRssFeedInputSchema = z.object({
+  url: z.string().url('Invalid URL format'),
+  refresh: z.boolean().optional(),
 });
 
 async function getOwnedFeed(db: Database, userId: string, feedId: string) {
@@ -84,6 +91,7 @@ export const rssRouter = router({
 
   add: protectedProcedure.input(AddRssFeedInputSchema).mutation(async ({ ctx, input }) => {
     const normalizedFeedUrl = normalizeFeedUrl(input.feedUrl);
+    const seedMode = input.seedMode ?? 'latest';
     const feedUrlHash = hashString(normalizedFeedUrl);
     const now = Date.now();
 
@@ -142,7 +150,7 @@ export const rssRouter = router({
 
     try {
       const seedResult = await syncRssFeed(ctx.db, feed, {
-        maxEntries: 1,
+        maxEntries: seedMode === 'none' ? 0 : 1,
         useConditional: false,
       });
 
@@ -168,6 +176,41 @@ export const rssRouter = router({
         message: error instanceof Error ? error.message : 'Failed to validate RSS feed',
       });
     }
+  }),
+
+  discover: protectedProcedure.input(DiscoverRssFeedInputSchema).query(async ({ ctx, input }) => {
+    const discoveryResult = await discoverFeedsForUrl(ctx.db, input.url, {
+      refresh: input.refresh ?? false,
+    });
+
+    const candidateUrls = discoveryResult.candidates.map((candidate) => candidate.feedUrl);
+    const existingFeeds =
+      candidateUrls.length > 0
+        ? await ctx.db.query.rssFeeds.findMany({
+            where: and(eq(rssFeeds.userId, ctx.userId), inArray(rssFeeds.feedUrl, candidateUrls)),
+          })
+        : [];
+
+    const existingByUrl = new Map(existingFeeds.map((feed) => [feed.feedUrl, feed]));
+
+    return {
+      sourceUrl: discoveryResult.sourceUrl,
+      sourceOrigin: discoveryResult.sourceOrigin,
+      checkedAt: discoveryResult.checkedAt,
+      cached: discoveryResult.cached,
+      candidates: discoveryResult.candidates.map((candidate) => {
+        const existing = existingByUrl.get(candidate.feedUrl);
+        return {
+          ...candidate,
+          subscription: existing
+            ? {
+                feedId: existing.id,
+                status: existing.status as z.infer<typeof RssFeedStatusSchema>,
+              }
+            : null,
+        };
+      }),
+    };
   }),
 
   remove: protectedProcedure.input(RssFeedActionInputSchema).mutation(async ({ ctx, input }) => {

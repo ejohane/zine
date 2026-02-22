@@ -25,3 +25,5 @@ export type NewslettersStatsOutput = RouterOutputs['subscriptions']['newsletters
 export type RssListInput = RouterInputs['subscriptions']['rss']['list'];
 export type RssListOutput = RouterOutputs['subscriptions']['rss']['list'];
 export type RssStatsOutput = RouterOutputs['subscriptions']['rss']['stats'];
+export type RssDiscoverInput = RouterInputs['subscriptions']['rss']['discover'];
+export type RssDiscoverOutput = RouterOutputs['subscriptions']['rss']['discover'];

@@ -11,10 +11,15 @@ import { rssRouter } from './rss';
 
 const mockSyncRssFeed = vi.fn();
 const mockSyncRssFeedById = vi.fn();
+const mockDiscoverFeedsForUrl = vi.fn();
 
 vi.mock('../../rss/service', () => ({
   syncRssFeed: (...args: unknown[]) => mockSyncRssFeed(...args),
   syncRssFeedById: (...args: unknown[]) => mockSyncRssFeedById(...args),
+}));
+
+vi.mock('../../rss/discovery', () => ({
+  discoverFeedsForUrl: (...args: unknown[]) => mockDiscoverFeedsForUrl(...args),
 }));
 
 function createMockCtx(userId: string | null = 'user_test_123') {
@@ -111,6 +116,50 @@ describe('rssRouter', () => {
     expect(result.created).toBe(true);
   });
 
+  it('adds a feed without seeding items when seedMode is none', async () => {
+    const ctx = createMockCtx();
+    const caller = rssRouter.createCaller(ctx as never);
+
+    ctx.mocks.mockFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'feed_1',
+        userId: 'user_test_123',
+        feedUrl: 'https://example.com/feed.xml',
+        status: 'ACTIVE',
+      })
+      .mockResolvedValueOnce({
+        id: 'feed_1',
+        userId: 'user_test_123',
+        feedUrl: 'https://example.com/feed.xml',
+        title: 'Example Feed',
+        status: 'ACTIVE',
+      });
+
+    mockSyncRssFeed.mockResolvedValue({
+      newItems: 0,
+      processedEntries: 0,
+      skipped: false,
+    });
+
+    const result = await caller.add({
+      feedUrl: 'https://example.com/feed.xml',
+      seedMode: 'none',
+    });
+
+    expect(result.seededItems).toBe(0);
+    expect(mockSyncRssFeed).toHaveBeenCalledWith(
+      ctx.db,
+      expect.objectContaining({
+        id: 'feed_1',
+      }),
+      expect.objectContaining({
+        maxEntries: 0,
+        useConditional: false,
+      })
+    );
+  });
+
   it('cleans up created feed when initial sync fails', async () => {
     const ctx = createMockCtx();
     const caller = rssRouter.createCaller(ctx as never);
@@ -163,6 +212,51 @@ describe('rssRouter', () => {
         useConditional: false,
       })
     );
+  });
+
+  it('discovers feeds and annotates existing subscriptions', async () => {
+    const ctx = createMockCtx();
+    const caller = rssRouter.createCaller(ctx as never);
+
+    mockDiscoverFeedsForUrl.mockResolvedValue({
+      sourceUrl: 'https://example.com/post',
+      sourceOrigin: 'https://example.com',
+      checkedAt: 123,
+      cached: false,
+      candidates: [
+        {
+          feedUrl: 'https://example.com/feed.xml',
+          title: 'Example Feed',
+          description: null,
+          siteUrl: 'https://example.com/',
+          discoveredFrom: 'page_link',
+          score: 100,
+        },
+      ],
+    });
+
+    ctx.mocks.mockFindMany.mockResolvedValue([
+      {
+        id: 'feed_existing',
+        userId: 'user_test_123',
+        feedUrl: 'https://example.com/feed.xml',
+        status: 'ACTIVE',
+      },
+    ]);
+
+    const result = await caller.discover({
+      url: 'https://example.com/post',
+    });
+
+    expect(mockDiscoverFeedsForUrl).toHaveBeenCalledWith(ctx.db, 'https://example.com/post', {
+      refresh: false,
+    });
+    expect(result.sourceOrigin).toBe('https://example.com');
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.subscription).toEqual({
+      feedId: 'feed_existing',
+      status: 'ACTIVE',
+    });
   });
 
   it('returns feed stats', async () => {

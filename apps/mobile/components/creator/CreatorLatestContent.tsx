@@ -1,18 +1,19 @@
 /**
  * CreatorLatestContent Component
  *
- * Displays the latest content from a creator fetched from YouTube/Spotify APIs.
+ * Displays the latest content from a creator fetched from connected providers
+ * or discovered source feeds.
  * Shows a horizontal carousel of content items for discovery.
- * Only available for YouTube and Spotify creators when the user is connected.
  */
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, Pressable, Linking, StyleSheet } from 'react-native';
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreatorLatestContent, type CreatorContentItem } from '@/hooks/use-creator';
 import { analytics, type ConnectionPromptReason } from '@/lib/analytics';
+import { trpc } from '@/lib/trpc';
 
 import { LatestContentCard, type LatestContentItem } from './LatestContentCard';
 
@@ -23,7 +24,7 @@ import { LatestContentCard, type LatestContentItem } from './LatestContentCard';
 export interface CreatorLatestContentProps {
   /** The creator ID to fetch content for */
   creatorId: string;
-  /** The provider (e.g., 'YOUTUBE', 'SPOTIFY') */
+  /** The provider (e.g., 'YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK') */
   provider: string;
 }
 
@@ -32,7 +33,14 @@ export interface CreatorLatestContentProps {
 // ============================================================================
 
 /** Providers that support fetching latest content */
-const SUPPORTED_PROVIDERS = ['YOUTUBE', 'SPOTIFY'];
+const SUPPORTED_PROVIDERS = ['YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK'];
+const THUMBNAIL_ENRICHMENT_PROVIDERS = ['RSS', 'WEB', 'SUBSTACK'];
+const THUMBNAIL_BATCH_SIZE = 4;
+const THUMBNAIL_BATCH_DELAY_MS = 120;
+const THUMBNAIL_VIEWABILITY_CONFIG = {
+  itemVisiblePercentThreshold: 40,
+  minimumViewTime: 120,
+} as const;
 
 /**
  * Gets the section title based on provider
@@ -43,6 +51,10 @@ function getSectionTitle(provider: string): string {
       return 'Recent Episodes';
     case 'YOUTUBE':
       return 'Recent Videos';
+    case 'RSS':
+    case 'WEB':
+    case 'SUBSTACK':
+      return 'Recent Posts';
     default:
       return 'Recent Content';
   }
@@ -148,7 +160,6 @@ function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps)
 
 /**
  * CreatorLatestContent displays the latest content from a creator.
- * Only shows for YouTube and Spotify creators.
  *
  * States:
  * - Loading: Shows skeleton placeholders
@@ -166,14 +177,23 @@ function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps)
 export function CreatorLatestContent({ creatorId, provider }: CreatorLatestContentProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const [resolvedThumbnailUrls, setResolvedThumbnailUrls] = useState<Record<string, string | null>>(
+    {}
+  );
+  const thumbnailQueueRef = useRef<string[]>([]);
+  const requestedThumbnailUrlsRef = useRef(new Set<string>());
+  const isProcessingQueueRef = useRef(false);
 
   // Check if provider is supported
   const isSupported = SUPPORTED_PROVIDERS.includes(provider);
+  const shouldEnrichThumbnails = THUMBNAIL_ENRICHMENT_PROVIDERS.includes(provider);
 
   // Always call hook to avoid conditional hook error
   // The hook will only fetch when enabled
   const { content, reason, connectUrl, cacheStatus, isLoading, error } =
     useCreatorLatestContent(creatorId);
+  const resolveLatestContentThumbnailsMutation =
+    trpc.creators.resolveLatestContentThumbnails.useMutation();
 
   // Track content loaded once
   const hasTrackedContentLoaded = useRef(false);
@@ -206,13 +226,137 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
     }
   }, [isLoading, reason, creatorId, provider]);
 
+  const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
+  const sectionTitle = getSectionTitle(provider);
+
+  const processThumbnailQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) {
+      return;
+    }
+
+    isProcessingQueueRef.current = true;
+    try {
+      while (thumbnailQueueRef.current.length > 0) {
+        const batch = thumbnailQueueRef.current.splice(0, THUMBNAIL_BATCH_SIZE);
+        if (batch.length === 0) {
+          continue;
+        }
+
+        try {
+          const result = await resolveLatestContentThumbnailsMutation.mutateAsync({
+            creatorId,
+            urls: batch,
+          });
+
+          if (result.items.length > 0) {
+            setResolvedThumbnailUrls((previous) => {
+              const next = { ...previous };
+              for (const item of result.items) {
+                next[item.url] = item.thumbnailUrl ?? null;
+              }
+              return next;
+            });
+          }
+        } catch {
+          // Keep base list rendering intact when enrichment fails.
+        }
+
+        if (thumbnailQueueRef.current.length > 0) {
+          await new Promise((resolve) => setTimeout(resolve, THUMBNAIL_BATCH_DELAY_MS));
+        }
+      }
+    } finally {
+      isProcessingQueueRef.current = false;
+    }
+  }, [creatorId, resolveLatestContentThumbnailsMutation]);
+
+  const enqueueThumbnailUrls = useCallback(
+    (urls: string[]) => {
+      let hasQueuedItems = false;
+
+      for (const url of urls) {
+        if (!url || requestedThumbnailUrlsRef.current.has(url)) {
+          continue;
+        }
+
+        requestedThumbnailUrlsRef.current.add(url);
+        thumbnailQueueRef.current.push(url);
+        hasQueuedItems = true;
+      }
+
+      if (hasQueuedItems) {
+        void processThumbnailQueue();
+      }
+    },
+    [processThumbnailQueue]
+  );
+
+  const handleViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: { item: LatestContentItem; isViewable?: boolean }[] }) => {
+      if (!shouldEnrichThumbnails || viewableItems.length === 0) {
+        return;
+      }
+
+      const visibleMissingUrls = viewableItems
+        .filter((token) => token.isViewable)
+        .map((token) => token.item)
+        .filter((item) => !item.thumbnailUrl && typeof item.url === 'string' && item.url.length > 0)
+        .map((item) => item.url as string);
+
+      enqueueThumbnailUrls(visibleMissingUrls);
+    },
+    [enqueueThumbnailUrls, shouldEnrichThumbnails]
+  );
+
+  // Reset progressive thumbnail state when creator/content set changes.
+  const contentIdentity = useMemo(
+    () => content.map((item) => `${item.id}:${item.externalUrl}`).join('|'),
+    [content]
+  );
+  useEffect(() => {
+    thumbnailQueueRef.current = [];
+    requestedThumbnailUrlsRef.current = new Set();
+    isProcessingQueueRef.current = false;
+    setResolvedThumbnailUrls({});
+  }, [creatorId, contentIdentity]);
+
+  // Lazy follow-up enrichment:
+  // 1. Render content immediately from existing metadata.
+  // 2. Backfill only the first visible chunk immediately.
+  // 3. Queue additional items as they become viewable.
+  useEffect(() => {
+    if (
+      !isSupported ||
+      !shouldEnrichThumbnails ||
+      isLoading ||
+      !!error ||
+      !!reason ||
+      content.length === 0
+    ) {
+      return;
+    }
+
+    const initialMissingUrls = content
+      .slice(0, THUMBNAIL_BATCH_SIZE)
+      .filter((item) => !item.thumbnailUrl)
+      .map((item) => item.externalUrl)
+      .filter((url): url is string => typeof url === 'string' && url.length > 0);
+
+    enqueueThumbnailUrls(initialMissingUrls);
+  }, [
+    content,
+    enqueueThumbnailUrls,
+    error,
+    isLoading,
+    isSupported,
+    reason,
+    shouldEnrichThumbnails,
+  ]);
+
   // Don't render for unsupported providers
   if (!isSupported) {
     return null;
   }
-
-  const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
-  const sectionTitle = getSectionTitle(provider);
 
   // Loading state
   if (isLoading) {
@@ -277,7 +421,7 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
   const items: LatestContentItem[] = content.map((item: CreatorContentItem) => ({
     providerId: item.id,
     title: item.title,
-    thumbnailUrl: item.thumbnailUrl,
+    thumbnailUrl: item.thumbnailUrl ?? resolvedThumbnailUrls[item.externalUrl] ?? null,
     duration: item.duration,
     publishedAt: item.publishedAt ? new Date(item.publishedAt).toISOString() : null,
     url: item.externalUrl,
@@ -295,6 +439,8 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
         renderItem={({ item }) => (
           <LatestContentCard item={item} creatorId={creatorId} provider={provider} />
         )}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={THUMBNAIL_VIEWABILITY_CONFIG}
         scrollEnabled={false}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}

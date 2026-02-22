@@ -426,6 +426,33 @@ export const rssFeedItems = sqliteTable(
 );
 
 // ============================================================================
+// RSS Discovery Cache
+// ============================================================================
+// Caches feed autodiscovery results by site origin to avoid repeated rescans.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const rssDiscoveryCache = sqliteTable(
+  'rss_discovery_cache',
+  {
+    id: text('id').primaryKey(), // Hash-derived key
+    sourceOrigin: text('source_origin').notNull(), // e.g. https://example.com
+    sourceOriginHash: text('source_origin_hash').notNull(),
+    sourceUrl: text('source_url').notNull(), // Last normalized URL that triggered discovery
+    candidatesJson: text('candidates_json').notNull(), // JSON string of discovered candidates
+    status: text('status').notNull().default('SUCCESS'), // SUCCESS | EMPTY | ERROR
+    lastError: text('last_error'),
+    checkedAt: integer('checked_at').notNull(), // Unix ms
+    expiresAt: integer('expires_at').notNull(), // Unix ms
+    createdAt: integer('created_at').notNull(), // Unix ms
+    updatedAt: integer('updated_at').notNull(), // Unix ms
+  },
+  (table) => [
+    uniqueIndex('rss_discovery_cache_source_origin_idx').on(table.sourceOrigin),
+    index('rss_discovery_cache_expires_idx').on(table.expiresAt),
+    index('rss_discovery_cache_source_origin_hash_idx').on(table.sourceOriginHash),
+  ]
+);
+
+// ============================================================================
 // Subscriptions (User subscriptions to specific channels/shows)
 // ============================================================================
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

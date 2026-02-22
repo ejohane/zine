@@ -50,6 +50,13 @@
       "when": 1771392000000,
       "tag": "0006_add_rss_feeds",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771545600000,
+      "tag": "0007_add_rss_discovery_cache",
+      "breakpoints": true
     }
   ]
 }
