@@ -32,6 +32,13 @@ export interface StatusDisplay {
 }
 
 /**
+ * Whether a connection status requires the user to reconnect the provider.
+ */
+export function isReconnectRequired(connectionStatus: ConnectionStatus): boolean {
+  return connectionStatus === 'EXPIRED' || connectionStatus === 'REVOKED';
+}
+
+/**
  * Returns the display configuration for a given connection status.
  *
  * Status mapping:

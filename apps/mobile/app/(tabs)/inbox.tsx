@@ -12,6 +12,7 @@ import { LoadingState, ErrorState } from '@/components/list-states';
 import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInboxItems,
@@ -21,6 +22,7 @@ import {
   mapProvider,
 } from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
+import { isReconnectRequired } from '@/lib/connection-status';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showWarning, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
@@ -69,6 +71,10 @@ export default function InboxScreen() {
   useTabPrefetch('inbox');
 
   const { data, isLoading, error } = useInboxItems();
+  const { data: connections } = useConnections();
+  const hasReconnectRequiredConnection = (connections ?? []).some((connection: Connection) =>
+    isReconnectRequired(connection.status)
+  );
 
   // Track items that should animate in after a failed mutation (rollback)
   // Maps item ID to the direction they should enter from
@@ -244,10 +250,26 @@ export default function InboxScreen() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push('/subscriptions' as Href);
             }}
-            accessibilityLabel="Manage subscriptions"
+            accessibilityLabel={
+              hasReconnectRequiredConnection
+                ? 'Manage subscriptions, reconnect required'
+                : 'Manage subscriptions'
+            }
             accessibilityRole="button"
           >
             <SubscriptionsIcon size={22} color={colors.primary} />
+            {hasReconnectRequiredConnection ? (
+              <View
+                style={[
+                  styles.reconnectIndicatorDot,
+                  {
+                    backgroundColor: colors.warning,
+                    borderColor: colors.backgroundSecondary,
+                  },
+                ]}
+                accessible={false}
+              />
+            ) : null}
           </Pressable>
         </View>
 
@@ -310,9 +332,19 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: Spacing.md,
+  },
+  reconnectIndicatorDot: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 10,
+    height: 10,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
   },
   // List
   listContent: {
