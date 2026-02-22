@@ -13,7 +13,7 @@
  * @see Issue zine-rvo: Frontend: Add tests for connection status display
  */
 
-import { getStatusDisplay, type ConnectionStatus } from './connection-status';
+import { getStatusDisplay, isReconnectRequired, type ConnectionStatus } from './connection-status';
 import { Colors } from '@/constants/theme';
 
 describe('getStatusDisplay', () => {
@@ -171,5 +171,23 @@ describe('getStatusDisplay', () => {
         expect(result.textColor).toMatch(/^#[0-9A-Fa-f]{6}$/);
       }
     });
+  });
+});
+
+describe('isReconnectRequired', () => {
+  it('returns true for EXPIRED status', () => {
+    expect(isReconnectRequired('EXPIRED')).toBe(true);
+  });
+
+  it('returns true for REVOKED status', () => {
+    expect(isReconnectRequired('REVOKED')).toBe(true);
+  });
+
+  it('returns false for ACTIVE status', () => {
+    expect(isReconnectRequired('ACTIVE')).toBe(false);
+  });
+
+  it('returns false when no connection exists', () => {
+    expect(isReconnectRequired(null)).toBe(false);
   });
 });
