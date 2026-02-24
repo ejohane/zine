@@ -452,9 +452,9 @@ export function useArchiveItem() {
 /**
  * Hook for unbookmarking an item with optimistic updates
  *
- * Moves an item from BOOKMARKED back to INBOX state.
- * Use case: User changes their mind, wants to re-triage.
- * Optimistically updates the library cache immediately.
+ * Moves an item from BOOKMARKED to ARCHIVED state.
+ * Use case: User removes a bookmark and dismisses the item.
+ * Optimistically removes the item from inbox and library caches immediately.
  *
  * @returns tRPC mutation with mutate/mutateAsync functions
  *
@@ -474,10 +474,11 @@ export function useUnbookmarkItem() {
 
   return trpc.items.unbookmark.useMutation(
     createOptimisticConfig(utils, {
+      updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
       updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
       updateSingleItem: (item) => ({
         ...item,
-        state: UserItemState.INBOX,
+        state: UserItemState.ARCHIVED,
         bookmarkedAt: null,
       }),
     })
