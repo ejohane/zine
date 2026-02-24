@@ -287,7 +287,7 @@ describe('article-extractor', () => {
         expect(result).not.toBeNull();
         expect(result!.isArticle).toBe(true);
         // author can be null
-        expect(result!.author).toSatisfy((v: string | null) => v === null || typeof v === 'string');
+        expect(result!.author === null || typeof result!.author === 'string').toBe(true);
       });
 
       it('handles missing OG image gracefully', () => {
