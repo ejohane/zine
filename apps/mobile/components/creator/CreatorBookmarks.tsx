@@ -22,6 +22,16 @@ import type { ContentType, Provider } from '@/lib/content-utils';
 export interface CreatorBookmarksProps {
   /** The creator ID to fetch bookmarks for */
   creatorId: string;
+  /** Optional override for deterministic tests/stories */
+  stateOverride?: {
+    bookmarks: ReturnType<typeof useCreatorBookmarks>['bookmarks'];
+    isLoading: boolean;
+    isFetchingNextPage: boolean;
+    hasNextPage: boolean;
+    fetchNextPage?: () => void;
+    error?: Error | null;
+    refetch?: () => void;
+  };
 }
 
 // ============================================================================
@@ -54,12 +64,18 @@ function BookmarksSkeleton({ colors }: { colors: typeof Colors.light }) {
  * <CreatorBookmarks creatorId="creator-123" />
  * ```
  */
-export function CreatorBookmarks({ creatorId }: CreatorBookmarksProps) {
+export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const { bookmarks, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, error, refetch } =
-    useCreatorBookmarks(creatorId);
+  const bookmarksState = useCreatorBookmarks(creatorId);
+  const bookmarks = stateOverride?.bookmarks ?? bookmarksState.bookmarks;
+  const isLoading = stateOverride?.isLoading ?? bookmarksState.isLoading;
+  const isFetchingNextPage = stateOverride?.isFetchingNextPage ?? bookmarksState.isFetchingNextPage;
+  const hasNextPage = stateOverride?.hasNextPage ?? bookmarksState.hasNextPage;
+  const fetchNextPage = stateOverride?.fetchNextPage ?? bookmarksState.fetchNextPage;
+  const error = stateOverride?.error ?? bookmarksState.error;
+  const refetch = stateOverride?.refetch ?? bookmarksState.refetch;
 
   const handleEndReached = () => {
     if (hasNextPage && !isFetchingNextPage) {

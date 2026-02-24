@@ -12,6 +12,7 @@
     "build:ios": "bun run --cwd apps/mobile build:ios",
     "dev": "turbo run dev",
     "dev:worktree": "./scripts/dev.sh",
+    "storybook:mobile": "bun run --cwd apps/mobile storybook",
     "dev:reset": "./scripts/dev-reset.sh",
     "test": "bun run test:mobile && bun run test:worker",
     "test:mobile": "bun run --cwd apps/mobile test",

@@ -19,6 +19,13 @@ import { Colors } from '@/constants/theme';
 
 interface AuthGuardProps {
   children: ReactNode;
+  /** Optional override for deterministic tests/stories */
+  authStateOverride?: {
+    isLoaded: boolean;
+    isSignedIn: boolean;
+  };
+  /** Optional fallback when signed out (defaults to redirect) */
+  signedOutFallback?: ReactNode;
 }
 
 /**
@@ -35,10 +42,12 @@ interface AuthGuardProps {
  * </AuthGuard>
  * ```
  */
-export function AuthGuard({ children }: AuthGuardProps) {
-  const { isSignedIn, isLoaded } = useAuth();
+export function AuthGuard({ children, authStateOverride, signedOutFallback }: AuthGuardProps) {
+  const auth = useAuth();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const isLoaded = authStateOverride?.isLoaded ?? auth.isLoaded;
+  const isSignedIn = authStateOverride?.isSignedIn ?? auth.isSignedIn;
 
   // Show loading state while auth is being determined
   if (!isLoaded) {
@@ -51,7 +60,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   // Redirect to sign-in if not authenticated
   if (!isSignedIn) {
-    return <Redirect href="/(auth)/sign-in" />;
+    return signedOutFallback ?? <Redirect href="/(auth)/sign-in" />;
   }
 
   // User is authenticated, render children

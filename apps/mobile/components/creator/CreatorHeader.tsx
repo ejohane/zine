@@ -28,6 +28,15 @@ export interface CreatorHeaderProps {
   creator: Creator;
   /** Best-known source URL for RSS autodiscovery (for WEB/RSS/SUBSTACK creators) */
   sourceUrlForDiscovery?: string | null;
+  /** Optional override for deterministic tests/stories */
+  subscriptionStateOverride?: {
+    isSubscribed: boolean;
+    canSubscribe: boolean;
+    isSubscribing: boolean;
+    reason?: string;
+    error?: Error | null;
+    subscribe?: () => void;
+  };
 }
 
 // ============================================================================
@@ -126,13 +135,22 @@ function getManageRoute(provider: string): Href | null {
  * <CreatorHeader creator={creator} />
  * ```
  */
-export function CreatorHeader({ creator, sourceUrlForDiscovery }: CreatorHeaderProps) {
+export function CreatorHeader({
+  creator,
+  sourceUrlForDiscovery,
+  subscriptionStateOverride,
+}: CreatorHeaderProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
 
-  const { isSubscribed, canSubscribe, subscribe, isSubscribing, reason, error } =
-    useCreatorSubscription(creator.id);
+  const subscriptionState = useCreatorSubscription(creator.id);
+  const isSubscribed = subscriptionStateOverride?.isSubscribed ?? subscriptionState.isSubscribed;
+  const canSubscribe = subscriptionStateOverride?.canSubscribe ?? subscriptionState.canSubscribe;
+  const subscribe = subscriptionStateOverride?.subscribe ?? subscriptionState.subscribe;
+  const isSubscribing = subscriptionStateOverride?.isSubscribing ?? subscriptionState.isSubscribing;
+  const reason = subscriptionStateOverride?.reason ?? subscriptionState.reason;
+  const error = subscriptionStateOverride?.error ?? subscriptionState.error;
 
   const [pendingFeedUrl, setPendingFeedUrl] = useState<string | null>(null);
 
