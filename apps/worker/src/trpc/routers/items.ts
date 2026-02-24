@@ -866,8 +866,8 @@ export const itemsRouter = router({
     }),
 
   /**
-   * Move an item from BOOKMARKED back to INBOX state.
-   * Use case: User changes their mind, wants to re-triage.
+   * Move an item from BOOKMARKED to ARCHIVED state.
+   * Use case: User removes a bookmark and dismisses the item.
    */
   unbookmark: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
@@ -896,12 +896,13 @@ export const itemsRouter = router({
         });
       }
 
-      // Update to INBOX state
+      // Update to ARCHIVED state
       await ctx.db
         .update(userItems)
         .set({
-          state: UserItemState.INBOX,
+          state: UserItemState.ARCHIVED,
           bookmarkedAt: null,
+          archivedAt: now,
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));

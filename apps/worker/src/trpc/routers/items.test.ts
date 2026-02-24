@@ -8,6 +8,7 @@
  * - items.get - Single item lookup
  * - items.bookmark - Update item state to bookmarked
  * - items.archive - Update item state to archived
+ * - items.unbookmark - Remove bookmark and archive item
  * - Auth: Verify unauthenticated requests fail
  *
  * @vitest-environment miniflare
@@ -246,6 +247,29 @@ function createMockItemsCaller(options: {
       return { success: true as const };
     },
 
+    unbookmark: async (input: { id: string }) => {
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED' });
+      }
+      const item = allItems.get(input.id);
+      if (!item) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+      if (item.state !== UserItemState.BOOKMARKED) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Item is not bookmarked',
+        });
+      }
+      item.state = UserItemState.ARCHIVED;
+      item.bookmarkedAt = null;
+
+      return { success: true as const };
+    },
+
     markOpened: async (input: { id: string }) => {
       if (!userId) {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
@@ -336,6 +360,15 @@ describe('Items Router', () => {
 
       await expect(caller.archive({ id: 'ui-001' })).rejects.toThrow(TRPCError);
       await expect(caller.archive({ id: 'ui-001' })).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('should reject unauthenticated requests to unbookmark', async () => {
+      const caller = createMockItemsCaller({ userId: null });
+
+      await expect(caller.unbookmark({ id: 'ui-001' })).rejects.toThrow(TRPCError);
+      await expect(caller.unbookmark({ id: 'ui-001' })).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
       });
     });
@@ -1097,6 +1130,52 @@ describe('Items Router', () => {
       await expect(caller.archive({ id: 'nonexistent' })).rejects.toThrow(TRPCError);
       await expect(caller.archive({ id: 'nonexistent' })).rejects.toMatchObject({
         code: 'NOT_FOUND',
+      });
+    });
+  });
+
+  // ==========================================================================
+  // items.unbookmark Tests
+  // ==========================================================================
+
+  describe('items.unbookmark', () => {
+    it('should return success when unbookmarking a bookmarked item', async () => {
+      const item = createMockItemView({
+        id: 'ui-bookmarked',
+        state: UserItemState.BOOKMARKED,
+        bookmarkedAt: '2024-12-10T12:00:00Z',
+      });
+      const itemsMap = new Map<string, ItemView>();
+      itemsMap.set('ui-bookmarked', item);
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: itemsMap,
+      });
+      const result = await caller.unbookmark({ id: 'ui-bookmarked' });
+
+      expect(result).toEqual({ success: true });
+      expect(item.state).toBe(UserItemState.ARCHIVED);
+      expect(item.bookmarkedAt).toBeNull();
+    });
+
+    it('should throw BAD_REQUEST when item is not bookmarked', async () => {
+      const item = createMockItemView({
+        id: 'ui-inbox',
+        state: UserItemState.INBOX,
+      });
+      const itemsMap = new Map<string, ItemView>();
+      itemsMap.set('ui-inbox', item);
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: itemsMap,
+      });
+
+      await expect(caller.unbookmark({ id: 'ui-inbox' })).rejects.toThrow(TRPCError);
+      await expect(caller.unbookmark({ id: 'ui-inbox' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'Item is not bookmarked',
       });
     });
   });
