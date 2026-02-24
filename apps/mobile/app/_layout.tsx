@@ -23,6 +23,7 @@ function PrefetchManager() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
 
   return (
     <GestureHandlerRootView style={styles.root}>
@@ -34,6 +35,9 @@ export default function RootLayout() {
               <ToastProvider defaultProps={{ placement: 'bottom' }} maxVisibleToasts={3}>
                 <Stack>
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  {isStorybookEnabled && (
+                    <Stack.Screen name="storybook" options={{ headerShown: false }} />
+                  )}
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                   <Stack.Screen name="settings" options={{ headerShown: false }} />
                   <Stack.Screen

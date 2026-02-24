@@ -92,6 +92,7 @@ export default function SettingsScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { signOut } = useClerk();
+  const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
 
   // Data hooks
   const { data: connections } = useConnections();
@@ -221,6 +222,21 @@ export default function SettingsScreen() {
 
           <SettingsRow title="Privacy Policy" rightText="→" onPress={handleOpenPrivacy} />
         </View>
+
+        {isStorybookEnabled && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DEVELOPER</Text>
+
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              <SettingsRow
+                title="Open Storybook"
+                subtitle="Preview component stories"
+                rightText="→"
+                onPress={() => router.push('/storybook')}
+              />
+            </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -18,7 +18,7 @@ import { Pressable, Text, View, ActivityIndicator, StyleSheet } from 'react-nati
 
 import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useSyncNow } from '@/hooks/use-sync-now';
+import { useSyncNow, type SyncResult } from '@/hooks/use-sync-now';
 
 // ============================================================================
 // Types
@@ -31,6 +31,13 @@ interface SyncNowButtonProps {
   compact?: boolean;
   /** Callback when sync completes successfully with items found */
   onSyncComplete?: (itemsFound: number) => void;
+  /** Optional override for deterministic tests/stories */
+  stateOverride?: {
+    syncNow?: () => void;
+    isLoading: boolean;
+    cooldownSeconds: number;
+    lastResult: SyncResult | null;
+  };
 }
 
 // ============================================================================
@@ -59,11 +66,16 @@ export function SyncNowButton({
   subscriptionId,
   compact = false,
   onSyncComplete,
+  stateOverride,
 }: SyncNowButtonProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const { syncNow, isLoading, cooldownSeconds, lastResult } = useSyncNow(subscriptionId);
+  const syncState = useSyncNow(subscriptionId);
+  const syncNow = stateOverride?.syncNow ?? syncState.syncNow;
+  const isLoading = stateOverride?.isLoading ?? syncState.isLoading;
+  const cooldownSeconds = stateOverride?.cooldownSeconds ?? syncState.cooldownSeconds;
+  const lastResult = stateOverride?.lastResult ?? syncState.lastResult;
 
   // Local countdown for UI display
   const [countdown, setCountdown] = useState(0);

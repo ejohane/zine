@@ -18,6 +18,16 @@ import type { ContentType, Provider } from '@/lib/content-utils';
 export interface CreatorPublicationsProps {
   /** The creator ID to fetch publications for */
   creatorId: string;
+  /** Optional override for deterministic tests/stories */
+  stateOverride?: {
+    publications: ReturnType<typeof useCreatorPublications>['publications'];
+    isLoading: boolean;
+    isFetchingNextPage: boolean;
+    hasNextPage: boolean;
+    fetchNextPage?: () => void;
+    error?: Error | null;
+    refetch?: () => void;
+  };
 }
 
 function PublicationsSkeleton({ colors }: { colors: typeof Colors.light }) {
@@ -33,19 +43,19 @@ function PublicationsSkeleton({ colors }: { colors: typeof Colors.light }) {
   );
 }
 
-export function CreatorPublications({ creatorId }: CreatorPublicationsProps) {
+export function CreatorPublications({ creatorId, stateOverride }: CreatorPublicationsProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const {
-    publications,
-    isLoading,
-    isFetchingNextPage,
-    hasNextPage,
-    fetchNextPage,
-    error,
-    refetch,
-  } = useCreatorPublications(creatorId);
+  const publicationsState = useCreatorPublications(creatorId);
+  const publications = stateOverride?.publications ?? publicationsState.publications;
+  const isLoading = stateOverride?.isLoading ?? publicationsState.isLoading;
+  const isFetchingNextPage =
+    stateOverride?.isFetchingNextPage ?? publicationsState.isFetchingNextPage;
+  const hasNextPage = stateOverride?.hasNextPage ?? publicationsState.hasNextPage;
+  const fetchNextPage = stateOverride?.fetchNextPage ?? publicationsState.fetchNextPage;
+  const error = stateOverride?.error ?? publicationsState.error;
+  const refetch = stateOverride?.refetch ?? publicationsState.refetch;
 
   const handleEndReached = () => {
     if (hasNextPage && !isFetchingNextPage) {

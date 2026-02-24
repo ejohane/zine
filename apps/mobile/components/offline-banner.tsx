@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useNetworkStatus } from '@/hooks/use-network-status';
+import { useNetworkStatus, type NetworkStatus } from '@/hooks/use-network-status';
 
 const ANIMATION_DURATION = 300;
 
@@ -40,11 +40,22 @@ const ANIMATION_DURATION = 300;
  * }
  * ```
  */
-export function OfflineBanner() {
-  const { isConnected, isInternetReachable } = useNetworkStatus();
+interface OfflineBannerProps {
+  /** Optional override for deterministic tests/stories */
+  statusOverride?: Pick<NetworkStatus, 'isConnected' | 'isInternetReachable'>;
+  /** Optional override for deterministic tests/stories */
+  topInsetOverride?: number;
+}
+
+export function OfflineBanner({ statusOverride, topInsetOverride }: OfflineBannerProps = {}) {
+  const networkStatus = useNetworkStatus();
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
+  const isConnected = statusOverride?.isConnected ?? networkStatus.isConnected;
+  const isInternetReachable =
+    statusOverride?.isInternetReachable ?? networkStatus.isInternetReachable;
+  const topInset = topInsetOverride ?? insets.top;
 
   // Determine if we're offline:
   // - isConnected is false, OR
@@ -63,7 +74,7 @@ export function OfflineBanner() {
   }, [isOffline, slideAnim]);
 
   // Calculate the banner height (content + safe area)
-  const bannerHeight = 44 + insets.top;
+  const bannerHeight = 44 + topInset;
 
   // Interpolate the animation value to translate Y
   const translateY = slideAnim.interpolate({
@@ -83,7 +94,7 @@ export function OfflineBanner() {
       style={[
         styles.container,
         {
-          paddingTop: insets.top,
+          paddingTop: topInset,
           backgroundColor: colors.warning,
           transform: [{ translateY }],
           opacity,

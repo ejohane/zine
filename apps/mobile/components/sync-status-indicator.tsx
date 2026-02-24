@@ -19,22 +19,32 @@ import { offlineQueue } from '../lib/offline-queue';
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export function SyncStatusIndicator() {
+interface SyncStatusIndicatorProps {
+  /** Optional override for deterministic tests/stories */
+  pendingCountOverride?: number;
+}
+
+export function SyncStatusIndicator({ pendingCountOverride }: SyncStatusIndicatorProps = {}) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [pendingCount, setPendingCount] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   // Store animation reference for cleanup on unmount
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const activePendingCount = pendingCountOverride ?? pendingCount;
 
   useEffect(() => {
+    if (pendingCountOverride != null) {
+      return;
+    }
+
     offlineQueue.getPendingCount().then(setPendingCount);
     const unsubscribe = offlineQueue.subscribe(async () => {
       const count = await offlineQueue.getPendingCount();
       setPendingCount(count);
     });
     return unsubscribe;
-  }, []);
+  }, [pendingCountOverride]);
 
   // Animation effect with proper cleanup
   useEffect(() => {
@@ -44,7 +54,7 @@ export function SyncStatusIndicator() {
       animationRef.current = null;
     }
 
-    if (pendingCount > 0) {
+    if (activePendingCount > 0) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 0.5, duration: 500, useNativeDriver: true }),
@@ -64,9 +74,9 @@ export function SyncStatusIndicator() {
         animationRef.current = null;
       }
     };
-  }, [pendingCount, pulseAnim]);
+  }, [activePendingCount, pulseAnim]);
 
-  if (pendingCount === 0) return null;
+  if (activePendingCount === 0) return null;
 
   return (
     <Animated.View
@@ -74,7 +84,7 @@ export function SyncStatusIndicator() {
     >
       <View style={[styles.dot, { backgroundColor: colors.primary }]} />
       <Text style={[styles.text, { color: colors.primaryDark }]}>
-        {pendingCount} pending {pendingCount === 1 ? 'change' : 'changes'}
+        {activePendingCount} pending {activePendingCount === 1 ? 'change' : 'changes'}
       </Text>
     </Animated.View>
   );

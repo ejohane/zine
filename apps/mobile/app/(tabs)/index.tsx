@@ -155,6 +155,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const greeting = useMemo(() => getGreeting(), []);
+  const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
 
   useTabPrefetch('home');
 
@@ -258,6 +259,26 @@ export default function HomeScreen() {
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
           </Animated.View>
+
+          {isStorybookEnabled && (
+            <Animated.View style={styles.storybookButtonContainer}>
+              <Pressable
+                onPress={() => router.push('/storybook')}
+                style={({ pressed }) => [
+                  styles.storybookButton,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                  },
+                  pressed && { opacity: 0.75 },
+                ]}
+              >
+                <Text style={[styles.storybookButtonLabel, { color: colors.primary }]}>
+                  Open Storybook
+                </Text>
+              </Pressable>
+            </Animated.View>
+          )}
 
           {isLoading ? (
             <View style={styles.loadingState}>
@@ -434,6 +455,21 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.displayMedium,
+  },
+  storybookButtonContainer: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  storybookButton: {
+    alignSelf: 'flex-start',
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  storybookButtonLabel: {
+    ...Typography.labelMedium,
+    fontWeight: '700',
   },
 
   // Section

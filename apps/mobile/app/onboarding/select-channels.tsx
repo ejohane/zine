@@ -20,7 +20,6 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useToast } from 'heroui-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Provider as SharedProvider } from '@zine/shared';
 
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { showSuccess, showError } from '@/lib/toast-utils';
@@ -72,8 +71,7 @@ export default function SelectChannelsScreen() {
   const provider: ChannelProvider = providerValidation.success
     ? providerValidation.data
     : 'YOUTUBE';
-  const discoverProvider: DiscoverAvailableInput['provider'] =
-    provider === 'YOUTUBE' ? SharedProvider.YOUTUBE : SharedProvider.SPOTIFY;
+  const discoverProvider: DiscoverAvailableInput['provider'] = provider;
   const providerDisplayName = getProviderDisplayName(provider);
 
   // Selected channels state (set of provider IDs)

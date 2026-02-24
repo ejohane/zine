@@ -78,7 +78,17 @@ interface OAuthErrorBoundaryProps {
   provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
   onRetry?: () => void;
   /** Optional error to display directly (for non-React error flows) */
-  error?: Error | string | null;
+  error?: Error | string | OAuthError | null;
+}
+
+function isOAuthError(error: unknown): error is OAuthError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    'message' in error &&
+    'recoverable' in error
+  );
 }
 
 /**
@@ -151,7 +161,9 @@ export function OAuthErrorBoundary({
 
   // Handle external errors (from navigation params, etc.)
   if (externalError) {
-    const parsedExternalError = parseOAuthError(externalError);
+    const parsedExternalError = isOAuthError(externalError)
+      ? externalError
+      : parseOAuthError(externalError);
     return (
       <OAuthErrorFallback provider={provider} error={parsedExternalError} onRetry={handleRetry} />
     );

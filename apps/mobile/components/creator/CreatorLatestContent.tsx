@@ -11,7 +11,11 @@ import { View, Text, FlatList, Pressable, Linking, StyleSheet } from 'react-nati
 
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useCreatorLatestContent, type CreatorContentItem } from '@/hooks/use-creator';
+import {
+  useCreatorLatestContent,
+  type CreatorContentItem,
+  type LatestContentCacheStatus,
+} from '@/hooks/use-creator';
 import { analytics, type ConnectionPromptReason } from '@/lib/analytics';
 import { trpc } from '@/lib/trpc';
 
@@ -26,6 +30,15 @@ export interface CreatorLatestContentProps {
   creatorId: string;
   /** The provider (e.g., 'YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK') */
   provider: string;
+  /** Optional override for deterministic tests/stories */
+  stateOverride?: {
+    content: CreatorContentItem[];
+    reason?: string;
+    connectUrl?: string;
+    cacheStatus?: LatestContentCacheStatus;
+    isLoading: boolean;
+    error?: Error | null;
+  };
 }
 
 // ============================================================================
@@ -174,7 +187,11 @@ function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps)
  * <CreatorLatestContent creatorId="creator-123" provider="YOUTUBE" />
  * ```
  */
-export function CreatorLatestContent({ creatorId, provider }: CreatorLatestContentProps) {
+export function CreatorLatestContent({
+  creatorId,
+  provider,
+  stateOverride,
+}: CreatorLatestContentProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const [resolvedThumbnailUrls, setResolvedThumbnailUrls] = useState<Record<string, string | null>>(
@@ -190,8 +207,13 @@ export function CreatorLatestContent({ creatorId, provider }: CreatorLatestConte
 
   // Always call hook to avoid conditional hook error
   // The hook will only fetch when enabled
-  const { content, reason, connectUrl, cacheStatus, isLoading, error } =
-    useCreatorLatestContent(creatorId);
+  const latestContentState = useCreatorLatestContent(creatorId);
+  const content = stateOverride?.content ?? latestContentState.content;
+  const reason = stateOverride?.reason ?? latestContentState.reason;
+  const connectUrl = stateOverride?.connectUrl ?? latestContentState.connectUrl;
+  const cacheStatus = stateOverride?.cacheStatus ?? latestContentState.cacheStatus;
+  const isLoading = stateOverride?.isLoading ?? latestContentState.isLoading;
+  const error = stateOverride?.error ?? latestContentState.error;
   const resolveLatestContentThumbnailsMutation =
     trpc.creators.resolveLatestContentThumbnails.useMutation();
 
