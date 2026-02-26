@@ -19,6 +19,7 @@ const rssLogger = logger.child('rss');
 const FEED_FETCH_TIMEOUT_MS = 10_000;
 const MAX_FEED_BYTES = 1_500_000;
 const MAX_ENTRIES_PER_SYNC = 20;
+const INITIAL_SYNC_MAX_ENTRIES = 1;
 const ERROR_THRESHOLD = 10;
 
 const RSS_POLL_LOCK_KEY = 'cron:poll-rss:lock';
@@ -470,7 +471,11 @@ export async function syncRssFeed(
   feed: RssFeedRow,
   options: SyncOptions = {}
 ): Promise<SyncRssFeedResult> {
-  const maxEntries = options.maxEntries ?? MAX_ENTRIES_PER_SYNC;
+  const requestedMaxEntries = options.maxEntries ?? MAX_ENTRIES_PER_SYNC;
+  const maxEntries =
+    feed.lastSuccessAt == null
+      ? Math.min(requestedMaxEntries, INITIAL_SYNC_MAX_ENTRIES)
+      : requestedMaxEntries;
   const normalizedFeedUrl = normalizeFeedUrl(feed.feedUrl);
   if (normalizedFeedUrl !== feed.feedUrl) {
     await db
