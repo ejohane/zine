@@ -79,6 +79,33 @@ const sampleAtom = `<?xml version="1.0" encoding="utf-8"?>
   </entry>
 </feed>`;
 
+const sampleAtomBacklog = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Feed</title>
+  <link href="https://example.com/" rel="alternate" />
+  <entry>
+    <id>tag:example.com,2026:entry-1</id>
+    <title>Newest Entry</title>
+    <link href="https://example.com/posts/1" rel="alternate" />
+    <updated>2026-02-20T10:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Newest&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <id>tag:example.com,2026:entry-2</id>
+    <title>Middle Entry</title>
+    <link href="https://example.com/posts/2" rel="alternate" />
+    <updated>2026-02-19T10:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Middle&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <id>tag:example.com,2026:entry-3</id>
+    <title>Oldest Entry</title>
+    <link href="https://example.com/posts/3" rel="alternate" />
+    <updated>2026-02-18T10:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Oldest&lt;/p&gt;</summary>
+  </entry>
+</feed>`;
+
 const feed = {
   id: 'feed_123',
   userId: 'user_123',
@@ -115,6 +142,44 @@ describe('syncRssFeed', () => {
         },
       })
     );
+  });
+
+  it('caps first sync to one entry even when a larger batch size is requested', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(sampleAtomBacklog, {
+        status: 200,
+      })
+    );
+
+    const { db } = createMockDb();
+    const result = await syncRssFeed(db, feed as SyncFeed, {
+      maxEntries: 20,
+      useConditional: false,
+    });
+
+    expect(result.processedEntries).toBe(1);
+    expect(mockPrepareItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the requested batch size after the feed has synced successfully', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(sampleAtomBacklog, {
+        status: 200,
+      })
+    );
+
+    const { db } = createMockDb();
+    const syncedFeed = {
+      ...feed,
+      lastSuccessAt: Date.now() - 60_000,
+    };
+    const result = await syncRssFeed(db, syncedFeed as SyncFeed, {
+      maxEntries: 2,
+      useConditional: false,
+    });
+
+    expect(result.processedEntries).toBe(2);
+    expect(mockPrepareItem).toHaveBeenCalledTimes(2);
   });
 
   it('backfills thumbnail, summary, and creator for skipped RSS items', async () => {
