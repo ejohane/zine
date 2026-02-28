@@ -24,7 +24,6 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
-      toggleFinishedPending: false,
     });
 
     expect(viewState.isXPost).toBe(false);
@@ -48,7 +47,6 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
-      toggleFinishedPending: false,
     });
 
     expect(viewState.isXPost).toBe(true);
@@ -66,7 +64,6 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
-      toggleFinishedPending: false,
     });
 
     expect(viewState.bookmarkActionIcon).toBe('bookmark');
@@ -87,7 +84,6 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
-      toggleFinishedPending: false,
     });
 
     expect(viewState.completeActionIcon).toBe('checkmark-circle');

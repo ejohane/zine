@@ -9,7 +9,6 @@ type ItemDetailViewStateInput = {
   colors: ItemDetailColors;
   bookmarkPending: boolean;
   unbookmarkPending: boolean;
-  toggleFinishedPending: boolean;
 };
 
 export function useItemDetailViewState({
@@ -17,7 +16,6 @@ export function useItemDetailViewState({
   colors,
   bookmarkPending,
   unbookmarkPending,
-  toggleFinishedPending,
 }: ItemDetailViewStateInput) {
   if (!item) {
     return {
@@ -47,7 +45,7 @@ export function useItemDetailViewState({
     ? 'checkmark-circle'
     : 'checkmark-circle-outline';
   const completeActionColor = isBookmarked && isFinished ? colors.success : colors.textSecondary;
-  const isCompleteActionDisabled = !isBookmarked || toggleFinishedPending;
+  const isCompleteActionDisabled = !isBookmarked;
 
   const descriptionLabel = (() => {
     switch (item.contentType) {
