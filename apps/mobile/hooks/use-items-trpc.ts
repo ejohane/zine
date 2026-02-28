@@ -6,6 +6,7 @@
  */
 
 import { keepPreviousData } from '@tanstack/react-query';
+import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
@@ -513,123 +514,184 @@ export function useUnbookmarkItem() {
 export function useToggleFinished() {
   const utils = trpc.useUtils();
 
+  const pendingToggleCountByIdRef = useRef(new Map<string, number>());
+
+  type ToggleableItem = ListItem | NonNullable<ItemQueryData>;
+  type LibraryQueryInput = Parameters<TrpcUtils['items']['library']['setData']>[0];
+
+  const prependUniqueById = <T extends { id: string }>(items: T[], item: T): T[] => [
+    item,
+    ...items.filter((existing) => existing.id !== item.id),
+  ];
+
+  const buildLibraryInputsForItem = (
+    item: ToggleableItem
+  ): {
+    unfinishedInputs: LibraryQueryInput[];
+    finishedInputs: LibraryQueryInput[];
+  } => ({
+    unfinishedInputs: [
+      undefined,
+      { filter: { isFinished: false } },
+      { filter: { provider: item.provider } },
+      { filter: { contentType: item.contentType } },
+      { filter: { provider: item.provider, contentType: item.contentType } },
+    ],
+    finishedInputs: [
+      { filter: { isFinished: true } },
+      { filter: { isFinished: true, provider: item.provider } },
+      { filter: { isFinished: true, contentType: item.contentType } },
+      { filter: { isFinished: true, provider: item.provider, contentType: item.contentType } },
+    ],
+  });
+
+  const toggleFinishedInCaches = (id: string): boolean => {
+    const currentItem = utils.items.get.getData({ id });
+    const unfinishedLibrary = utils.items.library.getData();
+    const explicitUnfinishedLibrary = utils.items.library.getData({
+      filter: { isFinished: false },
+    });
+    const finishedLibrary = utils.items.library.getData({ filter: { isFinished: true } });
+    const inbox = utils.items.inbox.getData();
+
+    const targetItem: ToggleableItem | undefined =
+      currentItem ??
+      unfinishedLibrary?.items.find((item) => item.id === id) ??
+      explicitUnfinishedLibrary?.items.find((item) => item.id === id) ??
+      finishedLibrary?.items.find((item) => item.id === id) ??
+      inbox?.items.find((item) => item.id === id);
+
+    if (!targetItem) {
+      return false;
+    }
+
+    const nowFinished = !targetItem.isFinished;
+    const finishedAt = nowFinished ? new Date().toISOString() : null;
+    const updatedItem: ToggleableItem = {
+      ...targetItem,
+      isFinished: nowFinished,
+      finishedAt,
+    };
+
+    const { unfinishedInputs, finishedInputs } = buildLibraryInputsForItem(updatedItem);
+
+    for (const input of unfinishedInputs) {
+      utils.items.library.setData(input, (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          items: nowFinished
+            ? old.items.filter((item) => item.id !== id)
+            : prependUniqueById(old.items, updatedItem as ListItem),
+        };
+      });
+    }
+
+    for (const input of finishedInputs) {
+      utils.items.library.setData(input, (old) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          items: nowFinished
+            ? prependUniqueById(old.items, updatedItem as ListItem)
+            : old.items.filter((item) => item.id !== id),
+        };
+      });
+    }
+
+    utils.items.inbox.setData(undefined, (old) => {
+      if (!old) return old;
+
+      const hasItem = old.items.some((item) => item.id === id);
+      if (!hasItem) return old;
+
+      return {
+        ...old,
+        items: old.items.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                isFinished: nowFinished,
+                finishedAt,
+              }
+            : item
+        ),
+      };
+    });
+
+    utils.items.get.setData({ id }, (old) => {
+      if (old) {
+        return {
+          ...old,
+          isFinished: nowFinished,
+          finishedAt,
+        };
+      }
+
+      return updatedItem as NonNullable<ItemQueryData>;
+    });
+
+    return true;
+  };
+
+  const incrementPendingCount = (id: string) => {
+    const current = pendingToggleCountByIdRef.current.get(id) ?? 0;
+    pendingToggleCountByIdRef.current.set(id, current + 1);
+  };
+
+  const decrementPendingCount = (id: string): number => {
+    const current = pendingToggleCountByIdRef.current.get(id) ?? 0;
+    const next = Math.max(0, current - 1);
+    if (next === 0) {
+      pendingToggleCountByIdRef.current.delete(id);
+    } else {
+      pendingToggleCountByIdRef.current.set(id, next);
+    }
+    return next;
+  };
+
   /** Context type for filter-aware rollback */
   type ToggleFinishedContext = {
-    previousUnfinished?: ListQueryData;
-    previousFinished?: ListQueryData;
-    previousUnfiltered?: ListQueryData;
-    previousInbox?: ListQueryData;
-    previousItem?: ItemQueryData;
+    didApplyOptimisticUpdate: boolean;
   };
 
   return trpc.items.toggleFinished.useMutation({
     onMutate: async ({ id }): Promise<ToggleFinishedContext> => {
-      // Cancel all potentially affected queries
+      // Cancel all potentially affected queries to reduce overwrite races.
       await Promise.all([
-        utils.items.library.cancel({ filter: { isFinished: false } }),
-        utils.items.library.cancel({ filter: { isFinished: true } }),
         utils.items.library.cancel(),
         utils.items.inbox.cancel(),
         utils.items.home.cancel(),
         utils.items.get.cancel({ id }),
       ]);
 
-      // Snapshot for rollback
-      const previousUnfinished = utils.items.library.getData({ filter: { isFinished: false } });
-      const previousFinished = utils.items.library.getData({ filter: { isFinished: true } });
-      const previousUnfiltered = utils.items.library.getData();
-      const previousInbox = utils.items.inbox.getData();
-      const previousItem = utils.items.get.getData({ id });
-
-      // Find the item to determine its current state
-      const allItems = [
-        ...(previousUnfinished?.items ?? []),
-        ...(previousFinished?.items ?? []),
-        ...(previousUnfiltered?.items ?? []),
-        ...(previousInbox?.items ?? []),
-      ];
-      const targetItem = allItems.find((item) => item.id === id);
-
-      if (targetItem) {
-        const nowFinished = !targetItem.isFinished;
-        const now = new Date().toISOString();
-        const updatedItem = {
-          ...targetItem,
-          isFinished: nowFinished,
-          finishedAt: nowFinished ? now : null,
-        };
-
-        if (nowFinished) {
-          // Remove from unfinished, add to finished
-          utils.items.library.setData({ filter: { isFinished: false } }, (old) =>
-            old ? { ...old, items: old.items.filter((i) => i.id !== id) } : old
-          );
-          utils.items.library.setData({ filter: { isFinished: true } }, (old) =>
-            old ? { ...old, items: [updatedItem, ...old.items] } : old
-          );
-        } else {
-          // Remove from finished, add to unfinished
-          utils.items.library.setData({ filter: { isFinished: true } }, (old) =>
-            old ? { ...old, items: old.items.filter((i) => i.id !== id) } : old
-          );
-          utils.items.library.setData({ filter: { isFinished: false } }, (old) =>
-            old ? { ...old, items: [updatedItem, ...old.items] } : old
-          );
-        }
-
-        // Update unfiltered library cache (toggle in place)
-        utils.items.library.setData(undefined, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: old.items.map((item) => (item.id === id ? updatedItem : item)),
-          };
-        });
-
-        // Update inbox cache (toggle in place)
-        utils.items.inbox.setData(undefined, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: old.items.map((item) => (item.id === id ? updatedItem : item)),
-          };
-        });
-
-        // Update single item cache
-        utils.items.get.setData({ id }, (old) => {
-          if (!old) return old;
-          return updatedItem;
-        });
-      }
+      incrementPendingCount(id);
 
       return {
-        previousUnfinished,
-        previousFinished,
-        previousUnfiltered,
-        previousInbox,
-        previousItem,
+        didApplyOptimisticUpdate: toggleFinishedInCaches(id),
       };
     },
     onError: (_err, { id }, context) => {
-      // Rollback all caches
-      if (context?.previousUnfinished) {
-        utils.items.library.setData({ filter: { isFinished: false } }, context.previousUnfinished);
-      }
-      if (context?.previousFinished) {
-        utils.items.library.setData({ filter: { isFinished: true } }, context.previousFinished);
-      }
-      if (context?.previousUnfiltered) {
-        utils.items.library.setData(undefined, context.previousUnfiltered);
-      }
-      if (context?.previousInbox) {
-        utils.items.inbox.setData(undefined, context.previousInbox);
-      }
-      if (context?.previousItem) {
-        utils.items.get.setData({ id }, context.previousItem);
+      // Revert failed optimistic toggles by inverting once more.
+      // This is resilient to overlapping toggles on the same item.
+      if (context?.didApplyOptimisticUpdate) {
+        const didRollback = toggleFinishedInCaches(id);
+        if (!didRollback) {
+          utils.items.library.invalidate();
+          utils.items.inbox.invalidate();
+          utils.items.home.invalidate();
+          utils.items.get.invalidate({ id });
+        }
       }
     },
     onSettled: (_data, _err, { id }) => {
-      // Refetch after mutation completes (success or error)
+      // Defer invalidation until the last in-flight toggle settles to avoid flicker.
+      if (decrementPendingCount(id) > 0) {
+        return;
+      }
+
       utils.items.library.invalidate();
       utils.items.inbox.invalidate();
       utils.items.home.invalidate();

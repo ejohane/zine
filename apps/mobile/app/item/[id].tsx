@@ -54,7 +54,6 @@ export default function ItemDetailScreen() {
     handleToggleFinished,
     bookmarkMutation,
     unbookmarkMutation,
-    toggleFinishedMutation,
   } = useItemDetailActions(item);
 
   const viewState = useItemDetailViewState({
@@ -62,7 +61,6 @@ export default function ItemDetailScreen() {
     colors,
     bookmarkPending: bookmarkMutation.isPending,
     unbookmarkPending: unbookmarkMutation.isPending,
-    toggleFinishedPending: toggleFinishedMutation.isPending,
   });
 
   if (!isValid) {
