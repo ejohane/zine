@@ -27,6 +27,28 @@ const dlqLogger = logger.child('sync-dlq');
 /** Maximum number of DLQ entry IDs to keep in the index */
 const DLQ_INDEX_MAX_ENTRIES = 100;
 
+function parseDLQIndex(indexData: string | null, operation: string): string[] {
+  if (!indexData) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(indexData) as unknown;
+    if (!Array.isArray(parsed) || parsed.some((entryId) => typeof entryId !== 'string')) {
+      dlqLogger.warn('DLQ index data has invalid shape; resetting', { operation });
+      return [];
+    }
+
+    return parsed;
+  } catch (error) {
+    dlqLogger.warn('Failed to parse DLQ index JSON; resetting', {
+      operation,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return [];
+  }
+}
+
 /**
  * Process a batch of DLQ messages.
  *
@@ -146,7 +168,7 @@ async function storeDLQEntries(entries: DLQEntry[], kv: KVNamespace): Promise<vo
   // Update the index with new entry IDs
   const indexKey = getDLQIndexKey();
   const existingIndex = await kv.get(indexKey);
-  let entryIds: string[] = existingIndex ? JSON.parse(existingIndex) : [];
+  let entryIds = parseDLQIndex(existingIndex, 'store');
 
   // Add new entries at the beginning (most recent first)
   entryIds = [...entries.map((e) => e.id), ...entryIds];
@@ -180,7 +202,7 @@ export async function getDLQEntries(kv: KVNamespace, limit: number = 20): Promis
     return [];
   }
 
-  const entryIds: string[] = JSON.parse(indexData);
+  const entryIds = parseDLQIndex(indexData, 'list');
   const idsToFetch = entryIds.slice(0, limit);
 
   // Fetch entries in parallel
@@ -222,7 +244,7 @@ export async function getDLQSummary(kv: KVNamespace): Promise<{
     };
   }
 
-  const entryIds: string[] = JSON.parse(indexData);
+  const entryIds = parseDLQIndex(indexData, 'summary');
   const count = entryIds.length;
 
   // Fetch recent entries (last 10)
@@ -275,7 +297,7 @@ export async function deleteDLQEntry(id: string, kv: KVNamespace): Promise<boole
   const indexData = await kv.get(indexKey);
 
   if (indexData) {
-    const entryIds: string[] = JSON.parse(indexData);
+    const entryIds = parseDLQIndex(indexData, 'delete');
     const updatedIds = entryIds.filter((entryId) => entryId !== id);
     await kv.put(indexKey, JSON.stringify(updatedIds), {
       expirationTtl: DLQ_ENTRY_TTL_SECONDS,

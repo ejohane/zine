@@ -269,6 +269,35 @@ describe('handleSyncDLQ', () => {
     expect(updatedIndex[2]).toBe('existing_id_2');
   });
 
+  it('should recover from corrupted DLQ index JSON when storing new entries', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: '{bad-json',
+    });
+
+    const message = createMockMessage({
+      jobId: TEST_JOB_ID,
+      userId: TEST_USER_ID,
+      subscriptionId: 'sub_1',
+      provider: 'YOUTUBE',
+      providerChannelId: 'UC123',
+      enqueuedAt: MOCK_NOW,
+    });
+
+    const batch = createMockDLQBatch([message]);
+    const env = createMockEnv(kv);
+
+    await expect(handleSyncDLQ(batch, env as never)).resolves.toBeUndefined();
+
+    const putMock = kv.put as ReturnType<typeof vi.fn>;
+    const putCalls = putMock.mock.calls as Array<[string, string, unknown]>;
+    const indexCall = putCalls.find((call) => call[0] === getDLQIndexKey());
+    expect(indexCall).toBeDefined();
+
+    const updatedIndex = JSON.parse(indexCall![1]);
+    expect(updatedIndex).toHaveLength(1);
+    expect(updatedIndex[0]).toMatch(/^01HQXYZ/);
+  });
+
   it('should store correct DLQ entry structure', async () => {
     const kv = createMockKV();
     const message = createMockMessage({
@@ -374,6 +403,14 @@ describe('getDLQEntries', () => {
     expect(entries).toHaveLength(2);
     expect(entries.map((e) => e.id)).toEqual(['entry_1', 'entry_2']);
   });
+
+  it('should return empty array when index JSON is corrupted', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: '{bad-json',
+    });
+
+    await expect(getDLQEntries(kv)).resolves.toEqual([]);
+  });
 });
 
 describe('getDLQSummary', () => {
@@ -444,6 +481,21 @@ describe('getDLQSummary', () => {
     expect(summary.count).toBe(15);
     expect(summary.recent).toHaveLength(10);
   });
+
+  it('should return empty summary when index JSON is corrupted', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: '{bad-json',
+    });
+
+    const summary = await getDLQSummary(kv);
+
+    expect(summary).toEqual({
+      count: 0,
+      recent: [],
+      oldestAt: null,
+      newestAt: null,
+    });
+  });
 });
 
 describe('deleteDLQEntry', () => {
@@ -486,6 +538,31 @@ describe('deleteDLQEntry', () => {
 
     expect(deleted).toBe(false);
     expect(kv.delete).not.toHaveBeenCalled();
+  });
+
+  it('should delete entry and reset corrupted index JSON', async () => {
+    const entry = {
+      id: 'entry_1',
+      message: { jobId: TEST_JOB_ID },
+      deadLetteredAt: MOCK_NOW,
+      attempts: 3,
+    };
+
+    const kv = createMockKV({
+      [getDLQIndexKey()]: '{bad-json',
+      [getDLQEntryKey('entry_1')]: JSON.stringify(entry),
+    });
+
+    const deleted = await deleteDLQEntry('entry_1', kv);
+
+    expect(deleted).toBe(true);
+    expect(kv.delete).toHaveBeenCalledWith(getDLQEntryKey('entry_1'));
+
+    const putMock = kv.put as ReturnType<typeof vi.fn>;
+    const putCalls = putMock.mock.calls as Array<[string, string, unknown]>;
+    const indexCall = putCalls.find((call) => call[0] === getDLQIndexKey());
+    expect(indexCall).toBeDefined();
+    expect(JSON.parse(indexCall![1])).toEqual([]);
   });
 });
 
