@@ -139,10 +139,12 @@ function createMockContentItem(overrides: Partial<CreatorContentItem> = {}): Cre
   return {
     id: 'vid-123',
     title: 'New Video',
+    description: null,
     thumbnailUrl: 'https://example.com/new-thumb.jpg',
     duration: 600,
     publishedAt: 1705276800000, // 2024-01-15T00:00:00.000Z as Unix ms
     externalUrl: 'https://youtube.com/watch?v=vid-123',
+    itemId: null,
     isBookmarked: false,
     ...overrides,
   };

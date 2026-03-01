@@ -1,5 +1,4 @@
 import { renderHook } from '@testing-library/react-hooks';
-import { useRssFeedDiscovery } from './use-rss-feed-discovery';
 
 const mockDiscoverUseQuery = jest.fn();
 const mockAddUseMutation = jest.fn();
@@ -42,6 +41,8 @@ jest.mock('../lib/trpc', () => ({
     })),
   },
 }));
+
+import { useRssFeedDiscovery } from './use-rss-feed-discovery';
 
 describe('useRssFeedDiscovery', () => {
   beforeEach(() => {
