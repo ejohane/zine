@@ -13,6 +13,12 @@
     "lint": {
       "dependsOn": ["^build"]
     },
+    "@zine/shared#lint": {
+      "outputs": [".eslintcache"]
+    },
+    "@zine/worker#lint": {
+      "outputs": [".eslintcache"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     }
