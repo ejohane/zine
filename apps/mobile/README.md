@@ -48,6 +48,14 @@ You can start developing by editing the files inside the **app** directory. This
    bun run dev
    ```
 
+## Expo doctor notes (SDK 55)
+
+- Run `npx expo-doctor` from `apps/mobile` for local diagnostics.
+- We intentionally exclude `expo-share-extension` from React Native Directory warnings and disable unknown-package warnings via `package.json > expo.doctor.reactNativeDirectoryCheck` because:
+  - `expo-share-extension` is currently reported as "untested on New Architecture"
+  - `@solana-mobile/mobile-wallet-adapter-protocol` has no RN Directory metadata yet
+- With Bun workspaces, `expo-doctor` may still report duplicate native module installs from `.bun` store linking even when dependency versions are aligned and builds/tests pass.
+
 ## Learn more
 
 To learn more about developing your project with Expo, look at the following resources:

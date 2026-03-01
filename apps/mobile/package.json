@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
-    "storybook": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
+    "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "storybook:generate": "sb-rn-get-stories",
     "start": "expo start -c",
     "android": "expo start --android -c",
@@ -89,6 +89,16 @@
     "storybook": "^10.2.10",
     "ts-jest": "^29.4.6",
     "typescript": "~5.9.2"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "expo-share-extension"
+        ],
+        "listUnknownPackages": false
+      }
+    }
   },
   "private": true
 }
