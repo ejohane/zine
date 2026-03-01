@@ -29,7 +29,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "lint": "eslint src --ext .ts,.tsx",
+    "lint": "eslint src --ext .ts,.tsx --cache --cache-location .eslintcache",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
