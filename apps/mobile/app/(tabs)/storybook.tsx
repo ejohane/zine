@@ -1,6 +1,6 @@
 import { Redirect } from 'expo-router';
 
-import StorybookUI from '../.rnstorybook';
+import StorybookUI from '../../.rnstorybook';
 
 const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
 
