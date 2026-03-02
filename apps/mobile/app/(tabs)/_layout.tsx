@@ -7,6 +7,8 @@ import { AuthGuard } from '@/components/auth-guard';
 // =============================================================================
 
 export default function TabLayout() {
+  const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
+
   // Dynamic colors for iOS liquid glass that adapt to light/dark backgrounds
   const dynamicTintColor =
     Platform.OS === 'ios'
@@ -63,6 +65,13 @@ export default function TabLayout() {
             drawable="ic_library"
           />
         </NativeTabs.Trigger>
+
+        {isStorybookEnabled && (
+          <NativeTabs.Trigger name="storybook">
+            <NativeTabs.Trigger.Label>Storybook</NativeTabs.Trigger.Label>
+            <NativeTabs.Trigger.Icon sf={{ default: 'hammer', selected: 'hammer.fill' }} />
+          </NativeTabs.Trigger>
+        )}
 
         {/* explore tab is hidden - not included in triggers */}
       </NativeTabs>
