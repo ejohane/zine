@@ -659,19 +659,25 @@ export function useToggleFinished() {
 
   return trpc.items.toggleFinished.useMutation({
     onMutate: async ({ id }): Promise<ToggleFinishedContext> => {
-      // Cancel all potentially affected queries to reduce overwrite races.
-      await Promise.all([
+      incrementPendingCount(id);
+
+      // Apply optimistic state immediately so the UI responds on tap.
+      const didApplyOptimisticUpdate = toggleFinishedInCaches(id);
+
+      // Cancel potentially affected in-flight queries in the background to reduce overwrite races.
+      void Promise.all([
         utils.items.library.cancel(),
         utils.items.inbox.cancel(),
         utils.items.home.cancel(),
         utils.items.get.cancel({ id }),
-      ]);
+      ]).catch(() => {
+        utils.items.library.invalidate();
+        utils.items.inbox.invalidate();
+        utils.items.home.invalidate();
+        utils.items.get.invalidate({ id });
+      });
 
-      incrementPendingCount(id);
-
-      return {
-        didApplyOptimisticUpdate: toggleFinishedInCaches(id),
-      };
+      return { didApplyOptimisticUpdate };
     },
     onError: (_err, { id }, context) => {
       // Revert failed optimistic toggles by inverting once more.

@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { useToast } from 'heroui-native';
 import { useCallback } from 'react';
 import { Linking, Share } from 'react-native';
 
@@ -12,10 +13,12 @@ import {
   UserItemState,
 } from '@/hooks/use-items-trpc';
 import { logger } from '@/lib/logger';
+import { showError } from '@/lib/toast-utils';
 
 import type { ItemDetailItem } from '../types';
 
 export function useItemDetailActions(item?: ItemDetailItem | null) {
+  const { toast } = useToast();
   const bookmarkMutation = useBookmarkItem();
   const unbookmarkMutation = useUnbookmarkItem();
   const toggleFinishedMutation = useToggleFinished();
@@ -83,8 +86,20 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
     if (!item) return;
     if (item.state !== UserItemState.BOOKMARKED) return;
 
-    toggleFinishedMutation.mutate({ id: item.id });
-  }, [item, toggleFinishedMutation]);
+    toggleFinishedMutation.mutate(
+      { id: item.id },
+      {
+        onError: (error) => {
+          showError(
+            toast,
+            error,
+            'Failed to update completion status',
+            'itemDetail.toggleFinished'
+          );
+        },
+      }
+    );
+  }, [item, toast, toggleFinishedMutation]);
 
   return {
     handleOpenLink,

@@ -424,4 +424,44 @@ describe('useToggleFinished', () => {
     expect(harness.spies.mockHomeInvalidate).toHaveBeenCalledTimes(1);
     expect(harness.spies.mockGetInvalidate).toHaveBeenCalledWith({ id: item.id });
   });
+
+  it('applies optimistic complete state immediately without waiting for query cancellation', async () => {
+    const item = createMockItem({ id: 'instant-item', isFinished: false });
+    const harness = createToggleUtils({
+      defaultLibrary: {
+        items: [item],
+        nextCursor: null,
+      },
+      finishedLibrary: {
+        items: [],
+        nextCursor: null,
+      },
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+
+    const neverResolves = new Promise<void>(() => {});
+    (harness.utils.items.library.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.inbox.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.home.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.get.cancel as jest.Mock).mockReturnValue(neverResolves);
+
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getToggleHandlers();
+
+    const mutatePromise = mutation.onMutate({ id: item.id });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(harness.readLibrary()?.items).toHaveLength(0);
+    expect(harness.readLibrary({ filter: { isFinished: true } })?.items[0]?.id).toBe(item.id);
+    expect(harness.readLibrary({ filter: { isFinished: true } })?.items[0]?.isFinished).toBe(true);
+
+    await expect(
+      Promise.race([mutatePromise, Promise.resolve({ didApplyOptimisticUpdate: false })])
+    ).resolves.toEqual({ didApplyOptimisticUpdate: true });
+  });
 });
