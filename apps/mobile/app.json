@@ -17,6 +17,9 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleURLTypes": [
           {
+            "CFBundleURLSchemes": ["zine", "app.zine.mobile"]
+          },
+          {
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.973421703522-58dfb15bdqdhvhs2r9tt88ubgg45dkq1"
             ]
@@ -41,18 +44,15 @@
       "expo-router",
       "expo-secure-store",
       [
-        "expo-share-extension",
+        "expo-sharing",
         {
-          "activationRules": [
-            {
-              "type": "url",
-              "max": 1
-            },
-            {
-              "type": "text",
-              "max": 1
+          "ios": {
+            "enabled": true,
+            "activationRule": {
+              "supportsText": true,
+              "supportsWebUrlWithMaxCount": 1
             }
-          ]
+          }
         }
       ],
       [
