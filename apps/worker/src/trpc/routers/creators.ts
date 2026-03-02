@@ -26,9 +26,10 @@ import {
   newsletterFeeds,
   newsletterFeedMessages,
 } from '../../db/schema';
-import { ContentType, UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
+import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
 import { toItemView, type ItemView } from './items';
+import { getLatestContentItemContentType } from './latest-content-content-type';
 import {
   getYouTubeClientForConnection,
   getUploadsPlaylistId,
@@ -853,7 +854,8 @@ export const creatorsRouter = router({
         });
       }
 
-      if (!['YOUTUBE', 'SPOTIFY'].includes(creator.provider)) {
+      const contentType = getLatestContentItemContentType(creator.provider);
+      if (!contentType) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Provider not supported for latest content',
@@ -861,7 +863,6 @@ export const creatorsRouter = router({
       }
 
       const now = new Date().toISOString();
-      const contentType = creator.provider === 'YOUTUBE' ? ContentType.VIDEO : ContentType.PODCAST;
       const publishedAtIso = input.publishedAt ? new Date(input.publishedAt).toISOString() : null;
 
       const existingItem = await ctx.db
