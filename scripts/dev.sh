@@ -160,9 +160,10 @@ if [ "$CURRENT_PORT" != "$WORKER_PORT" ]; then
 EXPO_PUBLIC_API_URL=http://localhost:$WORKER_PORT
 EOF
 
-    # Append other env vars from main's .env.local (excluding API_URL)
+    # Append other env vars from main's .env.local (excluding API_URL and dev-only flags)
     if [ -f "$MAIN_WORKTREE/apps/mobile/.env.local" ]; then
         grep -v "^EXPO_PUBLIC_API_URL=" "$MAIN_WORKTREE/apps/mobile/.env.local" | \
+            grep -v "^EXPO_PUBLIC_STORYBOOK_ENABLED=" | \
             grep -v "^#" | grep -v "^$" >> apps/mobile/.env.local 2>/dev/null || true
         echo "   ✓ Copied secrets from main's .env.local"
     else
