@@ -3,7 +3,7 @@
   "main": "index.js",
   "version": "1.0.0",
   "scripts": {
-    "dev": "EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
+    "dev": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "storybook:generate": "sb-rn-get-stories",
     "start": "expo start -c",
@@ -13,7 +13,7 @@
     "lint": "expo lint",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build:ios:preview": "dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
+    "build:ios:preview": "env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
     "deploy:ios:preview": "./scripts/build-and-install-ios.sh"
   },
   "dependencies": {
