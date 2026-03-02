@@ -487,6 +487,9 @@ export async function fetchVideoDetailsBatched(
     return new Map();
   }
 
+  const safeConcurrency =
+    Number.isFinite(concurrency) && concurrency > 0 ? Math.max(1, Math.floor(concurrency)) : 1;
+
   // Chunk into groups of 50 (YouTube API limit)
   const chunks: string[][] = [];
   for (let i = 0; i < videoIds.length; i += 50) {
@@ -495,9 +498,9 @@ export async function fetchVideoDetailsBatched(
 
   const allDetails = new Map<string, VideoDetails>();
 
-  // Process in waves of `concurrency` chunks
-  for (let i = 0; i < chunks.length; i += concurrency) {
-    const wave = chunks.slice(i, i + concurrency);
+  // Process in waves of `safeConcurrency` chunks
+  for (let i = 0; i < chunks.length; i += safeConcurrency) {
+    const wave = chunks.slice(i, i + safeConcurrency);
     const results = await Promise.all(
       wave.map(async (chunk) => {
         try {
