@@ -1,5 +1,5 @@
 import { Platform, DynamicColorIOS } from 'react-native';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { AuthGuard } from '@/components/auth-guard';
 
 // =============================================================================
@@ -37,22 +37,28 @@ export default function TabLayout() {
         }}
       >
         <NativeTabs.Trigger name="index">
-          <Label>Home</Label>
-          <Icon sf={{ default: 'house', selected: 'house.fill' }} drawable="ic_home" />
+          <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: 'house', selected: 'house.fill' }}
+            drawable="ic_home"
+          />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="inbox">
-          <Label>Inbox</Label>
-          <Icon sf={{ default: 'tray', selected: 'tray.fill' }} drawable="ic_inbox" />
+          <NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
+            sf={{ default: 'tray', selected: 'tray.fill' }}
+            drawable="ic_inbox"
+          />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="search" role="search">
-          <Label>Search</Label>
+          <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="library">
-          <Label>Library</Label>
-          <Icon
+          <NativeTabs.Trigger.Label>Library</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon
             sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }}
             drawable="ic_library"
           />
