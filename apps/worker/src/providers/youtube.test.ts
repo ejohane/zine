@@ -844,6 +844,54 @@ describe('fetchVideoDetailsBatched', () => {
     expect(result.size).toBeGreaterThan(0);
   });
 
+  it('should fall back to safe concurrency for zero or negative values', async () => {
+    const client = createMockYouTubeClient();
+    const videoIds = Array.from({ length: 75 }, (_, i) => `video${i}`);
+    mockVideosList.mockResolvedValue({ data: { items: [] } });
+
+    for (const invalidConcurrency of [0, -1]) {
+      mockVideosList.mockClear();
+
+      await fetchVideoDetailsBatched(client, videoIds, invalidConcurrency);
+
+      expect(mockVideosList).toHaveBeenCalledTimes(2);
+      expect(mockVideosList).toHaveBeenNthCalledWith(1, {
+        part: ['contentDetails', 'snippet'],
+        id: videoIds.slice(0, 50),
+      });
+      expect(mockVideosList).toHaveBeenNthCalledWith(2, {
+        part: ['contentDetails', 'snippet'],
+        id: videoIds.slice(50, 75),
+      });
+    }
+  });
+
+  it('should fall back to safe concurrency for non-finite values', async () => {
+    const client = createMockYouTubeClient();
+    const videoIds = Array.from({ length: 75 }, (_, i) => `video${i}`);
+    mockVideosList.mockResolvedValue({ data: { items: [] } });
+
+    for (const invalidConcurrency of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+    ]) {
+      mockVideosList.mockClear();
+
+      await fetchVideoDetailsBatched(client, videoIds, invalidConcurrency);
+
+      expect(mockVideosList).toHaveBeenCalledTimes(2);
+      expect(mockVideosList).toHaveBeenNthCalledWith(1, {
+        part: ['contentDetails', 'snippet'],
+        id: videoIds.slice(0, 50),
+      });
+      expect(mockVideosList).toHaveBeenNthCalledWith(2, {
+        part: ['contentDetails', 'snippet'],
+        id: videoIds.slice(50, 75),
+      });
+    }
+  });
+
   it('should handle all chunks failing gracefully', async () => {
     const client = createMockYouTubeClient();
     const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
