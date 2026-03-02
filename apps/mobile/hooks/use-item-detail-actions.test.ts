@@ -23,6 +23,8 @@ const mockCanOpenURL = jest.fn();
 const mockOpenURL = jest.fn();
 const mockOpenBrowserAsync = jest.fn();
 const mockShare = jest.fn();
+const mockShowError = jest.fn();
+const mockToastManager = { show: jest.fn() };
 
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(() => Promise.resolve()),
@@ -52,6 +54,14 @@ jest.mock('@/lib/logger', () => ({
   logger: {
     error: jest.fn(),
   },
+}));
+
+jest.mock('heroui-native', () => ({
+  useToast: () => ({ toast: mockToastManager }),
+}));
+
+jest.mock('@/lib/toast-utils', () => ({
+  showError: (...args: unknown[]) => mockShowError(...args),
 }));
 
 jest.mock('@/hooks/use-items-trpc', () => ({
@@ -244,6 +254,35 @@ describe('useItemDetailActions', () => {
     } as unknown as ItemDetailItem;
     const { result: bookmarkedResult } = renderHook(() => useItemDetailActions(bookmarkedItem));
     bookmarkedResult.current.handleToggleFinished();
-    expect(mockToggleFinishedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
+    expect(mockToggleFinishedMutation.mutate).toHaveBeenCalledWith(
+      { id: baseItem.id },
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
+  });
+
+  it('shows lightweight error feedback when complete toggle fails', () => {
+    const bookmarkedItem = {
+      ...baseItem,
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(bookmarkedItem));
+
+    result.current.handleToggleFinished();
+
+    const mutateOptions = mockToggleFinishedMutation.mutate.mock.calls[0][1] as {
+      onError: (error: unknown) => void;
+    };
+
+    const error = new Error('Network request failed');
+    mutateOptions.onError(error);
+
+    expect(mockShowError).toHaveBeenCalledWith(
+      mockToastManager,
+      error,
+      'Failed to update completion status',
+      'itemDetail.toggleFinished'
+    );
   });
 });
