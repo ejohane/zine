@@ -51,6 +51,7 @@ export default function RootLayout() {
                     name="item/[id]"
                     options={{ headerShown: true, headerBackTitle: '' }}
                   />
+                  <Stack.Screen name="handle-share" options={{ headerShown: false }} />
                   <Stack.Screen
                     name="add-link"
                     options={{
