@@ -60,12 +60,12 @@ describe('parseISO8601Duration', () => {
       expect(parseISO8601Duration('invalid')).toBe(0);
       expect(parseISO8601Duration('1:30')).toBe(0);
       expect(parseISO8601Duration('90')).toBe(0);
+      expect(parseISO8601Duration('PT1M30S-extra')).toBe(0);
+      expect(parseISO8601Duration('P1DT2H')).toBe(0);
     });
 
     it('handles null-like values', () => {
-      // @ts-expect-error - testing runtime behavior
       expect(parseISO8601Duration(null)).toBe(0);
-      // @ts-expect-error - testing runtime behavior
       expect(parseISO8601Duration(undefined)).toBe(0);
     });
   });

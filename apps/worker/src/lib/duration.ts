@@ -5,11 +5,13 @@
  * particularly ISO 8601 durations used by YouTube and other APIs.
  */
 
+const ISO8601_TIME_DURATION_PATTERN = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/;
+
 /**
- * Parse ISO 8601 duration format (e.g., "PT1M30S") into seconds.
+ * Parse ISO 8601 time duration format (e.g., "PT1M30S") into seconds.
  * Returns 0 for invalid/empty input (graceful degradation).
  *
- * @param duration - ISO 8601 duration string (e.g., "PT1H30M45S")
+ * @param duration - ISO 8601 duration-like value (e.g., "PT1H30M45S")
  * @returns Duration in seconds, or 0 if invalid
  *
  * @example
@@ -21,12 +23,12 @@
  * parseISO8601Duration("")         // 0 (graceful degradation)
  * ```
  */
-export function parseISO8601Duration(duration: string): number {
-  if (!duration) {
+export function parseISO8601Duration(duration: unknown): number {
+  if (typeof duration !== 'string' || duration.length === 0) {
     return 0;
   }
 
-  const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  const match = duration.match(ISO8601_TIME_DURATION_PATTERN);
   if (!match) {
     return 0;
   }
