@@ -87,6 +87,11 @@ const ESTIMATED_MS_PER_SUBSCRIPTION = 100;
 /** Estimated API calls per subscription (metadata lookup + episode fetch) */
 const ESTIMATED_API_CALLS_PER_SUBSCRIPTION = 2;
 
+function getPositiveIntEnv(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 // ============================================================================
 // Provider Configuration
 // ============================================================================
@@ -136,10 +141,14 @@ export async function pollSpotifySubscriptionsBatched(
   db: DrizzleDB
 ): Promise<BatchPollingResult> {
   // Get configurable batch size thresholds from environment
-  const maxSafeBatchSize =
-    parseInt(env.SPOTIFY_MAX_SAFE_BATCH_SIZE ?? '', 10) || DEFAULT_MAX_SAFE_BATCH_SIZE;
-  const criticalBatchSize =
-    parseInt(env.SPOTIFY_CRITICAL_BATCH_SIZE ?? '', 10) || DEFAULT_CRITICAL_BATCH_SIZE;
+  const maxSafeBatchSize = getPositiveIntEnv(
+    env.SPOTIFY_MAX_SAFE_BATCH_SIZE,
+    DEFAULT_MAX_SAFE_BATCH_SIZE
+  );
+  const criticalBatchSize = getPositiveIntEnv(
+    env.SPOTIFY_CRITICAL_BATCH_SIZE,
+    DEFAULT_CRITICAL_BATCH_SIZE
+  );
 
   // Batch size guard: log warnings/errors for large batches
   if (subs.length > criticalBatchSize) {
@@ -362,8 +371,10 @@ export async function pollSpotifySubscriptionsBatched(
   const pollingErrors: PollingError[] = [];
 
   // Get concurrency limit from environment, falling back to default
-  const concurrency =
-    parseInt(env.SPOTIFY_EPISODE_FETCH_CONCURRENCY ?? '', 10) || DEFAULT_EPISODE_FETCH_CONCURRENCY;
+  const concurrency = getPositiveIntEnv(
+    env.SPOTIFY_EPISODE_FETCH_CONCURRENCY,
+    DEFAULT_EPISODE_FETCH_CONCURRENCY
+  );
   const limit = pLimit(concurrency);
 
   // Parallel episode fetching with concurrency control
