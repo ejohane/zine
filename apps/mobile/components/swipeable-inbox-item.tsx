@@ -55,6 +55,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import ContextMenuView from 'react-native-context-menu-view';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
@@ -76,12 +77,10 @@ type ContextMenuProps = {
 // Fallback component that just renders children (for Expo Go)
 const ContextMenuFallback = ({ children }: ContextMenuProps) => <>{children}</>;
 
-// Only load native module if it's actually available
-const ContextMenuNative = isContextMenuAvailable
-  ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('react-native-context-menu-view').default
-  : null;
-const ContextMenu: React.ComponentType<ContextMenuProps> = ContextMenuNative ?? ContextMenuFallback;
+// ContextMenuView import is safe in Expo Go; we still gate rendering on native availability
+const ContextMenu: React.ComponentType<ContextMenuProps> = isContextMenuAvailable
+  ? (ContextMenuView as React.ComponentType<ContextMenuProps>)
+  : ContextMenuFallback;
 
 // ============================================================================
 // Types
