@@ -4,18 +4,6 @@
 
 Generic instructions for AI agents working on the Zine mobile app. These instructions work with any MCP-compatible AI tool (Claude Code, Cursor, VS Code, Zed, etc.).
 
-## Project Tracking
-
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --status in_progress  # Claim work
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
-
 ## iOS Simulator Integration
 
 ### MCP Server Configuration
@@ -156,13 +144,12 @@ apps/mobile/
 
 **MANDATORY WORKFLOW:**
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
+1. **Document remaining work** - Capture any follow-up work in your handoff
 2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
+3. **Review git state** - Make sure only the intended changes are staged or committed
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd sync
    git push
    git status  # MUST show "up to date with origin"
    ```

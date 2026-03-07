@@ -72,7 +72,7 @@
         "tailwind-variants": "^3.2.2",
         "tailwindcss": "^4.1.17",
         "ulid": "^3.0.2",
-        "uniwind": "1.2.2",
+        "uniwind": "^1.2.2",
       },
       "devDependencies": {
         "@storybook/addon-ondevice-actions": "^10.2.3",

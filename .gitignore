@@ -72,8 +72,4 @@ bun.lockb
 *.local
 tmp/
 
-# bv (beads viewer) local config and caches
-.bv/
-
-
 */uniwind-types.d.ts
