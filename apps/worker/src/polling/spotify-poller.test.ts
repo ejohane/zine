@@ -1362,6 +1362,53 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       expect(maxConcurrent).toBeLessThanOrEqual(5);
     });
 
+    it('should fall back to default concurrency when env var is invalid', async () => {
+      const subs = Array.from({ length: 8 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s, i) => ({
+            id: s.providerChannelId,
+            name: `Show ${i}`,
+            totalEpisodes: 11,
+          }))
+        )
+      );
+
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+
+      mockGetShowEpisodes.mockImplementation(async () => {
+        currentConcurrent++;
+        maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        currentConcurrent--;
+        return [createMockSpotifyEpisode({ id: 'ep', releaseDate: '2024-01-15' })];
+      });
+
+      mockIngestItem.mockResolvedValue({ created: true, itemId: 'i', userItemId: 'ui' });
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        { SPOTIFY_EPISODE_FETCH_CONCURRENCY: '-2' } as never,
+        db as never
+      );
+
+      expect(maxConcurrent).toBeLessThanOrEqual(5);
+      expect(maxConcurrent).toBeGreaterThan(0);
+    });
+
     it('should return all results including both successes and failures', async () => {
       const sub1 = createMockSubscription({
         id: 'sub_ok',
@@ -1971,6 +2018,44 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
 
       // Should complete - error logged but not thrown
       expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+    });
+
+    it('should fall back to default batch thresholds when env values are invalid', async () => {
+      // 501 exceeds default max-safe threshold (500), so this should still process and warn path is exercised
+      const subs = Array.from({ length: 501 }, (_, i) =>
+        createMockSubscription({
+          id: `sub_${i}`,
+          providerChannelId: `show_${i}`,
+          totalItems: 10,
+        })
+      );
+
+      mockGetMultipleShowsWithCache.mockResolvedValue(
+        createCacheResult(
+          subs.map((s, i) => ({
+            id: s.providerChannelId,
+            name: `Show ${i}`,
+            totalEpisodes: 10,
+          }))
+        )
+      );
+
+      const { pollSpotifySubscriptionsBatched } = await import('./spotify-poller');
+
+      const db = createMockDb();
+      const result = await pollSpotifySubscriptionsBatched(
+        subs as never[],
+        {} as never,
+        subs[0].userId,
+        {
+          SPOTIFY_MAX_SAFE_BATCH_SIZE: '-10',
+          SPOTIFY_CRITICAL_BATCH_SIZE: '0',
+        } as never,
+        db as never
+      );
+
+      expect(result.skipped).toBe(501);
+      expect(result.processed).toBe(0);
     });
 
     it('should handle empty batch gracefully (no warnings)', async () => {
