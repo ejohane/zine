@@ -50,7 +50,8 @@ const mockAddEventListener = jest.fn((event: string, callback: (state: AppStateS
 
 jest.mock('react-native', () => ({
   AppState: {
-    addEventListener: mockAddEventListener,
+    addEventListener: (...args: [string, (state: AppStateStatus) => void]) =>
+      mockAddEventListener(...args),
   },
 }));
 

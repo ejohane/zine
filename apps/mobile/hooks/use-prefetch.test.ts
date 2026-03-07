@@ -43,7 +43,8 @@ let isRestoring = false;
 
 jest.mock('react-native', () => ({
   AppState: {
-    addEventListener: mockAddEventListener,
+    addEventListener: (...args: [string, (state: AppStateStatus) => void]) =>
+      mockAddEventListener(...args),
   },
 }));
 

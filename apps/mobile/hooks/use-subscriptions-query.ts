@@ -69,8 +69,6 @@ export interface SubscriptionsResponse {
   hasMore: boolean;
 }
 
-type ListInput = Exclude<SubscriptionsListInput, undefined>;
-
 export function mapSubscription(item: SubscriptionListItemOutput): Subscription {
   return {
     id: item.id,
@@ -177,15 +175,17 @@ export function useSubscriptions() {
  */
 export function useSubscriptionsFiltered(options?: {
   /** Filter by provider */
-  provider?: ListInput['provider'];
+  provider?: SubscriptionProvider;
   /** Filter by status */
-  status?: ListInput['status'];
+  status?: SubscriptionStatus;
   /** Number of items per page (1-100, default 50) */
   limit?: number;
   /** Pagination cursor */
   cursor?: string;
 }) {
-  return trpc.subscriptions.list.useQuery(options ?? {}, {
+  const input = (options ?? {}) as SubscriptionsListInput;
+
+  return trpc.subscriptions.list.useQuery(input, {
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     placeholderData: keepPreviousData,

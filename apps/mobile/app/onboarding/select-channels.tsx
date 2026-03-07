@@ -71,7 +71,7 @@ export default function SelectChannelsScreen() {
   const provider: ChannelProvider = providerValidation.success
     ? providerValidation.data
     : 'YOUTUBE';
-  const discoverProvider: DiscoverAvailableInput['provider'] = provider;
+  const discoverProvider = provider as DiscoverAvailableInput['provider'];
   const providerDisplayName = getProviderDisplayName(provider);
 
   // Selected channels state (set of provider IDs)
