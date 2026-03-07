@@ -62,6 +62,12 @@ jest.mock('./logger', () => ({
   },
 }));
 
+jest.mock('./trpc-transport', () => ({
+  buildMobileTelemetryHeaders: jest.fn((headers: Record<string, string>) => headers),
+  createMobileActionTraceContext: jest.fn(() => ({ traceId: 'trc_oauth_test' })),
+  telemetryFetch: jest.fn(),
+}));
+
 // Mock tRPC client creation
 const mockMutate = jest.fn();
 jest.mock('@trpc/client', () => ({

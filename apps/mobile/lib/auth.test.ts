@@ -285,8 +285,11 @@ describe('validateClerkConfig', () => {
     const { validateClerkConfig } = require('./auth');
     validateClerkConfig();
 
-    expect(console.warn).toHaveBeenCalledWith(
-      '[Auth] Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Please set it in your .env.local file.'
+    const { authLogger: reloadedAuthLogger } = jest.requireMock('./logger') as {
+      authLogger: { warn: jest.Mock };
+    };
+    expect(reloadedAuthLogger.warn).toHaveBeenCalledWith(
+      'Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Please set it in your .env.local file.'
     );
 
     jest.resetModules();

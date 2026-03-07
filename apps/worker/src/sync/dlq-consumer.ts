@@ -21,6 +21,7 @@ import {
   getDLQIndexKey,
   DLQ_ENTRY_TTL_SECONDS,
 } from './types';
+import { updateJobProgress } from './service';
 
 const dlqLogger = logger.child('sync-dlq');
 
@@ -68,6 +69,9 @@ export async function handleSyncDLQ(
   // Log at ERROR level for Cloudflare dashboard alerts
   // This is the primary alerting mechanism - Cloudflare logs can be filtered by level
   dlqLogger.error('DLQ messages received - sync failures requiring investigation', {
+    operation: 'subscriptions.sync.dlq',
+    event: 'subscriptions.sync.dlq.batch_received',
+    status: 'error',
     messageCount: batch.messages.length,
     environment,
     // Include summary for quick triage
@@ -78,6 +82,9 @@ export async function handleSyncDLQ(
       userId: m.body?.userId,
       provider: m.body?.provider,
       subscriptionId: m.body?.subscriptionId,
+      traceId: m.body?.meta?.traceId,
+      requestId: m.body?.meta?.requestId,
+      release: m.body?.meta?.release,
     })),
   });
 
@@ -91,6 +98,9 @@ export async function handleSyncDLQ(
     if (!parseResult.success) {
       // Log malformed message separately
       dlqLogger.error('DLQ: Malformed message body', {
+        operation: 'subscriptions.sync.dlq',
+        event: 'subscriptions.sync.dlq.malformed',
+        status: 'error',
         messageId: message.id,
         attempts: message.attempts,
         error: parseResult.error.message,
@@ -107,6 +117,7 @@ export async function handleSyncDLQ(
           provider: message.body?.provider ?? 'YOUTUBE',
           providerChannelId: message.body?.providerChannelId ?? 'unknown',
           enqueuedAt: message.body?.enqueuedAt ?? now,
+          meta: message.body?.meta,
         },
         deadLetteredAt: now,
         attempts: message.attempts,
@@ -117,6 +128,9 @@ export async function handleSyncDLQ(
       // Log each DLQ entry with full context
       const body = parseResult.data;
       dlqLogger.error('DLQ: Subscription sync permanently failed', {
+        operation: 'subscriptions.sync.dlq',
+        event: 'subscriptions.sync.dlq.message_failed',
+        status: 'error',
         messageId: message.id,
         attempts: message.attempts,
         jobId: body.jobId,
@@ -126,6 +140,10 @@ export async function handleSyncDLQ(
         providerChannelId: body.providerChannelId,
         enqueuedAt: body.enqueuedAt,
         ageMs: now - body.enqueuedAt,
+        traceId: body.meta?.traceId,
+        requestId: body.meta?.requestId,
+        clientRequestId: body.meta?.clientRequestId,
+        release: body.meta?.release,
       });
 
       const entry: DLQEntry = {
@@ -136,6 +154,15 @@ export async function handleSyncDLQ(
         environment,
       };
       dlqEntries.push(entry);
+
+      await updateJobProgress(
+        body.jobId,
+        body.subscriptionId,
+        false,
+        0,
+        `Moved to DLQ after ${message.attempts} attempts`,
+        kv
+      );
     }
 
     // Acknowledge the message to remove it from DLQ
@@ -147,8 +174,17 @@ export async function handleSyncDLQ(
   await storeDLQEntries(dlqEntries, kv);
 
   dlqLogger.info('DLQ batch processed and stored', {
+    operation: 'subscriptions.sync.dlq',
+    event: 'subscriptions.sync.dlq.batch_stored',
     entriesStored: dlqEntries.length,
     entryIds: dlqEntries.map((e) => e.id),
+    releases: [
+      ...new Set(
+        dlqEntries.map(
+          (entry) => entry.message.meta?.release?.gitSha ?? entry.message.meta?.release?.version
+        )
+      ),
+    ].filter(Boolean),
   });
 }
 

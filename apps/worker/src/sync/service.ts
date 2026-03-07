@@ -13,6 +13,7 @@
  * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
  */
 
+import { createTraceId, type ReleaseContext } from '@zine/shared';
 import { ulid } from 'ulid';
 import { and, eq } from 'drizzle-orm';
 import { subscriptions, providerConnections } from '../db/schema';
@@ -25,6 +26,7 @@ import {
   type SyncAllAsyncResponse,
   type SyncStatusResponse,
   type ActiveSyncJobResponse,
+  type SyncJobTelemetry,
   getActiveJobKey,
   getJobStatusKey,
   JOB_STATUS_TTL_SECONDS,
@@ -47,6 +49,28 @@ const RATE_LIMIT_KEY_PREFIX = 'sync-all:';
 
 const syncLogger = logger.child('sync-service');
 
+interface SyncRequestTelemetryInput {
+  traceId?: string;
+  requestId?: string;
+  clientRequestId?: string;
+  source?: string;
+  release?: ReleaseContext;
+}
+
+function createSyncTelemetry(
+  enqueuedAt: number,
+  telemetry?: SyncRequestTelemetryInput
+): SyncJobTelemetry {
+  return {
+    traceId: telemetry?.traceId ?? createTraceId(),
+    requestId: telemetry?.requestId,
+    clientRequestId: telemetry?.clientRequestId,
+    source: telemetry?.source ?? 'subscriptions.syncAllAsync',
+    enqueuedAt,
+    release: telemetry?.release,
+  };
+}
+
 // ============================================================================
 // Job Management
 // ============================================================================
@@ -66,15 +90,18 @@ const syncLogger = logger.child('sync-service');
 export async function initiateSyncJob(
   userId: string,
   db: Database,
-  env: Bindings
+  env: Bindings,
+  telemetry?: SyncRequestTelemetryInput
 ): Promise<SyncAllAsyncResponse> {
   const kv = env.OAUTH_STATE_KV;
+  const now = Date.now();
+  const jobTelemetry = createSyncTelemetry(now, telemetry);
 
   // 1. Check rate limit
   const rateLimitKey = `${RATE_LIMIT_KEY_PREFIX}${userId}`;
   const lastSync = await kv.get(rateLimitKey);
   if (lastSync) {
-    const elapsed = Date.now() - parseInt(lastSync, 10);
+    const elapsed = now - parseInt(lastSync, 10);
     if (elapsed < RATE_LIMIT_COOLDOWN_MS) {
       const waitSeconds = Math.ceil((RATE_LIMIT_COOLDOWN_MS - elapsed) / 1000);
       throw new RateLimitError(`Please wait ${waitSeconds} seconds before syncing again`);
@@ -92,11 +119,15 @@ export async function initiateSyncJob(
         userId,
         jobId: existingJobId,
         status: existingStatus.status,
+        traceId: existingStatus.telemetry?.traceId,
+        requestId: existingStatus.telemetry?.requestId,
+        clientRequestId: existingStatus.telemetry?.clientRequestId,
       });
       return {
         jobId: existingJobId,
         total: existingStatus.total,
         existing: true,
+        telemetry: existingStatus.telemetry,
       };
     }
   }
@@ -118,9 +149,10 @@ export async function initiateSyncJob(
       failed: 0,
       itemsFound: 0,
       status: 'completed',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       errors: [],
+      telemetry: jobTelemetry,
     };
     await kv.put(getJobStatusKey(jobId), JSON.stringify(jobStatus), {
       expirationTtl: JOB_STATUS_TTL_SECONDS,
@@ -130,6 +162,7 @@ export async function initiateSyncJob(
       jobId,
       total: 0,
       existing: false,
+      telemetry: jobTelemetry,
     };
   }
 
@@ -155,12 +188,13 @@ export async function initiateSyncJob(
       failed: 0,
       itemsFound: 0,
       status: 'completed',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       errors: providers.map((p) => ({
         subscriptionId: 'all',
         error: `${p} not connected`,
       })),
+      telemetry: jobTelemetry,
     };
     await kv.put(getJobStatusKey(jobId), JSON.stringify(jobStatus), {
       expirationTtl: JOB_STATUS_TTL_SECONDS,
@@ -170,12 +204,12 @@ export async function initiateSyncJob(
       jobId,
       total: 0,
       existing: false,
+      telemetry: jobTelemetry,
     };
   }
 
   // 5. Create job
   const jobId = ulid();
-  const now = Date.now();
 
   const jobStatus: SyncJobStatus = {
     jobId,
@@ -189,6 +223,7 @@ export async function initiateSyncJob(
     createdAt: now,
     updatedAt: now,
     errors: [],
+    telemetry: jobTelemetry,
   };
 
   // 6. Store job status and active job marker
@@ -216,6 +251,7 @@ export async function initiateSyncJob(
       provider: sub.provider as 'YOUTUBE' | 'SPOTIFY',
       providerChannelId: sub.providerChannelId,
       enqueuedAt: now,
+      meta: jobTelemetry,
     }));
 
     // Batch send messages to queue
@@ -226,18 +262,31 @@ export async function initiateSyncJob(
     );
 
     syncLogger.info('Sync job initiated', {
+      operation: 'subscriptions.syncAllAsync',
+      event: 'subscriptions.sync.queued',
+      status: 'ok',
       jobId,
       userId,
       total: syncableSubs.length,
       youtube: syncableSubs.filter((s) => s.provider === 'YOUTUBE').length,
       spotify: syncableSubs.filter((s) => s.provider === 'SPOTIFY').length,
+      traceId: jobTelemetry.traceId,
+      requestId: jobTelemetry.requestId,
+      clientRequestId: jobTelemetry.clientRequestId,
+      release: jobTelemetry.release,
     });
   } else {
     // Fallback: Queue not available, process synchronously
     // This allows the feature to work in development without queue setup
     syncLogger.warn('Queue not available, falling back to synchronous processing', {
+      operation: 'subscriptions.syncAllAsync',
+      event: 'subscriptions.sync.fallback',
       jobId,
       userId,
+      traceId: jobTelemetry.traceId,
+      requestId: jobTelemetry.requestId,
+      clientRequestId: jobTelemetry.clientRequestId,
+      release: jobTelemetry.release,
     });
 
     // Process subscriptions synchronously
@@ -248,7 +297,8 @@ export async function initiateSyncJob(
       connections as ProviderConnection[],
       db,
       env,
-      kv
+      kv,
+      jobTelemetry
     );
   }
 
@@ -256,6 +306,7 @@ export async function initiateSyncJob(
     jobId,
     total: syncableSubs.length,
     existing: false,
+    telemetry: jobTelemetry,
   };
 }
 
@@ -305,6 +356,7 @@ export async function getSyncStatus(jobId: string, kv: KVNamespace): Promise<Syn
     itemsFound: status.itemsFound,
     progress,
     errors: status.errors,
+    ...(status.telemetry ? { telemetry: status.telemetry } : {}),
   };
 }
 
@@ -341,6 +393,7 @@ export async function getActiveSyncJob(
       completed: status.completed,
       status: status.status,
     },
+    ...(status.telemetry ? { telemetry: status.telemetry } : {}),
   };
 }
 
@@ -403,6 +456,9 @@ export async function updateJobProgress(
     completed: status.completed,
     total: status.total,
     status: status.status,
+    traceId: status.telemetry?.traceId,
+    requestId: status.telemetry?.requestId,
+    clientRequestId: status.telemetry?.clientRequestId,
   });
 }
 
@@ -424,7 +480,8 @@ async function processSyncFallback(
   connections: ProviderConnection[],
   db: Database,
   env: Bindings,
-  kv: KVNamespace
+  kv: KVNamespace,
+  telemetry: SyncJobTelemetry
 ): Promise<void> {
   // Dynamic imports to avoid loading googleapis at module initialization
   const [
@@ -477,13 +534,28 @@ async function processSyncFallback(
         }
 
         syncLogger.info('YouTube sync fallback completed', {
+          operation: 'subscriptions.syncAllAsync',
+          event: 'subscriptions.sync.fallback.completed',
           jobId,
           processed: result.processed,
           newItems: result.newItems,
           errors: result.errors?.length ?? 0,
+          traceId: telemetry.traceId,
+          requestId: telemetry.requestId,
+          clientRequestId: telemetry.clientRequestId,
+          release: telemetry.release,
         });
       } catch (error) {
-        syncLogger.error('YouTube sync fallback failed', { jobId, error });
+        syncLogger.error('YouTube sync fallback failed', {
+          operation: 'subscriptions.syncAllAsync',
+          event: 'subscriptions.sync.fallback.failed',
+          jobId,
+          error,
+          traceId: telemetry.traceId,
+          requestId: telemetry.requestId,
+          clientRequestId: telemetry.clientRequestId,
+          release: telemetry.release,
+        });
         totalFailed += youtubeSubs.length;
         errors.push({
           subscriptionId: 'youtube-all',
@@ -520,13 +592,28 @@ async function processSyncFallback(
         }
 
         syncLogger.info('Spotify sync fallback completed', {
+          operation: 'subscriptions.syncAllAsync',
+          event: 'subscriptions.sync.fallback.completed',
           jobId,
           processed: result.processed,
           newItems: result.newItems,
           errors: result.errors?.length ?? 0,
+          traceId: telemetry.traceId,
+          requestId: telemetry.requestId,
+          clientRequestId: telemetry.clientRequestId,
+          release: telemetry.release,
         });
       } catch (error) {
-        syncLogger.error('Spotify sync fallback failed', { jobId, error });
+        syncLogger.error('Spotify sync fallback failed', {
+          operation: 'subscriptions.syncAllAsync',
+          event: 'subscriptions.sync.fallback.failed',
+          jobId,
+          error,
+          traceId: telemetry.traceId,
+          requestId: telemetry.requestId,
+          clientRequestId: telemetry.clientRequestId,
+          release: telemetry.release,
+        });
         totalFailed += spotifySubs.length;
         errors.push({
           subscriptionId: 'spotify-all',
@@ -549,6 +636,7 @@ async function processSyncFallback(
     createdAt: Date.now(),
     updatedAt: Date.now(),
     errors,
+    telemetry,
   };
 
   await kv.put(getJobStatusKey(jobId), JSON.stringify(finalStatus), {
@@ -559,12 +647,19 @@ async function processSyncFallback(
   await kv.delete(getActiveJobKey(userId));
 
   syncLogger.info('Sync fallback completed', {
+    operation: 'subscriptions.syncAllAsync',
+    event: 'subscriptions.sync.fallback.completed',
+    status: totalFailed > 0 ? 'error' : 'ok',
     jobId,
     userId,
     total: subs.length,
     succeeded: totalSucceeded,
     failed: totalFailed,
     itemsFound: totalItems,
+    traceId: telemetry.traceId,
+    requestId: telemetry.requestId,
+    clientRequestId: telemetry.clientRequestId,
+    release: telemetry.release,
   });
 }
 

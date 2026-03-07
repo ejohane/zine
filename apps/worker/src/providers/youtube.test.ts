@@ -623,7 +623,15 @@ describe('fetchVideoDetails', () => {
     const result = await fetchVideoDetails(client, ['video123']);
 
     expect(result.size).toBe(0);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to fetch video details:', expect.any(Error));
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(consoleSpy.mock.calls[0]?.[0])) as {
+      msg: string;
+      module: string;
+      error: { message: string };
+    };
+    expect(payload.msg).toBe('Failed to fetch video details');
+    expect(payload.module).toBe('provider:youtube');
+    expect(payload.error.message).toBe('API error');
     consoleSpy.mockRestore();
   });
 
@@ -733,10 +741,17 @@ describe('fetchVideoDetailsBatched', () => {
     // Should have results from successful chunk only
     expect(result.size).toBe(1);
     expect(result.get('video0')).toBeDefined();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to fetch video details chunk:',
-      expect.any(Error)
-    );
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(String(consoleSpy.mock.calls[0]?.[0])) as {
+      msg: string;
+      module: string;
+      chunkSize: number;
+      error: { message: string };
+    };
+    expect(payload.msg).toBe('Failed to fetch video details chunk');
+    expect(payload.module).toBe('provider:youtube');
+    expect(payload.chunkSize).toBe(50);
+    expect(payload.error.message).toBe('API Error');
     consoleSpy.mockRestore();
   });
 

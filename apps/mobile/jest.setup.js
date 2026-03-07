@@ -44,6 +44,7 @@ jest.mock('react-native', () => ({
     OS: 'ios',
     select: jest.fn((obj) => obj.ios ?? obj.default),
   },
+  Text: 'Text',
   StyleSheet: {
     create: jest.fn((styles) => styles),
     flatten: jest.fn((style) => style),

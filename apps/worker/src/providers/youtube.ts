@@ -15,9 +15,12 @@ import type { ProviderConnection } from '../lib/token-refresh';
 import { getValidAccessToken } from '../lib/token-refresh';
 import { decrypt } from '../lib/crypto';
 import { parseISO8601Duration } from '../lib/duration';
+import { logger } from '../lib/logger';
 
 // Re-export for external consumers
 export { parseISO8601Duration } from '../lib/duration';
+
+const youtubeLogger = logger.child('provider:youtube');
 
 // The OAuth2Client type comes from google.auth.OAuth2 instance
 type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
@@ -457,7 +460,7 @@ export async function fetchVideoDetails(
     return details;
   } catch (error) {
     // Log warning but don't throw - graceful degradation
-    console.warn('Failed to fetch video details:', error);
+    youtubeLogger.warn('Failed to fetch video details', { error });
     return new Map();
   }
 }
@@ -506,7 +509,10 @@ export async function fetchVideoDetailsBatched(
         try {
           return await fetchVideoDetailsChunk(client, chunk);
         } catch (error) {
-          console.warn('Failed to fetch video details chunk:', error);
+          youtubeLogger.warn('Failed to fetch video details chunk', {
+            error,
+            chunkSize: chunk.length,
+          });
           return new Map<string, VideoDetails>();
         }
       })

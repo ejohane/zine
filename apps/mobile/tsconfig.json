@@ -4,6 +4,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
+      "@zine/shared": ["../../packages/shared/src/index.ts"],
+      "@zine/shared/*": ["../../packages/shared/src/*"],
       "@zine/worker/*": ["../worker/src/*"],
       "@testing-library/react-hooks": ["./test-utils/react-hooks.ts"]
     }

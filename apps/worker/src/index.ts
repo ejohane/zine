@@ -6,9 +6,13 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger as honoLogger } from 'hono/logger';
 import { trpcServer } from '@hono/trpc-server';
-import { ZINE_VERSION } from '@zine/shared';
+import {
+  ZINE_VERSION,
+  TELEMETRY_CLIENT_REQUEST_HEADER,
+  TELEMETRY_REQUEST_HEADER,
+  TELEMETRY_TRACE_HEADER,
+} from '@zine/shared';
 import type { Bindings, Env } from './types';
 import { pollProviderSubscriptions } from './polling/scheduler';
 import { pollGmailNewsletters } from './newsletters/gmail';
@@ -17,10 +21,12 @@ import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
 import { logger } from './lib/logger';
+import { createWorkerRequestTelemetry, getWorkerRelease } from './lib/telemetry';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
 import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
+import { getDependencyHealth, getQueueHealth } from './diagnostics/health';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -34,16 +40,43 @@ const app = new Hono<Env>();
  * Adds a unique request ID to each request for tracing
  */
 app.use('*', async (c, next) => {
-  const requestId = crypto.randomUUID();
-  c.set('requestId', requestId);
-  c.header('X-Request-ID', requestId);
+  const telemetry = createWorkerRequestTelemetry(c);
+
+  c.set('requestId', telemetry.requestId);
+  c.set('traceId', telemetry.traceId);
+  c.set('clientRequestId', telemetry.clientRequestId);
+
+  c.header(TELEMETRY_REQUEST_HEADER, telemetry.requestId);
+  c.header(TELEMETRY_TRACE_HEADER, telemetry.traceId);
+  if (telemetry.clientRequestId) {
+    c.header(TELEMETRY_CLIENT_REQUEST_HEADER, telemetry.clientRequestId);
+  }
   await next();
 });
 
 /**
- * Logger middleware - logs requests to console
+ * Structured request logging middleware.
  */
-app.use('*', honoLogger());
+app.use('*', async (c, next) => {
+  const startedAt = Date.now();
+  await next();
+
+  logger.info('HTTP request completed', {
+    service: 'worker',
+    env: c.env.ENVIRONMENT || 'development',
+    operation: 'http.request',
+    event: 'http.request.completed',
+    status: c.res.status >= 500 ? 'error' : 'ok',
+    method: c.req.method,
+    path: c.req.path,
+    httpStatus: c.res.status,
+    durationMs: Date.now() - startedAt,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+    clientRequestId: c.get('clientRequestId'),
+    release: getWorkerRelease(c.env),
+  });
+});
 
 /**
  * CORS middleware - allow cross-origin requests
@@ -73,8 +106,17 @@ app.use(
       return null;
     },
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
-    exposeHeaders: ['X-Request-ID'],
+    allowHeaders: [
+      'Content-Type',
+      'Authorization',
+      TELEMETRY_TRACE_HEADER,
+      TELEMETRY_CLIENT_REQUEST_HEADER,
+    ],
+    exposeHeaders: [
+      TELEMETRY_REQUEST_HEADER,
+      TELEMETRY_TRACE_HEADER,
+      TELEMETRY_CLIENT_REQUEST_HEADER,
+    ],
     maxAge: 86400,
   })
 );
@@ -92,10 +134,43 @@ app.use(
 app.get('/health', (c) => {
   return c.json({
     status: 'ok',
+    service: 'worker',
     version: ZINE_VERSION,
     environment: c.env.ENVIRONMENT || 'development',
     timestamp: new Date().toISOString(),
     requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+    release: getWorkerRelease(c.env),
+  });
+});
+
+app.get('/health/deps', async (c) => {
+  const health = await getDependencyHealth(c.env);
+
+  return c.json({
+    ...health,
+    service: 'worker',
+    version: ZINE_VERSION,
+    environment: c.env.ENVIRONMENT || 'development',
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+    release: getWorkerRelease(c.env),
+  });
+});
+
+app.get('/health/queues', async (c) => {
+  const health = await getQueueHealth(c.env);
+
+  return c.json({
+    ...health,
+    service: 'worker',
+    version: ZINE_VERSION,
+    environment: c.env.ENVIRONMENT || 'development',
+    timestamp: new Date().toISOString(),
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+    release: getWorkerRelease(c.env),
   });
 });
 
@@ -133,6 +208,7 @@ app.notFound((c) => {
       code: 'NOT_FOUND',
       path: c.req.path,
       requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
     },
     404
   );
@@ -143,7 +219,19 @@ app.notFound((c) => {
 // ---------------------------------------------------------------------------
 
 app.onError((err, c) => {
-  logger.error('Unhandled error', { error: err, path: c.req.path });
+  logger.error('Unhandled error', {
+    error: err,
+    service: 'worker',
+    env: c.env.ENVIRONMENT || 'development',
+    operation: 'http.request',
+    event: 'http.request.failed',
+    status: 'error',
+    path: c.req.path,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+    clientRequestId: c.get('clientRequestId'),
+    release: getWorkerRelease(c.env),
+  });
 
   return c.json(
     {
@@ -151,6 +239,7 @@ app.onError((err, c) => {
       code: 'INTERNAL_ERROR',
       message: c.env.ENVIRONMENT === 'development' ? err.message : undefined,
       requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
     },
     500
   );
@@ -237,3 +326,5 @@ export default {
     }
   },
 };
+
+export { app };

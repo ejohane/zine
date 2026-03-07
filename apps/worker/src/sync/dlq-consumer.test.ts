@@ -12,8 +12,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleSyncDLQ, getDLQEntries, getDLQSummary, deleteDLQEntry } from './dlq-consumer';
-import type { SyncQueueMessage } from './types';
-import { getDLQEntryKey, getDLQIndexKey } from './types';
+import type { SyncQueueMessage, SyncJobStatus } from './types';
+import { getActiveJobKey, getDLQEntryKey, getDLQIndexKey, getJobStatusKey } from './types';
 import { expectLoggerErrorCalls, mockLogger } from '../test/mock-logger';
 
 // ============================================================================
@@ -362,6 +362,57 @@ describe('handleSyncDLQ', () => {
       deadLetteredAt: expect.any(Number),
     });
     expectHandleSyncDLQErrorLogs(batch);
+  });
+
+  it('should mark the sync job as failed when a message reaches DLQ', async () => {
+    const jobStatus: SyncJobStatus = {
+      jobId: TEST_JOB_ID,
+      userId: TEST_USER_ID,
+      total: 1,
+      completed: 0,
+      succeeded: 0,
+      failed: 0,
+      itemsFound: 0,
+      status: 'pending',
+      createdAt: MOCK_NOW,
+      updatedAt: MOCK_NOW,
+      errors: [],
+    };
+    const kv = createMockKV({
+      [getJobStatusKey(TEST_JOB_ID)]: JSON.stringify(jobStatus),
+      [getActiveJobKey(TEST_USER_ID)]: TEST_JOB_ID,
+    });
+    const message = createMockMessage({
+      jobId: TEST_JOB_ID,
+      userId: TEST_USER_ID,
+      subscriptionId: 'sub_1',
+      provider: 'YOUTUBE',
+      providerChannelId: 'UC123',
+      enqueuedAt: MOCK_NOW,
+      meta: {
+        traceId: 'trc_dlq_test',
+        requestId: 'req_dlq_test',
+        source: 'subscriptions.syncAllAsync',
+        enqueuedAt: MOCK_NOW,
+      },
+    });
+
+    const batch = createMockDLQBatch([message]);
+    const env = createMockEnv(kv);
+
+    await handleSyncDLQ(batch, env as never);
+
+    const updatedStatus = JSON.parse(
+      kv.store.get(getJobStatusKey(TEST_JOB_ID))?.value ?? 'null'
+    ) as SyncJobStatus | null;
+
+    expect(updatedStatus).toMatchObject({
+      completed: 1,
+      failed: 1,
+      status: 'completed',
+      errors: [{ subscriptionId: 'sub_1', error: 'Moved to DLQ after 3 attempts' }],
+    });
+    expect(kv.delete).toHaveBeenCalledWith(getActiveJobKey(TEST_USER_ID));
   });
 });
 

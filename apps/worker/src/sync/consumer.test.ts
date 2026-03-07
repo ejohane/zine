@@ -530,17 +530,9 @@ describe('handleSyncQueue', () => {
 
       await handleSyncQueue(batch, env as never);
 
-      expect(mockUpdateJobProgress).toHaveBeenCalledWith(
-        TEST_JOB_ID,
-        'sub_1',
-        false,
-        0,
-        'API quota exceeded',
-        expect.anything()
-      );
-
-      // Should ack to prevent infinite retries
-      expect(message.ack).toHaveBeenCalled();
+      expect(mockUpdateJobProgress).not.toHaveBeenCalled();
+      expect(message.retry).toHaveBeenCalled();
+      expect(message.ack).not.toHaveBeenCalled();
     });
   });
 
@@ -677,16 +669,9 @@ describe('handleSyncQueue', () => {
 
       await handleSyncQueue(batch, env as never);
 
-      expect(mockUpdateJobProgress).toHaveBeenCalledWith(
-        TEST_JOB_ID,
-        'sub_1',
-        false,
-        0,
-        'Token expired',
-        expect.anything()
-      );
-
-      expect(message.ack).toHaveBeenCalled();
+      expect(mockUpdateJobProgress).not.toHaveBeenCalled();
+      expect(message.retry).toHaveBeenCalled();
+      expect(message.ack).not.toHaveBeenCalled();
     });
   });
 
@@ -811,18 +796,10 @@ describe('handleSyncQueue', () => {
       );
 
       // sub_2 should be marked as failure
-      expect(mockUpdateJobProgress).toHaveBeenCalledWith(
-        TEST_JOB_ID,
-        'sub_2',
-        false,
-        0,
-        'Channel not found',
-        expect.anything()
-      );
-
-      // Both should be acked
+      expect(mockUpdateJobProgress).toHaveBeenCalledTimes(1);
       expect(message1.ack).toHaveBeenCalled();
-      expect(message2.ack).toHaveBeenCalled();
+      expect(message2.retry).toHaveBeenCalled();
+      expect(message2.ack).not.toHaveBeenCalled();
     });
   });
 
@@ -859,18 +836,9 @@ describe('handleSyncQueue', () => {
 
       await handleSyncQueue(batch, env as never);
 
-      // Should mark as failed
-      expect(mockUpdateJobProgress).toHaveBeenCalledWith(
-        TEST_JOB_ID,
-        'sub_1',
-        false,
-        0,
-        'Token refresh failed',
-        expect.anything()
-      );
-
-      // Should ack to prevent infinite retries
-      expect(message.ack).toHaveBeenCalled();
+      expect(mockUpdateJobProgress).not.toHaveBeenCalled();
+      expect(message.retry).toHaveBeenCalled();
+      expect(message.ack).not.toHaveBeenCalled();
     });
   });
 });

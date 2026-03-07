@@ -18,6 +18,7 @@ import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
 import { trpcLogger } from '@/lib/logger';
+import { buildMobileTelemetryHeaders, telemetryFetch } from '@/lib/trpc-transport';
 import { DEFAULT_QUERY_OPTIONS } from '@/constants/query';
 import {
   buildQueryPersistenceBuster,
@@ -183,18 +184,20 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
       links: [
         httpBatchLink({
           url,
+          methodOverride: 'POST',
           transformer: superjson, // Required for Date serialization - must match server
           headers: async () => {
             try {
               const token = await getTokenRef.current();
               if (token) {
-                return { Authorization: `Bearer ${token}` };
+                return buildMobileTelemetryHeaders({ Authorization: `Bearer ${token}` });
               }
             } catch (error) {
               trpcLogger.warn('Failed to get auth token', { error });
             }
-            return {};
+            return buildMobileTelemetryHeaders({});
           },
+          fetch: telemetryFetch,
         }),
       ],
     });

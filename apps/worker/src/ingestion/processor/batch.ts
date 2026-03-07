@@ -1,6 +1,7 @@
 import type { Provider } from '@zine/shared';
 
 import type { Database } from '../../db';
+import { ingestionLogger } from '../../lib/logger';
 import type { NewItem } from '../transformers';
 import { serializeError } from '../../utils/error-utils';
 import { storeToDLQ } from './dlq';
@@ -254,7 +255,7 @@ export async function ingestBatchConsolidated<T>(
   result.durationMs = Date.now() - startTime;
 
   // Log metrics
-  console.log('Consolidated batch ingestion completed', {
+  ingestionLogger.info('Consolidated batch ingestion completed', {
     totalItems: result.total,
     created: result.created,
     skipped: result.skipped,
@@ -289,7 +290,7 @@ async function executeChunkBatch(
 
     return true;
   } catch (error) {
-    console.error('Batch chunk failed, will fallback to individual inserts', {
+    ingestionLogger.error('Batch chunk failed, will fallback to individual inserts', {
       chunkSize: itemChunk.length,
       error: serializeError(error),
     });
@@ -317,7 +318,7 @@ async function executeIndividualInsert(
     await executeBatchStatements(statements, db);
     return true;
   } catch (error) {
-    console.error('Individual insert failed', {
+    ingestionLogger.error('Individual insert failed', {
       providerId: prepared.providerId,
       error: serializeError(error),
     });

@@ -669,13 +669,26 @@ export const subscriptionsRouter = router({
    */
   syncAllAsync: protectedProcedure.mutation(async ({ ctx }) => {
     try {
-      const result = await initiateSyncJob(ctx.userId, ctx.db, ctx.env as Bindings);
+      const result = await initiateSyncJob(ctx.userId, ctx.db, ctx.env as Bindings, {
+        traceId: ctx.traceId,
+        requestId: ctx.requestId,
+        clientRequestId: ctx.clientRequestId,
+        source: 'subscriptions.syncAllAsync',
+        release: ctx.release,
+      });
 
       logger.info('syncAllAsync: job initiated', {
+        operation: 'subscriptions.syncAllAsync',
+        event: 'subscriptions.sync.accepted',
+        status: 'ok',
         userId: ctx.userId,
         jobId: result.jobId,
         total: result.total,
         existing: result.existing,
+        traceId: ctx.traceId,
+        requestId: ctx.requestId,
+        clientRequestId: ctx.clientRequestId,
+        release: ctx.release,
       });
 
       return result;
