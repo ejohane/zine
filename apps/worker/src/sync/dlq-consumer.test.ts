@@ -413,6 +413,7 @@ describe('handleSyncDLQ', () => {
       errors: [{ subscriptionId: 'sub_1', error: 'Moved to DLQ after 3 attempts' }],
     });
     expect(kv.delete).toHaveBeenCalledWith(getActiveJobKey(TEST_USER_ID));
+    expectHandleSyncDLQErrorLogs(batch);
   });
 });
 

@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { classifyError, ValidationError } from './processor';
 import { TransformError } from './transformers';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Mock Date.now for consistent testing
@@ -437,6 +438,18 @@ describe('ingestBatchConsolidated', () => {
       expect(result.fallbackCount).toBe(2);
       // 1 failed batch + 2 individual fallbacks
       expect(mockBatch).toHaveBeenCalledTimes(3);
+      expectLoggerErrorCalls([
+        [
+          'Batch chunk failed, will fallback to individual inserts',
+          expect.objectContaining({
+            chunkSize: 2,
+            error: expect.objectContaining({
+              message: 'Batch failed',
+              type: 'Error',
+            }),
+          }),
+        ],
+      ]);
     });
 
     it('should track errors when individual fallback also fails', async () => {
@@ -460,6 +473,28 @@ describe('ingestBatchConsolidated', () => {
       expect(result.errors).toBe(1);
       expect(result.errorDetails).toHaveLength(1);
       expect(result.errorDetails[0].providerId).toBe('ep1');
+      expectLoggerErrorCalls([
+        [
+          'Batch chunk failed, will fallback to individual inserts',
+          expect.objectContaining({
+            chunkSize: 1,
+            error: expect.objectContaining({
+              message: 'Batch failed',
+              type: 'Error',
+            }),
+          }),
+        ],
+        [
+          'Individual insert failed',
+          expect.objectContaining({
+            providerId: 'ep1',
+            error: expect.objectContaining({
+              message: 'Individual failed',
+              type: 'Error',
+            }),
+          }),
+        ],
+      ]);
     });
   });
 
