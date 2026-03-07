@@ -12,6 +12,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react-hooks';
+import { Provider } from '@zine/shared';
 
 // ============================================================================
 // Module-level Mocks
@@ -241,7 +242,7 @@ describe('useSubscriptions', () => {
       const { result } = renderHook(() => useSubscriptions());
 
       const payload: SubscribePayload = {
-        provider: 'YOUTUBE',
+        provider: Provider.YOUTUBE,
         providerChannelId: 'UC456',
         name: 'New Channel',
         imageUrl: 'https://example.com/new.jpg',
@@ -270,7 +271,7 @@ describe('useSubscriptions', () => {
       const { result } = renderHook(() => useSubscriptions());
 
       const payload: SubscribePayload = {
-        provider: 'SPOTIFY',
+        provider: Provider.SPOTIFY,
         providerChannelId: 'show-123',
         name: 'New Show',
       };
@@ -299,7 +300,7 @@ describe('useSubscriptions', () => {
       const { result } = renderHook(() => useSubscriptions());
 
       const payload: SubscribePayload = {
-        provider: 'YOUTUBE',
+        provider: Provider.YOUTUBE,
         providerChannelId: 'UC789',
         name: 'Test Channel',
         imageUrl: 'https://example.com/thumb.jpg',
@@ -326,7 +327,7 @@ describe('useSubscriptions', () => {
       const { result } = renderHook(() => useSubscriptions());
 
       const payload: SubscribePayload = {
-        provider: 'YOUTUBE',
+        provider: Provider.YOUTUBE,
         providerChannelId: 'UC123',
         name: 'First Subscription',
       };
@@ -456,7 +457,7 @@ describe('createTempSubscription', () => {
 
     act(() => {
       result.current.subscribe({
-        provider: 'YOUTUBE',
+        provider: Provider.YOUTUBE,
         providerChannelId: 'UC123',
         name: 'Test',
       });
@@ -473,7 +474,7 @@ describe('createTempSubscription', () => {
 
     act(() => {
       result.current.subscribe({
-        provider: 'SPOTIFY',
+        provider: Provider.SPOTIFY,
         providerChannelId: 'show-456',
         name: 'Test Show',
       });
@@ -490,7 +491,7 @@ describe('createTempSubscription', () => {
 
     act(() => {
       result.current.subscribe({
-        provider: 'YOUTUBE',
+        provider: Provider.YOUTUBE,
         providerChannelId: 'UC789',
         name: 'No Image Channel',
         // No imageUrl provided

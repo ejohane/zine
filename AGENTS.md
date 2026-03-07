@@ -3,7 +3,8 @@
 ## Core Setup
 
 - This repository is a monorepo using Turborepo.
-- The package manager is Bun (`bun@1.1.38`).
+- The package manager is Bun (`bun@1.3.4`).
+- Repo installs use a hoisted linker via `bunfig.toml`.
 - Node version is pinned to `22` in `.nvmrc`.
 - Workspace layout:
   - `apps/mobile`: Expo React Native app

@@ -51,8 +51,9 @@ You can start developing by editing the files inside the **app** directory. This
 ## Expo doctor notes (SDK 55)
 
 - Run `npx expo-doctor` from `apps/mobile` for local diagnostics.
-- We disable unknown-package warnings via `package.json > expo.doctor.reactNativeDirectoryCheck` because `@solana-mobile/mobile-wallet-adapter-protocol` has no RN Directory metadata yet.
-- With Bun workspaces, `expo-doctor` may still report duplicate native module installs from `.bun` store linking even when dependency versions are aligned and builds/tests pass.
+- The repo pins Bun `1.3.4` and uses a hoisted linker via [`bunfig.toml`](/Users/erikjohansson/.codex/worktrees/97ca/zine/bunfig.toml) so Expo dependency resolution stays deduplicated under Bun workspaces.
+- We exclude `react` and `react-dom` from `expo.install` validation in [`package.json`](/Users/erikjohansson/.codex/worktrees/97ca/zine/apps/mobile/package.json) because Expo SDK 55 still recommends `19.2.0`, while Bun + Clerk require a newer `19.2.x` patch to avoid nested React installs that fail `expo-doctor`.
+- We keep `expo.doctor.reactNativeDirectoryCheck.listUnknownPackages=false` because React Native Directory metadata remains noisy for some Expo and Storybook-adjacent packages used in this app.
 
 ## Learn more
 

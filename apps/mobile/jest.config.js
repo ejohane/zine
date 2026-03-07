@@ -37,6 +37,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
     '^@zine/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     '^@zine/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
+    '^@testing-library/react-hooks$': '<rootDir>/test-utils/react-hooks.ts',
   },
   collectCoverageFrom: [
     'lib/**/*.{ts,tsx}',
