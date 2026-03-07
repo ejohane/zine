@@ -869,6 +869,36 @@ function containsPattern(pattern: RegExp, ...values: Array<string | null | undef
   return values.some((value) => !!value && pattern.test(value));
 }
 
+function isStratecheryAllowlisted(params: {
+  listId?: string | null;
+  unsubscribeMailto?: string | null;
+  unsubscribeUrl?: string | null;
+  fromAddress?: string | null;
+  displayName?: string | null;
+  subject?: string | null;
+}): boolean {
+  const fromAddress = params.fromAddress?.trim().toLowerCase() ?? '';
+  const displayName = params.displayName?.trim().toLowerCase() ?? '';
+  const subject = params.subject?.trim().toLowerCase() ?? '';
+
+  if (fromAddress === 'email@stratechery.com') {
+    return true;
+  }
+
+  if (
+    containsPattern(
+      /\bstratechery\b/i,
+      params.listId,
+      params.unsubscribeMailto,
+      params.unsubscribeUrl
+    )
+  ) {
+    return true;
+  }
+
+  return displayName.includes('ben thompson') && subject.includes('stratechery');
+}
+
 export function isLikelyNewsletterFeedIdentity(params: {
   listId: string | null;
   unsubscribeMailto: string | null;
@@ -878,6 +908,7 @@ export function isLikelyNewsletterFeedIdentity(params: {
 }): boolean {
   const hasListId = !!params.listId;
   const hasListUnsubscribe = !!params.unsubscribeMailto || !!params.unsubscribeUrl;
+  const isAllowlisted = isStratecheryAllowlisted(params);
   const hasNewsletterKeywords = containsPattern(
     NEWSLETTER_KEYWORD_PATTERN,
     params.fromAddress,
@@ -902,17 +933,15 @@ export function isLikelyNewsletterFeedIdentity(params: {
     return false;
   }
 
+  if (isAllowlisted) {
+    return true;
+  }
+
   if (!hasListId && !hasListUnsubscribe && !hasPlatformSignal) {
     return false;
   }
 
-  // Structural headers alone are too noisy (e.g., transactional brands like Uber/GitHub).
-  // Require at least one semantic newsletter signal for feed-level visibility.
-  if (!hasSemanticNewsletterSignal) {
-    return false;
-  }
-
-  return hasListId || hasListUnsubscribe || hasSemanticNewsletterSignal;
+  return hasSemanticNewsletterSignal;
 }
 
 export function computeNewsletterScore(params: {
@@ -929,6 +958,14 @@ export function computeNewsletterScore(params: {
   const hasListUnsubscribe =
     !!params.listUnsubscribe || !!params.unsubscribeMailto || !!params.unsubscribeUrl;
   const hasOneClick = params.unsubscribePostHeader?.toLowerCase().includes('one-click') ?? false;
+  const isAllowlisted = isStratecheryAllowlisted({
+    listId: params.listId,
+    unsubscribeMailto: params.unsubscribeMailto,
+    unsubscribeUrl: params.unsubscribeUrl,
+    fromAddress: params.fromAddress,
+    displayName: params.fromDisplayName,
+    subject: params.subject,
+  });
   const hasNewsletterKeywords = containsPattern(
     NEWSLETTER_KEYWORD_PATTERN,
     params.subject,
@@ -1002,17 +1039,10 @@ export function computeNewsletterScore(params: {
     (isTransactionalSender || isTransactionalSubject) &&
     !hasNewsletterKeywords &&
     !hasPlatformSignal;
-  const identityReject = !isLikelyNewsletterFeedIdentity({
-    listId: params.listId,
-    unsubscribeMailto: params.unsubscribeMailto,
-    unsubscribeUrl: params.unsubscribeUrl,
-    fromAddress: params.fromAddress,
-    displayName: params.fromDisplayName,
-  });
 
   return {
-    isNewsletter: clamped >= NEWSLETTER_SCORE_THRESHOLD && !transactionalReject && !identityReject,
-    score: clamped,
+    isNewsletter: (clamped >= NEWSLETTER_SCORE_THRESHOLD && !transactionalReject) || isAllowlisted,
+    score: isAllowlisted ? Math.max(clamped, NEWSLETTER_SCORE_THRESHOLD) : clamped,
   };
 }
 

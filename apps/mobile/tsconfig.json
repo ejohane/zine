@@ -4,7 +4,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
-      "@zine/worker/*": ["../worker/src/*"]
+      "@zine/worker/*": ["../worker/src/*"],
+      "@testing-library/react-hooks": ["./test-utils/react-hooks.ts"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]

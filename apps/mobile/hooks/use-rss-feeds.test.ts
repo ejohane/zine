@@ -163,7 +163,10 @@ describe('useRssFeeds', () => {
 
     const { result } = renderHook(() => useRssFeeds());
 
-    expect(result.current.feeds.map((feed) => feed.id)).toEqual(['feed-active', 'feed-paused']);
+    expect(result.current.feeds.map((feed: { id: string }) => feed.id)).toEqual([
+      'feed-active',
+      'feed-paused',
+    ]);
   });
 
   it('invalidates list and stats on add success', () => {
