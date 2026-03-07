@@ -91,6 +91,31 @@ To enable iOS simulator interaction, add this to your MCP configuration:
 - **Styling**: TailwindCSS via uniwind
 - **Bundle ID**: `app.zine.mobile`
 
+## Design System Rules
+
+Before editing shared UI in `apps/mobile/components`, read:
+
+- `docs/mobile/design-system/principles.md`
+- `docs/mobile/design-system/foundations.md`
+- `docs/mobile/design-system/components.md`
+- `docs/mobile/design-system/story-map.md`
+
+Non-negotiable rules for shared mobile UI:
+
+- Use `useAppTheme()` and semantic theme tokens for shared components.
+- Prefer `@/components/primitives` (`Badge`, `Button`, `IconButton`, `Surface`, `Text`) before writing new shared press, text, or container styles.
+- Prefer canonical components before adding a new shared variant or surface.
+- Do not add new raw hex/rgb colors in tracked shared components unless the line or the line above it includes `design-system-exception:` with a short reason.
+- Do not add ad hoc `fontSize`, `lineHeight`, or `letterSpacing` values in tracked shared components unless the line or the line above it includes `design-system-exception:` with a short reason.
+- Do not add new imports from legacy UI paths: `components/home/*`, `components/themed-*`, `components/ui/*`.
+- New canonical shared components must ship with Storybook coverage and update the design-system docs when scope changes.
+
+Validation command:
+
+```bash
+bun run design-system:check
+```
+
 ## Development Workflows
 
 ### Expo Go Only (Critical Constraint)
@@ -118,6 +143,7 @@ Then open Expo Go on the simulator and scan the QR code or enter the URL.
 ```bash
 bun run test          # Run unit tests
 bun run lint          # Run ESLint
+bun run design-system:check
 ```
 
 ## Project Structure

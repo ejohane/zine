@@ -17,11 +17,19 @@
  */
 
 import { Image } from 'expo-image';
-import { View, Text, StyleSheet, Linking, type ViewStyle } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Linking,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Badge, Text } from '@/components/primitives';
+import { Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatDuration } from '@/lib/format';
 import {
   getContentIcon,
@@ -103,8 +111,8 @@ function LinkedText({
   numberOfLines,
 }: {
   text: string;
-  style: object;
-  linkStyle: object;
+  style: StyleProp<TextStyle>;
+  linkStyle: StyleProp<TextStyle>;
   numberOfLines?: number;
 }) {
   const parts = parseTextWithLinks(text);
@@ -141,42 +149,38 @@ function LinkedText({
 // ============================================================================
 
 function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
 
   return (
     <Animated.View
-      style={[styles.container, { backgroundColor: colors.card }, Shadows.md, style]}
+      style={[styles.container, { backgroundColor: colors.surfaceElevated }, Shadows.md, style]}
       accessible={true}
       accessibilityLabel="Loading preview"
     >
       {/* Skeleton Thumbnail */}
-      <View style={[styles.thumbnailContainer, { backgroundColor: colors.backgroundTertiary }]} />
+      <View style={[styles.thumbnailContainer, { backgroundColor: colors.surfaceRaised }]} />
 
       {/* Skeleton Content */}
       <View style={styles.content}>
         {/* Skeleton Meta Row - at top */}
         <View style={styles.metaRow}>
-          <View style={[styles.skeletonAvatar, { backgroundColor: colors.backgroundTertiary }]} />
+          <View style={[styles.skeletonAvatar, { backgroundColor: colors.surfaceRaised }]} />
           <View
             style={[
               styles.skeletonLine,
-              { backgroundColor: colors.backgroundTertiary, width: 120, marginBottom: 0 },
+              { backgroundColor: colors.surfaceRaised, width: 120, marginBottom: 0 },
             ]}
           />
         </View>
 
         {/* Skeleton Tweet text - two lines */}
         <View
-          style={[
-            styles.skeletonLine,
-            { backgroundColor: colors.backgroundTertiary, width: '90%' },
-          ]}
+          style={[styles.skeletonLine, { backgroundColor: colors.surfaceRaised, width: '90%' }]}
         />
         <View
           style={[
             styles.skeletonLine,
-            { backgroundColor: colors.backgroundTertiary, width: '60%', marginBottom: 0 },
+            { backgroundColor: colors.surfaceRaised, width: '60%', marginBottom: 0 },
           ]}
         />
       </View>
@@ -189,8 +193,8 @@ function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
 // ============================================================================
 
 export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, motion } = useAppTheme();
+  const mediaTransition = motion.duration.normal;
 
   // Show skeleton when loading
   if (isLoading || !preview) {
@@ -230,7 +234,7 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
 
   return (
     <Animated.View
-      style={[styles.container, { backgroundColor: colors.card }, Shadows.md, style]}
+      style={[styles.container, { backgroundColor: colors.surfaceElevated }, Shadows.md, style]}
       accessible={true}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
@@ -242,42 +246,41 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
             source={{ uri: preview.thumbnailUrl }}
             style={styles.thumbnail}
             contentFit="cover"
-            transition={200}
+            transition={mediaTransition}
           />
         ) : (
-          <View
-            style={[styles.thumbnailPlaceholder, { backgroundColor: colors.backgroundTertiary }]}
-          >
+          <View style={[styles.thumbnailPlaceholder, { backgroundColor: colors.surfaceRaised }]}>
             {getContentIcon(preview.contentType, 48, colors.textTertiary)}
           </View>
         )}
 
         {/* Content type badge - top left */}
-        <View style={[styles.typeBadge, { backgroundColor: contentColor }]}>
-          {getContentIcon(preview.contentType, 12, '#fff')}
-          <Text style={styles.typeBadgeText}>{contentTypeLabel}</Text>
-        </View>
+        <Badge
+          label={contentTypeLabel}
+          backgroundColor={contentColor}
+          textTone="overlay"
+          leadingAccessory={getContentIcon(preview.contentType, 12, colors.overlayForeground)}
+          style={styles.typeBadge}
+        />
 
         {/* Duration badge - bottom right (for video/podcast) */}
-        {showDuration && (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{durationText}</Text>
-          </View>
-        )}
+        {showDuration && durationText ? (
+          <Badge label={durationText} tone="overlay" style={styles.durationBadge} />
+        ) : null}
 
         {/* Reading time badge - bottom right (for articles) */}
-        {showReadingTime && (
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>{readingTimeText}</Text>
-          </View>
-        )}
+        {showReadingTime && readingTimeText ? (
+          <Badge label={readingTimeText} tone="overlay" style={styles.durationBadge} />
+        ) : null}
 
         {/* Connected badge - top right (for provider_api sources) */}
         {isConnected && (
-          <View style={[styles.connectedBadge, { backgroundColor: colors.success }]}>
-            <CheckIcon size={10} color="#fff" />
-            <Text style={styles.connectedText}>Connected</Text>
-          </View>
+          <Badge
+            label="Connected"
+            tone="success"
+            leadingAccessory={<CheckIcon size={10} color={colors.overlayForeground} />}
+            style={styles.connectedBadge}
+          />
         )}
       </View>
 
@@ -290,12 +293,12 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
               source={{ uri: preview.creatorImageUrl }}
               style={styles.creatorAvatar}
               contentFit="cover"
-              transition={200}
+              transition={mediaTransition}
             />
           ) : (
             <View style={[styles.providerDot, { backgroundColor: providerColor }]} />
           )}
-          <Text style={[styles.creator, { color: colors.text }]} numberOfLines={1}>
+          <Text style={styles.creator} tone="primary" numberOfLines={1}>
             {preview.creator}
           </Text>
         </View>
@@ -303,7 +306,7 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
         {/* Title/Tweet text - below creator, smaller */}
         <LinkedText
           text={preview.title}
-          style={[styles.tweetText, { color: '#fff' }]}
+          style={[styles.tweetText, { color: colors.textPrimary }]}
           linkStyle={{ color: colors.textTertiary }}
           numberOfLines={3}
         />
@@ -344,18 +347,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.sm,
     left: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-    gap: Spacing.xs,
-  },
-  typeBadgeText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
   },
 
   // Duration badge
@@ -363,16 +354,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: Spacing.sm,
     right: Spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-  },
-  durationText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
   },
 
   // Connected badge
@@ -380,18 +361,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.sm,
     right: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-    gap: Spacing.xs,
-  },
-  connectedText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
   },
 
   // Content section
@@ -405,7 +374,6 @@ const styles = StyleSheet.create({
   },
   tweetText: {
     ...Typography.bodyMedium,
-    lineHeight: 20,
   },
   providerDot: {
     width: 6,
@@ -422,9 +390,6 @@ const styles = StyleSheet.create({
   creator: {
     ...Typography.bodyMedium,
     flex: 1,
-  },
-  providerLabel: {
-    ...Typography.bodySmall,
   },
 
   // Skeleton styles

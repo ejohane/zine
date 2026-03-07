@@ -5,9 +5,10 @@
  * throughout the app.
  */
 
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { ContentColors, ProviderColors, Typography, Spacing, Radius } from '@/constants/theme';
+import { Badge } from '@/components/primitives';
 
 // =============================================================================
 // Types
@@ -32,9 +33,9 @@ function getProviderConfig(provider: string): { color: string; label: string } {
     SUBSTACK: { color: ProviderColors.substack, label: 'Substack' },
     X: { color: ProviderColors.x, label: 'X' },
     TWITTER: { color: ProviderColors.x, label: 'X' },
-    WEB: { color: '#6A6A6A', label: 'Web' },
+    WEB: { color: ProviderColors.web, label: 'Web' },
   };
-  return map[provider] ?? { color: '#6A6A6A', label: 'Web' };
+  return map[provider] ?? { color: ProviderColors.web, label: 'Web' };
 }
 
 /**
@@ -49,9 +50,15 @@ function getProviderConfig(provider: string): { color: string; label: string } {
 export function SourceBadge({ provider }: SourceBadgeProps) {
   const config = getProviderConfig(provider);
   return (
-    <View style={[styles.badge, { backgroundColor: config.color }]}>
-      <Text style={styles.badgeText}>{config.label}</Text>
-    </View>
+    <Badge
+      label={config.label}
+      backgroundColor={config.color}
+      textTone="overlay"
+      shape="pill"
+      size="md"
+      style={styles.badge}
+      labelStyle={styles.badgeText}
+    />
   );
 }
 
@@ -70,7 +77,7 @@ function getTypeConfig(contentType: string): { color: string; label: string } {
     ARTICLE: { color: ContentColors.article, label: 'Article' },
     POST: { color: ContentColors.post, label: 'Post' },
   };
-  return map[contentType] ?? { color: '#6A6A6A', label: 'Content' };
+  return map[contentType] ?? { color: ProviderColors.web, label: 'Content' };
 }
 
 /**
@@ -85,9 +92,15 @@ function getTypeConfig(contentType: string): { color: string; label: string } {
 export function TypeBadge({ contentType }: TypeBadgeProps) {
   const config = getTypeConfig(contentType);
   return (
-    <View style={[styles.badge, { backgroundColor: config.color }]}>
-      <Text style={styles.badgeText}>{config.label}</Text>
-    </View>
+    <Badge
+      label={config.label}
+      backgroundColor={config.color}
+      textTone="overlay"
+      shape="pill"
+      size="md"
+      style={styles.badge}
+      labelStyle={styles.badgeText}
+    />
   );
 }
 
@@ -103,6 +116,5 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...Typography.labelMedium,
-    color: '#FFFFFF',
   },
 });

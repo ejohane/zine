@@ -10,11 +10,12 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 
 import { SourceBadge } from '@/components/badges';
-import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Button, Text } from '@/components/primitives';
+import { Typography, Spacing, Radius } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { type Creator, useCreatorSubscription } from '@/hooks/use-creator';
 import { useRssFeedDiscovery, type DiscoveredRssCandidate } from '@/hooks/use-rss-feed-discovery';
 import { analytics } from '@/lib/analytics';
@@ -140,8 +141,7 @@ export function CreatorHeader({
   sourceUrlForDiscovery,
   subscriptionStateOverride,
 }: CreatorHeaderProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
+  const { colors } = useAppTheme();
   const router = useRouter();
 
   const subscriptionState = useCreatorSubscription(creator.id);
@@ -276,14 +276,20 @@ export function CreatorHeader({
       </View>
 
       {/* Creator Name */}
-      <Text style={[styles.name, { color: colors.text }]}>{creator.name}</Text>
+      <Text style={styles.name} tone="primary">
+        {creator.name}
+      </Text>
 
       {/* Handle (e.g., @waveform) */}
-      {handle && <Text style={[styles.handle, { color: colors.textSecondary }]}>{handle}</Text>}
+      {handle ? (
+        <Text style={styles.handle} tone="secondary">
+          {handle}
+        </Text>
+      ) : null}
 
       {/* Description */}
       {creator.description && (
-        <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={4}>
+        <Text style={styles.description} tone="secondary" numberOfLines={4}>
           {creator.description}
         </Text>
       )}
@@ -293,22 +299,22 @@ export function CreatorHeader({
           style={[
             styles.subscriptionCard,
             {
-              borderColor: colors.border,
-              backgroundColor: colors.backgroundSecondary,
+              borderColor: colors.borderDefault,
+              backgroundColor: colors.surfaceSubtle,
             },
           ]}
         >
-          <Text style={[styles.subscriptionLabel, { color: colors.textTertiary }]}>
+          <Text style={styles.subscriptionLabel} tone="tertiary">
             Source subscription
           </Text>
 
           {isOAuthSubscriptionProvider && (
-            <View style={[styles.subscriptionRow, { borderColor: colors.border }]}>
+            <View style={[styles.subscriptionRow, { borderColor: colors.borderDefault }]}>
               <View style={styles.subscriptionRowCopy}>
-                <Text style={[styles.subscriptionTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text style={styles.subscriptionTitle} tone="primary" numberOfLines={1}>
                   {creator.name}
                 </Text>
-                <Text style={[styles.subscriptionSubtitle, { color: colors.textSecondary }]}>
+                <Text style={styles.subscriptionSubtitle} tone="secondary">
                   {reason === 'NOT_CONNECTED'
                     ? `Connect ${providerName} to subscribe`
                     : reason === 'SOURCE_NOT_FOUND'
@@ -316,13 +322,20 @@ export function CreatorHeader({
                       : `Follow via ${providerName}`}
                 </Text>
                 {isSubscribed ? (
-                  <Text style={[styles.subscriptionStatus, { color: colors.textTertiary }]}>
+                  <Text style={styles.subscriptionStatus} tone="tertiary">
                     Subscribed
                   </Text>
                 ) : null}
               </View>
 
-              <Pressable
+              <Button
+                label={
+                  isNotConnected
+                    ? 'Connect'
+                    : isSubscribed || isSourceMissing
+                      ? 'Manage'
+                      : 'Subscribe'
+                }
                 onPress={() => {
                   if (isNotConnected || isSourceMissing) {
                     handleManagePress();
@@ -339,6 +352,10 @@ export function CreatorHeader({
                   (isSourceMissing && !manageRoute) ||
                   (!canSubscribe && !isNotConnected && !isSourceMissing)
                 }
+                loading={isSubscribing}
+                variant={
+                  isNotConnected || isSubscribed || isSourceMissing ? 'secondary' : 'primary'
+                }
                 accessibilityRole="button"
                 accessibilityLabel={
                   isNotConnected
@@ -347,47 +364,8 @@ export function CreatorHeader({
                       ? `Manage ${providerName} subscription`
                       : `Subscribe to ${creator.name}`
                 }
-                style={({ pressed }) => [
-                  styles.subscriptionButton,
-                  {
-                    backgroundColor:
-                      isNotConnected || isSubscribed || isSourceMissing
-                        ? colors.backgroundTertiary
-                        : colors.buttonPrimary,
-                  },
-                  pressed && { opacity: 0.85 },
-                  isSubscribing && { opacity: 0.5 },
-                ]}
-              >
-                {isSubscribing ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={
-                      isNotConnected || isSubscribed || isSourceMissing
-                        ? colors.text
-                        : colors.buttonPrimaryText
-                    }
-                  />
-                ) : (
-                  <Text
-                    style={[
-                      styles.subscriptionButtonLabel,
-                      {
-                        color:
-                          isNotConnected || isSubscribed || isSourceMissing
-                            ? colors.text
-                            : colors.buttonPrimaryText,
-                      },
-                    ]}
-                  >
-                    {isNotConnected
-                      ? 'Connect'
-                      : isSubscribed || isSourceMissing
-                        ? 'Manage'
-                        : 'Subscribe'}
-                  </Text>
-                )}
-              </Pressable>
+                style={styles.subscriptionButton}
+              />
             </View>
           )}
 
@@ -396,31 +374,32 @@ export function CreatorHeader({
               {isDiscovering && candidates.length === 0 ? (
                 <View style={styles.subscriptionLoadingRow}>
                   <ActivityIndicator size="small" color={colors.textSecondary} />
-                  <Text style={[styles.subscriptionHint, { color: colors.textSecondary }]}>
+                  <Text style={styles.subscriptionHint} tone="secondary">
                     {`Checking ${sourceHost ?? 'this source'} for RSS feeds...`}
                   </Text>
                 </View>
               ) : null}
 
               {!isDiscovering && !isHttpUrl(discoveryUrl) ? (
-                <Text style={[styles.subscriptionHint, { color: colors.textSecondary }]}>
+                <Text style={styles.subscriptionHint} tone="secondary">
                   Save content from this creator to discover an RSS feed.
                 </Text>
               ) : null}
 
               {!isDiscovering && discoveryError && candidates.length === 0 ? (
                 <>
-                  <Text style={[styles.subscriptionHint, { color: colors.textSecondary }]}>
+                  <Text style={styles.subscriptionHint} tone="secondary">
                     {`Couldn't check ${sourceHost ?? 'this source'} for RSS feeds.`}
                   </Text>
-                  <Pressable
+                  <Button
+                    label="Retry"
                     onPress={() => refetchDiscovery()}
-                    accessibilityRole="button"
                     accessibilityLabel="Retry RSS feed discovery"
-                    style={({ pressed }) => [styles.textButton, pressed && { opacity: 0.8 }]}
-                  >
-                    <Text style={[styles.textButtonLabel, { color: colors.link }]}>Retry</Text>
-                  </Pressable>
+                    variant="ghost"
+                    size="sm"
+                    style={styles.textButton}
+                    labelStyle={{ color: colors.accent }}
+                  />
                 </>
               ) : null}
 
@@ -428,7 +407,7 @@ export function CreatorHeader({
               !discoveryError &&
               isHttpUrl(discoveryUrl) &&
               candidates.length === 0 ? (
-                <Text style={[styles.subscriptionHint, { color: colors.textSecondary }]}>
+                <Text style={styles.subscriptionHint} tone="secondary">
                   {`No RSS feed detected for ${sourceHost ?? 'this source'} yet.`}
                 </Text>
               ) : null}
@@ -446,68 +425,38 @@ export function CreatorHeader({
                 return (
                   <View
                     key={candidate.feedUrl}
-                    style={[styles.subscriptionRow, { borderColor: colors.border }]}
+                    style={[styles.subscriptionRow, { borderColor: colors.borderDefault }]}
                   >
                     <View style={styles.subscriptionRowCopy}>
-                      <Text
-                        style={[styles.subscriptionTitle, { color: colors.text }]}
-                        numberOfLines={1}
-                      >
+                      <Text style={styles.subscriptionTitle} tone="primary" numberOfLines={1}>
                         {candidateLabel}
                       </Text>
-                      <Text
-                        style={[styles.subscriptionSubtitle, { color: colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
+                      <Text style={styles.subscriptionSubtitle} tone="secondary" numberOfLines={1}>
                         {candidate.feedUrl}
                       </Text>
                       {statusLabel ? (
-                        <Text style={[styles.subscriptionStatus, { color: colors.textTertiary }]}>
+                        <Text style={styles.subscriptionStatus} tone="tertiary">
                           {statusLabel}
                         </Text>
                       ) : null}
                     </View>
 
-                    <Pressable
+                    <Button
+                      label={isCandidateSubscribed ? 'Manage' : 'Subscribe'}
                       onPress={() =>
                         isCandidateSubscribed ? handleManagePress() : handleRssSubscribe(candidate)
                       }
                       disabled={actionDisabled}
+                      loading={busy}
+                      variant={isCandidateSubscribed ? 'secondary' : 'primary'}
                       accessibilityRole="button"
                       accessibilityLabel={
                         isCandidateSubscribed
                           ? `Manage subscription for ${candidateLabel}`
                           : `Subscribe to ${candidateLabel}`
                       }
-                      style={({ pressed }) => [
-                        styles.subscriptionButton,
-                        {
-                          backgroundColor: isCandidateSubscribed
-                            ? colors.backgroundTertiary
-                            : colors.buttonPrimary,
-                        },
-                        pressed && { opacity: 0.85 },
-                        actionDisabled && { opacity: 0.5 },
-                      ]}
-                    >
-                      {busy ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={isCandidateSubscribed ? colors.text : colors.buttonPrimaryText}
-                        />
-                      ) : (
-                        <Text
-                          style={[
-                            styles.subscriptionButtonLabel,
-                            {
-                              color: isCandidateSubscribed ? colors.text : colors.buttonPrimaryText,
-                            },
-                          ]}
-                        >
-                          {isCandidateSubscribed ? 'Manage' : 'Subscribe'}
-                        </Text>
-                      )}
-                    </Pressable>
+                      style={styles.subscriptionButton}
+                    />
                   </View>
                 );
               })}
@@ -517,7 +466,7 @@ export function CreatorHeader({
           {showSubscriptionCard && (
             <View style={styles.subscriptionFooter}>
               <Ionicons name="newspaper-outline" size={16} color={colors.textTertiary} />
-              <Text style={[styles.subscriptionFooterText, { color: colors.textTertiary }]}>
+              <Text style={styles.subscriptionFooterText} tone="tertiary">
                 Subscribe at the source level.
               </Text>
             </View>
@@ -553,7 +502,6 @@ const styles = StyleSheet.create({
   description: {
     ...Typography.bodyMedium,
     marginTop: Spacing.md,
-    lineHeight: 22,
   },
   subscriptionCard: {
     marginTop: Spacing.lg,
@@ -598,22 +546,9 @@ const styles = StyleSheet.create({
   subscriptionButton: {
     minWidth: 84,
     borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subscriptionButtonLabel: {
-    ...Typography.labelMedium,
-    fontWeight: '700',
   },
   textButton: {
     alignSelf: 'flex-start',
-    paddingVertical: Spacing.xs,
-  },
-  textButtonLabel: {
-    ...Typography.labelMedium,
-    fontWeight: '600',
   },
   subscriptionFooter: {
     flexDirection: 'row',

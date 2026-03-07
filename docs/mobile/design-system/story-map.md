@@ -1,6 +1,6 @@
 # Mobile Design System Story Map
 
-Last updated: February 24, 2026
+Last updated: March 7, 2026
 
 ## Purpose
 
@@ -25,6 +25,19 @@ Use this top-level structure in Storybook:
 10. `Dev/*`
 11. `Legacy/*` (optional, compatibility only)
 
+## Foundations Reference Stories
+
+These stories document the system itself, not a single component:
+
+| Story Title                                | Purpose                                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `Foundations/Tokens/Color Roles`           | Semantic text, surface, accent, border, status, provider, and content token reference.  |
+| `Foundations/Tokens/Typography Scale`      | Editorial type hierarchy and usage intent for shared mobile UI.                         |
+| `Foundations/Tokens/Layout Metrics`        | Spacing, radius, and elevation reference for coherent component rhythm.                 |
+| `Foundations/Tokens/Motion and Icon Sizes` | Standard interaction timing, press feedback, and icon scale guidance.                   |
+| `Foundations/Principles/North Star`        | Visual expression of the mobile product character and core principles.                  |
+| `Foundations/Principles/Review Checklist`  | Review-time guidance covering preferred patterns, anti-patterns, and release questions. |
+
 ## Required Story Sets by Status
 
 | Status          | Required Story Set                                                  |
@@ -39,6 +52,11 @@ Use this top-level structure in Storybook:
 
 | Component                                                         | Story Titles                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/mobile/components/primitives/text.tsx`                      | `Primitives/Text/Playground`, `Primitives/Text/Variants`, `Primitives/Text/Tones`, `Primitives/Text/Font Families`                                                                                                                                                                                  |
+| `apps/mobile/components/primitives/surface.tsx`                   | `Primitives/Surface/Tones`, `Primitives/Surface/Radius and Elevation`                                                                                                                                                                                                                               |
+| `apps/mobile/components/primitives/badge.tsx`                     | `Primitives/Badge/Playground`, `Primitives/Badge/Tones`, `Primitives/Badge/Accessories and Shapes`, `Primitives/Badge/Custom Fills`                                                                                                                                                                 |
+| `apps/mobile/components/primitives/button.tsx`                    | `Primitives/Button/Playground`, `Primitives/Button/Variants`, `Primitives/Button/States and Sizes`, `Primitives/Button/Accessories and Layout`                                                                                                                                                      |
+| `apps/mobile/components/primitives/icon-button.tsx`               | `Primitives/IconButton/Variants`, `Primitives/IconButton/Sizes and States`, `Primitives/IconButton/In Context`                                                                                                                                                                                      |
 | `apps/mobile/components/icons/index.tsx`                          | `Primitives/Icons/Gallery`, `Primitives/Icons/Sizes`, `Primitives/Icons/Color Contrast`                                                                                                                                                                                                             |
 | `apps/mobile/components/badges.tsx`                               | `Primitives/Badges/SourceBadge`, `Primitives/Badges/TypeBadge`, `Primitives/Badges/Fallback Labels`                                                                                                                                                                                                 |
 | `apps/mobile/components/filter-chip.tsx`                          | `Primitives/FilterChip/Playground`, `Primitives/FilterChip/Selected`, `Primitives/FilterChip/With Count`, `Primitives/FilterChip/Small vs Medium`                                                                                                                                                   |
@@ -76,11 +94,13 @@ Use this top-level structure in Storybook:
 
 ## Progress Snapshot
 
-Date: February 24, 2026
+Date: March 7, 2026
 
 - P0 story backlog is implemented.
 - P1 story backlog is implemented.
 - P2 story backlog is implemented.
+- Foundations reference stories are implemented under `Foundations/Tokens` and `Foundations/Principles`.
+- Shared runtime primitives are implemented under `Primitives/Text`, `Primitives/Surface`, `Primitives/Badge`, `Primitives/Button`, and `Primitives/IconButton`.
 - Shared Storybook primitives are in place:
   - `apps/mobile/components/storybook/decorators/*`
   - `apps/mobile/components/storybook/fixtures/*`

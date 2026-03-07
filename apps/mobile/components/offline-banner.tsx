@@ -8,14 +8,15 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Spacing, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Text } from '@/components/primitives';
+import { IconSizes, Motion, Spacing, Typography } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useNetworkStatus, type NetworkStatus } from '@/hooks/use-network-status';
 
-const ANIMATION_DURATION = 300;
+const ANIMATION_DURATION = Motion.duration.slow;
 
 /**
  * OfflineBanner displays a prominent yellow banner when the device loses
@@ -50,8 +51,7 @@ interface OfflineBannerProps {
 export function OfflineBanner({ statusOverride, topInsetOverride }: OfflineBannerProps = {}) {
   const networkStatus = useNetworkStatus();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
+  const { colors } = useAppTheme();
   const isConnected = statusOverride?.isConnected ?? networkStatus.isConnected;
   const isInternetReachable =
     statusOverride?.isInternetReachable ?? networkStatus.isInternetReachable;
@@ -95,7 +95,7 @@ export function OfflineBanner({ statusOverride, topInsetOverride }: OfflineBanne
         styles.container,
         {
           paddingTop: topInset,
-          backgroundColor: colors.warning,
+          backgroundColor: colors.statusWarning,
           transform: [{ translateY }],
           opacity,
         },
@@ -107,7 +107,9 @@ export function OfflineBanner({ statusOverride, topInsetOverride }: OfflineBanne
     >
       <View style={styles.content}>
         <Text style={styles.icon}>📡</Text>
-        <Text style={styles.text}>You&apos;re offline. Changes will sync when you reconnect.</Text>
+        <Text style={styles.text} tone="warningForeground">
+          You&apos;re offline. Changes will sync when you reconnect.
+        </Text>
       </View>
     </Animated.View>
   );
@@ -129,12 +131,11 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   icon: {
-    fontSize: 16,
+    fontSize: IconSizes.sm,
     marginRight: Spacing.sm,
   },
   text: {
     ...Typography.bodySmall,
-    color: '#000000', // Dark text on yellow background for contrast
     fontWeight: '500',
   },
 });

@@ -1,11 +1,9 @@
-import { ContentType, Provider } from '@zine/shared';
-
 import type { LinkPreview } from '@/hooks/use-bookmarks';
 
 export const linkPreviewFixtures = {
   video: {
-    provider: Provider.YOUTUBE,
-    contentType: ContentType.VIDEO,
+    provider: 'YOUTUBE' as LinkPreview['provider'],
+    contentType: 'VIDEO' as LinkPreview['contentType'],
     providerId: 'yt-123',
     title: 'System design for mobile apps: practical patterns',
     creator: 'Zine Engineering',
@@ -17,8 +15,8 @@ export const linkPreviewFixtures = {
     description: 'A concise overview of scalable mobile architecture patterns.',
   },
   article: {
-    provider: Provider.SUBSTACK,
-    contentType: ContentType.ARTICLE,
+    provider: 'SUBSTACK' as LinkPreview['provider'],
+    contentType: 'ARTICLE' as LinkPreview['contentType'],
     providerId: 'substack-42',
     title: 'Design tokens that survive product growth',
     creator: 'System Thinking',
@@ -32,8 +30,8 @@ export const linkPreviewFixtures = {
     description: 'A practical guide to token governance and adoption.',
   },
   stress: {
-    provider: Provider.X,
-    contentType: ContentType.POST,
+    provider: 'X' as LinkPreview['provider'],
+    contentType: 'POST' as LinkPreview['contentType'],
     providerId: 'x-777',
     title:
       'Follow @zine for updates and read https://zine.dev/blog for roadmap details plus docs at docs.zine.dev for implementation notes.',

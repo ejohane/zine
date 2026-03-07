@@ -1,7 +1,9 @@
 import type { ErrorInfo, ReactNode } from 'react';
 import { Component } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
+import { StyleSheet, View } from 'react-native';
+
+import { Button, Text } from '@/components/primitives';
+import { IconSizes, Spacing, type ThemeName } from '@/constants/theme';
 import { logger } from '@/lib/logger';
 
 /** Props passed to fallbackRender function */
@@ -27,6 +29,29 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+function DefaultErrorFallback({
+  colorScheme,
+  errorMessage,
+  onRetry,
+}: {
+  colorScheme: ThemeName;
+  errorMessage: string;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.emoji}>⚠️</Text>
+      <Text variant="titleMedium" style={styles.title} colorScheme={colorScheme}>
+        Something went wrong
+      </Text>
+      <Text variant="bodyMedium" tone="secondary" style={styles.message} colorScheme={colorScheme}>
+        {errorMessage}
+      </Text>
+      <Button label="Try Again" onPress={onRetry} colorScheme={colorScheme} />
+    </View>
+  );
 }
 
 /**
@@ -130,22 +155,12 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       // Default fallback UI with theme support
-      const colors = Colors[this.props.colorScheme ?? 'light'];
-
       return (
-        <View style={styles.container}>
-          <Text style={styles.emoji}>⚠️</Text>
-          <Text style={[styles.title, { color: colors.text }]}>Something went wrong</Text>
-          <Text style={[styles.message, { color: colors.textSecondary }]}>
-            {this.state.error?.message || 'An unexpected error occurred'}
-          </Text>
-          <Pressable
-            onPress={this.handleReset}
-            style={[styles.button, { backgroundColor: colors.primary }]}
-          >
-            <Text style={styles.buttonText}>Try Again</Text>
-          </Pressable>
-        </View>
+        <DefaultErrorFallback
+          colorScheme={this.props.colorScheme ?? 'light'}
+          errorMessage={this.state.error?.message || 'An unexpected error occurred'}
+          onRetry={this.handleReset}
+        />
       );
     }
 
@@ -161,28 +176,15 @@ const styles = StyleSheet.create({
     padding: Spacing['2xl'],
   },
   emoji: {
-    fontSize: 48,
+    fontSize: IconSizes['2xl'],
     marginBottom: Spacing.lg,
   },
   title: {
-    ...Typography.titleMedium,
-    fontWeight: '600',
     marginBottom: Spacing.sm,
   },
   message: {
-    ...Typography.bodyMedium,
     textAlign: 'center',
     marginBottom: Spacing.lg,
-  },
-  button: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 16,
   },
 });
 

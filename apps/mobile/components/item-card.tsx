@@ -25,8 +25,9 @@ import {
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Colors, Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Typography, Spacing, Radius, Shadows, ContentColors } from '@/constants/theme';
+import { Badge, IconButton } from '@/components/primitives';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
 import {
@@ -117,13 +118,14 @@ export function ItemCard({
   overlay = false,
 }: ItemCardProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
+  const mediaTransition = motion.duration.normal;
 
   // Map API types to UI types
   const contentType = mapContentType(item.contentType);
   const contentColor = ContentColors[contentType];
+  const contentTypeLabel = contentType.charAt(0).toUpperCase() + contentType.slice(1);
   const providerColor = getProviderColor(item.provider);
   const providerLabel = getProviderLabel(item.provider);
 
@@ -160,7 +162,6 @@ export function ItemCard({
   // Render based on variant
   if (variant === 'compact') {
     // Build metadata parts
-    const contentTypeLabel = contentType.charAt(0).toUpperCase() + contentType.slice(1);
     const metaParts = [item.creator, contentTypeLabel];
     if (durationText) {
       metaParts.push(durationText);
@@ -181,14 +182,11 @@ export function ItemCard({
                 source={{ uri: item.thumbnailUrl }}
                 style={styles.compactThumbnailImage}
                 contentFit="cover"
-                transition={200}
+                transition={mediaTransition}
               />
             ) : (
               <View
-                style={[
-                  styles.compactThumbnailImage,
-                  { backgroundColor: colors.backgroundTertiary },
-                ]}
+                style={[styles.compactThumbnailImage, { backgroundColor: colors.surfaceRaised }]}
               >
                 {getContentIcon(item.contentType, 20, colors.textTertiary)}
               </View>
@@ -219,7 +217,7 @@ export function ItemCard({
           onPress={handlePress}
           style={({ pressed }) => [
             styles.gridCard,
-            { backgroundColor: colors.backgroundSecondary },
+            { backgroundColor: colors.surfaceSubtle },
             pressed && { opacity: 0.85 },
           ]}
         >
@@ -229,14 +227,11 @@ export function ItemCard({
                 source={{ uri: item.thumbnailUrl }}
                 style={styles.gridThumbnail}
                 contentFit="cover"
-                transition={200}
+                transition={mediaTransition}
               />
             ) : (
               <View
-                style={[
-                  styles.gridThumbnailPlaceholder,
-                  { backgroundColor: colors.backgroundTertiary },
-                ]}
+                style={[styles.gridThumbnailPlaceholder, { backgroundColor: colors.surfaceRaised }]}
               >
                 {getContentIcon(item.contentType, 28, colors.textTertiary)}
               </View>
@@ -259,7 +254,7 @@ export function ItemCard({
           onPress={handlePress}
           style={({ pressed }) => [
             styles.fullCard,
-            { backgroundColor: colors.card },
+            { backgroundColor: colors.surfaceElevated },
             Shadows.md,
             pressed && { opacity: 0.95 },
           ]}
@@ -271,34 +266,30 @@ export function ItemCard({
                 source={{ uri: item.thumbnailUrl }}
                 style={styles.fullThumbnail}
                 contentFit="cover"
-                transition={200}
+                transition={mediaTransition}
               />
             ) : (
               <View
-                style={[
-                  styles.fullThumbnailPlaceholder,
-                  { backgroundColor: colors.backgroundTertiary },
-                ]}
+                style={[styles.fullThumbnailPlaceholder, { backgroundColor: colors.surfaceRaised }]}
               >
                 {getContentIcon(item.contentType, 48, colors.textTertiary)}
               </View>
             )}
             {/* Duration badge */}
             {durationText && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{durationText}</Text>
-              </View>
+              <Badge label={durationText} tone="overlay" style={styles.durationBadge} />
             )}
             {/* Reading time badge (for articles without duration) */}
             {readingTimeText && (
-              <View style={styles.durationBadge}>
-                <Text style={styles.durationText}>{readingTimeText}</Text>
-              </View>
+              <Badge label={readingTimeText} tone="overlay" style={styles.durationBadge} />
             )}
             {/* Content type badge */}
-            <View style={[styles.typeBadge, { backgroundColor: contentColor }]}>
-              <Text style={styles.typeText}>{contentType}</Text>
-            </View>
+            <Badge
+              label={contentTypeLabel}
+              backgroundColor={contentColor}
+              textTone="overlay"
+              style={styles.typeBadge}
+            />
           </View>
 
           {/* Content */}
@@ -322,38 +313,34 @@ export function ItemCard({
           {/* Actions */}
           {showActions && (
             <View style={styles.fullActions}>
-              <Pressable
+              <IconButton
                 onPress={handleActionPress(onArchive || (() => {}))}
                 disabled={isArchiving}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  styles.archiveButton,
-                  { backgroundColor: colors.backgroundTertiary },
-                  pressed && { opacity: 0.8 },
-                ]}
+                size="sm"
+                colors={colors}
+                variant="subtle"
+                accessibilityLabel="Archive item"
               >
                 {isArchiving ? (
                   <ActivityIndicator size="small" color={colors.textSecondary} />
                 ) : (
                   <ArchiveIcon size={18} color={colors.textSecondary} />
                 )}
-              </Pressable>
-              <Pressable
+              </IconButton>
+              <IconButton
                 onPress={handleActionPress(onBookmark || (() => {}))}
                 disabled={isBookmarking}
-                style={({ pressed }) => [
-                  styles.actionButton,
-                  styles.bookmarkButton,
-                  { backgroundColor: colors.primary },
-                  pressed && { opacity: 0.8 },
-                ]}
+                size="sm"
+                colors={colors}
+                variant="solid"
+                accessibilityLabel="Bookmark item"
               >
                 {isBookmarking ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.accentForeground} />
                 ) : (
-                  <BookmarkIcon size={18} color="#fff" />
+                  <BookmarkIcon size={18} color={colors.accentForeground} />
                 )}
-              </Pressable>
+              </IconButton>
             </View>
           )}
         </Pressable>
@@ -369,7 +356,7 @@ export function ItemCard({
           onPress={handlePress}
           style={({ pressed }) => [
             styles.horizontalCard,
-            { backgroundColor: colors.backgroundSecondary },
+            { backgroundColor: colors.surfaceSubtle },
             pressed && { opacity: 0.7 },
           ]}
         >
@@ -379,12 +366,10 @@ export function ItemCard({
               source={{ uri: item.thumbnailUrl }}
               style={styles.horizontalCardImage}
               contentFit="cover"
-              transition={200}
+              transition={mediaTransition}
             />
           ) : (
-            <View
-              style={[styles.horizontalCardImage, { backgroundColor: colors.backgroundTertiary }]}
-            >
+            <View style={[styles.horizontalCardImage, { backgroundColor: colors.surfaceRaised }]}>
               {getContentIcon(item.contentType, 32, colors.textTertiary)}
             </View>
           )}
@@ -423,21 +408,28 @@ export function ItemCard({
               source={{ uri: item.thumbnailUrl }}
               style={styles.largeOverlayImage}
               contentFit="cover"
-              transition={200}
+              transition={mediaTransition}
             />
           ) : (
-            <View
-              style={[styles.largeOverlayImage, { backgroundColor: colors.backgroundTertiary }]}
-            />
+            <View style={[styles.largeOverlayImage, { backgroundColor: colors.surfaceRaised }]} />
           )}
 
           {/* Overlay Content */}
-          <View style={styles.largeOverlayContent}>
-            <Text style={styles.largeOverlaySource}>{item.creator}</Text>
-            <Text style={styles.largeOverlayTitle} numberOfLines={2}>
+          <View style={[styles.largeOverlayContent, { backgroundColor: colors.overlaySoft }]}>
+            <Text style={[styles.largeOverlaySource, { color: colors.overlayForegroundSubtle }]}>
+              {item.creator}
+            </Text>
+            <Text
+              style={[styles.largeOverlayTitle, { color: colors.overlayForeground }]}
+              numberOfLines={2}
+            >
               {item.title}
             </Text>
-            {durationText && <Text style={styles.largeOverlayDuration}>{durationText}</Text>}
+            {durationText && (
+              <Text style={[styles.largeOverlayDuration, { color: colors.overlayForegroundMuted }]}>
+                {durationText}
+              </Text>
+            )}
           </View>
         </Pressable>
       </Animated.View>
@@ -451,7 +443,7 @@ export function ItemCard({
         onPress={handlePress}
         style={({ pressed }) => [
           styles.largeCard,
-          { backgroundColor: colors.card },
+          { backgroundColor: colors.surfaceElevated },
           Shadows.lg,
           pressed && { opacity: 0.95 },
         ]}
@@ -463,29 +455,22 @@ export function ItemCard({
               source={{ uri: item.thumbnailUrl }}
               style={styles.largeThumbnail}
               contentFit="cover"
-              transition={200}
+              transition={mediaTransition}
             />
           ) : (
             <View
-              style={[
-                styles.largeThumbnailPlaceholder,
-                { backgroundColor: colors.backgroundTertiary },
-              ]}
+              style={[styles.largeThumbnailPlaceholder, { backgroundColor: colors.surfaceRaised }]}
             >
               {getContentIcon(item.contentType, 64, colors.textTertiary)}
             </View>
           )}
           {/* Duration badge */}
           {durationText && (
-            <View style={styles.largeDurationBadge}>
-              <Text style={styles.largeDurationText}>{durationText}</Text>
-            </View>
+            <Badge label={durationText} tone="overlay" style={styles.largeDurationBadge} />
           )}
           {/* Reading time badge (for articles without duration) */}
           {readingTimeText && (
-            <View style={styles.largeDurationBadge}>
-              <Text style={styles.largeDurationText}>{readingTimeText}</Text>
-            </View>
+            <Badge label={readingTimeText} tone="overlay" style={styles.largeDurationBadge} />
           )}
         </View>
 
@@ -681,16 +666,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: Spacing.sm,
     right: Spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: Radius.sm,
   },
   largeDurationText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
+    ...Typography.labelSmallPlain,
   },
 
   // Large variant with overlay (text over image)
@@ -710,21 +691,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     padding: Spacing.lg,
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   largeOverlaySource: {
-    ...Typography.labelSmall,
-    color: 'rgba(255, 255, 255, 0.7)',
+    ...Typography.labelSmallPlain,
     marginBottom: Spacing.xs,
   },
   largeOverlayTitle: {
     ...Typography.titleMedium,
-    color: '#FFFFFF',
     marginBottom: Spacing.xs,
   },
   largeOverlayDuration: {
     ...Typography.bodySmall,
-    color: 'rgba(255, 255, 255, 0.8)',
   },
 
   // Horizontal variant (home horizontal lists)
@@ -794,29 +771,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.sm,
     left: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.sm,
-  },
-  typeText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'capitalize',
   },
   durationBadge: {
     position: 'absolute',
     bottom: Spacing.xs,
     right: Spacing.xs,
-    backgroundColor: 'rgba(0,0,0,0.75)',
-    paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
-    borderRadius: Radius.xs,
-  },
-  durationText: {
-    ...Typography.labelSmall,
-    color: '#fff',
-    textTransform: 'none',
-    letterSpacing: 0,
   },
   providerDot: {
     width: 6,
@@ -824,17 +784,6 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginRight: Spacing.xs,
   },
-
-  // Action buttons
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  archiveButton: {},
-  bookmarkButton: {},
 });
 
 export default ItemCard;

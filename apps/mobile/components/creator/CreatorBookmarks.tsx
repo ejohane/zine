@@ -5,12 +5,13 @@
  * Shows a list of bookmarks with infinite scroll pagination.
  */
 
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ErrorState } from '@/components/list-states';
-import { Colors, Typography, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Text } from '@/components/primitives';
+import { Radius, Typography, Spacing, type ThemeColors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useCreatorBookmarks } from '@/hooks/use-creator';
 import { mapContentType, mapProvider } from '@/hooks/use-items-trpc';
 import type { ContentType, Provider } from '@/lib/content-utils';
@@ -38,14 +39,11 @@ export interface CreatorBookmarksProps {
 // Skeleton Component
 // ============================================================================
 
-function BookmarksSkeleton({ colors }: { colors: typeof Colors.light }) {
+function BookmarksSkeleton({ colors }: { colors: ThemeColors }) {
   return (
     <View>
       {[1, 2, 3].map((i) => (
-        <View
-          key={i}
-          style={[styles.skeletonItem, { backgroundColor: colors.backgroundTertiary }]}
-        />
+        <View key={i} style={[styles.skeletonItem, { backgroundColor: colors.surfaceRaised }]} />
       ))}
     </View>
   );
@@ -65,8 +63,7 @@ function BookmarksSkeleton({ colors }: { colors: typeof Colors.light }) {
  * ```
  */
 export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
 
   const bookmarksState = useCreatorBookmarks(creatorId);
   const bookmarks = stateOverride?.bookmarks ?? bookmarksState.bookmarks;
@@ -103,7 +100,9 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Your Bookmarks</Text>
+          <Text style={styles.title} tone="primary">
+            Your Bookmarks
+          </Text>
         </View>
         <BookmarksSkeleton colors={colors} />
       </View>
@@ -115,7 +114,9 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Your Bookmarks</Text>
+          <Text style={styles.title} tone="primary">
+            Your Bookmarks
+          </Text>
         </View>
         <ErrorState
           title="Failed to load bookmarks"
@@ -135,8 +136,10 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Your Bookmarks</Text>
-        <Text style={[styles.count, { color: colors.textSecondary }]}>
+        <Text style={styles.title} tone="primary">
+          Your Bookmarks
+        </Text>
+        <Text style={styles.count} tone="secondary">
           {items.length} item{items.length === 1 ? '' : 's'}
         </Text>
       </View>
@@ -150,7 +153,7 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
         ListFooterComponent={
           isFetchingNextPage ? (
             <View style={styles.loadingFooter}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }
@@ -191,7 +194,7 @@ const styles = StyleSheet.create({
     height: 64,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.sm,
-    borderRadius: 8,
+    borderRadius: Radius.md,
   },
   loadingFooter: {
     paddingVertical: Spacing.lg,

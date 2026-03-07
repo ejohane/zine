@@ -19,6 +19,7 @@
 - Reset worktree state before re-seeding: `bun run dev:reset`
 - Run tests (mobile + worker): `bun run test`
 - Lint: `bun run lint`
+- Design system checks: `bun run design-system:check`
 - Typecheck: `bun run typecheck`
 - Build: `bun run build`
 - Format check: `bun run format:check`
@@ -50,6 +51,7 @@
   - Runs `lint-staged`
 - Pre-push (`.husky/pre-push`) runs:
   - `bun run format:check`
+  - `bun run design-system:check`
   - `bun run typecheck`
   - `cd apps/worker && bun run test:run --exclude='**/user-do.test.ts' --exclude='**/scheduler.test.ts'`
 
@@ -61,3 +63,15 @@
 ## Additional Agent Context
 
 - Mobile-specific guidance lives in `apps/mobile/AGENTS.md`.
+
+## Design System Workflow
+
+- When editing shared mobile UI, read:
+  - `docs/mobile/design-system/principles.md`
+  - `docs/mobile/design-system/foundations.md`
+  - `docs/mobile/design-system/components.md`
+- In `apps/mobile/components`, prefer `@/components/primitives` (`Badge`, `Button`, `IconButton`, `Surface`, `Text`) plus semantic theme tokens before introducing new one-off shared styles.
+- For `apps/mobile/components`, prefer canonical components and semantic theme tokens over one-off styles.
+- Do not add new raw hex/rgb colors or ad hoc typography literals in shared mobile components unless the line is marked with `design-system-exception:` and a short reason.
+- Do not expand legacy mobile UI paths (`apps/mobile/components/home/*`, `apps/mobile/components/themed-*`, `apps/mobile/components/ui/*`) for new work.
+- Run `bun run design-system:check` when mobile shared UI changes.

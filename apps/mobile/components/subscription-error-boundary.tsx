@@ -11,11 +11,13 @@
  */
 
 import type { ErrorInfo, ReactNode } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+
+import { Button, Surface, Text } from '@/components/primitives';
 import { ErrorBoundary } from './error-boundary';
-import { Colors, Spacing, Radius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { logger } from '@/lib/logger';
 
 /**
@@ -70,12 +72,7 @@ interface SubscriptionErrorFallbackProps {
 
 function SubscriptionErrorFallback({ provider, onRetry }: SubscriptionErrorFallbackProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
-  // Use error color with transparency for background since errorLight isn't in theme
-  const errorBackgroundColor =
-    colorScheme === 'dark' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)';
+  const { colors } = useAppTheme();
 
   const handleReconnect = () => {
     // Navigate to provider connect screen
@@ -89,39 +86,34 @@ function SubscriptionErrorFallback({ provider, onRetry }: SubscriptionErrorFallb
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: errorBackgroundColor }]}>
-      <Text style={[styles.title, { color: colors.error }]}>Failed to load subscription</Text>
-      <Text style={[styles.message, { color: colors.error }]}>
+    <Surface tone="error" border="tone" padding="lg" style={styles.container}>
+      <Text variant="titleMedium" tone="error" style={styles.title}>
+        Failed to load subscription
+      </Text>
+      <Text variant="bodyMedium" tone="error" style={styles.message}>
         There was a problem displaying this content.
       </Text>
 
       <View style={styles.buttonRow}>
-        {onRetry && (
-          <Pressable
+        {onRetry ? (
+          <Button
+            label="Try Again"
             onPress={onRetry}
-            style={[
-              styles.button,
-              { backgroundColor: errorBackgroundColor, borderWidth: 1, borderColor: colors.error },
-            ]}
-            accessibilityRole="button"
+            variant="outline"
+            tone="danger"
             accessibilityLabel="Try again"
-          >
-            <Text style={[styles.buttonText, { color: colors.error }]}>Try Again</Text>
-          </Pressable>
-        )}
+          />
+        ) : null}
 
-        <Pressable
+        <Button
+          label="Reconnect Account"
           onPress={handleReconnect}
-          style={styles.buttonSecondary}
-          accessibilityRole="button"
+          variant="ghost"
           accessibilityLabel="Reconnect account"
-        >
-          <Text style={[styles.buttonTextSecondary, { color: colors.textSecondary }]}>
-            Reconnect Account
-          </Text>
-        </Pressable>
+          labelStyle={{ color: colors.textSecondary }}
+        />
       </View>
-    </View>
+    </Surface>
   );
 }
 
@@ -182,16 +174,11 @@ export function SubscriptionErrorBoundary({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: Spacing.lg,
-    borderRadius: Radius.lg,
-  },
+  container: {},
   title: {
-    fontWeight: '500',
     marginBottom: Spacing.sm,
   },
   message: {
-    fontSize: 14,
     marginBottom: Spacing.md,
   },
   buttonRow: {
@@ -199,24 +186,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     flexWrap: 'wrap',
-  },
-  button: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.sm,
-    alignSelf: 'flex-start',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 14,
-  },
-  buttonSecondary: {
-    paddingVertical: Spacing.sm,
-  },
-  buttonTextSecondary: {
-    fontWeight: '500',
-    fontSize: 14,
   },
 });
 

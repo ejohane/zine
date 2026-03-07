@@ -8,16 +8,16 @@
  *
  * Features:
  * - Subscribes to offlineQueue changes
- * - Shows count with animated dot and text
+ * - Shows count with animated dot and badge copy
  * - Uses Animated.loop for pulse effect
  * - Proper cleanup of animations on unmount
  */
 
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { View, Animated, StyleSheet } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { offlineQueue } from '../lib/offline-queue';
-import { Colors, Spacing, Radius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Badge } from '@/components/primitives';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 interface SyncStatusIndicatorProps {
   /** Optional override for deterministic tests/stories */
@@ -25,8 +25,7 @@ interface SyncStatusIndicatorProps {
 }
 
 export function SyncStatusIndicator({ pendingCountOverride }: SyncStatusIndicatorProps = {}) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
   const [pendingCount, setPendingCount] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   // Store animation reference for cleanup on unmount
@@ -79,32 +78,26 @@ export function SyncStatusIndicator({ pendingCountOverride }: SyncStatusIndicato
   if (activePendingCount === 0) return null;
 
   return (
-    <Animated.View
-      style={[styles.container, { opacity: pulseAnim, backgroundColor: colors.primaryLight }]}
-    >
-      <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-      <Text style={[styles.text, { color: colors.primaryDark }]}>
-        {activePendingCount} pending {activePendingCount === 1 ? 'change' : 'changes'}
-      </Text>
+    <Animated.View style={[styles.container, { opacity: pulseAnim }]}>
+      <Badge
+        label={`${activePendingCount} pending ${activePendingCount === 1 ? 'change' : 'changes'}`}
+        shape="pill"
+        size="md"
+        backgroundColor={colors.accentMuted}
+        textTone="accent"
+        leadingAccessory={<View style={[styles.dot, { backgroundColor: colors.accent }]} />}
+      />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    borderRadius: Radius.full,
+    alignSelf: 'flex-start',
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-  },
-  text: {
-    fontSize: 14,
   },
 });

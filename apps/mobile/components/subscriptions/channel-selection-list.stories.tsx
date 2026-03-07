@@ -33,7 +33,8 @@ export const Loading: Story = {
   ),
 };
 
-export const Error: Story = {
+export const LoadError: Story = {
+  name: 'Error',
   render: () => (
     <ChannelSelectionList
       provider="YOUTUBE"

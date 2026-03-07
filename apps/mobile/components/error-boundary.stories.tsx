@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,7 +8,7 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 
 import { ErrorBoundary } from './error-boundary';
 
-function Crash({ message }: { message: string }) {
+function Crash({ message }: { message: string }): ReactElement {
   throw new Error(message);
 }
 
@@ -43,6 +44,9 @@ function ResetKeysDemo() {
 const meta = {
   title: 'Boundary/ErrorBoundary',
   component: ErrorBoundary,
+  args: {
+    children: null,
+  },
   decorators: [createDarkCanvasDecorator({ height: 520, padding: Spacing.md })],
   parameters: {
     backgrounds: {
@@ -56,6 +60,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const DefaultFallback: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <ErrorBoundary colorScheme="dark">
@@ -66,6 +73,9 @@ export const DefaultFallback: Story = {
 };
 
 export const CustomFallback: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <ErrorBoundary
@@ -85,6 +95,9 @@ export const CustomFallback: Story = {
 };
 
 export const ResetKeys: Story = {
+  args: {
+    children: null,
+  },
   render: () => <ResetKeysDemo />,
 };
 

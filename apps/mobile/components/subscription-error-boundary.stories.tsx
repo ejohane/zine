@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-native';
 import { StyleSheet, View } from 'react-native';
 
@@ -6,13 +7,16 @@ import { Colors, Radius, Spacing } from '@/constants/theme';
 
 import { SubscriptionErrorBoundary } from './subscription-error-boundary';
 
-function SubscriptionCrash({ message }: { message: string }) {
+function SubscriptionCrash({ message }: { message: string }): ReactElement {
   throw new Error(message);
 }
 
 const meta = {
   title: 'Boundary/SubscriptionErrorBoundary',
   component: SubscriptionErrorBoundary,
+  args: {
+    children: null,
+  },
   decorators: [createDarkCanvasDecorator({ height: 420, padding: Spacing.md })],
   parameters: {
     backgrounds: {
@@ -26,6 +30,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const AuthError: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <SubscriptionErrorBoundary subscriptionId="sub-yt-1" provider="YOUTUBE">
@@ -36,6 +43,9 @@ export const AuthError: Story = {
 };
 
 export const RetryPath: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <SubscriptionErrorBoundary subscriptionId="sub-sp-1" provider="SPOTIFY" onRetry={() => {}}>

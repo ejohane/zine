@@ -6,10 +6,11 @@
  */
 
 import { memo } from 'react';
-import { View, Text, Pressable, Image, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Pressable, Image, StyleSheet } from 'react-native';
 
+import { Button, Text } from '@/components/primitives';
 import type { Colors } from '@/constants/theme';
-import { Spacing, Radius, Typography, ProviderColors } from '@/constants/theme';
+import { IconSizes, ProviderColors, Radius, Spacing, Typography } from '@/constants/theme';
 import { CheckboxIcon } from '@/components/icons';
 
 // ============================================================================
@@ -133,7 +134,7 @@ function ChannelItemComponent({
             <View
               style={[styles.imagePlaceholder, { backgroundColor: colors.backgroundSecondary }]}
             >
-              <Text style={[styles.imagePlaceholderText, { color: colors.textTertiary }]}>
+              <Text style={styles.imagePlaceholderText} colors={colors} tone="tertiary">
                 {channel.name.charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -142,10 +143,10 @@ function ChannelItemComponent({
 
         {/* Channel Info */}
         <View style={styles.info}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <Text style={styles.name} colors={colors} numberOfLines={1}>
             {channel.name}
           </Text>
-          <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={1}>
+          <Text style={styles.description} colors={colors} tone="secondary" numberOfLines={1}>
             {channel.description || getProviderDescription(provider)}
           </Text>
         </View>
@@ -164,7 +165,7 @@ function ChannelItemComponent({
           <View
             style={[styles.imagePlaceholderLarge, { backgroundColor: colors.backgroundSecondary }]}
           >
-            <Text style={[styles.imagePlaceholderTextLarge, { color: colors.textTertiary }]}>
+            <Text style={styles.imagePlaceholderTextLarge} colors={colors} tone="tertiary">
               {channel.name.charAt(0).toUpperCase()}
             </Text>
           </View>
@@ -173,45 +174,40 @@ function ChannelItemComponent({
 
       {/* Channel Info */}
       <View style={styles.info}>
-        <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+        <Text style={styles.name} colors={colors} numberOfLines={1}>
           {channel.name}
         </Text>
         {channel.description && (
-          <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
+          <Text style={styles.description} colors={colors} tone="secondary" numberOfLines={2}>
             {channel.description}
           </Text>
         )}
         {channel.subscriberCount != null && (
-          <Text style={[styles.stats, { color: colors.textTertiary }]}>
+          <Text style={styles.stats} colors={colors} tone="tertiary">
             {formatSubscriberCount(channel.subscriberCount)} subscribers
           </Text>
         )}
       </View>
 
       {/* Subscribe Button */}
-      <Pressable
+      <Button
+        label={isSubscribed ? 'Subscribed' : 'Subscribe'}
         onPress={onSubscribe}
         disabled={isSubscribed || isSubscribing}
+        loading={isSubscribing}
+        size="sm"
+        colors={colors}
+        variant={isSubscribed ? 'secondary' : 'primary'}
         style={[
           styles.subscribeButton,
           isSubscribed
             ? { backgroundColor: colors.backgroundSecondary }
             : { backgroundColor: providerColor },
         ]}
-      >
-        {isSubscribing ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <Text
-            style={[
-              styles.subscribeButtonText,
-              isSubscribed ? { color: colors.textSecondary } : { color: '#FFFFFF' },
-            ]}
-          >
-            {isSubscribed ? 'Subscribed' : 'Subscribe'}
-          </Text>
-        )}
-      </Pressable>
+        labelStyle={{
+          color: isSubscribed ? colors.textSecondary : colors.overlayForeground,
+        }}
+      />
     </View>
   );
 }
@@ -267,11 +263,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePlaceholderText: {
-    fontSize: 20,
+    fontSize: IconSizes.lg,
     fontWeight: '600',
   },
   imagePlaceholderTextLarge: {
-    fontSize: 24,
+    fontSize: IconSizes.xl,
     fontWeight: '600',
   },
   info: {
@@ -287,19 +283,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   stats: {
-    ...Typography.labelSmall,
+    ...Typography.bodySmall,
     marginTop: Spacing.xs,
   },
   subscribeButton: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
     minWidth: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subscribeButtonText: {
-    fontWeight: '600',
-    fontSize: 14,
+    borderRadius: Radius.full,
   },
 });

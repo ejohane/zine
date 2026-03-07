@@ -7,8 +7,8 @@
 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Radius, Spacing, Typography } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 // =============================================================================
 // Types
@@ -72,9 +72,8 @@ export function FilterChip({
   count,
   size = 'medium',
 }: FilterChipProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-  const activeColor = selectedColor ?? colors.primary;
+  const { colors, motion } = useAppTheme();
+  const activeColor = selectedColor ?? colors.accent;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
@@ -86,21 +85,23 @@ export function FilterChip({
         styles.chip,
         sizeStyles,
         {
-          backgroundColor: isSelected ? activeColor : colors.backgroundSecondary,
-          borderColor: isSelected ? activeColor : colors.border,
+          backgroundColor: isSelected ? activeColor : colors.surfaceSubtle,
+          borderColor: isSelected ? activeColor : colors.borderDefault,
         },
-        pressed && { opacity: 0.8 },
+        pressed && { opacity: motion.opacity.pressed },
       ]}
     >
       {dotColor && !isSelected && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
-      <Text style={[textStyles, { color: isSelected ? colors.buttonPrimaryText : colors.text }]}>
+      <Text
+        style={[textStyles, { color: isSelected ? colors.accentForeground : colors.textPrimary }]}
+      >
         {label}
       </Text>
       {count !== undefined && (
         <Text
           style={[
             styles.count,
-            { color: isSelected ? colors.buttonPrimaryText : colors.textTertiary },
+            { color: isSelected ? colors.accentForeground : colors.textTertiary },
           ]}
         >
           {count}
@@ -136,9 +137,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   textSmall: {
-    ...Typography.labelSmall,
-    textTransform: 'none',
-    letterSpacing: 0,
+    ...Typography.labelSmallPlain,
   },
   textMedium: {
     ...Typography.labelMedium,

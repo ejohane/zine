@@ -1,3 +1,4 @@
 bun run format:check
+bun run design-system:check
 bun run typecheck
 cd apps/worker && bun run test:run --exclude='**/user-do.test.ts' --exclude='**/scheduler.test.ts'

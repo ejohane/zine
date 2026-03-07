@@ -10,6 +10,10 @@ import { OAuthErrorBoundary } from './oauth-error-boundary';
 const meta = {
   title: 'Boundary/OAuthErrorBoundary',
   component: OAuthErrorBoundary,
+  args: {
+    children: null,
+    provider: 'YOUTUBE',
+  },
   decorators: [createDarkCanvasDecorator({ height: 460, padding: Spacing.md })],
   parameters: {
     backgrounds: {
@@ -23,6 +27,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Recoverable: Story = {
+  args: {
+    children: null,
+    provider: 'YOUTUBE',
+  },
   render: () => (
     <OAuthErrorBoundary
       provider="YOUTUBE"
@@ -37,6 +45,10 @@ export const Recoverable: Story = {
 };
 
 export const Fatal: Story = {
+  args: {
+    children: null,
+    provider: 'GMAIL',
+  },
   render: () => (
     <OAuthErrorBoundary
       provider="GMAIL"
