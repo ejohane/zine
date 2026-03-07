@@ -8,6 +8,7 @@
 import React from 'react';
 import { Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { httpBatchLink } from '@trpc/client';
 import { getQueryKey } from '@trpc/react-query';
@@ -17,11 +18,6 @@ import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
 import { buildMobileTelemetryHeaders, telemetryFetch } from '@/lib/trpc-transport';
 import { PERSISTENCE_MAX_AGE_MS, PERSISTENCE_STORAGE_PREFIX } from '@/lib/query-persistence';
 import { act, create } from 'react-test-renderer';
-
-let mockQueryClient: {
-  invalidateQueries: jest.Mock;
-  clear: jest.Mock;
-};
 type PersistOptions = {
   buster: string;
   maxAge: number;
@@ -44,10 +40,8 @@ const mockGetItem = AsyncStorage.getItem as jest.Mock;
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
-  mockQueryClient = new actual.QueryClient();
   return {
     ...actual,
-    QueryClient: jest.fn(() => mockQueryClient),
     useIsRestoring: () => mockUseIsRestoring(),
   };
 });
@@ -115,6 +109,10 @@ jest.mock('@/lib/trpc-transport', () => ({
 // Tests
 // ==========================================================================
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe('TRPCProvider offline queue invalidation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -125,7 +123,7 @@ describe('TRPCProvider offline queue invalidation', () => {
   });
 
   it('registers offline queue callback with query invalidations', () => {
-    const invalidateSpy = jest.spyOn(mockQueryClient, 'invalidateQueries');
+    const invalidateSpy = jest.spyOn(QueryClient.prototype, 'invalidateQueries');
 
     act(() => {
       create(
@@ -304,7 +302,7 @@ describe('TRPCProvider cache persistence', () => {
   });
 
   it('clears cache and persisted data on user switch', async () => {
-    const clearSpy = jest.spyOn(mockQueryClient, 'clear');
+    const clearSpy = jest.spyOn(QueryClient.prototype, 'clear');
 
     let renderer: ReturnType<typeof create> | null = null;
 
