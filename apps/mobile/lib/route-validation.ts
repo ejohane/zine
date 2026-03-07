@@ -108,10 +108,7 @@ export function validateItemId(value: unknown): ValidationResult<string> {
  * }
  */
 export function isValidProviderRoute(value: unknown): value is ProviderRoute {
-  return (
-    typeof value === 'string' &&
-    VALID_PROVIDER_ROUTES.includes(value.toLowerCase() as ProviderRoute)
-  );
+  return normalizeProviderRoute(value) !== undefined;
 }
 
 /**
@@ -126,10 +123,12 @@ export function isValidProviderRoute(value: unknown): value is ProviderRoute {
  */
 export function normalizeProviderRoute(value: unknown): ProviderRoute | undefined {
   if (typeof value !== 'string') return undefined;
-  const lower = value.toLowerCase() as ProviderRoute;
-  if (VALID_PROVIDER_ROUTES.includes(lower)) {
-    return lower;
+
+  const normalized = value.trim().toLowerCase() as ProviderRoute;
+  if (VALID_PROVIDER_ROUTES.includes(normalized)) {
+    return normalized;
   }
+
   return undefined;
 }
 
@@ -210,7 +209,7 @@ export function validateAndConvertDiscoverProvider(
   if (!VALID_DISCOVER_PROVIDER_ROUTES.includes(routeResult.data as DiscoverProviderRoute)) {
     return {
       success: false,
-      message: `Provider \"${routeResult.data}\" is not supported for discovery.`,
+      message: `Provider "${routeResult.data}" is not supported for discovery.`,
     };
   }
 

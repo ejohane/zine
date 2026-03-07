@@ -101,6 +101,11 @@ describe('route-validation', () => {
       expect(isValidProviderRoute('Gmail')).toBe(true);
     });
 
+    it('returns true for valid providers with surrounding whitespace', () => {
+      expect(isValidProviderRoute(' youtube ')).toBe(true);
+      expect(isValidProviderRoute('\nSpotify\t')).toBe(true);
+    });
+
     it('returns false for invalid providers', () => {
       expect(isValidProviderRoute('invalid')).toBe(false);
       expect(isValidProviderRoute('rss')).toBe(false);
@@ -122,6 +127,11 @@ describe('route-validation', () => {
       expect(normalizeProviderRoute('spotify')).toBe('spotify');
       expect(normalizeProviderRoute('SPOTIFY')).toBe('spotify');
       expect(normalizeProviderRoute('GMAIL')).toBe('gmail');
+    });
+
+    it('trims surrounding whitespace before validating', () => {
+      expect(normalizeProviderRoute('  youtube  ')).toBe('youtube');
+      expect(normalizeProviderRoute('\tSPOTIFY\n')).toBe('spotify');
     });
 
     it('returns undefined for invalid providers', () => {
