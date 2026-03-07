@@ -22,7 +22,6 @@ import {
   searchShows,
   checkSavedShows,
   type SpotifyShow,
-  type SpotifyEpisode,
 } from './spotify';
 
 // ============================================================================
@@ -90,38 +89,6 @@ function createMockConnection() {
     connectedAt: MOCK_NOW - 86400000,
     lastRefreshedAt: null,
     status: 'ACTIVE' as const,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function createMockSpotifyShow(overrides: Partial<SpotifyShow> = {}): SpotifyShow {
-  return {
-    id: '4rOoJ6Egrf8K2IrywzwOMk',
-    name: 'Test Podcast',
-    description: 'A test podcast for testing',
-    publisher: 'Test Publisher',
-    images: [
-      { url: 'https://i.scdn.co/image/abc123-large', height: 640, width: 640 },
-      { url: 'https://i.scdn.co/image/abc123-medium', height: 300, width: 300 },
-    ],
-    externalUrl: 'https://open.spotify.com/show/4rOoJ6Egrf8K2IrywzwOMk',
-    totalEpisodes: 100,
-    ...overrides,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function createMockSpotifyEpisode(overrides: Partial<SpotifyEpisode> = {}): SpotifyEpisode {
-  return {
-    id: 'episode123abc',
-    name: 'Test Episode',
-    description: 'Test episode description',
-    releaseDate: '2024-01-15',
-    durationMs: 3600000,
-    externalUrl: 'https://open.spotify.com/episode/episode123abc',
-    images: [{ url: 'https://i.scdn.co/image/episode123', height: 640, width: 640 }],
-    isPlayable: true,
-    ...overrides,
   };
 }
 
