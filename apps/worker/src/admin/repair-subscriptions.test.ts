@@ -14,6 +14,7 @@ import {
   verifyRepairs,
   type FindCorruptedResult,
 } from './repair-subscriptions';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Mock Date.now for consistent testing
@@ -505,6 +506,7 @@ describe('repairCorruptedSubscriptions', () => {
   describe('error handling', () => {
     it('should handle database errors gracefully', async () => {
       const corrupted = createCorruptedSubscription();
+      const databaseError = new Error('Database error');
 
       const drizzleMock = {
         select: vi.fn(() => ({
@@ -514,7 +516,7 @@ describe('repairCorruptedSubscriptions', () => {
         })),
         update: vi.fn(() => ({
           set: vi.fn(() => ({
-            where: vi.fn(() => Promise.reject(new Error('Database error'))),
+            where: vi.fn(() => Promise.reject(databaseError)),
           })),
         })),
       };
@@ -526,6 +528,9 @@ describe('repairCorruptedSubscriptions', () => {
 
       expect(result.errors.length).toBe(1);
       expect(result.errors[0].error).toContain('Database error');
+      expectLoggerErrorCalls([
+        ['Failed to repair subscription', { subscriptionId: corrupted.id, error: databaseError }],
+      ]);
     });
   });
 

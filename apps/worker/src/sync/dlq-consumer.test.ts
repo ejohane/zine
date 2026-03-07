@@ -89,7 +89,7 @@ function expectHandleSyncDLQErrorLogs(
   batch: MessageBatch<SyncQueueMessage>,
   malformedMessageIds: string[] = []
 ): void {
-  expectLoggerErrorCalls([
+  const expectedCalls: Parameters<typeof expectLoggerErrorCalls>[0] = [
     [
       'DLQ messages received - sync failures requiring investigation',
       expect.objectContaining({
@@ -97,7 +97,7 @@ function expectHandleSyncDLQErrorLogs(
         environment: 'development',
       }),
     ],
-    ...batch.messages.map((message) => [
+    ...batch.messages.map<Parameters<typeof expectLoggerErrorCalls>[0][number]>((message) => [
       malformedMessageIds.includes(message.id)
         ? 'DLQ: Malformed message body'
         : 'DLQ: Subscription sync permanently failed',
@@ -106,7 +106,9 @@ function expectHandleSyncDLQErrorLogs(
         attempts: message.attempts,
       }),
     ]),
-  ]);
+  ];
+
+  expectLoggerErrorCalls(expectedCalls);
 }
 
 // ============================================================================

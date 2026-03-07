@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Mock Dependencies
@@ -916,11 +917,12 @@ describe('Polling Scheduler', () => {
       });
 
       // User 2 will fail with a non-auth error
+      const userBatchError = new Error('Network error for user 2');
       let clientCallCount = 0;
       mockGetYouTubeClientForConnection.mockImplementation(async () => {
         clientCallCount++;
         if (clientCallCount === 2) {
-          throw new Error('Network error for user 2');
+          throw userBatchError;
         }
         return {};
       });
@@ -936,6 +938,20 @@ describe('Polling Scheduler', () => {
       // 2 subscriptions should be processed successfully (user_1 and user_3)
       // user_2's subscription failed but was isolated
       expect(result.processed).toBe(2);
+      expectLoggerErrorCalls([
+        [
+          'User batch processing failed',
+          expect.objectContaining({
+            provider: 'youtube',
+            userId: 'user_2',
+            subscriptionCount: 1,
+            error: expect.objectContaining({
+              message: 'Network error for user 2',
+              type: 'Error',
+            }),
+          }),
+        ],
+      ]);
     });
 
     it('should respect USER_PROCESSING_CONCURRENCY environment variable', async () => {
@@ -1134,8 +1150,9 @@ describe('Polling Scheduler', () => {
       mockGetYouTubeClientForConnection
         .mockResolvedValueOnce({}) // First user succeeds
         .mockResolvedValueOnce({}); // Second user succeeds
+      const subscriptionError = new Error('API Error');
       mockFetchRecentVideos
-        .mockRejectedValueOnce(new Error('API Error')) // First subscription fails
+        .mockRejectedValueOnce(subscriptionError) // First subscription fails
         .mockResolvedValueOnce([]); // Second subscription succeeds
 
       const env = createMockEnv();
@@ -1146,17 +1163,21 @@ describe('Polling Scheduler', () => {
 
       // Both subscriptions should be counted as processed
       expect(result.processed).toBe(2);
+      expectLoggerErrorCalls([
+        ['Error polling subscription', { subscriptionId: 'sub_1', error: subscriptionError }],
+      ]);
     });
 
     it('should update lastPolledAt even on subscription error', async () => {
       const subscription = createMockSubscription({ provider: 'YOUTUBE' });
       const connection = createMockConnection({ provider: 'YOUTUBE' });
+      const subscriptionError = new Error('API Error');
 
       mockTryAcquireLock.mockResolvedValue(true);
       mockDbQuerySubscriptions.findMany.mockResolvedValue([subscription]);
       mockDbQueryConnections.findFirst.mockResolvedValue(connection);
       mockGetYouTubeClientForConnection.mockResolvedValue({});
-      mockFetchRecentVideos.mockRejectedValue(new Error('API Error'));
+      mockFetchRecentVideos.mockRejectedValue(subscriptionError);
 
       const env = createMockEnv();
       const ctx = createMockExecutionContext();
@@ -1166,6 +1187,12 @@ describe('Polling Scheduler', () => {
 
       // lastPolledAt should still be updated to prevent infinite retry
       expect(mockDbUpdate).toHaveBeenCalled();
+      expectLoggerErrorCalls([
+        [
+          'Error polling subscription',
+          { subscriptionId: subscription.id, error: subscriptionError },
+        ],
+      ]);
     });
   });
 

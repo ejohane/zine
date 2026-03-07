@@ -14,6 +14,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Mock Dependencies
@@ -210,6 +211,63 @@ interface MockSpotifyEpisode {
   isPlayable: boolean;
 }
 
+function expectFailedEpisodeIngestionLogs(
+  failures: Array<{ episodeId: string; errorMessage: string }>
+): void {
+  expectLoggerErrorCalls(
+    failures.map(({ episodeId, errorMessage }) => [
+      'Failed to ingest episode',
+      expect.objectContaining({
+        episodeId,
+        error: expect.objectContaining({
+          message: errorMessage,
+          type: 'Error',
+        }),
+        errorType: 'Error',
+      }),
+    ])
+  );
+}
+
+function expectFailedEpisodeFetchLogs(
+  failures: Array<{ subscriptionId: string; showId: string; errorMessage: string }>
+): void {
+  expectLoggerErrorCalls(
+    failures.map(({ subscriptionId, showId, errorMessage }) => [
+      'Failed to fetch episodes for show',
+      expect.objectContaining({
+        subscriptionId,
+        showId,
+        error: expect.objectContaining({
+          message: errorMessage,
+          type: 'Error',
+        }),
+      }),
+    ])
+  );
+}
+
+function expectCriticalBatchSizeErrorLog(params: {
+  batchSize: number;
+  maxSafe: number;
+  critical: number;
+  userId: string;
+}): void {
+  expectLoggerErrorCalls([
+    [
+      'Critical: Subscription batch size exceeds safe limit',
+      expect.objectContaining({
+        batchSize: params.batchSize,
+        maxSafe: params.maxSafe,
+        critical: params.critical,
+        userId: params.userId,
+        estimatedApiCalls: params.batchSize * 2,
+        estimatedDurationMs: params.batchSize * 100,
+      }),
+    ],
+  ]);
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -274,6 +332,9 @@ describe('Spotify Poller - Watermark Integrity', () => {
       expect(updateCall).toBeDefined();
       expect(updateCall?.values.lastPolledAt).toBeDefined();
       expect(updateCall?.values.lastPublishedAt).toBeUndefined();
+      expectFailedEpisodeIngestionLogs([
+        { episodeId: 'episode1', errorMessage: 'Ingestion failed' },
+      ]);
     });
 
     it('should NOT update lastPublishedAt when all episodes are skipped (already seen)', async () => {
@@ -355,6 +416,9 @@ describe('Spotify Poller - Watermark Integrity', () => {
       // 2024-01-14 at midnight UTC
       const expectedTimestamp = new Date('2024-01-14T00:00:00Z').getTime();
       expect(updateCall?.values.lastPublishedAt).toBe(expectedTimestamp);
+      expectFailedEpisodeIngestionLogs([
+        { episodeId: 'episode1', errorMessage: 'Failed to ingest newest' },
+      ]);
     });
 
     it('should update lastPublishedAt to newest when all episodes ingested successfully', async () => {
@@ -428,6 +492,10 @@ describe('Spotify Poller - Watermark Integrity', () => {
       const updateCall = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
       const expectedTimestamp = new Date('2024-01-14T00:00:00Z').getTime();
       expect(updateCall?.values.lastPublishedAt).toBe(expectedTimestamp);
+      expectFailedEpisodeIngestionLogs([
+        { episodeId: 'ep1', errorMessage: 'Failed' },
+        { episodeId: 'ep3', errorMessage: 'Failed' },
+      ]);
     });
   });
 
@@ -475,6 +543,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
       expect(updateCall).toBeDefined();
       expect(updateCall?.values.lastPublishedAt).toBeUndefined();
       expect(updateCall?.values.totalItems).toBeUndefined();
+      expectFailedEpisodeIngestionLogs([{ episodeId: 'ep1', errorMessage: 'Ingestion failed' }]);
     });
 
     it('should update lastPublishedAt AND totalItems only when ingestion succeeds', async () => {
@@ -566,6 +635,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
       const update2 = dbUpdateCalls.find((c) => c.subscriptionId === 'sub2');
       expect(update2?.values.lastPublishedAt).toBeDefined();
       expect(update2?.values.totalItems).toBe(21);
+      expectFailedEpisodeIngestionLogs([{ episodeId: 'ep1', errorMessage: 'Failed' }]);
     });
   });
 
@@ -1068,6 +1138,9 @@ describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
 
     // Verify lastPolledAt IS updated (so we don't poll too frequently)
     expect(updateCall?.values.lastPolledAt).toBeDefined();
+    expectFailedEpisodeIngestionLogs([
+      { episodeId: 'missed-episode', errorMessage: 'Database constraint violation' },
+    ]);
   });
 
   it('should preserve episode recovery opportunity after transient failure', async () => {
@@ -1097,6 +1170,9 @@ describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
     // Watermark should NOT advance
     const firstUpdate = dbUpdateCalls.find((c) => c.subscriptionId === sub.id);
     expect(firstUpdate?.values.lastPublishedAt).toBeUndefined();
+    expectFailedEpisodeIngestionLogs([
+      { episodeId: 'recoverable', errorMessage: 'Transient DB error' },
+    ]);
 
     // Simulate retry: same episode, now succeeds
     dbUpdateCalls.length = 0;
@@ -1259,6 +1335,13 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       expect(result.errors).toBeDefined();
       expect(result.errors?.length).toBe(1);
       expect(result.errors?.[0].subscriptionId).toBe('sub_fail');
+      expectFailedEpisodeFetchLogs([
+        {
+          subscriptionId: 'sub_fail',
+          showId: 'show_fail',
+          errorMessage: 'API rate limit exceeded',
+        },
+      ]);
     });
 
     it('should respect concurrency limit from environment', async () => {
@@ -1454,6 +1537,13 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       // Error recorded for failed subscription
       expect(result.errors).toHaveLength(1);
       expect(result.errors?.[0].subscriptionId).toBe('sub_api_error');
+      expectFailedEpisodeFetchLogs([
+        {
+          subscriptionId: 'sub_api_error',
+          showId: 'show_api_error',
+          errorMessage: 'Spotify API error',
+        },
+      ]);
     });
 
     it('should handle all parallel fetches failing gracefully', async () => {
@@ -1493,6 +1583,18 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       expect(result.processed).toBe(2);
       expect(result.newItems).toBe(0);
       expect(result.errors).toHaveLength(2);
+      expectFailedEpisodeFetchLogs([
+        {
+          subscriptionId: 'sub_fail_1',
+          showId: 'show_fail_1',
+          errorMessage: 'Network error',
+        },
+        {
+          subscriptionId: 'sub_fail_2',
+          showId: 'show_fail_2',
+          errorMessage: 'Network error',
+        },
+      ]);
     });
 
     it('should preserve watermark integrity during parallel processing', async () => {
@@ -1550,6 +1652,9 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
       const update2 = dbUpdateCalls.find((c) => c.subscriptionId === 'sub2');
       expect(update2?.values.lastPublishedAt).toBeUndefined();
       expect(update2?.values.totalItems).toBeUndefined();
+      expectFailedEpisodeIngestionLogs([
+        { episodeId: 'ep-show2', errorMessage: 'Ingestion failed' },
+      ]);
     });
   });
 });
@@ -1905,6 +2010,12 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
 
       // Function should complete without throwing (error is logged, not thrown)
       expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+      expectCriticalBatchSizeErrorLog({
+        batchSize: 1001,
+        maxSafe: 500,
+        critical: 1000,
+        userId: subs[0].userId,
+      });
     });
 
     it('should NOT log warning for batches within safe size', async () => {
@@ -2018,6 +2129,12 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
 
       // Should complete - error logged but not thrown
       expect(mockGetMultipleShowsWithCache).toHaveBeenCalled();
+      expectCriticalBatchSizeErrorLog({
+        batchSize: 101,
+        maxSafe: 50,
+        critical: 100,
+        userId: subs[0].userId,
+      });
     });
 
     it('should fall back to default batch thresholds when env values are invalid', async () => {
@@ -2198,6 +2315,12 @@ describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
       // (they're all skipped because no delta)
       expect(result.skipped).toBe(110);
       expect(result.processed).toBe(0);
+      expectCriticalBatchSizeErrorLog({
+        batchSize: 110,
+        maxSafe: 50,
+        critical: 100,
+        userId: subs[0].userId,
+      });
     });
 
     it('should correctly estimate API calls and duration in metrics', async () => {
