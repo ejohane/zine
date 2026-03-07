@@ -24,6 +24,40 @@ describe('gmail newsletter detection', () => {
     expect(detection.score).toBeGreaterThanOrEqual(0.78);
   });
 
+  it('classifies allowlisted Stratechery messages without list-id', () => {
+    const detection = computeNewsletterScore({
+      listId: null,
+      listUnsubscribe:
+        '<https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email>',
+      unsubscribeMailto: null,
+      unsubscribeUrl:
+        'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email',
+      unsubscribePostHeader: 'List-Unsubscribe=One-Click',
+      fromAddress: 'email@stratechery.com',
+      fromDisplayName: 'Ben Thompson',
+      subject: 'Higher Powers and Lower Macs (This Week in Stratechery)',
+    });
+
+    expect(detection.isNewsletter).toBe(true);
+    expect(detection.score).toBeGreaterThanOrEqual(0.78);
+  });
+
+  it('does not classify generic branded senders from unsubscribe headers alone', () => {
+    const detection = computeNewsletterScore({
+      listId: null,
+      listUnsubscribe: '<https://brand.example.com/unsubscribe>',
+      unsubscribeMailto: null,
+      unsubscribeUrl: 'https://brand.example.com/unsubscribe',
+      unsubscribePostHeader: 'List-Unsubscribe=One-Click',
+      fromAddress: 'email@brand.example.com',
+      fromDisplayName: 'Brand Author',
+      subject: 'Thoughts on software architecture',
+    });
+
+    expect(detection.isNewsletter).toBe(false);
+    expect(detection.score).toBeLessThan(0.78);
+  });
+
   it('rejects transactional notifications even with unsubscribe headers', () => {
     const githubDetection = computeNewsletterScore({
       listId: '<repo.github.com>',
@@ -64,8 +98,8 @@ describe('gmail newsletter detection', () => {
       listId: '<ride.uber.com>',
       unsubscribeMailto: null,
       unsubscribeUrl: 'https://uber.com/unsubscribe',
-      fromAddress: 'uber@uber.com',
-      displayName: 'Uber',
+      fromAddress: 'noreply@uber.com',
+      displayName: 'Uber Receipts',
     });
 
     const substackIdentity = isLikelyNewsletterFeedIdentity({
@@ -76,9 +110,19 @@ describe('gmail newsletter detection', () => {
       displayName: 'Author Weekly',
     });
 
+    const stratecheryIdentity = isLikelyNewsletterFeedIdentity({
+      listId: null,
+      unsubscribeMailto: null,
+      unsubscribeUrl:
+        'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email',
+      fromAddress: 'email@stratechery.com',
+      displayName: 'Ben Thompson',
+    });
+
     expect(githubIdentity).toBe(false);
     expect(uberIdentity).toBe(false);
     expect(substackIdentity).toBe(true);
+    expect(stratecheryIdentity).toBe(true);
   });
 
   it('prefers real content links over unsubscribe/manage links', () => {

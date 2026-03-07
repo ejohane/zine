@@ -776,7 +776,7 @@ describe('useOfflineMutation', () => {
       const { result, rerender } = renderHook(() => useOfflineMutation(options));
 
       const firstMutate = result.current.mutate;
-      rerender();
+      rerender(undefined);
       const secondMutate = result.current.mutate;
 
       // mutate is wrapped in useCallback, should be stable when deps don't change
