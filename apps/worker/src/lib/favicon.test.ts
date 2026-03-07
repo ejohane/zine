@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchFavicon } from './favicon';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Test HTML Templates
@@ -306,12 +307,16 @@ describe('fetchFavicon', () => {
     });
 
     it('should handle page fetch errors gracefully', async () => {
-      mockFetchError(new Error('Network error'));
+      const networkError = new Error('Network error');
+      mockFetchError(networkError);
 
       const result = await fetchFavicon('https://example.com/page');
 
       // Should return null on error
       expect(result).toBeNull();
+      expectLoggerErrorCalls([
+        ['Favicon fetch failed', { url: 'https://example.com/page', error: networkError }],
+      ]);
     });
 
     it('should handle non-HTML responses', async () => {

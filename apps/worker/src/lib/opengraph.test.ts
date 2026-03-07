@@ -7,6 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { scrapeOpenGraph, type OpenGraphData } from './opengraph';
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 
 // ============================================================================
 // Test HTML Templates
@@ -262,12 +263,16 @@ describe('scrapeOpenGraph', () => {
     });
 
     it('should return empty result on network error', async () => {
-      mockFetchError(new Error('Network error'));
+      const networkError = new Error('Network error');
+      mockFetchError(networkError);
 
       const result = await scrapeOpenGraph('https://example.com/page');
 
       expect(result.title).toBeNull();
       expect(result.description).toBeNull();
+      expectLoggerErrorCalls([
+        ['OG scrape failed', { url: 'https://example.com/page', error: networkError }],
+      ]);
     });
 
     it('should handle timeout gracefully', async () => {

@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleSyncDLQ, getDLQEntries, getDLQSummary, deleteDLQEntry } from './dlq-consumer';
 import type { SyncQueueMessage } from './types';
 import { getDLQEntryKey, getDLQIndexKey } from './types';
+import { expectLoggerErrorCalls, mockLogger } from '../test/mock-logger';
 
 // ============================================================================
 // Mocks
@@ -23,18 +24,6 @@ import { getDLQEntryKey, getDLQIndexKey } from './types';
 let mockUlidCounter = 0;
 vi.mock('ulid', () => ({
   ulid: () => `01HQXYZ${String(++mockUlidCounter).padStart(17, '0')}`,
-}));
-
-// Mock logger to suppress console output during tests
-vi.mock('../lib/logger', () => ({
-  logger: {
-    child: () => ({
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-    }),
-  },
 }));
 
 // ============================================================================
@@ -96,6 +85,32 @@ function createMockDLQBatch(messages: Message<SyncQueueMessage>[]): MessageBatch
   };
 }
 
+function expectHandleSyncDLQErrorLogs(
+  batch: MessageBatch<SyncQueueMessage>,
+  malformedMessageIds: string[] = []
+): void {
+  const expectedCalls: Parameters<typeof expectLoggerErrorCalls>[0] = [
+    [
+      'DLQ messages received - sync failures requiring investigation',
+      expect.objectContaining({
+        messageCount: batch.messages.length,
+        environment: 'development',
+      }),
+    ],
+    ...batch.messages.map<Parameters<typeof expectLoggerErrorCalls>[0][number]>((message) => [
+      malformedMessageIds.includes(message.id)
+        ? 'DLQ: Malformed message body'
+        : 'DLQ: Subscription sync permanently failed',
+      expect.objectContaining({
+        messageId: message.id,
+        attempts: message.attempts,
+      }),
+    ]),
+  ];
+
+  expectLoggerErrorCalls(expectedCalls);
+}
+
 // ============================================================================
 // Mock Environment
 // ============================================================================
@@ -155,6 +170,7 @@ describe('handleSyncDLQ', () => {
       expect.any(String),
       expect.objectContaining({ expirationTtl: 7 * 24 * 60 * 60 })
     );
+    expectHandleSyncDLQErrorLogs(batch);
   });
 
   it('should acknowledge all messages after processing', async () => {
@@ -184,6 +200,7 @@ describe('handleSyncDLQ', () => {
 
     expect(message1.ack).toHaveBeenCalled();
     expect(message2.ack).toHaveBeenCalled();
+    expectHandleSyncDLQErrorLogs(batch);
   });
 
   it('should handle malformed message bodies', async () => {
@@ -205,6 +222,7 @@ describe('handleSyncDLQ', () => {
     // Should still ack and store entry with partial data
     expect(malformedMessage.ack).toHaveBeenCalled();
     expect(kv.put).toHaveBeenCalled();
+    expectHandleSyncDLQErrorLogs(batch, ['msg_malformed']);
   });
 
   it('should include message attempts in DLQ entry', async () => {
@@ -234,6 +252,7 @@ describe('handleSyncDLQ', () => {
 
     const storedEntry = JSON.parse(entryCall![1]);
     expect(storedEntry.attempts).toBe(3);
+    expectHandleSyncDLQErrorLogs(batch);
   });
 
   it('should maintain DLQ index with most recent first', async () => {
@@ -267,6 +286,7 @@ describe('handleSyncDLQ', () => {
     expect(updatedIndex[0]).toMatch(/^01HQXYZ/);
     expect(updatedIndex[1]).toBe('existing_id_1');
     expect(updatedIndex[2]).toBe('existing_id_2');
+    expectHandleSyncDLQErrorLogs(batch);
   });
 
   it('should recover from corrupted DLQ index JSON when storing new entries', async () => {
@@ -296,6 +316,14 @@ describe('handleSyncDLQ', () => {
     const updatedIndex = JSON.parse(indexCall![1]);
     expect(updatedIndex).toHaveLength(1);
     expect(updatedIndex[0]).toMatch(/^01HQXYZ/);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Failed to parse DLQ index JSON; resetting',
+      expect.objectContaining({
+        operation: 'store',
+        error: expect.any(String),
+      })
+    );
+    expectHandleSyncDLQErrorLogs(batch);
   });
 
   it('should store correct DLQ entry structure', async () => {
@@ -333,6 +361,7 @@ describe('handleSyncDLQ', () => {
       environment: 'development',
       deadLetteredAt: expect.any(Number),
     });
+    expectHandleSyncDLQErrorLogs(batch);
   });
 });
 
@@ -410,6 +439,28 @@ describe('getDLQEntries', () => {
     });
 
     await expect(getDLQEntries(kv)).resolves.toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Failed to parse DLQ index JSON; resetting',
+      expect.objectContaining({
+        operation: 'list',
+        error: expect.any(String),
+      })
+    );
+  });
+
+  it('should return empty array and warn when index data has invalid shape', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: JSON.stringify(['entry_1', 42]),
+      [getDLQEntryKey('entry_1')]: JSON.stringify({ id: 'entry_1' }),
+    });
+
+    await expect(getDLQEntries(kv)).resolves.toEqual([]);
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'DLQ index data has invalid shape; resetting',
+      expect.objectContaining({
+        operation: 'list',
+      })
+    );
   });
 });
 
@@ -589,6 +640,7 @@ describe('DLQ entry TTL', () => {
       expect.any(String),
       { expirationTtl: 604800 }
     );
+    expectHandleSyncDLQErrorLogs(batch);
   });
 });
 
@@ -620,5 +672,6 @@ describe('queue routing', () => {
     expect(message.ack).toHaveBeenCalled();
     // Should store in KV
     expect(kv.put).toHaveBeenCalled();
+    expectHandleSyncDLQErrorLogs(batch);
   });
 });

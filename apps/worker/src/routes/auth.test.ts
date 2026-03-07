@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../types';
+import { expectLoggerErrorCalls, mockLogger } from '../test/mock-logger';
 
 // Mock svix for testing
 vi.mock('svix', () => ({
@@ -150,6 +151,7 @@ describe('POST /api/auth/webhook', () => {
 
     const body = (await res.json()) as JsonResponse;
     expect(body.code).toBe('WEBHOOK_NOT_CONFIGURED');
+    expectLoggerErrorCalls([['CLERK_WEBHOOK_SECRET not configured']]);
   });
 
   it('returns 400 if Svix headers are missing', async () => {
@@ -262,8 +264,6 @@ describe('POST /api/auth/webhook', () => {
   });
 
   it('logs but does not process user.updated events', async () => {
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     const req = new Request('http://localhost/api/auth/webhook', {
       method: 'POST',
       headers: {
@@ -287,10 +287,9 @@ describe('POST /api/auth/webhook', () => {
 
     const res = await app.fetch(req, mockEnv);
     expect(res.status).toBe(200);
-
-    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('user.updated'));
-
-    consoleSpy.mockRestore();
+    expect(mockLogger.info).toHaveBeenCalledWith('user.updated - no action needed', {
+      userId: 'user_789',
+    });
   });
 });
 

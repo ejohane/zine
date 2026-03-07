@@ -26,6 +26,7 @@ import {
   ACTIVE_JOB_TTL_SECONDS,
   type SyncJobStatus,
 } from './types';
+import { mockLogger } from '../test/mock-logger';
 
 vi.mock('../providers/youtube', () => ({
   getYouTubeClientForConnection: vi.fn(async () => ({ client: 'youtube' })),
@@ -483,6 +484,10 @@ describe('updateJobProgress', () => {
 
     // Should not have called put (only get)
     expect(mockKV.put).not.toHaveBeenCalled();
+    expect(mockLogger.warn).toHaveBeenCalledWith('Job status not found for update', {
+      jobId: TEST_JOB_ID,
+      subscriptionId: 'sub_1',
+    });
   });
 
   it('should increment completed and succeeded on success', async () => {
@@ -1140,6 +1145,13 @@ describe('initiateSyncJob', () => {
       expect(storedStatus.failed).toBe(0);
       expect(storedStatus.itemsFound).toBe(3);
       expect(storedStatus.errors).toEqual([]);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Queue not available, falling back to synchronous processing',
+        expect.objectContaining({
+          jobId: result.jobId,
+          userId: TEST_USER_ID,
+        })
+      );
     });
   });
 
