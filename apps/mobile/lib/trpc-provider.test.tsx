@@ -166,7 +166,7 @@ describe('TRPCProvider transport wiring', () => {
     mockGetItem.mockResolvedValue(null);
   });
 
-  it('configures httpBatchLink with POST, telemetry headers, and telemetry fetch', async () => {
+  it('configures httpBatchLink with telemetry headers and telemetry fetch', async () => {
     act(() => {
       create(
         <TRPCProvider>
@@ -177,7 +177,6 @@ describe('TRPCProvider transport wiring', () => {
 
     expect(httpBatchLink).toHaveBeenCalledWith(
       expect.objectContaining({
-        methodOverride: 'POST',
         fetch: telemetryFetch,
         headers: expect.any(Function),
       })

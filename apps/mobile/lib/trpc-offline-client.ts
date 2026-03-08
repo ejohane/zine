@@ -107,7 +107,6 @@ export function createOfflineTRPCClient(seed?: { traceId?: string; clientRequest
     links: [
       httpBatchLink({
         url,
-        methodOverride: 'POST',
         transformer: superjson, // Must match server configuration
         headers: async () => {
           const authHeaders = await getAuthHeaders();
