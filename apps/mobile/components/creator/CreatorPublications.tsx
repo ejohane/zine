@@ -5,12 +5,13 @@
  * (INBOX, BOOKMARKED, ARCHIVED).
  */
 
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ErrorState } from '@/components/list-states';
-import { Colors, Typography, Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Text } from '@/components/primitives';
+import { Radius, Typography, Spacing, type ThemeColors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useCreatorPublications } from '@/hooks/use-creator';
 import { mapContentType, mapProvider } from '@/hooks/use-items-trpc';
 import type { ContentType, Provider } from '@/lib/content-utils';
@@ -30,22 +31,18 @@ export interface CreatorPublicationsProps {
   };
 }
 
-function PublicationsSkeleton({ colors }: { colors: typeof Colors.light }) {
+function PublicationsSkeleton({ colors }: { colors: ThemeColors }) {
   return (
     <View>
       {[1, 2, 3].map((i) => (
-        <View
-          key={i}
-          style={[styles.skeletonItem, { backgroundColor: colors.backgroundTertiary }]}
-        />
+        <View key={i} style={[styles.skeletonItem, { backgroundColor: colors.surfaceRaised }]} />
       ))}
     </View>
   );
 }
 
 export function CreatorPublications({ creatorId, stateOverride }: CreatorPublicationsProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
 
   const publicationsState = useCreatorPublications(creatorId);
   const publications = stateOverride?.publications ?? publicationsState.publications;
@@ -81,7 +78,9 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Past Publications</Text>
+          <Text style={styles.title} tone="primary">
+            Past Publications
+          </Text>
         </View>
         <PublicationsSkeleton colors={colors} />
       </View>
@@ -92,7 +91,9 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Past Publications</Text>
+          <Text style={styles.title} tone="primary">
+            Past Publications
+          </Text>
         </View>
         <ErrorState
           title="Failed to load publications"
@@ -107,9 +108,11 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Past Publications</Text>
+          <Text style={styles.title} tone="primary">
+            Past Publications
+          </Text>
         </View>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+        <Text style={styles.emptyText} tone="secondary">
           No publications found yet
         </Text>
       </View>
@@ -119,8 +122,10 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Past Publications</Text>
-        <Text style={[styles.count, { color: colors.textSecondary }]}>
+        <Text style={styles.title} tone="primary">
+          Past Publications
+        </Text>
+        <Text style={styles.count} tone="secondary">
           {items.length} item{items.length === 1 ? '' : 's'}
         </Text>
       </View>
@@ -134,7 +139,7 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
         ListFooterComponent={
           isFetchingNextPage ? (
             <View style={styles.loadingFooter}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <ActivityIndicator size="small" color={colors.accent} />
             </View>
           ) : null
         }
@@ -170,7 +175,7 @@ const styles = StyleSheet.create({
     height: 64,
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.sm,
-    borderRadius: 8,
+    borderRadius: Radius.md,
   },
   loadingFooter: {
     paddingVertical: Spacing.lg,

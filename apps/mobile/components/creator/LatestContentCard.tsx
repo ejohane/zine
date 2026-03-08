@@ -7,10 +7,11 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Image, Pressable, StyleSheet } from 'react-native';
 
-import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Badge, Text } from '@/components/primitives';
+import { IconSizes, Radius, Spacing, Typography } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { analytics } from '@/lib/analytics';
 import { formatRelativeTime, formatDuration } from '@/lib/format';
 import { logger } from '@/lib/logger';
@@ -78,8 +79,7 @@ export interface LatestContentCardProps {
  */
 export function LatestContentCard({ item, creatorId, provider }: LatestContentCardProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors, motion } = useAppTheme();
   const ensureLatestContentItemMutation = trpc.creators.ensureLatestContentItem.useMutation();
 
   const handlePress = async () => {
@@ -138,7 +138,7 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
     <Pressable
       onPress={handlePress}
       disabled={ensureLatestContentItemMutation.isPending}
-      style={({ pressed }) => [styles.container, { opacity: pressed ? 0.7 : 1 }]}
+      style={({ pressed }) => [styles.container, { opacity: pressed ? motion.opacity.pressed : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open ${item.title}`}
       accessibilityHint="Opens content"
@@ -158,25 +158,27 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
 
       {/* Content */}
       <View style={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={2} ellipsizeMode="tail">
+        <Text style={styles.title} tone="primary" numberOfLines={2} ellipsizeMode="tail">
           {item.title}
         </Text>
         {showMetaRow && (
           <View style={styles.metaRow}>
             {metaLine ? (
-              <Text style={[styles.meta, { color: colors.textSecondary }]}>{metaLine}</Text>
+              <Text style={styles.meta} tone="secondary">
+                {metaLine}
+              </Text>
             ) : null}
             {item.isBookmarked ? (
-              <View
-                style={[
-                  styles.savedBadge,
-                  { backgroundColor: colors.success, marginLeft: metaLine ? Spacing.sm : 0 },
-                ]}
+              <Badge
+                label="Saved"
+                tone="success"
+                shape="pill"
+                leadingAccessory={
+                  <Ionicons name="bookmark" size={12} color={colors.overlayForeground} />
+                }
+                style={[styles.savedBadge, metaLine ? styles.savedBadgeWithMeta : null]}
                 accessibilityLabel="Saved"
-              >
-                <Ionicons name="bookmark" size={12} color="#FFFFFF" />
-                <Text style={styles.savedText}>Saved</Text>
-              </View>
+              />
             ) : null}
           </View>
         )}
@@ -217,7 +219,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   thumbnailPlaceholderText: {
-    fontSize: 20,
+    fontSize: IconSizes.lg,
   },
   content: {
     flex: 1,
@@ -239,16 +241,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   savedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 2,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: Radius.full,
   },
-  savedText: {
-    ...Typography.labelSmall,
-    marginLeft: Spacing.xs,
-    color: '#FFFFFF',
+  savedBadgeWithMeta: {
+    marginLeft: Spacing.sm,
   },
   chevronContainer: {
     paddingLeft: Spacing.sm,

@@ -1,6 +1,6 @@
 # Mobile Design System Component Inventory
 
-Last updated: February 22, 2026
+Last updated: March 7, 2026
 
 ## Purpose
 
@@ -20,8 +20,13 @@ and which are legacy or dormant.
 
 | Path                                                              | Status      | Story Priority | Notes                                                             |
 | ----------------------------------------------------------------- | ----------- | -------------- | ----------------------------------------------------------------- |
+| `apps/mobile/components/primitives/text.tsx`                      | `canonical` | `P0`           | Shared typography primitive for semantic tone, variant, and font. |
+| `apps/mobile/components/primitives/surface.tsx`                   | `canonical` | `P0`           | Shared container primitive for semantic surfaces and borders.     |
+| `apps/mobile/components/primitives/badge.tsx`                     | `canonical` | `P0`           | Shared metadata primitive for pills, overlays, and status chips.  |
+| `apps/mobile/components/primitives/button.tsx`                    | `canonical` | `P0`           | Shared action primitive for primary, secondary, outline, ghost.   |
+| `apps/mobile/components/primitives/icon-button.tsx`               | `canonical` | `P0`           | Shared icon-only action primitive for item and detail controls.   |
 | `apps/mobile/components/icons/index.tsx`                          | `canonical` | `P0`           | Shared icon primitives used throughout app screens.               |
-| `apps/mobile/components/badges.tsx`                               | `canonical` | `P0`           | Provider/type pills used in item and creator surfaces.            |
+| `apps/mobile/components/badges.tsx`                               | `canonical` | `P0`           | Provider/type wrappers built on the shared badge primitive.       |
 | `apps/mobile/components/filter-chip.tsx`                          | `canonical` | `P0`           | Shared filter primitive used in library filtering.                |
 | `apps/mobile/components/list-states.tsx`                          | `canonical` | `P0`           | Shared loading/error/empty/not-found state components.            |
 | `apps/mobile/components/item-card.tsx`                            | `canonical` | `P0`           | Primary card system with multiple variants.                       |
@@ -85,13 +90,14 @@ and which are legacy or dormant.
 ## Decision Rules
 
 1. New UI work must start from `canonical` components whenever possible.
-2. New screens can use `app-container` components, but shared visuals should move toward a pure presentational layer.
-3. `legacy` components should not receive new features.
-4. `dormant` components can be reactivated only as part of a scoped feature plan.
-5. If a component changes status, update this file in the same PR.
+2. Shared visual work should prefer `primitives/text.tsx`, `primitives/surface.tsx`, `primitives/badge.tsx`, `primitives/button.tsx`, and `primitives/icon-button.tsx` before adding duplicated local button/text/container styles.
+3. New screens can use `app-container` components, but shared visuals should move toward a pure presentational layer.
+4. `legacy` components should not receive new features.
+5. `dormant` components can be reactivated only as part of a scoped feature plan.
+6. If a component changes status, update this file in the same PR.
 
 ## Immediate Follow-Ups
 
-1. Add Storybook coverage for all `P0` rows first.
+1. Migrate remaining non-legacy theme consumers (`swipeable-inbox-item` and route-level item detail screens) to `useAppTheme()`.
 2. Create view-model splits for selected `app-container` rows before expanding their stories.
 3. Decide whether to archive or delete `legacy` home components after Storybook coverage lands.

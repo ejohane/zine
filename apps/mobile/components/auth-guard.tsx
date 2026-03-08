@@ -10,8 +10,7 @@ import { Redirect } from 'expo-router';
 import { type ReactNode } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 // ============================================================================
 // Component
@@ -44,16 +43,15 @@ interface AuthGuardProps {
  */
 export function AuthGuard({ children, authStateOverride, signedOutFallback }: AuthGuardProps) {
   const auth = useAuth();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
   const isLoaded = authStateOverride?.isLoaded ?? auth.isLoaded;
   const isSignedIn = authStateOverride?.isSignedIn ?? auth.isSignedIn;
 
   // Show loading state while auth is being determined
   if (!isLoaded) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: colors.surfaceCanvas }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }

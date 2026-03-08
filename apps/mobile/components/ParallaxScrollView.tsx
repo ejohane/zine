@@ -22,8 +22,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 type Props = PropsWithChildren<{
   headerImage: ReactElement;
@@ -43,8 +42,7 @@ export default function ParallaxScrollView({
 }: Props) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'dark'];
+  const { colors } = useAppTheme();
 
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -85,7 +83,7 @@ export default function ParallaxScrollView({
         style={[styles.headerContainer, { height: headerHeight }, headerAnimatedStyle]}
       >
         {headerImage}
-        <LinearGradient colors={['transparent', colors.background]} style={styles.gradient} />
+        <LinearGradient colors={['transparent', colors.surfaceCanvas]} style={styles.gradient} />
       </Animated.View>
       <View style={styles.contentContainer}>{children}</View>
     </Animated.ScrollView>

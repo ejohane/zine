@@ -3,6 +3,7 @@
   "main": "index.js",
   "version": "1.0.0",
   "scripts": {
+    "design-system:check": "node ../../scripts/check-mobile-design-system.mjs",
     "dev": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
     "storybook:generate": "sb-rn-get-stories",
@@ -10,7 +11,7 @@
     "android": "expo start --android -c",
     "ios": "expo start --ios -c",
     "web": "expo start --web -c",
-    "lint": "expo lint",
+    "lint": "expo lint && bun run design-system:check",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "build:ios:preview": "env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",

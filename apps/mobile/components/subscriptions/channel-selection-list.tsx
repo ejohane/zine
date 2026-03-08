@@ -15,18 +15,11 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  Pressable,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
+import { View, TextInput, FlatList, Pressable, StyleSheet } from 'react-native';
 
-import { Colors, Spacing, Radius, Typography, ProviderColors, Shadows } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Button, Surface, Text } from '@/components/primitives';
+import { Spacing, Radius, Typography, ProviderColors, Shadows } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { SearchIcon } from '@/components/icons';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { ChannelItem, type Channel, type Provider } from './channel-item';
@@ -112,8 +105,7 @@ export function ChannelSelectionList({
   emptyEmoji = '📺',
   ListFooterComponent,
 }: ChannelSelectionListProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -228,15 +220,7 @@ export function ChannelSelectionList({
       {/* Search Bar */}
       {showSearch && (
         <View style={styles.searchContainer}>
-          <View
-            style={[
-              styles.searchInputContainer,
-              {
-                backgroundColor: colors.backgroundSecondary,
-                borderColor: colors.border,
-              },
-            ]}
-          >
+          <Surface tone="subtle" border="default" style={styles.searchInputContainer}>
             <SearchIcon size={20} color={colors.textTertiary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
@@ -248,18 +232,18 @@ export function ChannelSelectionList({
               autoCorrect={false}
               clearButtonMode="while-editing"
             />
-          </View>
+          </Surface>
         </View>
       )}
 
       {/* Select All / Deselect All (multi-select mode only) */}
       {mode === 'multi' && channels.length > 0 && (
         <View style={styles.selectionActions}>
-          <Text style={[styles.selectionCount, { color: colors.textSecondary }]}>
+          <Text style={styles.selectionCount} tone="secondary">
             {selectedCount} of {totalCount} selected
           </Text>
           <Pressable onPress={allSelected ? deselectAll : selectAll}>
-            <Text style={[styles.selectionActionText, { color: colors.primary }]}>
+            <Text style={styles.selectionActionText} tone="accent">
               {allSelected ? 'Deselect All' : 'Select All'}
             </Text>
           </Pressable>
@@ -318,8 +302,7 @@ export function ChannelSelectionActionBar({
   subscribeText,
   skipText = 'Skip for now',
 }: ChannelSelectionActionBarProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
   const providerColor = getProviderColor(provider);
 
   const buttonText =
@@ -328,29 +311,24 @@ export function ChannelSelectionActionBar({
   return (
     <View style={[styles.actionBar, { borderTopColor: colors.border }]}>
       {selectedCount > 0 ? (
-        <Pressable
+        <Button
+          label={buttonText}
           onPress={onSubscribe}
           disabled={isSubscribing}
-          style={({ pressed }) => [
-            styles.subscribeAllButton,
-            { backgroundColor: providerColor },
-            pressed && styles.buttonPressed,
-            isSubscribing && styles.buttonDisabled,
-          ]}
-        >
-          {isSubscribing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.subscribeAllButtonText}>{buttonText}</Text>
-          )}
-        </Pressable>
+          loading={isSubscribing}
+          style={[styles.subscribeAllButton, { backgroundColor: providerColor }]}
+          labelStyle={{ color: colors.overlayForeground }}
+          fullWidth
+        />
       ) : onSkip ? (
-        <Pressable
+        <Button
+          label={skipText}
           onPress={onSkip}
-          style={({ pressed }) => [styles.skipButton, pressed && styles.buttonPressed]}
-        >
-          <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>{skipText}</Text>
-        </Pressable>
+          variant="ghost"
+          fullWidth
+          labelStyle={{ color: colors.textSecondary }}
+          style={styles.skipButton}
+        />
       ) : null}
     </View>
   );
@@ -406,32 +384,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   subscribeAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing['2xl'],
-    borderRadius: Radius.lg,
     ...Shadows.md,
   },
-  subscribeAllButtonText: {
-    color: '#FFFFFF',
-    ...Typography.labelLarge,
-    fontWeight: '600',
-  },
-  skipButton: {
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-  },
-  skipButtonText: {
-    ...Typography.labelLarge,
-  },
-  buttonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  skipButton: {},
 });

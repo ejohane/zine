@@ -13,10 +13,11 @@
 
 import type { ErrorInfo, ReactNode } from 'react';
 import { useCallback, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+
+import { Button, Text } from '@/components/primitives';
 import { ErrorBoundary, type FallbackRenderProps } from './error-boundary';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { IconSizes, Spacing } from '@/constants/theme';
 import { parseOAuthError, getOAuthErrorDisplay, type OAuthError } from '@/lib/oauth-errors';
 import { oauthLogger } from '@/lib/logger';
 
@@ -40,9 +41,6 @@ function getProviderName(provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'): string {
  * Shows specialized UI based on the error type.
  */
 function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
   const providerName = getProviderName(provider);
   const display = getOAuthErrorDisplay(error.code, providerName);
 
@@ -57,15 +55,15 @@ function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProp
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>{display.emoji}</Text>
-      <Text style={[styles.title, { color: colors.text }]}>{display.title}</Text>
-      <Text style={[styles.message, { color: colors.textSecondary }]}>{display.description}</Text>
-      {error.recoverable && onRetry && (
-        <Pressable onPress={onRetry} style={[styles.button, { backgroundColor: colors.primary }]}>
-          <Text style={styles.buttonText}>{buttonText}</Text>
-        </Pressable>
-      )}
+      <Text variant="titleMedium" style={styles.title}>
+        {display.title}
+      </Text>
+      <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        {display.description}
+      </Text>
+      {error.recoverable && onRetry ? <Button label={buttonText} onPress={onRetry} /> : null}
       {!error.recoverable && (
-        <Text style={[styles.helpText, { color: colors.textTertiary }]}>
+        <Text variant="bodySmall" tone="tertiary" style={styles.helpText}>
           If this problem persists, please contact support.
         </Text>
       )}
@@ -184,32 +182,19 @@ const styles = StyleSheet.create({
     padding: Spacing['2xl'],
   },
   emoji: {
-    fontSize: 64,
+    fontSize: IconSizes['3xl'],
     marginBottom: Spacing.lg,
   },
   title: {
-    ...Typography.titleMedium,
-    fontWeight: '600',
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   message: {
-    ...Typography.bodyMedium,
     textAlign: 'center',
     marginBottom: Spacing.lg,
     paddingHorizontal: Spacing.lg,
   },
-  button: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-  },
   helpText: {
-    ...Typography.bodySmall,
     textAlign: 'center',
     marginTop: Spacing.md,
   },

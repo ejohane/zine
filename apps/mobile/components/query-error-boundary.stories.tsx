@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -7,11 +8,11 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 
 import { QueryErrorBoundary } from './query-error-boundary';
 
-function NetworkCrash() {
+function NetworkCrash(): ReactElement {
   throw new Error('Network request failed: unable to reach API endpoint.');
 }
 
-function AppCrash() {
+function AppCrash(): ReactElement {
   throw new Error('Unexpected data shape returned by backend.');
 }
 
@@ -41,6 +42,9 @@ function ResetContractDemo() {
 const meta = {
   title: 'Boundary/QueryErrorBoundary',
   component: QueryErrorBoundary,
+  args: {
+    children: null,
+  },
   decorators: [createDarkCanvasDecorator({ height: 520, padding: Spacing.md })],
   parameters: {
     backgrounds: {
@@ -54,6 +58,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const NetworkError: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <QueryErrorBoundary>
@@ -64,6 +71,9 @@ export const NetworkError: Story = {
 };
 
 export const ApplicationError: Story = {
+  args: {
+    children: null,
+  },
   render: () => (
     <View style={styles.boundaryFrame}>
       <QueryErrorBoundary fallbackMessage="Failed to process server response for this query.">
@@ -74,6 +84,9 @@ export const ApplicationError: Story = {
 };
 
 export const ResetKeys: Story = {
+  args: {
+    children: null,
+  },
   render: () => <ResetContractDemo />,
 };
 

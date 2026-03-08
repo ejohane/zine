@@ -7,10 +7,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, Pressable, Linking, StyleSheet } from 'react-native';
+import { View, FlatList, Linking, StyleSheet } from 'react-native';
 
-import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Button, Text } from '@/components/primitives';
+import { Typography, Spacing, Radius, type ThemeColors } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import {
   useCreatorLatestContent,
   type CreatorContentItem,
@@ -77,14 +78,11 @@ function getSectionTitle(provider: string): string {
 // Helper Components
 // ============================================================================
 
-function Skeleton({ colors }: { colors: typeof Colors.light }) {
+function Skeleton({ colors }: { colors: ThemeColors }) {
   return (
     <View style={styles.skeletonContainer}>
       {[1, 2, 3, 4].map((i) => (
-        <View
-          key={i}
-          style={[styles.skeletonItem, { backgroundColor: colors.backgroundTertiary }]}
-        />
+        <View key={i} style={[styles.skeletonItem, { backgroundColor: colors.surfaceRaised }]} />
       ))}
     </View>
   );
@@ -94,7 +92,7 @@ interface ConnectPromptProps {
   provider: string;
   message: string;
   connectUrl?: string;
-  colors: typeof Colors.light;
+  colors: ThemeColors;
 }
 
 function ConnectPrompt({ provider, message, connectUrl, colors }: ConnectPromptProps) {
@@ -107,22 +105,17 @@ function ConnectPrompt({ provider, message, connectUrl, colors }: ConnectPromptP
   const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
 
   return (
-    <View style={[styles.promptContainer, { backgroundColor: colors.backgroundSecondary }]}>
-      <Text style={[styles.promptText, { color: colors.textSecondary }]}>{message}</Text>
+    <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
+      <Text style={styles.promptText} tone="secondary">
+        {message}
+      </Text>
       {connectUrl && (
-        <Pressable
+        <Button
+          label={`Connect ${providerDisplayName}`}
           onPress={handleConnect}
-          style={({ pressed }) => [
-            styles.connectButton,
-            { backgroundColor: colors.buttonPrimary, opacity: pressed ? 0.9 : 1 },
-          ]}
-          accessibilityRole="button"
+          style={styles.connectButton}
           accessibilityLabel={`Connect ${providerDisplayName}`}
-        >
-          <Text style={[styles.connectButtonText, { color: colors.buttonPrimaryText }]}>
-            Connect {providerDisplayName}
-          </Text>
-        </Pressable>
+        />
       )}
     </View>
   );
@@ -131,7 +124,7 @@ function ConnectPrompt({ provider, message, connectUrl, colors }: ConnectPromptP
 interface ReconnectPromptProps {
   provider: string;
   connectUrl?: string;
-  colors: typeof Colors.light;
+  colors: ThemeColors;
 }
 
 function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps) {
@@ -144,24 +137,17 @@ function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps)
   const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
 
   return (
-    <View style={[styles.promptContainer, { backgroundColor: colors.backgroundSecondary }]}>
-      <Text style={[styles.promptText, { color: colors.textSecondary }]}>
+    <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
+      <Text style={styles.promptText} tone="secondary">
         Your {providerDisplayName} connection needs to be refreshed
       </Text>
       {connectUrl && (
-        <Pressable
+        <Button
+          label="Reconnect"
           onPress={handleReconnect}
-          style={({ pressed }) => [
-            styles.connectButton,
-            { backgroundColor: colors.buttonPrimary, opacity: pressed ? 0.9 : 1 },
-          ]}
-          accessibilityRole="button"
+          style={styles.connectButton}
           accessibilityLabel={`Reconnect ${providerDisplayName}`}
-        >
-          <Text style={[styles.connectButtonText, { color: colors.buttonPrimaryText }]}>
-            Reconnect
-          </Text>
-        </Pressable>
+        />
       )}
     </View>
   );
@@ -192,8 +178,7 @@ export function CreatorLatestContent({
   provider,
   stateOverride,
 }: CreatorLatestContentProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
   const [resolvedThumbnailUrls, setResolvedThumbnailUrls] = useState<Record<string, string | null>>(
     {}
   );
@@ -384,7 +369,9 @@ export function CreatorLatestContent({
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
+        <Text style={styles.title} tone="primary">
+          {sectionTitle}
+        </Text>
         <Skeleton colors={colors} />
       </View>
     );
@@ -394,7 +381,9 @@ export function CreatorLatestContent({
   if (reason === 'NOT_CONNECTED') {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
+        <Text style={styles.title} tone="primary">
+          {sectionTitle}
+        </Text>
         <ConnectPrompt
           provider={provider}
           message={`Connect your ${providerDisplayName} account to see latest content`}
@@ -409,7 +398,9 @@ export function CreatorLatestContent({
   if (reason === 'TOKEN_EXPIRED') {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
+        <Text style={styles.title} tone="primary">
+          {sectionTitle}
+        </Text>
         <ReconnectPrompt provider={provider} connectUrl={connectUrl} colors={colors} />
       </View>
     );
@@ -419,8 +410,10 @@ export function CreatorLatestContent({
   if (error) {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
-        <Text style={[styles.errorText, { color: colors.error }]}>
+        <Text style={styles.title} tone="primary">
+          {sectionTitle}
+        </Text>
+        <Text style={styles.errorText} tone="error">
           Failed to load latest content
         </Text>
       </View>
@@ -431,8 +424,10 @@ export function CreatorLatestContent({
   if (content.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
-        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+        <Text style={styles.title} tone="primary">
+          {sectionTitle}
+        </Text>
+        <Text style={styles.emptyText} tone="secondary">
           No recent content found
         </Text>
       </View>
@@ -455,7 +450,9 @@ export function CreatorLatestContent({
   // Success state with items
   return (
     <View style={styles.container}>
-      <Text style={[styles.title, { color: colors.text }]}>{sectionTitle}</Text>
+      <Text style={styles.title} tone="primary">
+        {sectionTitle}
+      </Text>
       <FlatList
         data={items}
         keyExtractor={(item) => item.providerId}
@@ -510,13 +507,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   connectButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing['2xl'],
     borderRadius: Radius.full,
-  },
-  connectButtonText: {
-    ...Typography.labelLarge,
-    fontWeight: '600',
   },
   errorText: {
     ...Typography.bodyMedium,

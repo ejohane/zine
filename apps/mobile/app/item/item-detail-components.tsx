@@ -7,6 +7,7 @@ import Animated from 'react-native-reanimated';
 
 import { SourceBadge, TypeBadge } from '@/components/badges';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
+import { IconButton } from '@/components/primitives';
 import type { Colors } from '@/constants/theme';
 import { Spacing } from '@/constants/theme';
 import type { Provider } from '@/hooks/use-items-trpc';
@@ -88,13 +89,16 @@ export function IconActionButton({
   };
 
   return (
-    <Pressable
+    <IconButton
       onPress={handlePress}
       disabled={disabled}
-      style={[styles.iconActionButton, disabled ? { opacity: 0.5 } : null]}
+      size="md"
+      variant="ghost"
+      style={styles.iconActionButton}
+      accessibilityLabel={icon}
     >
       <Ionicons name={icon} size={24} color={color} style={{ fontWeight: '700' }} />
-    </Pressable>
+    </IconButton>
   );
 }
 
@@ -112,12 +116,16 @@ export function HeaderIconButton({
   onPress?: () => void;
 }) {
   return (
-    <Pressable
+    <IconButton
       onPress={onPress}
+      size="md"
+      variant="subtle"
+      colors={colors}
       style={[styles.headerIconButton, { backgroundColor: colors.backgroundSecondary }]}
+      accessibilityLabel={icon}
     >
       <Ionicons name={icon} size={20} color={colors.text} />
-    </Pressable>
+    </IconButton>
   );
 }
 
@@ -292,12 +300,15 @@ export function XPostBookmarkView({
           <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
           <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
         </View>
-        <Pressable
+        <IconButton
           onPress={onOpenLink}
+          size="lg"
+          variant="solid"
           style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
+          accessibilityLabel="Open original source"
         >
           {fabConfig.providerIcon}
-        </Pressable>
+        </IconButton>
       </Animated.View>
 
       {/* Tweet Content Section - Twitter-like layout */}

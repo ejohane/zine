@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
+
+import { Button, Text } from '@/components/primitives';
+import { IconSizes, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 /**
  * Props for LoadingState component
@@ -25,13 +27,16 @@ interface LoadingStateProps {
  * ```
  */
 export function LoadingState({ message }: LoadingStateProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
+  const { colors } = useAppTheme();
 
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.primary} />
-      {message && <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>}
+      {message ? (
+        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+          {message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -74,19 +79,18 @@ export function ErrorState({
   onRetry,
   retryLabel = 'Try Again',
 }: ErrorStateProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>⚠️</Text>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {message && <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>}
-      {onRetry && (
-        <Pressable onPress={onRetry} style={[styles.button, { backgroundColor: colors.primary }]}>
-          <Text style={styles.buttonText}>{retryLabel}</Text>
-        </Pressable>
-      )}
+      <Text variant="titleMedium" style={styles.title}>
+        {title}
+      </Text>
+      {message ? (
+        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+          {message}
+        </Text>
+      ) : null}
+      {onRetry ? <Button label={retryLabel} onPress={onRetry} /> : null}
     </View>
   );
 }
@@ -133,19 +137,18 @@ export function EmptyState({
   actionLabel,
   onAction,
 }: EmptyStateProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
-
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {message && <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>}
-      {actionLabel && onAction && (
-        <Pressable onPress={onAction} style={[styles.button, { backgroundColor: colors.primary }]}>
-          <Text style={styles.buttonText}>{actionLabel}</Text>
-        </Pressable>
-      )}
+      <Text variant="titleMedium" style={styles.title}>
+        {title}
+      </Text>
+      {message ? (
+        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+          {message}
+        </Text>
+      ) : null}
+      {actionLabel && onAction ? <Button label={actionLabel} onPress={onAction} /> : null}
     </View>
   );
 }
@@ -187,18 +190,20 @@ export function NotFoundState({
   onBack,
 }: NotFoundStateProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const handleBack = onBack ?? (() => router.back());
 
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>🔍</Text>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {message && <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>}
-      <Pressable onPress={handleBack} style={[styles.button, { backgroundColor: colors.primary }]}>
-        <Text style={styles.buttonText}>{backLabel}</Text>
-      </Pressable>
+      <Text variant="titleMedium" style={styles.title}>
+        {title}
+      </Text>
+      {message ? (
+        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+          {message}
+        </Text>
+      ) : null}
+      <Button label={backLabel} onPress={handleBack} />
     </View>
   );
 }
@@ -233,18 +238,18 @@ export function InvalidParamState({
   onBack,
 }: InvalidParamStateProps) {
   const router = useRouter();
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
   const handleBack = onBack ?? (() => router.back());
 
   return (
     <View style={styles.container}>
       <Text style={styles.emoji}>⚠️</Text>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text>
-      <Pressable onPress={handleBack} style={[styles.button, { backgroundColor: colors.primary }]}>
-        <Text style={styles.buttonText}>{backLabel}</Text>
-      </Pressable>
+      <Text variant="titleMedium" style={styles.title}>
+        {title}
+      </Text>
+      <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        {message}
+      </Text>
+      <Button label={backLabel} onPress={handleBack} />
     </View>
   );
 }
@@ -257,28 +262,15 @@ const styles = StyleSheet.create({
     padding: Spacing['2xl'],
   },
   emoji: {
-    fontSize: 48,
+    fontSize: IconSizes['2xl'],
     marginBottom: Spacing.lg,
   },
   title: {
-    ...Typography.titleMedium,
-    fontWeight: '600',
     marginBottom: Spacing.sm,
     textAlign: 'center',
   },
   message: {
-    ...Typography.bodyMedium,
     textAlign: 'center',
     marginBottom: Spacing.lg,
-  },
-  button: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 16,
   },
 });

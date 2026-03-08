@@ -14,10 +14,11 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
-import { Pressable, Text, View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Button, Text } from '@/components/primitives';
+import { IconSizes, Radius, Spacing, Typography } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useSyncNow, type SyncResult } from '@/hooks/use-sync-now';
 
 // ============================================================================
@@ -68,8 +69,7 @@ export function SyncNowButton({
   onSyncComplete,
   stateOverride,
 }: SyncNowButtonProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const { colors } = useAppTheme();
 
   const syncState = useSyncNow(subscriptionId);
   const syncNow = stateOverride?.syncNow ?? syncState.syncNow;
@@ -117,17 +117,26 @@ export function SyncNowButton({
   // -------------------------------------------------------------------------
   if (compact) {
     return (
-      <Pressable
+      <Button
+        label={isLoading ? 'Syncing...' : countdown > 0 ? formatCountdown(countdown) : 'Sync'}
         onPress={handlePress}
         disabled={isDisabled}
-        style={({ pressed }) => [
+        size="sm"
+        colors={colors}
+        style={[
           styles.compactButton,
           {
             backgroundColor: isDisabled ? colors.backgroundSecondary : colors.primaryLight,
-            opacity: pressed ? 0.7 : 1,
           },
         ]}
-        accessibilityRole="button"
+        labelStyle={{ color: countdown > 0 ? colors.textSecondary : colors.textInverse }}
+        leadingAccessory={
+          !isLoading && countdown === 0 ? (
+            <Text style={styles.syncIcon} colors={colors} tone="inverse">
+              ⟳
+            </Text>
+          ) : undefined
+        }
         accessibilityLabel={
           isLoading
             ? 'Syncing subscription'
@@ -136,23 +145,7 @@ export function SyncNowButton({
               : 'Sync now'
         }
         accessibilityState={{ disabled: isDisabled }}
-      >
-        {isLoading ? (
-          <>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[styles.compactText, { color: colors.primary }]}>Syncing...</Text>
-          </>
-        ) : countdown > 0 ? (
-          <Text style={[styles.compactText, { color: colors.textSecondary }]}>
-            {formatCountdown(countdown)}
-          </Text>
-        ) : (
-          <>
-            <Text style={[styles.syncIcon, { color: colors.primary }]}>⟳</Text>
-            <Text style={[styles.compactText, { color: colors.primary }]}>Sync</Text>
-          </>
-        )}
-      </Pressable>
+      />
     );
   }
 
@@ -161,17 +154,31 @@ export function SyncNowButton({
   // -------------------------------------------------------------------------
   return (
     <View style={styles.fullContainer}>
-      <Pressable
+      <Button
+        label={
+          isLoading
+            ? 'Syncing...'
+            : countdown > 0
+              ? `Wait ${formatCountdown(countdown)}`
+              : 'Sync Now'
+        }
         onPress={handlePress}
         disabled={isDisabled}
-        style={({ pressed }) => [
+        colors={colors}
+        style={[
           styles.fullButton,
           {
             backgroundColor: isDisabled ? colors.backgroundSecondary : colors.primary,
-            opacity: pressed ? 0.8 : 1,
           },
         ]}
-        accessibilityRole="button"
+        labelStyle={{ color: countdown > 0 ? colors.textSecondary : colors.textInverse }}
+        leadingAccessory={
+          !isLoading && countdown === 0 ? (
+            <Text style={styles.fullButtonEmoji} colors={colors} tone="inverse">
+              🔄
+            </Text>
+          ) : undefined
+        }
         accessibilityLabel={
           isLoading
             ? 'Syncing subscription'
@@ -180,29 +187,11 @@ export function SyncNowButton({
               : 'Sync now'
         }
         accessibilityState={{ disabled: isDisabled }}
-      >
-        {isLoading ? (
-          <>
-            <ActivityIndicator size="small" color="#FFFFFF" />
-            <Text style={styles.fullButtonText}>Syncing...</Text>
-          </>
-        ) : countdown > 0 ? (
-          <Text style={[styles.fullButtonText, { color: colors.textSecondary }]}>
-            Wait {formatCountdown(countdown)}
-          </Text>
-        ) : (
-          <>
-            <Text style={styles.fullButtonEmoji}>🔄</Text>
-            <Text style={styles.fullButtonText}>Sync Now</Text>
-          </>
-        )}
-      </Pressable>
+      />
 
       {/* Result message */}
       {lastResult && (
-        <Text
-          style={[styles.resultText, { color: lastResult.success ? colors.success : colors.error }]}
-        >
+        <Text style={styles.resultText} tone={lastResult.success ? 'success' : 'error'}>
           {lastResult.message}
         </Text>
       )}
@@ -217,20 +206,11 @@ export function SyncNowButton({
 const styles = StyleSheet.create({
   // Compact variant styles
   compactButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
     borderRadius: Radius.full,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
     minWidth: 64,
   },
-  compactText: {
-    ...Typography.labelMedium,
-  },
   syncIcon: {
-    fontSize: 14,
+    fontSize: IconSizes.xs,
   },
 
   // Full variant styles
@@ -239,22 +219,11 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   fullButton: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.md,
     borderRadius: Radius.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
     minWidth: 140,
   },
-  fullButtonText: {
-    color: '#FFFFFF',
-    ...Typography.labelLarge,
-    fontWeight: '500',
-  },
   fullButtonEmoji: {
-    fontSize: 18,
+    fontSize: IconSizes.md,
   },
   resultText: {
     ...Typography.bodySmall,

@@ -52,6 +52,8 @@ export const creatorLatestContentFixtures = {
     {
       id: 'latest-1',
       title: 'Building resilient mobile architectures for scaling teams',
+      description:
+        'A walkthrough of mobile system design choices that scale without losing clarity.',
       thumbnailUrl: 'https://picsum.photos/seed/zine-latest-1/320/180',
       duration: 1200,
       publishedAt: 1_739_772_000_000,
@@ -62,6 +64,8 @@ export const creatorLatestContentFixtures = {
     {
       id: 'latest-2',
       title: 'How design tokens evolve without breaking products',
+      description:
+        'A practical discussion of migration strategy, semantic naming, and rollout safety.',
       thumbnailUrl: 'https://picsum.photos/seed/zine-latest-2/320/180',
       duration: 920,
       publishedAt: 1_739_685_600_000,
@@ -72,6 +76,8 @@ export const creatorLatestContentFixtures = {
     {
       id: 'latest-3',
       title: 'Episode 63: Component API ergonomics in large orgs',
+      description:
+        'Why stricter component contracts often accelerate teams once the basics are stable.',
       thumbnailUrl: null,
       duration: 2600,
       publishedAt: 1_739_599_200_000,

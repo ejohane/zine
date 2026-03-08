@@ -9,7 +9,7 @@
  * @module
  */
 
-import { Colors } from '@/constants/theme';
+import { Colors, type ThemeColorName } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 /**
@@ -27,11 +27,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
  * const customText = useThemeColor({ light: '#000', dark: '#fff' }, 'text');
  * ```
  */
-export function useThemeColor(
-  props: { light?: string; dark?: string },
-  colorName: keyof typeof Colors.light & keyof typeof Colors.dark
-) {
-  const theme = useColorScheme() ?? 'light';
+export function useThemeColor(props: { light?: string; dark?: string }, colorName: ThemeColorName) {
+  const theme = useColorScheme() ?? 'dark';
   const colorFromProps = props[theme];
 
   if (colorFromProps) {

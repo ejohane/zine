@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useQueryErrorResetBoundary } from '@tanstack/react-query';
+
+import { Button, Text } from '@/components/primitives';
 import { ErrorBoundary } from './error-boundary';
-import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { IconSizes, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { isNetworkError, getErrorMessage } from '@/lib/error-utils';
 
 interface QueryErrorBoundaryProps {
@@ -45,8 +47,7 @@ export function QueryErrorBoundary({
   queryKey,
   fallbackMessage,
 }: QueryErrorBoundaryProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const colors = Colors[colorScheme];
+  const { colorScheme } = useAppTheme();
   const { reset: resetQueryError } = useQueryErrorResetBoundary();
 
   // Track the current error for custom fallback UI
@@ -76,19 +77,16 @@ export function QueryErrorBoundary({
     return (
       <View style={styles.container}>
         <Text style={styles.emoji}>{isNetwork ? '📡' : '⚠️'}</Text>
-        <Text style={[styles.title, { color: colors.text }]}>
+        <Text variant="titleMedium" style={styles.title}>
           {isNetwork ? 'Connection Problem' : 'Something went wrong'}
         </Text>
-        <Text style={[styles.message, { color: colors.textSecondary }]}>{errorMessage}</Text>
-        <Pressable
-          onPress={handleReset}
-          style={[styles.button, { backgroundColor: colors.primary }]}
-        >
-          <Text style={styles.buttonText}>{isNetwork ? 'Retry' : 'Try Again'}</Text>
-        </Pressable>
+        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+          {errorMessage}
+        </Text>
+        <Button label={isNetwork ? 'Retry' : 'Try Again'} onPress={handleReset} />
       </View>
     );
-  }, [currentError, fallbackMessage, colors, handleReset]);
+  }, [currentError, fallbackMessage, handleReset]);
 
   return (
     <ErrorBoundary
@@ -110,28 +108,15 @@ const styles = StyleSheet.create({
     padding: Spacing['2xl'],
   },
   emoji: {
-    fontSize: 48,
+    fontSize: IconSizes['2xl'],
     marginBottom: Spacing.lg,
   },
   title: {
-    ...Typography.titleMedium,
-    fontWeight: '600',
     marginBottom: Spacing.sm,
   },
   message: {
-    ...Typography.bodyMedium,
     textAlign: 'center',
     marginBottom: Spacing.lg,
-  },
-  button: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.lg,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontWeight: '500',
-    fontSize: 16,
   },
 });
 
