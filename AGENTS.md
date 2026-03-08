@@ -76,3 +76,9 @@
 - Do not add new raw hex/rgb colors or ad hoc typography literals in shared mobile components unless the line is marked with `design-system-exception:` and a short reason.
 - Do not expand legacy mobile UI paths (`apps/mobile/components/home/*`, `apps/mobile/components/themed-*`, `apps/mobile/components/ui/*`) for new work.
 - Run `bun run design-system:check` when mobile shared UI changes.
+
+## Observability Guidance
+
+- When you need to observe or diagnose application behavior, prefer the local Codex skill at `.codex/skills/zine-observability/SKILL.md`.
+- Use that skill for worker health regressions, request/trace correlation, sync failures, queue or DLQ triage, and release-scoped incident diagnosis.
+- Prefer the repo-owned diagnostics commands (`bun run diag:health`, `bun run diag:incident`, `bun run diag:cf:logs`, `bun run diag:release`, `bun run diag:queue:dlq`) over ad hoc dashboard browsing so evidence stays reproducible.

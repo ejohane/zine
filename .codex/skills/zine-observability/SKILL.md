@@ -1,8 +1,6 @@
 ---
 name: zine-observability
 description: Diagnose Zine mobile, worker, queue, and release incidents using the repo-owned observability commands and runbooks.
-version: 1.0.0
-license: MIT
 ---
 
 # Zine Observability
@@ -76,7 +74,7 @@ Use this to answer whether a regression clusters around a specific release versi
 bun run diag:queue:dlq
 ```
 
-This returns the worker’s safe DLQ summary from `/health/queues`.
+This returns the worker's safe DLQ summary from `/health/queues`.
 
 ### Incident Bundle
 

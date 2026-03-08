@@ -18,7 +18,7 @@ const scripts = packageJson.scripts ?? {};
 const requiredFiles = [
   'docs/observability/agent-diagnostics.md',
   'docs/observability/event-taxonomy.md',
-  '.opencode/skill/zine-observability/SKILL.md',
+  '.codex/skills/zine-observability/SKILL.md',
   'scripts/diag-health.mjs',
   'scripts/diag-cf-logs.mjs',
   'scripts/diag-release.mjs',

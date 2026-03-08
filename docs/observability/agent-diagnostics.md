@@ -170,7 +170,7 @@ For async subscription syncs:
 The canonical skill packaging for these flows lives at:
 
 ```text
-.opencode/skill/zine-observability/SKILL.md
+.codex/skills/zine-observability/SKILL.md
 ```
 
 Agents should prefer the skill workflow over ad hoc command composition when diagnosing sync, queue, release, or worker incidents.
