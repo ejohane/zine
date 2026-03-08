@@ -67,7 +67,6 @@ function createVanillaClient(seed?: { traceId?: string }) {
     links: [
       httpBatchLink({
         url: `${API_URL}/trpc`,
-        methodOverride: 'POST',
         transformer: superjson,
         headers: async () => {
           if (_getToken) {

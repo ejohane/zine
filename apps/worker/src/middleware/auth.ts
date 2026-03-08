@@ -12,7 +12,7 @@ import { users } from '../db/schema';
 /**
  * Default JWKS URL for Clerk (can be overridden via environment)
  */
-const DEFAULT_CLERK_JWKS_URL = 'https://clerk.zine.app/.well-known/jwks.json';
+const DEFAULT_CLERK_JWKS_URL = 'https://clerk.myzine.app/.well-known/jwks.json';
 
 /**
  * Development user ID used when auth is bypassed
@@ -43,6 +43,14 @@ function createAuthError(message: string, code: string, requestId: string): Auth
     code,
     requestId,
   };
+}
+
+function shouldUseDevelopmentAuthBypass(env: Env['Bindings']): boolean {
+  return env.ENVIRONMENT === 'development' && !env.CLERK_JWKS_URL;
+}
+
+function getClerkJwksUrl(env: Env['Bindings']): string {
+  return env.CLERK_JWKS_URL || DEFAULT_CLERK_JWKS_URL;
 }
 
 /**
@@ -76,7 +84,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
     const requestId = c.get('requestId') || 'unknown';
 
     // Development bypass: use mock user ID when no auth is configured
-    if (c.env.ENVIRONMENT === 'development' || !c.env.CLERK_JWKS_URL) {
+    if (shouldUseDevelopmentAuthBypass(c.env)) {
       // Ensure dev user exists in database (only once per process)
       if (!devUserEnsured) {
         try {
@@ -131,7 +139,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
     }
 
     // Get JWKS URL from environment or use default
-    const jwksUrl = c.env.CLERK_JWKS_URL || DEFAULT_CLERK_JWKS_URL;
+    const jwksUrl = getClerkJwksUrl(c.env);
 
     // Verify the token
     const result = await verifyClerkToken(token, jwksUrl);
@@ -191,7 +199,7 @@ export function optionalAuthMiddleware(): MiddlewareHandler<Env> {
       return;
     }
 
-    const jwksUrl = c.env.CLERK_JWKS_URL || DEFAULT_CLERK_JWKS_URL;
+    const jwksUrl = getClerkJwksUrl(c.env);
     const result = await verifyClerkToken(token, jwksUrl);
 
     // Set userId if valid, null otherwise

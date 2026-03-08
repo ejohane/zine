@@ -184,7 +184,6 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
       links: [
         httpBatchLink({
           url,
-          methodOverride: 'POST',
           transformer: superjson, // Required for Date serialization - must match server
           headers: async () => {
             try {
