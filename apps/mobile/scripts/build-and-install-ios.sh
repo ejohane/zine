@@ -19,7 +19,7 @@ BUILD_SUCCESS=0
 for attempt in $(seq 1 "$MAX_BUILD_ATTEMPTS"); do
     echo -e "${YELLOW}Build attempt ${attempt}/${MAX_BUILD_ATTEMPTS}${NC}"
 
-    BUILD_JSON=$(env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- eas build --platform ios --profile preview --non-interactive --wait --json 2>/dev/null || true)
+    BUILD_JSON=$(env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- env EXPO_PUBLIC_API_URL=https://api.myzine.app eas build --platform ios --profile preview --non-interactive --wait --json 2>/dev/null || true)
 
     BUILD_URL=$(echo "$BUILD_JSON" | jq -r 'if type == "array" then .[0].artifacts.buildUrl // .[0].artifacts.applicationArchiveUrl // .[0].artifacts.url else .artifacts.buildUrl // .artifacts.applicationArchiveUrl // .artifacts.url end // empty')
 

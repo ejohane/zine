@@ -14,7 +14,7 @@
     "lint": "expo lint && bun run design-system:check",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "build:ios:preview": "env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
+    "build:ios:preview": "env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- env EXPO_PUBLIC_API_URL=https://api.myzine.app eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
     "deploy:ios:preview": "./scripts/build-and-install-ios.sh"
   },
   "dependencies": {
