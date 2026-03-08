@@ -51,6 +51,14 @@ export interface Bindings {
   SPOTIFY_MAX_SAFE_BATCH_SIZE?: string;
   /** Critical batch size threshold before logging error (default: 1000) */
   SPOTIFY_CRITICAL_BATCH_SIZE?: string;
+  /** Release git SHA for diagnostics correlation */
+  RELEASE_GIT_SHA?: string;
+  /** Release build identifier for diagnostics correlation */
+  RELEASE_BUILD_ID?: string;
+  /** ISO deployment timestamp for diagnostics correlation */
+  RELEASE_DEPLOYED_AT?: string;
+  /** Optional rollout ring or percentage */
+  RELEASE_RING?: string;
   /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
   SYNC_QUEUE?: Queue<SyncQueueMessage>;
 }
@@ -63,6 +71,10 @@ export interface Variables {
   userId: string | null;
   /** Unique request ID for tracing */
   requestId: string;
+  /** Trace ID propagated from the client or generated at the edge */
+  traceId: string;
+  /** Optional client-side request ID for mobile correlation */
+  clientRequestId: string | undefined;
 }
 
 /**

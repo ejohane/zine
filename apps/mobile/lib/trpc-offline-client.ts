@@ -17,6 +17,7 @@ import * as SecureStore from 'expo-secure-store';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
 import { trpcLogger } from './logger';
+import { buildMobileTelemetryHeaders, telemetryFetch } from './trpc-transport';
 
 // ============================================================================
 // Callback Registration for Cache Invalidation
@@ -99,17 +100,20 @@ let offlineClient: ReturnType<typeof createOfflineTRPCClient> | null = null;
  *
  * @returns A vanilla tRPC client (not React-integrated)
  */
-export function createOfflineTRPCClient() {
+export function createOfflineTRPCClient(seed?: { traceId?: string; clientRequestId?: string }) {
   const url = `${API_URL}/trpc`;
 
   return createTRPCClient<AppRouter>({
     links: [
       httpBatchLink({
         url,
+        methodOverride: 'POST',
         transformer: superjson, // Must match server configuration
         headers: async () => {
-          return getAuthHeaders();
+          const authHeaders = await getAuthHeaders();
+          return buildMobileTelemetryHeaders(authHeaders, seed);
         },
+        fetch: telemetryFetch,
       }),
     ],
   });

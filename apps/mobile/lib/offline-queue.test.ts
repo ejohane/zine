@@ -33,7 +33,7 @@ jest.mock('@react-native-community/netinfo', () => ({
 
 // Mock the trpc-offline-client module
 jest.mock('./trpc-offline-client', () => ({
-  getOfflineTRPCClient: jest.fn(),
+  createOfflineTRPCClient: jest.fn(),
   notifyQueueProcessed: jest.fn(),
 }));
 
@@ -58,7 +58,7 @@ import {
   type OfflineActionType,
   type ErrorClassification,
 } from './offline-queue';
-import { getOfflineTRPCClient, notifyQueueProcessed } from './trpc-offline-client';
+import { createOfflineTRPCClient, notifyQueueProcessed } from './trpc-offline-client';
 import { getClerkInstance } from '@clerk/clerk-expo';
 
 // Helper to reset queue state between tests
@@ -88,6 +88,7 @@ function createTestAction(overrides: Partial<OfflineAction> = {}): OfflineAction
     id: 'test-action-id',
     type: 'SUBSCRIBE',
     payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+    traceId: 'trc_test_action',
     createdAt: Date.now(),
     retryCount: 0,
     authRetryCount: 0,
@@ -163,6 +164,16 @@ describe('OfflineActionQueue', () => {
       expect(savedQueue).toHaveLength(1);
       expect(savedQueue[0].retryCount).toBe(0);
       expect(savedQueue[0].authRetryCount).toBe(0);
+    });
+
+    it('stores a trace ID for later replay correlation', async () => {
+      await offlineQueue.enqueue({
+        type: 'SUBSCRIBE',
+        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+      });
+
+      const savedQueue = getSavedQueue();
+      expect(savedQueue[0].traceId).toEqual(expect.stringMatching(/^trc_/));
     });
 
     it('includes createdAt timestamp', async () => {
@@ -375,7 +386,7 @@ describe('Queue Processing', () => {
         remove: { mutate: jest.fn().mockResolvedValue({}) },
       },
     };
-    (getOfflineTRPCClient as jest.Mock).mockReturnValue(mockTrpcClient);
+    (createOfflineTRPCClient as jest.Mock).mockReturnValue(mockTrpcClient);
 
     // Default: online
     (NetInfo.fetch as jest.Mock).mockResolvedValue({
@@ -397,6 +408,18 @@ describe('Queue Processing', () => {
       await offlineQueue.processQueue();
 
       expect(mockTrpcClient.sources.add.mutate).not.toHaveBeenCalled();
+    });
+
+    it('replays queued actions with the persisted trace ID', async () => {
+      const action = createTestAction({ traceId: 'trc_persisted_action' });
+      mockQueueContents([action]);
+
+      await offlineQueue.processQueue();
+
+      expect(createOfflineTRPCClient).toHaveBeenCalledWith({
+        traceId: 'trc_persisted_action',
+        clientRequestId: 'test-action-id',
+      });
     });
 
     it('does not process when internet not reachable', async () => {
@@ -757,7 +780,7 @@ describe('Error Classification Integration', () => {
         remove: { mutate: jest.fn() },
       },
     };
-    (getOfflineTRPCClient as jest.Mock).mockReturnValue(mockTrpcClient);
+    (createOfflineTRPCClient as jest.Mock).mockReturnValue(mockTrpcClient);
 
     (NetInfo.fetch as jest.Mock).mockResolvedValue({
       isConnected: true,

@@ -22,3 +22,14 @@ export {
   isSubscriptionStatus,
   isProviderConnectionStatus,
 } from './domain';
+
+// Telemetry types
+export type {
+  TelemetryService,
+  TelemetryLevel,
+  TelemetryStatus,
+  TraceContext,
+  ReleaseContext,
+  TelemetryError,
+  TelemetryEnvelope,
+} from '../telemetry';

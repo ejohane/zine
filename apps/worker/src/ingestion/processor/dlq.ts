@@ -3,6 +3,7 @@ import type { Provider } from '@zine/shared';
 
 import type { Database } from '../../db';
 import { deadLetterQueue } from '../../db/schema';
+import { ingestionLogger } from '../../lib/logger';
 import { serializeError } from '../../utils/error-utils';
 import { classifyError } from './errors';
 
@@ -40,7 +41,7 @@ export async function storeToDLQ(
     });
   } catch (dlqError) {
     // Best-effort - log but don't fail
-    console.error('Failed to store item in dead-letter queue:', {
+    ingestionLogger.error('Failed to store item in dead-letter queue', {
       error: serializeError(dlqError),
       providerId,
     });

@@ -246,10 +246,13 @@ describe('useOfflineMutation', () => {
         });
       });
 
-      expect(offlineQueue.enqueue).toHaveBeenCalledWith({
-        type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@channel' },
-      });
+      expect(offlineQueue.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SUBSCRIBE',
+          payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@channel' },
+          traceId: expect.any(String),
+        })
+      );
     });
 
     it('does not execute mutation immediately when offline', async () => {
@@ -444,10 +447,13 @@ describe('useOfflineMutation', () => {
       });
 
       // Verify correct action type and payload are passed to queue
-      expect(offlineQueue.enqueue).toHaveBeenCalledWith({
-        type: 'SUBSCRIBE',
-        payload: { data: 'test' },
-      });
+      expect(offlineQueue.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SUBSCRIBE',
+          payload: { data: 'test' },
+          traceId: expect.any(String),
+        })
+      );
     });
   });
 
@@ -633,10 +639,13 @@ describe('useOfflineMutation', () => {
         await result.current.mutate({ provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' });
       });
 
-      expect(offlineQueue.enqueue).toHaveBeenCalledWith({
-        type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
-      });
+      expect(offlineQueue.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SUBSCRIBE',
+          payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+          traceId: expect.any(String),
+        })
+      );
     });
 
     it('queues UNSUBSCRIBE actions correctly', async () => {
@@ -648,10 +657,13 @@ describe('useOfflineMutation', () => {
         await result.current.mutate({ id: 'subscription-123' });
       });
 
-      expect(offlineQueue.enqueue).toHaveBeenCalledWith({
-        type: 'UNSUBSCRIBE',
-        payload: { id: 'subscription-123' },
-      });
+      expect(offlineQueue.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'UNSUBSCRIBE',
+          payload: { id: 'subscription-123' },
+          traceId: expect.any(String),
+        })
+      );
     });
   });
 

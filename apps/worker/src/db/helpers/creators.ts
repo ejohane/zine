@@ -13,6 +13,9 @@ import { eq, and } from 'drizzle-orm';
 import { creators } from '../schema';
 import type { Database } from '../index';
 import type { Creator } from '@zine/shared';
+import { logger } from '../../lib/logger';
+
+const creatorLogger = logger.child('db:creators');
 
 // ============================================================================
 // Types
@@ -230,7 +233,7 @@ export function extractCreatorFromMetadata(
         return null;
     }
   } catch (error) {
-    console.error('Error extracting creator from metadata:', error);
+    creatorLogger.warn('Error extracting creator from metadata', { provider, error });
     return null;
   }
 }

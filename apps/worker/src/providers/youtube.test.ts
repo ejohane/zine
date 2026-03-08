@@ -32,6 +32,7 @@ import {
   extractVideoInfo,
   parseISO8601Duration,
 } from './youtube';
+import { mockLogger } from '../test/mock-logger';
 
 // ============================================================================
 // Mocks
@@ -617,14 +618,19 @@ describe('fetchVideoDetails', () => {
 
   it('should return empty map on API error (graceful degradation)', async () => {
     const client = createMockYouTubeClient();
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockVideosList.mockRejectedValue(new Error('API error'));
 
     const result = await fetchVideoDetails(client, ['video123']);
 
     expect(result.size).toBe(0);
-    expect(consoleSpy).toHaveBeenCalledWith('Failed to fetch video details:', expect.any(Error));
-    consoleSpy.mockRestore();
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Failed to fetch video details',
+      expect.objectContaining({
+        error: expect.objectContaining({
+          message: 'API error',
+        }),
+      })
+    );
   });
 
   it('should handle missing description', async () => {
@@ -711,7 +717,6 @@ describe('fetchVideoDetailsBatched', () => {
 
   it('should handle partial chunk failures gracefully', async () => {
     const client = createMockYouTubeClient();
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     mockVideosList
       .mockResolvedValueOnce({
@@ -733,11 +738,15 @@ describe('fetchVideoDetailsBatched', () => {
     // Should have results from successful chunk only
     expect(result.size).toBe(1);
     expect(result.get('video0')).toBeDefined();
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Failed to fetch video details chunk:',
-      expect.any(Error)
+    expect(mockLogger.warn).toHaveBeenCalledWith(
+      'Failed to fetch video details chunk',
+      expect.objectContaining({
+        chunkSize: 50,
+        error: expect.objectContaining({
+          message: 'API Error',
+        }),
+      })
     );
-    consoleSpy.mockRestore();
   });
 
   it('should merge results from all chunks', async () => {
@@ -894,15 +903,13 @@ describe('fetchVideoDetailsBatched', () => {
 
   it('should handle all chunks failing gracefully', async () => {
     const client = createMockYouTubeClient();
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockVideosList.mockRejectedValue(new Error('Total API failure'));
 
     const videoIds = Array.from({ length: 100 }, (_, i) => `video${i}`);
     const result = await fetchVideoDetailsBatched(client, videoIds);
 
     expect(result.size).toBe(0);
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    expect(mockLogger.warn).toHaveBeenCalled();
   });
 
   it('should handle videos without duration', async () => {
@@ -1449,14 +1456,20 @@ describe('error handling', () => {
 
     it('should propagate 401 error from video fetch', async () => {
       const client = createMockYouTubeClient();
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const error = createYouTubeApiError(401, 'Unauthorized');
       mockVideosList.mockRejectedValue(error);
 
       // fetchVideoDetails gracefully degrades
       const result = await fetchVideoDetails(client, ['video123']);
       expect(result.size).toBe(0);
-      consoleSpy.mockRestore();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to fetch video details',
+        expect.objectContaining({
+          error: expect.objectContaining({
+            message: 'Unauthorized',
+          }),
+        })
+      );
     });
   });
 
@@ -1515,15 +1528,20 @@ describe('error handling', () => {
 
     it('should handle quota exceeded gracefully in fetchVideoDetails', async () => {
       const client = createMockYouTubeClient();
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const error = createYouTubeApiError(403, 'quotaExceeded');
       mockVideosList.mockRejectedValue(error);
 
       const result = await fetchVideoDetails(client, ['video123']);
 
       expect(result.size).toBe(0);
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Failed to fetch video details',
+        expect.objectContaining({
+          error: expect.objectContaining({
+            message: 'quotaExceeded',
+          }),
+        })
+      );
     });
   });
 

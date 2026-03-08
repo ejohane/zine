@@ -18,6 +18,7 @@ import { useState, useCallback } from 'react';
 import { useNetworkStatus } from './use-network-status';
 import { offlineQueue, type OfflineActionType } from '../lib/offline-queue';
 import { offlineLogger } from '../lib/logger';
+import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib/trpc-transport';
 
 /**
  * Options for configuring the offline-capable mutation hook.
@@ -157,6 +158,8 @@ export function useOfflineMutation<TPayload extends Record<string, unknown>>({
 
   const mutate = useCallback(
     async (payload: TPayload) => {
+      const actionTrace = createMobileActionTraceContext();
+
       // Reset state for new mutation
       setIsPending(true);
       setIsQueued(false);
@@ -171,6 +174,7 @@ export function useOfflineMutation<TPayload extends Record<string, unknown>>({
           await offlineQueue.enqueue({
             type: actionType,
             payload,
+            traceId: actionTrace.traceId,
           });
           setIsQueued(true);
           // Note: No rollback here - optimistic update stays until queue processes
@@ -187,7 +191,7 @@ export function useOfflineMutation<TPayload extends Record<string, unknown>>({
 
       // Online path: Execute mutation directly
       try {
-        await mutationFn(payload);
+        await runWithMobileActionTrace(actionTrace, () => mutationFn(payload));
         onSuccess?.(payload);
       } catch (error) {
         // Mutation failed - roll back optimistic update

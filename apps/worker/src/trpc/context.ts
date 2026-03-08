@@ -1,6 +1,8 @@
+import type { ReleaseContext } from '@zine/shared';
 import { createDb, ensureUserItemsLastOpenedAt } from '../db';
 import type { Context } from 'hono';
 import type { Env } from '../types';
+import { getEnvironmentName, getWorkerRelease } from '../lib/telemetry';
 
 /**
  * Create tRPC context from Hono request context
@@ -12,9 +14,23 @@ import type { Env } from '../types';
  */
 export async function createContext(c: Context<Env>) {
   const userId = c.get('userId');
+  const requestId = c.get('requestId');
+  const traceId = c.get('traceId');
+  const clientRequestId = c.get('clientRequestId');
   await ensureUserItemsLastOpenedAt(c.env.DB);
   const db = createDb(c.env.DB);
-  return { userId, db, env: c.env };
+  return {
+    userId,
+    db,
+    env: c.env,
+    requestId,
+    traceId,
+    clientRequestId,
+    environment: getEnvironmentName(c.env),
+    release: getWorkerRelease(c.env),
+  };
 }
 
 export type TRPCContext = Awaited<ReturnType<typeof createContext>>;
+
+export type ContextRelease = ReleaseContext;

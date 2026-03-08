@@ -8,10 +8,30 @@
  */
 
 import { z } from 'zod';
+import { ReleaseContextSchema, TraceContextSchema } from '@zine/shared';
 
 // ============================================================================
 // Queue Message Types
 // ============================================================================
+
+export interface SyncJobTelemetry {
+  traceId: string;
+  requestId?: string;
+  clientRequestId?: string;
+  source: string;
+  enqueuedAt: number;
+  release?: z.infer<typeof ReleaseContextSchema>;
+}
+
+export const SyncJobTelemetrySchema = TraceContextSchema.pick({
+  traceId: true,
+  requestId: true,
+  clientRequestId: true,
+}).extend({
+  source: z.string(),
+  enqueuedAt: z.number(),
+  release: ReleaseContextSchema.optional(),
+});
 
 /**
  * Message sent to the sync queue for processing a single subscription.
@@ -30,6 +50,8 @@ export interface SyncQueueMessage {
   providerChannelId: string;
   /** Timestamp when the message was enqueued */
   enqueuedAt: number;
+  /** Correlation metadata from the originating request */
+  meta?: SyncJobTelemetry;
 }
 
 /**
@@ -42,6 +64,7 @@ export const SyncQueueMessageSchema = z.object({
   provider: z.enum(['YOUTUBE', 'SPOTIFY']),
   providerChannelId: z.string(),
   enqueuedAt: z.number(),
+  meta: SyncJobTelemetrySchema.optional(),
 });
 
 // ============================================================================
@@ -75,6 +98,8 @@ export interface SyncJobStatus {
   updatedAt: number;
   /** List of failed subscription IDs with error messages */
   errors: Array<{ subscriptionId: string; error: string }>;
+  /** Correlation metadata for the originating request */
+  telemetry?: SyncJobTelemetry;
 }
 
 /**
@@ -97,6 +122,7 @@ export const SyncJobStatusSchema = z.object({
       error: z.string(),
     })
   ),
+  telemetry: SyncJobTelemetrySchema.optional(),
 });
 
 // ============================================================================
@@ -113,6 +139,8 @@ export interface SyncAllAsyncResponse {
   total: number;
   /** Whether this is an existing job (deduplication) */
   existing: boolean;
+  /** Correlation metadata for reconstructing the sync flow */
+  telemetry?: SyncJobTelemetry;
 }
 
 /**
@@ -137,6 +165,8 @@ export interface SyncStatusResponse {
   progress: number;
   /** Errors if any */
   errors: Array<{ subscriptionId: string; error: string }>;
+  /** Correlation metadata from job creation */
+  telemetry?: SyncJobTelemetry;
 }
 
 /**
@@ -153,6 +183,8 @@ export interface ActiveSyncJobResponse {
     completed: number;
     status: 'pending' | 'processing' | 'completed';
   };
+  /** Correlation metadata from the active job */
+  telemetry?: SyncJobTelemetry;
 }
 
 // ============================================================================

@@ -21,6 +21,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { trpc } from '../lib/trpc';
+import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib/trpc-transport';
 
 // ============================================================================
 // Types
@@ -294,67 +295,78 @@ export function useSyncAll(): UseSyncAllReturn {
    */
   const syncAll = useCallback(() => {
     if (cooldownSeconds > 0 || isLoading) return;
+    const actionTrace = createMobileActionTraceContext();
 
     setIsLoading(true);
     setProgress({ total: 0, completed: 0, percentage: 0 });
 
-    syncAsyncMutation.mutate(undefined, {
-      onSuccess: (data) => {
-        if (data.total === 0) {
-          // No subscriptions to sync
-          setIsLoading(false);
-          setProgress(null);
-          setLastResult({
-            success: true,
-            synced: 0,
-            total: 0,
-            itemsFound: 0,
-            errors: [],
-            message: 'No subscriptions to sync',
+    void runWithMobileActionTrace(
+      actionTrace,
+      () =>
+        new Promise<void>((resolve) => {
+          syncAsyncMutation.mutate(undefined, {
+            onSuccess: (data) => {
+              if (data.total === 0) {
+                // No subscriptions to sync
+                setIsLoading(false);
+                setProgress(null);
+                setLastResult({
+                  success: true,
+                  synced: 0,
+                  total: 0,
+                  itemsFound: 0,
+                  errors: [],
+                  message: 'No subscriptions to sync',
+                });
+                setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
+                resolve();
+                return;
+              }
+
+              // Update initial progress
+              setProgress({ total: data.total, completed: 0, percentage: 0 });
+
+              // Start polling for status
+              startStatusPolling(data.jobId);
+              resolve();
+            },
+            onError: (error) => {
+              setIsLoading(false);
+              setProgress(null);
+
+              if (error.data?.code === 'TOO_MANY_REQUESTS') {
+                const match = error.message?.match(/(\d+)\s*(minutes?|seconds?)/i);
+                let seconds = DEFAULT_COOLDOWN_SECONDS;
+                if (match) {
+                  const value = parseInt(match[1], 10);
+                  seconds = match[2].toLowerCase().startsWith('minute') ? value * 60 : value;
+                }
+
+                setCooldownSeconds(seconds);
+                setLastResult({
+                  success: false,
+                  synced: 0,
+                  total: 0,
+                  itemsFound: 0,
+                  errors: [],
+                  message: `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
+                });
+              } else {
+                setLastResult({
+                  success: false,
+                  synced: 0,
+                  total: 0,
+                  itemsFound: 0,
+                  errors: [error.message ?? 'Sync failed'],
+                  message: error.message ?? 'Sync failed',
+                });
+              }
+
+              resolve();
+            },
           });
-          setCooldownSeconds(DEFAULT_COOLDOWN_SECONDS);
-          return;
-        }
-
-        // Update initial progress
-        setProgress({ total: data.total, completed: 0, percentage: 0 });
-
-        // Start polling for status
-        startStatusPolling(data.jobId);
-      },
-      onError: (error) => {
-        setIsLoading(false);
-        setProgress(null);
-
-        if (error.data?.code === 'TOO_MANY_REQUESTS') {
-          const match = error.message?.match(/(\d+)\s*(minutes?|seconds?)/i);
-          let seconds = DEFAULT_COOLDOWN_SECONDS;
-          if (match) {
-            const value = parseInt(match[1], 10);
-            seconds = match[2].toLowerCase().startsWith('minute') ? value * 60 : value;
-          }
-
-          setCooldownSeconds(seconds);
-          setLastResult({
-            success: false,
-            synced: 0,
-            total: 0,
-            itemsFound: 0,
-            errors: [],
-            message: `Try again in ${Math.ceil(seconds / 60)} minute${Math.ceil(seconds / 60) === 1 ? '' : 's'}`,
-          });
-        } else {
-          setLastResult({
-            success: false,
-            synced: 0,
-            total: 0,
-            itemsFound: 0,
-            errors: [error.message ?? 'Sync failed'],
-            message: error.message ?? 'Sync failed',
-          });
-        }
-      },
-    });
+        })
+    );
   }, [cooldownSeconds, isLoading, syncAsyncMutation, startStatusPolling]);
 
   return {

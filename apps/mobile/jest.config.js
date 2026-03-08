@@ -15,8 +15,11 @@ module.exports = {
   // Match test files in lib/, hooks/, and components/
   testMatch: [
     '<rootDir>/lib/**/*.test.ts',
+    '<rootDir>/lib/**/*.test.tsx',
     '<rootDir>/hooks/**/*.test.ts',
+    '<rootDir>/hooks/**/*.test.tsx',
     '<rootDir>/components/**/*.test.ts',
+    '<rootDir>/components/**/*.test.tsx',
   ],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transform: {
@@ -24,7 +27,7 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: {
-          jsx: 'react',
+          jsx: 'react-jsx',
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
           module: 'CommonJS',

@@ -1039,6 +1039,59 @@ describe('initiateSyncJob', () => {
       });
     });
 
+    it('should propagate request telemetry into the job and queue messages', async () => {
+      const mockDb = createMockDb({
+        subscriptions: [
+          {
+            id: 'sub_1',
+            userId: TEST_USER_ID,
+            provider: 'YOUTUBE',
+            providerChannelId: 'UC123',
+            status: 'ACTIVE',
+          },
+        ],
+        connections: [
+          { id: 'conn_1', userId: TEST_USER_ID, provider: 'YOUTUBE', status: 'ACTIVE' },
+        ],
+      });
+      const mockEnv = createMockEnv(mockKV, mockQueue);
+
+      const result = await initiateSyncJob(TEST_USER_ID, mockDb as never, mockEnv as never, {
+        traceId: 'trc_test_trace',
+        requestId: 'req_test_request',
+        clientRequestId: 'crq_test_client_request',
+        source: 'subscriptions.syncAllAsync',
+        release: {
+          version: '0.0.1',
+          channel: 'test',
+        },
+      });
+
+      expect(result.telemetry).toMatchObject({
+        traceId: 'trc_test_trace',
+        requestId: 'req_test_request',
+        clientRequestId: 'crq_test_client_request',
+        source: 'subscriptions.syncAllAsync',
+        enqueuedAt: MOCK_NOW,
+        release: {
+          version: '0.0.1',
+          channel: 'test',
+        },
+      });
+
+      expect(result.telemetry).toBeDefined();
+      const telemetry = result.telemetry!;
+      const batchCall = mockQueue.sendBatch.mock.calls[0][0] as Array<{
+        body: { meta?: SyncJobStatus['telemetry'] };
+      }>;
+      expect(batchCall[0].body.meta).toMatchObject(telemetry);
+
+      const storedStatus = JSON.parse(
+        mockKV._store.get(getJobStatusKey(result.jobId))!
+      ) as SyncJobStatus;
+      expect(storedStatus.telemetry).toMatchObject(telemetry);
+    });
+
     it('should store job status with TTL', async () => {
       const mockDb = createMockDb({
         subscriptions: [

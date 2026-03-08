@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Zine Observability'
+  short_description: 'Diagnose Zine incidents with repo commands'
+  default_prompt: 'Use $zine-observability to diagnose this Zine worker, queue, release, or health incident with the repo-owned observability commands.'
+
+policy:
+  allow_implicit_invocation: true

@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 
 import type { Database } from '../../db';
 import { items } from '../../db/schema';
+import { ingestionLogger } from '../../lib/logger';
 import type { NewItem } from '../transformers';
 import { serializeError } from '../../utils/error-utils';
 import {
@@ -94,7 +95,7 @@ export async function getOrCreateCreator(
     return creator.id;
   } catch (error) {
     // Log but don't fail ingestion if creator extraction fails
-    console.error('Failed to extract/create creator:', {
+    ingestionLogger.warn('Failed to extract/create creator', {
       provider,
       error: serializeError(error),
     });
@@ -140,7 +141,7 @@ export async function backfillCreatorIdIfMissing<T>(
       .set({ creatorId, updatedAt: new Date().toISOString() })
       .where(eq(items.id, existing[0].id));
 
-    console.log('Backfilled creatorId for item', {
+    ingestionLogger.info('Backfilled creatorId for item', {
       itemId: existing[0].id,
       provider,
       providerId: transformedItem.providerId,
@@ -148,7 +149,7 @@ export async function backfillCreatorIdIfMissing<T>(
     });
   } catch (error) {
     // Log but don't fail - backfill is best-effort
-    console.error('Failed to backfill creatorId:', {
+    ingestionLogger.warn('Failed to backfill creatorId', {
       provider,
       providerId: transformedItem.providerId,
       error: serializeError(error),

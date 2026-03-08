@@ -22,6 +22,11 @@ import { Provider } from '@zine/shared';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
 import { oauthLogger } from './logger';
+import {
+  buildMobileTelemetryHeaders,
+  createMobileActionTraceContext,
+  telemetryFetch,
+} from './trpc-transport';
 
 // CRITICAL: Call at module level to handle auth session completion
 // This is required for expo-web-browser to properly complete the OAuth flow
@@ -57,23 +62,27 @@ export function setTokenGetter(getter: TokenGetter): void {
  *
  * Note: The auth token getter must be set via `setTokenGetter` before making calls.
  */
-const vanillaClient = createTRPCClient<AppRouter>({
-  links: [
-    httpBatchLink({
-      url: `${API_URL}/trpc`,
-      transformer: superjson,
-      headers: async () => {
-        if (_getToken) {
-          const token = await _getToken();
-          if (token) {
-            return { Authorization: `Bearer ${token}` };
+function createVanillaClient(seed?: { traceId?: string }) {
+  return createTRPCClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: `${API_URL}/trpc`,
+        methodOverride: 'POST',
+        transformer: superjson,
+        headers: async () => {
+          if (_getToken) {
+            const token = await _getToken();
+            if (token) {
+              return buildMobileTelemetryHeaders({ Authorization: `Bearer ${token}` }, seed);
+            }
           }
-        }
-        return {};
-      },
-    }),
-  ],
-});
+          return buildMobileTelemetryHeaders({}, seed);
+        },
+        fetch: telemetryFetch,
+      }),
+    ],
+  });
+}
 
 // ============================================================================
 // OAuth Configuration
@@ -175,7 +184,7 @@ export function getRedirectUri(provider?: OAuthProvider): string {
   // For Spotify and fallback, use our custom scheme
   if (__DEV__) {
     const uri = AuthSession.makeRedirectUri({ scheme: 'zine', path: 'oauth/callback' });
-    console.log('[OAuth] Dev redirect URI:', uri);
+    oauthLogger.debug('Using development redirect URI', { uri, provider });
     return uri;
   }
   return REDIRECT_URI;
@@ -284,6 +293,18 @@ function getStateKey(provider: OAuthProvider): string {
   return `${provider.toLowerCase()}_oauth_state`;
 }
 
+function getTraceKey(provider: OAuthProvider): string {
+  return `${provider.toLowerCase()}_oauth_trace_id`;
+}
+
+async function clearOAuthSessionState(provider: OAuthProvider): Promise<void> {
+  await Promise.all([
+    SecureStore.deleteItemAsync(getVerifierKey(provider)),
+    SecureStore.deleteItemAsync(getStateKey(provider)),
+    SecureStore.deleteItemAsync(getTraceKey(provider)),
+  ]);
+}
+
 // ============================================================================
 // Connect Provider Flow
 // ============================================================================
@@ -331,6 +352,9 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw new Error(error);
   }
 
+  const actionTrace = createMobileActionTraceContext();
+  const client = createVanillaClient({ traceId: actionTrace.traceId });
+
   // STEP 1: Generate PKCE (CLIENT-SIDE - security requirement)
   // The verifier is a cryptographically random string, the challenge is its SHA-256 hash
   oauthLogger.debug('Generating PKCE challenge');
@@ -345,17 +369,19 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   // 2. Provider identification (needed by cold-start callback handler)
   // Format: "PROVIDER:uuid" - allows parseOAuthCallback to know which SecureStore keys to use
   const state = `${provider}:${Crypto.randomUUID()}`;
+  await SecureStore.setItemAsync(getTraceKey(provider), actionTrace.traceId);
 
   // STEP 3: Register state with server (CSRF protection only)
   // The server stores state → userId mapping with TTL for validation on callback
   oauthLogger.debug('Registering state with server');
   try {
-    await vanillaClient.subscriptions.connections.registerState.mutate({
+    await client.subscriptions.connections.registerState.mutate({
       provider: toProviderEnum(provider),
       state,
     });
     oauthLogger.debug('State registered successfully');
   } catch (error) {
+    await clearOAuthSessionState(provider);
     oauthLogger.error('Failed to register state', { error });
     throw error;
   }
@@ -390,8 +416,7 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
 
   if (result.type !== 'success') {
     // Clean up stored values on cancellation/failure
-    await SecureStore.deleteItemAsync(getVerifierKey(provider));
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error('OAuth flow cancelled or failed');
   }
 
@@ -404,35 +429,31 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   const errorParam = redirectUrl.searchParams.get('error');
   if (errorParam) {
     const errorDescription = redirectUrl.searchParams.get('error_description');
-    await SecureStore.deleteItemAsync(getVerifierKey(provider));
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error(`OAuth error: ${errorDescription || errorParam}`);
   }
 
   if (!returnedState) {
-    await SecureStore.deleteItemAsync(getVerifierKey(provider));
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error('OAuth failed: No state returned');
   }
 
   // Validate state matches (client-side check - server also validates)
   const storedState = await SecureStore.getItemAsync(getStateKey(provider));
   if (returnedState !== storedState) {
-    await SecureStore.deleteItemAsync(getVerifierKey(provider));
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error('OAuth state mismatch - possible CSRF attack');
   }
 
   if (!code) {
-    await SecureStore.deleteItemAsync(getVerifierKey(provider));
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error('OAuth failed: No authorization code returned');
   }
 
   // Retrieve stored verifier
   const storedVerifier = await SecureStore.getItemAsync(getVerifierKey(provider));
   if (!storedVerifier) {
-    await SecureStore.deleteItemAsync(getStateKey(provider));
+    await clearOAuthSessionState(provider);
     throw new Error('PKCE verifier not found - OAuth flow corrupted');
   }
 
@@ -441,7 +462,7 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   // NOTE: redirectUri must be sent to server because it must match the one used in auth request
   oauthLogger.debug('Exchanging code for tokens');
   try {
-    await vanillaClient.subscriptions.connections.callback.mutate({
+    await client.subscriptions.connections.callback.mutate({
       provider: toProviderEnum(provider),
       code,
       state: returnedState,
@@ -450,13 +471,13 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     });
     oauthLogger.info('Token exchange successful', { provider });
   } catch (error) {
+    await clearOAuthSessionState(provider);
     oauthLogger.error('Token exchange failed', { error });
     throw error;
   }
 
   // STEP 8: Cleanup secure storage
-  await SecureStore.deleteItemAsync(getVerifierKey(provider));
-  await SecureStore.deleteItemAsync(getStateKey(provider));
+  await clearOAuthSessionState(provider);
 }
 
 // ============================================================================
@@ -507,12 +528,11 @@ export async function completeOAuthFlow(
   state: string,
   provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'
 ): Promise<OAuthFlowResult> {
-  const providerKey = provider.toLowerCase();
-
   try {
     // 1. Validate state matches stored state
-    const storedState = await SecureStore.getItemAsync(`${providerKey}_oauth_state`);
+    const storedState = await SecureStore.getItemAsync(getStateKey(provider));
     if (storedState !== state) {
+      await clearOAuthSessionState(provider);
       return {
         success: false,
         error: 'State mismatch - possible CSRF attack',
@@ -520,18 +540,22 @@ export async function completeOAuthFlow(
     }
 
     // 2. Retrieve PKCE verifier
-    const verifier = await SecureStore.getItemAsync(`${providerKey}_code_verifier`);
+    const verifier = await SecureStore.getItemAsync(getVerifierKey(provider));
     if (!verifier) {
+      await clearOAuthSessionState(provider);
       return {
         success: false,
         error: 'PKCE verifier not found - OAuth session may have expired',
       };
     }
 
+    const traceId = await SecureStore.getItemAsync(getTraceKey(provider));
+    const client = createVanillaClient({ traceId: traceId ?? undefined });
+
     // 3. Exchange code for tokens via tRPC
     // The server validates the state, exchanges the code using PKCE,
     // and stores encrypted tokens in the database
-    await vanillaClient.subscriptions.connections.callback.mutate({
+    await client.subscriptions.connections.callback.mutate({
       provider: toProviderEnum(provider),
       code,
       state, // Full state string (PROVIDER:uuid format)
@@ -539,10 +563,7 @@ export async function completeOAuthFlow(
     });
 
     // 4. Clean up SecureStore
-    await Promise.all([
-      SecureStore.deleteItemAsync(`${providerKey}_code_verifier`),
-      SecureStore.deleteItemAsync(`${providerKey}_oauth_state`),
-    ]);
+    await clearOAuthSessionState(provider);
 
     return {
       success: true,
@@ -550,10 +571,7 @@ export async function completeOAuthFlow(
     };
   } catch (error) {
     // Clean up SecureStore even on error to prevent stale state
-    await Promise.all([
-      SecureStore.deleteItemAsync(`${providerKey}_code_verifier`).catch(() => {}),
-      SecureStore.deleteItemAsync(`${providerKey}_oauth_state`).catch(() => {}),
-    ]).catch(() => {});
+    await clearOAuthSessionState(provider).catch(() => {});
 
     const message =
       error instanceof Error ? error.message : 'Unknown error during OAuth completion';

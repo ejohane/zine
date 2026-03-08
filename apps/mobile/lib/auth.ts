@@ -82,7 +82,7 @@ export function validateClerkConfig(): void {
       'Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Please set it in your .env.local file.';
 
     if (__DEV__) {
-      console.warn(`[Auth] ${message}`);
+      authLogger.warn(message);
     }
   }
 }

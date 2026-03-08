@@ -38,8 +38,20 @@ jobs:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+      - name: Capture release metadata
+        run: |
+          echo "RELEASE_GIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "RELEASE_BUILD_ID=gha_${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+          echo "RELEASE_DEPLOYED_AT=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_ENV"
+          echo "RELEASE_RING=100%" >> "$GITHUB_ENV"
+
       - name: Deploy to Cloudflare
-        run: bun run deploy:production
+        run: |
+          bunx wrangler deploy --env production \
+            --var RELEASE_GIT_SHA:${RELEASE_GIT_SHA} \
+            --var RELEASE_BUILD_ID:${RELEASE_BUILD_ID} \
+            --var RELEASE_DEPLOYED_AT:${RELEASE_DEPLOYED_AT} \
+            --var RELEASE_RING:${RELEASE_RING}
         working-directory: apps/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

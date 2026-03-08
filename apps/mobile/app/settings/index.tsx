@@ -10,7 +10,7 @@
  * @see features/subscriptions/frontend-spec.md Section 3 (Settings Screen)
  */
 
-import { View, Text, ScrollView, Pressable, StyleSheet, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useClerk } from '@clerk/clerk-expo';
@@ -20,6 +20,7 @@ import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
+import { buildMobileDiagnosticBundle } from '@/lib/diagnostics';
 import { settingsLogger } from '@/lib/logger';
 
 // ============================================================================
@@ -93,6 +94,7 @@ export default function SettingsScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { signOut } = useClerk();
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
+  const isDeveloperDiagnosticsEnabled = __DEV__ || isStorybookEnabled;
 
   // Data hooks
   const { data: connections } = useConnections();
@@ -127,6 +129,17 @@ export default function SettingsScreen() {
 
   const handleOpenPrivacy = () => {
     Linking.openURL('https://zine.app/privacy');
+  };
+
+  const handleShareDiagnosticBundle = async () => {
+    try {
+      const bundle = await buildMobileDiagnosticBundle();
+      await Share.share({
+        message: JSON.stringify(bundle, null, 2),
+      });
+    } catch (error) {
+      settingsLogger.error('Failed to share mobile diagnostic bundle', { error });
+    }
   };
 
   return (
@@ -223,11 +236,17 @@ export default function SettingsScreen() {
           <SettingsRow title="Privacy Policy" rightText="→" onPress={handleOpenPrivacy} />
         </View>
 
-        {isStorybookEnabled && (
+        {isDeveloperDiagnosticsEnabled && (
           <>
             <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DEVELOPER</Text>
 
             <View style={[styles.section, { backgroundColor: colors.card }]}>
+              <SettingsRow
+                title="Share Diagnostic Bundle"
+                subtitle="Recent traces, queue state, and release info"
+                rightText="→"
+                onPress={handleShareDiagnosticBundle}
+              />
               <SettingsRow
                 title="Open Storybook"
                 subtitle="Preview component stories"

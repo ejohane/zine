@@ -24,9 +24,13 @@
  * ```
  */
 
+import { logger } from './logger';
+
 // ============================================================================
 // Types
 // ============================================================================
+
+const analyticsLogger = logger.child('Analytics');
 
 /**
  * Source from which the Creator View was opened
@@ -164,12 +168,11 @@ class Analytics {
   track<E extends keyof AnalyticsEvents>(event: E, properties: AnalyticsEvents[E]): void {
     if (!this.enabled) return;
 
-    // In development, log to console directly
-    // Uses isDev() function for lazy evaluation (important for test environments)
     if (isDev()) {
-      console.log(
-        `[Analytics] Event: ${event} | ${formatProperties(properties as Record<string, unknown>)}`
-      );
+      analyticsLogger.info('Event tracked', {
+        event,
+        properties: formatProperties(properties as Record<string, unknown>),
+      });
     }
 
     // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).
@@ -186,8 +189,7 @@ class Analytics {
     if (!this.enabled) return;
 
     if (isDev()) {
-      const traitsStr = traits ? `, traits=${JSON.stringify(traits)}` : '';
-      console.log(`[Analytics] Identify user | userId="${userId}"${traitsStr}`);
+      analyticsLogger.info('Identify user', { userId, traits });
     }
 
     // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).
@@ -198,7 +200,7 @@ class Analytics {
    */
   reset(): void {
     if (isDev()) {
-      console.log('[Analytics] Analytics reset');
+      analyticsLogger.info('Analytics reset');
     }
 
     // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).

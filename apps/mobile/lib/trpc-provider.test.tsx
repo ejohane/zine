@@ -8,18 +8,16 @@
 import React from 'react';
 import { Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
+import { httpBatchLink } from '@trpc/client';
 import { getQueryKey } from '@trpc/react-query';
 import { trpc } from '@/lib/trpc';
 import { TRPCProvider } from '@/providers/trpc-provider';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
+import { buildMobileTelemetryHeaders, telemetryFetch } from '@/lib/trpc-transport';
 import { PERSISTENCE_MAX_AGE_MS, PERSISTENCE_STORAGE_PREFIX } from '@/lib/query-persistence';
 import { act, create } from 'react-test-renderer';
-
-let mockQueryClient: {
-  invalidateQueries: jest.Mock;
-  clear: jest.Mock;
-};
 type PersistOptions = {
   buster: string;
   maxAge: number;
@@ -42,11 +40,9 @@ const mockGetItem = AsyncStorage.getItem as jest.Mock;
 
 jest.mock('@tanstack/react-query', () => {
   const actual = jest.requireActual('@tanstack/react-query');
-  mockQueryClient = new actual.QueryClient();
   return {
     ...actual,
-    QueryClient: jest.fn(() => mockQueryClient),
-    useIsRestoring: mockUseIsRestoring,
+    useIsRestoring: () => mockUseIsRestoring(),
   };
 });
 
@@ -69,6 +65,23 @@ jest.mock('@tanstack/query-async-storage-persister', () => ({
   })),
 }));
 
+jest.mock('@trpc/client', () => {
+  const actual = jest.requireActual('@trpc/client');
+  return {
+    ...actual,
+    httpBatchLink: jest.fn((options) => {
+      const link = jest.fn(() => jest.fn());
+      Object.assign(link, { options });
+      return link;
+    }),
+  };
+});
+
+jest.mock('superjson', () => ({
+  __esModule: true,
+  default: {},
+}));
+
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
     getToken: jest.fn(async () => 'token'),
@@ -84,9 +97,21 @@ jest.mock('@/lib/trpc-offline-client', () => ({
   setQueueProcessedCallback: jest.fn(),
 }));
 
+jest.mock('@/lib/trpc-transport', () => ({
+  buildMobileTelemetryHeaders: jest.fn((headers: Record<string, string>) => ({
+    ...headers,
+    'X-Trace-ID': 'trc_test_header',
+  })),
+  telemetryFetch: jest.fn(),
+}));
+
 // ==========================================================================
 // Tests
 // ==========================================================================
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe('TRPCProvider offline queue invalidation', () => {
   beforeEach(() => {
@@ -98,7 +123,7 @@ describe('TRPCProvider offline queue invalidation', () => {
   });
 
   it('registers offline queue callback with query invalidations', () => {
-    const invalidateSpy = jest.spyOn(mockQueryClient, 'invalidateQueries');
+    const invalidateSpy = jest.spyOn(QueryClient.prototype, 'invalidateQueries');
 
     act(() => {
       create(
@@ -128,6 +153,42 @@ describe('TRPCProvider offline queue invalidation', () => {
 
     expectedQueryKeys.forEach((queryKey) => {
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey });
+    });
+  });
+});
+
+describe('TRPCProvider transport wiring', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUserId = 'user-123';
+    latestPersistOptions = null;
+    mockUseIsRestoring.mockReturnValue(false);
+    mockGetItem.mockResolvedValue(null);
+  });
+
+  it('configures httpBatchLink with POST, telemetry headers, and telemetry fetch', async () => {
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    expect(httpBatchLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        methodOverride: 'POST',
+        fetch: telemetryFetch,
+        headers: expect.any(Function),
+      })
+    );
+
+    const headers = await (httpBatchLink as jest.Mock).mock.calls[0][0].headers();
+
+    expect(buildMobileTelemetryHeaders).toHaveBeenCalledWith({ Authorization: 'Bearer token' });
+    expect(headers).toEqual({
+      Authorization: 'Bearer token',
+      'X-Trace-ID': 'trc_test_header',
     });
   });
 });
@@ -240,25 +301,35 @@ describe('TRPCProvider cache persistence', () => {
     expect(renderer.root.findByType(MockChild)).toBeTruthy();
   });
 
-  it('clears cache and persisted data on user switch', () => {
-    const clearSpy = jest.spyOn(mockQueryClient, 'clear');
+  it('clears cache and persisted data on user switch', async () => {
+    const clearSpy = jest.spyOn(QueryClient.prototype, 'clear');
 
-    const renderer = create(
-      <TRPCProvider>
-        <></>
-      </TRPCProvider>
-    );
+    let renderer: ReturnType<typeof create> | null = null;
+
+    await act(async () => {
+      renderer = create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+      await Promise.resolve();
+    });
 
     expect(mockRemoveClient).not.toHaveBeenCalled();
 
     mockUserId = 'user-456';
 
-    act(() => {
+    await act(async () => {
+      if (!renderer) {
+        throw new Error('Renderer not set');
+      }
+
       renderer.update(
         <TRPCProvider>
           <></>
         </TRPCProvider>
       );
+      await Promise.resolve();
     });
 
     expect(mockRemoveClient).toHaveBeenCalledTimes(1);

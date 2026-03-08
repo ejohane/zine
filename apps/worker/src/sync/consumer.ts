@@ -35,6 +35,34 @@ import { updateJobProgress } from './service';
 
 const consumerLogger = logger.child('sync-consumer');
 
+function getMessageLogContext(message: Message<SyncQueueMessage>) {
+  return {
+    messageId: message.id,
+    attempts: message.attempts,
+    jobId: message.body.jobId,
+    userId: message.body.userId,
+    subscriptionId: message.body.subscriptionId,
+    provider: message.body.provider,
+    traceId: message.body.meta?.traceId,
+    requestId: message.body.meta?.requestId,
+    clientRequestId: message.body.meta?.clientRequestId,
+    source: message.body.meta?.source,
+    release: message.body.meta?.release,
+  };
+}
+
+function retryMessage(message: Message<SyncQueueMessage>, reason: string, error?: string): void {
+  consumerLogger.warn('Retrying sync message', {
+    operation: 'subscriptions.sync.process',
+    event: 'subscriptions.sync.retry',
+    status: 'error',
+    reason,
+    error,
+    ...getMessageLogContext(message),
+  });
+  message.retry();
+}
+
 // ============================================================================
 // Queue Handler
 // ============================================================================
@@ -53,6 +81,8 @@ export async function handleSyncQueue(
   env: Bindings
 ): Promise<void> {
   consumerLogger.info('Processing sync queue batch', {
+    operation: 'subscriptions.sync.process',
+    event: 'subscriptions.sync.batch.started',
     messageCount: batch.messages.length,
   });
 
@@ -66,6 +96,9 @@ export async function handleSyncQueue(
     const parseResult = SyncQueueMessageSchema.safeParse(message.body);
     if (!parseResult.success) {
       consumerLogger.error('Invalid message body', {
+        operation: 'subscriptions.sync.process',
+        event: 'subscriptions.sync.batch.invalid_message',
+        status: 'error',
         messageId: message.id,
         error: parseResult.error.message,
       });
@@ -107,9 +140,12 @@ async function processUserMessages(
   env: Bindings
 ): Promise<void> {
   consumerLogger.info('Processing user messages', {
+    operation: 'subscriptions.sync.process',
+    event: 'subscriptions.sync.user_batch.started',
     jobId,
     userId,
     messageCount: messages.length,
+    traceIds: [...new Set(messages.map((message) => message.body.meta?.traceId).filter(Boolean))],
   });
 
   // Group by provider
@@ -155,9 +191,12 @@ async function processProviderMessages(
 
   if (!connection) {
     consumerLogger.warn('No active connection for provider', {
+      operation: 'subscriptions.sync.process',
+      event: 'subscriptions.sync.provider.unavailable',
       jobId,
       userId,
       provider,
+      traceIds: [...new Set(messages.map((message) => message.body.meta?.traceId).filter(Boolean))],
     });
 
     // Mark all messages as failed
@@ -186,10 +225,13 @@ async function processProviderMessages(
 
   if (subsToSync.length === 0) {
     consumerLogger.warn('No valid subscriptions found', {
+      operation: 'subscriptions.sync.process',
+      event: 'subscriptions.sync.subscription_missing',
       jobId,
       userId,
       provider,
       requestedIds: subscriptionIds,
+      traceIds: [...new Set(messages.map((message) => message.body.meta?.traceId).filter(Boolean))],
     });
 
     // Mark all messages as completed (subscription may have been removed)
@@ -233,12 +275,17 @@ async function processProviderMessages(
           const subId = message.body.subscriptionId;
           const errorEntry = result.errors?.find((e) => e.subscriptionId === subId);
 
+          if (errorEntry) {
+            retryMessage(message, 'batched_provider_error', errorEntry.error);
+            continue;
+          }
+
           await updateJobProgress(
             jobId,
             subId,
-            !errorEntry,
-            errorEntry ? 0 : Math.round(itemsPerSub),
-            errorEntry?.error ?? null,
+            true,
+            Math.round(itemsPerSub),
+            null,
             env.OAUTH_STATE_KV
           );
           message.ack();
@@ -260,15 +307,11 @@ async function processProviderMessages(
           await updateJobProgress(jobId, sub.id, true, result.newItems, null, env.OAUTH_STATE_KV);
           message.ack();
         } catch (error) {
-          await updateJobProgress(
-            jobId,
-            sub.id,
-            false,
-            0,
-            error instanceof Error ? error.message : String(error),
-            env.OAUTH_STATE_KV
+          retryMessage(
+            message,
+            'single_subscription_error',
+            error instanceof Error ? error.message : String(error)
           );
-          message.ack(); // Ack to prevent infinite retries
         }
       }
     } else {
@@ -296,12 +339,17 @@ async function processProviderMessages(
           const subId = message.body.subscriptionId;
           const errorEntry = result.errors?.find((e) => e.subscriptionId === subId);
 
+          if (errorEntry) {
+            retryMessage(message, 'batched_provider_error', errorEntry.error);
+            continue;
+          }
+
           await updateJobProgress(
             jobId,
             subId,
-            !errorEntry,
-            errorEntry ? 0 : Math.round(itemsPerSub),
-            errorEntry?.error ?? null,
+            true,
+            Math.round(itemsPerSub),
+            null,
             env.OAUTH_STATE_KV
           );
           message.ack();
@@ -323,37 +371,33 @@ async function processProviderMessages(
           await updateJobProgress(jobId, sub.id, true, result.newItems, null, env.OAUTH_STATE_KV);
           message.ack();
         } catch (error) {
-          await updateJobProgress(
-            jobId,
-            sub.id,
-            false,
-            0,
-            error instanceof Error ? error.message : String(error),
-            env.OAUTH_STATE_KV
+          retryMessage(
+            message,
+            'single_subscription_error',
+            error instanceof Error ? error.message : String(error)
           );
-          message.ack(); // Ack to prevent infinite retries
         }
       }
     }
   } catch (error) {
     consumerLogger.error('Provider processing failed', {
+      operation: 'subscriptions.sync.process',
+      event: 'subscriptions.sync.provider.failed',
+      status: 'error',
       jobId,
       userId,
       provider,
       error,
+      traceIds: [...new Set(messages.map((message) => message.body.meta?.traceId).filter(Boolean))],
     });
 
-    // Mark all messages as failed
+    // Retry the whole provider batch so Cloudflare Queues can DLQ persistent failures.
     for (const message of messages) {
-      await updateJobProgress(
-        jobId,
-        message.body.subscriptionId,
-        false,
-        0,
-        error instanceof Error ? error.message : String(error),
-        env.OAUTH_STATE_KV
+      retryMessage(
+        message,
+        'provider_batch_failure',
+        error instanceof Error ? error.message : String(error)
       );
-      message.ack(); // Ack to prevent infinite retries
     }
   }
 }

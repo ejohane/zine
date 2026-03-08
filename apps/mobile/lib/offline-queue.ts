@@ -23,6 +23,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { createTraceId } from '@zine/shared';
 import { ulid } from 'ulid';
 import type { createOfflineTRPCClient } from './trpc-offline-client';
 import { offlineLogger } from './logger';
@@ -61,6 +62,8 @@ export interface OfflineAction {
   type: OfflineActionType;
   /** Mutation payload (specific to action type) */
   payload: Record<string, unknown>;
+  /** Logical trace ID for the originating user action */
+  traceId?: string;
   /** Timestamp when the action was created */
   createdAt: number;
   /** Number of retry attempts for network/server errors */
@@ -176,6 +179,7 @@ class OfflineActionQueue {
   async enqueue(action: {
     type: OfflineActionType;
     payload: Record<string, unknown>;
+    traceId?: string;
   }): Promise<string> {
     const queue = await this.getQueue();
 
@@ -183,6 +187,7 @@ class OfflineActionQueue {
       id: ulid(),
       type: action.type,
       payload: action.payload,
+      traceId: action.traceId ?? createTraceId(),
       createdAt: Date.now(),
       retryCount: 0,
       authRetryCount: 0,
@@ -506,8 +511,11 @@ class OfflineActionQueue {
    * @throws Error if the mutation fails
    */
   private async executeAction(action: OfflineAction): Promise<void> {
-    const { getOfflineTRPCClient } = await import('./trpc-offline-client');
-    const client = getOfflineTRPCClient() as OfflineQueueTRPCClient;
+    const { createOfflineTRPCClient } = await import('./trpc-offline-client');
+    const client = createOfflineTRPCClient({
+      traceId: action.traceId ?? `trc_offline_${action.id}`,
+      clientRequestId: action.id,
+    }) as OfflineQueueTRPCClient;
 
     // Map action types to tRPC mutations. Legacy `sources` route is kept as
     // a fallback for older test/mocked clients.
