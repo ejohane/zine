@@ -40,15 +40,37 @@ export const trpc = createTRPCReact<AppRouter>();
  *
  * @returns The API URL for the current platform
  */
+export function resolveApiUrl(
+  configuredUrl: string | undefined,
+  platform: string,
+  isDev: boolean
+): string | undefined {
+  if (!configuredUrl) return undefined;
+
+  const trimmed = configuredUrl.trim();
+  const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(trimmed);
+
+  // Preview/release builds installed on physical devices cannot reach localhost.
+  // If a local .env.preview accidentally sets localhost, force the production API.
+  if (!isDev && isLocalhost) {
+    return 'https://api.myzine.app';
+  }
+
+  if (platform === 'android') {
+    return trimmed.replace('localhost', '10.0.2.2');
+  }
+
+  return trimmed;
+}
+
 function getApiUrl(): string {
-  const configuredUrl = process.env.EXPO_PUBLIC_API_URL;
+  const configuredUrl = resolveApiUrl(
+    process.env.EXPO_PUBLIC_API_URL,
+    Platform.OS,
+    typeof __DEV__ === 'boolean' ? __DEV__ : false
+  );
 
   if (configuredUrl) {
-    // For Android emulator, substitute localhost with the special host alias
-    // This allows worktree-generated .env.local (which uses localhost) to work
-    if (Platform.OS === 'android') {
-      return configuredUrl.replace('localhost', '10.0.2.2');
-    }
     return configuredUrl;
   }
 
