@@ -1,4 +1,4 @@
-import { useRouter, type Href } from 'expo-router';
+import { useNavigation, useRouter, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -64,6 +64,7 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
 
 export default function InboxScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
@@ -79,6 +80,7 @@ export default function InboxScreen() {
   // Track items that should animate in after a failed mutation (rollback)
   // Maps item ID to the direction they should enter from
   const [reappearingItems, setReappearingItems] = useState<Map<string, EnterDirection>>(new Map());
+  const listRef = useRef<Animated.FlatList<ItemCardData>>(null);
 
   // Action mutations for swipeable items with rollback handling
   const archiveMutation = useArchiveItem();
@@ -223,6 +225,14 @@ export default function InboxScreen() {
     [handleArchive, handleBookmark, reappearingItems]
   );
 
+  useEffect(() => {
+    return navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    });
+  }, [navigation]);
+
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -280,6 +290,7 @@ export default function InboxScreen() {
           <ErrorState message={error.message} />
         ) : (
           <Animated.FlatList
+            ref={listRef}
             data={inboxItems}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}

@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 
 import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -84,6 +84,8 @@ const filterOptions: {
 
 export default function LibraryScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const listScrollRef = useRef<ScrollView>(null);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -165,6 +167,14 @@ export default function LibraryScreen() {
     publishedAt: item.publishedAt ?? null,
     isFinished: item.isFinished,
   }));
+
+  useEffect(() => {
+    return navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+
+      listScrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, [navigation]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
@@ -253,6 +263,7 @@ export default function LibraryScreen() {
           />
         ) : (
           <ScrollView
+            ref={listScrollRef}
             style={styles.listContainer}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}

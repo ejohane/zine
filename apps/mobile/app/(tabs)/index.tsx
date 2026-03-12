@@ -1,7 +1,7 @@
-import { Stack, useRouter, type Href } from 'expo-router';
+import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
 import { Image } from 'expo-image';
 import { Surface } from 'heroui-native';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
+import { SettingsIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -152,6 +153,8 @@ function JumpBackInCard({ item, colors }: { item: ItemCardData; colors: typeof C
 
 export default function HomeScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const greeting = useMemo(() => getGreeting(), []);
@@ -242,22 +245,50 @@ export default function HomeScreen() {
     },
     [router]
   );
+  const handleOpenSettings = useCallback(() => {
+    router.push('/settings');
+  }, [router]);
 
   const isLoading = isInboxLoading || isHomeLoading;
+
+  useEffect(() => {
+    return navigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, [navigation]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <Animated.View style={styles.header}>
-            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
+            <View style={styles.headerTopRow}>
+              <View style={styles.headerTitleWrap}>
+                <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
+              </View>
+              <Pressable
+                onPress={handleOpenSettings}
+                style={({ pressed }) => [
+                  styles.settingsButton,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                  pressed && { opacity: 0.75 },
+                ]}
+                accessibilityLabel="Open settings"
+                accessibilityRole="button"
+              >
+                <SettingsIcon size={20} color={colors.text} />
+              </Pressable>
+            </View>
           </Animated.View>
 
           {isStorybookEnabled && (
@@ -449,12 +480,29 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl,
   },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  headerTitleWrap: {
+    flex: 1,
+  },
   greeting: {
     ...Typography.labelMedium,
     marginBottom: Spacing.xs,
   },
   headerTitle: {
     ...Typography.displayMedium,
+  },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
   storybookButtonContainer: {
     paddingHorizontal: Spacing.md,
