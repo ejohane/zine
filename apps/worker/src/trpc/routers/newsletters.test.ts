@@ -69,9 +69,10 @@ describe('newslettersRouter', () => {
     vi.clearAllMocks();
   });
 
-  it('returns branded newsletters with strong list headers', async () => {
+  it('returns branded newsletters with strong list headers and dedupes unstable unsubscribe keys', async () => {
     const ctx = createMockCtx();
     const caller = newslettersRouter.createCaller(ctx as never);
+    const now = Date.now();
 
     ctx.mocks.mockProviderConnectionsFindFirst.mockResolvedValue({
       id: 'conn_1',
@@ -88,7 +89,7 @@ describe('newslettersRouter', () => {
     ]);
     ctx.mocks.mockNewsletterFeedsFindMany.mockResolvedValue([
       {
-        id: 'feed_stratechery',
+        id: 'feed_stratechery_newer',
         gmailMailboxId: 'mailbox_1',
         userId: 'user_test_123',
         displayName: 'Stratechery',
@@ -96,11 +97,26 @@ describe('newslettersRouter', () => {
         listId: null,
         unsubscribeMailto: null,
         unsubscribeUrl:
-          'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email',
+          'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email&access_token=new-token',
         status: 'HIDDEN',
         detectionScore: 0.83,
-        lastSeenAt: Date.now(),
-        firstSeenAt: Date.now(),
+        lastSeenAt: now,
+        firstSeenAt: now,
+      },
+      {
+        id: 'feed_stratechery_older',
+        gmailMailboxId: 'mailbox_1',
+        userId: 'user_test_123',
+        displayName: 'Stratechery',
+        fromAddress: 'email@stratechery.com',
+        listId: null,
+        unsubscribeMailto: null,
+        unsubscribeUrl:
+          'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?access_token=old-token&channel=email',
+        status: 'HIDDEN',
+        detectionScore: 0.83,
+        lastSeenAt: now - 1000,
+        firstSeenAt: now - 1000,
       },
       {
         id: 'feed_github',
@@ -123,7 +139,7 @@ describe('newslettersRouter', () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
-      id: 'feed_stratechery',
+      id: 'feed_stratechery_newer',
       displayName: 'Stratechery',
       fromAddress: 'email@stratechery.com',
     });

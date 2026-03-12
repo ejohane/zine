@@ -213,6 +213,56 @@ function normalizeKeySegment(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+const VOLATILE_UNSUBSCRIBE_PARAM_NAMES = new Set([
+  'access_token',
+  'auth',
+  'expires',
+  'expiration',
+  'exp',
+  'hash',
+  'jwt',
+  'signature',
+  'sig',
+  'timestamp',
+  'token',
+  'ts',
+]);
+
+export function normalizeUnsubscribeIdentityUrl(rawUrl: string): string {
+  const normalizedCandidate = normalizeCandidateUrl(rawUrl) ?? rawUrl.trim();
+
+  try {
+    const parsed = new URL(normalizedCandidate);
+    parsed.hash = '';
+
+    const retainedEntries = Array.from(parsed.searchParams.entries())
+      .filter(([key]) => {
+        const normalizedKey = key.trim().toLowerCase();
+        return !(
+          normalizedKey.startsWith('utm_') ||
+          normalizedKey.startsWith('mc_') ||
+          VOLATILE_UNSUBSCRIBE_PARAM_NAMES.has(normalizedKey)
+        );
+      })
+      .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+        if (leftKey === rightKey) {
+          return leftValue.localeCompare(rightValue);
+        }
+
+        return leftKey.localeCompare(rightKey);
+      });
+
+    parsed.search = '';
+    for (const [key, value] of retainedEntries) {
+      parsed.searchParams.append(key, value);
+    }
+
+    return parsed.toString();
+  } catch {
+    return normalizeKeySegment(normalizedCandidate);
+  }
+}
+
 function parseAddress(value: string): { email: string; displayName: string } {
   const trimmed = value.trim();
   const bracketMatch = trimmed.match(/^(.*)<([^>]+)>$/);
@@ -1057,7 +1107,7 @@ function buildCanonicalKey(params: {
   }
 
   if (params.unsubscribeUrl) {
-    return `unsub-url:${normalizeKeySegment(params.unsubscribeUrl)}`;
+    return `unsub-url:${normalizeKeySegment(normalizeUnsubscribeIdentityUrl(params.unsubscribeUrl))}`;
   }
 
   if (params.unsubscribeMailto) {

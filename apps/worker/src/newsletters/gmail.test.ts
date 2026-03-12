@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeNewsletterScore,
   isLikelyNewsletterFeedIdentity,
+  normalizeUnsubscribeIdentityUrl,
   selectBestNewsletterIssueUrl,
   shouldUpgradeNewsletterIssueUrl,
 } from './gmail';
@@ -123,6 +124,30 @@ describe('gmail newsletter detection', () => {
     expect(uberIdentity).toBe(false);
     expect(substackIdentity).toBe(true);
     expect(stratecheryIdentity).toBe(true);
+  });
+
+  it('normalizes volatile unsubscribe tokens out of newsletter identity URLs', () => {
+    const firstUrl =
+      'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?access_token=token-a&channel=email';
+    const secondUrl =
+      'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email&access_token=token-b';
+
+    expect(normalizeUnsubscribeIdentityUrl(firstUrl)).toBe(
+      'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email'
+    );
+    expect(normalizeUnsubscribeIdentityUrl(secondUrl)).toBe(
+      'https://stratechery.passport.online/api/1.0.0/users/test/channelOptOut?channel=email'
+    );
+  });
+
+  it('retains stable unsubscribe identity parameters while removing tracking params', () => {
+    const normalizedUrl = normalizeUnsubscribeIdentityUrl(
+      'https://newsletter.example.com/unsubscribe?list=weekly&user=user-123&utm_source=gmail&token=secret'
+    );
+
+    expect(normalizedUrl).toBe(
+      'https://newsletter.example.com/unsubscribe?list=weekly&user=user-123'
+    );
   });
 
   it('prefers real content links over unsubscribe/manage links', () => {
