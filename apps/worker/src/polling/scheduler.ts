@@ -664,8 +664,7 @@ async function processProviderBatch<TClient>(
   const userIds = Object.keys(byUser);
 
   // Get concurrency limit from environment, falling back to default
-  const concurrency =
-    parseInt(env.USER_PROCESSING_CONCURRENCY ?? '', 10) || DEFAULT_USER_CONCURRENCY;
+  const concurrency = getUserProcessingConcurrency(env.USER_PROCESSING_CONCURRENCY);
   const limit = pLimit(concurrency);
 
   const userProcessingStart = Date.now();
@@ -718,6 +717,20 @@ function aggregateUserResults(userResults: UserBatchResult[]): BatchResult {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/**
+ * Parse USER_PROCESSING_CONCURRENCY env value into a safe positive integer.
+ * Falls back to DEFAULT_USER_CONCURRENCY for missing, non-numeric, zero,
+ * negative, or non-integer values.
+ */
+export function getUserProcessingConcurrency(rawValue: string | undefined): number {
+  if (!rawValue) {
+    return DEFAULT_USER_CONCURRENCY;
+  }
+
+  const parsed = Number.parseInt(rawValue.trim(), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_USER_CONCURRENCY;
+}
 
 /**
  * Check if an error indicates an authentication failure.

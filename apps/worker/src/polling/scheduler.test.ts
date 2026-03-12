@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
+import { getUserProcessingConcurrency } from './scheduler';
 
 // ============================================================================
 // Mock Dependencies
@@ -206,6 +207,22 @@ interface MockConnection {
 // ============================================================================
 // Tests
 // ============================================================================
+
+describe('getUserProcessingConcurrency', () => {
+  it('returns default when value is missing or invalid', () => {
+    expect(getUserProcessingConcurrency(undefined)).toBe(10);
+    expect(getUserProcessingConcurrency('')).toBe(10);
+    expect(getUserProcessingConcurrency('   ')).toBe(10);
+    expect(getUserProcessingConcurrency('0')).toBe(10);
+    expect(getUserProcessingConcurrency('-2')).toBe(10);
+    expect(getUserProcessingConcurrency('abc')).toBe(10);
+  });
+
+  it('parses positive integer values (including trimmed values)', () => {
+    expect(getUserProcessingConcurrency('5')).toBe(5);
+    expect(getUserProcessingConcurrency(' 7 ')).toBe(7);
+  });
+});
 
 describe('Polling Scheduler', () => {
   const MOCK_NOW = 1705320000000;
