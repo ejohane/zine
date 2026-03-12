@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Stack } from 'expo-router';
+import { Stack, useNavigation } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,8 @@ import { mapContentType, mapProvider, useLibraryItems } from '@/hooks/use-items-
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 export default function SearchTabScreen() {
+  const navigation = useNavigation();
+  const listScrollRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -47,6 +49,16 @@ export default function SearchTabScreen() {
     [data?.items]
   );
 
+  useEffect(() => {
+    const tabNavigation = navigation.getParent() ?? navigation;
+
+    return tabNavigation.addListener('tabPress', () => {
+      if (!navigation.isFocused()) return;
+
+      listScrollRef.current?.scrollTo({ y: 0, animated: true });
+    });
+  }, [navigation]);
+
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
@@ -78,6 +90,7 @@ export default function SearchTabScreen() {
           />
         ) : (
           <ScrollView
+            ref={listScrollRef}
             style={styles.listContainer}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
