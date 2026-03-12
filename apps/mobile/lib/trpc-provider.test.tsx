@@ -28,6 +28,8 @@ type PersistOptions = {
 };
 
 let mockUserId = 'user-123';
+const mockGetToken = jest.fn();
+const mockSignOut = jest.fn(async () => undefined);
 let latestPersistOptions: PersistOptions | null = null;
 const mockRemoveClient = jest.fn(async () => undefined);
 const mockUseIsRestoring = jest.fn(() => false);
@@ -84,8 +86,11 @@ jest.mock('superjson', () => ({
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
-    getToken: jest.fn(async () => 'token'),
+    getToken: mockGetToken,
     userId: mockUserId,
+  }),
+  useClerk: () => ({
+    signOut: mockSignOut,
   }),
 }));
 
@@ -117,6 +122,8 @@ describe('TRPCProvider offline queue invalidation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
+    mockGetToken.mockResolvedValue('token');
+    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
@@ -161,6 +168,8 @@ describe('TRPCProvider transport wiring', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
+    mockGetToken.mockResolvedValue('token');
+    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
@@ -177,7 +186,7 @@ describe('TRPCProvider transport wiring', () => {
 
     expect(httpBatchLink).toHaveBeenCalledWith(
       expect.objectContaining({
-        fetch: telemetryFetch,
+        fetch: expect.any(Function),
         headers: expect.any(Function),
       })
     );
@@ -190,12 +199,74 @@ describe('TRPCProvider transport wiring', () => {
       'X-Trace-ID': 'trc_test_header',
     });
   });
+
+  it('retries unauthorized requests with a refreshed token', async () => {
+    mockGetToken.mockResolvedValueOnce('refreshed-token');
+    const unauthorizedResponse = { status: 401 } as Response;
+    const successResponse = { status: 200 } as Response;
+    (telemetryFetch as jest.Mock)
+      .mockResolvedValueOnce(unauthorizedResponse)
+      .mockResolvedValueOnce(successResponse);
+
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    const fetchFn = (httpBatchLink as jest.Mock).mock.calls[0][0].fetch as typeof fetch;
+    const response = await fetchFn('https://api.myzine.app/trpc/items.home', {
+      headers: { Authorization: 'Bearer stale-token' },
+      method: 'GET',
+    });
+
+    expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
+    expect(telemetryFetch).toHaveBeenCalledTimes(2);
+
+    const retryInit = (telemetryFetch as jest.Mock).mock.calls[1][1] as RequestInit;
+    expect(new Headers(retryInit.headers).get('Authorization')).toBe('Bearer refreshed-token');
+    expect(response.status).toBe(200);
+    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('signs out after an unauthorized retry also fails', async () => {
+    const clearSpy = jest.spyOn(QueryClient.prototype, 'clear');
+
+    mockGetToken.mockResolvedValueOnce('refreshed-token');
+    const unauthorizedResponse = { status: 401 } as Response;
+    (telemetryFetch as jest.Mock)
+      .mockResolvedValueOnce(unauthorizedResponse)
+      .mockResolvedValueOnce(unauthorizedResponse);
+
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    const fetchFn = (httpBatchLink as jest.Mock).mock.calls[0][0].fetch as typeof fetch;
+    const response = await fetchFn('https://api.myzine.app/trpc/items.home', {
+      headers: { Authorization: 'Bearer stale-token' },
+      method: 'GET',
+    });
+
+    expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
+    expect(response.status).toBe(401);
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('TRPCProvider cache persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
+    mockGetToken.mockResolvedValue('token');
+    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);

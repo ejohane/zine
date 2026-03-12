@@ -13,7 +13,7 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { getQueryKey } from '@trpc/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth, useClerk } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
@@ -33,6 +33,31 @@ import {
 
 interface TRPCProviderProps {
   children: ReactNode;
+}
+
+function isRequest(input: RequestInfo | URL): input is Request {
+  return typeof Request !== 'undefined' && input instanceof Request;
+}
+
+function isUnauthorizedResponse(response: Response): boolean {
+  return response.status === 401;
+}
+
+function buildRetryRequest(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  token: string
+): { input: RequestInfo | URL; init: RequestInit } {
+  const headers = new Headers(init?.headers ?? (isRequest(input) ? input.headers : undefined));
+  headers.set('Authorization', `Bearer ${token}`);
+
+  return {
+    input: isRequest(input) ? input.clone() : input,
+    init: {
+      ...init,
+      headers,
+    },
+  };
 }
 
 function HydrationGate({ children, shouldBlock }: { children: ReactNode; shouldBlock: boolean }) {
@@ -60,10 +85,14 @@ function HydrationGate({ children, shouldBlock }: { children: ReactNode; shouldB
  */
 export function TRPCProvider({ children }: TRPCProviderProps) {
   const { getToken, userId } = useAuth();
+  const { signOut } = useClerk();
 
   // Store getToken in a ref to avoid recreating the tRPC client when auth changes
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
+  const signOutRef = useRef(signOut);
+  signOutRef.current = signOut;
+  const hasTriggeredSignOutRef = useRef(false);
 
   // ---------------------------------------------------------------------------
   // Initialize OAuth Token Getter
@@ -73,6 +102,10 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
   useEffect(() => {
     setTokenGetter(() => getTokenRef.current());
   }, []);
+
+  useEffect(() => {
+    hasTriggeredSignOutRef.current = false;
+  }, [userId]);
 
   // ---------------------------------------------------------------------------
   // QueryClient Configuration
@@ -180,6 +213,57 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
     const url = `${API_URL}/trpc`;
     trpcLogger.info('Connecting to tRPC server', { url });
 
+    const fetchWithAuthRecovery: typeof fetch = async (input, init) => {
+      const response = await telemetryFetch(isRequest(input) ? input.clone() : input, init);
+
+      if (!isUnauthorizedResponse(response)) {
+        return response;
+      }
+
+      try {
+        const refreshedToken = await getTokenRef.current({ skipCache: true });
+
+        if (refreshedToken) {
+          trpcLogger.warn('Retrying unauthorized tRPC request with refreshed auth token', {
+            url,
+            httpStatus: response.status,
+          });
+
+          const retryRequest = buildRetryRequest(input, init, refreshedToken);
+          const retryResponse = await telemetryFetch(retryRequest.input, retryRequest.init);
+
+          if (!isUnauthorizedResponse(retryResponse)) {
+            return retryResponse;
+          }
+        } else {
+          trpcLogger.warn(
+            'Skipping unauthorized tRPC retry because auth refresh returned no token',
+            {
+              url,
+            }
+          );
+        }
+      } catch (error) {
+        trpcLogger.warn('Failed to refresh auth token after unauthorized tRPC request', {
+          error,
+          url,
+        });
+      }
+
+      if (!hasTriggeredSignOutRef.current) {
+        hasTriggeredSignOutRef.current = true;
+        queryClient.clear();
+        void signOutRef.current().catch((error) => {
+          trpcLogger.warn('Failed to sign out after repeated unauthorized tRPC request', {
+            error,
+            url,
+          });
+        });
+      }
+
+      return response;
+    };
+
     return trpc.createClient({
       links: [
         httpBatchLink({
@@ -196,7 +280,7 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
             }
             return buildMobileTelemetryHeaders({});
           },
-          fetch: telemetryFetch,
+          fetch: fetchWithAuthRecovery,
         }),
       ],
     });
