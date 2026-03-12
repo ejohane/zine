@@ -8,7 +8,7 @@
 import React from 'react';
 
 import { ContentColors, ProviderColors } from '@/constants/theme';
-import { HeadphonesIcon, VideoIcon, ArticleIcon, BookmarkIcon } from '@/components/icons';
+import { HeadphonesIcon, VideoIcon, ArticleIcon, PostIcon } from '@/components/icons';
 
 // ============================================================================
 // Types
@@ -113,7 +113,7 @@ export function getContentIcon(
       return React.createElement(ArticleIcon, { size, color });
     case 'post':
     default:
-      return React.createElement(BookmarkIcon, { size, color });
+      return React.createElement(PostIcon, { size, color });
   }
 }
 

@@ -2,17 +2,24 @@
  * FilterChip Component
  *
  * A reusable chip component for filtering content by type or category.
- * Supports selected/unselected states with color-coded dots.
+ * Supports selected/unselected states with restrained editorial styling.
  */
 
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ComponentType } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing, Typography } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { Text } from '@/components/primitives/text';
 
 // =============================================================================
 // Types
 // =============================================================================
+
+type FilterChipIconProps = {
+  size?: number;
+  color?: string;
+};
 
 export interface FilterChipProps {
   /** Label text displayed on the chip */
@@ -24,11 +31,17 @@ export interface FilterChipProps {
   /** Handler called when chip is pressed */
   onPress: () => void;
 
+  /** Optional leading icon component */
+  icon?: ComponentType<FilterChipIconProps>;
+
   /** Optional dot color (shown when not selected) */
   dotColor?: string;
 
-  /** Optional selected background/border color */
+  /** Optional selected accent color for restrained border/text emphasis */
   selectedColor?: string;
+
+  /** Optional selected surface color for type-associated selection states */
+  selectedSurfaceColor?: string;
 
   /** Optional count badge (e.g., "12") */
   count?: number;
@@ -42,7 +55,7 @@ export interface FilterChipProps {
 // =============================================================================
 
 /**
- * FilterChip displays a selectable chip with optional color dot and count.
+ * FilterChip displays a selectable chip with optional icon and count.
  * Used for filtering content by type (Articles, Podcasts, Videos, etc.).
  *
  * @example
@@ -52,7 +65,7 @@ export interface FilterChipProps {
  *   label="Podcasts"
  *   isSelected={false}
  *   onPress={() => setFilter('podcast')}
- *   dotColor={ContentColors.podcast}
+ *   icon={HeadphonesIcon}
  * />
  *
  * // Selected state
@@ -67,16 +80,28 @@ export function FilterChip({
   label,
   isSelected,
   onPress,
+  icon: Icon,
   dotColor,
   selectedColor,
+  selectedSurfaceColor,
   count,
   size = 'medium',
 }: FilterChipProps) {
   const { colors, motion } = useAppTheme();
-  const activeColor = selectedColor ?? colors.accent;
+  const hasTintedSelection = Boolean(selectedColor && selectedSurfaceColor);
+  const chipBackgroundColor = isSelected
+    ? (selectedSurfaceColor ?? colors.surfaceRaised)
+    : colors.surfaceSubtle;
+  const chipBorderColor = isSelected
+    ? (selectedColor ?? colors.borderDefault)
+    : colors.borderSubtle;
+  const selectedForegroundColor = hasTintedSelection ? selectedColor : colors.textPrimary;
+  const iconColor = isSelected ? selectedForegroundColor : colors.textTertiary;
+  const displayedCount = count && count > 0 ? (count > 99 ? '99+' : String(count)) : null;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
+  const iconSize = size === 'small' ? 12 : 14;
 
   return (
     <Pressable
@@ -85,28 +110,32 @@ export function FilterChip({
         styles.chip,
         sizeStyles,
         {
-          backgroundColor: isSelected ? activeColor : colors.surfaceSubtle,
-          borderColor: isSelected ? activeColor : colors.borderDefault,
+          backgroundColor: chipBackgroundColor,
+          borderColor: chipBorderColor,
         },
         pressed && { opacity: motion.opacity.pressed },
       ]}
     >
-      {dotColor && !isSelected && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
+      {Icon ? <Icon size={iconSize} color={iconColor} /> : null}
+      {!Icon && dotColor && !isSelected ? (
+        <View style={[styles.dot, { backgroundColor: dotColor }]} />
+      ) : null}
       <Text
-        style={[textStyles, { color: isSelected ? colors.accentForeground : colors.textPrimary }]}
+        variant={size === 'small' ? 'labelSmallPlain' : 'labelMedium'}
+        tone={isSelected ? 'primary' : 'secondary'}
+        style={[textStyles, isSelected ? { color: selectedForegroundColor } : null]}
       >
         {label}
       </Text>
-      {count !== undefined && (
+      {displayedCount ? (
         <Text
-          style={[
-            styles.count,
-            { color: isSelected ? colors.accentForeground : colors.textTertiary },
-          ]}
+          variant="bodySmall"
+          tone={isSelected ? 'primary' : 'tertiary'}
+          style={[styles.count, isSelected ? { color: selectedForegroundColor } : null]}
         >
-          {count}
+          {displayedCount}
         </Text>
-      )}
+      ) : null}
     </Pressable>
   );
 }
@@ -132,17 +161,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: Radius.full,
   },
   textSmall: {
     ...Typography.labelSmallPlain,
+    textTransform: 'uppercase',
   },
   textMedium: {
     ...Typography.labelMedium,
   },
   count: {
     ...Typography.bodySmall,
+    minWidth: 18,
   },
 });

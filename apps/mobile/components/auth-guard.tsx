@@ -11,6 +11,7 @@ import { type ReactNode } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { useAuthAvailability } from '@/providers/auth-provider';
 
 // ============================================================================
 // Component
@@ -42,6 +43,20 @@ interface AuthGuardProps {
  * ```
  */
 export function AuthGuard({ children, authStateOverride, signedOutFallback }: AuthGuardProps) {
+  const { isEnabled } = useAuthAvailability();
+
+  if (!isEnabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <ClerkAuthGuard authStateOverride={authStateOverride} signedOutFallback={signedOutFallback}>
+      {children}
+    </ClerkAuthGuard>
+  );
+}
+
+function ClerkAuthGuard({ children, authStateOverride, signedOutFallback }: AuthGuardProps) {
   const auth = useAuth();
   const { colors } = useAppTheme();
   const isLoaded = authStateOverride?.isLoaded ?? auth.isLoaded;

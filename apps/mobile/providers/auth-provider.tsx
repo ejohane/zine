@@ -5,7 +5,7 @@
  */
 
 import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
-import { type ReactNode } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 import { tokenCache, CLERK_PUBLISHABLE_KEY, validateClerkConfig } from '@/lib/auth';
 import { authLogger } from '@/lib/logger';
 
@@ -15,6 +15,18 @@ import { authLogger } from '@/lib/logger';
 
 interface AuthProviderProps {
   children: ReactNode;
+}
+
+interface AuthAvailabilityValue {
+  isEnabled: boolean;
+}
+
+const AuthAvailabilityContext = createContext<AuthAvailabilityValue>({
+  isEnabled: Boolean(CLERK_PUBLISHABLE_KEY),
+});
+
+export function useAuthAvailability() {
+  return useContext(AuthAvailabilityContext);
 }
 
 /**
@@ -36,6 +48,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Validate configuration on mount
   validateClerkConfig();
 
+  const authAvailability = {
+    isEnabled: Boolean(CLERK_PUBLISHABLE_KEY),
+  };
+
   // If no publishable key is configured, render children without auth
   // This allows the app to run in development without Clerk configured
   if (!CLERK_PUBLISHABLE_KEY) {
@@ -44,12 +60,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         'Running without Clerk authentication. Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY to enable auth.'
       );
     }
-    return <>{children}</>;
+    return (
+      <AuthAvailabilityContext.Provider value={authAvailability}>
+        {children}
+      </AuthAvailabilityContext.Provider>
+    );
   }
 
   return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
-      <ClerkLoaded>{children}</ClerkLoaded>
-    </ClerkProvider>
+    <AuthAvailabilityContext.Provider value={authAvailability}>
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+        <ClerkLoaded>{children}</ClerkLoaded>
+      </ClerkProvider>
+    </AuthAvailabilityContext.Provider>
   );
 }
