@@ -301,11 +301,11 @@ describe('SwipeableInboxItem Performance Configuration', () => {
       // Per issue zine-iln: Rapid swipes work correctly
       // Each swipe is independent, no shared state corruption
       const swipeSequence = [
-        { id: 'item-1', direction: 'right', action: 'archive' },
-        { id: 'item-2', direction: 'left', action: 'bookmark' },
-        { id: 'item-3', direction: 'right', action: 'archive' },
-        { id: 'item-4', direction: 'left', action: 'bookmark' },
-        { id: 'item-5', direction: 'right', action: 'archive' },
+        { id: 'item-1', direction: 'right', action: 'bookmark' },
+        { id: 'item-2', direction: 'left', action: 'archive' },
+        { id: 'item-3', direction: 'right', action: 'bookmark' },
+        { id: 'item-4', direction: 'left', action: 'archive' },
+        { id: 'item-5', direction: 'right', action: 'bookmark' },
       ];
 
       // All swipes should be independent

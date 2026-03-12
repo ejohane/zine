@@ -43,15 +43,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: () => <SwipeableHarness prompt="Swipe right to archive and left to save." />,
+  render: () => <SwipeableHarness prompt="Swipe right to save and left to archive." />,
 };
 
 export const ArchivePath: Story = {
-  render: () => <SwipeableHarness prompt="Archive path: swipe right until release threshold." />,
+  render: () => <SwipeableHarness prompt="Archive path: swipe left until release threshold." />,
 };
 
 export const BookmarkPath: Story = {
-  render: () => <SwipeableHarness prompt="Bookmark path: swipe left until release threshold." />,
+  render: () => <SwipeableHarness prompt="Save path: swipe right until release threshold." />,
 };
 
 export const AccessibilityActions: Story = {

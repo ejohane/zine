@@ -5,12 +5,12 @@
  * Uses ReanimatedSwipeable from react-native-gesture-handler for 60 FPS performance.
  *
  * Features:
+ * - Swipe right to save (primary color panel)
  * - Swipe left to archive (gray action panel)
- * - Swipe right to bookmark (primary color panel)
  * - Full swipe auto-completes action
  * - Partial swipe + release animates back smoothly
  * - Smooth exit animation when action completes
- * - Haptic feedback on action completion (Light for archive, Medium for bookmark)
+ * - Haptic feedback on action completion (Medium for save, Light for archive)
  * - Long-press context menu as accessibility fallback
  * - VoiceOver accessibility actions
  *
@@ -144,8 +144,8 @@ interface ActionPanelProps {
 }
 
 /**
- * Left action panel (Archive) - revealed when swiping right
- * Gray/neutral styling per design spec (soft delete, not destructive)
+ * Left action panel (Save) - revealed when swiping right
+ * Primary color styling per design spec
  */
 function LeftActionPanel({ progress }: ActionPanelProps) {
   const colorScheme = useColorScheme();
@@ -162,24 +162,18 @@ function LeftActionPanel({ progress }: ActionPanelProps) {
   });
 
   return (
-    <View
-      style={[
-        styles.actionPanel,
-        styles.leftActionPanel,
-        { backgroundColor: colors.backgroundTertiary },
-      ]}
-    >
+    <View style={[styles.actionPanel, styles.leftActionPanel, { backgroundColor: colors.primary }]}>
       <Animated.View style={[styles.actionContent, animatedStyle]}>
-        <ArchiveIcon size={24} color={colors.textSecondary} />
-        <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Archive</Text>
+        <BookmarkIcon size={24} color={colors.buttonPrimaryText} />
+        <Text style={[styles.actionLabel, { color: colors.buttonPrimaryText }]}>Save</Text>
       </Animated.View>
     </View>
   );
 }
 
 /**
- * Right action panel (Bookmark) - revealed when swiping left
- * Primary color styling per design spec
+ * Right action panel (Archive) - revealed when swiping left
+ * Gray/neutral styling per design spec (soft delete, not destructive)
  */
 function RightActionPanel({ progress }: ActionPanelProps) {
   const colorScheme = useColorScheme();
@@ -197,11 +191,15 @@ function RightActionPanel({ progress }: ActionPanelProps) {
 
   return (
     <View
-      style={[styles.actionPanel, styles.rightActionPanel, { backgroundColor: colors.primary }]}
+      style={[
+        styles.actionPanel,
+        styles.rightActionPanel,
+        { backgroundColor: colors.backgroundTertiary },
+      ]}
     >
       <Animated.View style={[styles.actionContent, animatedStyle]}>
-        <BookmarkIcon size={24} color={colors.buttonPrimaryText} />
-        <Text style={[styles.actionLabel, { color: colors.buttonPrimaryText }]}>Save</Text>
+        <ArchiveIcon size={24} color={colors.textSecondary} />
+        <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Archive</Text>
       </Animated.View>
     </View>
   );
@@ -246,9 +244,9 @@ export function SwipeableInboxItem({
   const executeAction = useCallback(
     (direction: 'left' | 'right') => {
       if (direction === 'left') {
-        onBookmark(item.id);
-      } else {
         onArchive(item.id);
+      } else {
+        onBookmark(item.id);
       }
     },
     [item.id, onArchive, onBookmark]
@@ -275,14 +273,14 @@ export function SwipeableInboxItem({
   }, [item.id, onArchive]);
 
   /**
-   * Render left actions (Archive) - appears when swiping right
+   * Render left actions (Save) - appears when swiping right
    */
   const renderLeftActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
     return <LeftActionPanel progress={progress} />;
   };
 
   /**
-   * Render right actions (Bookmark) - appears when swiping left
+   * Render right actions (Archive) - appears when swiping left
    */
   const renderRightActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
     return <RightActionPanel progress={progress} />;
@@ -303,20 +301,19 @@ export function SwipeableInboxItem({
   const handleSwipeableOpen = useCallback(
     (direction: 'left' | 'right') => {
       // Trigger haptic feedback on action completion
-      // Archive (swipe right) = Light haptic (subtle, neutral action)
-      // Bookmark (swipe left) = Medium haptic (more prominent, positive action)
+      // Save (swipe right) = Medium haptic (prominent, positive action)
+      // Archive (swipe left) = Light haptic (subtle, neutral action)
       if (direction === 'right') {
+        // Save action - more satisfying feedback
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } else {
         // Archive action - subtle feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else {
-        // Bookmark action - more satisfying feedback
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       }
 
-      // Set exit direction to trigger exit animation
-      // Archive (swipe right) exits to left, Bookmark (swipe left) exits to right
-      const exitDir = direction === 'right' ? 'left' : 'right';
-      setExitDirection(exitDir);
+      // Set exit direction to trigger exit animation.
+      // Each action exits in the same direction as its swipe.
+      setExitDirection(direction);
 
       // Execute the action callback
       executeAction(direction);
@@ -407,7 +404,7 @@ export function SwipeableInboxItem({
       accessible={true}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}${item.creator ? ` by ${item.creator}` : ''}`}
-      accessibilityHint="Swipe right to archive, swipe left to save. Double tap and hold for more options."
+      accessibilityHint="Swipe right to save, swipe left to archive. Double tap and hold for more options."
       accessibilityActions={accessibilityActions}
       onAccessibilityAction={handleAccessibilityAction}
     >
@@ -453,10 +450,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   leftActionPanel: {
-    // Archive panel - left side (revealed on right swipe)
+    // Save panel - left side (revealed on right swipe)
   },
   rightActionPanel: {
-    // Bookmark panel - right side (revealed on left swipe)
+    // Archive panel - right side (revealed on left swipe)
   },
   actionContent: {
     justifyContent: 'center',
