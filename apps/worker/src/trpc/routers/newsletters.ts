@@ -14,6 +14,7 @@ import {
 import {
   syncGmailNewslettersForUser,
   isLikelyNewsletterFeedIdentity,
+  normalizeUnsubscribeIdentityUrl,
   seedLatestNewsletterItemForFeed,
 } from '../../newsletters/gmail';
 import type { TokenRefreshEnv } from '../../lib/token-refresh';
@@ -80,6 +81,27 @@ async function getActiveGmailMailboxes(
   });
 }
 
+function buildFeedIdentityKey(feed: {
+  listId: string | null;
+  unsubscribeUrl: string | null;
+  unsubscribeMailto: string | null;
+  fromAddress: string | null;
+}): string {
+  if (feed.listId) {
+    return `list:${feed.listId.trim().toLowerCase()}`;
+  }
+
+  if (feed.unsubscribeUrl) {
+    return `unsub-url:${normalizeUnsubscribeIdentityUrl(feed.unsubscribeUrl).trim().toLowerCase()}`;
+  }
+
+  if (feed.unsubscribeMailto) {
+    return `unsub-mailto:${feed.unsubscribeMailto.trim().toLowerCase()}`;
+  }
+
+  return `from:${(feed.fromAddress ?? '').trim().toLowerCase()}`;
+}
+
 export const newslettersRouter = router({
   list: protectedProcedure
     .input(ListNewslettersInputSchema.optional())
@@ -121,15 +143,31 @@ export const newslettersRouter = router({
       });
 
       const hasMore = rows.length > limit;
-      const visibleRows = (hasMore ? rows.slice(0, limit) : rows).filter((row) =>
-        isLikelyNewsletterFeedIdentity({
-          listId: row.listId,
-          unsubscribeMailto: row.unsubscribeMailto,
-          unsubscribeUrl: row.unsubscribeUrl,
-          fromAddress: row.fromAddress,
-          displayName: row.displayName,
-        })
-      );
+      const candidateRows = hasMore ? rows.slice(0, limit) : rows;
+      const visibleRows: typeof candidateRows = [];
+      const seenIdentityKeys = new Set<string>();
+
+      for (const row of candidateRows) {
+        if (
+          !isLikelyNewsletterFeedIdentity({
+            listId: row.listId,
+            unsubscribeMailto: row.unsubscribeMailto,
+            unsubscribeUrl: row.unsubscribeUrl,
+            fromAddress: row.fromAddress,
+            displayName: row.displayName,
+          })
+        ) {
+          continue;
+        }
+
+        const identityKey = buildFeedIdentityKey(row);
+        if (seenIdentityKeys.has(identityKey)) {
+          continue;
+        }
+
+        seenIdentityKeys.add(identityKey);
+        visibleRows.push(row);
+      }
 
       const latestThumbnailByFeedId = new Map<string, string | null>();
       const visibleFeedIds = visibleRows.map((row) => row.id);
