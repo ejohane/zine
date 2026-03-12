@@ -1,7 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-native';
 import { StyleSheet, View } from 'react-native';
 
-import { Colors, ContentColors, Spacing } from '@/constants/theme';
+import { FilterChipPalette, Spacing } from '@/constants/theme';
+import {
+  ArticleIcon,
+  CheckOutlineIcon,
+  HeadphonesIcon,
+  PostIcon,
+  VideoIcon,
+} from '@/components/icons';
 import { createDarkCanvasDecorator } from '@/components/storybook/decorators';
 import { FilterChip } from './filter-chip';
 
@@ -11,7 +18,7 @@ const meta = {
   args: {
     label: 'Podcasts',
     isSelected: false,
-    dotColor: ContentColors.podcast,
+    icon: HeadphonesIcon,
     onPress: () => {},
   },
   decorators: [createDarkCanvasDecorator()],
@@ -32,7 +39,9 @@ export const Selected: Story = {
   args: {
     label: 'Videos',
     isSelected: true,
-    selectedColor: Colors.dark.primary,
+    icon: VideoIcon,
+    selectedColor: FilterChipPalette.video.accent,
+    selectedSurfaceColor: FilterChipPalette.video.surface,
   },
 };
 
@@ -40,8 +49,58 @@ export const WithCount: Story = {
   args: {
     label: 'Articles',
     count: 42,
-    dotColor: ContentColors.article,
+    icon: ArticleIcon,
   },
+};
+
+export const SuccessSelection: Story = {
+  args: {
+    label: 'Completed',
+    count: 18,
+    isSelected: true,
+    icon: CheckOutlineIcon,
+    selectedColor: FilterChipPalette.completed.accent,
+    selectedSurfaceColor: FilterChipPalette.completed.surface,
+  },
+};
+
+export const TypePalette: Story = {
+  render: () => (
+    <View style={styles.row}>
+      <FilterChip
+        label="Articles"
+        isSelected={true}
+        icon={ArticleIcon}
+        selectedColor={FilterChipPalette.article.accent}
+        selectedSurfaceColor={FilterChipPalette.article.surface}
+        onPress={() => {}}
+      />
+      <FilterChip
+        label="Podcasts"
+        isSelected={true}
+        icon={HeadphonesIcon}
+        selectedColor={FilterChipPalette.podcast.accent}
+        selectedSurfaceColor={FilterChipPalette.podcast.surface}
+        onPress={() => {}}
+      />
+      <FilterChip
+        label="Videos"
+        isSelected={true}
+        icon={VideoIcon}
+        selectedColor={FilterChipPalette.video.accent}
+        selectedSurfaceColor={FilterChipPalette.video.surface}
+        onPress={() => {}}
+      />
+      <FilterChip
+        label="Posts"
+        isSelected={true}
+        icon={PostIcon}
+        selectedColor={FilterChipPalette.post.accent}
+        selectedSurfaceColor={FilterChipPalette.post.surface}
+        onPress={() => {}}
+      />
+    </View>
+  ),
 };
 
 export const SmallVsMedium: Story = {
@@ -52,7 +111,7 @@ export const SmallVsMedium: Story = {
           label="Podcasts"
           isSelected={false}
           size="small"
-          dotColor={ContentColors.podcast}
+          icon={HeadphonesIcon}
           onPress={() => {}}
         />
         <FilterChip
@@ -60,7 +119,7 @@ export const SmallVsMedium: Story = {
           isSelected={true}
           size="small"
           count={12}
-          selectedColor={Colors.dark.primary}
+          icon={HeadphonesIcon}
           onPress={() => {}}
         />
       </View>
@@ -69,7 +128,7 @@ export const SmallVsMedium: Story = {
           label="Articles"
           isSelected={false}
           size="medium"
-          dotColor={ContentColors.article}
+          icon={ArticleIcon}
           onPress={() => {}}
         />
         <FilterChip
@@ -77,7 +136,16 @@ export const SmallVsMedium: Story = {
           isSelected={true}
           size="medium"
           count={7}
-          selectedColor={Colors.dark.primary}
+          icon={ArticleIcon}
+          onPress={() => {}}
+        />
+      </View>
+      <View style={styles.row}>
+        <FilterChip
+          label="Posts"
+          isSelected={false}
+          size="small"
+          icon={PostIcon}
           onPress={() => {}}
         />
       </View>

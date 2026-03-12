@@ -44,6 +44,30 @@ export const ProviderColors = {
   web: '#4A4A4A',
 };
 
+// Filter chip selection palette - muted but distinct accents for dark-first filtering UI
+export const FilterChipPalette = {
+  article: {
+    accent: '#3B82F6',
+    surface: 'rgba(59, 130, 246, 0.16)',
+  },
+  podcast: {
+    accent: '#1DB954',
+    surface: 'rgba(29, 185, 84, 0.16)',
+  },
+  video: {
+    accent: '#FF3B30',
+    surface: 'rgba(255, 59, 48, 0.16)',
+  },
+  post: {
+    accent: '#CFCFCF',
+    surface: 'rgba(255, 255, 255, 0.1)',
+  },
+  completed: {
+    accent: semantic.success,
+    surface: 'rgba(16, 185, 129, 0.16)',
+  },
+} as const;
+
 export const Colors = {
   light: {
     // Core - Light theme (kept for compatibility, but app uses dark only)

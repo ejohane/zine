@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType } from 'react';
 
 import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
@@ -9,9 +9,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { FilterChip } from '@/components/filter-chip';
+import {
+  ArticleIcon,
+  CheckOutlineIcon,
+  HeadphonesIcon,
+  PostIcon,
+  VideoIcon,
+} from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
-import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
+import {
+  Colors,
+  Typography,
+  Spacing,
+  Radius,
+  ContentColors,
+  FilterChipPalette,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
@@ -49,6 +63,9 @@ const filterOptions: {
   id: string;
   label: string;
   color: string | undefined;
+  icon?: ComponentType<{ size?: number; color?: string }>;
+  selectedColor?: string;
+  selectedSurfaceColor?: string;
   contentType: ApiContentType | null;
 }[] = [
   { id: 'all', label: 'All', color: undefined, contentType: null },
@@ -56,24 +73,36 @@ const filterOptions: {
     id: 'article',
     label: 'Articles',
     color: ContentColors.article,
+    icon: ArticleIcon,
+    selectedColor: FilterChipPalette.article.accent,
+    selectedSurfaceColor: FilterChipPalette.article.surface,
     contentType: 'ARTICLE',
   },
   {
     id: 'podcast',
     label: 'Podcasts',
     color: ContentColors.podcast,
+    icon: HeadphonesIcon,
+    selectedColor: FilterChipPalette.podcast.accent,
+    selectedSurfaceColor: FilterChipPalette.podcast.surface,
     contentType: 'PODCAST',
   },
   {
     id: 'video',
     label: 'Videos',
     color: ContentColors.video,
+    icon: VideoIcon,
+    selectedColor: FilterChipPalette.video.accent,
+    selectedSurfaceColor: FilterChipPalette.video.surface,
     contentType: 'VIDEO',
   },
   {
     id: 'post',
     label: 'Posts',
     color: ContentColors.post,
+    icon: PostIcon,
+    selectedColor: FilterChipPalette.post.accent,
+    selectedSurfaceColor: FilterChipPalette.post.surface,
     contentType: 'POST',
   },
 ];
@@ -232,8 +261,9 @@ export default function LibraryScreen() {
               label="Completed"
               isSelected={showCompletedOnly}
               onPress={() => setShowCompletedOnly((prev) => !prev)}
-              dotColor={colors.success}
-              selectedColor={colors.success}
+              icon={CheckOutlineIcon}
+              selectedColor={FilterChipPalette.completed.accent}
+              selectedSurfaceColor={FilterChipPalette.completed.surface}
             />
             {filterOptions.map((option) => (
               <FilterChip
@@ -241,7 +271,10 @@ export default function LibraryScreen() {
                 label={option.label}
                 isSelected={contentTypeFilter === option.contentType}
                 onPress={() => setContentTypeFilter(option.contentType)}
+                icon={option.icon}
                 dotColor={option.color}
+                selectedColor={option.selectedColor}
+                selectedSurfaceColor={option.selectedSurfaceColor}
               />
             ))}
           </ScrollView>

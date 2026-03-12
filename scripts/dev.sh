@@ -144,8 +144,11 @@ fi
 # --- Mobile Secrets ---
 # Only regenerate if port has changed or file doesn't exist
 CURRENT_PORT=""
+CURRENT_ENV_BACKUP=""
 if [ -f apps/mobile/.env.local ]; then
     CURRENT_PORT=$(grep "^EXPO_PUBLIC_API_URL=" apps/mobile/.env.local 2>/dev/null | sed 's/.*localhost:\([0-9]*\).*/\1/' || echo "")
+    CURRENT_ENV_BACKUP=$(mktemp)
+    cp apps/mobile/.env.local "$CURRENT_ENV_BACKUP"
 fi
 
 if [ "$CURRENT_PORT" != "$WORKER_PORT" ]; then
@@ -160,17 +163,31 @@ if [ "$CURRENT_PORT" != "$WORKER_PORT" ]; then
 EXPO_PUBLIC_API_URL=http://localhost:$WORKER_PORT
 EOF
 
-    # Append other env vars from main's .env.local (excluding API_URL and dev-only flags)
-    if [ -f "$MAIN_WORKTREE/apps/mobile/.env.local" ]; then
-        grep -v "^EXPO_PUBLIC_API_URL=" "$MAIN_WORKTREE/apps/mobile/.env.local" | \
+    # Append other env vars from the previous env file snapshot (main if available,
+    # otherwise the current worktree's prior file) excluding dynamic/local-only vars.
+    ENV_SOURCE_FILE=""
+    if [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ] && [ -n "$CURRENT_ENV_BACKUP" ] && [ -f "$CURRENT_ENV_BACKUP" ]; then
+        ENV_SOURCE_FILE="$CURRENT_ENV_BACKUP"
+    elif [ -f "$MAIN_WORKTREE/apps/mobile/.env.local" ]; then
+        ENV_SOURCE_FILE="$MAIN_WORKTREE/apps/mobile/.env.local"
+    elif [ -n "$CURRENT_ENV_BACKUP" ] && [ -f "$CURRENT_ENV_BACKUP" ]; then
+        ENV_SOURCE_FILE="$CURRENT_ENV_BACKUP"
+    fi
+
+    if [ -n "$ENV_SOURCE_FILE" ]; then
+        grep -v "^EXPO_PUBLIC_API_URL=" "$ENV_SOURCE_FILE" | \
             grep -v "^EXPO_PUBLIC_STORYBOOK_ENABLED=" | \
             grep -v "^#" | grep -v "^$" >> apps/mobile/.env.local 2>/dev/null || true
-        echo "   ✓ Copied secrets from main's .env.local"
+        echo "   ✓ Copied secrets from existing .env.local"
     else
         echo "   ⚠️  No main .env.local found"
         echo "      You may need to add EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY etc."
         echo "      See apps/mobile/.env.example for required variables"
     fi
+fi
+
+if [ -n "$CURRENT_ENV_BACKUP" ] && [ -f "$CURRENT_ENV_BACKUP" ]; then
+    rm -f "$CURRENT_ENV_BACKUP"
 fi
 
 # -----------------------------------------------------------------------------

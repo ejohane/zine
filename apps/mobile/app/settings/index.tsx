@@ -22,6 +22,7 @@ import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { buildMobileDiagnosticBundle } from '@/lib/diagnostics';
 import { settingsLogger } from '@/lib/logger';
+import { useAuthAvailability } from '@/providers/auth-provider';
 
 // ============================================================================
 // Types
@@ -89,10 +90,30 @@ function SettingsRow({
 // ============================================================================
 
 export default function SettingsScreen() {
+  const { isEnabled } = useAuthAvailability();
+
+  if (!isEnabled) {
+    return <SettingsScreenContent authEnabled={false} />;
+  }
+
+  return <AuthenticatedSettingsScreen />;
+}
+
+function AuthenticatedSettingsScreen() {
+  const { signOut } = useClerk();
+  return <SettingsScreenContent authEnabled={true} signOut={signOut} />;
+}
+
+function SettingsScreenContent({
+  authEnabled,
+  signOut,
+}: {
+  authEnabled: boolean;
+  signOut?: () => Promise<void>;
+}) {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const { signOut } = useClerk();
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
   const isDeveloperDiagnosticsEnabled = __DEV__ || isStorybookEnabled;
 
@@ -115,6 +136,10 @@ export default function SettingsScreen() {
 
   // Handlers
   const handleSignOut = async () => {
+    if (!signOut) {
+      return;
+    }
+
     try {
       await signOut();
       router.replace('/(auth)/sign-in');
@@ -219,11 +244,15 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT</Text>
+        {authEnabled && (
+          <>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT</Text>
 
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          <SettingsRow title="Sign Out" titleColor={colors.error} onPress={handleSignOut} />
-        </View>
+            <View style={[styles.section, { backgroundColor: colors.card }]}>
+              <SettingsRow title="Sign Out" titleColor={colors.error} onPress={handleSignOut} />
+            </View>
+          </>
+        )}
 
         {/* About Section */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ABOUT</Text>

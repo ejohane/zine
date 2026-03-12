@@ -30,6 +30,7 @@ type PersistOptions = {
 let mockUserId = 'user-123';
 const mockGetToken = jest.fn();
 const mockSignOut = jest.fn(async () => undefined);
+const mockUseAuthAvailability = jest.fn(() => ({ isEnabled: true }));
 let latestPersistOptions: PersistOptions | null = null;
 const mockRemoveClient = jest.fn(async () => undefined);
 const mockUseIsRestoring = jest.fn(() => false);
@@ -110,6 +111,10 @@ jest.mock('@/lib/trpc-transport', () => ({
   telemetryFetch: jest.fn(),
 }));
 
+jest.mock('@/providers/auth-provider', () => ({
+  useAuthAvailability: () => mockUseAuthAvailability(),
+}));
+
 // ==========================================================================
 // Tests
 // ==========================================================================
@@ -127,6 +132,7 @@ describe('TRPCProvider offline queue invalidation', () => {
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
   });
 
   it('registers offline queue callback with query invalidations', () => {
@@ -173,6 +179,7 @@ describe('TRPCProvider transport wiring', () => {
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
   });
 
   it('configures httpBatchLink with telemetry headers and telemetry fetch', async () => {
@@ -198,6 +205,34 @@ describe('TRPCProvider transport wiring', () => {
       Authorization: 'Bearer token',
       'X-Trace-ID': 'trc_test_header',
     });
+  });
+
+  it('omits Clerk auth headers when auth is disabled', async () => {
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: false });
+
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    expect(httpBatchLink).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fetch: telemetryFetch,
+        headers: expect.any(Function),
+      })
+    );
+
+    const headers = await (httpBatchLink as jest.Mock).mock.calls[0][0].headers();
+
+    expect(buildMobileTelemetryHeaders).toHaveBeenCalledWith({});
+    expect(headers).toEqual({
+      'X-Trace-ID': 'trc_test_header',
+    });
+    expect(mockGetToken).not.toHaveBeenCalled();
+    expect(setQueueProcessedCallback).not.toHaveBeenCalled();
   });
 
   it('retries unauthorized requests with a refreshed token', async () => {
@@ -270,6 +305,7 @@ describe('TRPCProvider cache persistence', () => {
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
   });
 
   it('configures a user-scoped persister with allowlisted queries', () => {

@@ -11,6 +11,7 @@ import {
   Filter,
   Headphones,
   Inbox,
+  MessageSquare,
   Play,
   Plus,
   PlusCircle,
@@ -51,6 +52,10 @@ export function HeadphonesIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconPr
 
 export function VideoIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
   return <Video size={size} color={color} fill={color} strokeWidth={0} />;
+}
+
+export function PostIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
+  return <MessageSquare size={size} color={color} fill={color} strokeWidth={0} />;
 }
 
 // =============================================================================

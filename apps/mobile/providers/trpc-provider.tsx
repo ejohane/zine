@@ -26,6 +26,7 @@ import {
   PERSISTENCE_MAX_AGE_MS,
   shouldPersistQuery,
 } from '@/lib/query-persistence';
+import { useAuthAvailability } from '@/providers/auth-provider';
 
 // ============================================================================
 // Provider Component
@@ -84,6 +85,16 @@ function HydrationGate({ children, shouldBlock }: { children: ReactNode; shouldB
  * ```
  */
 export function TRPCProvider({ children }: TRPCProviderProps) {
+  const { isEnabled } = useAuthAvailability();
+
+  if (!isEnabled) {
+    return <UnauthenticatedTRPCProvider>{children}</UnauthenticatedTRPCProvider>;
+  }
+
+  return <AuthenticatedTRPCProvider>{children}</AuthenticatedTRPCProvider>;
+}
+
+function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   const { getToken, userId } = useAuth();
   const { signOut } = useClerk();
 
@@ -297,6 +308,60 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
         <HydrationGate shouldBlock={shouldBlockHydration}>{children}</HydrationGate>
+      </PersistQueryClientProvider>
+    </trpc.Provider>
+  );
+}
+
+function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: DEFAULT_QUERY_OPTIONS,
+        },
+      })
+  );
+
+  const [trpcClient] = useState(() => {
+    const url = `${API_URL}/trpc`;
+    trpcLogger.info('Connecting to tRPC server without Clerk auth', { url });
+
+    return trpc.createClient({
+      links: [
+        httpBatchLink({
+          url,
+          transformer: superjson,
+          headers: async () => buildMobileTelemetryHeaders({}),
+          fetch: telemetryFetch,
+        }),
+      ],
+    });
+  });
+
+  return (
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: createAsyncStoragePersister({
+            storage: AsyncStorage,
+            key: buildQueryPersistenceKey(null, buildQueryPersistenceBuster()),
+          }),
+          maxAge: PERSISTENCE_MAX_AGE_MS,
+          buster: buildQueryPersistenceBuster(),
+          dehydrateOptions: {
+            shouldDehydrateQuery: ({
+              queryKey,
+              state,
+            }: {
+              queryKey: unknown;
+              state: { status: QueryStatus };
+            }) => shouldPersistQuery({ queryKey, status: state.status }),
+          },
+        }}
+      >
+        <HydrationGate shouldBlock={false}>{children}</HydrationGate>
       </PersistQueryClientProvider>
     </trpc.Provider>
   );
