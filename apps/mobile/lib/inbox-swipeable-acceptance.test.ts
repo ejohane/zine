@@ -83,7 +83,7 @@ const ANIMATION_CONSTANTS = {
 
 /** Helper to get exit direction based on swipe direction */
 function getExitDirection(swipeDir: 'left' | 'right'): 'left' | 'right' {
-  return swipeDir === 'right' ? 'left' : 'right';
+  return swipeDir;
 }
 
 /** Theme colors for action panels */
@@ -155,13 +155,10 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
 
   describe('2. Swipe left reveals archive action with gray/neutral styling', () => {
     it('swipe left reveals right action panel (archive)', () => {
-      // NOTE: The implementation has swipe left → bookmark, swipe right → archive
-      // This test documents the actual behavior vs. original spec
-      // The implementation follows iOS mail conventions: swipe right = archive/delete
-      const swipeDirection = 'right'; // Archive is actually on right swipe
+      const swipeDirection = 'left';
       const revealedAction = 'archive';
 
-      expect(swipeDirection).toBe('right');
+      expect(swipeDirection).toBe('left');
       expect(revealedAction).toBe('archive');
     });
 
@@ -192,11 +189,10 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
 
   describe('3. Swipe right reveals bookmark action with primary color', () => {
     it('swipe right reveals left action panel (bookmark)', () => {
-      // NOTE: The implementation has swipe left → bookmark (right panel)
-      const swipeDirection = 'left'; // Bookmark is on left swipe
+      const swipeDirection = 'right';
       const revealedAction = 'bookmark';
 
-      expect(swipeDirection).toBe('left');
+      expect(swipeDirection).toBe('right');
       expect(revealedAction).toBe('bookmark');
     });
 
@@ -313,14 +309,14 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
     });
 
     it('archive action exits to the left (SlideOutLeft)', () => {
-      const swipeDirection: 'left' | 'right' = 'right'; // Archive
+      const swipeDirection: 'left' | 'right' = 'left'; // Archive
       const exitDirection = getExitDirection(swipeDirection);
 
       expect(exitDirection).toBe('left');
     });
 
     it('bookmark action exits to the right (SlideOutRight)', () => {
-      const swipeDirection: 'left' | 'right' = 'left'; // Bookmark
+      const swipeDirection: 'left' | 'right' = 'right'; // Bookmark
       const exitDirection = getExitDirection(swipeDirection);
 
       expect(exitDirection).toBe('right');
@@ -481,7 +477,7 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
     });
 
     it('archive rollback enters from left (direction it exited)', () => {
-      const swipeDirection: 'left' | 'right' = 'right'; // Archive swipe
+      const swipeDirection: 'left' | 'right' = 'left'; // Archive swipe
       const exitDirection = getExitDirection(swipeDirection);
       const enterDirection = exitDirection; // Re-enter from same direction
 
@@ -489,7 +485,7 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
     });
 
     it('bookmark rollback enters from right (direction it exited)', () => {
-      const swipeDirection: 'left' | 'right' = 'left'; // Bookmark swipe
+      const swipeDirection: 'left' | 'right' = 'right'; // Bookmark swipe
       const exitDirection = getExitDirection(swipeDirection);
       const enterDirection = exitDirection; // Re-enter from same direction
 
@@ -574,7 +570,7 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
 
     it('accessibility hint describes available gestures', () => {
       const hint =
-        'Swipe right to archive, swipe left to save. Double tap and hold for more options.';
+        'Swipe right to save, swipe left to archive. Double tap and hold for more options.';
 
       expect(hint).toContain('Swipe');
       expect(hint).toContain('archive');

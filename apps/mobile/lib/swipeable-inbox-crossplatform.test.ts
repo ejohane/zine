@@ -136,22 +136,13 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
         const platform: SupportedPlatform = 'ios';
         const swipeDirection = 'left';
 
-        // onSwipeableOpen('right') is called when user swipes left
-        // This reveals the left action panel (archive)
-        // Note: Direction in callback is opposite to swipe direction
-        // Per implementation: swipe LEFT reveals RIGHT panel (bookmark)
-        // Swipe RIGHT reveals LEFT panel (archive)
-        // So swipe left → bookmark, swipe right → archive
         const actionFromSwipe =
           swipeDirection === 'left'
-            ? 'bookmark' // Swipe left = bookmark (right panel)
-            : 'archive'; // Swipe right = archive (left panel)
+            ? 'archive' // Swipe left = archive (right panel)
+            : 'bookmark'; // Swipe right = save (left panel)
 
         expect(platform).toBe('ios');
-        expect(actionFromSwipe).toBe('bookmark');
-        // Note: Test matrix says "Swipe left → archive" but implementation has
-        // swipe left → bookmark, swipe right → archive
-        // Updating understanding based on code review
+        expect(actionFromSwipe).toBe('archive');
       });
 
       it('swipe left triggers archive on Android', () => {
@@ -159,11 +150,10 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
         const platform: SupportedPlatform = 'android';
         const swipeDirection = 'left';
 
-        // Same behavior as iOS - react-native-gesture-handler provides consistency
-        const actionFromSwipe = swipeDirection === 'left' ? 'bookmark' : 'archive';
+        const actionFromSwipe = swipeDirection === 'left' ? 'archive' : 'bookmark';
 
         expect(platform).toBe('android');
-        expect(actionFromSwipe).toBe('bookmark');
+        expect(actionFromSwipe).toBe('archive');
       });
     });
 
@@ -173,11 +163,10 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
         const platform: SupportedPlatform = 'ios';
         const swipeDirection = 'right';
 
-        // Per implementation: swipe right reveals left panel (archive)
-        const actionFromSwipe = swipeDirection === 'right' ? 'archive' : 'bookmark';
+        const actionFromSwipe = swipeDirection === 'right' ? 'bookmark' : 'archive';
 
         expect(platform).toBe('ios');
-        expect(actionFromSwipe).toBe('archive');
+        expect(actionFromSwipe).toBe('bookmark');
       });
 
       it('swipe right triggers bookmark on Android', () => {
@@ -185,64 +174,47 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
         const platform: SupportedPlatform = 'android';
         const swipeDirection = 'right';
 
-        // Same behavior as iOS
-        const actionFromSwipe = swipeDirection === 'right' ? 'archive' : 'bookmark';
+        const actionFromSwipe = swipeDirection === 'right' ? 'bookmark' : 'archive';
 
         expect(platform).toBe('android');
-        expect(actionFromSwipe).toBe('archive');
+        expect(actionFromSwipe).toBe('bookmark');
       });
     });
 
     describe('Direction Mapping Clarification', () => {
       it('documents actual swipe-to-action mapping', () => {
         // Clarifying the actual implementation from swipeable-inbox-item.tsx:
-        // - renderLeftActions shows Archive (gray panel)
-        // - renderRightActions shows Bookmark (primary panel)
-        // - Swipe RIGHT reveals LEFT actions (Archive)
-        // - Swipe LEFT reveals RIGHT actions (Bookmark)
+        // - renderLeftActions shows Save (primary panel)
+        // - renderRightActions shows Archive (neutral panel)
+        // - Swipe RIGHT reveals LEFT actions (Save)
+        // - Swipe LEFT reveals RIGHT actions (Archive)
         const swipeMapping = {
           swipeRight: {
             reveals: 'leftPanel',
-            action: 'archive',
-            haptic: 'Light',
-            exitDirection: 'left',
-          },
-          swipeLeft: {
-            reveals: 'rightPanel',
             action: 'bookmark',
             haptic: 'Medium',
             exitDirection: 'right',
           },
+          swipeLeft: {
+            reveals: 'rightPanel',
+            action: 'archive',
+            haptic: 'Light',
+            exitDirection: 'left',
+          },
         };
 
-        expect(swipeMapping.swipeRight.action).toBe('archive');
-        expect(swipeMapping.swipeLeft.action).toBe('bookmark');
+        expect(swipeMapping.swipeRight.action).toBe('bookmark');
+        expect(swipeMapping.swipeLeft.action).toBe('archive');
       });
 
       it('test matrix naming matches epic issue description', () => {
-        // From epic zine-g05:
-        // - Swipe left → Archive (soft delete, gray styling)
-        // - Swipe right → Bookmark (save to library, primary color)
-        // The implementation reverses this convention:
-        // - Swipe left → reveals RIGHT panel → Bookmark (Save)
-        // - Swipe right → reveals LEFT panel → Archive
-
-        // This test documents the discrepancy between epic spec and implementation
-        // The epic says "Swipe left → Archive" but implementation has "Swipe left → Bookmark"
-        // This should be verified during manual testing
-        const epicSpec = {
+        const implementation = {
           swipeLeft: 'archive',
           swipeRight: 'bookmark',
         };
 
-        const implementation = {
-          swipeLeft: 'bookmark', // reveals RIGHT panel with bookmark
-          swipeRight: 'archive', // reveals LEFT panel with archive
-        };
-
-        // Document the difference - during manual testing, verify which is correct
-        expect(epicSpec.swipeLeft).not.toBe(implementation.swipeLeft);
-        // NOTE: This may require implementation fix or epic update
+        expect(implementation.swipeLeft).toBe('archive');
+        expect(implementation.swipeRight).toBe('bookmark');
       });
     });
   });
@@ -350,11 +322,11 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
     });
 
     it('exit direction matches swipe direction semantically', () => {
-      // Archive (swipe right) → exits left (item slides out to the left)
-      // Bookmark (swipe left) → exits right (item slides out to the right)
+      // Archive (swipe left) → exits left.
+      // Save (swipe right) → exits right.
       const exitMapping = {
-        archive: 'left', // Swipe right, exit left
-        bookmark: 'right', // Swipe left, exit right
+        archive: 'left',
+        bookmark: 'right',
       };
 
       expect(exitMapping.archive).toBe('left');
@@ -716,7 +688,7 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
 
       it('accessibilityHint describes available actions', () => {
         const hint =
-          'Swipe right to archive, swipe left to save. Double tap and hold for more options.';
+          'Swipe right to save, swipe left to archive. Double tap and hold for more options.';
 
         expect(hint).toContain('Swipe');
         expect(hint).toContain('archive');
@@ -823,8 +795,8 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
           '1. Open iOS Simulator (iPhone 14 Pro recommended)',
           '2. Build and run the app: npx expo run:ios',
           '3. Navigate to Inbox tab',
-          '4. Test swipe left → verify bookmark action',
-          '5. Test swipe right → verify archive action',
+          '4. Test swipe left → verify archive action',
+          '5. Test swipe right → verify save action',
           '6. Test partial swipe (<100px) → verify snap-back',
           '7. Test full swipe (>100px) → verify action triggers',
           '8. Test exit animation → verify smooth slide out',
@@ -855,8 +827,8 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
           '1. Open Android Emulator (Pixel 7 API 34 recommended)',
           '2. Build and run the app: npx expo run:android',
           '3. Navigate to Inbox tab',
-          '4. Test swipe left → verify bookmark action',
-          '5. Test swipe right → verify archive action',
+          '4. Test swipe left → verify archive action',
+          '5. Test swipe right → verify save action',
           '6. Test partial swipe (<100px) → verify snap-back',
           '7. Test full swipe (>100px) → verify action triggers',
           '8. Test exit animation → verify smooth slide out',

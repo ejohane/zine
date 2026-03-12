@@ -169,24 +169,24 @@ describe('SwipeableInboxItem', () => {
   });
 
   describe('swipe directions', () => {
-    it('swipe left reveals bookmark action (right panel)', () => {
-      // Per design spec: Swipe left -> right action panel -> bookmark
-      // This maps to onSwipeableOpen('left') -> onBookmark
+    it('swipe left reveals archive action (right panel)', () => {
+      // Per current spec: Swipe left -> right action panel -> archive
+      // This maps to onSwipeableOpen('left') -> onArchive
       const swipeDirection = 'left';
-      const expectedAction = 'bookmark';
-
-      expect(swipeDirection).toBe('left');
-      expect(expectedAction).toBe('bookmark');
-    });
-
-    it('swipe right reveals archive action (left panel)', () => {
-      // Per design spec: Swipe right -> left action panel -> archive
-      // This maps to onSwipeableOpen('right') -> onArchive
-      const swipeDirection = 'right';
       const expectedAction = 'archive';
 
-      expect(swipeDirection).toBe('right');
+      expect(swipeDirection).toBe('left');
       expect(expectedAction).toBe('archive');
+    });
+
+    it('swipe right reveals save action (left panel)', () => {
+      // Per current spec: Swipe right -> left action panel -> save
+      // This maps to onSwipeableOpen('right') -> onBookmark
+      const swipeDirection = 'right';
+      const expectedAction = 'bookmark';
+
+      expect(swipeDirection).toBe('right');
+      expect(expectedAction).toBe('bookmark');
     });
   });
 
@@ -330,48 +330,48 @@ describe('SwipeableInboxItem', () => {
     // Test that simulates the handleSwipeableOpen logic from the component
     // The actual ReanimatedSwipeable callback behavior is tested via manual testing
 
-    it('onSwipeableOpen with direction "left" triggers bookmark callback', () => {
-      // Per issue zine-e28: Swiping left triggers bookmark
-      // onSwipeableOpen('left') = right panel revealed = bookmark action
+    it('onSwipeableOpen with direction "left" triggers archive callback', () => {
+      // Per current behavior: Swiping left triggers archive
+      // onSwipeableOpen('left') = right panel revealed = archive action
       const bookmarkIds: string[] = [];
       const archiveIds: string[] = [];
       const item = createMockItem({ id: 'swipe-test-1' });
 
       const handleSwipeableOpen = (direction: 'left' | 'right') => {
         if (direction === 'left') {
-          // Swiped left = right action panel revealed = bookmark
-          bookmarkIds.push(item.id);
-        } else if (direction === 'right') {
-          // Swiped right = left action panel revealed = archive
+          // Swiped left = right action panel revealed = archive
           archiveIds.push(item.id);
+        } else if (direction === 'right') {
+          // Swiped right = left action panel revealed = save
+          bookmarkIds.push(item.id);
         }
       };
 
       handleSwipeableOpen('left');
 
-      expect(bookmarkIds).toContain('swipe-test-1');
-      expect(archiveIds).not.toContain('swipe-test-1');
+      expect(archiveIds).toContain('swipe-test-1');
+      expect(bookmarkIds).not.toContain('swipe-test-1');
     });
 
-    it('onSwipeableOpen with direction "right" triggers archive callback', () => {
-      // Per issue zine-e28: Swiping right triggers archive
-      // onSwipeableOpen('right') = left panel revealed = archive action
+    it('onSwipeableOpen with direction "right" triggers bookmark callback', () => {
+      // Per current behavior: Swiping right triggers save
+      // onSwipeableOpen('right') = left panel revealed = save action
       const bookmarkIds: string[] = [];
       const archiveIds: string[] = [];
       const item = createMockItem({ id: 'swipe-test-2' });
 
       const handleSwipeableOpen = (direction: 'left' | 'right') => {
         if (direction === 'left') {
-          bookmarkIds.push(item.id);
-        } else if (direction === 'right') {
           archiveIds.push(item.id);
+        } else if (direction === 'right') {
+          bookmarkIds.push(item.id);
         }
       };
 
       handleSwipeableOpen('right');
 
-      expect(archiveIds).toContain('swipe-test-2');
-      expect(bookmarkIds).not.toContain('swipe-test-2');
+      expect(bookmarkIds).toContain('swipe-test-2');
+      expect(archiveIds).not.toContain('swipe-test-2');
     });
 
     it('swipe threshold equals action panel width for consistent feel', () => {
@@ -544,7 +544,7 @@ describe('SwipeableInboxItem', () => {
       expect(mutationCalls[0].id).toBe('prop-test');
     });
 
-    it('archive flow: swipe right -> onSwipeableOpen("right") -> onArchive -> mutation', () => {
+    it('archive flow: swipe left -> onSwipeableOpen("left") -> onArchive -> mutation', () => {
       // Per issue zine-4v6: Full integration flow
       const flow: string[] = [];
       const mutationCalls: { id: string }[] = [];
@@ -563,15 +563,15 @@ describe('SwipeableInboxItem', () => {
 
       const handleSwipeableOpen = (direction: 'left' | 'right', itemId: string) => {
         flow.push(`onSwipeableOpen: ${direction}`);
-        if (direction === 'right') {
+        if (direction === 'left') {
           handleArchive(itemId);
         }
       };
 
       // Simulate the full swipe flow
-      handleSwipeableOpen('right', 'flow-test-item');
+      handleSwipeableOpen('left', 'flow-test-item');
 
-      expect(flow).toEqual(['onSwipeableOpen: right', 'handleArchive called', 'mutation called']);
+      expect(flow).toEqual(['onSwipeableOpen: left', 'handleArchive called', 'mutation called']);
       expect(mutationCalls[0].id).toBe('flow-test-item');
     });
 
@@ -614,27 +614,19 @@ describe('SwipeableInboxItem', () => {
     });
 
     it('archive action exits to the left (SlideOutLeft)', () => {
-      // Per issue zine-av9: Archive exits left (continues in swipe direction)
-      // Swipe right reveals archive -> item exits left
+      // Per issue zine-av9: Archive exits left.
+      const getExitDirection = (swipeDir: 'left' | 'right') => swipeDir;
 
-      // Helper that mirrors component logic
-      const getExitDirection = (swipeDir: 'left' | 'right') =>
-        swipeDir === 'right' ? 'left' : 'right';
-
-      const exitDir = getExitDirection('right');
+      const exitDir = getExitDirection('left');
 
       expect(exitDir).toBe('left');
     });
 
     it('bookmark action exits to the right (SlideOutRight)', () => {
-      // Per issue zine-av9: Bookmark exits right (continues in swipe direction)
-      // Swipe left reveals bookmark -> item exits right
+      // Per issue zine-av9: Save exits right.
+      const getExitDirection = (swipeDir: 'left' | 'right') => swipeDir;
 
-      // Helper that mirrors component logic
-      const getExitDirection = (swipeDir: 'left' | 'right') =>
-        swipeDir === 'right' ? 'left' : 'right';
-
-      const exitDir = getExitDirection('left');
+      const exitDir = getExitDirection('right');
 
       expect(exitDir).toBe('right');
     });
@@ -654,15 +646,14 @@ describe('SwipeableInboxItem', () => {
 
       // Simulating handleSwipeableOpen from component
       const handleSwipeableOpen = (direction: 'left' | 'right') => {
-        const exitDir = direction === 'right' ? 'left' : 'right';
+        const exitDir = direction;
         setExitDirection(exitDir);
         executeAction(direction);
       };
 
       handleSwipeableOpen('right');
 
-      // Exit animation trigger comes before action execution
-      expect(events).toEqual(['exit:left', 'action:right']);
+      expect(events).toEqual(['exit:right', 'action:right']);
     });
 
     it('exit direction state starts as null (no animation pending)', () => {
@@ -693,12 +684,12 @@ describe('SwipeableInboxItem', () => {
     it('exit animation direction maps correctly for both actions', () => {
       // Per issue zine-av9: Comprehensive mapping test
       const testCases = [
-        { swipe: 'right', action: 'archive', exitDir: 'left' },
-        { swipe: 'left', action: 'bookmark', exitDir: 'right' },
+        { swipe: 'left', action: 'archive', exitDir: 'left' },
+        { swipe: 'right', action: 'bookmark', exitDir: 'right' },
       ] as const;
 
       testCases.forEach(({ swipe, exitDir }) => {
-        const computedExitDir = swipe === 'right' ? 'left' : 'right';
+        const computedExitDir = swipe;
         expect(computedExitDir).toBe(exitDir);
       });
     });
@@ -769,7 +760,7 @@ describe('SwipeableInboxItem', () => {
       const processedItems: { id: string; action: string }[] = [];
 
       const processSwipe = (itemId: string, direction: 'left' | 'right') => {
-        const action = direction === 'right' ? 'archive' : 'bookmark';
+        const action = direction === 'right' ? 'bookmark' : 'archive';
         processedItems.push({ id: itemId, action });
       };
 
@@ -779,9 +770,9 @@ describe('SwipeableInboxItem', () => {
       processSwipe('item-3', 'right');
 
       expect(processedItems).toEqual([
-        { id: 'item-1', action: 'archive' },
-        { id: 'item-2', action: 'bookmark' },
-        { id: 'item-3', action: 'archive' },
+        { id: 'item-1', action: 'bookmark' },
+        { id: 'item-2', action: 'archive' },
+        { id: 'item-3', action: 'bookmark' },
       ]);
     });
   });
@@ -900,20 +891,20 @@ describe('SwipeableInboxItem', () => {
       const testCases = [
         {
           action: 'archive',
-          swipeDir: 'right',
+          swipeDir: 'left',
           exitDir: 'left',
           enterDir: 'left',
         },
         {
           action: 'bookmark',
-          swipeDir: 'left',
+          swipeDir: 'right',
           exitDir: 'right',
           enterDir: 'right',
         },
       ] as const;
 
       testCases.forEach(({ action, swipeDir, exitDir, enterDir }) => {
-        const computedExitDir = swipeDir === 'right' ? 'left' : 'right';
+        const computedExitDir = swipeDir;
         expect(computedExitDir).toBe(exitDir);
         expect(enterDir).toBe(exitDir); // Enter from same direction as exit
         expect(action).toBeDefined(); // Just to use the variable
@@ -1234,11 +1225,11 @@ describe('SwipeableInboxItem', () => {
       let exitDirection: ExitDirection = null;
 
       const handleBookmarkAction = () => {
-        exitDirection = 'right'; // Same as swipe left -> bookmark
+        exitDirection = 'right'; // Same as swipe right -> save
       };
 
       const handleArchiveAction = () => {
-        exitDirection = 'left'; // Same as swipe right -> archive
+        exitDirection = 'left'; // Same as swipe left -> archive
       };
 
       handleBookmarkAction();
@@ -1341,7 +1332,7 @@ describe('SwipeableInboxItem', () => {
     it('component has appropriate accessibility hint', () => {
       // Per issue zine-9mi: VoiceOver users know how to interact
       const accessibilityHint =
-        'Swipe right to archive, swipe left to save. Double tap and hold for more options.';
+        'Swipe right to save, swipe left to archive. Double tap and hold for more options.';
 
       expect(accessibilityHint).toContain('Swipe');
       expect(accessibilityHint).toContain('archive');
