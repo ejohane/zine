@@ -322,6 +322,10 @@ function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         },
       })
   );
+  const persistenceKey = useMemo(
+    () => buildQueryPersistenceKey(null, buildQueryPersistenceBuster()),
+    []
+  );
 
   const [trpcClient] = useState(() => {
     const url = `${API_URL}/trpc`;
@@ -339,6 +343,20 @@ function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     });
   });
 
+  useEffect(() => {
+    if (__DEV__ && typeof AsyncStorage.removeItem === 'function') {
+      void AsyncStorage.removeItem(persistenceKey);
+    }
+  }, [persistenceKey]);
+
+  if (__DEV__) {
+    return (
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <HydrationGate shouldBlock={false}>{children}</HydrationGate>
+      </trpc.Provider>
+    );
+  }
+
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <PersistQueryClientProvider
@@ -346,7 +364,7 @@ function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         persistOptions={{
           persister: createAsyncStoragePersister({
             storage: AsyncStorage,
-            key: buildQueryPersistenceKey(null, buildQueryPersistenceBuster()),
+            key: persistenceKey,
           }),
           maxAge: PERSISTENCE_MAX_AGE_MS,
           buster: buildQueryPersistenceBuster(),

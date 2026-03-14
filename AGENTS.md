@@ -45,6 +45,34 @@
   - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://localhost:<WORKER_PORT>`
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
 
+### Empty Local Data Recovery
+
+- Symptom: Expo Go loads, but Home/Inbox/Library are empty even though local test data should exist.
+- First verify which local worker the app is actually using:
+  - Check `apps/mobile/.env.local` for `EXPO_PUBLIC_API_URL`.
+  - Check Expo logs; Expo Go may still be talking to `http://localhost:8787` if the main worktree dev server is running.
+- Then inspect the local D1 file behind that worker:
+  - Path: `apps/worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/2a13f10f1e768310d0250437a6253d204a8c839f02e306404fa5e52ca7ded965.sqlite`
+  - Quick check:
+    - `sqlite3 <db> "SELECT 'items', count(*) FROM items UNION ALL SELECT 'subscriptions', count(*) FROM subscriptions UNION ALL SELECT 'provider_connections', count(*) FROM provider_connections UNION ALL SELECT 'user_items', count(*) FROM user_items;"`
+- Important failure mode:
+  - `bun run dev:reset && bun run dev:worktree` only re-seeds from the main worktree.
+  - If the main worktree D1 file is empty, missing, or `0` bytes, the worktree will faithfully copy that broken state and the app will still show no data.
+- Recovery order:
+  - If the current worktree DB is broken, check the same D1 path in other Zine worktrees for a non-empty SQLite file with real row counts.
+  - If another worktree has the expected data, stop the active local `wrangler dev` process, copy that SQLite file into both:
+    - the current worktree D1 path
+    - the main worktree D1 path
+  - Restart `wrangler dev` after the copy.
+- Expo Go cache gotcha:
+  - After the DB is fixed, Expo Go can still show stale anonymous React Query results.
+  - Cold restart Expo Go and reopen the project after restoring the DB.
+  - In this repo, `apps/mobile/providers/trpc-provider.tsx` now clears the anonymous persisted query cache in development to reduce this failure mode.
+- Verification:
+  - Query the running local worker directly before trusting the UI:
+    - `bun -e "import { createTRPCProxyClient, httpBatchLink } from '@trpc/client'; import superjson from 'superjson'; const client = createTRPCProxyClient({ links:[httpBatchLink({ url:'http://localhost:8787/trpc', transformer: superjson })]}); const home = await client.items.home.query(); console.log(home.recentBookmarks.map(i => i.title));"`
+  - Then verify in the iOS simulator after reopening the project in Expo Go.
+
 ## Quality Gates and Commit Hygiene
 
 - Pre-commit (`.husky/pre-commit`):
