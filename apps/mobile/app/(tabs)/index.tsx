@@ -1,7 +1,7 @@
 import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
 import { Image } from 'expo-image';
 import { Surface } from 'heroui-native';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,17 @@ import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { SettingsIcon } from '@/components/icons';
+import { FilterChip } from '@/components/filter-chip';
+import { ArticleIcon, HeadphonesIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
-import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
+import {
+  Colors,
+  Typography,
+  Spacing,
+  Radius,
+  ContentColors,
+  FilterChipPalette,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePrefetchItemDetail, useTabPrefetch } from '@/hooks/use-prefetch';
 import {
@@ -53,6 +61,48 @@ function getGreeting(): string {
   return 'Good evening';
 }
 
+const contentTypeFilters: {
+  id: UIContentType;
+  label: string;
+  icon: ComponentType<{ size?: number; color?: string }>;
+  dotColor: string;
+  selectedColor: string;
+  selectedSurfaceColor: string;
+}[] = [
+  {
+    id: 'article',
+    label: 'Articles',
+    icon: ArticleIcon,
+    dotColor: ContentColors.article,
+    selectedColor: FilterChipPalette.article.accent,
+    selectedSurfaceColor: FilterChipPalette.article.surface,
+  },
+  {
+    id: 'podcast',
+    label: 'Podcasts',
+    icon: HeadphonesIcon,
+    dotColor: ContentColors.podcast,
+    selectedColor: FilterChipPalette.podcast.accent,
+    selectedSurfaceColor: FilterChipPalette.podcast.surface,
+  },
+  {
+    id: 'video',
+    label: 'Videos',
+    icon: VideoIcon,
+    dotColor: ContentColors.video,
+    selectedColor: FilterChipPalette.video.accent,
+    selectedSurfaceColor: FilterChipPalette.video.surface,
+  },
+  {
+    id: 'post',
+    label: 'Posts',
+    icon: PostIcon,
+    dotColor: ContentColors.post,
+    selectedColor: FilterChipPalette.post.accent,
+    selectedSurfaceColor: FilterChipPalette.post.surface,
+  },
+];
+
 // =============================================================================
 // Components
 // =============================================================================
@@ -77,31 +127,6 @@ function SectionHeader({
         )}
       </View>
       {onPress && <ChevronRightIcon size={20} color={colors.textTertiary} />}
-    </Pressable>
-  );
-}
-
-function CategoryPill({
-  label,
-  count,
-  color,
-  colors,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  color: string;
-  colors: typeof Colors.dark;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.categoryPill, { backgroundColor: colors.backgroundSecondary }]}
-    >
-      <View style={[styles.categoryDot, { backgroundColor: color }]} />
-      <Text style={[styles.categoryLabel, { color: colors.text }]}>{label}</Text>
-      <Text style={[styles.categoryCount, { color: colors.textTertiary }]}>{count}</Text>
     </Pressable>
   );
 }
@@ -158,7 +183,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const greeting = useMemo(() => getGreeting(), []);
-  const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
+  const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
 
   useTabPrefetch('home');
 
@@ -228,6 +253,18 @@ export default function HomeScreen() {
     }));
   }, [homeData?.byContentType.videos]);
 
+  const articles = useMemo((): ItemCardData[] => {
+    return (homeData?.byContentType.articles ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      creator: item.publisher ?? item.creator,
+      thumbnailUrl: item.thumbnailUrl ?? null,
+      contentType: 'article' as ContentType,
+      provider: mapProvider(item.provider) as Provider,
+      duration: item.duration ?? null,
+    }));
+  }, [homeData?.byContentType.articles]);
+
   // Category counts
   const categoryCounts = useMemo(() => {
     const items = libraryData?.items ?? [];
@@ -239,17 +276,39 @@ export default function HomeScreen() {
     };
   }, [libraryData?.items]);
 
-  const handleCategoryPress = useCallback(
-    (contentType: UIContentType) => {
-      router.push({ pathname: '/(tabs)/library', params: { contentType } });
-    },
-    [router]
-  );
   const handleOpenSettings = useCallback(() => {
     router.push('/settings');
   }, [router]);
 
   const isLoading = isInboxLoading || isHomeLoading;
+
+  const filteredJumpBackInItems = useMemo(
+    () =>
+      contentTypeFilter === null
+        ? jumpBackInItems
+        : jumpBackInItems.filter((item) => item.contentType === contentTypeFilter),
+    [contentTypeFilter, jumpBackInItems]
+  );
+
+  const filteredRecentlyBookmarked = useMemo(
+    () =>
+      contentTypeFilter === null
+        ? recentlyBookmarked
+        : recentlyBookmarked.filter((item) => item.contentType === contentTypeFilter),
+    [contentTypeFilter, recentlyBookmarked]
+  );
+
+  const filteredInboxItems = useMemo(
+    () =>
+      contentTypeFilter === null
+        ? inboxItems
+        : inboxItems.filter((item) => item.contentType === contentTypeFilter),
+    [contentTypeFilter, inboxItems]
+  );
+
+  const showPodcastsSection = contentTypeFilter === null || contentTypeFilter === 'podcast';
+  const showVideosSection = contentTypeFilter === null || contentTypeFilter === 'video';
+  const showArticlesSection = contentTypeFilter === null || contentTypeFilter === 'article';
 
   useEffect(() => {
     return navigation.addListener('tabPress', () => {
@@ -291,25 +350,29 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          {isStorybookEnabled && (
-            <Animated.View style={styles.storybookButtonContainer}>
-              <Pressable
-                onPress={() => router.push('/storybook')}
-                style={({ pressed }) => [
-                  styles.storybookButton,
-                  {
-                    backgroundColor: colors.backgroundSecondary,
-                    borderColor: colors.border,
-                  },
-                  pressed && { opacity: 0.75 },
-                ]}
-              >
-                <Text style={[styles.storybookButtonLabel, { color: colors.primary }]}>
-                  Open Storybook
-                </Text>
-              </Pressable>
-            </Animated.View>
-          )}
+          <Animated.View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContainer}
+            >
+              {contentTypeFilters.map((filter) => (
+                <FilterChip
+                  key={filter.id}
+                  label={filter.label}
+                  isSelected={contentTypeFilter === filter.id}
+                  onPress={() =>
+                    setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
+                  }
+                  icon={filter.icon}
+                  dotColor={filter.dotColor}
+                  selectedColor={filter.selectedColor}
+                  selectedSurfaceColor={filter.selectedSurfaceColor}
+                  count={categoryCounts[filter.id]}
+                />
+              ))}
+            </ScrollView>
+          </Animated.View>
 
           {isLoading ? (
             <View style={styles.loadingState}>
@@ -318,15 +381,15 @@ export default function HomeScreen() {
           ) : (
             <>
               {/* Jump Back In - Recently Opened Bookmarks */}
-              {jumpBackInItems.length > 0 && (
+              {filteredJumpBackInItems.length > 0 && (
                 <Animated.View>
                   <SectionHeader
                     title="Jump Back In"
-                    count={jumpBackInItems.length}
+                    count={filteredJumpBackInItems.length}
                     colors={colors}
                   />
                   <View style={styles.jumpBackInGrid}>
-                    {jumpBackInItems.map((item) => (
+                    {filteredJumpBackInItems.map((item) => (
                       <JumpBackInCard key={item.id} item={item} colors={colors} />
                     ))}
                   </View>
@@ -334,16 +397,16 @@ export default function HomeScreen() {
               )}
 
               {/* Recently Bookmarked - Horizontal Cards */}
-              {recentlyBookmarked.length > 0 && (
+              {filteredRecentlyBookmarked.length > 0 && (
                 <Animated.View>
                   <SectionHeader
                     title="Recently Bookmarked"
-                    count={recentlyBookmarked.length}
+                    count={filteredRecentlyBookmarked.length}
                     colors={colors}
                   />
                   <FlatList
                     horizontal
-                    data={recentlyBookmarked}
+                    data={filteredRecentlyBookmarked}
                     renderItem={({ item, index }) => (
                       <ItemCard item={item} variant="horizontal" index={index} />
                     )}
@@ -355,18 +418,18 @@ export default function HomeScreen() {
               )}
 
               {/* Inbox Section - Condensed List using compact ItemCard */}
-              {inboxItems.length > 0 && (
+              {filteredInboxItems.length > 0 && (
                 <Animated.View style={styles.section}>
                   <SectionHeader
                     title="Inbox"
-                    count={inboxData?.items.length ?? 0}
+                    count={filteredInboxItems.length}
                     colors={colors}
                     onPress={() => router.push('/(tabs)/inbox')}
                   />
                   <View
                     style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
                   >
-                    {inboxItems.map((item, index) => (
+                    {filteredInboxItems.map((item, index) => (
                       <ItemCard key={item.id} item={item} variant="compact" index={index} />
                     ))}
                   </View>
@@ -374,7 +437,7 @@ export default function HomeScreen() {
               )}
 
               {/* Category Collection - Large Cards with overlay */}
-              {podcasts.length > 0 && (
+              {showPodcastsSection && podcasts.length > 0 && (
                 <Animated.View>
                   <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
                   <FlatList
@@ -390,47 +453,24 @@ export default function HomeScreen() {
                 </Animated.View>
               )}
 
-              {/* Categories */}
-              <Animated.View style={styles.section}>
-                <SectionHeader title="Categories" colors={colors} />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoriesContainer}
-                >
-                  <CategoryPill
-                    label="Podcasts"
-                    count={categoryCounts.podcast}
-                    color={ContentColors.podcast}
-                    colors={colors}
-                    onPress={() => handleCategoryPress('podcast')}
+              {showArticlesSection && articles.length > 0 && (
+                <Animated.View>
+                  <SectionHeader title="Articles" count={articles.length} colors={colors} />
+                  <FlatList
+                    horizontal
+                    data={articles}
+                    renderItem={({ item, index }) => (
+                      <ItemCard item={item} variant="horizontal" index={index} />
+                    )}
+                    keyExtractor={(item) => item.id}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
                   />
-                  <CategoryPill
-                    label="Videos"
-                    count={categoryCounts.video}
-                    color={ContentColors.video}
-                    colors={colors}
-                    onPress={() => handleCategoryPress('video')}
-                  />
-                  <CategoryPill
-                    label="Articles"
-                    count={categoryCounts.article}
-                    color={ContentColors.article}
-                    colors={colors}
-                    onPress={() => handleCategoryPress('article')}
-                  />
-                  <CategoryPill
-                    label="Posts"
-                    count={categoryCounts.post}
-                    color={ContentColors.post}
-                    colors={colors}
-                    onPress={() => handleCategoryPress('post')}
-                  />
-                </ScrollView>
-              </Animated.View>
+                </Animated.View>
+              )}
 
               {/* Videos - Horizontal Cards */}
-              {videos.length > 0 && (
+              {showVideosSection && videos.length > 0 && (
                 <Animated.View>
                   <SectionHeader title="Videos" count={videos.length} colors={colors} />
                   <FlatList
@@ -504,20 +544,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  storybookButtonContainer: {
+  filterContainer: {
     paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
     marginBottom: Spacing.lg,
-  },
-  storybookButton: {
-    alignSelf: 'flex-start',
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-  },
-  storybookButtonLabel: {
-    ...Typography.labelMedium,
-    fontWeight: '700',
   },
 
   // Section
@@ -599,31 +629,6 @@ const styles = StyleSheet.create({
     marginHorizontal: Spacing.md,
     borderRadius: Radius.lg,
     overflow: 'hidden',
-  },
-
-  // Categories
-  categoriesContainer: {
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.sm,
-  },
-  categoryPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.full,
-    gap: Spacing.sm,
-  },
-  categoryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  categoryLabel: {
-    ...Typography.labelMedium,
-  },
-  categoryCount: {
-    ...Typography.bodySmall,
   },
 
   // Loading state
