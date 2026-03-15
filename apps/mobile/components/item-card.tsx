@@ -341,7 +341,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   rowFeaturedWrapper: {
-    width: '48%',
+    flexBasis: '48%',
+    flexGrow: 1,
     height: 72,
   },
   rowFeaturedThumbnailContainer: {
