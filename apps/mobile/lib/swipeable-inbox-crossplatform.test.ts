@@ -776,7 +776,7 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
       });
 
       it('item row height exceeds minimum touch target', () => {
-        // ItemCard compact variant has height of at least 64px
+        // ItemCard row shape has height of at least 64px
         // This exceeds both iOS (44) and Android (48) minimums
         const estimatedRowHeight = 64;
         const iosMin = PLATFORM_CONFIG.ios.minTouchTarget;

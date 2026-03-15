@@ -430,7 +430,7 @@ export function SwipeableInboxItem({
           onSwipeableWillOpen={handleSwipeableWillOpen}
           onSwipeableOpen={handleSwipeableOpen}
         >
-          <ItemCard item={item} variant="compact" index={index} onPress={handleItemPress} />
+          <ItemCard item={item} shape="row" index={index} onPress={handleItemPress} />
         </ReanimatedSwipeable>
       </ContextMenu>
     </Animated.View>

@@ -1,5 +1,4 @@
-import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
-import { Image } from 'expo-image';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
@@ -27,7 +26,7 @@ import {
   FilterChipPalette,
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { usePrefetchItemDetail, useTabPrefetch } from '@/hooks/use-prefetch';
+import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInboxItems,
   useHomeData,
@@ -35,7 +34,6 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
-import { getContentIcon } from '@/lib/content-utils';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 // =============================================================================
@@ -127,47 +125,6 @@ function SectionHeader({
         )}
       </View>
       {onPress && <ChevronRightIcon size={20} color={colors.textTertiary} />}
-    </Pressable>
-  );
-}
-
-function JumpBackInCard({ item, colors }: { item: ItemCardData; colors: typeof Colors.dark }) {
-  const router = useRouter();
-  const prefetchItemDetail = usePrefetchItemDetail();
-
-  const handlePress = () => {
-    prefetchItemDetail(item.id);
-    router.push(`/item/${item.id}` as Href);
-  };
-
-  return (
-    <Pressable
-      onPress={handlePress}
-      style={({ pressed }) => [
-        styles.jumpBackInCard,
-        { backgroundColor: colors.card, borderColor: colors.border },
-        pressed && { opacity: 0.75 },
-      ]}
-    >
-      <View style={styles.jumpBackInRow}>
-        <View style={[styles.jumpBackInThumbnail, { backgroundColor: colors.backgroundTertiary }]}>
-          {item.thumbnailUrl ? (
-            <Image
-              source={{ uri: item.thumbnailUrl }}
-              style={styles.jumpBackInThumbnailImage}
-              contentFit="cover"
-              transition={200}
-            />
-          ) : (
-            getContentIcon(item.contentType, 20, colors.textTertiary)
-          )}
-        </View>
-        <View style={styles.jumpBackInTitleWrap}>
-          <Text style={[styles.jumpBackInTitle, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
-        </View>
-      </View>
     </Pressable>
   );
 }
@@ -390,7 +347,7 @@ export default function HomeScreen() {
                   />
                   <View style={styles.jumpBackInGrid}>
                     {filteredJumpBackInItems.map((item) => (
-                      <JumpBackInCard key={item.id} item={item} colors={colors} />
+                      <ItemCard key={item.id} item={item} shape="row" rowStyle="featured" />
                     ))}
                   </View>
                 </Animated.View>
@@ -408,7 +365,7 @@ export default function HomeScreen() {
                     horizontal
                     data={filteredRecentlyBookmarked}
                     renderItem={({ item, index }) => (
-                      <ItemCard item={item} variant="horizontal" index={index} />
+                      <ItemCard item={item} shape="stack" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -430,7 +387,7 @@ export default function HomeScreen() {
                     style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
                   >
                     {filteredInboxItems.map((item, index) => (
-                      <ItemCard key={item.id} item={item} variant="compact" index={index} />
+                      <ItemCard key={item.id} item={item} shape="row" index={index} />
                     ))}
                   </View>
                 </Animated.View>
@@ -444,7 +401,7 @@ export default function HomeScreen() {
                     horizontal
                     data={podcasts.slice(0, 5)}
                     renderItem={({ item, index }) => (
-                      <ItemCard item={item} variant="large" overlay index={index} />
+                      <ItemCard item={item} shape="cover" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -460,7 +417,7 @@ export default function HomeScreen() {
                     horizontal
                     data={articles}
                     renderItem={({ item, index }) => (
-                      <ItemCard item={item} variant="horizontal" index={index} />
+                      <ItemCard item={item} shape="stack" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -477,7 +434,7 @@ export default function HomeScreen() {
                     horizontal
                     data={videos}
                     renderItem={({ item, index }) => (
-                      <ItemCard item={item} variant="horizontal" index={index} />
+                      <ItemCard item={item} shape="stack" index={index} />
                     )}
                     keyExtractor={(item) => item.id}
                     showsHorizontalScrollIndicator={false}
@@ -587,41 +544,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
     marginBottom: Spacing.xl,
-  },
-  jumpBackInCard: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    height: 72,
-    overflow: 'hidden',
-  },
-  jumpBackInRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    alignItems: 'center',
-    height: '100%',
-  },
-  jumpBackInThumbnail: {
-    width: 64,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  jumpBackInThumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  jumpBackInTitleWrap: {
-    flex: 1,
-    paddingVertical: 2,
-    paddingRight: Spacing.xs,
-    justifyContent: 'center',
-  },
-  jumpBackInTitle: {
-    ...Typography.bodySmall,
-    fontWeight: '600',
-    lineHeight: 14,
   },
 
   // Inbox Container

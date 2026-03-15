@@ -147,7 +147,7 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item, index }) => <ItemCard item={item} variant="compact" index={index} />}
+        renderItem={({ item, index }) => <ItemCard item={item} shape="row" index={index} />}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={

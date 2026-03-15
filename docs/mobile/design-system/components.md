@@ -18,24 +18,24 @@ and which are legacy or dormant.
 
 ## Canonical Components
 
-| Path                                                              | Status      | Story Priority | Notes                                                             |
-| ----------------------------------------------------------------- | ----------- | -------------- | ----------------------------------------------------------------- |
-| `apps/mobile/components/primitives/text.tsx`                      | `canonical` | `P0`           | Shared typography primitive for semantic tone, variant, and font. |
-| `apps/mobile/components/primitives/surface.tsx`                   | `canonical` | `P0`           | Shared container primitive for semantic surfaces and borders.     |
-| `apps/mobile/components/primitives/badge.tsx`                     | `canonical` | `P0`           | Shared metadata primitive for pills, overlays, and status chips.  |
-| `apps/mobile/components/primitives/button.tsx`                    | `canonical` | `P0`           | Shared action primitive for primary, secondary, outline, ghost.   |
-| `apps/mobile/components/primitives/icon-button.tsx`               | `canonical` | `P0`           | Shared icon-only action primitive for item and detail controls.   |
-| `apps/mobile/components/icons/index.tsx`                          | `canonical` | `P0`           | Shared icon primitives used throughout app screens.               |
-| `apps/mobile/components/badges.tsx`                               | `canonical` | `P0`           | Provider/type wrappers built on the shared badge primitive.       |
-| `apps/mobile/components/filter-chip.tsx`                          | `canonical` | `P0`           | Shared filter primitive used in library filtering.                |
-| `apps/mobile/components/list-states.tsx`                          | `canonical` | `P0`           | Shared loading/error/empty/not-found state components.            |
-| `apps/mobile/components/item-card.tsx`                            | `canonical` | `P0`           | Primary card system with multiple variants.                       |
-| `apps/mobile/components/link-preview-card.tsx`                    | `canonical` | `P0`           | Add-link preview card and skeleton state.                         |
-| `apps/mobile/components/ParallaxScrollView.tsx`                   | `canonical` | `P1`           | Reusable parallax layout primitive for detail views.              |
-| `apps/mobile/components/error-boundary.tsx`                       | `canonical` | `P1`           | Base boundary used by specialized boundaries.                     |
-| `apps/mobile/components/subscriptions/channel-item.tsx`           | `canonical` | `P0`           | Reusable channel row in single and multi-select modes.            |
-| `apps/mobile/components/subscriptions/channel-selection-list.tsx` | `canonical` | `P0`           | Shared subscriptions list shell with search and selection states. |
-| `apps/mobile/components/creator/LatestContentCard.tsx`            | `canonical` | `P1`           | Reusable creator content row used in creator flows.               |
+| Path                                                              | Status      | Story Priority | Notes                                                              |
+| ----------------------------------------------------------------- | ----------- | -------------- | ------------------------------------------------------------------ |
+| `apps/mobile/components/primitives/text.tsx`                      | `canonical` | `P0`           | Shared typography primitive for semantic tone, variant, and font.  |
+| `apps/mobile/components/primitives/surface.tsx`                   | `canonical` | `P0`           | Shared container primitive for semantic surfaces and borders.      |
+| `apps/mobile/components/primitives/badge.tsx`                     | `canonical` | `P0`           | Shared metadata primitive for pills, overlays, and status chips.   |
+| `apps/mobile/components/primitives/button.tsx`                    | `canonical` | `P0`           | Shared action primitive for primary, secondary, outline, ghost.    |
+| `apps/mobile/components/primitives/icon-button.tsx`               | `canonical` | `P0`           | Shared icon-only action primitive for item and detail controls.    |
+| `apps/mobile/components/icons/index.tsx`                          | `canonical` | `P0`           | Shared icon primitives used throughout app screens.                |
+| `apps/mobile/components/badges.tsx`                               | `canonical` | `P0`           | Provider/type wrappers built on the shared badge primitive.        |
+| `apps/mobile/components/filter-chip.tsx`                          | `canonical` | `P0`           | Shared filter primitive used in library filtering.                 |
+| `apps/mobile/components/list-states.tsx`                          | `canonical` | `P0`           | Shared loading/error/empty/not-found state components.             |
+| `apps/mobile/components/item-card.tsx`                            | `canonical` | `P0`           | Primary card system organized around row, stack, and cover shapes. |
+| `apps/mobile/components/link-preview-card.tsx`                    | `canonical` | `P0`           | Add-link preview card and skeleton state.                          |
+| `apps/mobile/components/ParallaxScrollView.tsx`                   | `canonical` | `P1`           | Reusable parallax layout primitive for detail views.               |
+| `apps/mobile/components/error-boundary.tsx`                       | `canonical` | `P1`           | Base boundary used by specialized boundaries.                      |
+| `apps/mobile/components/subscriptions/channel-item.tsx`           | `canonical` | `P0`           | Reusable channel row in single and multi-select modes.             |
+| `apps/mobile/components/subscriptions/channel-selection-list.tsx` | `canonical` | `P0`           | Shared subscriptions list shell with search and selection states.  |
+| `apps/mobile/components/creator/LatestContentCard.tsx`            | `canonical` | `P1`           | Reusable creator content row used in creator flows.                |
 
 ## App-Container Components
 

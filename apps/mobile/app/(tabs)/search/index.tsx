@@ -96,7 +96,7 @@ export default function SearchTabScreen() {
             showsVerticalScrollIndicator={false}
           >
             {libraryItems.map((item, index) => (
-              <ItemCard key={item.id} item={item} variant="compact" index={index} />
+              <ItemCard key={item.id} item={item} shape="row" index={index} />
             ))}
             <View style={styles.bottomSpacer} />
           </ScrollView>

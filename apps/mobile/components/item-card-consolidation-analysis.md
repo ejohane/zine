@@ -1,5 +1,7 @@
 # ItemCard Consolidation Analysis & Design
 
+> Historical note: this analysis predates the later `row` / `stack` / `cover` shape refactor in `ItemCard`.
+
 **Issue**: zine-o21 - Home Page Card Consolidation - Analysis & Design
 **Parent Epic**: Component Reusability Consolidation (Issue #50)
 **Date**: 2026-01-17

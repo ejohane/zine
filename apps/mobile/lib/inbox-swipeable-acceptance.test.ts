@@ -55,7 +55,7 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
 
 /** Design system constants for validation */
 const DESIGN_CONSTANTS = {
-  /** Compact variant thumbnail size (matches library) */
+  /** Row shape thumbnail size (matches library) */
   thumbnailSize: 48,
   /** Action panel width in pixels */
   actionPanelWidth: 100,
@@ -108,16 +108,16 @@ const THEME_COLORS = {
 
 describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
   describe('1. Inbox uses flat list design matching library page', () => {
-    it('inbox uses ItemCard with variant="compact"', () => {
-      // Per AC: Inbox should use same compact layout as library
-      const inboxCardVariant = 'compact';
-      const libraryCardVariant = 'compact';
+    it('inbox uses ItemCard with shape="row"', () => {
+      // Per AC: Inbox should use the same row layout as library
+      const inboxCardShape = 'row';
+      const libraryCardShape = 'row';
 
-      expect(inboxCardVariant).toBe(libraryCardVariant);
+      expect(inboxCardShape).toBe(libraryCardShape);
     });
 
-    it('compact variant has 48x48 thumbnail', () => {
-      // Per design: Compact variant uses 48x48 thumbnail
+    it('row shape has 48x48 thumbnail', () => {
+      // Per design: Compact row uses 48x48 thumbnail
       expect(DESIGN_CONSTANTS.thumbnailSize).toBe(48);
     });
 

@@ -1,11 +1,11 @@
 /**
- * Tests for ItemCard compact variant metadata display
+ * Tests for ItemCard row shape metadata display
  *
  * The ItemCard component uses react-native components that require native modules.
  * Full component rendering tests are done via manual testing in the iOS simulator.
  *
  * This test file validates the metadata building logic and type interfaces
- * for the compact variant without importing the actual component.
+ * for the compact row shape without importing the actual component.
  *
  * @see Issue zine-ali for compact variant metadata requirements
  * @see Issue zine-g05 (Epic) for the inbox redesign
@@ -39,8 +39,8 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
 // ============================================================================
 
 /**
- * Builds the metadata parts array for compact variant display
- * This mirrors the logic in ItemCard component for the compact variant
+ * Builds the metadata parts array for row card display
+ * This mirrors the logic in ItemCard component for the compact row style
  */
 function buildMetaParts(
   item: ItemCardData,
@@ -78,7 +78,7 @@ function formatDuration(seconds: number | null | undefined): string | null {
 // Tests
 // ============================================================================
 
-describe('ItemCard compact variant metadata', () => {
+describe('ItemCard row shape metadata', () => {
   describe('metadata parts building', () => {
     it('includes creator name', () => {
       const item = createMockItem({ creator: 'John Doe' });
