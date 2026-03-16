@@ -188,6 +188,7 @@ export default function LibraryScreen() {
     id: item.id,
     title: item.title,
     creator: item.creator,
+    creatorImageUrl: item.creatorImageUrl ?? null,
     thumbnailUrl: item.thumbnailUrl ?? null,
     contentType: mapContentType(item.contentType) as UIContentType,
     provider: mapProvider(item.provider) as Provider,
