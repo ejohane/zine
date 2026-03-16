@@ -207,14 +207,14 @@ export function ItemCard({
           onPress={handlePress}
           style={({ pressed }) => [
             styles.rowFeaturedCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            pressed && { opacity: 0.75 },
+            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDefault },
+            pressed && { opacity: motion.opacity.pressed },
           ]}
         >
           <View
             style={[
               styles.rowFeaturedThumbnailContainer,
-              { backgroundColor: colors.backgroundTertiary },
+              { backgroundColor: colors.surfaceRaised },
             ]}
           >
             {item.thumbnailUrl ? (
@@ -228,7 +228,7 @@ export function ItemCard({
               getContentIcon(item.contentType, 20, colors.textTertiary)
             )}
           </View>
-          <View style={styles.rowFeaturedTitleWrap}>
+          <View style={styles.rowFeaturedContent}>
             <Text style={[styles.rowFeaturedTitle, { color: colors.text }]} numberOfLines={2}>
               {item.title}
             </Text>
@@ -334,38 +334,36 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    alignItems: 'stretch',
     borderRadius: Radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
   rowFeaturedWrapper: {
-    flexBasis: '48%',
-    flexGrow: 1,
-    height: 72,
+    width: '100%',
+    height: 56,
   },
   rowFeaturedThumbnailContainer: {
-    width: 64,
+    width: 56,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   rowFeaturedThumbnailImage: {
     width: '100%',
     height: '100%',
   },
-  rowFeaturedTitleWrap: {
+  rowFeaturedContent: {
     flex: 1,
-    paddingVertical: 2,
-    paddingRight: Spacing.xs,
+    minWidth: 0,
     justifyContent: 'center',
+    paddingLeft: Spacing.sm,
+    paddingRight: Spacing.md,
   },
   rowFeaturedTitle: {
-    ...Typography.bodySmall,
+    ...Typography.labelSmallPlain,
     fontWeight: '600',
-    // design-system-exception: preserve existing Jump Back In line-height while the 12/14 token gap is unresolved.
-    lineHeight: 14,
   },
 
   stackCard: {

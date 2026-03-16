@@ -27,6 +27,7 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
+import { getValidFeaturedGridItems } from '@/lib/home-layout';
 import {
   useInboxItems,
   useHomeData,
@@ -151,7 +152,7 @@ export default function HomeScreen() {
 
   // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
-    return (homeData?.jumpBackIn ?? []).slice(0, 6).map((item) => ({
+    return (homeData?.jumpBackIn ?? []).map((item) => ({
       id: item.id,
       title: item.title,
       creator: item.publisher ?? item.creator,
@@ -239,13 +240,14 @@ export default function HomeScreen() {
 
   const isLoading = isInboxLoading || isHomeLoading;
 
-  const filteredJumpBackInItems = useMemo(
-    () =>
+  const filteredJumpBackInItems = useMemo(() => {
+    const visibleItems =
       contentTypeFilter === null
         ? jumpBackInItems
-        : jumpBackInItems.filter((item) => item.contentType === contentTypeFilter),
-    [contentTypeFilter, jumpBackInItems]
-  );
+        : jumpBackInItems.filter((item) => item.contentType === contentTypeFilter);
+
+    return getValidFeaturedGridItems(visibleItems);
+  }, [contentTypeFilter, jumpBackInItems]);
 
   const filteredRecentlyBookmarked = useMemo(
     () =>
@@ -347,7 +349,9 @@ export default function HomeScreen() {
                   />
                   <View style={styles.jumpBackInGrid}>
                     {filteredJumpBackInItems.map((item) => (
-                      <ItemCard key={item.id} item={item} shape="row" rowStyle="featured" />
+                      <View key={item.id} style={styles.jumpBackInGridItem}>
+                        <ItemCard item={item} shape="row" rowStyle="featured" />
+                      </View>
                     ))}
                   </View>
                 </Animated.View>
@@ -544,6 +548,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
     marginBottom: Spacing.xl,
+  },
+  jumpBackInGridItem: {
+    flexBasis: '48%',
+    flexGrow: 1,
   },
 
   // Inbox Container

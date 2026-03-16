@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-native';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { createDarkCanvasDecorator } from '@/components/storybook/decorators';
@@ -33,11 +33,13 @@ export const Compact: Story = {
 };
 
 export const FeaturedRow: Story = {
-  args: {
-    item: itemCardFixtures.article,
-    shape: 'row',
-    rowStyle: 'featured',
-  },
+  render: (args) => (
+    <View style={styles.featuredGrid}>
+      <View style={styles.featuredGridItem}>
+        <ItemCard {...args} item={itemCardFixtures.article} shape="row" rowStyle="featured" />
+      </View>
+    </View>
+  ),
 };
 
 export const Stack: Story = {
@@ -68,5 +70,13 @@ export const ContentStress: Story = {
 const styles = StyleSheet.create({
   stack: {
     gap: Spacing.md,
+  },
+  featuredGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  featuredGridItem: {
+    flexBasis: '48%',
+    flexGrow: 1,
   },
 });
