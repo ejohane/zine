@@ -9,6 +9,7 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +28,7 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
-import { getValidFeaturedGridItems } from '@/lib/home-layout';
+import { getFeaturedGridItemWidth, getVisibleFeaturedGridItems } from '@/lib/home-layout';
 import {
   useInboxItems,
   useHomeData,
@@ -140,8 +141,10 @@ export default function HomeScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
+  const { width: windowWidth } = useWindowDimensions();
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
+  const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
 
   useTabPrefetch('home');
 
@@ -240,14 +243,10 @@ export default function HomeScreen() {
 
   const isLoading = isInboxLoading || isHomeLoading;
 
-  const filteredJumpBackInItems = useMemo(() => {
-    const visibleItems =
-      contentTypeFilter === null
-        ? jumpBackInItems
-        : jumpBackInItems.filter((item) => item.contentType === contentTypeFilter);
-
-    return getValidFeaturedGridItems(visibleItems);
-  }, [contentTypeFilter, jumpBackInItems]);
+  const filteredJumpBackInItems = useMemo(
+    () => getVisibleFeaturedGridItems(jumpBackInItems, contentTypeFilter),
+    [contentTypeFilter, jumpBackInItems]
+  );
 
   const filteredRecentlyBookmarked = useMemo(
     () =>
@@ -349,7 +348,10 @@ export default function HomeScreen() {
                   />
                   <View style={styles.jumpBackInGrid}>
                     {filteredJumpBackInItems.map((item) => (
-                      <View key={item.id} style={styles.jumpBackInGridItem}>
+                      <View
+                        key={item.id}
+                        style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                      >
                         <ItemCard item={item} shape="row" rowStyle="featured" />
                       </View>
                     ))}
@@ -550,8 +552,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   jumpBackInGridItem: {
-    flexBasis: '48%',
-    flexGrow: 1,
+    minWidth: 0,
   },
 
   // Inbox Container

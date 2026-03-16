@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { createDarkCanvasDecorator } from '@/components/storybook/decorators';
 import { itemCardFixtures } from '@/components/storybook/fixtures';
+import { getFeaturedGridItemWidth } from '@/lib/home-layout';
 import { ItemCard } from './item-card';
 
 const meta = {
@@ -33,13 +34,31 @@ export const Compact: Story = {
 };
 
 export const FeaturedRow: Story = {
-  render: (args) => (
-    <View style={styles.featuredGrid}>
-      <View style={styles.featuredGridItem}>
-        <ItemCard {...args} item={itemCardFixtures.article} shape="row" rowStyle="featured" />
+  args: {
+    item: itemCardFixtures.article,
+    shape: 'row',
+    rowStyle: 'featured',
+  },
+  render: function Render(args) {
+    const { width } = useWindowDimensions();
+    const featuredGridItemWidth = getFeaturedGridItemWidth(width - Spacing.md * 2, Spacing.md);
+
+    return (
+      <View style={styles.featuredGrid}>
+        <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
+          <ItemCard {...args} />
+        </View>
+        <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
+          <ItemCard
+            item={itemCardFixtures.video}
+            shape="row"
+            rowStyle="featured"
+            onPress={args.onPress}
+          />
+        </View>
       </View>
-    </View>
-  ),
+    );
+  },
 };
 
 export const Stack: Story = {
@@ -57,14 +76,28 @@ export const Cover: Story = {
 };
 
 export const ContentStress: Story = {
-  render: () => (
-    <ScrollView contentContainerStyle={styles.stack} showsVerticalScrollIndicator={false}>
-      <ItemCard item={itemCardFixtures.stress} shape="row" onPress={() => {}} />
-      <ItemCard item={itemCardFixtures.stress} shape="row" rowStyle="featured" onPress={() => {}} />
-      <ItemCard item={itemCardFixtures.stress} shape="stack" onPress={() => {}} />
-      <ItemCard item={itemCardFixtures.stress} shape="cover" onPress={() => {}} />
-    </ScrollView>
-  ),
+  render: function Render() {
+    const { width } = useWindowDimensions();
+    const featuredGridItemWidth = getFeaturedGridItemWidth(width - Spacing.md * 2, Spacing.md);
+
+    return (
+      <ScrollView contentContainerStyle={styles.stack} showsVerticalScrollIndicator={false}>
+        <ItemCard item={itemCardFixtures.stress} shape="row" onPress={() => {}} />
+        <View style={styles.featuredGrid}>
+          <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
+            <ItemCard
+              item={itemCardFixtures.stress}
+              shape="row"
+              rowStyle="featured"
+              onPress={() => {}}
+            />
+          </View>
+        </View>
+        <ItemCard item={itemCardFixtures.stress} shape="stack" onPress={() => {}} />
+        <ItemCard item={itemCardFixtures.stress} shape="cover" onPress={() => {}} />
+      </ScrollView>
+    );
+  },
 };
 
 const styles = StyleSheet.create({
@@ -74,9 +107,10 @@ const styles = StyleSheet.create({
   featuredGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
   },
   featuredGridItem: {
-    flexBasis: '48%',
-    flexGrow: 1,
+    minWidth: 0,
   },
 });
