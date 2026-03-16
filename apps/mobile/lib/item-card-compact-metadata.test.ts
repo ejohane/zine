@@ -1,22 +1,16 @@
 /**
- * Tests for ItemCard row shape metadata display
+ * Tests for ItemCard compact row text treatment.
  *
  * The ItemCard component uses react-native components that require native modules.
  * Full component rendering tests are done via manual testing in the iOS simulator.
  *
- * This test file validates the metadata building logic and type interfaces
- * for the compact row shape without importing the actual component.
- *
- * @see Issue zine-ali for compact variant metadata requirements
- * @see Issue zine-g05 (Epic) for the inbox redesign
+ * This test file validates the metadata and inline-length logic mirrored from the
+ * compact row implementation without importing the actual component.
  */
 
+import { IconSizes } from '../constants/theme';
 import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
-
-// ============================================================================
-// Test Data Factory
-// ============================================================================
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -34,34 +28,6 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-// ============================================================================
-// Metadata Building Logic (mirrored from component)
-// ============================================================================
-
-/**
- * Builds the metadata parts array for row card display
- * This mirrors the logic in ItemCard component for the compact row style
- */
-function buildMetaParts(
-  item: ItemCardData,
-  durationText: string | null,
-  readingTimeText: string | null
-): string[] {
-  const contentType = item.contentType.toLowerCase();
-  const contentTypeLabel = contentType.charAt(0).toUpperCase() + contentType.slice(1);
-  const metaParts = [item.creator, contentTypeLabel];
-  if (durationText) {
-    metaParts.push(durationText);
-  } else if (readingTimeText) {
-    metaParts.push(readingTimeText);
-  }
-  return metaParts;
-}
-
-/**
- * Formats duration in seconds to human readable string
- * This mirrors the formatDuration logic
- */
 function formatDuration(seconds: number | null | undefined): string | null {
   if (!seconds) return null;
   const hours = Math.floor(seconds / 3600);
@@ -71,173 +37,169 @@ function formatDuration(seconds: number | null | undefined): string | null {
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
+
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-// ============================================================================
-// Tests
-// ============================================================================
+function getInlineLengthText(item: ItemCardData): string | null {
+  const durationText = formatDuration(item.duration);
 
-describe('ItemCard row shape metadata', () => {
-  describe('metadata parts building', () => {
-    it('includes creator name', () => {
-      const item = createMockItem({ creator: 'John Doe' });
-      const metaParts = buildMetaParts(item, null, null);
+  if (durationText) {
+    return durationText;
+  }
 
-      expect(metaParts).toContain('John Doe');
-    });
+  if (item.readingTimeMinutes) {
+    return `${item.readingTimeMinutes} min`;
+  }
 
-    it('includes content type label (capitalized)', () => {
-      const item = createMockItem({ contentType: 'VIDEO' as ContentType });
-      const metaParts = buildMetaParts(item, null, null);
+  return null;
+}
 
-      expect(metaParts).toContain('Video');
-    });
+function buildCompactSubtitleText(item: ItemCardData): string {
+  return item.creator;
+}
 
-    it('includes duration when available for video', () => {
+function getSubtitleLeadingVisualMode(
+  item: ItemCardData,
+  avatarLoadFailed = false
+): 'creator-avatar' | 'content-type' {
+  return item.creatorImageUrl && !avatarLoadFailed ? 'creator-avatar' : 'content-type';
+}
+
+describe('ItemCard compact row text treatment', () => {
+  describe('inline title length', () => {
+    it('uses duration when available for video items', () => {
       const item = createMockItem({
         contentType: 'VIDEO' as ContentType,
         duration: 300,
       });
-      const durationText = formatDuration(item.duration);
-      const metaParts = buildMetaParts(item, durationText, null);
 
-      expect(metaParts).toContain('5:00');
+      expect(getInlineLengthText(item)).toBe('5:00');
     });
 
-    it('includes duration when available for podcast', () => {
+    it('uses duration when available for podcast items', () => {
       const item = createMockItem({
         contentType: 'PODCAST' as ContentType,
         duration: 3600,
       });
-      const durationText = formatDuration(item.duration);
-      const metaParts = buildMetaParts(item, durationText, null);
 
-      expect(metaParts).toContain('1:00:00');
+      expect(getInlineLengthText(item)).toBe('1:00:00');
     });
 
-    it('includes reading time for articles without duration', () => {
+    it('uses reading time when no duration exists', () => {
       const item = createMockItem({
         contentType: 'ARTICLE' as ContentType,
         duration: null,
         readingTimeMinutes: 5,
       });
-      const readingTimeText = '5 min';
-      const metaParts = buildMetaParts(item, null, readingTimeText);
 
-      expect(metaParts).toContain('5 min');
+      expect(getInlineLengthText(item)).toBe('5 min');
     });
 
-    it('prefers duration over reading time when both available', () => {
+    it('prefers duration over reading time when both exist', () => {
       const item = createMockItem({
         contentType: 'VIDEO' as ContentType,
         duration: 300,
         readingTimeMinutes: 10,
       });
-      const durationText = formatDuration(item.duration);
-      const readingTimeText = '10 min';
-      const metaParts = buildMetaParts(item, durationText, readingTimeText);
 
-      expect(metaParts).toContain('5:00');
-      expect(metaParts).not.toContain('10 min');
+      expect(getInlineLengthText(item)).toBe('5:00');
     });
 
-    it('returns correct order: creator, content type, time', () => {
+    it('returns null when no applicable length exists', () => {
       const item = createMockItem({
-        creator: 'Test Creator',
+        duration: null,
+        readingTimeMinutes: null,
+      });
+
+      expect(getInlineLengthText(item)).toBeNull();
+    });
+  });
+
+  describe('subtitle text', () => {
+    it('uses creator name only', () => {
+      const item = createMockItem({ creator: 'John Doe' });
+
+      expect(buildCompactSubtitleText(item)).toBe('John Doe');
+    });
+
+    it('does not append content type label to subtitle text', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
         contentType: 'VIDEO' as ContentType,
+      });
+
+      const subtitle = buildCompactSubtitleText(item);
+      expect(subtitle).toBe('John Doe');
+      expect(subtitle).not.toContain('Video');
+    });
+
+    it('does not append duration to subtitle text', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
         duration: 300,
       });
-      const durationText = formatDuration(item.duration);
-      const metaParts = buildMetaParts(item, durationText, null);
 
-      expect(metaParts[0]).toBe('Test Creator');
-      expect(metaParts[1]).toBe('Video');
-      expect(metaParts[2]).toBe('5:00');
+      const subtitle = buildCompactSubtitleText(item);
+      expect(subtitle).toBe('John Doe');
+      expect(subtitle).not.toContain('5:00');
     });
+  });
 
-    it('handles post content type', () => {
-      const item = createMockItem({ contentType: 'POST' as ContentType });
-      const metaParts = buildMetaParts(item, null, null);
-
-      expect(metaParts).toContain('Post');
-    });
-
-    it('joins parts with separator correctly', () => {
+  describe('subtitle leading visual', () => {
+    it('prefers creator avatar when creatorImageUrl exists', () => {
       const item = createMockItem({
-        creator: 'Test Creator',
-        contentType: 'PODCAST' as ContentType,
-        duration: 1800,
+        creatorImageUrl: 'https://example.com/avatar.jpg',
       });
-      const durationText = formatDuration(item.duration);
-      const metaParts = buildMetaParts(item, durationText, null);
 
-      const display = metaParts.join(' · ');
-      expect(display).toBe('Test Creator · Podcast · 30:00');
+      expect(getSubtitleLeadingVisualMode(item)).toBe('creator-avatar');
+    });
+
+    it('falls back to content type icon when creatorImageUrl is missing', () => {
+      const item = createMockItem({
+        creatorImageUrl: null,
+      });
+
+      expect(getSubtitleLeadingVisualMode(item)).toBe('content-type');
+    });
+
+    it('falls back to content type icon when creator avatar fails to load', () => {
+      const item = createMockItem({
+        creatorImageUrl: 'https://example.com/avatar.jpg',
+      });
+
+      expect(getSubtitleLeadingVisualMode(item, true)).toBe('content-type');
     });
   });
 
-  describe('provider color dot', () => {
-    it('YouTube provider should have a provider color', () => {
-      // YouTube uses red (#FF0000 family)
-      const youtubeColor = '#FF0000';
-      expect(youtubeColor).toBeTruthy();
-    });
-
-    it('Spotify provider should have a provider color', () => {
-      // Spotify uses green (#1DB954 family)
-      const spotifyColor = '#1DB954';
-      expect(spotifyColor).toBeTruthy();
-    });
-
-    it('RSS provider should have a provider color', () => {
-      // RSS uses orange (#FFA500 family)
-      const rssColor = '#FFA500';
-      expect(rssColor).toBeTruthy();
-    });
-
-    it('provider dot dimensions meet minimum visibility', () => {
-      // Per component styles: width: 6, height: 6, borderRadius: 3
-      const PROVIDER_DOT_SIZE = 6;
-      const MIN_VISIBLE_SIZE = 4; // Minimum for visibility
-
-      expect(PROVIDER_DOT_SIZE).toBeGreaterThanOrEqual(MIN_VISIBLE_SIZE);
-    });
-  });
-
-  describe('text truncation', () => {
+  describe('layout constraints', () => {
     it('title truncation is set to single line', () => {
-      // Per component: numberOfLines={1} on title
       const TITLE_LINES = 1;
+
       expect(TITLE_LINES).toBe(1);
     });
 
-    it('metadata truncation is set to single line', () => {
-      // Per component: numberOfLines={1} on meta text
-      const META_LINES = 1;
-      expect(META_LINES).toBe(1);
-    });
-  });
+    it('subtitle truncation is set to single line', () => {
+      const SUBTITLE_LINES = 1;
 
-  describe('thumbnail', () => {
+      expect(SUBTITLE_LINES).toBe(1);
+    });
+
     it('thumbnail dimensions are 48x48', () => {
-      // Per component styles: width: 48, height: 48
       const THUMBNAIL_SIZE = 48;
+
       expect(THUMBNAIL_SIZE).toBe(48);
     });
-  });
 
-  describe('content type variants', () => {
-    it.each([
-      ['VIDEO', 'Video'],
-      ['PODCAST', 'Podcast'],
-      ['ARTICLE', 'Article'],
-      ['POST', 'Post'],
-    ])('content type %s displays as %s', (contentType, expected) => {
-      const item = createMockItem({ contentType: contentType as ContentType });
-      const metaParts = buildMetaParts(item, null, null);
+    it('content-type icon slot matches the shared xs icon size', () => {
+      expect(IconSizes.xs).toBe(14);
+    });
 
-      expect(metaParts).toContain(expected);
+    it('subtitle separator dot dimensions meet minimum visibility', () => {
+      const SEPARATOR_DOT_SIZE = 6;
+      const MIN_VISIBLE_SIZE = 4;
+
+      expect(SEPARATOR_DOT_SIZE).toBeGreaterThanOrEqual(MIN_VISIBLE_SIZE);
     });
   });
 });

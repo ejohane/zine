@@ -85,6 +85,7 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
     id: item.id,
     title: item.title,
     creator: item.creator,
+    creatorImageUrl: item.creatorImageUrl ?? null,
     thumbnailUrl: item.thumbnailUrl ?? null,
     contentType: mapContentType(item.contentType) as ContentType,
     provider: mapProvider(item.provider) as Provider,

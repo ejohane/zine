@@ -68,6 +68,19 @@ export const Stack: Story = {
   },
 };
 
+export const StackSizing: Story = {
+  render: () => (
+    <ScrollView
+      horizontal
+      contentContainerStyle={styles.horizontalStack}
+      showsHorizontalScrollIndicator={false}
+    >
+      <ItemCard item={itemCardFixtures.video} shape="stack" onPress={() => {}} />
+      <ItemCard item={itemCardFixtures.article} shape="stack" onPress={() => {}} />
+    </ScrollView>
+  ),
+};
+
 export const Cover: Story = {
   args: {
     item: itemCardFixtures.video,
@@ -102,6 +115,9 @@ export const ContentStress: Story = {
 
 const styles = StyleSheet.create({
   stack: {
+    gap: Spacing.md,
+  },
+  horizontalStack: {
     gap: Spacing.md,
   },
   featuredGrid: {

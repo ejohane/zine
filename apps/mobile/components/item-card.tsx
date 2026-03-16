@@ -7,22 +7,33 @@
  * - cover: full-bleed image with text overlay
  */
 
+import { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
+import { Typography, Spacing, Radius, ContentColors, IconSizes } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
 import {
   getContentIcon,
-  getProviderColor,
   mapContentType,
+  upgradeSpotifyImageUrl,
+  upgradeYouTubeImageUrl,
   type ContentType,
   type Provider,
 } from '@/lib/content-utils';
+
+const STACK_IMAGE_HEIGHT = 112;
+const STACK_TITLE_HEIGHT = Typography.bodyMedium.lineHeight;
+const STACK_CARD_HEIGHT =
+  STACK_IMAGE_HEIGHT +
+  Spacing.md * 2 +
+  STACK_TITLE_HEIGHT +
+  Spacing.xs +
+  Typography.bodySmall.lineHeight;
 
 // ============================================================================
 // Types
@@ -38,6 +49,7 @@ export interface ItemCardData {
   id: string;
   title: string;
   creator: string;
+  creatorImageUrl?: string | null;
   thumbnailUrl: string | null;
   contentType: ContentType;
   provider: Provider;
@@ -68,23 +80,6 @@ export interface ItemCardProps {
   onPress?: () => void;
 }
 
-function buildRowMetaParts(
-  item: ItemCardData,
-  contentTypeLabel: string,
-  durationText: string | null,
-  readingTimeText: string | null
-) {
-  const metaParts = [item.creator, contentTypeLabel];
-
-  if (durationText) {
-    metaParts.push(durationText);
-  } else if (readingTimeText) {
-    metaParts.push(readingTimeText);
-  }
-
-  return metaParts;
-}
-
 // ============================================================================
 // Component
 // ============================================================================
@@ -100,14 +95,41 @@ export function ItemCard({
   const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
   const mediaTransition = motion.duration.normal;
+  const [showInlineTitleLength, setShowInlineTitleLength] = useState(false);
+  const [subtitleAvatarFailed, setSubtitleAvatarFailed] = useState(false);
 
   const contentType = mapContentType(item.contentType);
   const contentColor = ContentColors[contentType];
-  const contentTypeLabel = contentType.charAt(0).toUpperCase() + contentType.slice(1);
-  const providerColor = getProviderColor(item.provider);
   const durationText = formatDuration(item.duration);
   const readingTimeText =
     item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null;
+  const inlineLengthText = durationText ?? readingTimeText;
+  const creatorImageUrl =
+    upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl ?? null)) ?? null;
+
+  useEffect(() => {
+    setShowInlineTitleLength(false);
+  }, [item.id, inlineLengthText, rowStyle, shape]);
+
+  useEffect(() => {
+    setSubtitleAvatarFailed(false);
+  }, [item.id, creatorImageUrl]);
+
+  const renderSubtitleLeadingVisual = () => {
+    if (creatorImageUrl && !subtitleAvatarFailed) {
+      return (
+        <Image
+          source={{ uri: creatorImageUrl }}
+          style={styles.subtitleAvatar}
+          contentFit="cover"
+          transition={mediaTransition}
+          onError={() => setSubtitleAvatarFailed(true)}
+        />
+      );
+    }
+
+    return getContentIcon(item.contentType, IconSizes.xs, colors.textSecondary);
+  };
 
   const handlePress = () => {
     if (onPress) {
@@ -183,10 +205,34 @@ export function ItemCard({
           )}
 
           <View style={styles.stackContent}>
-            <Text style={[styles.stackTitle, { color: colors.text }]} numberOfLines={2}>
+            {inlineLengthText ? (
+              <View style={styles.inlineTitleMeasurement} pointerEvents="none" accessible={false}>
+                <Text
+                  style={[styles.stackTitle, { color: colors.text }]}
+                  onTextLayout={(event) => {
+                    const fitsOnOneLine = event.nativeEvent.lines.length <= 1;
+                    setShowInlineTitleLength((current) =>
+                      current === fitsOnOneLine ? current : fitsOnOneLine
+                    );
+                  }}
+                >
+                  {item.title}
+                  <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
+                    {` · ${inlineLengthText}`}
+                  </Text>
+                </Text>
+              </View>
+            ) : null}
+            <Text style={[styles.stackTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title}
+              {showInlineTitleLength && inlineLengthText ? (
+                <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
+                  {` · ${inlineLengthText}`}
+                </Text>
+              ) : null}
             </Text>
             <View style={styles.stackMeta}>
+              <View style={styles.stackMetaIcon}>{renderSubtitleLeadingVisual()}</View>
               <View style={[styles.stackTypeDot, { backgroundColor: contentColor }]} />
               <Text style={[styles.stackSource, { color: colors.textSecondary }]} numberOfLines={1}>
                 {item.creator}
@@ -238,8 +284,6 @@ export function ItemCard({
     );
   }
 
-  const metaParts = buildRowMetaParts(item, contentTypeLabel, durationText, readingTimeText);
-
   return (
     <Animated.View>
       <Pressable
@@ -264,16 +308,40 @@ export function ItemCard({
         </View>
 
         <View style={styles.rowCompactContent}>
+          {inlineLengthText ? (
+            <View style={styles.inlineTitleMeasurement} pointerEvents="none" accessible={false}>
+              <Text
+                style={[styles.rowCompactTitle, { color: colors.text }]}
+                onTextLayout={(event) => {
+                  const fitsOnOneLine = event.nativeEvent.lines.length <= 1;
+                  setShowInlineTitleLength((current) =>
+                    current === fitsOnOneLine ? current : fitsOnOneLine
+                  );
+                }}
+              >
+                {item.title}
+                <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
+                  {` · ${inlineLengthText}`}
+                </Text>
+              </Text>
+            </View>
+          ) : null}
           <Text style={[styles.rowCompactTitle, { color: colors.text }]} numberOfLines={1}>
             {item.title}
+            {showInlineTitleLength && inlineLengthText ? (
+              <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
+                {` · ${inlineLengthText}`}
+              </Text>
+            ) : null}
           </Text>
           <View style={styles.rowCompactMeta}>
-            <View style={[styles.rowCompactProviderDot, { backgroundColor: providerColor }]} />
+            <View style={styles.rowCompactMetaIcon}>{renderSubtitleLeadingVisual()}</View>
+            <View style={[styles.rowCompactMetaDot, { backgroundColor: contentColor }]} />
             <Text
               style={[styles.rowCompactMetaText, { color: colors.textSecondary }]}
               numberOfLines={1}
             >
-              {metaParts.join(' · ')}
+              {item.creator}
             </Text>
           </View>
         </View>
@@ -312,18 +380,30 @@ const styles = StyleSheet.create({
   rowCompactTitle: {
     ...Typography.bodyMedium,
     fontWeight: '500',
-    marginBottom: 2,
+    minHeight: STACK_TITLE_HEIGHT,
+    marginBottom: Spacing.xs,
   },
   rowCompactMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.xs,
   },
-  rowCompactProviderDot: {
+  rowCompactMetaIcon: {
+    width: IconSizes.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  rowCompactMetaDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginRight: Spacing.xs,
     flexShrink: 0,
+  },
+  subtitleAvatar: {
+    width: IconSizes.xs,
+    height: IconSizes.xs,
+    borderRadius: Radius.full,
   },
   rowCompactMetaText: {
     ...Typography.bodySmall,
@@ -368,36 +448,54 @@ const styles = StyleSheet.create({
 
   stackCard: {
     width: 200,
+    height: STACK_CARD_HEIGHT,
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
   stackImage: {
     width: '100%',
-    height: 112,
+    height: STACK_IMAGE_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stackContent: {
+    flex: 1,
     padding: Spacing.md,
   },
   stackTitle: {
     ...Typography.bodyMedium,
     fontWeight: '500',
+    minHeight: STACK_TITLE_HEIGHT,
     marginBottom: Spacing.xs,
+  },
+  inlineTitleLength: {
+    ...Typography.bodySmall,
+  },
+  inlineTitleMeasurement: {
+    height: 0,
+    opacity: 0,
+    overflow: 'hidden',
   },
   stackMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
   },
-  stackSource: {
-    ...Typography.bodySmall,
-    flex: 1,
+  stackMetaIcon: {
+    width: IconSizes.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   stackTypeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    flexShrink: 0,
+  },
+  stackSource: {
+    ...Typography.bodySmall,
+    flex: 1,
   },
 
   coverCard: {
