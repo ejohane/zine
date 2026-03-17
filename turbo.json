@@ -8,7 +8,7 @@
     "dev": {
       "cache": false,
       "persistent": true,
-      "env": ["WORKER_PORT", "METRO_PORT"]
+      "env": ["WORKER_PORT", "METRO_PORT", "EXPO_HOSTNAME", "REACT_NATIVE_PACKAGER_HOSTNAME"]
     },
     "lint": {
       "dependsOn": ["^build"]

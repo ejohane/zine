@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "design-system:check": "node ../../scripts/check-mobile-design-system.mjs",
-    "dev": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
-    "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true EXPO_HOSTNAME=100.92.242.50 expo start -c --port ${METRO_PORT:-8081}",
+    "dev": "EXPO_PUBLIC_STORYBOOK_ENABLED=true expo start -c --port ${METRO_PORT:-8081}",
+    "storybook:start": "EXPO_PUBLIC_STORYBOOK_ENABLED=true expo start -c --port ${METRO_PORT:-8081}",
     "storybook:generate": "sb-rn-get-stories",
     "start": "expo start -c",
     "android": "expo start --android -c",
