@@ -128,7 +128,7 @@ function EmptyState({ colors }: { colors: typeof Colors.light }) {
   return (
     <Animated.View style={styles.stateContainer}>
       <LinkIcon size={48} color={colors.textTertiary} />
-      <Text style={[styles.stateTitle, { color: colors.textSecondary }]}>
+      <Text style={[styles.stateTitle, { color: colors.textSubheader }]}>
         Paste a link to get started
       </Text>
       <Text style={[styles.stateMessage, { color: colors.textTertiary }]}>
@@ -146,7 +146,7 @@ function LoadingState({ colors }: { colors: typeof Colors.light }) {
   return (
     <Animated.View style={styles.stateContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.stateTitle, { color: colors.textSecondary }]}>Fetching preview...</Text>
+      <Text style={[styles.stateTitle, { color: colors.textSubheader }]}>Fetching preview...</Text>
     </Animated.View>
   );
 }
@@ -168,7 +168,7 @@ function ErrorState({
     <Animated.View style={styles.stateContainer}>
       <AlertCircleIcon size={48} color={colors.error} />
       <Text style={[styles.stateTitle, { color: colors.text }]}>{"Couldn't load preview"}</Text>
-      <Text style={[styles.stateMessage, { color: colors.textSecondary }]}>{message}</Text>
+      <Text style={[styles.stateMessage, { color: colors.textSubheader }]}>{message}</Text>
       {onRetry && (
         <Pressable
           onPress={onRetry}

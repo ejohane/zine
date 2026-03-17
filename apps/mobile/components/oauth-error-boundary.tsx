@@ -58,7 +58,7 @@ function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProp
       <Text variant="titleMedium" style={styles.title}>
         {display.title}
       </Text>
-      <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+      <Text variant="bodyMedium" tone="subheader" style={styles.message}>
         {display.description}
       </Text>
       {error.recoverable && onRetry ? <Button label={buttonText} onPress={onRetry} /> : null}

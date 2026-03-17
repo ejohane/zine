@@ -23,6 +23,7 @@ Use `Colors[scheme]` and semantic tokens before literal color values.
 Core dark tokens:
 
 - `text`
+- `textSubheader`
 - `textSecondary`
 - `textTertiary`
 - `background`
@@ -39,7 +40,7 @@ Core dark tokens:
 
 Semantic aliases for new shared component work:
 
-- Text: `textPrimary`, `textSecondary`, `textTertiary`, `textInverse`
+- Text: `textPrimary`, `textSubheader`, `textSecondary`, `textTertiary`, `textInverse`
 - Surface: `surfaceCanvas`, `surfaceSubtle`, `surfaceElevated`, `surfaceRaised`
 - Accent: `accent`, `accentMuted`, `accentForeground`
 - Border: `borderDefault`, `borderSubtle`

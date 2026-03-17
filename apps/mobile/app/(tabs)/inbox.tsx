@@ -45,7 +45,7 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
         <InboxArrowIcon size={48} color={colors.primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>Your inbox is clear</Text>
-      <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
+      <Text style={[styles.emptyDescription, { color: colors.textSubheader }]}>
         New content from your sources will appear here. Bookmark what you want to keep, archive the
         rest.
       </Text>
@@ -208,6 +208,7 @@ export default function InboxScreen() {
     contentType: mapContentType(item.contentType) as ContentType,
     provider: mapProvider(item.provider) as Provider,
     duration: item.duration ?? null,
+    readingTimeMinutes: item.readingTimeMinutes ?? null,
     bookmarkedAt: null,
     publishedAt: item.publishedAt ?? null,
     isFinished: item.isFinished,
@@ -248,7 +249,7 @@ export default function InboxScreen() {
                 </Text>
               </Animated.View>
             ) : (
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+              <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
                 {inboxItems.length > 0
                   ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
                   : 'Decide what to keep'}

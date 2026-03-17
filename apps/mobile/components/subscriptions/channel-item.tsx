@@ -146,7 +146,7 @@ function ChannelItemComponent({
           <Text style={styles.name} colors={colors} numberOfLines={1}>
             {channel.name}
           </Text>
-          <Text style={styles.description} colors={colors} tone="secondary" numberOfLines={1}>
+          <Text style={styles.description} colors={colors} tone="subheader" numberOfLines={1}>
             {channel.description || getProviderDescription(provider)}
           </Text>
         </View>
@@ -178,7 +178,7 @@ function ChannelItemComponent({
           {channel.name}
         </Text>
         {channel.description && (
-          <Text style={styles.description} colors={colors} tone="secondary" numberOfLines={2}>
+          <Text style={styles.description} colors={colors} tone="subheader" numberOfLines={2}>
             {channel.description}
           </Text>
         )}

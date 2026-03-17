@@ -106,7 +106,7 @@ function ConnectPrompt({ provider, message, connectUrl, colors }: ConnectPromptP
 
   return (
     <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
-      <Text style={styles.promptText} tone="secondary">
+      <Text style={styles.promptText} tone="subheader">
         {message}
       </Text>
       {connectUrl && (
@@ -138,7 +138,7 @@ function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps)
 
   return (
     <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
-      <Text style={styles.promptText} tone="secondary">
+      <Text style={styles.promptText} tone="subheader">
         Your {providerDisplayName} connection needs to be refreshed
       </Text>
       {connectUrl && (
@@ -427,7 +427,7 @@ export function CreatorLatestContent({
         <Text style={styles.title} tone="primary">
           {sectionTitle}
         </Text>
-        <Text style={styles.emptyText} tone="secondary">
+        <Text style={styles.emptyText} tone="subheader">
           No recent content found
         </Text>
       </View>

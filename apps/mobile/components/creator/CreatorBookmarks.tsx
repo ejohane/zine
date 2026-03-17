@@ -140,7 +140,7 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
         <Text style={styles.title} tone="primary">
           Your Bookmarks
         </Text>
-        <Text style={styles.count} tone="secondary">
+        <Text style={styles.count} tone="subheader">
           {items.length} item{items.length === 1 ? '' : 's'}
         </Text>
       </View>

@@ -46,7 +46,7 @@ function FeedRow(props: {
         <Text style={[styles.feedStatus, { color: colors.textTertiary }]}>{feed.status}</Text>
       </View>
 
-      <Text style={[styles.feedUrl, { color: colors.textSecondary }]} numberOfLines={1}>
+      <Text style={[styles.feedUrl, { color: colors.textSubheader }]} numberOfLines={1}>
         {feed.feedUrl}
       </Text>
 
@@ -265,13 +265,13 @@ export default function RssSubscriptionsScreen() {
               </Pressable>
 
               <View style={styles.statsRow}>
-                <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+                <Text style={[styles.statsText, { color: colors.textSubheader }]}>
                   {stats?.active ?? 0} active
                 </Text>
-                <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+                <Text style={[styles.statsText, { color: colors.textSubheader }]}>
                   {stats?.paused ?? 0} paused
                 </Text>
-                <Text style={[styles.statsText, { color: colors.textSecondary }]}>
+                <Text style={[styles.statsText, { color: colors.textSubheader }]}>
                   {stats?.error ?? 0} error
                 </Text>
               </View>
@@ -296,7 +296,7 @@ export default function RssSubscriptionsScreen() {
             ) : (
               <View style={styles.emptyState}>
                 <Text style={[styles.emptyTitle, { color: colors.text }]}>No RSS feeds yet</Text>
-                <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
+                <Text style={[styles.emptyDescription, { color: colors.textSubheader }]}>
                   Add a feed URL to start receiving new articles in your inbox.
                 </Text>
               </View>

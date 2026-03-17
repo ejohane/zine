@@ -33,7 +33,7 @@ export function LoadingState({ message }: LoadingStateProps) {
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.primary} />
       {message ? (
-        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        <Text variant="bodyMedium" tone="subheader" style={styles.message}>
           {message}
         </Text>
       ) : null}
@@ -86,7 +86,7 @@ export function ErrorState({
         {title}
       </Text>
       {message ? (
-        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        <Text variant="bodyMedium" tone="subheader" style={styles.message}>
           {message}
         </Text>
       ) : null}
@@ -144,7 +144,7 @@ export function EmptyState({
         {title}
       </Text>
       {message ? (
-        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        <Text variant="bodyMedium" tone="subheader" style={styles.message}>
           {message}
         </Text>
       ) : null}
@@ -199,7 +199,7 @@ export function NotFoundState({
         {title}
       </Text>
       {message ? (
-        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        <Text variant="bodyMedium" tone="subheader" style={styles.message}>
           {message}
         </Text>
       ) : null}
@@ -246,7 +246,7 @@ export function InvalidParamState({
       <Text variant="titleMedium" style={styles.title}>
         {title}
       </Text>
-      <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+      <Text variant="bodyMedium" tone="subheader" style={styles.message}>
         {message}
       </Text>
       <Button label={backLabel} onPress={handleBack} />

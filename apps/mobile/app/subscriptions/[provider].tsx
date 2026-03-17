@@ -229,7 +229,7 @@ function ConnectionStatusCard({
                   <Text style={[styles.statusLabel, { color: colors.success }]}>Connected</Text>
                 </View>
                 {connection?.providerUserId && (
-                  <Text style={[styles.connectionDetail, { color: colors.textSecondary }]}>
+                  <Text style={[styles.connectionDetail, { color: colors.textSubheader }]}>
                     {connection.providerUserId}
                   </Text>
                 )}
@@ -422,7 +422,7 @@ function NewsletterItem({
           </Text>
           {feed.fromAddress && (
             <Text
-              style={[styles.connectionDetail, { color: colors.textSecondary }]}
+              style={[styles.connectionDetail, { color: colors.textSubheader }]}
               numberOfLines={1}
             >
               {feed.fromAddress}
@@ -481,7 +481,7 @@ function EmptyChannelsState({ provider, isConnected, colors }: EmptyChannelsStat
       <Text style={[styles.emptyTitle, { color: colors.text }]}>
         {isConnected ? `No ${config.contentName} found` : `Connect ${config.name}`}
       </Text>
-      <Text style={[styles.emptyDescription, { color: colors.textSecondary }]}>
+      <Text style={[styles.emptyDescription, { color: colors.textSubheader }]}>
         {isConnected
           ? `We couldn't find any ${config.contentName} in your ${config.name} account.`
           : `Connect your ${config.name} account to see your ${config.contentName} and add them to Zine.`}
@@ -903,7 +903,7 @@ export default function ProviderDetailScreen() {
               ) : (
                 <View style={styles.loadingChannels}>
                   <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.loadingText, { color: colors.textSubheader }]}>
                     Loading {config.contentName}...
                   </Text>
                 </View>
@@ -968,7 +968,7 @@ export default function ProviderDetailScreen() {
               ) : (
                 <View style={styles.loadingChannels}>
                   <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.loadingText, { color: colors.textSubheader }]}>
                     Loading {config.contentName}...
                   </Text>
                 </View>

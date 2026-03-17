@@ -13,13 +13,12 @@ import { useRouter, type Href } from 'expo-router';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { Typography, Spacing, Radius, ContentColors, IconSizes } from '@/constants/theme';
+import { Typography, Spacing, Radius, IconSizes } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
 import {
   getContentIcon,
-  mapContentType,
   upgradeSpotifyImageUrl,
   upgradeYouTubeImageUrl,
   type ContentType,
@@ -95,21 +94,14 @@ export function ItemCard({
   const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
   const mediaTransition = motion.duration.normal;
-  const [showInlineTitleLength, setShowInlineTitleLength] = useState(false);
   const [subtitleAvatarFailed, setSubtitleAvatarFailed] = useState(false);
 
-  const contentType = mapContentType(item.contentType);
-  const contentColor = ContentColors[contentType];
-  const durationText = formatDuration(item.duration);
+  const durationText = formatDuration(item.duration) || null;
   const readingTimeText =
     item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null;
   const inlineLengthText = durationText ?? readingTimeText;
   const creatorImageUrl =
     upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl ?? null)) ?? null;
-
-  useEffect(() => {
-    setShowInlineTitleLength(false);
-  }, [item.id, inlineLengthText, rowStyle, shape]);
 
   useEffect(() => {
     setSubtitleAvatarFailed(false);
@@ -128,7 +120,7 @@ export function ItemCard({
       );
     }
 
-    return getContentIcon(item.contentType, IconSizes.xs, colors.textSecondary);
+    return getContentIcon(item.contentType, IconSizes.xs, colors.textSubheader);
   };
 
   const handlePress = () => {
@@ -205,38 +197,42 @@ export function ItemCard({
           )}
 
           <View style={styles.stackContent}>
-            {inlineLengthText ? (
-              <View style={styles.inlineTitleMeasurement} pointerEvents="none" accessible={false}>
-                <Text
-                  style={[styles.stackTitle, { color: colors.text }]}
-                  onTextLayout={(event) => {
-                    const fitsOnOneLine = event.nativeEvent.lines.length <= 1;
-                    setShowInlineTitleLength((current) =>
-                      current === fitsOnOneLine ? current : fitsOnOneLine
-                    );
-                  }}
-                >
-                  {item.title}
-                  <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
-                    {` · ${inlineLengthText}`}
-                  </Text>
-                </Text>
-              </View>
-            ) : null}
             <Text style={[styles.stackTitle, { color: colors.text }]} numberOfLines={1}>
               {item.title}
-              {showInlineTitleLength && inlineLengthText ? (
-                <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
-                  {` · ${inlineLengthText}`}
-                </Text>
-              ) : null}
             </Text>
             <View style={styles.stackMeta}>
               <View style={styles.stackMetaIcon}>{renderSubtitleLeadingVisual()}</View>
-              <View style={[styles.stackTypeDot, { backgroundColor: contentColor }]} />
-              <Text style={[styles.stackSource, { color: colors.textSecondary }]} numberOfLines={1}>
-                {item.creator}
-              </Text>
+              <View style={styles.stackMetaTextGroup}>
+                <View style={styles.stackMetaCreatorContainer}>
+                  <Text
+                    style={[
+                      styles.stackSource,
+                      styles.stackMetaCreator,
+                      { color: colors.textSubheader },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {item.creator}
+                  </Text>
+                </View>
+                {inlineLengthText ? (
+                  <>
+                    <View
+                      style={[styles.stackTypeDot, { backgroundColor: colors.textSubheader }]}
+                    />
+                    <Text
+                      style={[
+                        styles.stackSource,
+                        styles.stackMetaLength,
+                        { color: colors.textSubheader },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {inlineLengthText}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
             </View>
           </View>
         </Pressable>
@@ -308,41 +304,38 @@ export function ItemCard({
         </View>
 
         <View style={styles.rowCompactContent}>
-          {inlineLengthText ? (
-            <View style={styles.inlineTitleMeasurement} pointerEvents="none" accessible={false}>
-              <Text
-                style={[styles.rowCompactTitle, { color: colors.text }]}
-                onTextLayout={(event) => {
-                  const fitsOnOneLine = event.nativeEvent.lines.length <= 1;
-                  setShowInlineTitleLength((current) =>
-                    current === fitsOnOneLine ? current : fitsOnOneLine
-                  );
-                }}
-              >
-                {item.title}
-                <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
-                  {` · ${inlineLengthText}`}
-                </Text>
-              </Text>
-            </View>
-          ) : null}
           <Text style={[styles.rowCompactTitle, { color: colors.text }]} numberOfLines={1}>
             {item.title}
-            {showInlineTitleLength && inlineLengthText ? (
-              <Text style={[styles.inlineTitleLength, { color: colors.textSecondary }]}>
-                {` · ${inlineLengthText}`}
-              </Text>
-            ) : null}
           </Text>
           <View style={styles.rowCompactMeta}>
             <View style={styles.rowCompactMetaIcon}>{renderSubtitleLeadingVisual()}</View>
-            <View style={[styles.rowCompactMetaDot, { backgroundColor: contentColor }]} />
             <Text
-              style={[styles.rowCompactMetaText, { color: colors.textSecondary }]}
+              style={[
+                styles.rowCompactMetaText,
+                styles.rowCompactMetaCreator,
+                { color: colors.textSubheader },
+              ]}
               numberOfLines={1}
             >
               {item.creator}
             </Text>
+            {inlineLengthText ? (
+              <>
+                <View
+                  style={[styles.rowCompactMetaDot, { backgroundColor: colors.textSubheader }]}
+                />
+                <Text
+                  style={[
+                    styles.rowCompactMetaText,
+                    styles.rowCompactMetaLength,
+                    { color: colors.textSubheader },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {inlineLengthText}
+                </Text>
+              </>
+            ) : null}
           </View>
         </View>
       </Pressable>
@@ -387,6 +380,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+    minWidth: 0,
   },
   rowCompactMetaIcon: {
     width: IconSizes.xs,
@@ -395,9 +389,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   rowCompactMetaDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     flexShrink: 0,
   },
   subtitleAvatar: {
@@ -407,7 +401,13 @@ const styles = StyleSheet.create({
   },
   rowCompactMetaText: {
     ...Typography.bodySmall,
-    flex: 1,
+  },
+  rowCompactMetaCreator: {
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  rowCompactMetaLength: {
+    flexShrink: 0,
   },
 
   rowFeaturedCard: {
@@ -468,18 +468,11 @@ const styles = StyleSheet.create({
     minHeight: STACK_TITLE_HEIGHT,
     marginBottom: Spacing.xs,
   },
-  inlineTitleLength: {
-    ...Typography.bodySmall,
-  },
-  inlineTitleMeasurement: {
-    height: 0,
-    opacity: 0,
-    overflow: 'hidden',
-  },
   stackMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+    minWidth: 0,
   },
   stackMetaIcon: {
     width: IconSizes.xs,
@@ -487,15 +480,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  stackMetaTextGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
   stackTypeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     flexShrink: 0,
   },
   stackSource: {
     ...Typography.bodySmall,
-    flex: 1,
+  },
+  stackMetaCreatorContainer: {
+    flexShrink: 1,
+    maxWidth: '70%',
+    minWidth: 0,
+  },
+  stackMetaCreator: {
+    minWidth: 0,
+  },
+  stackMetaLength: {
+    flexShrink: 0,
   },
 
   coverCard: {

@@ -171,7 +171,7 @@ export default function ProviderDiscoverScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Your {providerDisplayName} Subscriptions
           </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
             Select channels to follow in Zine
             {selectedCount > 0 && ` (${selectedCount} selected)`}
           </Text>
@@ -194,7 +194,7 @@ export default function ProviderDiscoverScreen() {
             subscribeQueued ? (
               <View style={styles.footerLoader}>
                 <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.footerText, { color: colors.textSecondary }]}>
+                <Text style={[styles.footerText, { color: colors.textSubheader }]}>
                   Changes will sync when online...
                 </Text>
               </View>

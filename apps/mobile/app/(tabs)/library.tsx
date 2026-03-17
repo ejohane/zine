@@ -193,6 +193,7 @@ export default function LibraryScreen() {
     contentType: mapContentType(item.contentType) as UIContentType,
     provider: mapProvider(item.provider) as Provider,
     duration: item.duration ?? null,
+    readingTimeMinutes: item.readingTimeMinutes ?? null,
     bookmarkedAt: item.bookmarkedAt ?? null,
     publishedAt: item.publishedAt ?? null,
     isFinished: item.isFinished,
@@ -222,7 +223,7 @@ export default function LibraryScreen() {
               <PlusIcon size={22} color={colors.text} />
             </Pressable>
           </View>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
             {isLoading
               ? 'Loading...'
               : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}

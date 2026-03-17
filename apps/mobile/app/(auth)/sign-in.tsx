@@ -250,7 +250,7 @@ function createStyles(colors: typeof Colors.light) {
     },
     subtitle: {
       ...Typography.bodyLarge,
-      color: colors.textSecondary,
+      color: colors.textSubheader,
     },
     errorContainer: {
       backgroundColor: `${colors.error}15`,
@@ -335,7 +335,7 @@ function createStyles(colors: typeof Colors.light) {
     },
     footerText: {
       ...Typography.bodyMedium,
-      color: colors.textSecondary,
+      color: colors.textSubheader,
     },
     linkText: {
       ...Typography.titleSmall,

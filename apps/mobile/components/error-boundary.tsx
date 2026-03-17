@@ -46,7 +46,7 @@ function DefaultErrorFallback({
       <Text variant="titleMedium" style={styles.title} colorScheme={colorScheme}>
         Something went wrong
       </Text>
-      <Text variant="bodyMedium" tone="secondary" style={styles.message} colorScheme={colorScheme}>
+      <Text variant="bodyMedium" tone="subheader" style={styles.message} colorScheme={colorScheme}>
         {errorMessage}
       </Text>
       <Button label="Try Again" onPress={onRetry} colorScheme={colorScheme} />

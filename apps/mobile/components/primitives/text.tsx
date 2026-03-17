@@ -14,6 +14,7 @@ export type TextVariant = keyof typeof Typography;
 
 export type TextTone =
   | 'primary'
+  | 'subheader'
   | 'secondary'
   | 'tertiary'
   | 'inverse'
@@ -45,6 +46,8 @@ export interface TextProps extends RNTextProps {
 
 function getToneColor(colors: ThemeColors, tone: TextTone): string {
   switch (tone) {
+    case 'subheader':
+      return colors.textSubheader;
     case 'secondary':
       return colors.textSecondary;
     case 'tertiary':

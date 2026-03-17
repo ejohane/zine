@@ -44,6 +44,7 @@ const variants = [
 
 const tones = [
   'primary',
+  'subheader',
   'secondary',
   'tertiary',
   'accent',

@@ -1,10 +1,10 @@
 /**
- * Tests for ItemCard compact row text treatment.
+ * Tests for ItemCard compact row metadata treatment.
  *
  * The ItemCard component uses react-native components that require native modules.
  * Full component rendering tests are done via manual testing in the iOS simulator.
  *
- * This test file validates the metadata and inline-length logic mirrored from the
+ * This test file validates the metadata and length-label logic mirrored from the
  * compact row implementation without importing the actual component.
  */
 
@@ -56,7 +56,13 @@ function getInlineLengthText(item: ItemCardData): string | null {
 }
 
 function buildCompactSubtitleText(item: ItemCardData): string {
-  return item.creator;
+  const inlineLengthText = getInlineLengthText(item);
+
+  if (!inlineLengthText) {
+    return item.creator;
+  }
+
+  return `${item.creator} · ${inlineLengthText}`;
 }
 
 function getSubtitleLeadingVisualMode(
@@ -67,7 +73,7 @@ function getSubtitleLeadingVisualMode(
 }
 
 describe('ItemCard compact row text treatment', () => {
-  describe('inline title length', () => {
+  describe('compact metadata length', () => {
     it('uses duration when available for video items', () => {
       const item = createMockItem({
         contentType: 'VIDEO' as ContentType,
@@ -117,8 +123,12 @@ describe('ItemCard compact row text treatment', () => {
   });
 
   describe('subtitle text', () => {
-    it('uses creator name only', () => {
-      const item = createMockItem({ creator: 'John Doe' });
+    it('uses creator name only when no duration or reading time exists', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
+        duration: null,
+        readingTimeMinutes: null,
+      });
 
       expect(buildCompactSubtitleText(item)).toBe('John Doe');
     });
@@ -127,6 +137,8 @@ describe('ItemCard compact row text treatment', () => {
       const item = createMockItem({
         creator: 'John Doe',
         contentType: 'VIDEO' as ContentType,
+        duration: null,
+        readingTimeMinutes: null,
       });
 
       const subtitle = buildCompactSubtitleText(item);
@@ -134,15 +146,25 @@ describe('ItemCard compact row text treatment', () => {
       expect(subtitle).not.toContain('Video');
     });
 
-    it('does not append duration to subtitle text', () => {
+    it('appends duration to subtitle text', () => {
       const item = createMockItem({
         creator: 'John Doe',
         duration: 300,
       });
 
       const subtitle = buildCompactSubtitleText(item);
-      expect(subtitle).toBe('John Doe');
-      expect(subtitle).not.toContain('5:00');
+      expect(subtitle).toBe('John Doe · 5:00');
+    });
+
+    it('appends reading time to subtitle text when duration is missing', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
+        duration: null,
+        readingTimeMinutes: 5,
+      });
+
+      const subtitle = buildCompactSubtitleText(item);
+      expect(subtitle).toBe('John Doe · 5 min');
     });
   });
 
@@ -196,7 +218,7 @@ describe('ItemCard compact row text treatment', () => {
     });
 
     it('subtitle separator dot dimensions meet minimum visibility', () => {
-      const SEPARATOR_DOT_SIZE = 6;
+      const SEPARATOR_DOT_SIZE = 4;
       const MIN_VISIBLE_SIZE = 4;
 
       expect(SEPARATOR_DOT_SIZE).toBeGreaterThanOrEqual(MIN_VISIBLE_SIZE);

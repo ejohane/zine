@@ -28,7 +28,7 @@ function PermissionItem({
       <Text style={styles.permissionIcon}>{icon}</Text>
       <View style={styles.permissionText}>
         <Text style={[styles.permissionTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.permissionDescription, { color: colors.textSecondary }]}>
+        <Text style={[styles.permissionDescription, { color: colors.textSubheader }]}>
           {description}
         </Text>
       </View>
@@ -77,7 +77,7 @@ function GmailConnectContent() {
             <Text style={styles.providerIcon}>📬</Text>
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Connect Gmail</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
             Import newsletters from your inbox into Zine
           </Text>
         </View>
@@ -88,7 +88,7 @@ function GmailConnectContent() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>
+          <Text style={[styles.permissionsHeader, { color: colors.textSubheader }]}>
             WHAT WE&apos;LL ACCESS
           </Text>
           <View style={styles.permissionsList}>
@@ -113,7 +113,7 @@ function GmailConnectContent() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          <Text style={[styles.permissionsHeader, { color: colors.textSecondary }]}>
+          <Text style={[styles.permissionsHeader, { color: colors.textSubheader }]}>
             WHAT WE WON&apos;T DO
           </Text>
           <View style={styles.permissionsList}>
@@ -158,7 +158,7 @@ function GmailConnectContent() {
         </Pressable>
 
         {isConnecting && (
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <Text style={[styles.loadingText, { color: colors.textSubheader }]}>
             Opening Gmail authorization...
           </Text>
         )}
