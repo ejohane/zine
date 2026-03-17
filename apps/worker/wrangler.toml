@@ -69,7 +69,6 @@ max_batch_timeout = 30
 enabled = true
 head_sampling_rate = 1
 invocation_logs = true
-persist = true
 
 # Development environment vars
 [vars]
@@ -127,7 +126,6 @@ max_batch_timeout = 30
 enabled = true
 head_sampling_rate = 1
 invocation_logs = true
-persist = true
 
 # Production environment
 [env.production]
@@ -182,7 +180,6 @@ max_batch_timeout = 30
 enabled = true
 head_sampling_rate = 1
 invocation_logs = true
-persist = true
 
 # ============================================================================
 # Required Secrets (set via `wrangler secret put <NAME>`)
