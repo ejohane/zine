@@ -1,5 +1,5 @@
 import type { ReleaseContext } from '@zine/shared';
-import { createDb, ensureUserItemsLastOpenedAt } from '../db';
+import { createDb, ensureRecapSchema } from '../db';
 import type { Context } from 'hono';
 import type { Env } from '../types';
 import { getEnvironmentName, getWorkerRelease } from '../lib/telemetry';
@@ -17,7 +17,7 @@ export async function createContext(c: Context<Env>) {
   const requestId = c.get('requestId');
   const traceId = c.get('traceId');
   const clientRequestId = c.get('clientRequestId');
-  await ensureUserItemsLastOpenedAt(c.env.DB);
+  await ensureRecapSchema(c.env.DB);
   const db = createDb(c.env.DB);
   return {
     userId,

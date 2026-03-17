@@ -30,6 +30,9 @@ describe('Cache UX Acceptance Criteria (gh-64)', () => {
 
     it('persists only successful allowlisted queries', () => {
       expect(shouldPersistQuery({ queryKey: [['items', 'home']], status: 'success' })).toBe(true);
+      expect(
+        shouldPersistQuery({ queryKey: [['insights', 'weeklyRecapTeaser']], status: 'success' })
+      ).toBe(true);
       expect(shouldPersistQuery({ queryKey: [['subscriptions', 'list']], status: 'success' })).toBe(
         true
       );
@@ -72,8 +75,14 @@ describe('Cache UX Acceptance Criteria (gh-64)', () => {
     });
 
     it('documents offline queue invalidation coverage', () => {
-      const invalidatedQueries = ['items.home', 'items.inbox', 'items.library'];
-      expect(invalidatedQueries.length).toBe(3);
+      const invalidatedQueries = [
+        'items.home',
+        'items.inbox',
+        'items.library',
+        'insights.weeklyRecap',
+        'insights.weeklyRecapTeaser',
+      ];
+      expect(invalidatedQueries.length).toBe(5);
     });
   });
 });

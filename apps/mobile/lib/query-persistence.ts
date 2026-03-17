@@ -14,6 +14,8 @@ const ALLOWLISTED_QUERY_PATHS = new Set([
   'items.inbox',
   'items.library',
   'items.get',
+  'insights.weeklyRecap',
+  'insights.weeklyRecapTeaser',
   'subscriptions.list',
   'subscriptions.connections.list',
   'creators.get',

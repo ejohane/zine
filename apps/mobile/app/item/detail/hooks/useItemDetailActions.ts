@@ -32,25 +32,29 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
     try {
       const isArticle = item.contentType === ContentType.ARTICLE;
       const isSubstack = item.provider === 'SUBSTACK';
+      let didOpen = false;
 
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
           enableBarCollapsing: true,
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
+        didOpen = true;
       } else {
         const supported = await Linking.canOpenURL(item.canonicalUrl);
         if (supported) {
           await Linking.openURL(item.canonicalUrl);
+          didOpen = true;
         } else if (isSubstack) {
           await WebBrowser.openBrowserAsync(item.canonicalUrl, {
             enableBarCollapsing: true,
             presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
           });
+          didOpen = true;
         }
       }
 
-      if (item.state === UserItemState.BOOKMARKED) {
+      if (didOpen) {
         markOpenedMutation.mutate({ id: item.id });
       }
     } catch (err) {

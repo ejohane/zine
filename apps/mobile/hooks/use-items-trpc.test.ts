@@ -145,6 +145,8 @@ function createToggleUtils(initial?: {
   const mockInboxInvalidate = jest.fn();
   const mockHomeInvalidate = jest.fn();
   const mockGetInvalidate = jest.fn();
+  const mockWeeklyRecapInvalidate = jest.fn();
+  const mockWeeklyRecapTeaserInvalidate = jest.fn();
 
   const utils = {
     items: {
@@ -202,6 +204,14 @@ function createToggleUtils(initial?: {
         }),
       },
     },
+    insights: {
+      weeklyRecap: {
+        invalidate: mockWeeklyRecapInvalidate,
+      },
+      weeklyRecapTeaser: {
+        invalidate: mockWeeklyRecapTeaserInvalidate,
+      },
+    },
   };
 
   return {
@@ -215,6 +225,8 @@ function createToggleUtils(initial?: {
       mockInboxInvalidate,
       mockHomeInvalidate,
       mockGetInvalidate,
+      mockWeeklyRecapInvalidate,
+      mockWeeklyRecapTeaserInvalidate,
     },
   };
 }
@@ -423,6 +435,8 @@ describe('useToggleFinished', () => {
     expect(harness.spies.mockInboxInvalidate).toHaveBeenCalledTimes(1);
     expect(harness.spies.mockHomeInvalidate).toHaveBeenCalledTimes(1);
     expect(harness.spies.mockGetInvalidate).toHaveBeenCalledWith({ id: item.id });
+    expect(harness.spies.mockWeeklyRecapInvalidate).toHaveBeenCalledTimes(1);
+    expect(harness.spies.mockWeeklyRecapTeaserInvalidate).toHaveBeenCalledTimes(1);
   });
 
   it('applies optimistic complete state immediately without waiting for query cancellation', async () => {

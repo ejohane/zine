@@ -192,14 +192,14 @@ describe('useItemDetailActions', () => {
     });
   });
 
-  it('does not mark opened when item is not bookmarked', async () => {
+  it('marks opened after a successful open even when the item is not bookmarked', async () => {
     const { result } = renderHook(() => useItemDetailActions(baseItem));
 
     await act(async () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
   });
 
   it('logs errors when link opening fails', async () => {
@@ -213,6 +213,23 @@ describe('useItemDetailActions', () => {
 
     expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
     expect(mockOpenBrowserAsync).toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
+  });
+
+  it('does not mark opened when the external URL can not be opened', async () => {
+    mockCanOpenURL.mockResolvedValueOnce(false);
+    const item = {
+      ...baseItem,
+      contentType: 'VIDEO',
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('shares item details', async () => {
