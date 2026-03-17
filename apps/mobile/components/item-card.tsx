@@ -17,13 +17,8 @@ import { Typography, Spacing, Radius, IconSizes } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
-import {
-  getContentIcon,
-  upgradeSpotifyImageUrl,
-  upgradeYouTubeImageUrl,
-  type ContentType,
-  type Provider,
-} from '@/lib/content-utils';
+import { getItemCardImageCandidates, normalizeItemCardImageUrl } from '@/lib/item-card-image';
+import { getContentIcon, type ContentType, type Provider } from '@/lib/content-utils';
 
 const STACK_IMAGE_HEIGHT = 112;
 const STACK_TITLE_HEIGHT = Typography.bodyMedium.lineHeight;
@@ -94,18 +89,32 @@ export function ItemCard({
   const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
   const mediaTransition = motion.duration.normal;
+  const thumbnailImageUrl = normalizeItemCardImageUrl(item.thumbnailUrl);
+  const creatorImageUrl = normalizeItemCardImageUrl(item.creatorImageUrl);
+  const mediaImageCandidates = getItemCardImageCandidates({
+    thumbnailUrl: thumbnailImageUrl,
+    creatorImageUrl,
+  });
+  const [mediaImageCandidateIndex, setMediaImageCandidateIndex] = useState(0);
   const [subtitleAvatarFailed, setSubtitleAvatarFailed] = useState(false);
 
   const durationText = formatDuration(item.duration) || null;
   const readingTimeText =
     item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null;
   const inlineLengthText = durationText ?? readingTimeText;
-  const creatorImageUrl =
-    upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(item.creatorImageUrl ?? null)) ?? null;
+  const mediaImageUrl = mediaImageCandidates[mediaImageCandidateIndex] ?? null;
+
+  useEffect(() => {
+    setMediaImageCandidateIndex(0);
+  }, [item.id, thumbnailImageUrl, creatorImageUrl]);
 
   useEffect(() => {
     setSubtitleAvatarFailed(false);
   }, [item.id, creatorImageUrl]);
+
+  const handleMediaImageError = () => {
+    setMediaImageCandidateIndex((currentIndex) => currentIndex + 1);
+  };
 
   const renderSubtitleLeadingVisual = () => {
     if (creatorImageUrl && !subtitleAvatarFailed) {
@@ -140,12 +149,13 @@ export function ItemCard({
           onPress={handlePress}
           style={({ pressed }) => [styles.coverCard, pressed && { opacity: 0.95 }]}
         >
-          {item.thumbnailUrl ? (
+          {mediaImageUrl ? (
             <Image
-              source={{ uri: item.thumbnailUrl }}
+              source={{ uri: mediaImageUrl }}
               style={styles.coverImage}
               contentFit="cover"
               transition={mediaTransition}
+              onError={handleMediaImageError}
             />
           ) : (
             <View style={[styles.coverImage, { backgroundColor: colors.surfaceRaised }]} />
@@ -183,17 +193,16 @@ export function ItemCard({
             pressed && { opacity: 0.7 },
           ]}
         >
-          {item.thumbnailUrl ? (
+          {mediaImageUrl ? (
             <Image
-              source={{ uri: item.thumbnailUrl }}
+              source={{ uri: mediaImageUrl }}
               style={styles.stackImage}
               contentFit="cover"
               transition={mediaTransition}
+              onError={handleMediaImageError}
             />
           ) : (
-            <View style={[styles.stackImage, { backgroundColor: colors.surfaceRaised }]}>
-              {getContentIcon(item.contentType, 32, colors.textTertiary)}
-            </View>
+            <View style={[styles.stackImage, { backgroundColor: colors.surfaceRaised }]} />
           )}
 
           <View style={styles.stackContent}>
@@ -264,16 +273,15 @@ export function ItemCard({
               { backgroundColor: colors.surfaceRaised },
             ]}
           >
-            {item.thumbnailUrl ? (
+            {mediaImageUrl ? (
               <Image
-                source={{ uri: item.thumbnailUrl }}
+                source={{ uri: mediaImageUrl }}
                 style={styles.rowFeaturedThumbnailImage}
                 contentFit="cover"
                 transition={mediaTransition}
+                onError={handleMediaImageError}
               />
-            ) : (
-              getContentIcon(item.contentType, 20, colors.textTertiary)
-            )}
+            ) : null}
           </View>
           <View style={styles.rowFeaturedContent}>
             <Text style={[styles.rowFeaturedTitle, { color: colors.text }]} numberOfLines={2}>
@@ -292,19 +300,18 @@ export function ItemCard({
         style={({ pressed }) => [styles.rowCompactCard, pressed && { opacity: 0.7 }]}
       >
         <View style={styles.rowCompactThumbnailContainer}>
-          {item.thumbnailUrl ? (
+          {mediaImageUrl ? (
             <Image
-              source={{ uri: item.thumbnailUrl }}
+              source={{ uri: mediaImageUrl }}
               style={styles.rowCompactThumbnailImage}
               contentFit="cover"
               transition={mediaTransition}
+              onError={handleMediaImageError}
             />
           ) : (
             <View
               style={[styles.rowCompactThumbnailImage, { backgroundColor: colors.surfaceRaised }]}
-            >
-              {getContentIcon(item.contentType, 20, colors.textTertiary)}
-            </View>
+            />
           )}
         </View>
 
