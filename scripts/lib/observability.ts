@@ -621,22 +621,53 @@ export function parseCommandArgs(argv: string[]): Record<string, string | boolea
     _: [],
   };
 
+  const appendValue = (key: string, value: string | boolean): void => {
+    const existing = parsed[key];
+
+    if (existing === undefined) {
+      parsed[key] = value;
+      return;
+    }
+
+    if (Array.isArray(existing)) {
+      parsed[key] = [...existing, String(value)];
+      return;
+    }
+
+    parsed[key] = [String(existing), String(value)];
+  };
+
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
+    if (token === '--') {
+      (parsed._ as string[]).push(...argv.slice(index + 1));
+      break;
+    }
+
     if (!token.startsWith('--')) {
       (parsed._ as string[]).push(token);
       continue;
     }
 
-    const key = token.slice(2);
-    const next = argv[index + 1];
+    const assignment = token.slice(2);
+    const equalsIndex = assignment.indexOf('=');
 
-    if (!next || next.startsWith('--')) {
-      parsed[key] = true;
+    if (equalsIndex > -1) {
+      const key = assignment.slice(0, equalsIndex);
+      const value = assignment.slice(equalsIndex + 1);
+      appendValue(key, value);
       continue;
     }
 
-    parsed[key] = next;
+    const key = assignment;
+    const next = argv[index + 1];
+
+    if (!next || next.startsWith('--')) {
+      appendValue(key, true);
+      continue;
+    }
+
+    appendValue(key, next);
     index += 1;
   }
 

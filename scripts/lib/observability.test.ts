@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   buildIncidentReport,
   filterDiagnosticRecords,
+  parseCommandArgs,
   redactDiagnosticValue,
   scanWorkerRuntimeConsoleUsage,
   summarizeDiagnosticRecords,
@@ -155,6 +156,27 @@ describe('buildIncidentReport', () => {
     expect(report.verdict).toBe('queue_dlq_backlog');
     expect(report.nextQueries).toContain('bun run diag:queue:dlq');
     expect(report.candidateFixes[0]?.action).toContain('Inspect DLQ message metadata');
+  });
+});
+
+describe('parseCommandArgs', () => {
+  it('parses equals assignments, repeated flags, and positional args', () => {
+    const parsed = parseCommandArgs([
+      '--since=2h',
+      '--provider',
+      'youtube',
+      '--provider=spotify',
+      '--verbose',
+      '--',
+      'incident-123',
+    ]);
+
+    expect(parsed).toEqual({
+      _: ['incident-123'],
+      since: '2h',
+      provider: ['youtube', 'spotify'],
+      verbose: true,
+    });
   });
 });
 
