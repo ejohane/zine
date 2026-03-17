@@ -34,14 +34,7 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import {
-  View,
-  StyleSheet,
-  Text,
-  UIManager,
-  Platform,
-  type AccessibilityActionEvent,
-} from 'react-native';
+import { View, StyleSheet, Text, type AccessibilityActionEvent } from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
@@ -55,32 +48,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import ContextMenuView from 'react-native-context-menu-view';
+import ContextMenu from '../lib/context-menu';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-
-// ContextMenu requires native code - doesn't work in Expo Go
-// Check if native component is actually registered before using it
-const isContextMenuAvailable =
-  Platform.OS === 'ios' && UIManager.getViewManagerConfig('ContextMenu') != null;
-
-type ContextMenuProps = {
-  actions?: { title: string; systemIcon?: string }[];
-  onPress?: (e: { nativeEvent: { name: string } }) => void;
-  previewBackgroundColor?: string;
-  children: React.ReactNode;
-};
-
-// Fallback component that just renders children (for Expo Go)
-const ContextMenuFallback = ({ children }: ContextMenuProps) => <>{children}</>;
-
-// ContextMenuView import is safe in Expo Go; we still gate rendering on native availability
-const ContextMenu: React.ComponentType<ContextMenuProps> = isContextMenuAvailable
-  ? (ContextMenuView as React.ComponentType<ContextMenuProps>)
-  : ContextMenuFallback;
 
 // ============================================================================
 // Types

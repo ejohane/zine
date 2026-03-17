@@ -42,15 +42,20 @@
   - Seeds `apps/worker/.wrangler/state` from the main worktree on first run
   - Applies local D1 migrations
   - Symlinks `apps/worker/.dev.vars` from the main worktree when appropriate
-  - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://localhost:<WORKER_PORT>`
+  - Detects the current Tailscale IPv4 when available and uses it for Expo Go + `EXPO_PUBLIC_API_URL`
+  - Falls back to `localhost` when Tailscale is unavailable
+  - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
+  - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://<reachable-host>:<public-api-port>`
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
+- Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
+- Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
 
 ### Empty Local Data Recovery
 
 - Symptom: Expo Go loads, but Home/Inbox/Library are empty even though local test data should exist.
 - First verify which local worker the app is actually using:
   - Check `apps/mobile/.env.local` for `EXPO_PUBLIC_API_URL`.
-  - Check Expo logs; Expo Go may still be talking to `http://localhost:8787` if the main worktree dev server is running.
+  - Check Expo logs; Expo Go may still be talking to an older `exp://<host>:<port>` endpoint if another dev server is running.
 - Then inspect the local D1 file behind that worker:
   - Path: `apps/worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/2a13f10f1e768310d0250437a6253d204a8c839f02e306404fa5e52ca7ded965.sqlite`
   - Quick check:
