@@ -98,7 +98,7 @@ function ProviderCard({
         </View>
         <View style={styles.providerInfo}>
           <Text style={[styles.providerName, { color: colors.text }]}>{name}</Text>
-          <Text style={[styles.providerDescription, { color: colors.textSecondary }]}>
+          <Text style={[styles.providerDescription, { color: colors.textSubheader }]}>
             {description}
           </Text>
         </View>
@@ -130,7 +130,7 @@ interface ComingSoonCardProps {
 function ComingSoonCard({ colors }: ComingSoonCardProps) {
   return (
     <View style={[styles.comingSoonCard, { backgroundColor: colors.backgroundSecondary }]}>
-      <Text style={[styles.comingSoonTitle, { color: colors.textSecondary }]}>
+      <Text style={[styles.comingSoonTitle, { color: colors.textSubheader }]}>
         More coming soon...
       </Text>
       <Text style={[styles.comingSoonDescription, { color: colors.textTertiary }]}>
@@ -185,7 +185,7 @@ export default function OnboardingConnectScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Connect your favorite sources</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
             Import your subscriptions from YouTube and Spotify to get started
           </Text>
         </View>

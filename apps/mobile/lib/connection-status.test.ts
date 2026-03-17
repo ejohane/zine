@@ -26,7 +26,7 @@ describe('getStatusDisplay', () => {
 
       expect(result.dotColor).toBe(colors.success);
       expect(result.text).toBe('Connected');
-      expect(result.textColor).toBe(colors.textSecondary);
+      expect(result.textColor).toBe(colors.textSubheader);
       expect(result.showCount).toBe(true);
     });
 
@@ -156,7 +156,7 @@ describe('getStatusDisplay', () => {
       const result = getStatusDisplay('ACTIVE', lightColors);
 
       expect(result.dotColor).toBe(lightColors.success);
-      expect(result.textColor).toBe(lightColors.textSecondary);
+      expect(result.textColor).toBe(lightColors.textSubheader);
     });
 
     it('uses theme colors consistently across all statuses', () => {
@@ -168,7 +168,7 @@ describe('getStatusDisplay', () => {
 
         // All colors should be hex strings
         expect(result.dotColor).toMatch(/^#[0-9A-Fa-f]{6}$/);
-        expect(result.textColor).toMatch(/^#[0-9A-Fa-f]{6}$/);
+        expect(result.textColor).toMatch(/^(#[0-9A-Fa-f]{6}|rgba?\(.+\))$/);
       }
     });
   });

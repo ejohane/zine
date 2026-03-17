@@ -164,7 +164,7 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
         {showMetaRow && (
           <View style={styles.metaRow}>
             {metaLine ? (
-              <Text style={styles.meta} tone="secondary">
+              <Text style={styles.meta} tone="subheader">
                 {metaLine}
               </Text>
             ) : null}

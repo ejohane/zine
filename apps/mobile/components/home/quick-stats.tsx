@@ -49,7 +49,7 @@ export function QuickStats({ colors, stats, isLoading = false }: QuickStatsProps
           <View style={[styles.statIcon, { backgroundColor: colors.background }]}>{stat.icon}</View>
           <View style={styles.statText}>
             <Text style={[styles.statValue, { color: colors.text }]}>{stat.value}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSubheader }]}>{stat.label}</Text>
           </View>
         </View>
       ))}

@@ -96,7 +96,8 @@ export function FilterChip({
     ? (selectedColor ?? colors.borderDefault)
     : colors.borderSubtle;
   const selectedForegroundColor = hasTintedSelection ? selectedColor : colors.textPrimary;
-  const iconColor = isSelected ? selectedForegroundColor : colors.textTertiary;
+  const unselectedForegroundColor = colors.textSubheader;
+  const iconColor = isSelected ? selectedForegroundColor : unselectedForegroundColor;
   const displayedCount = count && count > 0 ? (count > 99 ? '99+' : String(count)) : null;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
@@ -122,16 +123,22 @@ export function FilterChip({
       ) : null}
       <Text
         variant={size === 'small' ? 'labelSmallPlain' : 'labelMedium'}
-        tone={isSelected ? 'primary' : 'secondary'}
-        style={[textStyles, isSelected ? { color: selectedForegroundColor } : null]}
+        tone={isSelected ? 'primary' : 'subheader'}
+        style={[
+          textStyles,
+          { color: isSelected ? selectedForegroundColor : unselectedForegroundColor },
+        ]}
       >
         {label}
       </Text>
       {displayedCount ? (
         <Text
           variant="bodySmall"
-          tone={isSelected ? 'primary' : 'tertiary'}
-          style={[styles.count, isSelected ? { color: selectedForegroundColor } : null]}
+          tone={isSelected ? 'primary' : 'subheader'}
+          style={[
+            styles.count,
+            { color: isSelected ? selectedForegroundColor : unselectedForegroundColor },
+          ]}
         >
           {displayedCount}
         </Text>

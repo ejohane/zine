@@ -143,7 +143,7 @@ function YouTubeConnectContent() {
             <YouTubeIcon size={48} />
           </View>
           <Text style={[styles.title, { color: colors.text }]}>Connect YouTube</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
             Import your YouTube subscriptions to see new videos from your favorite creators
           </Text>
         </View>
@@ -151,7 +151,7 @@ function YouTubeConnectContent() {
         {/* What we CAN access */}
         <View style={[styles.permissionSection, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>What Zine can access</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSubheader }]}>
             Read-only access to:
           </Text>
 
@@ -204,8 +204,8 @@ function YouTubeConnectContent() {
 
         {/* Security note */}
         <View style={styles.securityNote}>
-          <ShieldIcon color={colors.textSecondary} />
-          <Text style={[styles.securityText, { color: colors.textSecondary }]}>
+          <ShieldIcon color={colors.textSubheader} />
+          <Text style={[styles.securityText, { color: colors.textSubheader }]}>
             You can disconnect at any time from Settings. Your data is encrypted and never shared.
           </Text>
         </View>

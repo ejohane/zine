@@ -43,6 +43,7 @@ export default function SearchTabScreen() {
         contentType: mapContentType(item.contentType) as ContentType,
         provider: mapProvider(item.provider) as Provider,
         duration: item.duration ?? null,
+        readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: item.bookmarkedAt ?? null,
         publishedAt: item.publishedAt ?? null,
         isFinished: item.isFinished,

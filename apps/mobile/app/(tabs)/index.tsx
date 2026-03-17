@@ -164,6 +164,7 @@ export default function HomeScreen() {
       contentType: mapContentType(item.contentType) as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.jumpBackIn]);
 
@@ -177,6 +178,7 @@ export default function HomeScreen() {
       contentType: mapContentType(item.contentType) as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.recentBookmarks]);
 
@@ -190,6 +192,7 @@ export default function HomeScreen() {
       contentType: mapContentType(item.contentType) as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [inboxData?.items]);
 
@@ -203,6 +206,7 @@ export default function HomeScreen() {
       contentType: 'podcast' as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.byContentType.podcasts]);
 
@@ -216,6 +220,7 @@ export default function HomeScreen() {
       contentType: 'video' as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.byContentType.videos]);
 
@@ -229,6 +234,7 @@ export default function HomeScreen() {
       contentType: 'article' as ContentType,
       provider: mapProvider(item.provider) as Provider,
       duration: item.duration ?? null,
+      readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.byContentType.articles]);
 
@@ -296,7 +302,7 @@ export default function HomeScreen() {
           <Animated.View style={styles.header}>
             <View style={styles.headerTopRow}>
               <View style={styles.headerTitleWrap}>
-                <Text style={[styles.greeting, { color: colors.textSecondary }]}>{greeting}</Text>
+                <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
                 <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
               </View>
               <Pressable

@@ -239,7 +239,7 @@ export function ChannelSelectionList({
       {/* Select All / Deselect All (multi-select mode only) */}
       {mode === 'multi' && channels.length > 0 && (
         <View style={styles.selectionActions}>
-          <Text style={styles.selectionCount} tone="secondary">
+          <Text style={styles.selectionCount} tone="subheader">
             {selectedCount} of {totalCount} selected
           </Text>
           <Pressable onPress={allSelected ? deselectAll : selectAll}>

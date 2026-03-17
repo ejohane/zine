@@ -113,7 +113,7 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
             Past Publications
           </Text>
         </View>
-        <Text style={styles.emptyText} tone="secondary">
+        <Text style={styles.emptyText} tone="subheader">
           No publications found yet
         </Text>
       </View>
@@ -126,7 +126,7 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
         <Text style={styles.title} tone="primary">
           Past Publications
         </Text>
-        <Text style={styles.count} tone="secondary">
+        <Text style={styles.count} tone="subheader">
           {items.length} item{items.length === 1 ? '' : 's'}
         </Text>
       </View>

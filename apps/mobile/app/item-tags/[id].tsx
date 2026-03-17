@@ -206,14 +206,14 @@ export default function ItemTagsScreen() {
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Tags</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+          <Text style={[styles.subtitle, { color: colors.textSubheader }]} numberOfLines={2}>
             {item.title}
           </Text>
         </View>
 
         {!isBookmarked && (
           <View style={[styles.warningBox, { backgroundColor: colors.backgroundSecondary }]}>
-            <Text style={[styles.warningText, { color: colors.textSecondary }]}>
+            <Text style={[styles.warningText, { color: colors.textSubheader }]}>
               Only bookmarked items can have tags.
             </Text>
           </View>
@@ -238,7 +238,7 @@ export default function ItemTagsScreen() {
         </View>
 
         <View style={styles.selectedSection}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Selected</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>Selected</Text>
           <View style={styles.tagWrap}>
             {selectedTags.length === 0 ? (
               <Text style={[styles.emptySelected, { color: colors.textTertiary }]}>
@@ -266,7 +266,7 @@ export default function ItemTagsScreen() {
         </View>
 
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>All tags</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>All tags</Text>
 
           {canCreateTag && isBookmarked && (
             <Pressable

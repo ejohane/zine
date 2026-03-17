@@ -15,7 +15,7 @@ export function ItemDetailDescription({ summary, label, colors }: ItemDetailDesc
     <>
       <Text style={[styles.descriptionLabel, { color: colors.text }]}>{label}</Text>
       <LinkedText
-        style={[styles.description, { color: colors.textSecondary }]}
+        style={[styles.description, { color: colors.textSubheader }]}
         linkColor={colors.primary}
       >
         {summary}

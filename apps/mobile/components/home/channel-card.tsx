@@ -95,7 +95,7 @@ export function ChannelCard({ channel, provider, isSelected, onToggle, colors }:
           {channel.name}
         </Text>
         <Text
-          style={[styles.channelDescription, { color: colors.textSecondary }]}
+          style={[styles.channelDescription, { color: colors.textSubheader }]}
           numberOfLines={1}
         >
           {provider === 'YOUTUBE' ? 'YouTube Channel' : 'Spotify Podcast'}

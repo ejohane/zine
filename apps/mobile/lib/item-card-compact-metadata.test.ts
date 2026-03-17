@@ -1,16 +1,17 @@
 /**
- * Tests for ItemCard compact row text treatment.
+ * Tests for ItemCard compact row metadata treatment.
  *
  * The ItemCard component uses react-native components that require native modules.
  * Full component rendering tests are done via manual testing in the iOS simulator.
  *
- * This test file validates the metadata and inline-length logic mirrored from the
- * compact row implementation without importing the actual component.
+ * This test file validates the metadata and length-label logic mirrored from the
+ * compact and stack row implementations without importing the actual component.
  */
 
 import { IconSizes } from '../constants/theme';
 import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
+import { formatDuration } from '../lib/format';
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -28,21 +29,8 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-function formatDuration(seconds: number | null | undefined): string | null {
-  if (!seconds) return null;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
 function getInlineLengthText(item: ItemCardData): string | null {
-  const durationText = formatDuration(item.duration);
+  const durationText = formatDuration(item.duration) || null;
 
   if (durationText) {
     return durationText;
@@ -56,7 +44,17 @@ function getInlineLengthText(item: ItemCardData): string | null {
 }
 
 function buildCompactSubtitleText(item: ItemCardData): string {
-  return item.creator;
+  const inlineLengthText = getInlineLengthText(item);
+
+  if (!inlineLengthText) {
+    return item.creator;
+  }
+
+  return `${item.creator} · ${inlineLengthText}`;
+}
+
+function getStackCreatorMaxWidth(item: ItemCardData): string | null {
+  return getInlineLengthText(item) ? '70%' : null;
 }
 
 function getSubtitleLeadingVisualMode(
@@ -67,14 +65,14 @@ function getSubtitleLeadingVisualMode(
 }
 
 describe('ItemCard compact row text treatment', () => {
-  describe('inline title length', () => {
+  describe('compact metadata length', () => {
     it('uses duration when available for video items', () => {
       const item = createMockItem({
         contentType: 'VIDEO' as ContentType,
         duration: 300,
       });
 
-      expect(getInlineLengthText(item)).toBe('5:00');
+      expect(getInlineLengthText(item)).toBe('5m');
     });
 
     it('uses duration when available for podcast items', () => {
@@ -83,7 +81,7 @@ describe('ItemCard compact row text treatment', () => {
         duration: 3600,
       });
 
-      expect(getInlineLengthText(item)).toBe('1:00:00');
+      expect(getInlineLengthText(item)).toBe('1h 0m');
     });
 
     it('uses reading time when no duration exists', () => {
@@ -103,7 +101,18 @@ describe('ItemCard compact row text treatment', () => {
         readingTimeMinutes: 10,
       });
 
-      expect(getInlineLengthText(item)).toBe('5:00');
+      expect(getInlineLengthText(item)).toBe('5m');
+    });
+
+    it('falls back to reading time when the shared formatter returns an empty duration string', () => {
+      const item = createMockItem({
+        contentType: 'ARTICLE' as ContentType,
+        duration: null,
+        readingTimeMinutes: 7,
+      });
+
+      expect(formatDuration(item.duration)).toBe('');
+      expect(getInlineLengthText(item)).toBe('7 min');
     });
 
     it('returns null when no applicable length exists', () => {
@@ -117,8 +126,12 @@ describe('ItemCard compact row text treatment', () => {
   });
 
   describe('subtitle text', () => {
-    it('uses creator name only', () => {
-      const item = createMockItem({ creator: 'John Doe' });
+    it('uses creator name only when no duration or reading time exists', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
+        duration: null,
+        readingTimeMinutes: null,
+      });
 
       expect(buildCompactSubtitleText(item)).toBe('John Doe');
     });
@@ -127,6 +140,8 @@ describe('ItemCard compact row text treatment', () => {
       const item = createMockItem({
         creator: 'John Doe',
         contentType: 'VIDEO' as ContentType,
+        duration: null,
+        readingTimeMinutes: null,
       });
 
       const subtitle = buildCompactSubtitleText(item);
@@ -134,15 +149,25 @@ describe('ItemCard compact row text treatment', () => {
       expect(subtitle).not.toContain('Video');
     });
 
-    it('does not append duration to subtitle text', () => {
+    it('appends duration to subtitle text', () => {
       const item = createMockItem({
         creator: 'John Doe',
         duration: 300,
       });
 
       const subtitle = buildCompactSubtitleText(item);
-      expect(subtitle).toBe('John Doe');
-      expect(subtitle).not.toContain('5:00');
+      expect(subtitle).toBe('John Doe · 5m');
+    });
+
+    it('appends reading time to subtitle text when duration is missing', () => {
+      const item = createMockItem({
+        creator: 'John Doe',
+        duration: null,
+        readingTimeMinutes: 5,
+      });
+
+      const subtitle = buildCompactSubtitleText(item);
+      expect(subtitle).toBe('John Doe · 5 min');
     });
   });
 
@@ -173,6 +198,25 @@ describe('ItemCard compact row text treatment', () => {
   });
 
   describe('layout constraints', () => {
+    it('stack cards do not reserve creator width when no length label exists', () => {
+      const item = createMockItem({
+        creator: 'Long Creator Name',
+        duration: null,
+        readingTimeMinutes: null,
+      });
+
+      expect(getStackCreatorMaxWidth(item)).toBeNull();
+    });
+
+    it('stack cards reserve creator width when a length label exists', () => {
+      const item = createMockItem({
+        creator: 'Long Creator Name',
+        duration: 300,
+      });
+
+      expect(getStackCreatorMaxWidth(item)).toBe('70%');
+    });
+
     it('title truncation is set to single line', () => {
       const TITLE_LINES = 1;
 
@@ -196,7 +240,7 @@ describe('ItemCard compact row text treatment', () => {
     });
 
     it('subtitle separator dot dimensions meet minimum visibility', () => {
-      const SEPARATOR_DOT_SIZE = 6;
+      const SEPARATOR_DOT_SIZE = 4;
       const MIN_VISIBLE_SIZE = 4;
 
       expect(SEPARATOR_DOT_SIZE).toBeGreaterThanOrEqual(MIN_VISIBLE_SIZE);

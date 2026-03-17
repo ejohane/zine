@@ -91,7 +91,7 @@ export function ContentCard({ item, colors, variant = 'default', onPress }: Cont
         <Text style={[styles.contentTitle, { color: colors.text }]} numberOfLines={2}>
           {item.title}
         </Text>
-        <Text style={[styles.contentSource, { color: colors.textSecondary }]} numberOfLines={1}>
+        <Text style={[styles.contentSource, { color: colors.textSubheader }]} numberOfLines={1}>
           {item.source}
         </Text>
       </View>

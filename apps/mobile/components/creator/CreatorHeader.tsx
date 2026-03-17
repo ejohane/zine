@@ -282,14 +282,14 @@ export function CreatorHeader({
 
       {/* Handle (e.g., @waveform) */}
       {handle ? (
-        <Text style={styles.handle} tone="secondary">
+        <Text style={styles.handle} tone="subheader">
           {handle}
         </Text>
       ) : null}
 
       {/* Description */}
       {creator.description && (
-        <Text style={styles.description} tone="secondary" numberOfLines={4}>
+        <Text style={styles.description} tone="subheader" numberOfLines={4}>
           {creator.description}
         </Text>
       )}
@@ -314,7 +314,7 @@ export function CreatorHeader({
                 <Text style={styles.subscriptionTitle} tone="primary" numberOfLines={1}>
                   {creator.name}
                 </Text>
-                <Text style={styles.subscriptionSubtitle} tone="secondary">
+                <Text style={styles.subscriptionSubtitle} tone="subheader">
                   {reason === 'NOT_CONNECTED'
                     ? `Connect ${providerName} to subscribe`
                     : reason === 'SOURCE_NOT_FOUND'
@@ -374,21 +374,21 @@ export function CreatorHeader({
               {isDiscovering && candidates.length === 0 ? (
                 <View style={styles.subscriptionLoadingRow}>
                   <ActivityIndicator size="small" color={colors.textSecondary} />
-                  <Text style={styles.subscriptionHint} tone="secondary">
+                  <Text style={styles.subscriptionHint} tone="subheader">
                     {`Checking ${sourceHost ?? 'this source'} for RSS feeds...`}
                   </Text>
                 </View>
               ) : null}
 
               {!isDiscovering && !isHttpUrl(discoveryUrl) ? (
-                <Text style={styles.subscriptionHint} tone="secondary">
+                <Text style={styles.subscriptionHint} tone="subheader">
                   Save content from this creator to discover an RSS feed.
                 </Text>
               ) : null}
 
               {!isDiscovering && discoveryError && candidates.length === 0 ? (
                 <>
-                  <Text style={styles.subscriptionHint} tone="secondary">
+                  <Text style={styles.subscriptionHint} tone="subheader">
                     {`Couldn't check ${sourceHost ?? 'this source'} for RSS feeds.`}
                   </Text>
                   <Button
@@ -407,7 +407,7 @@ export function CreatorHeader({
               !discoveryError &&
               isHttpUrl(discoveryUrl) &&
               candidates.length === 0 ? (
-                <Text style={styles.subscriptionHint} tone="secondary">
+                <Text style={styles.subscriptionHint} tone="subheader">
                   {`No RSS feed detected for ${sourceHost ?? 'this source'} yet.`}
                 </Text>
               ) : null}
@@ -431,7 +431,7 @@ export function CreatorHeader({
                       <Text style={styles.subscriptionTitle} tone="primary" numberOfLines={1}>
                         {candidateLabel}
                       </Text>
-                      <Text style={styles.subscriptionSubtitle} tone="secondary" numberOfLines={1}>
+                      <Text style={styles.subscriptionSubtitle} tone="subheader" numberOfLines={1}>
                         {candidate.feedUrl}
                       </Text>
                       {statusLabel ? (

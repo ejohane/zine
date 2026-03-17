@@ -80,7 +80,7 @@ export function QueryErrorBoundary({
         <Text variant="titleMedium" style={styles.title}>
           {isNetwork ? 'Connection Problem' : 'Something went wrong'}
         </Text>
-        <Text variant="bodyMedium" tone="secondary" style={styles.message}>
+        <Text variant="bodyMedium" tone="subheader" style={styles.message}>
           {errorMessage}
         </Text>
         <Button label={isNetwork ? 'Retry' : 'Try Again'} onPress={handleReset} />

@@ -72,6 +72,7 @@ export const Colors = {
   light: {
     // Core - Light theme (kept for compatibility, but app uses dark only)
     text: '#0F172A',
+    textSubheader: 'rgba(15, 23, 42, 0.72)',
     textSecondary: '#64748B',
     textTertiary: '#94A3B8',
     textPrimary: '#0F172A',
@@ -139,6 +140,7 @@ export const Colors = {
   dark: {
     // Core - Pure black background
     text: '#FFFFFF',
+    textSubheader: 'rgba(255, 255, 255, 0.82)',
     textSecondary: '#A0A0A0',
     textTertiary: '#6A6A6A',
     textPrimary: '#FFFFFF',

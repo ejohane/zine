@@ -113,7 +113,7 @@ function ProviderCard({
         </View>
         <View style={styles.providerInfo}>
           <Text style={[styles.providerName, { color: colors.text }]}>{config.name}</Text>
-          <Text style={[styles.providerDescription, { color: colors.textSecondary }]}>
+          <Text style={[styles.providerDescription, { color: colors.textSubheader }]}>
             {config.description}
           </Text>
         </View>
@@ -129,7 +129,7 @@ function ProviderCard({
                 <Text style={[styles.statusText, { color: colors.success }]}>Connected</Text>
               </View>
               {connection?.providerUserId && (
-                <Text style={[styles.userId, { color: colors.textSecondary }]}>
+                <Text style={[styles.userId, { color: colors.textSubheader }]}>
                   {connection.providerUserId}
                 </Text>
               )}
@@ -179,7 +179,7 @@ function LoadingState({ colors }: { colors: typeof Colors.light }) {
   return (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+      <Text style={[styles.loadingText, { color: colors.textSubheader }]}>
         Loading connections...
       </Text>
     </View>
@@ -300,7 +300,7 @@ export default function ConnectionsScreen() {
     >
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header Description */}
-        <Text style={[styles.headerDescription, { color: colors.textSecondary }]}>
+        <Text style={[styles.headerDescription, { color: colors.textSubheader }]}>
           Connect your accounts to import subscriptions and get updates in your inbox.
         </Text>
 

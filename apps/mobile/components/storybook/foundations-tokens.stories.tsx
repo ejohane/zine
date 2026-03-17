@@ -39,9 +39,14 @@ const colorSections: ColorSection[] = [
         note: 'Default reading copy and high-emphasis labels.',
       },
       {
+        name: 'textSubheader',
+        value: Colors.dark.textSubheader,
+        note: 'Readable subheaders, metadata rows, and supporting descriptions.',
+      },
+      {
         name: 'textSecondary',
         value: Colors.dark.textSecondary,
-        note: 'Metadata, supporting labels, and secondary actions.',
+        note: 'Secondary actions, disabled labels, and neutral control text.',
       },
       {
         name: 'textTertiary',

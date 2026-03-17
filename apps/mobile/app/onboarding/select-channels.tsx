@@ -189,7 +189,7 @@ export default function SelectChannelsScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             Your {providerDisplayName} subscriptions
           </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
             Select channels to follow in Zine
           </Text>
         </View>

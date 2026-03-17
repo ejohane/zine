@@ -142,7 +142,7 @@ export default function CreatorScreen() {
         <View style={styles.errorContainer}>
           <Text style={[styles.errorEmoji]}>:(</Text>
           <Text style={[styles.errorTitle, { color: colors.text }]}>Something went wrong</Text>
-          <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
+          <Text style={[styles.errorMessage, { color: colors.textSubheader }]}>
             {error.message}
           </Text>
           <Pressable
@@ -172,7 +172,7 @@ export default function CreatorScreen() {
         <View style={styles.errorContainer}>
           <Text style={[styles.errorEmoji]}>?</Text>
           <Text style={[styles.errorTitle, { color: colors.text }]}>Creator not found</Text>
-          <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
+          <Text style={[styles.errorMessage, { color: colors.textSubheader }]}>
             This creator may have been removed or does not exist.
           </Text>
         </View>

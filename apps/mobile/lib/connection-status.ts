@@ -59,7 +59,7 @@ export function getStatusDisplay(
       return {
         dotColor: colors.success,
         text: 'Connected',
-        textColor: colors.textSecondary,
+        textColor: colors.textSubheader,
         showCount: true,
       };
     case 'EXPIRED':

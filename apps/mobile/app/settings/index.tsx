@@ -64,7 +64,7 @@ function SettingsRow({
         <View style={icon ? undefined : styles.rowTextContainer}>
           <Text style={[styles.rowTitle, { color: titleColor ?? colors.text }]}>{title}</Text>
           {subtitle && (
-            <Text style={[styles.rowSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+            <Text style={[styles.rowSubtitle, { color: colors.textSubheader }]}>{subtitle}</Text>
           )}
         </View>
       </View>
@@ -171,7 +171,7 @@ function SettingsScreenContent({
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Connected Accounts Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>
           CONNECTED ACCOUNTS
         </Text>
 
@@ -232,7 +232,7 @@ function SettingsScreenContent({
         </View>
 
         {/* Subscriptions Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>SUBSCRIPTIONS</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>SUBSCRIPTIONS</Text>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsRow
@@ -246,7 +246,7 @@ function SettingsScreenContent({
         {/* Account Section */}
         {authEnabled && (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ACCOUNT</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>ACCOUNT</Text>
 
             <View style={[styles.section, { backgroundColor: colors.card }]}>
               <SettingsRow title="Sign Out" titleColor={colors.error} onPress={handleSignOut} />
@@ -255,7 +255,7 @@ function SettingsScreenContent({
         )}
 
         {/* About Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>ABOUT</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>ABOUT</Text>
 
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsRow title="Version" rightText={`${appVersion} (${buildNumber})`} />
@@ -267,7 +267,7 @@ function SettingsScreenContent({
 
         {isDeveloperDiagnosticsEnabled && (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>DEVELOPER</Text>
+            <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>DEVELOPER</Text>
 
             <View style={[styles.section, { backgroundColor: colors.card }]}>
               <SettingsRow

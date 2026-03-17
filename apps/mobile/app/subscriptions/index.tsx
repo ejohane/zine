@@ -118,7 +118,7 @@ function ProviderCard({
       ? {
           dotColor: colors.primary,
           text: 'Feed source',
-          textColor: colors.textSecondary,
+          textColor: colors.textSubheader,
           showCount: true,
         }
       : getStatusDisplay(connectionStatus, colors);
