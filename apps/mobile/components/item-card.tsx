@@ -89,11 +89,10 @@ export function ItemCard({
   const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
   const mediaTransition = motion.duration.normal;
-  const thumbnailImageUrl = normalizeItemCardImageUrl(item.thumbnailUrl);
   const creatorImageUrl = normalizeItemCardImageUrl(item.creatorImageUrl);
   const mediaImageCandidates = getItemCardImageCandidates({
-    thumbnailUrl: thumbnailImageUrl,
-    creatorImageUrl,
+    thumbnailUrl: item.thumbnailUrl,
+    creatorImageUrl: item.creatorImageUrl,
   });
   const [mediaImageCandidateIndex, setMediaImageCandidateIndex] = useState(0);
   const [subtitleAvatarFailed, setSubtitleAvatarFailed] = useState(false);
@@ -106,14 +105,20 @@ export function ItemCard({
 
   useEffect(() => {
     setMediaImageCandidateIndex(0);
-  }, [item.id, thumbnailImageUrl, creatorImageUrl]);
+  }, [item.id, item.thumbnailUrl, creatorImageUrl]);
 
   useEffect(() => {
     setSubtitleAvatarFailed(false);
   }, [item.id, creatorImageUrl]);
 
   const handleMediaImageError = () => {
-    setMediaImageCandidateIndex((currentIndex) => currentIndex + 1);
+    if (mediaImageUrl === creatorImageUrl) {
+      setSubtitleAvatarFailed(true);
+    }
+
+    setMediaImageCandidateIndex((currentIndex) =>
+      Math.min(currentIndex + 1, mediaImageCandidates.length)
+    );
   };
 
   const renderSubtitleLeadingVisual = () => {

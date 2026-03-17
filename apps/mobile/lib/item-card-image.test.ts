@@ -15,9 +15,16 @@ describe('item card image selection', () => {
       );
     });
 
+    it('trims surrounding whitespace before normalizing', () => {
+      expect(normalizeItemCardImageUrl('  https://example.com/image.jpg  ')).toBe(
+        'https://example.com/image.jpg'
+      );
+    });
+
     it('returns null for empty values', () => {
       expect(normalizeItemCardImageUrl(null)).toBeNull();
       expect(normalizeItemCardImageUrl(undefined)).toBeNull();
+      expect(normalizeItemCardImageUrl('   ')).toBeNull();
     });
   });
 
@@ -56,6 +63,15 @@ describe('item card image selection', () => {
           creatorImageUrl: 'https://example.com/shared.jpg',
         })
       ).toEqual(['https://example.com/shared.jpg']);
+    });
+
+    it('ignores blank image urls after trimming', () => {
+      expect(
+        getItemCardImageCandidates({
+          thumbnailUrl: '   ',
+          creatorImageUrl: ' https://example.com/creator.jpg ',
+        })
+      ).toEqual(['https://example.com/creator.jpg']);
     });
   });
 });

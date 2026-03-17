@@ -6,17 +6,28 @@ export interface ItemCardImageSources {
 }
 
 export function normalizeItemCardImageUrl(url: string | null | undefined): string | null {
-  return upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(url ?? null)) ?? null;
+  const trimmedUrl = url?.trim();
+
+  if (!trimmedUrl) {
+    return null;
+  }
+
+  return upgradeSpotifyImageUrl(upgradeYouTubeImageUrl(trimmedUrl)) ?? null;
 }
 
 export function getItemCardImageCandidates({
   thumbnailUrl,
   creatorImageUrl,
 }: ItemCardImageSources): string[] {
-  const candidates = [thumbnailUrl ?? null, creatorImageUrl ?? null];
+  const imageCandidates = new Set<string>();
 
-  return candidates.filter(
-    (url, index): url is string =>
-      typeof url === 'string' && url.length > 0 && candidates.indexOf(url) === index
-  );
+  for (const url of [thumbnailUrl, creatorImageUrl]) {
+    const normalizedUrl = normalizeItemCardImageUrl(url);
+
+    if (normalizedUrl) {
+      imageCandidates.add(normalizedUrl);
+    }
+  }
+
+  return [...imageCandidates];
 }

@@ -31,6 +31,16 @@ export const itemCardFixtures = {
     provider: 'SUBSTACK',
     readingTimeMinutes: 11,
   },
+  creatorFallback: {
+    id: 'creator-fallback-1',
+    title: 'Missing cover art should fall back to the creator image',
+    creator: 'Fallback Media Weekly',
+    creatorImageUrl: 'https://picsum.photos/seed/zine-creator-fallback/640/640',
+    thumbnailUrl: null,
+    contentType: 'PODCAST',
+    provider: 'SPOTIFY',
+    duration: 1560,
+  },
   stress: {
     id: 'stress-1',
     title:

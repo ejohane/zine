@@ -88,6 +88,31 @@ export const Cover: Story = {
   },
 };
 
+export const CreatorImageFallback: Story = {
+  render: function Render() {
+    const { width } = useWindowDimensions();
+    const featuredGridItemWidth = getFeaturedGridItemWidth(width - Spacing.md * 2, Spacing.md);
+
+    return (
+      <ScrollView contentContainerStyle={styles.stack} showsVerticalScrollIndicator={false}>
+        <ItemCard item={itemCardFixtures.creatorFallback} shape="row" onPress={() => {}} />
+        <View style={styles.featuredGrid}>
+          <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
+            <ItemCard
+              item={itemCardFixtures.creatorFallback}
+              shape="row"
+              rowStyle="featured"
+              onPress={() => {}}
+            />
+          </View>
+        </View>
+        <ItemCard item={itemCardFixtures.creatorFallback} shape="stack" onPress={() => {}} />
+        <ItemCard item={itemCardFixtures.creatorFallback} shape="cover" onPress={() => {}} />
+      </ScrollView>
+    );
+  },
+};
+
 export const ContentStress: Story = {
   render: function Render() {
     const { width } = useWindowDimensions();
