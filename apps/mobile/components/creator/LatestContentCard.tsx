@@ -119,7 +119,7 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
       destination: 'internal',
     });
 
-    router.push(`/item/${userItemId}` as any);
+    router.push({ pathname: '/item/[id]', params: { id: String(userItemId) } });
   };
 
   // Build metadata line (date · duration)
