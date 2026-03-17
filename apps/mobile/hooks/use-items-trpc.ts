@@ -33,6 +33,7 @@ type TrpcUtils = ReturnType<typeof trpc.useUtils>;
 
 /** Inbox/Library query data type */
 type ListQueryData = ReturnType<TrpcUtils['items']['inbox']['getData']>;
+type InfiniteListQueryData = ReturnType<TrpcUtils['items']['inbox']['getInfiniteData']>;
 
 /** Single item query data type */
 type ItemQueryData = ReturnType<TrpcUtils['items']['get']['getData']>;
@@ -44,7 +45,27 @@ type ListItem = NonNullable<ListQueryData>['items'][number];
 type OptimisticContext = {
   previousInbox?: ListQueryData;
   previousLibrary?: ListQueryData;
+  previousInfiniteInbox?: InfiniteListQueryData;
+  previousInfiniteLibrary?: InfiniteListQueryData;
   previousItem?: ItemQueryData;
+};
+
+type InboxItemsOptions = {
+  filter?: {
+    provider?: Provider;
+    contentType?: ContentType;
+  };
+  limit?: number;
+};
+
+type LibraryItemsOptions = {
+  filter?: {
+    provider?: Provider;
+    contentType?: ContentType;
+    isFinished?: boolean;
+  };
+  search?: string;
+  limit?: number;
 };
 
 // ============================================================================
@@ -91,6 +112,32 @@ function createOptimisticConfig<TInput extends { id: string }>(
     ) => NonNullable<ItemQueryData>;
   }
 ) {
+  const updateListData = (
+    old: ListQueryData,
+    updateItems: (items: ListItem[]) => ListItem[]
+  ): ListQueryData => {
+    if (!old) return old;
+    return {
+      ...old,
+      items: updateItems(old.items),
+    };
+  };
+
+  const updateInfiniteListData = (
+    old: InfiniteListQueryData | undefined,
+    updateItems: (items: ListItem[]) => ListItem[]
+  ) => {
+    if (!old) return old;
+
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: updateItems(page.items),
+      })),
+    };
+  };
+
   return {
     onMutate: async (input: TInput): Promise<OptimisticContext> => {
       // Cancel outgoing queries to prevent race conditions
@@ -105,23 +152,23 @@ function createOptimisticConfig<TInput extends { id: string }>(
 
       if (options.updateInbox) {
         context.previousInbox = utils.items.inbox.getData();
+        context.previousInfiniteInbox = utils.items.inbox.getInfiniteData();
         utils.items.inbox.setData(undefined, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: options.updateInbox!(old.items, input),
-          };
+          return updateListData(old, (items) => options.updateInbox!(items, input));
+        });
+        utils.items.inbox.setInfiniteData(undefined, (old) => {
+          return updateInfiniteListData(old, (items) => options.updateInbox!(items, input));
         });
       }
 
       if (options.updateLibrary) {
         context.previousLibrary = utils.items.library.getData();
+        context.previousInfiniteLibrary = utils.items.library.getInfiniteData();
         utils.items.library.setData(undefined, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: options.updateLibrary!(old.items, input),
-          };
+          return updateListData(old, (items) => options.updateLibrary!(items, input));
+        });
+        utils.items.library.setInfiniteData(undefined, (old) => {
+          return updateInfiniteListData(old, (items) => options.updateLibrary!(items, input));
         });
       }
 
@@ -140,8 +187,14 @@ function createOptimisticConfig<TInput extends { id: string }>(
       if (context?.previousInbox) {
         utils.items.inbox.setData(undefined, context.previousInbox);
       }
+      if (context?.previousInfiniteInbox) {
+        utils.items.inbox.setInfiniteData(undefined, context.previousInfiniteInbox);
+      }
       if (context?.previousLibrary) {
         utils.items.library.setData(undefined, context.previousLibrary);
+      }
+      if (context?.previousInfiniteLibrary) {
+        utils.items.library.setInfiniteData(undefined, context.previousInfiniteLibrary);
       }
       if (context?.previousItem) {
         utils.items.get.setData({ id: vars.id }, context.previousItem);
@@ -217,6 +270,49 @@ export function formatDuration(seconds?: number | null): string | undefined {
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+function buildInboxItemsInput(options?: InboxItemsOptions) {
+  const filter = options?.filter
+    ? {
+        ...(options.filter.provider !== undefined ? { provider: options.filter.provider } : {}),
+        ...(options.filter.contentType !== undefined
+          ? { contentType: options.filter.contentType }
+          : {}),
+      }
+    : undefined;
+
+  const input = options
+    ? {
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
+        ...(filter && Object.keys(filter).length > 0 ? { filter } : {}),
+      }
+    : undefined;
+
+  return input;
+}
+
+function buildLibraryItemsInput(options?: LibraryItemsOptions) {
+  const filter = options?.filter
+    ? {
+        ...(options.filter.provider !== undefined ? { provider: options.filter.provider } : {}),
+        ...(options.filter.contentType !== undefined
+          ? { contentType: options.filter.contentType }
+          : {}),
+        ...(options.filter.isFinished ? { isFinished: true } : {}),
+      }
+    : undefined;
+
+  const search = options?.search?.trim();
+  const input = options
+    ? {
+        ...(options.limit !== undefined ? { limit: options.limit } : {}),
+        ...(filter && Object.keys(filter).length > 0 ? { filter } : {}),
+        ...(search ? { search } : {}),
+      }
+    : undefined;
+
+  return input;
+}
+
 // ============================================================================
 // Query Hooks
 // ============================================================================
@@ -242,14 +338,15 @@ export function formatDuration(seconds?: number | null): string | undefined {
  *   ));
  * }
  */
-export function useInboxItems(options?: {
-  filter?: {
-    provider?: Provider;
-    contentType?: ContentType;
-  };
-  limit?: number;
-}) {
-  return trpc.items.inbox.useQuery(options, {
+export function useInboxItems(options?: InboxItemsOptions) {
+  return trpc.items.inbox.useQuery(buildInboxItemsInput(options), {
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useInfiniteInboxItems(options?: InboxItemsOptions) {
+  return trpc.items.inbox.useInfiniteQuery(buildInboxItemsInput(options) ?? {}, {
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
   });
 }
@@ -291,35 +388,15 @@ export function useInboxItems(options?: {
  *   // ...
  * }
  */
-export function useLibraryItems(options?: {
-  filter?: {
-    provider?: Provider;
-    contentType?: ContentType;
-    isFinished?: boolean;
-  };
-  search?: string;
-  limit?: number;
-}) {
-  const filter = options?.filter
-    ? {
-        ...(options.filter.provider !== undefined ? { provider: options.filter.provider } : {}),
-        ...(options.filter.contentType !== undefined
-          ? { contentType: options.filter.contentType }
-          : {}),
-        ...(options.filter.isFinished ? { isFinished: true } : {}),
-      }
-    : undefined;
+export function useLibraryItems(options?: LibraryItemsOptions) {
+  return trpc.items.library.useQuery(buildLibraryItemsInput(options), {
+    placeholderData: keepPreviousData,
+  });
+}
 
-  const search = options?.search?.trim();
-  const input = options
-    ? {
-        ...(options.limit !== undefined ? { limit: options.limit } : {}),
-        ...(filter && Object.keys(filter).length > 0 ? { filter } : {}),
-        ...(search ? { search } : {}),
-      }
-    : undefined;
-
-  return trpc.items.library.useQuery(input, {
+export function useInfiniteLibraryItems(options?: LibraryItemsOptions) {
+  return trpc.items.library.useInfiniteQuery(buildLibraryItemsInput(options) ?? {}, {
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
   });
 }
