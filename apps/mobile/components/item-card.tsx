@@ -203,7 +203,12 @@ export function ItemCard({
             <View style={styles.stackMeta}>
               <View style={styles.stackMetaIcon}>{renderSubtitleLeadingVisual()}</View>
               <View style={styles.stackMetaTextGroup}>
-                <View style={styles.stackMetaCreatorContainer}>
+                <View
+                  style={[
+                    styles.stackMetaCreatorContainer,
+                    inlineLengthText ? styles.stackMetaCreatorContainerWithLength : null,
+                  ]}
+                >
                   <Text
                     style={[
                       styles.stackSource,
@@ -498,8 +503,10 @@ const styles = StyleSheet.create({
   },
   stackMetaCreatorContainer: {
     flexShrink: 1,
-    maxWidth: '70%',
     minWidth: 0,
+  },
+  stackMetaCreatorContainerWithLength: {
+    maxWidth: '70%',
   },
   stackMetaCreator: {
     minWidth: 0,

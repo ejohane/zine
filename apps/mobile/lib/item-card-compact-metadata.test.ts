@@ -5,12 +5,13 @@
  * Full component rendering tests are done via manual testing in the iOS simulator.
  *
  * This test file validates the metadata and length-label logic mirrored from the
- * compact row implementation without importing the actual component.
+ * compact and stack row implementations without importing the actual component.
  */
 
 import { IconSizes } from '../constants/theme';
 import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
+import { formatDuration } from '../lib/format';
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -28,21 +29,8 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-function formatDuration(seconds: number | null | undefined): string | null {
-  if (!seconds) return null;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
 function getInlineLengthText(item: ItemCardData): string | null {
-  const durationText = formatDuration(item.duration);
+  const durationText = formatDuration(item.duration) || null;
 
   if (durationText) {
     return durationText;
@@ -65,6 +53,10 @@ function buildCompactSubtitleText(item: ItemCardData): string {
   return `${item.creator} · ${inlineLengthText}`;
 }
 
+function getStackCreatorMaxWidth(item: ItemCardData): string | null {
+  return getInlineLengthText(item) ? '70%' : null;
+}
+
 function getSubtitleLeadingVisualMode(
   item: ItemCardData,
   avatarLoadFailed = false
@@ -80,7 +72,7 @@ describe('ItemCard compact row text treatment', () => {
         duration: 300,
       });
 
-      expect(getInlineLengthText(item)).toBe('5:00');
+      expect(getInlineLengthText(item)).toBe('5m');
     });
 
     it('uses duration when available for podcast items', () => {
@@ -89,7 +81,7 @@ describe('ItemCard compact row text treatment', () => {
         duration: 3600,
       });
 
-      expect(getInlineLengthText(item)).toBe('1:00:00');
+      expect(getInlineLengthText(item)).toBe('1h 0m');
     });
 
     it('uses reading time when no duration exists', () => {
@@ -109,7 +101,18 @@ describe('ItemCard compact row text treatment', () => {
         readingTimeMinutes: 10,
       });
 
-      expect(getInlineLengthText(item)).toBe('5:00');
+      expect(getInlineLengthText(item)).toBe('5m');
+    });
+
+    it('falls back to reading time when the shared formatter returns an empty duration string', () => {
+      const item = createMockItem({
+        contentType: 'ARTICLE' as ContentType,
+        duration: null,
+        readingTimeMinutes: 7,
+      });
+
+      expect(formatDuration(item.duration)).toBe('');
+      expect(getInlineLengthText(item)).toBe('7 min');
     });
 
     it('returns null when no applicable length exists', () => {
@@ -153,7 +156,7 @@ describe('ItemCard compact row text treatment', () => {
       });
 
       const subtitle = buildCompactSubtitleText(item);
-      expect(subtitle).toBe('John Doe · 5:00');
+      expect(subtitle).toBe('John Doe · 5m');
     });
 
     it('appends reading time to subtitle text when duration is missing', () => {
@@ -195,6 +198,25 @@ describe('ItemCard compact row text treatment', () => {
   });
 
   describe('layout constraints', () => {
+    it('stack cards do not reserve creator width when no length label exists', () => {
+      const item = createMockItem({
+        creator: 'Long Creator Name',
+        duration: null,
+        readingTimeMinutes: null,
+      });
+
+      expect(getStackCreatorMaxWidth(item)).toBeNull();
+    });
+
+    it('stack cards reserve creator width when a length label exists', () => {
+      const item = createMockItem({
+        creator: 'Long Creator Name',
+        duration: 300,
+      });
+
+      expect(getStackCreatorMaxWidth(item)).toBe('70%');
+    });
+
     it('title truncation is set to single line', () => {
       const TITLE_LINES = 1;
 
