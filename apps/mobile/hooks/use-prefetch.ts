@@ -31,8 +31,13 @@ function prefetchListQueries(
 ) {
   const listPrefetchers: Record<ListQueryKey, () => Promise<unknown>> = {
     home: () => utils.items.home.prefetch(),
-    inbox: () => utils.items.inbox.prefetch(),
-    library: () => utils.items.library.prefetch(),
+    inbox: () =>
+      Promise.all([utils.items.inbox.prefetch(), utils.items.inbox.prefetchInfinite(undefined)]),
+    library: () =>
+      Promise.all([
+        utils.items.library.prefetch(),
+        utils.items.library.prefetchInfinite(undefined),
+      ]),
   };
 
   targets.forEach((target) => {

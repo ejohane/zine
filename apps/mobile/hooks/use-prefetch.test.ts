@@ -11,7 +11,9 @@ import type { AppStateStatus } from 'react-native';
 
 const mockPrefetchHome = jest.fn(() => Promise.resolve());
 const mockPrefetchInbox = jest.fn(() => Promise.resolve());
+const mockPrefetchInboxInfinite = jest.fn(() => Promise.resolve());
 const mockPrefetchLibrary = jest.fn(() => Promise.resolve());
+const mockPrefetchLibraryInfinite = jest.fn(() => Promise.resolve());
 const mockPrefetchSubscriptions = jest.fn(() => Promise.resolve());
 const mockPrefetchConnections = jest.fn(() => Promise.resolve());
 const mockPrefetchItem = jest.fn(() => Promise.resolve());
@@ -19,8 +21,8 @@ const mockPrefetchItem = jest.fn(() => Promise.resolve());
 const mockUtils = {
   items: {
     home: { prefetch: mockPrefetchHome },
-    inbox: { prefetch: mockPrefetchInbox },
-    library: { prefetch: mockPrefetchLibrary },
+    inbox: { prefetch: mockPrefetchInbox, prefetchInfinite: mockPrefetchInboxInfinite },
+    library: { prefetch: mockPrefetchLibrary, prefetchInfinite: mockPrefetchLibraryInfinite },
     get: { prefetch: mockPrefetchItem },
   },
   subscriptions: {
@@ -91,7 +93,9 @@ describe('prefetch strategy hooks', () => {
 
     expect(mockPrefetchHome).toHaveBeenCalledTimes(1);
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchSubscriptions).toHaveBeenCalledTimes(1);
     expect(mockPrefetchConnections).toHaveBeenCalledTimes(1);
   });
@@ -116,7 +120,9 @@ describe('prefetch strategy hooks', () => {
 
     expect(mockPrefetchHome).toHaveBeenCalledTimes(1);
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchSubscriptions).toHaveBeenCalledTimes(1);
     expect(mockPrefetchConnections).toHaveBeenCalledTimes(1);
   });
@@ -125,7 +131,9 @@ describe('prefetch strategy hooks', () => {
     renderHook(() => useTabPrefetch('home'));
 
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchHome).not.toHaveBeenCalled();
   });
 

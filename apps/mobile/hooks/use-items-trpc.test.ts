@@ -13,7 +13,9 @@ import { ContentType, Provider, UserItemState } from '@zine/shared';
 // ============================================================================
 
 const mockInboxUseQuery = jest.fn();
+const mockInboxUseInfiniteQuery = jest.fn();
 const mockLibraryUseQuery = jest.fn();
+const mockLibraryUseInfiniteQuery = jest.fn();
 const mockHomeUseQuery = jest.fn();
 const mockToggleFinishedUseMutation = jest.fn();
 const mockUseUtils = jest.fn();
@@ -23,9 +25,11 @@ jest.mock('../lib/trpc', () => ({
     items: {
       inbox: {
         useQuery: mockInboxUseQuery,
+        useInfiniteQuery: mockInboxUseInfiniteQuery,
       },
       library: {
         useQuery: mockLibraryUseQuery,
+        useInfiniteQuery: mockLibraryUseInfiniteQuery,
       },
       home: {
         useQuery: mockHomeUseQuery,
@@ -42,7 +46,14 @@ jest.mock('../lib/trpc', () => ({
 // Test Setup
 // ============================================================================
 
-import { useInboxItems, useLibraryItems, useHomeData, useToggleFinished } from './use-items-trpc';
+import {
+  useInboxItems,
+  useInfiniteInboxItems,
+  useLibraryItems,
+  useInfiniteLibraryItems,
+  useHomeData,
+  useToggleFinished,
+} from './use-items-trpc';
 
 function createMockItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -227,10 +238,26 @@ beforeEach(() => {
     isLoading: false,
     error: null,
   });
+  mockInboxUseInfiniteQuery.mockReturnValue({
+    data: null,
+    isLoading: false,
+    error: null,
+    isFetchingNextPage: false,
+    hasNextPage: false,
+    fetchNextPage: jest.fn(),
+  });
   mockLibraryUseQuery.mockReturnValue({
     data: null,
     isLoading: false,
     error: null,
+  });
+  mockLibraryUseInfiniteQuery.mockReturnValue({
+    data: null,
+    isLoading: false,
+    error: null,
+    isFetchingNextPage: false,
+    hasNextPage: false,
+    fetchNextPage: jest.fn(),
   });
   mockHomeUseQuery.mockReturnValue({
     data: null,
@@ -290,6 +317,40 @@ describe('useItems list queries', () => {
       undefined,
       expect.objectContaining({ placeholderData: expect.any(Function) })
     );
+  });
+
+  it('configures infinite inbox queries with cursor pagination', () => {
+    renderHook(() => useInfiniteInboxItems({ limit: 30 }));
+
+    expect(mockInboxUseInfiniteQuery).toHaveBeenCalledWith(
+      { limit: 30 },
+      expect.objectContaining({
+        getNextPageParam: expect.any(Function),
+        placeholderData: expect.any(Function),
+      })
+    );
+
+    const options = mockInboxUseInfiniteQuery.mock.calls[0][1];
+    expect(options.getNextPageParam({ nextCursor: 'cursor-123', items: [] })).toBe('cursor-123');
+  });
+
+  it('configures infinite library queries with trimmed search input', () => {
+    renderHook(() =>
+      useInfiniteLibraryItems({
+        search: '  all in  ',
+      })
+    );
+
+    expect(mockLibraryUseInfiniteQuery).toHaveBeenCalledWith(
+      { search: 'all in' },
+      expect.objectContaining({
+        getNextPageParam: expect.any(Function),
+        placeholderData: expect.any(Function),
+      })
+    );
+
+    const options = mockLibraryUseInfiniteQuery.mock.calls[0][1];
+    expect(options.getNextPageParam({ nextCursor: 'cursor-abc', items: [] })).toBe('cursor-abc');
   });
 });
 

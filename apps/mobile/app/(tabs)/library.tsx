@@ -3,7 +3,17 @@ import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType }
 import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput } from 'react-native';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  FlatList,
+  type ListRenderItemInfo,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -28,7 +38,7 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
-import { useLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
 import type { ContentType as ApiContentType, UIContentType, Provider } from '@/lib/content-utils';
 
 // =============================================================================
@@ -58,6 +68,8 @@ function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: str
 // =============================================================================
 // Filter Options
 // =============================================================================
+
+const LIBRARY_PAGE_SIZE = 20;
 
 const filterOptions: {
   id: string;
@@ -114,7 +126,7 @@ const filterOptions: {
 export default function LibraryScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const listScrollRef = useRef<ScrollView>(null);
+  const listScrollRef = useRef<FlatList<ItemCardData>>(null);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -178,32 +190,59 @@ export default function LibraryScreen() {
   );
 
   // Fetch library items from tRPC with memoized filter
-  const { data, isLoading, error } = useLibraryItems({
-    filter,
-    search: debouncedSearchQuery || undefined,
-  });
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteLibraryItems({
+      filter,
+      search: debouncedSearchQuery || undefined,
+      limit: LIBRARY_PAGE_SIZE,
+    });
 
   // Transform API response to ItemCardData format
-  const libraryItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
-    id: item.id,
-    title: item.title,
-    creator: item.creator,
-    creatorImageUrl: item.creatorImageUrl ?? null,
-    thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType) as UIContentType,
-    provider: mapProvider(item.provider) as Provider,
-    duration: item.duration ?? null,
-    readingTimeMinutes: item.readingTimeMinutes ?? null,
-    bookmarkedAt: item.bookmarkedAt ?? null,
-    publishedAt: item.publishedAt ?? null,
-    isFinished: item.isFinished,
-  }));
+  const libraryItems: ItemCardData[] = useMemo(
+    () =>
+      (data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        creator: item.creator,
+        creatorImageUrl: item.creatorImageUrl ?? null,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        contentType: mapContentType(item.contentType) as UIContentType,
+        provider: mapProvider(item.provider) as Provider,
+        duration: item.duration ?? null,
+        readingTimeMinutes: item.readingTimeMinutes ?? null,
+        bookmarkedAt: item.bookmarkedAt ?? null,
+        publishedAt: item.publishedAt ?? null,
+        isFinished: item.isFinished,
+      })),
+    [data?.pages]
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
+      <ItemCard item={item} shape="row" index={index} />
+    ),
+    []
+  );
+
+  const libraryCountLabel = isLoading
+    ? 'Loading...'
+    : hasNextPage
+      ? `${libraryItems.length}+ saved items`
+      : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
 
   useEffect(() => {
     return navigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
-      listScrollRef.current?.scrollTo({ y: 0, animated: true });
+      listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
   }, [navigation]);
 
@@ -224,9 +263,7 @@ export default function LibraryScreen() {
             </Pressable>
           </View>
           <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
-            {isLoading
-              ? 'Loading...'
-              : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`}
+            {libraryCountLabel}
           </Text>
         </View>
 
@@ -297,17 +334,24 @@ export default function LibraryScreen() {
             }
           />
         ) : (
-          <ScrollView
+          <FlatList
             ref={listScrollRef}
+            data={libraryItems}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
             style={styles.listContainer}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
-          >
-            {libraryItems.map((item, index) => (
-              <ItemCard key={item.id} item={item} shape="row" index={index} />
-            ))}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.6}
+            ListFooterComponent={
+              <View style={styles.listFooter}>
+                {isFetchingNextPage ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : null}
+              </View>
+            }
+          />
         )}
       </SafeAreaView>
     </Surface>
@@ -384,9 +428,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: Spacing['3xl'],
   },
-
-  // Bottom spacer
-  bottomSpacer: {
-    height: 40,
+  listFooter: {
+    minHeight: Spacing['3xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
