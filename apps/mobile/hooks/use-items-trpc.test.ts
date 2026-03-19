@@ -17,6 +17,7 @@ const mockInboxUseInfiniteQuery = jest.fn();
 const mockLibraryUseQuery = jest.fn();
 const mockLibraryUseInfiniteQuery = jest.fn();
 const mockHomeUseQuery = jest.fn();
+const mockBookmarkUseMutation = jest.fn();
 const mockArchiveUseMutation = jest.fn();
 const mockToggleFinishedUseMutation = jest.fn();
 const mockUseUtils = jest.fn();
@@ -34,6 +35,9 @@ jest.mock('../lib/trpc', () => ({
       },
       home: {
         useQuery: mockHomeUseQuery,
+      },
+      bookmark: {
+        useMutation: (...args: unknown[]) => mockBookmarkUseMutation(...args),
       },
       archive: {
         useMutation: (...args: unknown[]) => mockArchiveUseMutation(...args),
@@ -56,6 +60,7 @@ import {
   useLibraryItems,
   useInfiniteLibraryItems,
   useHomeData,
+  useBookmarkItem,
   useArchiveItem,
   useToggleFinished,
 } from './use-items-trpc';
@@ -338,6 +343,13 @@ beforeEach(() => {
     isPending: false,
   }));
 
+  mockBookmarkUseMutation.mockImplementation((config: unknown) => ({
+    ...(config as Record<string, unknown>),
+    mutate: jest.fn(),
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }));
+
   mockToggleFinishedUseMutation.mockImplementation((config: unknown) => ({
     ...(config as Record<string, unknown>),
     mutate: jest.fn(),
@@ -475,6 +487,98 @@ describe('useArchiveItem', () => {
     });
 
     expect(harness.spies.mockGetInvalidate).toHaveBeenCalledWith({ id: item.id });
+  });
+
+  it('applies optimistic archive state immediately without waiting for query cancellation', async () => {
+    const item = createMockItem({ id: 'archive-immediate-item', state: UserItemState.INBOX });
+    const harness = createToggleUtils({
+      inbox: {
+        items: [item],
+        nextCursor: null,
+      },
+      defaultLibrary: {
+        items: [item],
+        nextCursor: null,
+      },
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+
+    const neverResolves = new Promise<void>(() => {});
+    (harness.utils.items.library.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.inbox.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.home.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.get.cancel as jest.Mock).mockReturnValue(neverResolves);
+
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getArchiveHandlers();
+
+    const mutatePromise = mutation.onMutate({ id: item.id });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(harness.readInbox()?.items).toHaveLength(0);
+    expect(harness.readLibrary()?.items).toHaveLength(0);
+    expect(harness.readItem(item.id)?.state).toBe(UserItemState.ARCHIVED);
+
+    const pendingSentinel = Symbol('pending');
+    await expect(Promise.race([mutatePromise, Promise.resolve(pendingSentinel)])).resolves.not.toBe(
+      pendingSentinel
+    );
+  });
+});
+
+describe('useBookmarkItem', () => {
+  type BookmarkHandlers = {
+    onMutate: ({ id }: { id: string }) => Promise<unknown>;
+  };
+
+  function getBookmarkHandlers() {
+    const { result } = renderHook(() => useBookmarkItem());
+    return result.current as unknown as BookmarkHandlers;
+  }
+
+  it('applies optimistic bookmark state immediately without waiting for query cancellation', async () => {
+    const item = createMockItem({
+      id: 'bookmark-immediate-item',
+      state: UserItemState.INBOX,
+      bookmarkedAt: null,
+    });
+    const harness = createToggleUtils({
+      inbox: {
+        items: [item],
+        nextCursor: null,
+      },
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+
+    const neverResolves = new Promise<void>(() => {});
+    (harness.utils.items.inbox.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.home.cancel as jest.Mock).mockReturnValue(neverResolves);
+    (harness.utils.items.get.cancel as jest.Mock).mockReturnValue(neverResolves);
+
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getBookmarkHandlers();
+
+    const mutatePromise = mutation.onMutate({ id: item.id });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(harness.readInbox()?.items).toHaveLength(0);
+    expect(harness.readItem(item.id)?.state).toBe(UserItemState.BOOKMARKED);
+    expect(harness.readItem(item.id)?.bookmarkedAt).toEqual(expect.any(String));
+
+    const pendingSentinel = Symbol('pending');
+    await expect(Promise.race([mutatePromise, Promise.resolve(pendingSentinel)])).resolves.not.toBe(
+      pendingSentinel
+    );
   });
 });
 
