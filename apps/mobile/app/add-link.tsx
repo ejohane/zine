@@ -27,12 +27,13 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useHeaderHeight } from '@react-navigation/elements';
 import { useToast } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -191,6 +192,8 @@ export default function AddLinkScreen() {
   const { toast } = useToast();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const headerHeight = useHeaderHeight();
+  const insets = useSafeAreaInsets();
 
   // Input state
   const [url, setUrl] = useState('');
@@ -350,12 +353,13 @@ export default function AddLinkScreen() {
       <KeyboardAvoidingView
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
       >
-        <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
@@ -444,7 +448,16 @@ export default function AddLinkScreen() {
           </ScrollView>
 
           {/* Save Button */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View
+            testID="add-link-footer"
+            style={[
+              styles.footer,
+              {
+                borderTopColor: colors.border,
+                paddingBottom: Spacing.xl + insets.bottom,
+              },
+            ]}
+          >
             <Pressable
               onPress={handleSave}
               disabled={!canSave}

@@ -304,6 +304,52 @@ describe('TRPCProvider transport wiring', () => {
     expect(mockSignOut).not.toHaveBeenCalled();
   });
 
+  it('reuses the forced token refresh started on app resume', async () => {
+    const resumeTokenResolver = {
+      current: null as ((token: string | null) => void) | null,
+    };
+    const resumeTokenPromise = new Promise<string | null>((resolve) => {
+      resumeTokenResolver.current = resolve;
+    });
+    mockGetToken.mockImplementationOnce(() => resumeTokenPromise);
+
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    act(() => {
+      appStateCallback?.('background');
+    });
+
+    await act(async () => {
+      appStateCallback?.('active');
+    });
+
+    const headersPromise = (httpBatchLink as jest.Mock).mock.calls[0][0].headers();
+
+    expect(mockGetToken).toHaveBeenCalledTimes(1);
+    expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
+
+    if (!resumeTokenResolver.current) {
+      throw new Error('Resume token resolver was not set');
+    }
+
+    resumeTokenResolver.current('resume-token');
+    const headers = await headersPromise;
+
+    expect(buildMobileTelemetryHeaders).toHaveBeenCalledWith({
+      Authorization: 'Bearer resume-token',
+    });
+    expect(headers).toEqual({
+      Authorization: 'Bearer resume-token',
+      'X-Trace-ID': 'trc_test_header',
+    });
+  });
+
   it('signs out after an unauthorized retry also fails', async () => {
     const clearSpy = jest.spyOn(QueryClient.prototype, 'clear');
 

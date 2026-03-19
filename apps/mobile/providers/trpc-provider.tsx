@@ -38,6 +38,8 @@ interface TRPCProviderProps {
   children: ReactNode;
 }
 
+const AUTH_RESUME_REFRESH_GRACE_MS = 5_000;
+
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== 'undefined' && input instanceof Request;
 }
@@ -106,8 +108,51 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   const signOutRef = useRef(signOut);
   signOutRef.current = signOut;
   const hasTriggeredSignOutRef = useRef(false);
-  const authRefreshPromiseRef = useRef<Promise<boolean> | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const resumeTokenRefreshRef = useRef<Promise<string | null> | null>(null);
+  const lastResumeAtRef = useRef<number | null>(null);
+
+  const isWithinResumeRefreshGraceWindow = useCallback(() => {
+    if (lastResumeAtRef.current === null) {
+      return false;
+    }
+
+    return Date.now() - lastResumeAtRef.current <= AUTH_RESUME_REFRESH_GRACE_MS;
+  }, []);
+
+  const startResumeTokenRefresh = useCallback(() => {
+    lastResumeAtRef.current = Date.now();
+
+    const refreshPromise: Promise<string | null> = getTokenRef
+      .current({ skipCache: true })
+      .catch((error) => {
+        trpcLogger.warn('Failed to refresh auth token on app resume', { error });
+        return null;
+      })
+      .finally(() => {
+        if (resumeTokenRefreshRef.current === refreshPromise) {
+          resumeTokenRefreshRef.current = null;
+        }
+      });
+
+    resumeTokenRefreshRef.current = refreshPromise;
+    return refreshPromise;
+  }, []);
+
+  const getTokenForAuthRequest = useCallback(
+    async (options?: { skipCache?: boolean }) => {
+      if (resumeTokenRefreshRef.current) {
+        const resumeToken = await resumeTokenRefreshRef.current;
+        if (resumeToken) {
+          return resumeToken;
+        }
+      }
+
+      const shouldSkipCache = options?.skipCache === true || isWithinResumeRefreshGraceWindow();
+      return getTokenRef.current(shouldSkipCache ? { skipCache: true } : options);
+    },
+    [isWithinResumeRefreshGraceWindow]
+  );
 
   // ---------------------------------------------------------------------------
   // Initialize OAuth Token Getter
@@ -115,11 +160,13 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   // The vanilla tRPC client in oauth.ts needs access to auth tokens for
   // imperative OAuth operations like connectProvider(). This hooks it up.
   useEffect(() => {
-    setTokenGetter(() => getTokenRef.current());
-  }, []);
+    setTokenGetter(() => getTokenForAuthRequest());
+  }, [getTokenForAuthRequest]);
 
   useEffect(() => {
     hasTriggeredSignOutRef.current = false;
+    resumeTokenRefreshRef.current = null;
+    lastResumeAtRef.current = null;
   }, [userId]);
 
   const ensureFreshAuthToken = useCallback(async (): Promise<boolean> => {
@@ -127,52 +174,27 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
       return false;
     }
 
-    if (!authRefreshPromiseRef.current) {
-      const refreshPromise = getTokenRef
-        .current({ skipCache: true })
-        .then((token) => {
-          if (!token) {
-            trpcLogger.warn(
-              'Skipped app resume network work because auth refresh returned no token'
-            );
-            return false;
-          }
-
-          return true;
-        })
-        .catch((error) => {
-          trpcLogger.warn('Skipped app resume network work because auth refresh failed', {
-            error,
-          });
-          return false;
-        })
-        .finally(() => {
-          if (authRefreshPromiseRef.current === refreshPromise) {
-            authRefreshPromiseRef.current = null;
-          }
-        });
-
-      authRefreshPromiseRef.current = refreshPromise;
+    const token = await startResumeTokenRefresh();
+    if (!token) {
+      trpcLogger.warn('Skipped app resume network work because auth refresh returned no token');
+      return false;
     }
 
-    return authRefreshPromiseRef.current;
-  }, [isLoaded, isSignedIn]);
+    return true;
+  }, [isLoaded, isSignedIn, startResumeTokenRefresh]);
 
   useEffect(() => {
-    const handleAppStateChange = (nextState: AppStateStatus) => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       const wasInBackground = /inactive|background/.test(appStateRef.current);
-
       appStateRef.current = nextState;
 
       if (wasInBackground && nextState === 'active') {
-        void ensureFreshAuthToken();
+        void startResumeTokenRefresh();
       }
-    };
-
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    });
 
     return () => subscription.remove();
-  }, [ensureFreshAuthToken]);
+  }, [startResumeTokenRefresh]);
 
   // ---------------------------------------------------------------------------
   // QueryClient Configuration
@@ -290,7 +312,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
       }
 
       try {
-        const refreshedToken = await getTokenRef.current({ skipCache: true });
+        const refreshedToken = await getTokenForAuthRequest({ skipCache: true });
 
         if (refreshedToken) {
           trpcLogger.warn('Retrying unauthorized tRPC request with refreshed auth token', {
@@ -340,7 +362,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
           transformer: superjson, // Required for Date serialization - must match server
           headers: async () => {
             try {
-              const token = await getTokenRef.current();
+              const token = await getTokenForAuthRequest();
               if (token) {
                 return buildMobileTelemetryHeaders({ Authorization: `Bearer ${token}` });
               }
