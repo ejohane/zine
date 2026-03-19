@@ -23,10 +23,12 @@ export function useWeeklyRecap() {
   };
 }
 
-export function useWeeklyRecapTeaser() {
+export function useWeeklyRecapTeaser(options?: { enabled?: boolean }) {
   const timezone = getRecapTimezone();
+  const isEnabled = options?.enabled ?? true;
 
   return trpc.insights.weeklyRecapTeaser.useQuery(timezone ? { timezone } : undefined, {
+    enabled: isEnabled,
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000,
   }) as ReturnType<typeof trpc.insights.weeklyRecapTeaser.useQuery> & {

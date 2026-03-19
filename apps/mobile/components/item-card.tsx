@@ -18,7 +18,13 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 import { usePrefetchItemDetail } from '@/hooks/use-prefetch';
 import { formatDuration } from '@/lib/format';
 import { getItemCardImageCandidates, normalizeItemCardImageUrl } from '@/lib/item-card-image';
-import { getContentIcon, type ContentType, type Provider } from '@/lib/content-utils';
+import {
+  getContentIcon,
+  type ContentType,
+  type Provider,
+  type UIContentType,
+  type UIProvider,
+} from '@/lib/content-utils';
 
 const STACK_IMAGE_HEIGHT = 112;
 const STACK_TITLE_HEIGHT = Typography.bodyMedium.lineHeight;
@@ -45,8 +51,8 @@ export interface ItemCardData {
   creator: string;
   creatorImageUrl?: string | null;
   thumbnailUrl: string | null;
-  contentType: ContentType;
-  provider: Provider;
+  contentType: ContentType | UIContentType;
+  provider: Provider | UIProvider;
   duration?: number | null;
   readingTimeMinutes?: number | null;
   bookmarkedAt?: string | null;

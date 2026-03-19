@@ -38,6 +38,7 @@ import {
   mapProvider,
 } from '@/hooks/use-items-trpc';
 import { useWeeklyRecapTeaser } from '@/hooks/use-insights-trpc';
+import { shouldShowWeeklyRecapEntry } from '@/lib/weekly-recap';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 // =============================================================================
@@ -137,9 +138,14 @@ function SectionHeader({
 // Main Screen
 // =============================================================================
 
+type HomeTabNavigation = {
+  addListener: (event: 'tabPress', listener: () => void) => () => void;
+  isFocused: () => boolean;
+};
+
 export default function HomeScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as HomeTabNavigation;
   const scrollViewRef = useRef<ScrollView>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
@@ -147,6 +153,7 @@ export default function HomeScreen() {
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
+  const shouldShowWeeklyRecapTeaser = shouldShowWeeklyRecapEntry();
 
   useTabPrefetch('home');
 
@@ -154,7 +161,9 @@ export default function HomeScreen() {
   const { data: inboxData, isLoading: isInboxLoading } = useInboxItems();
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
-  const { data: weeklyRecapTeaser, isLoading: isWeeklyRecapLoading } = useWeeklyRecapTeaser();
+  const { data: weeklyRecapTeaser, isLoading: isWeeklyRecapLoading } = useWeeklyRecapTeaser({
+    enabled: shouldShowWeeklyRecapTeaser,
+  });
 
   // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
@@ -347,7 +356,7 @@ export default function HomeScreen() {
             </ScrollView>
           </Animated.View>
 
-          {(weeklyRecapTeaser || isWeeklyRecapLoading) && (
+          {shouldShowWeeklyRecapTeaser && (weeklyRecapTeaser || isWeeklyRecapLoading) && (
             <Animated.View style={styles.recapCardSection}>
               <WeeklyRecapCard
                 recap={weeklyRecapTeaser}

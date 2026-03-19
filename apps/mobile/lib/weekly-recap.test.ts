@@ -5,6 +5,7 @@ import {
   formatEstimatedMinutes,
   getDominantModeLabel,
   groupRecapItemsByDay,
+  shouldShowWeeklyRecapEntry,
 } from './weekly-recap';
 
 const recapFixture = {
@@ -96,6 +97,12 @@ describe('weekly recap mobile helpers', () => {
     expect(formatEstimatedMinutes(45)).toBe('45m');
     expect(formatEstimatedMinutes(60)).toBe('1h');
     expect(formatEstimatedMinutes(75)).toBe('1h 15m');
+  });
+
+  it('shows the recap entry only on Sunday and Monday', () => {
+    expect(shouldShowWeeklyRecapEntry(new Date(2026, 2, 15, 12, 0, 0))).toBe(true);
+    expect(shouldShowWeeklyRecapEntry(new Date(2026, 2, 16, 12, 0, 0))).toBe(true);
+    expect(shouldShowWeeklyRecapEntry(new Date(2026, 2, 17, 12, 0, 0))).toBe(false);
   });
 
   it('formats delta labels for recap comparisons', () => {

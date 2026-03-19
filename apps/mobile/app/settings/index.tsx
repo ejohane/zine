@@ -243,6 +243,17 @@ function SettingsScreenContent({
           />
         </View>
 
+        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>INSIGHTS</Text>
+
+        <View style={[styles.section, { backgroundColor: colors.card }]}>
+          <SettingsRow
+            title="Weekly Recap"
+            subtitle="Review your reading, watching, and listening anytime"
+            rightText="→"
+            onPress={() => router.push('/recap/weekly')}
+          />
+        </View>
+
         {/* Account Section */}
         {authEnabled && (
           <>

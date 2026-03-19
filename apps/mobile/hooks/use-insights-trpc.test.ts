@@ -57,7 +57,24 @@ describe('use-insights-trpc', () => {
 
     expect(mockWeeklyRecapTeaserUseQuery).toHaveBeenCalledWith(
       { timezone: 'America/Chicago' },
-      expect.objectContaining({ placeholderData: expect.any(Function), staleTime: 60_000 })
+      expect.objectContaining({
+        enabled: true,
+        placeholderData: expect.any(Function),
+        staleTime: 60_000,
+      })
+    );
+  });
+
+  it('can disable the teaser query outside the recap entry window', () => {
+    renderHook(() => useWeeklyRecapTeaser({ enabled: false }));
+
+    expect(mockWeeklyRecapTeaserUseQuery).toHaveBeenCalledWith(
+      { timezone: 'America/Chicago' },
+      expect.objectContaining({
+        enabled: false,
+        placeholderData: expect.any(Function),
+        staleTime: 60_000,
+      })
     );
   });
 

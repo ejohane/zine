@@ -41,6 +41,11 @@ export function formatEstimatedMinutes(totalMinutes: number): string {
   return `${minutes}m`;
 }
 
+export function shouldShowWeeklyRecapEntry(date = new Date()): boolean {
+  const day = date.getDay();
+  return day === 0 || day === 1;
+}
+
 export function formatDeltaLabel(deltaPct: number | null | undefined): string | null {
   if (deltaPct === null || deltaPct === undefined) {
     return null;
