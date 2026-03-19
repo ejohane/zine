@@ -15,6 +15,7 @@ import type { ItemDetailItem } from '@/app/item/detail/types';
 // ============================================================================
 
 const mockBookmarkMutation = { mutate: jest.fn(), isPending: false };
+const mockArchiveMutation = { mutate: jest.fn(), isPending: false };
 const mockUnbookmarkMutation = { mutate: jest.fn(), isPending: false };
 const mockToggleFinishedMutation = { mutate: jest.fn(), isPending: false };
 const mockMarkOpenedMutation = { mutate: jest.fn(), isPending: false };
@@ -74,8 +75,10 @@ jest.mock('@/hooks/use-items-trpc', () => ({
   UserItemState: {
     BOOKMARKED: 'BOOKMARKED',
     INBOX: 'INBOX',
+    ARCHIVED: 'ARCHIVED',
   },
   useBookmarkItem: () => mockBookmarkMutation,
+  useArchiveItem: () => mockArchiveMutation,
   useUnbookmarkItem: () => mockUnbookmarkMutation,
   useToggleFinished: () => mockToggleFinishedMutation,
   useMarkItemOpened: () => mockMarkOpenedMutation,
@@ -109,12 +112,13 @@ describe('useItemDetailActions', () => {
       await result.current.handleOpenLink();
       await result.current.handleShare();
       result.current.handleToggleBookmark();
-      result.current.handleToggleFinished();
+      result.current.handleSecondaryAction();
     });
 
     expect(mockCanOpenURL).not.toHaveBeenCalled();
     expect(mockShare).not.toHaveBeenCalled();
     expect(mockBookmarkMutation.mutate).not.toHaveBeenCalled();
+    expect(mockArchiveMutation.mutate).not.toHaveBeenCalled();
     expect(mockUnbookmarkMutation.mutate).not.toHaveBeenCalled();
     expect(mockToggleFinishedMutation.mutate).not.toHaveBeenCalled();
   });
@@ -283,23 +287,32 @@ describe('useItemDetailActions', () => {
     expect(mockUnbookmarkMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
   });
 
-  it('only toggles finished for bookmarked items', () => {
+  it('archives non-bookmarked items from the secondary action', () => {
     const { result: inboxResult } = renderHook(() => useItemDetailActions(baseItem));
-    inboxResult.current.handleToggleFinished();
+    inboxResult.current.handleSecondaryAction();
+    expect(mockArchiveMutation.mutate).toHaveBeenCalledWith(
+      { id: baseItem.id },
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
     expect(mockToggleFinishedMutation.mutate).not.toHaveBeenCalled();
+  });
 
+  it('keeps the complete toggle for bookmarked items', () => {
     const bookmarkedItem = {
       ...baseItem,
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
     const { result: bookmarkedResult } = renderHook(() => useItemDetailActions(bookmarkedItem));
-    bookmarkedResult.current.handleToggleFinished();
+    bookmarkedResult.current.handleSecondaryAction();
     expect(mockToggleFinishedMutation.mutate).toHaveBeenCalledWith(
       { id: baseItem.id },
       expect.objectContaining({
         onError: expect.any(Function),
       })
     );
+    expect(mockArchiveMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('shows lightweight error feedback when complete toggle fails', () => {
@@ -309,7 +322,7 @@ describe('useItemDetailActions', () => {
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(bookmarkedItem));
 
-    result.current.handleToggleFinished();
+    result.current.handleSecondaryAction();
 
     const mutateOptions = mockToggleFinishedMutation.mutate.mock.calls[0][1] as {
       onError: (error: unknown) => void;
@@ -323,6 +336,26 @@ describe('useItemDetailActions', () => {
       error,
       'Failed to update completion status',
       'itemDetail.toggleFinished'
+    );
+  });
+
+  it('shows lightweight error feedback when archiving fails', () => {
+    const { result } = renderHook(() => useItemDetailActions(baseItem));
+
+    result.current.handleSecondaryAction();
+
+    const mutateOptions = mockArchiveMutation.mutate.mock.calls[0][1] as {
+      onError: (error: unknown) => void;
+    };
+
+    const error = new Error('Archive request failed');
+    mutateOptions.onError(error);
+
+    expect(mockShowError).toHaveBeenCalledWith(
+      mockToastManager,
+      error,
+      'Failed to archive item',
+      'itemDetail.archive'
     );
   });
 });

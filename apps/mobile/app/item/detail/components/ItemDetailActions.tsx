@@ -15,11 +15,11 @@ type ItemDetailActionsProps = {
   bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
   bookmarkActionColor: string;
   isBookmarkActionDisabled: boolean;
-  completeActionIcon: keyof typeof Ionicons.glyphMap;
-  completeActionColor: string;
-  isCompleteActionDisabled: boolean;
+  secondaryActionIcon: keyof typeof Ionicons.glyphMap;
+  secondaryActionColor: string;
+  isSecondaryActionDisabled: boolean;
   onBookmarkToggle: () => void;
-  onComplete: () => void;
+  onSecondaryAction: () => void;
   onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
@@ -32,11 +32,11 @@ export function ItemDetailActions({
   bookmarkActionIcon,
   bookmarkActionColor,
   isBookmarkActionDisabled,
-  completeActionIcon,
-  completeActionColor,
-  isCompleteActionDisabled,
+  secondaryActionIcon,
+  secondaryActionColor,
+  isSecondaryActionDisabled,
   onBookmarkToggle,
-  onComplete,
+  onSecondaryAction,
   onManageTags,
   onShare,
   onOpenLink,
@@ -56,10 +56,10 @@ export function ItemDetailActions({
           disabled={isBookmarkActionDisabled}
         />
         <IconActionButton
-          icon={completeActionIcon}
-          color={completeActionColor}
-          onPress={onComplete}
-          disabled={isCompleteActionDisabled}
+          icon={secondaryActionIcon}
+          color={secondaryActionColor}
+          onPress={onSecondaryAction}
+          disabled={isSecondaryActionDisabled}
         />
         <IconActionButton
           icon="add-circle-outline"

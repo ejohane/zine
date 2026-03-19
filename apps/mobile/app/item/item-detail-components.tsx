@@ -152,15 +152,15 @@ export function XPostBookmarkView({
   onOpenLink,
   onShare,
   onBookmarkToggle,
-  onComplete,
+  onSecondaryAction,
   onManageTags,
   onCreatorPress,
   bookmarkActionIcon,
   bookmarkActionColor,
   isBookmarkActionDisabled,
-  completeActionIcon,
-  completeActionColor,
-  isCompleteActionDisabled,
+  secondaryActionIcon,
+  secondaryActionColor,
+  isSecondaryActionDisabled,
   creatorData,
 }: {
   item: {
@@ -182,15 +182,15 @@ export function XPostBookmarkView({
   onOpenLink: () => void;
   onShare: () => void;
   onBookmarkToggle: () => void;
-  onComplete: () => void;
+  onSecondaryAction: () => void;
   onManageTags: () => void;
   onCreatorPress?: () => void;
   bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
   bookmarkActionColor: string;
   isBookmarkActionDisabled: boolean;
-  completeActionIcon: keyof typeof Ionicons.glyphMap;
-  completeActionColor: string;
-  isCompleteActionDisabled: boolean;
+  secondaryActionIcon: keyof typeof Ionicons.glyphMap;
+  secondaryActionColor: string;
+  isSecondaryActionDisabled: boolean;
   creatorData?: { handle?: string | null } | null;
 }) {
   const canManageTags = item.state === UserItemState.BOOKMARKED;
@@ -286,10 +286,10 @@ export function XPostBookmarkView({
             disabled={isBookmarkActionDisabled}
           />
           <IconActionButton
-            icon={completeActionIcon}
-            color={completeActionColor}
-            onPress={onComplete}
-            disabled={isCompleteActionDisabled}
+            icon={secondaryActionIcon}
+            color={secondaryActionColor}
+            onPress={onSecondaryAction}
+            disabled={isSecondaryActionDisabled}
           />
           <IconActionButton
             icon="add-circle-outline"

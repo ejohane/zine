@@ -1,8 +1,15 @@
 import { useNavigation, useRouter, type Href } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Surface, useToast } from 'heroui-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, type ListRenderItemInfo } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  type ListRenderItemInfo,
+} from 'react-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,7 +22,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
-  useInboxItems,
+  useInfiniteInboxItems,
   useArchiveItem,
   useBookmarkItem,
   mapContentType,
@@ -33,6 +40,7 @@ import type { ContentType, Provider } from '@/lib/content-utils';
 
 /** How long to wait before clearing reappeared state (ms) */
 const REENTRY_CLEANUP_DELAY = 500;
+const INBOX_PAGE_SIZE = 20;
 
 // =============================================================================
 // Custom Empty State for Inbox
@@ -71,7 +79,8 @@ export default function InboxScreen() {
 
   useTabPrefetch('inbox');
 
-  const { data, isLoading, error } = useInboxItems();
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteInboxItems({ limit: INBOX_PAGE_SIZE });
   const { data: connections } = useConnections();
   const hasReconnectRequiredConnection = (connections ?? []).some((connection: Connection) =>
     isReconnectRequired(connection.status)
@@ -199,20 +208,39 @@ export default function InboxScreen() {
   }, [lastResult, toast]);
 
   // Transform API response to ItemCardData format
-  const inboxItems: ItemCardData[] = (data?.items ?? []).map((item) => ({
-    id: item.id,
-    title: item.title,
-    creator: item.creator,
-    creatorImageUrl: item.creatorImageUrl ?? null,
-    thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType) as ContentType,
-    provider: mapProvider(item.provider) as Provider,
-    duration: item.duration ?? null,
-    readingTimeMinutes: item.readingTimeMinutes ?? null,
-    bookmarkedAt: null,
-    publishedAt: item.publishedAt ?? null,
-    isFinished: item.isFinished,
-  }));
+  const inboxItems: ItemCardData[] = useMemo(
+    () =>
+      (data?.pages.flatMap((page) => page.items) ?? []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        creator: item.creator,
+        creatorImageUrl: item.creatorImageUrl ?? null,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        contentType: mapContentType(item.contentType) as ContentType,
+        provider: mapProvider(item.provider) as Provider,
+        duration: item.duration ?? null,
+        readingTimeMinutes: item.readingTimeMinutes ?? null,
+        bookmarkedAt: null,
+        publishedAt: item.publishedAt ?? null,
+        isFinished: item.isFinished,
+      })),
+    [data?.pages]
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
+
+    void fetchNextPage();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const inboxCountLabel =
+    inboxItems.length === 0
+      ? 'Decide what to keep'
+      : hasNextPage
+        ? `${inboxItems.length}+ items to triage`
+        : `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`;
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
@@ -250,9 +278,7 @@ export default function InboxScreen() {
               </Animated.View>
             ) : (
               <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
-                {inboxItems.length > 0
-                  ? `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`
-                  : 'Decide what to keep'}
+                {inboxCountLabel}
               </Text>
             )}
           </View>
@@ -305,6 +331,15 @@ export default function InboxScreen() {
             refreshing={isSyncing}
             ListEmptyComponent={<InboxEmptyState colors={colors} />}
             itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.6}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View style={styles.loadingFooter}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                </View>
+              ) : null
+            }
           />
         )}
       </SafeAreaView>
@@ -362,6 +397,10 @@ const styles = StyleSheet.create({
   // List
   listContent: {
     paddingBottom: Spacing['3xl'],
+  },
+  loadingFooter: {
+    paddingVertical: Spacing.lg,
+    alignItems: 'center',
   },
   emptyListContent: {
     flexGrow: 1,

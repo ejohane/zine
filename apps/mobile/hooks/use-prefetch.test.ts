@@ -11,7 +11,9 @@ import type { AppStateStatus } from 'react-native';
 
 const mockPrefetchHome = jest.fn(() => Promise.resolve());
 const mockPrefetchInbox = jest.fn(() => Promise.resolve());
+const mockPrefetchInboxInfinite = jest.fn(() => Promise.resolve());
 const mockPrefetchLibrary = jest.fn(() => Promise.resolve());
+const mockPrefetchLibraryInfinite = jest.fn(() => Promise.resolve());
 const mockPrefetchSubscriptions = jest.fn(() => Promise.resolve());
 const mockPrefetchConnections = jest.fn(() => Promise.resolve());
 const mockPrefetchItem = jest.fn(() => Promise.resolve());
@@ -19,8 +21,8 @@ const mockPrefetchItem = jest.fn(() => Promise.resolve());
 const mockUtils = {
   items: {
     home: { prefetch: mockPrefetchHome },
-    inbox: { prefetch: mockPrefetchInbox },
-    library: { prefetch: mockPrefetchLibrary },
+    inbox: { prefetch: mockPrefetchInbox, prefetchInfinite: mockPrefetchInboxInfinite },
+    library: { prefetch: mockPrefetchLibrary, prefetchInfinite: mockPrefetchLibraryInfinite },
     get: { prefetch: mockPrefetchItem },
   },
   subscriptions: {
@@ -40,6 +42,7 @@ const mockAddEventListener = jest.fn((event: string, callback: (state: AppStateS
 });
 
 let isRestoring = false;
+const mockEnsureFreshAuthToken = jest.fn(() => Promise.resolve(true));
 
 jest.mock('react-native', () => ({
   AppState: {
@@ -62,6 +65,12 @@ jest.mock('@/lib/trpc', () => ({
   },
 }));
 
+jest.mock('@/providers/auth-resume-gate', () => ({
+  useAuthResumeGate: () => ({
+    ensureFreshAuthToken: mockEnsureFreshAuthToken,
+  }),
+}));
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -78,6 +87,7 @@ describe('prefetch strategy hooks', () => {
     jest.clearAllMocks();
     appStateCallback = null;
     isRestoring = false;
+    mockEnsureFreshAuthToken.mockResolvedValue(true);
   });
 
   it('returns sibling targets for each tab', () => {
@@ -86,46 +96,85 @@ describe('prefetch strategy hooks', () => {
     expect(getTabPrefetchTargets('library')).toEqual(['home', 'inbox']);
   });
 
-  it('prefetches baseline queries on mount when hydrated', () => {
-    renderHook(() => useBaselinePrefetchOnFocus());
+  it('prefetches baseline queries on mount when hydrated', async () => {
+    await act(async () => {
+      renderHook(() => useBaselinePrefetchOnFocus());
+      await Promise.resolve();
+    });
 
+    expect(mockEnsureFreshAuthToken).toHaveBeenCalledTimes(1);
     expect(mockPrefetchHome).toHaveBeenCalledTimes(1);
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchSubscriptions).toHaveBeenCalledTimes(1);
     expect(mockPrefetchConnections).toHaveBeenCalledTimes(1);
   });
 
-  it('skips baseline prefetch while restoring', () => {
+  it('skips baseline prefetch while restoring', async () => {
     isRestoring = true;
 
-    renderHook(() => useBaselinePrefetchOnFocus());
+    await act(async () => {
+      renderHook(() => useBaselinePrefetchOnFocus());
+      await Promise.resolve();
+    });
 
+    expect(mockEnsureFreshAuthToken).not.toHaveBeenCalled();
     expect(mockPrefetchHome).not.toHaveBeenCalled();
     expect(mockPrefetchSubscriptions).not.toHaveBeenCalled();
   });
 
-  it('prefetches baseline queries on app focus', () => {
-    renderHook(() => useBaselinePrefetchOnFocus());
-
-    jest.clearAllMocks();
-
-    act(() => {
-      appStateCallback?.('active');
+  it('prefetches baseline queries on app focus', async () => {
+    await act(async () => {
+      renderHook(() => useBaselinePrefetchOnFocus());
+      await Promise.resolve();
     });
 
+    jest.clearAllMocks();
+    mockEnsureFreshAuthToken.mockResolvedValue(true);
+
+    await act(async () => {
+      appStateCallback?.('active');
+      await Promise.resolve();
+    });
+
+    expect(mockEnsureFreshAuthToken).toHaveBeenCalledTimes(1);
     expect(mockPrefetchHome).toHaveBeenCalledTimes(1);
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchSubscriptions).toHaveBeenCalledTimes(1);
     expect(mockPrefetchConnections).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips baseline prefetch on app focus when auth refresh is not ready', async () => {
+    await act(async () => {
+      renderHook(() => useBaselinePrefetchOnFocus());
+      await Promise.resolve();
+    });
+
+    jest.clearAllMocks();
+    mockEnsureFreshAuthToken.mockResolvedValue(false);
+
+    await act(async () => {
+      appStateCallback?.('active');
+      await Promise.resolve();
+    });
+
+    expect(mockEnsureFreshAuthToken).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchHome).not.toHaveBeenCalled();
+    expect(mockPrefetchSubscriptions).not.toHaveBeenCalled();
   });
 
   it('prefetches sibling tabs on focus', () => {
     renderHook(() => useTabPrefetch('home'));
 
     expect(mockPrefetchInbox).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchInboxInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchLibrary).toHaveBeenCalledTimes(1);
+    expect(mockPrefetchLibraryInfinite).toHaveBeenCalledTimes(1);
     expect(mockPrefetchHome).not.toHaveBeenCalled();
   });
 

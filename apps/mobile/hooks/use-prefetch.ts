@@ -7,6 +7,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useIsRestoring } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
+import { useAuthResumeGate } from '@/providers/auth-resume-gate';
 
 type ListQueryKey = 'home' | 'inbox' | 'library';
 export type PrefetchTab = 'home' | 'inbox' | 'library';
@@ -31,8 +32,13 @@ function prefetchListQueries(
 ) {
   const listPrefetchers: Record<ListQueryKey, () => Promise<unknown>> = {
     home: () => utils.items.home.prefetch(),
-    inbox: () => utils.items.inbox.prefetch(),
-    library: () => utils.items.library.prefetch(),
+    inbox: () =>
+      Promise.all([utils.items.inbox.prefetch(), utils.items.inbox.prefetchInfinite(undefined)]),
+    library: () =>
+      Promise.all([
+        utils.items.library.prefetch(),
+        utils.items.library.prefetchInfinite(undefined),
+      ]),
   };
 
   targets.forEach((target) => {
@@ -44,25 +50,34 @@ export function useBaselinePrefetchOnFocus() {
   const utils = trpc.useUtils();
   const isRestoring = useIsRestoring();
   const hasHydratedRef = useRef(false);
+  const { ensureFreshAuthToken } = useAuthResumeGate();
 
-  const prefetchBaseline = useCallback(() => {
-    if (isRestoring) return;
+  const prefetchBaseline = useCallback(async (): Promise<boolean> => {
+    if (isRestoring) return false;
+    const shouldPrefetch = await ensureFreshAuthToken();
+    if (!shouldPrefetch) {
+      return false;
+    }
 
     prefetchListQueries(utils, ['home', 'inbox', 'library']);
     prefetchSafely(() => utils.subscriptions.list.prefetch({}));
     prefetchSafely(() => utils.subscriptions.connections.list.prefetch());
-  }, [isRestoring, utils]);
+    return true;
+  }, [ensureFreshAuthToken, isRestoring, utils]);
 
   useEffect(() => {
     if (isRestoring || hasHydratedRef.current) return;
-    hasHydratedRef.current = true;
-    prefetchBaseline();
+    void prefetchBaseline().then((didPrefetch) => {
+      if (didPrefetch) {
+        hasHydratedRef.current = true;
+      }
+    });
   }, [isRestoring, prefetchBaseline]);
 
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
       if (nextState === 'active') {
-        prefetchBaseline();
+        void prefetchBaseline();
       }
     };
 

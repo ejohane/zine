@@ -51,9 +51,11 @@ export default function ItemDetailScreen() {
     handleOpenLink,
     handleShare,
     handleToggleBookmark,
-    handleToggleFinished,
+    handleSecondaryAction,
     bookmarkMutation,
+    archiveMutation,
     unbookmarkMutation,
+    toggleFinishedMutation,
   } = useItemDetailActions(item);
 
   const viewState = useItemDetailViewState({
@@ -61,6 +63,8 @@ export default function ItemDetailScreen() {
     colors,
     bookmarkPending: bookmarkMutation.isPending,
     unbookmarkPending: unbookmarkMutation.isPending,
+    archivePending: archiveMutation.isPending,
+    toggleFinishedPending: toggleFinishedMutation.isPending,
   });
 
   if (!isValid) {
@@ -93,7 +97,7 @@ export default function ItemDetailScreen() {
         onOpenLink={handleOpenLink}
         onShare={handleShare}
         onBookmarkToggle={handleToggleBookmark}
-        onComplete={handleToggleFinished}
+        onSecondaryAction={handleSecondaryAction}
         onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
         onCreatorPress={
           item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
@@ -101,9 +105,9 @@ export default function ItemDetailScreen() {
         bookmarkActionIcon={viewState.bookmarkActionIcon}
         bookmarkActionColor={viewState.bookmarkActionColor}
         isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
-        completeActionIcon={viewState.completeActionIcon}
-        completeActionColor={viewState.completeActionColor}
-        isCompleteActionDisabled={viewState.isCompleteActionDisabled}
+        secondaryActionIcon={viewState.secondaryActionIcon}
+        secondaryActionColor={viewState.secondaryActionColor}
+        isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
         creatorData={creatorData}
       />
     );
@@ -140,11 +144,11 @@ export default function ItemDetailScreen() {
           bookmarkActionIcon={viewState.bookmarkActionIcon}
           bookmarkActionColor={viewState.bookmarkActionColor}
           isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
-          completeActionIcon={viewState.completeActionIcon}
-          completeActionColor={viewState.completeActionColor}
-          isCompleteActionDisabled={viewState.isCompleteActionDisabled}
+          secondaryActionIcon={viewState.secondaryActionIcon}
+          secondaryActionColor={viewState.secondaryActionColor}
+          isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
           onBookmarkToggle={handleToggleBookmark}
-          onComplete={handleToggleFinished}
+          onSecondaryAction={handleSecondaryAction}
           onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
           onShare={handleShare}
           onOpenLink={handleOpenLink}
@@ -169,11 +173,11 @@ export default function ItemDetailScreen() {
         bookmarkActionIcon={viewState.bookmarkActionIcon}
         bookmarkActionColor={viewState.bookmarkActionColor}
         isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
-        completeActionIcon={viewState.completeActionIcon}
-        completeActionColor={viewState.completeActionColor}
-        isCompleteActionDisabled={viewState.isCompleteActionDisabled}
+        secondaryActionIcon={viewState.secondaryActionIcon}
+        secondaryActionColor={viewState.secondaryActionColor}
+        isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
         onBookmarkToggle={handleToggleBookmark}
-        onComplete={handleToggleFinished}
+        onSecondaryAction={handleSecondaryAction}
         onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
         onShare={handleShare}
         onOpenLink={handleOpenLink}
