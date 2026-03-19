@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { useToast } from 'heroui-native';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Linking, Share } from 'react-native';
 
 import {
@@ -25,6 +25,21 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
   const unbookmarkMutation = useUnbookmarkItem();
   const toggleFinishedMutation = useToggleFinished();
   const markOpenedMutation = useMarkItemOpened();
+  const lastMarkedItemIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!item?.id) {
+      lastMarkedItemIdRef.current = null;
+      return;
+    }
+
+    if (lastMarkedItemIdRef.current === item.id) {
+      return;
+    }
+
+    lastMarkedItemIdRef.current = item.id;
+    markOpenedMutation.mutate({ id: item.id });
+  }, [item?.id, markOpenedMutation]);
 
   const handleOpenLink = useCallback(async () => {
     if (!item?.canonicalUrl) return;
@@ -34,25 +49,29 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
     try {
       const isArticle = item.contentType === ContentType.ARTICLE;
       const isSubstack = item.provider === 'SUBSTACK';
+      let didOpen = false;
 
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
           enableBarCollapsing: true,
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
+        didOpen = true;
       } else {
         const supported = await Linking.canOpenURL(item.canonicalUrl);
         if (supported) {
           await Linking.openURL(item.canonicalUrl);
+          didOpen = true;
         } else if (isSubstack) {
           await WebBrowser.openBrowserAsync(item.canonicalUrl, {
             enableBarCollapsing: true,
             presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
           });
+          didOpen = true;
         }
       }
 
-      if (item.state === UserItemState.BOOKMARKED) {
+      if (didOpen) {
         markOpenedMutation.mutate({ id: item.id });
       }
     } catch (err) {

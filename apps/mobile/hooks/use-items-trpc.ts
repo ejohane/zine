@@ -50,6 +50,11 @@ type OptimisticContext = {
   previousItem?: ItemQueryData;
 };
 
+function invalidateRecapQueries(utils: TrpcUtils) {
+  utils.insights.weeklyRecap.invalidate();
+  utils.insights.weeklyRecapTeaser.invalidate();
+}
+
 type InboxItemsOptions = {
   filter?: {
     provider?: Provider;
@@ -205,6 +210,7 @@ function createOptimisticConfig<TInput extends { id: string }>(
       utils.items.inbox.invalidate();
       utils.items.library.invalidate();
       utils.items.home.invalidate();
+      invalidateRecapQueries(utils);
       if (options.updateSingleItem) {
         utils.items.get.invalidate({ id: vars.id });
       }
@@ -783,14 +789,15 @@ export function useToggleFinished() {
       utils.items.inbox.invalidate();
       utils.items.home.invalidate();
       utils.items.get.invalidate({ id });
+      invalidateRecapQueries(utils);
     },
   });
 }
 
 /**
- * Hook for marking a bookmarked item as opened
+ * Hook for marking an item as opened
  *
- * Used to power the "Jump Back In" section on home.
+ * Used for recap tracking and to power the "Jump Back In" section on home.
  */
 export function useMarkItemOpened() {
   const utils = trpc.useUtils();
@@ -799,6 +806,7 @@ export function useMarkItemOpened() {
     onSettled: (_data, _err, { id }) => {
       utils.items.home.invalidate();
       utils.items.get.invalidate({ id });
+      invalidateRecapQueries(utils);
     },
   });
 }
@@ -848,8 +856,10 @@ export function useUpdateProgress() {
   const utils = trpc.useUtils();
 
   return trpc.items.updateProgress.useMutation({
-    onSettled: () => {
+    onSettled: (_data, _err, { id }) => {
       utils.items.home.invalidate();
+      utils.items.get.invalidate({ id });
+      invalidateRecapQueries(utils);
     },
   });
 }

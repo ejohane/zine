@@ -114,6 +114,44 @@ export const userItems = sqliteTable(
 );
 
 // ============================================================================
+// User Item Consumption Events
+// ============================================================================
+// Immutable interaction history used for recap and trend calculations.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userItemConsumptionEvents = sqliteTable(
+  'user_item_consumption_events',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    eventType: text('event_type').notNull(), // OPENED | FINISHED | UNFINISHED | PROGRESS_DELTA
+    occurredAt: integer('occurred_at').notNull(), // Unix ms
+    positionSeconds: integer('position_seconds'),
+    durationSeconds: integer('duration_seconds'),
+    deltaSeconds: integer('delta_seconds'),
+    source: text('source').notNull(), // ITEM_DETAIL_OPEN | MANUAL_FINISH_TOGGLE | PLAYER
+    metadata: text('metadata'), // JSON string for forward-compatible context
+  },
+  (table) => [
+    index('user_item_consumption_events_user_idx').on(table.userId, table.occurredAt),
+    index('user_item_consumption_events_user_type_idx').on(
+      table.userId,
+      table.eventType,
+      table.occurredAt
+    ),
+    index('user_item_consumption_events_user_item_idx').on(table.userItemId, table.occurredAt),
+    index('user_item_consumption_events_item_idx').on(table.itemId, table.occurredAt),
+  ]
+);
+
+// ============================================================================
 // Tags (User-defined collections)
 // ============================================================================
 // Stores optional user-defined tags for organizing bookmarked items.

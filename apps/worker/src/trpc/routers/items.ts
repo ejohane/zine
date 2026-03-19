@@ -11,7 +11,14 @@ import {
   ProviderSchema,
   ContentTypeSchema,
 } from '@zine/shared';
-import { userItems, items, creators, tags, userItemTags } from '../../db/schema';
+import {
+  userItems,
+  items,
+  creators,
+  tags,
+  userItemTags,
+  userItemConsumptionEvents,
+} from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
@@ -289,6 +296,38 @@ async function toItemViewsWithTags(
   const tagsByItemId = await getTagsForUserItems(ctx, userItemIds);
 
   return rows.map((row) => toItemView(row, tagsByItemId.get(row.user_items.id) ?? []));
+}
+
+type ConsumptionEventType = 'OPENED' | 'FINISHED' | 'UNFINISHED' | 'PROGRESS_DELTA';
+type ConsumptionEventSource = 'ITEM_DETAIL_OPEN' | 'MANUAL_FINISH_TOGGLE' | 'PLAYER' | 'READER';
+
+async function insertConsumptionEvent(
+  ctx: { db: Database; userId: string },
+  event: {
+    userItemId: string;
+    itemId: string;
+    eventType: ConsumptionEventType;
+    occurredAt: number;
+    positionSeconds?: number | null;
+    durationSeconds?: number | null;
+    deltaSeconds?: number | null;
+    source: ConsumptionEventSource;
+    metadata?: Record<string, unknown> | null;
+  }
+) {
+  await ctx.db.insert(userItemConsumptionEvents).values({
+    id: ulid(),
+    userId: ctx.userId,
+    userItemId: event.userItemId,
+    itemId: event.itemId,
+    eventType: event.eventType,
+    occurredAt: event.occurredAt,
+    positionSeconds: event.positionSeconds ?? null,
+    durationSeconds: event.durationSeconds ?? null,
+    deltaSeconds: event.deltaSeconds ?? null,
+    source: event.source,
+    metadata: event.metadata ? JSON.stringify(event.metadata) : null,
+  });
 }
 
 // ============================================================================
@@ -918,10 +957,11 @@ export const itemsRouter = router({
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       const now = new Date().toISOString();
+      const nowMs = Date.now();
 
       // Find the user item
       const existing = await ctx.db
-        .select({ id: userItems.id, isFinished: userItems.isFinished })
+        .select({ id: userItems.id, itemId: userItems.itemId, isFinished: userItems.isFinished })
         .from(userItems)
         .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
         .limit(1);
@@ -947,6 +987,14 @@ export const itemsRouter = router({
         })
         .where(eq(userItems.id, input.id));
 
+      await insertConsumptionEvent(ctx, {
+        userItemId: existing[0].id,
+        itemId: existing[0].itemId,
+        eventType: newIsFinished ? 'FINISHED' : 'UNFINISHED',
+        occurredAt: nowMs,
+        source: 'MANUAL_FINISH_TOGGLE',
+      });
+
       return {
         success: true as const,
         isFinished: newIsFinished,
@@ -955,15 +1003,16 @@ export const itemsRouter = router({
     }),
 
   /**
-   * Record that a bookmarked item was opened via the FAB.
+   * Record that an item was opened from detail.
    */
   markOpened: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       const now = new Date().toISOString();
+      const nowMs = Date.now();
 
       const existing = await ctx.db
-        .select({ id: userItems.id, state: userItems.state })
+        .select({ id: userItems.id, itemId: userItems.itemId, state: userItems.state })
         .from(userItems)
         .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
         .limit(1);
@@ -975,10 +1024,6 @@ export const itemsRouter = router({
         });
       }
 
-      if (existing[0].state !== UserItemState.BOOKMARKED) {
-        return { success: true as const, updated: false };
-      }
-
       await ctx.db
         .update(userItems)
         .set({
@@ -986,6 +1031,17 @@ export const itemsRouter = router({
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));
+
+      await insertConsumptionEvent(ctx, {
+        userItemId: existing[0].id,
+        itemId: existing[0].itemId,
+        eventType: 'OPENED',
+        occurredAt: nowMs,
+        source: 'ITEM_DETAIL_OPEN',
+        metadata: {
+          state: existing[0].state,
+        },
+      });
 
       return { success: true as const, updated: true, lastOpenedAt: now };
     }),
@@ -1003,10 +1059,16 @@ export const itemsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       const now = new Date().toISOString();
+      const nowMs = Date.now();
 
       // Verify the item exists and belongs to the user
       const existing = await ctx.db
-        .select({ id: userItems.id })
+        .select({
+          id: userItems.id,
+          itemId: userItems.itemId,
+          progressPosition: userItems.progressPosition,
+          progressDuration: userItems.progressDuration,
+        })
         .from(userItems)
         .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
         .limit(1);
@@ -1028,6 +1090,27 @@ export const itemsRouter = router({
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));
+
+      const previousPosition = existing[0].progressPosition ?? 0;
+      const deltaSeconds = Math.max(0, Math.round(input.position - previousPosition));
+
+      if (deltaSeconds > 0) {
+        await insertConsumptionEvent(ctx, {
+          userItemId: existing[0].id,
+          itemId: existing[0].itemId,
+          eventType: 'PROGRESS_DELTA',
+          occurredAt: nowMs,
+          positionSeconds: Math.round(input.position),
+          durationSeconds: Math.round(input.duration),
+          deltaSeconds,
+          source: 'PLAYER',
+          metadata: existing[0].progressDuration
+            ? {
+                previousDurationSeconds: existing[0].progressDuration,
+              }
+            : null,
+        });
+      }
 
       return { success: true as const };
     }),

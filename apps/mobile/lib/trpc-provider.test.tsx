@@ -175,6 +175,8 @@ describe('TRPCProvider offline queue invalidation', () => {
       getQueryKey(trpc.items.inbox),
       getQueryKey(trpc.items.library),
       getQueryKey(trpc.items.home),
+      getQueryKey(trpc.insights.weeklyRecap),
+      getQueryKey(trpc.insights.weeklyRecapTeaser),
     ];
 
     expect(invalidateSpy).toHaveBeenCalledTimes(expectedQueryKeys.length);

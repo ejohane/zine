@@ -123,9 +123,26 @@ describe('useItemDetailActions', () => {
     expect(mockToggleFinishedMutation.mutate).not.toHaveBeenCalled();
   });
 
+  it('marks an item opened when the detail view loads', () => {
+    let currentItem: ItemDetailItem | undefined = baseItem;
+    const { rerender } = renderHook(() => useItemDetailActions(currentItem));
+
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(1);
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
+
+    rerender();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(1);
+
+    currentItem = { ...baseItem, id: 'item-2' } as unknown as ItemDetailItem;
+    rerender();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(2);
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenLastCalledWith({ id: 'item-2' });
+  });
+
   it('opens in-app browser for articles and marks opened for bookmarked items', async () => {
     const item = { ...baseItem, state: UserItemState.BOOKMARKED } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
@@ -145,6 +162,7 @@ describe('useItemDetailActions', () => {
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
@@ -163,6 +181,7 @@ describe('useItemDetailActions', () => {
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
@@ -183,6 +202,7 @@ describe('useItemDetailActions', () => {
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
@@ -196,20 +216,22 @@ describe('useItemDetailActions', () => {
     });
   });
 
-  it('does not mark opened when item is not bookmarked', async () => {
+  it('marks opened after a successful open even when the item is not bookmarked', async () => {
     const { result } = renderHook(() => useItemDetailActions(baseItem));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
   });
 
   it('logs errors when link opening fails', async () => {
     const error = new Error('offline');
     mockOpenBrowserAsync.mockRejectedValueOnce(error);
     const { result } = renderHook(() => useItemDetailActions(baseItem));
+    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
@@ -217,6 +239,24 @@ describe('useItemDetailActions', () => {
 
     expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
     expect(mockOpenBrowserAsync).toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
+  });
+
+  it('does not mark opened when the external URL can not be opened', async () => {
+    mockCanOpenURL.mockResolvedValueOnce(false);
+    const item = {
+      ...baseItem,
+      contentType: 'VIDEO',
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockOpenURL).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('shares item details', async () => {

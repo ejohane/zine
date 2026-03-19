@@ -268,6 +268,8 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.inbox) }),
         queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.library) }),
         queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.items.home) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.insights.weeklyRecap) }),
+        queryClient.invalidateQueries({ queryKey: getQueryKey(trpc.insights.weeklyRecapTeaser) }),
       ]);
     });
   }, [queryClient]);
