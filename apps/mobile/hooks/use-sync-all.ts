@@ -22,6 +22,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import { trpc } from '../lib/trpc';
 import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib/trpc-transport';
+import { useAuthResumeGate } from '@/providers/auth-resume-gate';
 
 // ============================================================================
 // Types
@@ -88,6 +89,7 @@ export interface UseSyncAllReturn {
 
 export function useSyncAll(): UseSyncAllReturn {
   const utils = trpc.useUtils();
+  const { ensureFreshAuthToken } = useAuthResumeGate();
 
   // UI state
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
@@ -210,6 +212,11 @@ export function useSyncAll(): UseSyncAllReturn {
    * Check for active sync job on app resume
    */
   const checkActiveJob = useCallback(async () => {
+    const isAuthReady = await ensureFreshAuthToken();
+    if (!isAuthReady) {
+      return;
+    }
+
     try {
       const result = await utils.client.subscriptions.activeSyncJob.query();
 
@@ -230,7 +237,7 @@ export function useSyncAll(): UseSyncAllReturn {
     } catch {
       // Ignore errors during resume check
     }
-  }, [utils.client.subscriptions.activeSyncJob, startStatusPolling]);
+  }, [ensureFreshAuthToken, utils.client.subscriptions.activeSyncJob, startStatusPolling]);
 
   /**
    * Handle app state changes - check for active job on resume

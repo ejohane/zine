@@ -6,7 +6,8 @@
  */
 
 import React from 'react';
-import { Text } from 'react-native';
+import { AppState, Text } from 'react-native';
+import type { AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
@@ -34,6 +35,16 @@ const mockUseAuthAvailability = jest.fn(() => ({ isEnabled: true }));
 let latestPersistOptions: PersistOptions | null = null;
 const mockRemoveClient = jest.fn(async () => undefined);
 const mockUseIsRestoring = jest.fn(() => false);
+let appStateCallback: ((state: AppStateStatus) => void) | null = null;
+const mockAppStateAddEventListener = jest.fn(
+  (event: string, callback: (state: AppStateStatus) => void) => {
+    if (event === 'change') {
+      appStateCallback = callback;
+    }
+
+    return { remove: jest.fn() };
+  }
+);
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -88,6 +99,8 @@ jest.mock('superjson', () => ({
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
     getToken: mockGetToken,
+    isLoaded: true,
+    isSignedIn: true,
     userId: mockUserId,
   }),
   useClerk: () => ({
@@ -133,6 +146,8 @@ describe('TRPCProvider offline queue invalidation', () => {
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
     mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
+    appStateCallback = null;
+    (AppState.addEventListener as jest.Mock).mockImplementation(mockAppStateAddEventListener);
   });
 
   it('registers offline queue callback with query invalidations', () => {
@@ -205,6 +220,27 @@ describe('TRPCProvider transport wiring', () => {
       Authorization: 'Bearer token',
       'X-Trace-ID': 'trc_test_header',
     });
+  });
+
+  it('refreshes the auth token when the app returns to the foreground', async () => {
+    await act(async () => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+      await Promise.resolve();
+    });
+
+    mockGetToken.mockClear();
+
+    await act(async () => {
+      appStateCallback?.('background');
+      appStateCallback?.('active');
+      await Promise.resolve();
+    });
+
+    expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
   });
 
   it('omits Clerk auth headers when auth is disabled', async () => {

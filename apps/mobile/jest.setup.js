@@ -52,6 +52,10 @@ jest.mock('react-native', () => ({
   Dimensions: {
     get: jest.fn(() => ({ width: 375, height: 812 })),
   },
+  AppState: {
+    currentState: 'active',
+    addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  },
 }));
 
 // Mock react-native-svg

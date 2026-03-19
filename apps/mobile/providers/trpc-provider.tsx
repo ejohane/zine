@@ -5,7 +5,8 @@
  * type-safe API calls with automatic caching and auth integration.
  */
 
-import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, useIsRestoring, type QueryStatus } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
@@ -27,6 +28,7 @@ import {
   shouldPersistQuery,
 } from '@/lib/query-persistence';
 import { useAuthAvailability } from '@/providers/auth-provider';
+import { AuthResumeGateContext } from '@/providers/auth-resume-gate';
 
 // ============================================================================
 // Provider Component
@@ -95,7 +97,7 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
 }
 
 function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, isLoaded, isSignedIn } = useAuth();
   const { signOut } = useClerk();
 
   // Store getToken in a ref to avoid recreating the tRPC client when auth changes
@@ -104,6 +106,8 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   const signOutRef = useRef(signOut);
   signOutRef.current = signOut;
   const hasTriggeredSignOutRef = useRef(false);
+  const authRefreshPromiseRef = useRef<Promise<boolean> | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   // ---------------------------------------------------------------------------
   // Initialize OAuth Token Getter
@@ -117,6 +121,58 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   useEffect(() => {
     hasTriggeredSignOutRef.current = false;
   }, [userId]);
+
+  const ensureFreshAuthToken = useCallback(async (): Promise<boolean> => {
+    if (!isLoaded || !isSignedIn) {
+      return false;
+    }
+
+    if (!authRefreshPromiseRef.current) {
+      const refreshPromise = getTokenRef
+        .current({ skipCache: true })
+        .then((token) => {
+          if (!token) {
+            trpcLogger.warn(
+              'Skipped app resume network work because auth refresh returned no token'
+            );
+            return false;
+          }
+
+          return true;
+        })
+        .catch((error) => {
+          trpcLogger.warn('Skipped app resume network work because auth refresh failed', {
+            error,
+          });
+          return false;
+        })
+        .finally(() => {
+          if (authRefreshPromiseRef.current === refreshPromise) {
+            authRefreshPromiseRef.current = null;
+          }
+        });
+
+      authRefreshPromiseRef.current = refreshPromise;
+    }
+
+    return authRefreshPromiseRef.current;
+  }, [isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      const wasInBackground = /inactive|background/.test(appStateRef.current);
+
+      appStateRef.current = nextState;
+
+      if (wasInBackground && nextState === 'active') {
+        void ensureFreshAuthToken();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => subscription.remove();
+  }, [ensureFreshAuthToken]);
 
   // ---------------------------------------------------------------------------
   // QueryClient Configuration
@@ -305,11 +361,13 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   const shouldBlockHydration = hasPersistedClient === true;
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
-        <HydrationGate shouldBlock={shouldBlockHydration}>{children}</HydrationGate>
-      </PersistQueryClientProvider>
-    </trpc.Provider>
+    <AuthResumeGateContext.Provider value={{ ensureFreshAuthToken }}>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+          <HydrationGate shouldBlock={shouldBlockHydration}>{children}</HydrationGate>
+        </PersistQueryClientProvider>
+      </trpc.Provider>
+    </AuthResumeGateContext.Provider>
   );
 }
 
@@ -351,36 +409,40 @@ function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
 
   if (__DEV__) {
     return (
-      <trpc.Provider client={trpcClient} queryClient={queryClient}>
-        <HydrationGate shouldBlock={false}>{children}</HydrationGate>
-      </trpc.Provider>
+      <AuthResumeGateContext.Provider value={{ ensureFreshAuthToken: async () => true }}>
+        <trpc.Provider client={trpcClient} queryClient={queryClient}>
+          <HydrationGate shouldBlock={false}>{children}</HydrationGate>
+        </trpc.Provider>
+      </AuthResumeGateContext.Provider>
     );
   }
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <PersistQueryClientProvider
-        client={queryClient}
-        persistOptions={{
-          persister: createAsyncStoragePersister({
-            storage: AsyncStorage,
-            key: persistenceKey,
-          }),
-          maxAge: PERSISTENCE_MAX_AGE_MS,
-          buster: buildQueryPersistenceBuster(),
-          dehydrateOptions: {
-            shouldDehydrateQuery: ({
-              queryKey,
-              state,
-            }: {
-              queryKey: unknown;
-              state: { status: QueryStatus };
-            }) => shouldPersistQuery({ queryKey, status: state.status }),
-          },
-        }}
-      >
-        <HydrationGate shouldBlock={false}>{children}</HydrationGate>
-      </PersistQueryClientProvider>
-    </trpc.Provider>
+    <AuthResumeGateContext.Provider value={{ ensureFreshAuthToken: async () => true }}>
+      <trpc.Provider client={trpcClient} queryClient={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister: createAsyncStoragePersister({
+              storage: AsyncStorage,
+              key: persistenceKey,
+            }),
+            maxAge: PERSISTENCE_MAX_AGE_MS,
+            buster: buildQueryPersistenceBuster(),
+            dehydrateOptions: {
+              shouldDehydrateQuery: ({
+                queryKey,
+                state,
+              }: {
+                queryKey: unknown;
+                state: { status: QueryStatus };
+              }) => shouldPersistQuery({ queryKey, status: state.status }),
+            },
+          }}
+        >
+          <HydrationGate shouldBlock={false}>{children}</HydrationGate>
+        </PersistQueryClientProvider>
+      </trpc.Provider>
+    </AuthResumeGateContext.Provider>
   );
 }

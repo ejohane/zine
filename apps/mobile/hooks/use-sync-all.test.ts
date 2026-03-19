@@ -38,6 +38,7 @@ const mockActiveJobQuery = jest.fn();
 
 // Mock invalidate
 const mockInvalidate = jest.fn();
+const mockEnsureFreshAuthToken = jest.fn(() => Promise.resolve(true));
 
 // AppState event listener mock
 let appStateCallback: ((state: AppStateStatus) => void) | null = null;
@@ -91,6 +92,12 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
+jest.mock('@/providers/auth-resume-gate', () => ({
+  useAuthResumeGate: () => ({
+    ensureFreshAuthToken: mockEnsureFreshAuthToken,
+  }),
+}));
+
 // ============================================================================
 // Test Setup
 // ============================================================================
@@ -104,6 +111,7 @@ beforeEach(() => {
   mockOnError = undefined;
   appStateCallback = null;
   mockActiveJobQuery.mockResolvedValue({ inProgress: false, jobId: null });
+  mockEnsureFreshAuthToken.mockResolvedValue(true);
 });
 
 afterEach(() => {
