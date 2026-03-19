@@ -20,11 +20,11 @@ type ItemDetailContentProps = {
   bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
   bookmarkActionColor: string;
   isBookmarkActionDisabled: boolean;
-  completeActionIcon: keyof typeof Ionicons.glyphMap;
-  completeActionColor: string;
-  isCompleteActionDisabled: boolean;
+  secondaryActionIcon: keyof typeof Ionicons.glyphMap;
+  secondaryActionColor: string;
+  isSecondaryActionDisabled: boolean;
   onBookmarkToggle: () => void;
-  onComplete: () => void;
+  onSecondaryAction: () => void;
   onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
@@ -42,11 +42,11 @@ export function ItemDetailContent({
   bookmarkActionIcon,
   bookmarkActionColor,
   isBookmarkActionDisabled,
-  completeActionIcon,
-  completeActionColor,
-  isCompleteActionDisabled,
+  secondaryActionIcon,
+  secondaryActionColor,
+  isSecondaryActionDisabled,
   onBookmarkToggle,
-  onComplete,
+  onSecondaryAction,
   onManageTags,
   onShare,
   onOpenLink,
@@ -74,11 +74,11 @@ export function ItemDetailContent({
         bookmarkActionIcon={bookmarkActionIcon}
         bookmarkActionColor={bookmarkActionColor}
         isBookmarkActionDisabled={isBookmarkActionDisabled}
-        completeActionIcon={completeActionIcon}
-        completeActionColor={completeActionColor}
-        isCompleteActionDisabled={isCompleteActionDisabled}
+        secondaryActionIcon={secondaryActionIcon}
+        secondaryActionColor={secondaryActionColor}
+        isSecondaryActionDisabled={isSecondaryActionDisabled}
         onBookmarkToggle={onBookmarkToggle}
-        onComplete={onComplete}
+        onSecondaryAction={onSecondaryAction}
         onManageTags={onManageTags}
         onShare={onShare}
         onOpenLink={onOpenLink}

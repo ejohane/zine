@@ -523,6 +523,10 @@ export function useArchiveItem() {
     createOptimisticConfig(utils, {
       updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
       updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
+      updateSingleItem: (item) => ({
+        ...item,
+        state: UserItemState.ARCHIVED,
+      }),
     })
   );
 }

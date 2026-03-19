@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 import { Linking, Share } from 'react-native';
 
 import {
+  useArchiveItem,
   useBookmarkItem,
   useMarkItemOpened,
   useToggleFinished,
@@ -20,6 +21,7 @@ import type { ItemDetailItem } from '../types';
 export function useItemDetailActions(item?: ItemDetailItem | null) {
   const { toast } = useToast();
   const bookmarkMutation = useBookmarkItem();
+  const archiveMutation = useArchiveItem();
   const unbookmarkMutation = useUnbookmarkItem();
   const toggleFinishedMutation = useToggleFinished();
   const markOpenedMutation = useMarkItemOpened();
@@ -82,9 +84,20 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
     }
   }, [bookmarkMutation, item, unbookmarkMutation]);
 
-  const handleToggleFinished = useCallback(() => {
+  const handleSecondaryAction = useCallback(() => {
     if (!item) return;
-    if (item.state !== UserItemState.BOOKMARKED) return;
+
+    if (item.state !== UserItemState.BOOKMARKED) {
+      archiveMutation.mutate(
+        { id: item.id },
+        {
+          onError: (error) => {
+            showError(toast, error, 'Failed to archive item', 'itemDetail.archive');
+          },
+        }
+      );
+      return;
+    }
 
     toggleFinishedMutation.mutate(
       { id: item.id },
@@ -99,14 +112,15 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
         },
       }
     );
-  }, [item, toast, toggleFinishedMutation]);
+  }, [archiveMutation, item, toast, toggleFinishedMutation]);
 
   return {
     handleOpenLink,
     handleShare,
     handleToggleBookmark,
-    handleToggleFinished,
+    handleSecondaryAction,
     bookmarkMutation,
+    archiveMutation,
     unbookmarkMutation,
     toggleFinishedMutation,
   };
