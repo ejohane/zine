@@ -3,6 +3,8 @@ import {
   buildWeeklyRecapEmptyState,
   formatDeltaLabel,
   formatEstimatedMinutes,
+  getDelayUntilNextLocalMidnight,
+  getWeeklyRecapAnchorDate,
   getDominantModeLabel,
   groupRecapItemsByDay,
   shouldShowWeeklyRecapEntry,
@@ -11,11 +13,11 @@ import {
 const recapFixture = {
   window: {
     timezone: 'America/Chicago',
-    startAt: '2026-03-11T05:00:00.000Z',
-    endAt: '2026-03-18T05:00:00.000Z',
-    comparisonStartAt: '2026-03-04T06:00:00.000Z',
-    comparisonEndAt: '2026-03-11T05:00:00.000Z',
-    label: 'Last 7 days',
+    startAt: '2026-03-08T06:00:00.000Z',
+    endAt: '2026-03-15T05:00:00.000Z',
+    comparisonStartAt: '2026-03-01T06:00:00.000Z',
+    comparisonEndAt: '2026-03-08T06:00:00.000Z',
+    label: 'Mar 8 - Mar 14',
   },
   headline: {
     completedCount: 2,
@@ -105,6 +107,18 @@ describe('weekly recap mobile helpers', () => {
     expect(shouldShowWeeklyRecapEntry(new Date(2026, 2, 17, 12, 0, 0))).toBe(false);
   });
 
+  it('anchors the recap query to the start of the local week', () => {
+    expect(getWeeklyRecapAnchorDate(new Date(2026, 2, 16, 12, 0, 0))).toBe('2026-03-15');
+    expect(getWeeklyRecapAnchorDate(new Date(2026, 2, 20, 8, 30, 0))).toBe('2026-03-15');
+  });
+
+  it('computes a positive delay until the next local midnight refresh', () => {
+    const delayMs = getDelayUntilNextLocalMidnight(new Date(2026, 2, 16, 23, 59, 0));
+
+    expect(delayMs).toBeGreaterThan(0);
+    expect(delayMs).toBeLessThanOrEqual(60_000);
+  });
+
   it('formats delta labels for recap comparisons', () => {
     expect(formatDeltaLabel(25)).toBe('Up 25% vs last week');
     expect(formatDeltaLabel(-10)).toBe('Down 10% vs last week');
@@ -151,7 +165,7 @@ describe('weekly recap mobile helpers', () => {
         },
       })
     ).toEqual({
-      title: 'No completed items in the last 7 days',
+      title: 'No completed items last week',
       message: 'You still started 2 items.',
     });
   });

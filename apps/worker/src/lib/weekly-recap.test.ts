@@ -24,30 +24,44 @@ describe('weekly recap', () => {
   });
 
   describe('getWeeklyRecapWindow', () => {
-    it('builds a rolling 7 day window in the requested timezone across DST changes', () => {
+    it('builds the most recent completed week in the requested timezone across DST changes', () => {
       const window = getWeeklyRecapWindow(TIMEZONE, NOW);
 
-      expect(window.startAt).toBe('2026-03-11T05:00:00.000Z');
-      expect(window.endAt).toBe('2026-03-18T05:00:00.000Z');
-      expect(window.comparisonStartAt).toBe('2026-03-04T06:00:00.000Z');
-      expect(window.comparisonEndAt).toBe('2026-03-11T05:00:00.000Z');
+      expect(window.startAt).toBe('2026-03-08T06:00:00.000Z');
+      expect(window.endAt).toBe('2026-03-15T05:00:00.000Z');
+      expect(window.comparisonStartAt).toBe('2026-03-01T06:00:00.000Z');
+      expect(window.comparisonEndAt).toBe('2026-03-08T06:00:00.000Z');
+      expect(window.label).toBe('Mar 8 - Mar 14');
+    });
+
+    it('resolves the same recap window on Sunday and Monday', () => {
+      const sundayWindow = getWeeklyRecapWindow(TIMEZONE, new Date('2026-03-15T15:00:00.000Z'));
+      const mondayWindow = getWeeklyRecapWindow(TIMEZONE, new Date('2026-03-16T15:00:00.000Z'));
+
+      expect(mondayWindow).toMatchObject({
+        startAt: sundayWindow.startAt,
+        endAt: sundayWindow.endAt,
+        comparisonStartAt: sundayWindow.comparisonStartAt,
+        comparisonEndAt: sundayWindow.comparisonEndAt,
+        label: sundayWindow.label,
+      });
     });
   });
 
   describe('buildWeeklyRecap', () => {
-    it('aggregates event-backed and legacy completions without letting unfinish events erase history', () => {
+    it('aggregates the latest completion state per recap week and uses the latest started timestamp', () => {
       const recap = buildWeeklyRecap({
         timezone: TIMEZONE,
         now: NOW,
         completionTransitions: [
           {
             event_id: 'evt-current-finished',
-            user_item_id: 'ui-event-current',
+            user_item_id: 'ui-event-finished',
             item_id: 'item-video-current',
             event_type: 'FINISHED',
-            occurred_at: Date.parse('2026-03-16T15:00:00.000Z'),
-            bookmarked_at: '2026-03-15T15:00:00.000Z',
-            ingested_at: '2026-03-14T15:00:00.000Z',
+            occurred_at: Date.parse('2026-03-14T15:00:00.000Z'),
+            bookmarked_at: '2026-03-13T15:00:00.000Z',
+            ingested_at: '2026-03-12T15:00:00.000Z',
             title: 'Deep Work Video',
             thumbnail_url: 'https://example.com/video.jpg',
             content_type: 'VIDEO',
@@ -60,21 +74,39 @@ describe('weekly recap', () => {
           },
           {
             event_id: 'evt-current-unfinished',
-            user_item_id: 'ui-event-current',
-            item_id: 'item-video-current',
+            user_item_id: 'ui-event-unfinished',
+            item_id: 'item-video-unfinished',
             event_type: 'UNFINISHED',
-            occurred_at: Date.parse('2026-03-17T14:00:00.000Z'),
-            bookmarked_at: '2026-03-15T15:00:00.000Z',
-            ingested_at: '2026-03-14T15:00:00.000Z',
-            title: 'Deep Work Video',
-            thumbnail_url: 'https://example.com/video.jpg',
+            occurred_at: Date.parse('2026-03-14T18:00:00.000Z'),
+            bookmarked_at: '2026-03-14T12:00:00.000Z',
+            ingested_at: '2026-03-13T12:00:00.000Z',
+            title: 'Undo Finish Video',
+            thumbnail_url: 'https://example.com/undo.jpg',
             content_type: 'VIDEO',
             provider: 'YOUTUBE',
-            duration: 1800,
+            duration: 1200,
             reading_time_minutes: null,
             word_count: null,
-            creator_id: 'creator-video',
-            creator_name: 'Video Creator',
+            creator_id: 'creator-undo',
+            creator_name: 'Undo Creator',
+          },
+          {
+            event_id: 'evt-current-finished-then-undone',
+            user_item_id: 'ui-event-unfinished',
+            item_id: 'item-video-unfinished',
+            event_type: 'FINISHED',
+            occurred_at: Date.parse('2026-03-14T17:00:00.000Z'),
+            bookmarked_at: '2026-03-14T12:00:00.000Z',
+            ingested_at: '2026-03-13T12:00:00.000Z',
+            title: 'Undo Finish Video',
+            thumbnail_url: 'https://example.com/undo.jpg',
+            content_type: 'VIDEO',
+            provider: 'YOUTUBE',
+            duration: 1200,
+            reading_time_minutes: null,
+            word_count: null,
+            creator_id: 'creator-undo',
+            creator_name: 'Undo Creator',
           },
           {
             event_id: 'evt-comparison-finished',
@@ -113,11 +145,11 @@ describe('weekly recap', () => {
             creator_name: 'Legacy Creator',
           },
           {
-            user_item_id: 'ui-event-current',
+            user_item_id: 'ui-event-finished',
             item_id: 'item-video-current',
-            finished_at: '2026-03-16T15:00:00.000Z',
-            bookmarked_at: '2026-03-15T15:00:00.000Z',
-            ingested_at: '2026-03-14T15:00:00.000Z',
+            finished_at: '2026-03-14T15:00:00.000Z',
+            bookmarked_at: '2026-03-13T15:00:00.000Z',
+            ingested_at: '2026-03-12T15:00:00.000Z',
             title: 'Duplicate Event Backed Item',
             thumbnail_url: null,
             content_type: 'VIDEO',
@@ -127,6 +159,22 @@ describe('weekly recap', () => {
             word_count: null,
             creator_id: 'creator-video',
             creator_name: 'Video Creator',
+          },
+          {
+            user_item_id: 'ui-event-unfinished',
+            item_id: 'item-video-unfinished',
+            finished_at: '2026-03-14T17:00:00.000Z',
+            bookmarked_at: '2026-03-14T12:00:00.000Z',
+            ingested_at: '2026-03-13T12:00:00.000Z',
+            title: 'Legacy Undo Candidate',
+            thumbnail_url: null,
+            content_type: 'VIDEO',
+            provider: 'YOUTUBE',
+            duration: 1200,
+            reading_time_minutes: null,
+            word_count: null,
+            creator_id: 'creator-undo',
+            creator_name: 'Undo Creator',
           },
         ],
         startedSnapshotRows: [
@@ -139,13 +187,14 @@ describe('weekly recap', () => {
             provider: 'SPOTIFY',
             creator_id: 'creator-podcast',
             creator_name: 'Podcast Creator',
-            last_opened_at: '2026-03-17T03:00:00.000Z',
+            last_opened_at: '2026-03-14T04:00:00.000Z',
             progress_position: 600,
             progress_duration: 1800,
-            progress_updated_at: '2026-03-17T03:05:00.000Z',
+            progress_updated_at: '2026-03-13T03:05:00.000Z',
+            last_touched_at: '2026-03-14T04:00:00.000Z',
           },
           {
-            user_item_id: 'ui-event-current',
+            user_item_id: 'ui-event-finished',
             item_id: 'item-video-current',
             title: 'Should be excluded from started',
             thumbnail_url: null,
@@ -153,10 +202,11 @@ describe('weekly recap', () => {
             provider: 'YOUTUBE',
             creator_id: 'creator-video',
             creator_name: 'Video Creator',
-            last_opened_at: '2026-03-17T04:00:00.000Z',
+            last_opened_at: '2026-03-14T20:00:00.000Z',
             progress_position: null,
             progress_duration: null,
             progress_updated_at: null,
+            last_touched_at: '2026-03-14T20:00:00.000Z',
           },
         ],
       });
@@ -194,13 +244,14 @@ describe('weekly recap', () => {
       expect(recap.startedItems[0]).toMatchObject({
         userItemId: 'ui-started',
         title: 'Started Podcast',
+        lastTouchedAt: '2026-03-14T04:00:00.000Z',
         progressPercent: 33,
       });
       expect(recap.completedItems.map((item) => item.userItemId)).toEqual([
-        'ui-event-current',
+        'ui-event-finished',
         'ui-legacy-current',
       ]);
-      expect(recap.trend.find((bucket) => bucket.date === '2026-03-16')).toMatchObject({
+      expect(recap.trend.find((bucket) => bucket.date === '2026-03-14')).toMatchObject({
         completedCount: 1,
         estimatedMinutes: 30,
         watchingMinutes: 30,
@@ -212,7 +263,7 @@ describe('weekly recap', () => {
       });
 
       const teaser = toWeeklyRecapTeaser(recap);
-      expect(teaser.headline).toBe('You finished 2 things this week');
+      expect(teaser.headline).toBe('You finished 2 things last week');
       expect(teaser.supportingLine).toBe('3m reading, 30m watching');
       expect(teaser.trendLabel).toBe('Up 175% vs last week');
     });
@@ -230,7 +281,7 @@ describe('weekly recap', () => {
       expect(recap.totals.startedCount).toBe(0);
       expect(recap.headline.dominantMode).toBe('NONE');
       expect(toWeeklyRecapTeaser(recap)).toMatchObject({
-        headline: 'No completed items this week',
+        headline: 'No completed items last week',
         supportingLine: 'No estimated time yet',
         trendLabel: 'No change vs last week',
       });
@@ -255,9 +306,9 @@ describe('weekly recap', () => {
                           user_item_id: 'ui-1',
                           item_id: 'item-1',
                           event_type: 'FINISHED',
-                          occurred_at: Date.parse('2026-03-17T01:00:00.000Z'),
-                          bookmarked_at: '2026-03-16T01:00:00.000Z',
-                          ingested_at: '2026-03-15T01:00:00.000Z',
+                          occurred_at: Date.parse('2026-03-14T01:00:00.000Z'),
+                          bookmarked_at: '2026-03-13T01:00:00.000Z',
+                          ingested_at: '2026-03-12T01:00:00.000Z',
                           title: 'Mock Video',
                           thumbnail_url: null,
                           content_type: 'VIDEO',

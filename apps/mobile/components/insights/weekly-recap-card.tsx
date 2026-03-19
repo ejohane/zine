@@ -25,7 +25,7 @@ export function WeeklyRecapCard({ recap, isLoading = false, onPress }: WeeklyRec
           Weekly recap
         </Text>
         <Text variant="headlineSmall" style={styles.loadingHeadline}>
-          Loading your last 7 days
+          Loading your weekly recap
         </Text>
         <Text variant="bodyMedium" tone="subheader">
           Pulling together recent completions, estimated time, and trends.

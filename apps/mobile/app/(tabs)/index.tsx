@@ -37,9 +37,9 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
-import { useWeeklyRecapTeaser } from '@/hooks/use-insights-trpc';
-import { shouldShowWeeklyRecapEntry } from '@/lib/weekly-recap';
+import { useWeeklyRecapEntryState, useWeeklyRecapTeaser } from '@/hooks/use-insights-trpc';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
+import { useAuthAvailability } from '@/providers/auth-provider';
 
 // =============================================================================
 // Icons
@@ -153,7 +153,9 @@ export default function HomeScreen() {
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
-  const shouldShowWeeklyRecapTeaser = shouldShowWeeklyRecapEntry();
+  const { isEnabled: isAuthEnabled } = useAuthAvailability();
+  const { shouldShowEntry: shouldShowWeeklyRecapTeaser, weekAnchorDate } =
+    useWeeklyRecapEntryState();
 
   useTabPrefetch('home');
 
@@ -162,7 +164,8 @@ export default function HomeScreen() {
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
   const { data: weeklyRecapTeaser, isLoading: isWeeklyRecapLoading } = useWeeklyRecapTeaser({
-    enabled: shouldShowWeeklyRecapTeaser,
+    enabled: isAuthEnabled && shouldShowWeeklyRecapTeaser,
+    weekAnchorDate,
   });
 
   // Transform to ItemCardData format for use with ItemCard component
@@ -356,15 +359,17 @@ export default function HomeScreen() {
             </ScrollView>
           </Animated.View>
 
-          {shouldShowWeeklyRecapTeaser && (weeklyRecapTeaser || isWeeklyRecapLoading) && (
-            <Animated.View style={styles.recapCardSection}>
-              <WeeklyRecapCard
-                recap={weeklyRecapTeaser}
-                isLoading={isWeeklyRecapLoading}
-                onPress={() => router.push('/recap/weekly')}
-              />
-            </Animated.View>
-          )}
+          {isAuthEnabled &&
+            shouldShowWeeklyRecapTeaser &&
+            (weeklyRecapTeaser || isWeeklyRecapLoading) && (
+              <Animated.View style={styles.recapCardSection}>
+                <WeeklyRecapCard
+                  recap={weeklyRecapTeaser}
+                  isLoading={isWeeklyRecapLoading}
+                  onPress={() => router.push('/recap/weekly')}
+                />
+              </Animated.View>
+            )}
 
           {isLoading ? (
             <View style={styles.loadingState}>

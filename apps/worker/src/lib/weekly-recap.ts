@@ -1,11 +1,10 @@
 import type { D1Database } from '@cloudflare/workers-types';
 
 const DEFAULT_TIMEZONE = 'UTC';
-const RECAP_LABEL = 'Last 7 days';
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
 const WORDS_PER_MINUTE = 220;
-const CURRENT_WINDOW_DAYS = 7;
+const RECAP_WINDOW_DAYS = 7;
 const TOP_GROUP_LIMIT = 3;
 
 export type WeeklyRecapMode = 'READING' | 'WATCHING' | 'LISTENING' | 'MIXED' | 'NONE';
@@ -41,7 +40,6 @@ type WindowRange = {
   comparisonStartAtMs: number;
   comparisonEndAtMs: number;
   startLocalDate: LocalDateParts;
-  currentLocalDate: LocalDateParts;
 };
 
 type TransitionEventRow = {
@@ -93,6 +91,7 @@ type StartedSnapshotRow = {
   progress_position: number | null;
   progress_duration: number | null;
   progress_updated_at: string | null;
+  last_touched_at: string | null;
 };
 
 type CompletedEntry = {
@@ -322,23 +321,91 @@ function formatDayLabel(dateKey: string): string {
   }).format(date);
 }
 
+function formatMonthDay(localDate: LocalDateParts): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(`${toLocalDateKey(localDate)}T12:00:00.000Z`));
+}
+
+function formatWindowLabel(startLocalDate: LocalDateParts, endLocalDate: LocalDateParts): string {
+  return `${formatMonthDay(startLocalDate)} - ${formatMonthDay(endLocalDate)}`;
+}
+
 function getDayBucket(dateString: string, timezone: string): string {
   return toLocalDateKey(getLocalDateParts(new Date(dateString), timezone));
 }
 
-export function getWeeklyRecapWindow(timezone: string, now: Date = new Date()): WindowRange {
-  const currentLocalDate = getLocalDateParts(now, timezone);
-  const startLocalDate = addDays(currentLocalDate, -(CURRENT_WINDOW_DAYS - 1));
-  const endLocalDate = addDays(currentLocalDate, 1);
-  const comparisonStartLocalDate = addDays(startLocalDate, -CURRENT_WINDOW_DAYS);
+function getLocalDayOfWeek(localDate: LocalDateParts): number {
+  return new Date(Date.UTC(localDate.year, localDate.month - 1, localDate.day)).getUTCDay();
+}
+
+function getStartOfWeek(localDate: LocalDateParts): LocalDateParts {
+  return addDays(localDate, -getLocalDayOfWeek(localDate));
+}
+
+function parseLocalDateKey(dateKey: string | undefined): LocalDateParts | null {
+  if (!dateKey) {
+    return null;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = {
+    year: Number.parseInt(match[1], 10),
+    month: Number.parseInt(match[2], 10),
+    day: Number.parseInt(match[3], 10),
+  };
+
+  const normalizedDate = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day));
+  const normalizedParts = {
+    year: normalizedDate.getUTCFullYear(),
+    month: normalizedDate.getUTCMonth() + 1,
+    day: normalizedDate.getUTCDate(),
+  };
+
+  return toLocalDateKey(normalizedParts) === dateKey ? parsed : null;
+}
+
+function getLatestIsoTimestamp(...timestamps: Array<string | null | undefined>): string | null {
+  let latest: string | null = null;
+
+  for (const timestamp of timestamps) {
+    if (!timestamp) {
+      continue;
+    }
+
+    if (!latest || timestamp > latest) {
+      latest = timestamp;
+    }
+  }
+
+  return latest;
+}
+
+export function getWeeklyRecapWindow(
+  timezone: string,
+  now: Date = new Date(),
+  weekAnchorDate?: string
+): WindowRange {
+  const derivedAnchorDate =
+    parseLocalDateKey(weekAnchorDate) ?? getStartOfWeek(getLocalDateParts(now, timezone));
+  const startLocalDate = addDays(derivedAnchorDate, -RECAP_WINDOW_DAYS);
+  const endLocalDate = derivedAnchorDate;
+  const comparisonStartLocalDate = addDays(startLocalDate, -RECAP_WINDOW_DAYS);
 
   const startAtDate = getStartOfDayUtc(startLocalDate, timezone);
   const endAtDate = getStartOfDayUtc(endLocalDate, timezone);
   const comparisonStartAtDate = getStartOfDayUtc(comparisonStartLocalDate, timezone);
+  const inclusiveEndLocalDate = addDays(endLocalDate, -1);
 
   return {
     timezone,
-    label: RECAP_LABEL,
+    label: formatWindowLabel(startLocalDate, inclusiveEndLocalDate),
     startAt: startAtDate.toISOString(),
     endAt: endAtDate.toISOString(),
     comparisonStartAt: comparisonStartAtDate.toISOString(),
@@ -348,7 +415,6 @@ export function getWeeklyRecapWindow(timezone: string, now: Date = new Date()): 
     comparisonStartAtMs: comparisonStartAtDate.getTime(),
     comparisonEndAtMs: startAtDate.getTime(),
     startLocalDate,
-    currentLocalDate,
   };
 }
 
@@ -427,6 +493,7 @@ function toStartedSnapshotRow(row: QueryRow): StartedSnapshotRow {
     progress_position: toNullableNumber(row.progress_position),
     progress_duration: toNullableNumber(row.progress_duration),
     progress_updated_at: toNullableString(row.progress_updated_at),
+    last_touched_at: toNullableString(row.last_touched_at),
   };
 }
 
@@ -535,6 +602,12 @@ async function queryStartedSnapshotRows(
       ui.progress_position,
       ui.progress_duration,
       ui.progress_updated_at,
+      CASE
+        WHEN ui.last_opened_at IS NOT NULL
+          AND (ui.progress_updated_at IS NULL OR ui.last_opened_at >= ui.progress_updated_at)
+          THEN ui.last_opened_at
+        ELSE ui.progress_updated_at
+      END AS last_touched_at,
       i.title,
       i.thumbnail_url,
       i.content_type,
@@ -553,7 +626,14 @@ async function queryStartedSnapshotRows(
         OR
         (ui.progress_updated_at IS NOT NULL AND ui.progress_updated_at >= ? AND ui.progress_updated_at < ?)
       )
-    ORDER BY COALESCE(ui.progress_updated_at, ui.last_opened_at) DESC, ui.id DESC`,
+    ORDER BY
+      CASE
+        WHEN ui.last_opened_at IS NOT NULL
+          AND (ui.progress_updated_at IS NULL OR ui.last_opened_at >= ui.progress_updated_at)
+          THEN ui.last_opened_at
+        ELSE ui.progress_updated_at
+      END DESC,
+      ui.id DESC`,
     [userId, startAt, endAt, startAt, endAt]
   );
 
@@ -660,7 +740,8 @@ function buildCompletedEntryFromLegacyRow(
 }
 
 function buildStartedEntry(row: StartedSnapshotRow, timezone: string): StartedEntry | null {
-  const lastTouchedAt = row.progress_updated_at ?? row.last_opened_at;
+  const lastTouchedAt =
+    row.last_touched_at ?? getLatestIsoTimestamp(row.last_opened_at, row.progress_updated_at);
   if (!lastTouchedAt) {
     return null;
   }
@@ -802,7 +883,7 @@ function addEntryToContentTypeCounts(counts: ContentTypeCounts, entry: Completed
 function buildTrendBuckets(window: WindowRange): WeeklyRecapResponse['trend'] {
   const buckets: WeeklyRecapResponse['trend'] = [];
 
-  for (let index = 0; index < CURRENT_WINDOW_DAYS; index += 1) {
+  for (let index = 0; index < RECAP_WINDOW_DAYS; index += 1) {
     const localDate = addDays(window.startLocalDate, index);
     const dateKey = toLocalDateKey(localDate);
     buckets.push({
@@ -877,20 +958,17 @@ function formatTrendLabel(deltaPct: number | null): string | null {
 export function buildWeeklyRecap(params: {
   timezone: string;
   now?: Date;
+  weekAnchorDate?: string;
   completionTransitions: TransitionEventRow[];
   legacyCompletedRows: LegacyCompletedRow[];
   startedSnapshotRows: StartedSnapshotRow[];
 }): WeeklyRecapResponse {
-  const window = getWeeklyRecapWindow(params.timezone, params.now);
+  const window = getWeeklyRecapWindow(params.timezone, params.now, params.weekAnchorDate);
 
-  const latestFinishedEventByWindowKey = new Map<string, TransitionEventRow>();
-  const completedEventUserItemIds = new Set<string>();
+  const latestTransitionByWindowKey = new Map<string, TransitionEventRow>();
+  const eventBackedWindowKeys = new Set<string>();
 
   for (const row of params.completionTransitions) {
-    if (row.event_type !== 'FINISHED') {
-      continue;
-    }
-
     const finishedAt = new Date(row.occurred_at).toISOString();
     const windowKey =
       finishedAt >= window.startAt && finishedAt < window.endAt
@@ -903,21 +981,38 @@ export function buildWeeklyRecap(params: {
       continue;
     }
 
-    completedEventUserItemIds.add(row.user_item_id);
-
     const dedupeKey = `${windowKey}:${row.user_item_id}`;
-    const existing = latestFinishedEventByWindowKey.get(dedupeKey);
-    if (!existing || row.occurred_at > existing.occurred_at) {
-      latestFinishedEventByWindowKey.set(dedupeKey, row);
+    eventBackedWindowKeys.add(dedupeKey);
+
+    const existing = latestTransitionByWindowKey.get(dedupeKey);
+    if (
+      !existing ||
+      row.occurred_at > existing.occurred_at ||
+      (row.occurred_at === existing.occurred_at && row.event_id > existing.event_id)
+    ) {
+      latestTransitionByWindowKey.set(dedupeKey, row);
     }
   }
 
-  const completedEntriesFromEvents = Array.from(latestFinishedEventByWindowKey.values()).map(
-    (row) => buildCompletedEntryFromTransitionRow(row, params.timezone)
-  );
+  const completedEntriesFromEvents = Array.from(latestTransitionByWindowKey.values())
+    .filter((row) => row.event_type === 'FINISHED')
+    .map((row) => buildCompletedEntryFromTransitionRow(row, params.timezone));
 
   const completedEntriesFromLegacy = params.legacyCompletedRows
-    .filter((row) => !completedEventUserItemIds.has(row.user_item_id))
+    .filter((row) => {
+      const windowKey =
+        row.finished_at >= window.startAt && row.finished_at < window.endAt
+          ? 'current'
+          : row.finished_at >= window.comparisonStartAt && row.finished_at < window.comparisonEndAt
+            ? 'comparison'
+            : null;
+
+      if (!windowKey) {
+        return false;
+      }
+
+      return !eventBackedWindowKeys.has(`${windowKey}:${row.user_item_id}`);
+    })
     .map((row) => buildCompletedEntryFromLegacyRow(row, params.timezone));
 
   const allCompletedEntries = [...completedEntriesFromEvents, ...completedEntriesFromLegacy].sort(
@@ -1105,8 +1200,8 @@ export function buildWeeklyRecap(params: {
 export function toWeeklyRecapTeaser(recap: WeeklyRecapResponse): WeeklyRecapTeaserResponse {
   const headline =
     recap.totals.completedCount > 0
-      ? `You finished ${recap.totals.completedCount} ${recap.totals.completedCount === 1 ? 'thing' : 'things'} this week`
-      : 'No completed items this week';
+      ? `You finished ${recap.totals.completedCount} ${recap.totals.completedCount === 1 ? 'thing' : 'things'} last week`
+      : 'No completed items last week';
 
   return {
     window: recap.window,
@@ -1128,9 +1223,10 @@ export async function getWeeklyRecap(params: {
   userId: string;
   timezone?: string;
   now?: Date;
+  weekAnchorDate?: string;
 }): Promise<WeeklyRecapResponse> {
   const timezone = resolveWeeklyRecapTimezone(params.timezone);
-  const window = getWeeklyRecapWindow(timezone, params.now);
+  const window = getWeeklyRecapWindow(timezone, params.now, params.weekAnchorDate);
 
   const [transitionRows, legacyCompletedRows, startedSnapshotRows] = await Promise.all([
     queryCompletionTransitionRows(
@@ -1146,6 +1242,7 @@ export async function getWeeklyRecap(params: {
   return buildWeeklyRecap({
     timezone,
     now: params.now,
+    weekAnchorDate: params.weekAnchorDate,
     completionTransitions: transitionRows,
     legacyCompletedRows,
     startedSnapshotRows,

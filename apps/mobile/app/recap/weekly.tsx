@@ -6,7 +6,7 @@ import { WeeklyRecapChart } from '@/components/insights/weekly-recap-chart';
 import { WeeklyRecapList } from '@/components/insights/weekly-recap-list';
 import { Surface, Text } from '@/components/primitives';
 import { ContentColors, Radius, Spacing } from '@/constants/theme';
-import { useWeeklyRecap } from '@/hooks/use-insights-trpc';
+import { useWeeklyRecap, useWeeklyRecapEntryState } from '@/hooks/use-insights-trpc';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
   buildModeSplit,
@@ -15,6 +15,7 @@ import {
   formatEstimatedMinutes,
   getDominantModeLabel,
 } from '@/lib/weekly-recap';
+import { useAuthAvailability } from '@/providers/auth-provider';
 
 function HighlightTile({
   label,
@@ -40,7 +41,30 @@ function HighlightTile({
 
 export default function WeeklyRecapScreen() {
   const { colors } = useAppTheme();
-  const { data: recap, isLoading, error, refetch } = useWeeklyRecap();
+  const { isEnabled } = useAuthAvailability();
+  const { weekAnchorDate } = useWeeklyRecapEntryState();
+  const {
+    data: recap,
+    isLoading,
+    error,
+    refetch,
+  } = useWeeklyRecap({
+    enabled: isEnabled,
+    weekAnchorDate,
+  });
+
+  if (!isEnabled) {
+    return (
+      <Surface style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Stack.Screen options={{ title: 'Weekly Recap', headerBackTitle: '' }} />
+        <EmptyState
+          title="Weekly recap requires sign-in"
+          message="Sign in to see your reading, watching, and listening summary."
+          emoji="🔒"
+        />
+      </Surface>
+    );
+  }
 
   if (isLoading && !recap) {
     return (
@@ -185,7 +209,7 @@ export default function WeeklyRecapScreen() {
               description={
                 recap.highlights.longestCompletedItem
                   ? `${formatEstimatedMinutes(recap.highlights.longestCompletedItem.estimatedMinutes)} estimated`
-                  : 'Finish something this week to unlock this'
+                  : 'Finish something to unlock this'
               }
             />
             <HighlightTile

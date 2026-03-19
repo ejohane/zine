@@ -73,7 +73,7 @@ export function WeeklyRecapList(props: WeeklyRecapListProps) {
                             ? `Estimated ${formatEstimatedMinutes(item.estimatedMinutes)}`
                             : item.progressPercent !== null
                               ? `${item.progressPercent}% complete`
-                              : 'Opened this week'}
+                              : 'Opened last week'}
                         </Text>
                       </View>
                     </View>

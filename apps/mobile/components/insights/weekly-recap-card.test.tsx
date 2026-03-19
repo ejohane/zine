@@ -44,13 +44,13 @@ jest.mock('@/hooks/use-app-theme', () => ({
 const recap = {
   window: {
     timezone: 'America/Chicago',
-    startAt: '2026-03-11T05:00:00.000Z',
-    endAt: '2026-03-18T05:00:00.000Z',
-    comparisonStartAt: '2026-03-04T06:00:00.000Z',
-    comparisonEndAt: '2026-03-11T05:00:00.000Z',
-    label: 'Last 7 days',
+    startAt: '2026-03-08T06:00:00.000Z',
+    endAt: '2026-03-15T05:00:00.000Z',
+    comparisonStartAt: '2026-03-01T06:00:00.000Z',
+    comparisonEndAt: '2026-03-08T06:00:00.000Z',
+    label: 'Mar 8 - Mar 14',
   },
-  headline: 'You finished 4 things this week',
+  headline: 'You finished 4 things last week',
   supportingLine: '1h 20m reading, 35m watching',
   trendLabel: 'Up 42% vs last week',
   completedCount: 4,
@@ -78,7 +78,7 @@ describe('WeeklyRecapCard', () => {
       .join(' ');
 
     expect(output).toContain('Weekly recap');
-    expect(output).toContain('You finished 4 things this week');
+    expect(output).toContain('You finished 4 things last week');
     expect(output).toContain('1h 20m reading, 35m watching');
     expect(output).toContain('See full recap');
   });
@@ -93,7 +93,7 @@ describe('WeeklyRecapCard', () => {
       .flatMap((node: any) => node.children)
       .join(' ');
 
-    expect(output).toContain('Loading your last 7 days');
+    expect(output).toContain('Loading your weekly recap');
     expect(output).toContain('Pulling together recent completions');
   });
 });

@@ -22,6 +22,14 @@ const MODE_LABELS: Record<WeeklyRecapMode, string> = {
   NONE: 'No dominant mode',
 };
 
+function formatLocalDateKey(date: Date): string {
+  return [
+    date.getFullYear().toString().padStart(4, '0'),
+    (date.getMonth() + 1).toString().padStart(2, '0'),
+    date.getDate().toString().padStart(2, '0'),
+  ].join('-');
+}
+
 export function formatEstimatedMinutes(totalMinutes: number): string {
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
     return '0m';
@@ -44,6 +52,19 @@ export function formatEstimatedMinutes(totalMinutes: number): string {
 export function shouldShowWeeklyRecapEntry(date = new Date()): boolean {
   const day = date.getDay();
   return day === 0 || day === 1;
+}
+
+export function getWeeklyRecapAnchorDate(date = new Date()): string {
+  const anchor = new Date(date);
+  anchor.setHours(0, 0, 0, 0);
+  anchor.setDate(anchor.getDate() - anchor.getDay());
+  return formatLocalDateKey(anchor);
+}
+
+export function getDelayUntilNextLocalMidnight(date = new Date()): number {
+  const nextMidnight = new Date(date);
+  nextMidnight.setHours(24, 0, 0, 0);
+  return Math.max(1_000, nextMidnight.getTime() - date.getTime());
 }
 
 export function formatDeltaLabel(deltaPct: number | null | undefined): string | null {
@@ -118,20 +139,20 @@ export function buildWeeklyRecapEmptyState(recap: WeeklyRecap): {
 } {
   if (recap.totals.completedCount > 0) {
     return {
-      title: 'You completed items this week',
+      title: 'You completed items last week',
       message: 'The recap below is based on estimated time from finished items.',
     };
   }
 
   if (recap.totals.startedCount > 0) {
     return {
-      title: 'No completed items in the last 7 days',
+      title: 'No completed items last week',
       message: `You still started ${recap.totals.startedCount} ${recap.totals.startedCount === 1 ? 'item' : 'items'}.`,
     };
   }
 
   return {
-    title: 'No completed items in the last 7 days',
+    title: 'No completed items last week',
     message: 'Open something from your library and this recap will start filling in.',
   };
 }

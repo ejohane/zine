@@ -5,6 +5,8 @@ import WeeklyRecapScreen from '@/app/recap/weekly';
 
 const mockUseWeeklyRecap = jest.fn();
 const mockRefetch = jest.fn();
+const mockUseAuthAvailability = jest.fn(() => ({ isEnabled: true }));
+const mockUseWeeklyRecapEntryState = jest.fn(() => ({ weekAnchorDate: '2026-03-15' }));
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 type TestNode = Renderer['root'];
@@ -24,11 +26,11 @@ function createRecap(overrides?: Record<string, unknown>) {
   return {
     window: {
       timezone: 'America/Chicago',
-      startAt: '2026-03-11T05:00:00.000Z',
-      endAt: '2026-03-18T05:00:00.000Z',
-      comparisonStartAt: '2026-03-04T06:00:00.000Z',
-      comparisonEndAt: '2026-03-11T05:00:00.000Z',
-      label: 'Last 7 days',
+      startAt: '2026-03-08T06:00:00.000Z',
+      endAt: '2026-03-15T05:00:00.000Z',
+      comparisonStartAt: '2026-03-01T06:00:00.000Z',
+      comparisonEndAt: '2026-03-08T06:00:00.000Z',
+      label: 'Mar 8 - Mar 14',
     },
     headline: {
       completedCount: 2,
@@ -163,6 +165,7 @@ jest.mock('@/components/primitives', () => ({
 
 jest.mock('@/hooks/use-insights-trpc', () => ({
   useWeeklyRecap: (...args: unknown[]) => mockUseWeeklyRecap(...args),
+  useWeeklyRecapEntryState: () => mockUseWeeklyRecapEntryState(),
 }));
 
 jest.mock('@/hooks/use-app-theme', () => ({
@@ -174,10 +177,36 @@ jest.mock('@/hooks/use-app-theme', () => ({
   }),
 }));
 
+jest.mock('@/providers/auth-provider', () => ({
+  useAuthAvailability: () => mockUseAuthAvailability(),
+}));
+
 describe('WeeklyRecapScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockRefetch.mockResolvedValue(undefined);
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
+    mockUseWeeklyRecapEntryState.mockReturnValue({ weekAnchorDate: '2026-03-15' });
+  });
+
+  it('renders an unavailable state when auth is disabled', () => {
+    mockUseAuthAvailability.mockReturnValue({ isEnabled: false });
+    mockUseWeeklyRecap.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<WeeklyRecapScreen />);
+    });
+
+    expect(getTextContent(renderer!.root)).toContain('Weekly recap requires sign-in');
+    expect(getTextContent(renderer!.root)).toContain(
+      'Sign in to see your reading, watching, and listening summary.'
+    );
   });
 
   it('renders a loading state while the recap is being built', () => {
@@ -258,7 +287,7 @@ describe('WeeklyRecapScreen', () => {
     });
 
     expect(getTextContent(renderer!.root)).toContain('A quieter week');
-    expect(getTextContent(renderer!.root)).toContain('No completed items in the last 7 days');
+    expect(getTextContent(renderer!.root)).toContain('No completed items last week');
     expect(getTextContent(renderer!.root)).toContain('You still started 2 items.');
   });
 
@@ -277,7 +306,7 @@ describe('WeeklyRecapScreen', () => {
 
     const output = getTextContent(renderer!.root);
 
-    expect(output).toContain('Last 7 days');
+    expect(output).toContain('Mar 8 - Mar 14');
     expect(output).toContain('2 completions');
     expect(output).toContain('1h 30m');
     expect(output).toContain('estimated time');
