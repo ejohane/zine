@@ -143,14 +143,26 @@ function createOptimisticConfig<TInput extends { id: string }>(
     };
   };
 
+  const invalidateItemQueries = (input: TInput) => {
+    utils.items.inbox.invalidate();
+    utils.items.library.invalidate();
+    utils.items.home.invalidate();
+    if (options.updateSingleItem) {
+      utils.items.get.invalidate({ id: input.id });
+    }
+  };
+
   return {
     onMutate: async (input: TInput): Promise<OptimisticContext> => {
-      // Cancel outgoing queries to prevent race conditions
+      // Apply optimistic state immediately so swipe/tap actions do not wait on query cancellation.
+      // Cancellation still runs in the background to reduce stale overwrite races.
       const cancellations: Promise<void>[] = [utils.items.home.cancel()];
       if (options.updateInbox) cancellations.push(utils.items.inbox.cancel());
       if (options.updateLibrary) cancellations.push(utils.items.library.cancel());
       if (options.updateSingleItem) cancellations.push(utils.items.get.cancel({ id: input.id }));
-      await Promise.all(cancellations);
+      void Promise.all(cancellations).catch(() => {
+        invalidateItemQueries(input);
+      });
 
       // Snapshot previous values for rollback
       const context: OptimisticContext = {};
@@ -207,13 +219,8 @@ function createOptimisticConfig<TInput extends { id: string }>(
     },
     onSettled: (_data: unknown, _err: unknown, vars: TInput) => {
       // Refetch after mutation completes (success or error)
-      utils.items.inbox.invalidate();
-      utils.items.library.invalidate();
-      utils.items.home.invalidate();
+      invalidateItemQueries(vars);
       invalidateRecapQueries(utils);
-      if (options.updateSingleItem) {
-        utils.items.get.invalidate({ id: vars.id });
-      }
     },
   };
 }
