@@ -24,14 +24,17 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
+      archivePending: false,
+      toggleFinishedPending: false,
     });
 
     expect(viewState.isXPost).toBe(false);
     expect(viewState.hasThumbnail).toBe(false);
     expect(viewState.headerAspectRatio).toBe(1);
     expect(viewState.isBookmarkActionDisabled).toBe(true);
-    expect(viewState.isCompleteActionDisabled).toBe(true);
+    expect(viewState.isSecondaryActionDisabled).toBe(true);
     expect(viewState.bookmarkActionIcon).toBe('bookmark-outline');
+    expect(viewState.secondaryActionIcon).toBe('archive-outline');
   });
 
   it('marks X posts and uses post description label', () => {
@@ -47,6 +50,8 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
+      archivePending: false,
+      toggleFinishedPending: false,
     });
 
     expect(viewState.isXPost).toBe(true);
@@ -64,14 +69,17 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
+      archivePending: false,
+      toggleFinishedPending: false,
     });
 
     expect(viewState.bookmarkActionIcon).toBe('bookmark');
     expect(viewState.bookmarkActionColor).toBe(Colors.dark.primary);
     expect(viewState.isBookmarkActionDisabled).toBe(false);
-    expect(viewState.isCompleteActionDisabled).toBe(false);
+    expect(viewState.isSecondaryActionDisabled).toBe(false);
     expect(viewState.descriptionLabel).toBe('About this video');
     expect(viewState.headerAspectRatio).toBeCloseTo(16 / 9);
+    expect(viewState.secondaryActionIcon).toBe('checkmark-circle-outline');
   });
 
   it('uses success colors for finished bookmarks', () => {
@@ -84,9 +92,26 @@ describe('useItemDetailViewState', () => {
       colors: Colors.dark,
       bookmarkPending: false,
       unbookmarkPending: false,
+      archivePending: false,
+      toggleFinishedPending: false,
     });
 
-    expect(viewState.completeActionIcon).toBe('checkmark-circle');
-    expect(viewState.completeActionColor).toBe(Colors.dark.success);
+    expect(viewState.secondaryActionIcon).toBe('checkmark-circle');
+    expect(viewState.secondaryActionColor).toBe(Colors.dark.success);
+  });
+
+  it('shows an archive action for non-bookmarked items', () => {
+    const viewState = useItemDetailViewState({
+      item: baseItem,
+      colors: Colors.dark,
+      bookmarkPending: false,
+      unbookmarkPending: false,
+      archivePending: false,
+      toggleFinishedPending: false,
+    });
+
+    expect(viewState.secondaryActionIcon).toBe('archive-outline');
+    expect(viewState.secondaryActionColor).toBe(Colors.dark.textSecondary);
+    expect(viewState.isSecondaryActionDisabled).toBe(false);
   });
 });

@@ -9,6 +9,8 @@ type ItemDetailViewStateInput = {
   colors: ItemDetailColors;
   bookmarkPending: boolean;
   unbookmarkPending: boolean;
+  archivePending: boolean;
+  toggleFinishedPending: boolean;
 };
 
 export function useItemDetailViewState({
@@ -16,6 +18,8 @@ export function useItemDetailViewState({
   colors,
   bookmarkPending,
   unbookmarkPending,
+  archivePending,
+  toggleFinishedPending,
 }: ItemDetailViewStateInput) {
   if (!item) {
     return {
@@ -25,10 +29,10 @@ export function useItemDetailViewState({
       descriptionLabel: 'Description',
       bookmarkActionIcon: 'bookmark-outline' as keyof typeof Ionicons.glyphMap,
       bookmarkActionColor: colors.textSecondary,
-      completeActionIcon: 'checkmark-circle-outline' as keyof typeof Ionicons.glyphMap,
-      completeActionColor: colors.textSecondary,
+      secondaryActionIcon: 'archive-outline' as keyof typeof Ionicons.glyphMap,
+      secondaryActionColor: colors.textSecondary,
       isBookmarkActionDisabled: true,
-      isCompleteActionDisabled: true,
+      isSecondaryActionDisabled: true,
     };
   }
 
@@ -41,11 +45,15 @@ export function useItemDetailViewState({
     : 'bookmark-outline';
   const bookmarkActionColor = isBookmarked ? colors.primary : colors.textSecondary;
 
-  const completeActionIcon: keyof typeof Ionicons.glyphMap = isFinished
-    ? 'checkmark-circle'
-    : 'checkmark-circle-outline';
-  const completeActionColor = isBookmarked && isFinished ? colors.success : colors.textSecondary;
-  const isCompleteActionDisabled = !isBookmarked;
+  const secondaryActionIcon: keyof typeof Ionicons.glyphMap = isBookmarked
+    ? isFinished
+      ? 'checkmark-circle'
+      : 'checkmark-circle-outline'
+    : item.state === UserItemState.ARCHIVED
+      ? 'archive'
+      : 'archive-outline';
+  const secondaryActionColor = isBookmarked && isFinished ? colors.success : colors.textSecondary;
+  const isSecondaryActionDisabled = isBookmarked ? toggleFinishedPending : archivePending;
 
   const descriptionLabel = (() => {
     switch (item.contentType) {
@@ -69,9 +77,9 @@ export function useItemDetailViewState({
     descriptionLabel,
     bookmarkActionIcon,
     bookmarkActionColor,
-    completeActionIcon,
-    completeActionColor,
+    secondaryActionIcon,
+    secondaryActionColor,
     isBookmarkActionDisabled,
-    isCompleteActionDisabled,
+    isSecondaryActionDisabled,
   };
 }
