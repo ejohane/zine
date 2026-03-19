@@ -97,9 +97,17 @@ export function decodeCursor(cursorString: string): PaginationCursor | null {
       typeof parsed.sortValue === 'string' &&
       typeof parsed.id === 'string'
     ) {
+      const sortValue = parsed.sortValue.trim();
+      const id = parsed.id.trim();
+
+      // Reject empty values and non-date sort values to avoid malformed cursors.
+      if (!sortValue || !id || Number.isNaN(Date.parse(sortValue))) {
+        return null;
+      }
+
       return {
-        sortValue: parsed.sortValue,
-        id: parsed.id,
+        sortValue,
+        id,
       };
     }
 

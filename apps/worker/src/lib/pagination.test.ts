@@ -46,6 +46,24 @@ describe('pagination utilities', () => {
 
       expect(decodeCursor(invalidPayload)).toBeNull();
     });
+
+    it('returns null for empty cursor fields', () => {
+      const emptyFields = btoa(JSON.stringify({ sortValue: '   ', id: '' }))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      expect(decodeCursor(emptyFields)).toBeNull();
+    });
+
+    it('returns null for invalid date sortValue', () => {
+      const invalidDate = btoa(JSON.stringify({ sortValue: 'not-a-date', id: 'item_1' }))
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      expect(decodeCursor(invalidDate)).toBeNull();
+    });
   });
 
   describe('buildPaginatedQuery', () => {
