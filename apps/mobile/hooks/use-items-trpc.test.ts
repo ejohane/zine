@@ -17,6 +17,7 @@ const mockInboxUseInfiniteQuery = jest.fn();
 const mockLibraryUseQuery = jest.fn();
 const mockLibraryUseInfiniteQuery = jest.fn();
 const mockHomeUseQuery = jest.fn();
+const mockArchiveUseMutation = jest.fn();
 const mockToggleFinishedUseMutation = jest.fn();
 const mockUseUtils = jest.fn();
 
@@ -33,6 +34,9 @@ jest.mock('../lib/trpc', () => ({
       },
       home: {
         useQuery: mockHomeUseQuery,
+      },
+      archive: {
+        useMutation: (...args: unknown[]) => mockArchiveUseMutation(...args),
       },
       toggleFinished: {
         useMutation: (...args: unknown[]) => mockToggleFinishedUseMutation(...args),
@@ -52,6 +56,7 @@ import {
   useLibraryItems,
   useInfiniteLibraryItems,
   useHomeData,
+  useArchiveItem,
   useToggleFinished,
 } from './use-items-trpc';
 
@@ -88,6 +93,11 @@ function createMockItem(overrides: Record<string, unknown> = {}) {
 type MockListData = {
   items: ReturnType<typeof createMockItem>[];
   nextCursor: string | null;
+};
+
+type MockInfiniteListData = {
+  pages: MockListData[];
+  pageParams: unknown[];
 };
 
 function serializeLibraryInput(
@@ -142,6 +152,22 @@ function createToggleUtils(initial?: {
   const inboxRef: { current: MockListData | undefined } = {
     current: initial?.inbox,
   };
+  const inboxInfiniteRef: { current: MockInfiniteListData | undefined } = {
+    current: initial?.inbox
+      ? {
+          pages: [initial.inbox],
+          pageParams: [],
+        }
+      : undefined,
+  };
+  const libraryInfiniteRef: { current: MockInfiniteListData | undefined } = {
+    current: initial?.defaultLibrary
+      ? {
+          pages: [initial.defaultLibrary],
+          pageParams: [],
+        }
+      : undefined,
+  };
 
   const itemsById = new Map<string, ReturnType<typeof createMockItem> | undefined>(
     Object.entries(initial?.itemsById ?? {})
@@ -165,6 +191,7 @@ function createToggleUtils(initial?: {
         getData: jest.fn((input?: Parameters<typeof serializeLibraryInput>[0]) =>
           libraryDataByKey.get(serializeLibraryInput(input))
         ),
+        getInfiniteData: jest.fn(() => libraryInfiniteRef.current),
         setData: jest.fn((input: Parameters<typeof serializeLibraryInput>[0], updater: unknown) => {
           const key = serializeLibraryInput(input);
           const previous = libraryDataByKey.get(key);
@@ -175,11 +202,25 @@ function createToggleUtils(initial?: {
           libraryDataByKey.set(key, next);
           return next;
         }),
+        setInfiniteData: jest.fn((_: undefined, updater: unknown) => {
+          const previous = libraryInfiniteRef.current;
+          const next =
+            typeof updater === 'function'
+              ? (
+                  updater as (
+                    value: MockInfiniteListData | undefined
+                  ) => MockInfiniteListData | undefined
+                )(previous)
+              : (updater as MockInfiniteListData | undefined);
+          libraryInfiniteRef.current = next;
+          return next;
+        }),
       },
       inbox: {
         cancel: mockInboxCancel,
         invalidate: mockInboxInvalidate,
         getData: jest.fn(() => inboxRef.current),
+        getInfiniteData: jest.fn(() => inboxInfiniteRef.current),
         setData: jest.fn((_: undefined, updater: unknown) => {
           const previous = inboxRef.current;
           const next =
@@ -187,6 +228,19 @@ function createToggleUtils(initial?: {
               ? (updater as (value: MockListData | undefined) => MockListData | undefined)(previous)
               : (updater as MockListData | undefined);
           inboxRef.current = next;
+          return next;
+        }),
+        setInfiniteData: jest.fn((_: undefined, updater: unknown) => {
+          const previous = inboxInfiniteRef.current;
+          const next =
+            typeof updater === 'function'
+              ? (
+                  updater as (
+                    value: MockInfiniteListData | undefined
+                  ) => MockInfiniteListData | undefined
+                )(previous)
+              : (updater as MockInfiniteListData | undefined);
+          inboxInfiniteRef.current = next;
           return next;
         }),
       },
@@ -264,6 +318,13 @@ beforeEach(() => {
     isLoading: false,
     error: null,
   });
+
+  mockArchiveUseMutation.mockImplementation((config: unknown) => ({
+    ...(config as Record<string, unknown>),
+    mutate: jest.fn(),
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }));
 
   mockToggleFinishedUseMutation.mockImplementation((config: unknown) => ({
     ...(config as Record<string, unknown>),
@@ -351,6 +412,57 @@ describe('useItems list queries', () => {
 
     const options = mockLibraryUseInfiniteQuery.mock.calls[0][1];
     expect(options.getNextPageParam({ nextCursor: 'cursor-abc', items: [] })).toBe('cursor-abc');
+  });
+});
+
+describe('useArchiveItem', () => {
+  type ArchiveHandlers = {
+    onMutate: ({ id }: { id: string }) => Promise<unknown>;
+    onError: (error: unknown, vars: { id: string }, context?: unknown) => void;
+    onSettled: (data: unknown, error: unknown, vars: { id: string }) => void;
+  };
+
+  function getArchiveHandlers() {
+    const { result } = renderHook(() => useArchiveItem());
+    return result.current as unknown as ArchiveHandlers;
+  }
+
+  it('optimistically updates the single item cache when archiving from detail', async () => {
+    const item = createMockItem({ id: 'archive-item', state: UserItemState.INBOX });
+    const harness = createToggleUtils({
+      inbox: {
+        items: [item],
+        nextCursor: null,
+      },
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getArchiveHandlers();
+
+    let context: unknown;
+
+    await act(async () => {
+      context = await mutation.onMutate({ id: item.id });
+    });
+
+    expect(harness.readInbox()?.items).toHaveLength(0);
+    expect(harness.readItem(item.id)?.state).toBe(UserItemState.ARCHIVED);
+
+    act(() => {
+      mutation.onError(new Error('Archive failed'), { id: item.id }, context);
+    });
+
+    expect(harness.readInbox()?.items[0]?.id).toBe(item.id);
+    expect(harness.readItem(item.id)?.state).toBe(UserItemState.INBOX);
+
+    act(() => {
+      mutation.onSettled(undefined, undefined, { id: item.id });
+    });
+
+    expect(harness.spies.mockGetInvalidate).toHaveBeenCalledWith({ id: item.id });
   });
 });
 
