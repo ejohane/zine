@@ -30,6 +30,12 @@ import {
 } from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import { isReconnectRequired } from '@/lib/connection-status';
+import {
+  addPendingDismissedId,
+  filterPendingDismissedItems,
+  pruneResolvedPendingDismissedIds,
+  removePendingDismissedId,
+} from '@/lib/inbox-optimistic-dismissal';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showWarning, showError } from '@/lib/toast-utils';
 import type { ContentType, Provider } from '@/lib/content-utils';
@@ -89,6 +95,7 @@ export default function InboxScreen() {
   // Track items that should animate in after a failed mutation (rollback)
   // Maps item ID to the direction they should enter from
   const [reappearingItems, setReappearingItems] = useState<Map<string, EnterDirection>>(new Map());
+  const [pendingDismissedItemIds, setPendingDismissedItemIds] = useState<Set<string>>(new Set());
   const listRef = useRef<Animated.FlatList<ItemCardData>>(null);
 
   // Action mutations for swipeable items with rollback handling
@@ -113,10 +120,12 @@ export default function InboxScreen() {
 
   const handleArchive = useCallback(
     (id: string) => {
+      setPendingDismissedItemIds((prev) => addPendingDismissedId(prev, id));
       archiveMutation.mutate(
         { id },
         {
           onError: () => {
+            setPendingDismissedItemIds((prev) => removePendingDismissedId(prev, id));
             // Archive exits left, so reappear from left
             markAsReappearing(id, 'left');
             showError(toast, new Error('Archive failed'), 'Failed to archive item', 'archive');
@@ -129,10 +138,12 @@ export default function InboxScreen() {
 
   const handleBookmark = useCallback(
     (id: string) => {
+      setPendingDismissedItemIds((prev) => addPendingDismissedId(prev, id));
       bookmarkMutation.mutate(
         { id },
         {
           onError: () => {
+            setPendingDismissedItemIds((prev) => removePendingDismissedId(prev, id));
             // Bookmark exits right, so reappear from right
             markAsReappearing(id, 'right');
             showError(toast, new Error('Bookmark failed'), 'Failed to save item', 'bookmark');
@@ -227,6 +238,15 @@ export default function InboxScreen() {
     [data?.pages]
   );
 
+  const visibleInboxItems = useMemo(
+    () => filterPendingDismissedItems(inboxItems, pendingDismissedItemIds),
+    [inboxItems, pendingDismissedItemIds]
+  );
+
+  useEffect(() => {
+    setPendingDismissedItemIds((prev) => pruneResolvedPendingDismissedIds(prev, inboxItems));
+  }, [inboxItems]);
+
   const handleEndReached = useCallback(() => {
     if (!hasNextPage || isFetchingNextPage) {
       return;
@@ -236,11 +256,11 @@ export default function InboxScreen() {
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const inboxCountLabel =
-    inboxItems.length === 0
+    visibleInboxItems.length === 0
       ? 'Decide what to keep'
       : hasNextPage
-        ? `${inboxItems.length}+ items to triage`
-        : `${inboxItems.length} item${inboxItems.length === 1 ? '' : 's'} to triage`;
+        ? `${visibleInboxItems.length}+ items to triage`
+        : `${visibleInboxItems.length} item${visibleInboxItems.length === 1 ? '' : 's'} to triage`;
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
@@ -319,12 +339,12 @@ export default function InboxScreen() {
         ) : (
           <Animated.FlatList
             ref={listRef}
-            data={inboxItems}
+            data={visibleInboxItems}
             renderItem={renderItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={[
               styles.listContent,
-              inboxItems.length === 0 && styles.emptyListContent,
+              visibleInboxItems.length === 0 && styles.emptyListContent,
             ]}
             showsVerticalScrollIndicator={false}
             onRefresh={handleRefresh}
