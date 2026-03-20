@@ -50,6 +50,7 @@ import { hashString } from '../../rss/url';
 import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
+import type { Bindings } from '../../types';
 
 // ============================================================================
 // Types
@@ -1204,8 +1205,7 @@ interface CachedLatestContent {
  * Environment type for provider fetch operations
  * Uses Bindings from types.ts - env vars are validated at runtime
  */
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
-type ProviderFetchEnv = import('../../types').Bindings;
+type ProviderFetchEnv = Bindings;
 
 // ============================================================================
 // Helper Functions
