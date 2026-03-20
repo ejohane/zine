@@ -22,13 +22,13 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Dimensions,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
+  type KeyboardEvent,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useToast } from 'heroui-native';
 import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
@@ -125,9 +125,18 @@ function LinkIcon({ size = 48, color = '#94A3B8' }: { size?: number; color?: str
 // Empty State Component
 // ============================================================================
 
-function EmptyState({ colors }: { colors: typeof Colors.light }) {
+function EmptyState({
+  colors,
+  compact = false,
+}: {
+  colors: typeof Colors.light;
+  compact?: boolean;
+}) {
   return (
-    <Animated.View style={styles.stateContainer}>
+    <Animated.View
+      testID="add-link-empty-state"
+      style={[styles.stateContainer, compact && styles.stateContainerCompact]}
+    >
       <LinkIcon size={48} color={colors.textTertiary} />
       <Text style={[styles.stateTitle, { color: colors.textSubheader }]}>
         Paste a link to get started
@@ -192,12 +201,13 @@ export default function AddLinkScreen() {
   const { toast } = useToast();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const headerHeight = useHeaderHeight();
   const insets = useSafeAreaInsets();
 
   // Input state
   const [url, setUrl] = useState('');
   const [debouncedUrl, setDebouncedUrl] = useState('');
+  const [keyboardOverlap, setKeyboardOverlap] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const didSetSharedUrl = useRef(false);
 
@@ -218,6 +228,40 @@ export default function AddLinkScreen() {
     setDebouncedUrl(sharedUrl.trim());
     didSetSharedUrl.current = true;
   }, [sharedUrl]);
+
+  useEffect(() => {
+    const handleKeyboardFrame = (event: KeyboardEvent) => {
+      if (Platform.OS === 'ios') {
+        Keyboard.scheduleLayoutAnimation(event);
+      }
+
+      const nextOverlap =
+        Platform.OS === 'ios'
+          ? Math.max(0, Dimensions.get('window').height - event.endCoordinates.screenY)
+          : event.endCoordinates.height;
+
+      setKeyboardOverlap(nextOverlap);
+    };
+
+    const handleKeyboardHide = (event?: KeyboardEvent) => {
+      if (event && Platform.OS === 'ios') {
+        Keyboard.scheduleLayoutAnimation(event);
+      }
+
+      setKeyboardOverlap(0);
+    };
+
+    const frameEvent = Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const frameSubscription = Keyboard.addListener(frameEvent, handleKeyboardFrame);
+    const hideSubscription = Keyboard.addListener(hideEvent, handleKeyboardHide);
+
+    return () => {
+      frameSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // Debounce URL input
   useEffect(() => {
@@ -254,6 +298,7 @@ export default function AddLinkScreen() {
 
   // Can save when we have a valid preview, not fetching, and not currently saving
   const canSave = preview && !isFetchingPreview && !isSaving;
+  const isKeyboardVisible = keyboardOverlap > 0;
 
   // Handle paste from clipboard
   // Note: On iOS, the paste button triggers the system paste permission dialog
@@ -322,6 +367,36 @@ export default function AddLinkScreen() {
     inputRef.current?.focus();
   }, [resetSaveMutation]);
 
+  const renderSaveButton = () => (
+    <Pressable
+      onPress={handleSave}
+      disabled={!canSave}
+      style={({ pressed }) => [
+        styles.saveButton,
+        {
+          backgroundColor: canSave ? colors.buttonPrimary : colors.backgroundTertiary,
+          opacity: pressed && canSave ? 0.9 : 1,
+        },
+      ]}
+      accessibilityLabel="Save to library"
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !canSave }}
+    >
+      {isSaving ? (
+        <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
+      ) : (
+        <Text
+          style={[
+            styles.saveButtonText,
+            { color: canSave ? colors.buttonPrimaryText : colors.textTertiary },
+          ]}
+        >
+          Save to Library
+        </Text>
+      )}
+    </Pressable>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
@@ -350,144 +425,119 @@ export default function AddLinkScreen() {
         }}
       />
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-      >
-        <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* URL Input */}
-            <Animated.View style={styles.inputSection}>
-              <View
-                style={[
-                  styles.inputContainer,
-                  {
-                    backgroundColor: colors.backgroundSecondary,
-                    borderColor: hasInput
-                      ? isUrlValid
-                        ? colors.primary
-                        : colors.error
-                      : colors.border,
-                  },
-                ]}
-              >
-                <TextInput
-                  ref={inputRef}
-                  value={url}
-                  onChangeText={setUrl}
-                  placeholder="Paste a link..."
-                  placeholderTextColor={colors.textTertiary}
-                  style={[styles.input, { color: colors.text }]}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="url"
-                  returnKeyType="done"
-                  onSubmitEditing={() => Keyboard.dismiss()}
-                  autoFocus
-                  accessibilityLabel="URL input"
-                  accessibilityHint="Paste or type a URL to save"
-                />
-                {hasInput ? (
-                  <Pressable
-                    onPress={handleClear}
-                    style={styles.inputButton}
-                    hitSlop={8}
-                    accessibilityLabel="Clear input"
-                    accessibilityRole="button"
-                  >
-                    <CloseIcon size={18} color={colors.textTertiary} />
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={handlePaste}
-                    style={[styles.pasteButton, { backgroundColor: colors.backgroundTertiary }]}
-                    hitSlop={8}
-                    accessibilityLabel="Paste from clipboard"
-                    accessibilityRole="button"
-                  >
-                    <ClipboardIcon size={16} color={colors.textSecondary} />
-                    <Text style={[styles.pasteButtonText, { color: colors.textSecondary }]}>
-                      Paste
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {/* Invalid URL hint */}
-              {hasInput && !isUrlValid && (
-                <Animated.Text style={[styles.hintText, { color: colors.error }]}>
-                  Please enter a valid URL (http:// or https://)
-                </Animated.Text>
-              )}
-            </Animated.View>
-
-            {/* Preview Area */}
-            <View style={styles.previewSection}>
-              {showEmpty && <EmptyState colors={colors} />}
-              {showLoading && <LoadingState colors={colors} />}
-              {showError && (
-                <ErrorState
-                  colors={colors}
-                  message={previewError?.message || 'Unable to fetch preview for this URL'}
-                  onRetry={handleRetry}
-                />
-              )}
-              {showPreview && (
-                <Animated.View>
-                  <LinkPreviewCard preview={preview} isLoading={isFetchingPreview} />
-                </Animated.View>
-              )}
-            </View>
-          </ScrollView>
-
-          {/* Save Button */}
-          <View
-            testID="add-link-footer"
-            style={[
-              styles.footer,
-              {
-                borderTopColor: colors.border,
-                paddingBottom: Spacing.xl + insets.bottom,
-              },
-            ]}
-          >
-            <Pressable
-              onPress={handleSave}
-              disabled={!canSave}
-              style={({ pressed }) => [
-                styles.saveButton,
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingBottom: footerHeight + Spacing.xl,
+            },
+          ]}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* URL Input */}
+          <Animated.View style={styles.inputSection}>
+            <View
+              style={[
+                styles.inputContainer,
                 {
-                  backgroundColor: canSave ? colors.buttonPrimary : colors.backgroundTertiary,
-                  opacity: pressed && canSave ? 0.9 : 1,
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: hasInput
+                    ? isUrlValid
+                      ? colors.primary
+                      : colors.error
+                    : colors.border,
                 },
               ]}
-              accessibilityLabel="Save to library"
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canSave }}
             >
-              {isSaving ? (
-                <ActivityIndicator size="small" color={colors.buttonPrimaryText} />
-              ) : (
-                <Text
-                  style={[
-                    styles.saveButtonText,
-                    { color: canSave ? colors.buttonPrimaryText : colors.textTertiary },
-                  ]}
+              <TextInput
+                ref={inputRef}
+                value={url}
+                onChangeText={setUrl}
+                placeholder="Paste a link..."
+                placeholderTextColor={colors.textTertiary}
+                style={[styles.input, { color: colors.text }]}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="done"
+                onSubmitEditing={() => Keyboard.dismiss()}
+                autoFocus
+                accessibilityLabel="URL input"
+                accessibilityHint="Paste or type a URL to save"
+              />
+              {hasInput ? (
+                <Pressable
+                  onPress={handleClear}
+                  style={styles.inputButton}
+                  hitSlop={8}
+                  accessibilityLabel="Clear input"
+                  accessibilityRole="button"
                 >
-                  Save to Library
-                </Text>
+                  <CloseIcon size={18} color={colors.textTertiary} />
+                </Pressable>
+              ) : (
+                <Pressable
+                  onPress={handlePaste}
+                  style={[styles.pasteButton, { backgroundColor: colors.backgroundTertiary }]}
+                  hitSlop={8}
+                  accessibilityLabel="Paste from clipboard"
+                  accessibilityRole="button"
+                >
+                  <ClipboardIcon size={16} color={colors.textSecondary} />
+                  <Text style={[styles.pasteButtonText, { color: colors.textSecondary }]}>
+                    Paste
+                  </Text>
+                </Pressable>
               )}
-            </Pressable>
+            </View>
+
+            {/* Invalid URL hint */}
+            {hasInput && !isUrlValid && (
+              <Animated.Text style={[styles.hintText, { color: colors.error }]}>
+                Please enter a valid URL (http:// or https://)
+              </Animated.Text>
+            )}
+          </Animated.View>
+
+          {/* Preview Area */}
+          <View style={styles.previewSection}>
+            {showEmpty && <EmptyState colors={colors} compact={isKeyboardVisible} />}
+            {showLoading && <LoadingState colors={colors} />}
+            {showError && (
+              <ErrorState
+                colors={colors}
+                message={previewError?.message || 'Unable to fetch preview for this URL'}
+                onRetry={handleRetry}
+              />
+            )}
+            {showPreview && (
+              <Animated.View>
+                <LinkPreviewCard preview={preview} isLoading={isFetchingPreview} />
+              </Animated.View>
+            )}
           </View>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+        </ScrollView>
+      </SafeAreaView>
+      <View
+        testID="add-link-footer"
+        onLayout={(event) => setFooterHeight(event.nativeEvent.layout.height)}
+        style={[
+          styles.footer,
+          {
+            backgroundColor: colors.background,
+            borderTopColor: colors.border,
+            bottom: keyboardOverlap,
+            paddingBottom: Spacing.xl + (isKeyboardVisible ? 0 : insets.bottom),
+          },
+        ]}
+      >
+        {renderSaveButton()}
+      </View>
     </View>
   );
 }
@@ -498,9 +548,6 @@ export default function AddLinkScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  keyboardAvoid: {
     flex: 1,
   },
   safeArea: {
@@ -571,6 +618,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing['3xl'],
     gap: Spacing.md,
   },
+  stateContainerCompact: {
+    flex: 0,
+    justifyContent: 'flex-start',
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.xl,
+  },
   stateTitle: {
     ...Typography.titleMedium,
     textAlign: 'center',
@@ -592,6 +645,10 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     padding: Spacing.xl,
     paddingTop: Spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,

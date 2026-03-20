@@ -4,8 +4,11 @@ import TestRenderer, { act } from 'react-test-renderer';
 const mockBack = jest.fn();
 const mockUsePreview = jest.fn();
 const mockUseSaveBookmark = jest.fn();
-const mockUseHeaderHeight = jest.fn();
 const mockUseSafeAreaInsets = jest.fn();
+const keyboardListeners = new Map<
+  string,
+  (event: { endCoordinates: { screenY: number; height: number }; duration?: number }) => void
+>();
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 
@@ -30,10 +33,6 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('@react-navigation/elements', () => ({
-  useHeaderHeight: () => mockUseHeaderHeight(),
-}));
-
 jest.mock('heroui-native', () => ({
   useToast: () => ({
     toast: {},
@@ -45,6 +44,14 @@ jest.mock('react-native', () => ({
   Platform: {
     OS: 'ios',
     select: (options: Record<string, unknown>) => options.ios ?? options.default,
+  },
+  Dimensions: {
+    get: () => ({
+      width: 393,
+      height: 852,
+      scale: 3,
+      fontScale: 1,
+    }),
   },
   View: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement('view', props, children),
@@ -79,9 +86,20 @@ jest.mock('react-native', () => ({
     React.createElement('activity-indicator', props),
   Keyboard: {
     dismiss: jest.fn(),
+    addListener: jest.fn(
+      (
+        eventName: string,
+        listener: (event: { endCoordinates: { screenY: number; height: number } }) => void
+      ) => {
+        keyboardListeners.set(eventName, listener);
+
+        return {
+          remove: () => keyboardListeners.delete(eventName),
+        };
+      }
+    ),
+    scheduleLayoutAnimation: jest.fn(),
   },
-  KeyboardAvoidingView: ({ children, ...props }: { children?: React.ReactNode }) =>
-    React.createElement('keyboard-avoiding-view', props, children),
   ScrollView: ({ children, ...props }: { children?: React.ReactNode }) =>
     React.createElement('scroll-view', props, children),
 }));
@@ -140,7 +158,7 @@ import AddLinkScreen from '@/app/add-link';
 describe('AddLinkScreen keyboard layout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseHeaderHeight.mockReturnValue(72);
+    keyboardListeners.clear();
     mockUseSafeAreaInsets.mockReturnValue({
       top: 0,
       right: 0,
@@ -161,20 +179,19 @@ describe('AddLinkScreen keyboard layout', () => {
     });
   });
 
-  it('uses the active header height for keyboard avoidance', () => {
+  it('enables automatic keyboard insets on the scroll view for iOS', () => {
     let renderer: Renderer;
 
     act(() => {
       renderer = TestRenderer.create(<AddLinkScreen />);
     });
 
-    const keyboardAvoidingView = renderer!.root.findByType('keyboard-avoiding-view');
+    const scrollView = renderer!.root.findByType('scroll-view');
 
-    expect(keyboardAvoidingView.props.behavior).toBe('padding');
-    expect(keyboardAvoidingView.props.keyboardVerticalOffset).toBe(72);
+    expect(scrollView.props.automaticallyAdjustKeyboardInsets).toBe(true);
   });
 
-  it('keeps footer spacing aligned with the bottom safe area inset', () => {
+  it('keeps footer spacing aligned with the bottom safe area inset when input is not focused', () => {
     let renderer: Renderer;
 
     act(() => {
@@ -185,6 +202,54 @@ describe('AddLinkScreen keyboard layout', () => {
     const style = flattenStyle(footer.props.style);
 
     expect(style.paddingTop).toBe(Spacing.lg);
+    expect(style.bottom).toBe(0);
     expect(style.paddingBottom).toBe(Spacing.xl + 34);
+  });
+
+  it('snaps the footer to the top of the keyboard on iOS', () => {
+    let renderer: Renderer;
+
+    act(() => {
+      renderer = TestRenderer.create(<AddLinkScreen />);
+    });
+
+    act(() => {
+      keyboardListeners.get('keyboardWillChangeFrame')?.({
+        endCoordinates: {
+          screenY: 540,
+          height: 312,
+        },
+      });
+    });
+
+    const footer = renderer!.root.findByProps({ testID: 'add-link-footer' });
+    const style = flattenStyle(footer.props.style);
+
+    expect(style.bottom).toBe(312);
+    expect(style.paddingBottom).toBe(Spacing.xl);
+  });
+
+  it('moves the empty state up when the keyboard is visible on iOS', () => {
+    let renderer: Renderer;
+
+    act(() => {
+      renderer = TestRenderer.create(<AddLinkScreen />);
+    });
+
+    act(() => {
+      keyboardListeners.get('keyboardWillChangeFrame')?.({
+        endCoordinates: {
+          screenY: 540,
+          height: 312,
+        },
+      });
+    });
+
+    const emptyState = renderer!.root.findByProps({ testID: 'add-link-empty-state' });
+    const style = flattenStyle(emptyState.props.style);
+
+    expect(style.flex).toBe(0);
+    expect(style.justifyContent).toBe('flex-start');
+    expect(style.paddingTop).toBe(Spacing.lg);
   });
 });
