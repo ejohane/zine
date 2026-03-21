@@ -34,6 +34,7 @@ type TrpcUtils = ReturnType<typeof trpc.useUtils>;
 /** Inbox/Library query data type */
 type ListQueryData = ReturnType<TrpcUtils['items']['inbox']['getData']>;
 type InfiniteListQueryData = ReturnType<TrpcUtils['items']['inbox']['getInfiniteData']>;
+type HomeQueryData = ReturnType<TrpcUtils['items']['home']['getData']>;
 
 /** Single item query data type */
 type ItemQueryData = ReturnType<TrpcUtils['items']['get']['getData']>;
@@ -47,8 +48,28 @@ type OptimisticContext = {
   previousLibrary?: ListQueryData;
   previousInfiniteInbox?: InfiniteListQueryData;
   previousInfiniteLibrary?: InfiniteListQueryData;
+  previousHome?: HomeQueryData;
   previousItem?: ItemQueryData;
 };
+
+const HOME_SECTION_LIMIT = 5;
+const HOME_JUMP_BACK_IN_LIMIT = 10;
+
+function removeItemFromHomeData(
+  old: NonNullable<HomeQueryData>,
+  id: string
+): NonNullable<HomeQueryData> {
+  return {
+    ...old,
+    recentBookmarks: old.recentBookmarks.filter((item) => item.id !== id),
+    jumpBackIn: old.jumpBackIn.filter((item) => item.id !== id),
+    byContentType: {
+      videos: old.byContentType.videos.filter((item) => item.id !== id),
+      podcasts: old.byContentType.podcasts.filter((item) => item.id !== id),
+      articles: old.byContentType.articles.filter((item) => item.id !== id),
+    },
+  };
+}
 
 function invalidateRecapQueries(utils: TrpcUtils) {
   utils.insights.weeklyRecap.invalidate();
@@ -110,6 +131,8 @@ function createOptimisticConfig<TInput extends { id: string }>(
     updateInbox?: (items: ListItem[], input: TInput) => ListItem[];
     /** Transform library items (return filtered/mapped items) */
     updateLibrary?: (items: ListItem[], input: TInput) => ListItem[];
+    /** Transform home query data */
+    updateHome?: (home: NonNullable<HomeQueryData>, input: TInput) => NonNullable<HomeQueryData>;
     /** Transform single item cache */
     updateSingleItem?: (
       item: NonNullable<ItemQueryData>,
@@ -189,6 +212,14 @@ function createOptimisticConfig<TInput extends { id: string }>(
         });
       }
 
+      if (options.updateHome) {
+        context.previousHome = utils.items.home.getData();
+        utils.items.home.setData(undefined, (old) => {
+          if (!old) return old;
+          return options.updateHome!(old, input);
+        });
+      }
+
       if (options.updateSingleItem) {
         context.previousItem = utils.items.get.getData({ id: input.id });
         utils.items.get.setData({ id: input.id }, (old) => {
@@ -212,6 +243,9 @@ function createOptimisticConfig<TInput extends { id: string }>(
       }
       if (context?.previousInfiniteLibrary) {
         utils.items.library.setInfiniteData(undefined, context.previousInfiniteLibrary);
+      }
+      if (context?.previousHome) {
+        utils.items.home.setData(undefined, context.previousHome);
       }
       if (context?.previousItem) {
         utils.items.get.setData({ id: vars.id }, context.previousItem);
@@ -536,6 +570,7 @@ export function useArchiveItem() {
     createOptimisticConfig(utils, {
       updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
       updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
+      updateHome: (home, { id }) => removeItemFromHomeData(home, id),
       updateSingleItem: (item) => ({
         ...item,
         state: UserItemState.ARCHIVED,
@@ -571,6 +606,7 @@ export function useUnbookmarkItem() {
     createOptimisticConfig(utils, {
       updateInbox: (items, { id }) => items.filter((item) => item.id !== id),
       updateLibrary: (items, { id }) => items.filter((item) => item.id !== id),
+      updateHome: (home, { id }) => removeItemFromHomeData(home, id),
       updateSingleItem: (item) => ({
         ...item,
         state: UserItemState.ARCHIVED,
@@ -626,6 +662,7 @@ export function useToggleFinished() {
   } => ({
     unfinishedInputs: [
       undefined,
+      {},
       { filter: { isFinished: false } },
       { filter: { provider: item.provider } },
       { filter: { contentType: item.contentType } },
@@ -638,6 +675,23 @@ export function useToggleFinished() {
       { filter: { isFinished: true, provider: item.provider, contentType: item.contentType } },
     ],
   });
+
+  const updateInfiniteLibraryItems = (
+    input: LibraryQueryInput,
+    updateItems: (items: ListItem[]) => ListItem[]
+  ) => {
+    utils.items.library.setInfiniteData(input, (old) => {
+      if (!old) return old;
+
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          items: updateItems(page.items),
+        })),
+      };
+    });
+  };
 
   const toggleFinishedInCaches = (id: string): boolean => {
     const currentItem = utils.items.get.getData({ id });
@@ -680,6 +734,12 @@ export function useToggleFinished() {
             : prependUniqueById(old.items, updatedItem as ListItem),
         };
       });
+
+      updateInfiniteLibraryItems(input, (items) =>
+        nowFinished
+          ? items.filter((item) => item.id !== id)
+          : prependUniqueById(items, updatedItem as ListItem)
+      );
     }
 
     for (const input of finishedInputs) {
@@ -693,6 +753,12 @@ export function useToggleFinished() {
             : old.items.filter((item) => item.id !== id),
         };
       });
+
+      updateInfiniteLibraryItems(input, (items) =>
+        nowFinished
+          ? prependUniqueById(items, updatedItem as ListItem)
+          : items.filter((item) => item.id !== id)
+      );
     }
 
     utils.items.inbox.setData(undefined, (old) => {
@@ -725,6 +791,44 @@ export function useToggleFinished() {
       }
 
       return updatedItem as NonNullable<ItemQueryData>;
+    });
+
+    utils.items.home.setData(undefined, (old) => {
+      if (!old) return old;
+
+      if (nowFinished || updatedItem.state !== UserItemState.BOOKMARKED) {
+        return removeItemFromHomeData(old, id);
+      }
+
+      const homeItem = updatedItem as (typeof old.recentBookmarks)[number];
+
+      const recentBookmarks = prependUniqueById(old.recentBookmarks, homeItem).slice(
+        0,
+        HOME_SECTION_LIMIT
+      );
+      const jumpBackIn = updatedItem.lastOpenedAt
+        ? prependUniqueById(old.jumpBackIn, homeItem).slice(0, HOME_JUMP_BACK_IN_LIMIT)
+        : old.jumpBackIn.filter((item) => item.id !== id);
+
+      return {
+        ...old,
+        recentBookmarks,
+        jumpBackIn,
+        byContentType: {
+          videos:
+            updatedItem.contentType === ContentType.VIDEO
+              ? prependUniqueById(old.byContentType.videos, homeItem).slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.videos.filter((item) => item.id !== id),
+          podcasts:
+            updatedItem.contentType === ContentType.PODCAST
+              ? prependUniqueById(old.byContentType.podcasts, homeItem).slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.podcasts.filter((item) => item.id !== id),
+          articles:
+            updatedItem.contentType === ContentType.ARTICLE
+              ? prependUniqueById(old.byContentType.articles, homeItem).slice(0, HOME_SECTION_LIMIT)
+              : old.byContentType.articles.filter((item) => item.id !== id),
+        },
+      };
     });
 
     return true;
