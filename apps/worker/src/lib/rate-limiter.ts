@@ -13,6 +13,102 @@
 import { logger } from './logger';
 
 const rateLimitLogger = logger.child('rate-limiter');
+const DEFAULT_RETRY_AFTER_MS = 30 * 1000;
+
+function createDefaultRateLimitState(): RateLimitState {
+  return {
+    retryAfter: null,
+    consecutiveFailures: 0,
+    lastRequest: 0,
+  };
+}
+
+function isValidRateLimitState(value: unknown): value is RateLimitState {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const state = value as Record<string, unknown>;
+  const retryAfterIsValid =
+    state.retryAfter === null ||
+    (typeof state.retryAfter === 'number' &&
+      Number.isFinite(state.retryAfter) &&
+      state.retryAfter >= 0);
+
+  return (
+    retryAfterIsValid &&
+    typeof state.consecutiveFailures === 'number' &&
+    Number.isFinite(state.consecutiveFailures) &&
+    state.consecutiveFailures >= 0 &&
+    typeof state.lastRequest === 'number' &&
+    Number.isFinite(state.lastRequest) &&
+    state.lastRequest >= 0
+  );
+}
+
+async function readStoredRateLimitState(
+  key: string,
+  kv: Pick<KVNamespace, 'delete'>,
+  stored: string | null
+): Promise<RateLimitState> {
+  if (!stored) {
+    return createDefaultRateLimitState();
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    if (isValidRateLimitState(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    rateLimitLogger.warn('Failed to parse stored rate limit state', { key, error });
+    await kv.delete(key);
+    return createDefaultRateLimitState();
+  }
+
+  rateLimitLogger.warn('Ignoring invalid stored rate limit state shape', { key });
+  await kv.delete(key);
+  return createDefaultRateLimitState();
+}
+
+function readHeaderValue(headers: unknown, headerName: string): string | undefined {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
+  }
+
+  const headersWithGet = headers as { get?: (name: string) => string | null };
+  if (typeof headersWithGet.get === 'function') {
+    return headersWithGet.get(headerName) ?? undefined;
+  }
+
+  const lowerHeaderName = headerName.toLowerCase();
+  for (const [key, value] of Object.entries(headers as Record<string, unknown>)) {
+    if (key.toLowerCase() === lowerHeaderName && typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function parseRetryAfterHeader(retryAfterHeader: string, now: number): number | null {
+  const trimmed = retryAfterHeader.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const retryAfterSeconds = Number(trimmed);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return now + retryAfterSeconds * 1000;
+  }
+
+  const retryAfterDate = Date.parse(trimmed);
+  if (Number.isFinite(retryAfterDate) && retryAfterDate > now) {
+    return retryAfterDate;
+  }
+
+  return null;
+}
 
 /**
  * State tracked per provider/user combination
@@ -158,39 +254,29 @@ export class RateLimitedFetcher {
    * - Default fallback of 30 seconds
    */
   private parseRetryAfter(error: unknown): number {
+    const now = Date.now();
+
     if (!error || typeof error !== 'object') {
-      return Date.now() + 30 * 1000;
+      return now + DEFAULT_RETRY_AFTER_MS;
     }
 
     const err = error as Record<string, unknown>;
 
-    // Try to extract Retry-After from headers
-    let retryAfterHeader: string | undefined;
-
-    // Check error.headers.get() (fetch Response style)
-    if (err.headers && typeof (err.headers as Record<string, unknown>).get === 'function') {
-      const headers = err.headers as { get: (name: string) => string | null };
-      retryAfterHeader = headers.get('Retry-After') ?? undefined;
-    }
-
-    // Check error.response.headers['retry-after'] (axios style)
-    if (!retryAfterHeader && err.response && typeof err.response === 'object') {
-      const response = err.response as Record<string, unknown>;
-      if (response.headers && typeof response.headers === 'object') {
-        const headers = response.headers as Record<string, string>;
-        retryAfterHeader = headers['retry-after'];
-      }
-    }
+    const retryAfterHeader =
+      readHeaderValue(err.headers, 'Retry-After') ??
+      (err.response && typeof err.response === 'object'
+        ? readHeaderValue((err.response as Record<string, unknown>).headers, 'Retry-After')
+        : undefined);
 
     if (retryAfterHeader) {
-      const seconds = parseInt(retryAfterHeader, 10);
-      if (!isNaN(seconds)) {
-        return Date.now() + seconds * 1000;
+      const retryAfter = parseRetryAfterHeader(retryAfterHeader, now);
+      if (retryAfter !== null) {
+        return retryAfter;
       }
     }
 
     // Default: 30 seconds
-    return Date.now() + 30 * 1000;
+    return now + DEFAULT_RETRY_AFTER_MS;
   }
 
   /**
@@ -217,9 +303,7 @@ export class RateLimitedFetcher {
     if (cached) return cached;
 
     const stored = await this.kv.get(key);
-    const state: RateLimitState = stored
-      ? JSON.parse(stored)
-      : { retryAfter: null, consecutiveFailures: 0, lastRequest: 0 };
+    const state = await readStoredRateLimitState(key, this.kv, stored);
 
     this.memoryState.set(key, state);
     return state;
@@ -295,7 +379,7 @@ export async function isRateLimited(
 
   if (!stored) return { limited: false };
 
-  const state: RateLimitState = JSON.parse(stored);
+  const state = await readStoredRateLimitState(key, kv, stored);
   if (!state.retryAfter || Date.now() >= state.retryAfter) {
     return { limited: false };
   }

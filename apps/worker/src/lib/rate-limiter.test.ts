@@ -151,6 +151,31 @@ describe('isRateLimited', () => {
 
     expect(mockKV.get).toHaveBeenCalledWith('rate:SPOTIFY:user_test');
   });
+
+  it('should ignore malformed stored state and clear it', async () => {
+    mockKV._store.set('rate:SPOTIFY:user_bad_json', '{not-json');
+
+    const result = await isRateLimited('SPOTIFY', 'user_bad_json', mockKV);
+
+    expect(result).toEqual({ limited: false });
+    expect(mockKV.delete).toHaveBeenCalledWith('rate:SPOTIFY:user_bad_json');
+  });
+
+  it('should ignore invalid stored state shapes and clear them', async () => {
+    mockKV._store.set(
+      'rate:YOUTUBE:user_bad_shape',
+      JSON.stringify({
+        retryAfter: 'soon',
+        consecutiveFailures: 1,
+        lastRequest: MOCK_NOW,
+      })
+    );
+
+    const result = await isRateLimited('YOUTUBE', 'user_bad_shape', mockKV);
+
+    expect(result).toEqual({ limited: false });
+    expect(mockKV.delete).toHaveBeenCalledWith('rate:YOUTUBE:user_bad_shape');
+  });
 });
 
 // ============================================================================
@@ -220,6 +245,16 @@ describe('RateLimitedFetcher', () => {
       await fetcher.fetch('SPOTIFY', 'user_clear', mockFn);
 
       expect(mockKV.delete).toHaveBeenCalledWith('rate:SPOTIFY:user_clear');
+    });
+
+    it('should recover from malformed stored state', async () => {
+      mockKV._store.set('rate:SPOTIFY:user_corrupt', '{not-json');
+      const mockFn = vi.fn().mockResolvedValue('ok');
+
+      const result = await fetcher.fetch('SPOTIFY', 'user_corrupt', mockFn);
+
+      expect(result).toBe('ok');
+      expect(mockFn).toHaveBeenCalled();
     });
   });
 
@@ -316,6 +351,23 @@ describe('RateLimitedFetcher', () => {
       }
     });
 
+    it('should parse Retry-After HTTP-date values', async () => {
+      const retryAfter = new Date(MOCK_NOW + 90000).toUTCString();
+      const mockFn = vi.fn().mockRejectedValue({
+        status: 429,
+        headers: {
+          get: (name: string) => (name === 'Retry-After' ? retryAfter : null),
+        },
+      });
+
+      try {
+        await fetcher.fetch('SPOTIFY', 'user_http_date', mockFn);
+      } catch (error) {
+        expect(error).toBeInstanceOf(RateLimitError);
+        expect((error as RateLimitError).retryInMs).toBe(90000);
+      }
+    });
+
     it('should parse Retry-After from response.headers style', async () => {
       const mockFn = vi.fn().mockRejectedValue({
         status: 429,
@@ -331,6 +383,24 @@ describe('RateLimitedFetcher', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(RateLimitError);
         expect((error as RateLimitError).retryInMs).toBeCloseTo(45000, -2);
+      }
+    });
+
+    it('should parse case-insensitive Retry-After header keys', async () => {
+      const mockFn = vi.fn().mockRejectedValue({
+        status: 429,
+        response: {
+          headers: {
+            'Retry-After': '15',
+          },
+        },
+      });
+
+      try {
+        await fetcher.fetch('YOUTUBE', 'user_case_header', mockFn);
+      } catch (error) {
+        expect(error).toBeInstanceOf(RateLimitError);
+        expect((error as RateLimitError).retryInMs).toBeCloseTo(15000, -2);
       }
     });
 
