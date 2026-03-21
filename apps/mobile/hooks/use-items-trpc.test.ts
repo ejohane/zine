@@ -105,6 +105,28 @@ type MockInfiniteListData = {
   pageParams: unknown[];
 };
 
+type MockHomeData = {
+  recentBookmarks: ReturnType<typeof createMockItem>[];
+  jumpBackIn: ReturnType<typeof createMockItem>[];
+  byContentType: {
+    videos: ReturnType<typeof createMockItem>[];
+    podcasts: ReturnType<typeof createMockItem>[];
+    articles: ReturnType<typeof createMockItem>[];
+  };
+};
+
+function createMockHomeData(items: ReturnType<typeof createMockItem>[] = []): MockHomeData {
+  return {
+    recentBookmarks: items,
+    jumpBackIn: items.filter((item) => item.lastOpenedAt !== null),
+    byContentType: {
+      videos: items.filter((item) => item.contentType === ContentType.VIDEO),
+      podcasts: items.filter((item) => item.contentType === ContentType.PODCAST),
+      articles: items.filter((item) => item.contentType === ContentType.ARTICLE),
+    },
+  };
+}
+
 function serializeLibraryInput(
   input?:
     | {
@@ -134,6 +156,7 @@ function createToggleUtils(initial?: {
   unfinishedLibrary?: MockListData;
   finishedLibrary?: MockListData;
   inbox?: MockListData;
+  home?: MockHomeData;
   itemsById?: Record<string, ReturnType<typeof createMockItem> | undefined>;
 }) {
   const libraryDataByKey = new Map<string, MockListData | undefined>();
@@ -177,6 +200,9 @@ function createToggleUtils(initial?: {
   const itemsById = new Map<string, ReturnType<typeof createMockItem> | undefined>(
     Object.entries(initial?.itemsById ?? {})
   );
+  const homeRef: { current: MockHomeData | undefined } = {
+    current: initial?.home,
+  };
 
   const mockLibraryCancel = jest.fn().mockResolvedValue(undefined);
   const mockInboxCancel = jest.fn().mockResolvedValue(undefined);
@@ -254,6 +280,16 @@ function createToggleUtils(initial?: {
       home: {
         cancel: mockHomeCancel,
         invalidate: mockHomeInvalidate,
+        getData: jest.fn(() => homeRef.current),
+        setData: jest.fn((_: undefined, updater: unknown) => {
+          const previous = homeRef.current;
+          const next =
+            typeof updater === 'function'
+              ? (updater as (value: MockHomeData | undefined) => MockHomeData | undefined)(previous)
+              : (updater as MockHomeData | undefined);
+          homeRef.current = next;
+          return next;
+        }),
       },
       get: {
         cancel: mockGetCancel,
@@ -289,6 +325,7 @@ function createToggleUtils(initial?: {
     readLibrary: (input?: Parameters<typeof serializeLibraryInput>[0]) =>
       libraryDataByKey.get(serializeLibraryInput(input)),
     readInbox: () => inboxRef.current,
+    readHome: () => homeRef.current,
     readItem: (id: string) => itemsById.get(id),
     spies: {
       mockLibraryInvalidate,
@@ -529,6 +566,31 @@ describe('useArchiveItem', () => {
       pendingSentinel
     );
   });
+
+  it('removes archived items from home caches immediately', async () => {
+    const item = createMockItem({ id: 'archive-home-item', state: UserItemState.BOOKMARKED });
+    const harness = createToggleUtils({
+      defaultLibrary: {
+        items: [item],
+        nextCursor: null,
+      },
+      home: createMockHomeData([item]),
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getArchiveHandlers();
+
+    await act(async () => {
+      await mutation.onMutate({ id: item.id });
+    });
+
+    expect(harness.readHome()?.recentBookmarks).toHaveLength(0);
+    expect(harness.readHome()?.byContentType.articles).toHaveLength(0);
+  });
 });
 
 describe('useBookmarkItem', () => {
@@ -754,5 +816,39 @@ describe('useToggleFinished', () => {
     await expect(
       Promise.race([mutatePromise, Promise.resolve({ didApplyOptimisticUpdate: false })])
     ).resolves.toEqual({ didApplyOptimisticUpdate: true });
+  });
+
+  it('removes completed bookmarks from home caches immediately', async () => {
+    const item = createMockItem({
+      id: 'home-finished-item',
+      isFinished: false,
+      lastOpenedAt: '2026-01-02T00:00:00.000Z',
+    });
+    const harness = createToggleUtils({
+      defaultLibrary: {
+        items: [item],
+        nextCursor: null,
+      },
+      finishedLibrary: {
+        items: [],
+        nextCursor: null,
+      },
+      home: createMockHomeData([item]),
+      itemsById: {
+        [item.id]: item,
+      },
+    });
+
+    mockUseUtils.mockReturnValue(harness.utils);
+
+    const mutation = getToggleHandlers();
+
+    await act(async () => {
+      await mutation.onMutate({ id: item.id });
+    });
+
+    expect(harness.readHome()?.recentBookmarks).toHaveLength(0);
+    expect(harness.readHome()?.jumpBackIn).toHaveLength(0);
+    expect(harness.readHome()?.byContentType.articles).toHaveLength(0);
   });
 });
