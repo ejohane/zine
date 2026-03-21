@@ -55,6 +55,13 @@ describe('fxtwitter', () => {
       expect(result).toEqual({ username: 'user', tweetId: '12345' });
     });
 
+    it('parses mobile x.com URL with query params', () => {
+      const result = parseTwitterUrl(
+        'https://mobile.x.com/saranormous/status/2035080458304987603?s=12'
+      );
+      expect(result).toEqual({ username: 'saranormous', tweetId: '2035080458304987603' });
+    });
+
     it('returns null for invalid domain', () => {
       const result = parseTwitterUrl('https://google.com');
       expect(result).toBeNull();

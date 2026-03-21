@@ -326,6 +326,19 @@ describe('parseLink', () => {
         expect(result?.provider).toBe(Provider.X);
         expect(result?.providerId).toBe('1234567890123456789');
       });
+
+      it('handles mobile x.com host with query parameters', () => {
+        const result = parseLink(
+          'https://mobile.x.com/saranormous/status/2035080458304987603?s=12'
+        );
+
+        expect(result).toEqual({
+          provider: Provider.X,
+          contentType: ContentType.POST,
+          providerId: '2035080458304987603',
+          canonicalUrl: 'https://x.com/saranormous/status/2035080458304987603',
+        });
+      });
     });
 
     describe('tracking parameter stripping', () => {
