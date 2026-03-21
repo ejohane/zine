@@ -233,10 +233,6 @@ export const FXTWITTER_API_BASE = 'https://api.fxtwitter.com';
 /** Request timeout in milliseconds (10s for Worker environment reliability) */
 const FETCH_TIMEOUT_MS = 10000;
 
-/** Regex pattern for Twitter/X URLs */
-const TWITTER_URL_PATTERN =
-  /^https?:\/\/(?:www\.)?(?:twitter\.com|x\.com)\/([^/]+)\/status\/(\d+)/i;
-
 // ============================================================================
 // Logger
 // ============================================================================
@@ -293,16 +289,31 @@ async function fetchWithTimeout(
  * ```
  */
 export function parseTwitterUrl(url: string): ParsedTwitterUrl | null {
-  const match = url.match(TWITTER_URL_PATTERN);
+  try {
+    const parsedUrl = new URL(url);
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, '');
+    const baseHostname = hostname.replace(/^(?:mobile\.|m\.)/, '');
 
-  if (!match || !match[1] || !match[2]) {
+    if (baseHostname !== 'twitter.com' && baseHostname !== 'x.com') {
+      return null;
+    }
+
+    const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+    if (pathParts.length < 3 || pathParts[1] !== 'status') {
+      return null;
+    }
+
+    const username = pathParts[0];
+    const tweetId = pathParts[2] ?? '';
+
+    if (!username || !/^\d+$/.test(tweetId)) {
+      return null;
+    }
+
+    return { username, tweetId };
+  } catch {
     return null;
   }
-
-  return {
-    username: match[1],
-    tweetId: match[2],
-  };
 }
 
 // ============================================================================

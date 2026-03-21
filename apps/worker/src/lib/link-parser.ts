@@ -227,9 +227,10 @@ function parseSubstack(url: URL): ParsedLink | null {
  *
  */
 function parseTwitter(url: URL): ParsedLink | null {
-  const hostname = url.hostname.toLowerCase().replace('www.', '');
+  const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+  const baseHostname = hostname.replace(/^(?:mobile\.|m\.)/, '');
 
-  if (hostname !== 'twitter.com' && hostname !== 'x.com') {
+  if (baseHostname !== 'twitter.com' && baseHostname !== 'x.com') {
     return null;
   }
 
