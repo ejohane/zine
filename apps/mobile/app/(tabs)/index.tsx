@@ -17,7 +17,6 @@ import Svg, { Path } from 'react-native-svg';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, HeadphonesIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
-import { WeeklyRecapCard } from '@/components/insights/weekly-recap-card';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import {
   Colors,
@@ -37,9 +36,7 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
-import { useWeeklyRecapEntryState, useWeeklyRecapTeaser } from '@/hooks/use-insights-trpc';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
-import { useAuthAvailability } from '@/providers/auth-provider';
 
 // =============================================================================
 // Icons
@@ -153,9 +150,6 @@ export default function HomeScreen() {
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
-  const { isEnabled: isAuthEnabled } = useAuthAvailability();
-  const { shouldShowEntry: shouldShowWeeklyRecapTeaser, weekAnchorDate } =
-    useWeeklyRecapEntryState();
 
   useTabPrefetch('home');
 
@@ -163,10 +157,6 @@ export default function HomeScreen() {
   const { data: inboxData, isLoading: isInboxLoading } = useInboxItems();
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
-  const { data: weeklyRecapTeaser, isLoading: isWeeklyRecapLoading } = useWeeklyRecapTeaser({
-    enabled: isAuthEnabled && shouldShowWeeklyRecapTeaser,
-    weekAnchorDate,
-  });
 
   // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
@@ -358,19 +348,6 @@ export default function HomeScreen() {
               ))}
             </ScrollView>
           </Animated.View>
-
-          {isAuthEnabled &&
-            shouldShowWeeklyRecapTeaser &&
-            (weeklyRecapTeaser || isWeeklyRecapLoading) && (
-              <Animated.View style={styles.recapCardSection}>
-                <WeeklyRecapCard
-                  recap={weeklyRecapTeaser}
-                  isLoading={isWeeklyRecapLoading}
-                  onPress={() => router.push('/recap/weekly')}
-                />
-              </Animated.View>
-            )}
-
           {isLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator size="large" color={colors.primary} />
@@ -550,10 +527,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
-  },
-  recapCardSection: {
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.xl,
   },
 
   // Section
