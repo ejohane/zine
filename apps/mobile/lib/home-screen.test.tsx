@@ -6,7 +6,6 @@ import HomeScreen from '@/app/(tabs)/index';
 const mockPush = jest.fn();
 const mockUseWeeklyRecapTeaser = jest.fn();
 const mockUseWeeklyRecapEntryState = jest.fn();
-const mockUseAuthAvailability = jest.fn(() => ({ isEnabled: true }));
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 type TestNode = Renderer['root'];
@@ -116,13 +115,12 @@ jest.mock('@/components/icons', () => ({
   ArticleIcon: () => null,
   HeadphonesIcon: () => null,
   PostIcon: () => null,
-  SettingsIcon: () => null,
+  SettingsIcon: () => React.createElement('span', null, 'Settings icon'),
   VideoIcon: () => null,
 }));
 
 jest.mock('@/components/insights/weekly-recap-card', () => ({
-  WeeklyRecapCard: ({ onPress }: { onPress?: () => void }) =>
-    React.createElement('button', { onClick: onPress, onPress }, 'Weekly recap card'),
+  WeeklyRecapCard: () => React.createElement('button', null, 'Weekly recap card'),
 }));
 
 jest.mock('@/components/item-card', () => ({
@@ -166,11 +164,7 @@ jest.mock('@/hooks/use-insights-trpc', () => ({
   useWeeklyRecapEntryState: () => mockUseWeeklyRecapEntryState(),
 }));
 
-jest.mock('@/providers/auth-provider', () => ({
-  useAuthAvailability: () => mockUseAuthAvailability(),
-}));
-
-describe('HomeScreen weekly recap entry', () => {
+describe('HomeScreen weekly recap behavior', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseWeeklyRecapTeaser.mockReturnValue({
@@ -181,58 +175,29 @@ describe('HomeScreen weekly recap entry', () => {
       shouldShowEntry: true,
       weekAnchorDate: '2026-03-15',
     });
-    mockUseAuthAvailability.mockReturnValue({ isEnabled: true });
   });
 
-  it('shows the recap teaser on the home screen during the Sunday/Monday window', () => {
-    let renderer: Renderer;
-    act(() => {
-      renderer = TestRenderer.create(<HomeScreen />);
-    });
-
-    expect(getTextContent(renderer!.root)).toContain('Weekly recap card');
-    expect(mockUseWeeklyRecapTeaser).toHaveBeenCalledWith({
-      enabled: true,
-      weekAnchorDate: '2026-03-15',
-    });
-
-    act(() => {
-      findButtonByText(renderer!, 'Weekly recap card').props.onPress();
-    });
-
-    expect(mockPush).toHaveBeenCalledWith('/recap/weekly');
-  });
-
-  it('hides the recap teaser outside the Sunday/Monday window', () => {
-    mockUseWeeklyRecapEntryState.mockReturnValue({
-      shouldShowEntry: false,
-      weekAnchorDate: '2026-03-15',
-    });
-
+  it('does not render a weekly recap card on Home and does not query teaser data', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<HomeScreen />);
     });
 
     expect(getTextContent(renderer!.root)).not.toContain('Weekly recap card');
-    expect(mockUseWeeklyRecapTeaser).toHaveBeenCalledWith({
-      enabled: false,
-      weekAnchorDate: '2026-03-15',
-    });
+    expect(mockUseWeeklyRecapEntryState).not.toHaveBeenCalled();
+    expect(mockUseWeeklyRecapTeaser).not.toHaveBeenCalled();
   });
 
-  it('disables the recap teaser query when auth is unavailable', () => {
-    mockUseAuthAvailability.mockReturnValue({ isEnabled: false });
-
+  it('keeps settings navigation on the Home screen', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<HomeScreen />);
     });
 
-    expect(getTextContent(renderer!.root)).not.toContain('Weekly recap card');
-    expect(mockUseWeeklyRecapTeaser).toHaveBeenCalledWith({
-      enabled: false,
-      weekAnchorDate: '2026-03-15',
+    act(() => {
+      findButtonByText(renderer!, 'Settings icon').props.onPress();
     });
+
+    expect(mockPush).toHaveBeenCalledWith('/settings');
   });
 });
