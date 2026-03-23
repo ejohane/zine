@@ -4,8 +4,8 @@
  * Features:
  * - Wraps individual subscription cards to prevent cascade failures
  * - Detects OAuth-related errors (401, token expired, revoked)
- * - Shows "Reconnect Account" for auth errors, "Try Again" for others
- * - Navigates to provider reconnection flow for auth issues
+ * - Shows "Reconnect Integration" for auth errors, "Try Again" for others
+ * - Navigates to the canonical source screen for auth issues
  *
  * @see frontend-spec.md Section 8.2
  */
@@ -75,13 +75,13 @@ function SubscriptionErrorFallback({ provider, onRetry }: SubscriptionErrorFallb
   const { colors } = useAppTheme();
 
   const handleReconnect = () => {
-    // Navigate to provider connect screen
+    // Navigate to the canonical source screen; auth can be resolved there.
     if (provider === 'SPOTIFY') {
-      router.push('/subscriptions/connect/spotify');
+      router.push('/subscriptions/spotify');
     } else if (provider === 'GMAIL') {
-      router.push('/subscriptions/connect/gmail');
+      router.push('/subscriptions/gmail');
     } else {
-      router.push('/subscriptions/connect/youtube');
+      router.push('/subscriptions/youtube');
     }
   };
 
@@ -106,10 +106,10 @@ function SubscriptionErrorFallback({ provider, onRetry }: SubscriptionErrorFallb
         ) : null}
 
         <Button
-          label="Reconnect Account"
+          label="Reconnect Integration"
           onPress={handleReconnect}
           variant="ghost"
-          accessibilityLabel="Reconnect account"
+          accessibilityLabel="Reconnect integration"
           labelStyle={{ color: colors.textSecondary }}
         />
       </View>
@@ -131,7 +131,7 @@ interface SubscriptionErrorBoundaryProps {
  * Error boundary specialized for subscription cards.
  *
  * Wraps subscription content to isolate failures. When an error occurs:
- * - For auth errors: Shows "Reconnect Account" and navigates to OAuth flow
+ * - For auth errors: Shows "Reconnect Integration" and navigates to the source screen
  * - For other errors: Shows "Try Again" button
  *
  * @example

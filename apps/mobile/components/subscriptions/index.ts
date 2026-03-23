@@ -11,3 +11,12 @@ export {
   type ChannelSelectionListProps,
   type ChannelSelectionActionBarProps,
 } from './channel-selection-list';
+export {
+  IntegrationCard,
+  SourceEmptyState,
+  SourceHero,
+  SourceListRow,
+  SourceSearchField,
+  SourceSectionHeader,
+  SourceSubscriptionRow,
+} from './source-ui';

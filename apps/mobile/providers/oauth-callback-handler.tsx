@@ -156,11 +156,7 @@ export function OAuthCallbackHandler({ onSuccess, onError, children }: OAuthCall
 
       if (result.success) {
         onSuccess?.(params.provider);
-        if (params.provider === 'GMAIL') {
-          router.replace('/subscriptions/gmail');
-        } else {
-          router.replace(`/subscriptions/discover/${params.provider.toLowerCase()}`);
-        }
+        router.replace(`/subscriptions/${params.provider.toLowerCase()}`);
       } else {
         onError?.(result.error || 'OAuth failed');
         router.replace(`/subscriptions/connect/${params.provider.toLowerCase()}`);

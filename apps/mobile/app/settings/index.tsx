@@ -2,8 +2,7 @@
  * Settings Main Screen
  *
  * Main settings screen displaying:
- * - Connected Accounts (YouTube/Spotify connection status)
- * - Subscriptions (count and link to manage)
+ * - Subscriptions (single entrypoint for sources and integrations)
  * - Account (Sign Out)
  * - About (version, terms, privacy)
  *
@@ -18,10 +17,13 @@ import Constants from 'expo-constants';
 
 import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useConnections, type Connection } from '@/hooks/use-connections';
+import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
+import { isReconnectRequired } from '@/lib/connection-status';
 import { buildMobileDiagnosticBundle } from '@/lib/diagnostics';
 import { settingsLogger } from '@/lib/logger';
+import { buildSubscriptionsSummary } from '@/lib/subscription-sources';
+import { trpc } from '@/lib/trpc';
 import { useAuthAvailability } from '@/providers/auth-provider';
 
 // ============================================================================
@@ -120,14 +122,21 @@ function SettingsScreenContent({
   // Data hooks
   const { data: connections } = useConnections();
   const { data: subscriptionsData } = useSubscriptions();
+  const newsletterStatsQuery = trpc.subscriptions.newsletters.stats.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
+  const rssStatsQuery = trpc.subscriptions.rss.stats.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
 
-  // Extract connection status
-  const youtubeConnection = connections?.find((c: Connection) => c.provider === 'YOUTUBE');
-  const spotifyConnection = connections?.find((c: Connection) => c.provider === 'SPOTIFY');
-  const gmailConnection = connections?.find((c: Connection) => c.provider === 'GMAIL');
-
-  // Get subscription count from items array
-  const activeSubscriptionCount = subscriptionsData?.items?.length ?? 0;
+  const activeSubscriptionCount =
+    (subscriptionsData?.items?.length ?? 0) +
+    (newsletterStatsQuery.data?.active ?? 0) +
+    (rssStatsQuery.data?.active ?? 0);
+  const activeIntegrationCount =
+    connections?.filter((connection) => connection.status === 'ACTIVE')?.length ?? 0;
+  const needsAttentionCount =
+    connections?.filter((connection) => isReconnectRequired(connection.status))?.length ?? 0;
 
   // Get app version from expo-constants
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
@@ -170,74 +179,18 @@ function SettingsScreenContent({
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Connected Accounts Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>
-          CONNECTED ACCOUNTS
-        </Text>
-
-        <View style={[styles.section, { backgroundColor: colors.card }]}>
-          {/* YouTube */}
-          <SettingsRow
-            icon="🎬"
-            title="YouTube"
-            subtitle={
-              youtubeConnection?.status === 'ACTIVE'
-                ? youtubeConnection.providerUserId || 'Connected'
-                : 'Not connected'
-            }
-            rightText={youtubeConnection?.status === 'ACTIVE' ? 'Connected' : 'Add'}
-            rightTextColor={
-              youtubeConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary
-            }
-            onPress={() =>
-              router.push({ pathname: '/settings/connections', params: { provider: 'youtube' } })
-            }
-          />
-
-          {/* Spotify */}
-          <SettingsRow
-            icon="🎧"
-            title="Spotify"
-            subtitle={
-              spotifyConnection?.status === 'ACTIVE'
-                ? spotifyConnection.providerUserId || 'Connected'
-                : 'Not connected'
-            }
-            rightText={spotifyConnection?.status === 'ACTIVE' ? 'Connected' : 'Add'}
-            rightTextColor={
-              spotifyConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary
-            }
-            onPress={() =>
-              router.push({ pathname: '/settings/connections', params: { provider: 'spotify' } })
-            }
-          />
-
-          {/* Gmail */}
-          <SettingsRow
-            icon="📬"
-            title="Gmail"
-            subtitle={
-              gmailConnection?.status === 'ACTIVE'
-                ? gmailConnection.providerUserId || 'Connected'
-                : 'Not connected'
-            }
-            rightText={gmailConnection?.status === 'ACTIVE' ? 'Connected' : 'Add'}
-            rightTextColor={
-              gmailConnection?.status === 'ACTIVE' ? colors.success : colors.textTertiary
-            }
-            onPress={() =>
-              router.push({ pathname: '/settings/connections', params: { provider: 'gmail' } })
-            }
-          />
-        </View>
-
-        {/* Subscriptions Section */}
-        <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>SUBSCRIPTIONS</Text>
-
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsRow
-            title="Manage Subscriptions"
-            subtitle={`${activeSubscriptionCount} active subscription${activeSubscriptionCount !== 1 ? 's' : ''}`}
+            title="Subscriptions"
+            subtitle={
+              activeSubscriptionCount > 0
+                ? buildSubscriptionsSummary(
+                    activeSubscriptionCount,
+                    activeIntegrationCount,
+                    needsAttentionCount
+                  )
+                : 'Manage your subscriptions and integrations'
+            }
             rightText="→"
             onPress={() => router.push('/subscriptions')}
           />

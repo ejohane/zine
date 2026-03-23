@@ -7,7 +7,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, FlatList, Linking, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 
 import { Button, Text } from '@/components/primitives';
 import { Typography, Spacing, Radius, type ThemeColors } from '@/constants/theme';
@@ -74,6 +75,37 @@ function getSectionTitle(provider: string): string {
   }
 }
 
+function getProviderDisplayName(provider: string): string {
+  switch (provider) {
+    case 'YOUTUBE':
+      return 'YouTube';
+    case 'SPOTIFY':
+      return 'Spotify';
+    case 'RSS':
+      return 'RSS';
+    case 'SUBSTACK':
+      return 'Substack';
+    case 'WEB':
+      return 'Web';
+    case 'GMAIL':
+      return 'Newsletters';
+    default:
+      return provider.charAt(0) + provider.slice(1).toLowerCase();
+  }
+}
+
+function getManageRoute(provider: string): Href | null {
+  if (provider === 'YOUTUBE' || provider === 'SPOTIFY' || provider === 'GMAIL') {
+    return `/subscriptions/${provider.toLowerCase()}` as Href;
+  }
+
+  if (provider === 'RSS' || provider === 'WEB' || provider === 'SUBSTACK') {
+    return '/subscriptions/rss' as Href;
+  }
+
+  return null;
+}
+
 // ============================================================================
 // Helper Components
 // ============================================================================
@@ -91,64 +123,50 @@ function Skeleton({ colors }: { colors: ThemeColors }) {
 interface ConnectPromptProps {
   provider: string;
   message: string;
-  connectUrl?: string;
+  onPress?: () => void;
   colors: ThemeColors;
 }
 
-function ConnectPrompt({ provider, message, connectUrl, colors }: ConnectPromptProps) {
-  const handleConnect = () => {
-    if (connectUrl) {
-      Linking.openURL(connectUrl);
-    }
-  };
-
-  const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
-
+function ConnectPrompt({ provider, message, onPress, colors }: ConnectPromptProps) {
+  const providerDisplayName = getProviderDisplayName(provider);
   return (
     <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
       <Text style={styles.promptText} tone="subheader">
         {message}
       </Text>
-      {connectUrl && (
+      {onPress ? (
         <Button
           label={`Connect ${providerDisplayName}`}
-          onPress={handleConnect}
+          onPress={onPress}
           style={styles.connectButton}
           accessibilityLabel={`Connect ${providerDisplayName}`}
         />
-      )}
+      ) : null}
     </View>
   );
 }
 
 interface ReconnectPromptProps {
   provider: string;
-  connectUrl?: string;
+  onPress?: () => void;
   colors: ThemeColors;
 }
 
-function ReconnectPrompt({ provider, connectUrl, colors }: ReconnectPromptProps) {
-  const handleReconnect = () => {
-    if (connectUrl) {
-      Linking.openURL(connectUrl);
-    }
-  };
-
-  const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
-
+function ReconnectPrompt({ provider, onPress, colors }: ReconnectPromptProps) {
+  const providerDisplayName = getProviderDisplayName(provider);
   return (
     <View style={[styles.promptContainer, { backgroundColor: colors.surfaceSubtle }]}>
       <Text style={styles.promptText} tone="subheader">
         Your {providerDisplayName} connection needs to be refreshed
       </Text>
-      {connectUrl && (
+      {onPress ? (
         <Button
           label="Reconnect"
-          onPress={handleReconnect}
+          onPress={onPress}
           style={styles.connectButton}
           accessibilityLabel={`Reconnect ${providerDisplayName}`}
         />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -179,6 +197,7 @@ export function CreatorLatestContent({
   stateOverride,
 }: CreatorLatestContentProps) {
   const { colors } = useAppTheme();
+  const router = useRouter();
   const [resolvedThumbnailUrls, setResolvedThumbnailUrls] = useState<Record<string, string | null>>(
     {}
   );
@@ -195,7 +214,6 @@ export function CreatorLatestContent({
   const latestContentState = useCreatorLatestContent(creatorId);
   const content = stateOverride?.content ?? latestContentState.content;
   const reason = stateOverride?.reason ?? latestContentState.reason;
-  const connectUrl = stateOverride?.connectUrl ?? latestContentState.connectUrl;
   const cacheStatus = stateOverride?.cacheStatus ?? latestContentState.cacheStatus;
   const isLoading = stateOverride?.isLoading ?? latestContentState.isLoading;
   const error = stateOverride?.error ?? latestContentState.error;
@@ -233,8 +251,17 @@ export function CreatorLatestContent({
     }
   }, [isLoading, reason, creatorId, provider]);
 
-  const providerDisplayName = provider.charAt(0) + provider.slice(1).toLowerCase();
+  const providerDisplayName = getProviderDisplayName(provider);
   const sectionTitle = getSectionTitle(provider);
+  const manageRoute = useMemo(() => getManageRoute(provider), [provider]);
+
+  const handleManagePress = useCallback(() => {
+    if (!manageRoute) {
+      return;
+    }
+
+    router.push(manageRoute);
+  }, [manageRoute, router]);
 
   const processThumbnailQueue = useCallback(async () => {
     if (isProcessingQueueRef.current) {
@@ -387,7 +414,7 @@ export function CreatorLatestContent({
         <ConnectPrompt
           provider={provider}
           message={`Connect your ${providerDisplayName} account to see latest content`}
-          connectUrl={connectUrl}
+          onPress={handleManagePress}
           colors={colors}
         />
       </View>
@@ -401,7 +428,7 @@ export function CreatorLatestContent({
         <Text style={styles.title} tone="primary">
           {sectionTitle}
         </Text>
-        <ReconnectPrompt provider={provider} connectUrl={connectUrl} colors={colors} />
+        <ReconnectPrompt provider={provider} onPress={handleManagePress} colors={colors} />
       </View>
     );
   }

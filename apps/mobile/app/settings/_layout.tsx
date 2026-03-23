@@ -25,7 +25,7 @@ export default function SettingsLayout() {
       <Stack.Screen
         name="connections"
         options={{
-          title: 'Connected Accounts',
+          title: 'Integrations',
         }}
       />
       <Stack.Screen

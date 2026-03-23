@@ -1,25 +1,16 @@
-import { useNavigation, useRouter, type Href } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { useNavigation } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  type ListRenderItemInfo,
-} from 'react-native';
+import { ActivityIndicator, View, Text, StyleSheet, type ListRenderItemInfo } from 'react-native';
 import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { InboxArrowIcon, SubscriptionsIcon } from '@/components/icons';
+import { InboxArrowIcon } from '@/components/icons';
 import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
 import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
   useInfiniteInboxItems,
@@ -29,7 +20,6 @@ import {
   mapProvider,
 } from '@/hooks/use-items-trpc';
 import { useSyncAll } from '@/hooks/use-sync-all';
-import { isReconnectRequired } from '@/lib/connection-status';
 import {
   addPendingDismissedId,
   filterPendingDismissedItems,
@@ -65,7 +55,7 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
       </Text>
       <View style={[styles.emptyHint, { backgroundColor: colors.backgroundSecondary }]}>
         <Text style={[styles.emptyHintText, { color: colors.textTertiary }]}>
-          Connect sources in Settings to start receiving content
+          Connect integrations in Settings to start receiving content
         </Text>
       </View>
     </Animated.View>
@@ -77,7 +67,6 @@ function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
 // =============================================================================
 
 export default function InboxScreen() {
-  const router = useRouter();
   const navigation = useNavigation();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -87,10 +76,6 @@ export default function InboxScreen() {
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useInfiniteInboxItems({ limit: INBOX_PAGE_SIZE });
-  const { data: connections } = useConnections();
-  const hasReconnectRequiredConnection = (connections ?? []).some((connection: Connection) =>
-    isReconnectRequired(connection.status)
-  );
 
   // Track items that should animate in after a failed mutation (rollback)
   // Maps item ID to the direction they should enter from
@@ -302,33 +287,6 @@ export default function InboxScreen() {
               </Text>
             )}
           </View>
-          <Pressable
-            style={[styles.subscriptionsButton, { backgroundColor: colors.backgroundSecondary }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/subscriptions' as Href);
-            }}
-            accessibilityLabel={
-              hasReconnectRequiredConnection
-                ? 'Manage subscriptions, reconnect required'
-                : 'Manage subscriptions'
-            }
-            accessibilityRole="button"
-          >
-            <SubscriptionsIcon size={22} color={colors.primary} />
-            {hasReconnectRequiredConnection ? (
-              <View
-                style={[
-                  styles.reconnectIndicatorDot,
-                  {
-                    backgroundColor: colors.warning,
-                    borderColor: colors.backgroundSecondary,
-                  },
-                ]}
-                accessible={false}
-              />
-            ) : null}
-          </Pressable>
         </View>
 
         {/* Content */}
@@ -395,24 +353,6 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     ...Typography.bodyMedium,
-  },
-  subscriptionsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Spacing.md,
-  },
-  reconnectIndicatorDot: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 10,
-    height: 10,
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
   },
   // List
   listContent: {
