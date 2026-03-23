@@ -162,11 +162,11 @@ export default function OnboardingConnectScreen() {
 
   // Navigation handlers
   const handleConnectYouTube = useCallback(() => {
-    router.push('/subscriptions/connect/youtube');
+    router.push('/subscriptions/youtube');
   }, [router]);
 
   const handleConnectSpotify = useCallback(() => {
-    router.push('/subscriptions/connect/spotify');
+    router.push('/subscriptions/spotify');
   }, [router]);
 
   const handleSkip = useCallback(() => {

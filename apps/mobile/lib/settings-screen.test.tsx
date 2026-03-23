@@ -19,12 +19,6 @@ function getTextContent(node: TestNode): string {
     .join(' ');
 }
 
-function findButtonByText(renderer: Renderer, text: string) {
-  return renderer.root.find(
-    (node: TestNode) => node.type === 'button' && getTextContent(node).includes(text)
-  );
-}
-
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -95,11 +89,36 @@ jest.mock('@/hooks/use-color-scheme', () => ({
 }));
 
 jest.mock('@/hooks/use-connections', () => ({
-  useConnections: () => ({ data: [] }),
+  useConnections: () => ({
+    data: [
+      { provider: 'YOUTUBE', status: 'ACTIVE', providerUserId: 'yt-user' },
+      { provider: 'SPOTIFY', status: 'EXPIRED', providerUserId: 'sp-user' },
+      { provider: 'GMAIL', status: 'ACTIVE', providerUserId: 'mail-user' },
+    ],
+  }),
 }));
 
 jest.mock('@/hooks/use-subscriptions-query', () => ({
-  useSubscriptions: () => ({ data: { items: [{ id: 'sub-1' }, { id: 'sub-2' }] } }),
+  useSubscriptions: () => ({
+    data: { items: [{ id: 'sub-1' }, { id: 'sub-2' }, { id: 'sub-3' }] },
+  }),
+}));
+
+jest.mock('@/lib/trpc', () => ({
+  trpc: {
+    subscriptions: {
+      newsletters: {
+        stats: {
+          useQuery: () => ({ data: { active: 4 } }),
+        },
+      },
+      rss: {
+        stats: {
+          useQuery: () => ({ data: { active: 2 } }),
+        },
+      },
+    },
+  },
 }));
 
 jest.mock('@/lib/diagnostics', () => ({
@@ -116,34 +135,47 @@ jest.mock('@/providers/auth-provider', () => ({
   useAuthAvailability: () => ({ isEnabled: false }),
 }));
 
-describe('SettingsScreen weekly recap entry', () => {
+describe('SettingsScreen subscriptions entrypoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders a permanent weekly recap row in settings', () => {
+  it('surfaces a single subscriptions entrypoint instead of provider-specific connection rows', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<SettingsScreen />);
     });
 
-    expect(getTextContent(renderer!.root)).toContain('INSIGHTS');
-    expect(getTextContent(renderer!.root)).toContain('Weekly Recap');
-    expect(getTextContent(renderer!.root)).toContain(
-      'Review your reading, watching, and listening anytime'
+    const rootText = getTextContent(renderer!.root);
+
+    expect(rootText).toContain('Subscriptions');
+    expect(rootText).toContain(
+      '9 active subscriptions · 2 integrations connected · 1 integration needs attention'
     );
+    expect(rootText).not.toContain('Connected Accounts');
+    expect(rootText).not.toContain('YouTube');
+    expect(rootText).not.toContain('Spotify');
+    expect(rootText).not.toContain('Gmail');
+    consoleErrorSpy.mockRestore();
   });
 
-  it('opens the detailed weekly recap screen from settings', () => {
+  it('opens subscriptions from settings using the consolidated entrypoint', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<SettingsScreen />);
     });
 
+    const subscriptionsButton = renderer!.root.find(
+      (node: TestNode) => node.type === 'button' && getTextContent(node).includes('Subscriptions')
+    );
+
     act(() => {
-      findButtonByText(renderer!, 'Weekly Recap').props.onPress();
+      subscriptionsButton.props.onPress();
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/recap/weekly');
+    expect(mockPush).toHaveBeenCalledWith('/subscriptions');
+    consoleErrorSpy.mockRestore();
   });
 });

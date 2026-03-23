@@ -35,6 +35,7 @@ and which are legacy or dormant.
 | `apps/mobile/components/error-boundary.tsx`                       | `canonical` | `P1`           | Base boundary used by specialized boundaries.                      |
 | `apps/mobile/components/subscriptions/channel-item.tsx`           | `canonical` | `P0`           | Reusable channel row in single and multi-select modes.             |
 | `apps/mobile/components/subscriptions/channel-selection-list.tsx` | `canonical` | `P0`           | Shared subscriptions list shell with search and selection states.  |
+| `apps/mobile/components/subscriptions/source-ui.tsx`              | `canonical` | `P1`           | Shared source rows, integration cards, and subscription list rows. |
 | `apps/mobile/components/creator/LatestContentCard.tsx`            | `canonical` | `P1`           | Reusable creator content row used in creator flows.                |
 
 ## App-Container Components

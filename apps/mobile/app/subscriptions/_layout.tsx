@@ -25,7 +25,7 @@ export default function SubscriptionsLayout() {
       <Stack.Screen
         name="rss"
         options={{
-          title: 'RSS Feeds',
+          title: 'RSS',
           headerLargeTitle: true,
         }}
       />

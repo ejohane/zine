@@ -13,38 +13,134 @@
  * @see Task zine-1yfa for requirements
  */
 
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import { CreatorLatestContent } from './CreatorLatestContent';
+
 // ============================================================================
 // Module-level Mocks
 // ============================================================================
 
-const mockUseCreatorLatestContent = jest.fn();
-const mockOpenURL = jest.fn();
-const mockUseColorScheme = jest.fn(() => 'light');
+type Renderer = ReturnType<typeof TestRenderer.create>;
+type TestNode = Renderer['root'];
+
+function getTextContent(node: TestNode): string {
+  return node.children
+    .map((child: TestNode | string) => {
+      if (typeof child === 'string') {
+        return child;
+      }
+      return getTextContent(child);
+    })
+    .join(' ');
+}
+
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  ...(() => {
+    const push = jest.fn();
+    return {
+      useRouter: () => ({
+        push,
+      }),
+      __mockPush: push,
+    };
+  })(),
+}));
 
 jest.mock('@/hooks/use-creator', () => ({
-  useCreatorLatestContent: mockUseCreatorLatestContent,
+  __esModule: true,
+  ...(() => {
+    const useCreatorLatestContent = jest.fn();
+    return {
+      useCreatorLatestContent,
+      __mockUseCreatorLatestContent: useCreatorLatestContent,
+    };
+  })(),
+}));
+
+jest.mock('@/hooks/use-app-theme', () => ({
+  useAppTheme: () => ({
+    colors: {
+      surfaceRaised: '#111',
+      surfaceSubtle: '#111',
+      textSecondary: '#666',
+      textPrimary: '#fff',
+      textSubheader: '#999',
+      statusError: '#f00',
+      accent: '#fff',
+    },
+  }),
 }));
 
 jest.mock('react-native', () => ({
-  View: 'View',
-  Text: 'Text',
-  FlatList: 'FlatList',
-  Pressable: 'Pressable',
-  Linking: {
-    openURL: mockOpenURL,
-  },
-  StyleSheet: {
-    create: (styles: Record<string, unknown>) => styles,
-  },
+  __esModule: true,
+  ...(() => {
+    const openURL = jest.fn();
+    return {
+      View: 'View',
+      Text: 'Text',
+      FlatList: 'FlatList',
+      Pressable: 'Pressable',
+      Linking: {
+        openURL,
+      },
+      __mockOpenURL: openURL,
+      StyleSheet: {
+        create: (styles: Record<string, unknown>) => styles,
+      },
+    };
+  })(),
+}));
+
+jest.mock('@/components/primitives', () => ({
+  Button: ({ label, onPress }: { label: string; onPress?: () => void }) =>
+    React.createElement('button', { onClick: onPress, onPress }, label),
+  Text: ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('span', null, children),
 }));
 
 jest.mock('@/hooks/use-color-scheme', () => ({
-  useColorScheme: mockUseColorScheme,
+  __esModule: true,
+  ...(() => {
+    const useColorScheme = jest.fn(() => 'light');
+    return {
+      useColorScheme,
+      __mockUseColorScheme: useColorScheme,
+    };
+  })(),
 }));
 
 jest.mock('./LatestContentCard', () => ({
   LatestContentCard: 'LatestContentCard',
 }));
+
+jest.mock('@/lib/analytics', () => ({
+  analytics: {
+    track: jest.fn(),
+  },
+}));
+
+jest.mock('@/lib/trpc', () => ({
+  trpc: {
+    creators: {
+      resolveLatestContentThumbnails: {
+        useMutation: () => ({
+          mutateAsync: jest.fn(),
+        }),
+      },
+    },
+  },
+}));
+const mockPush = (jest.requireMock('expo-router') as { __mockPush: jest.Mock }).__mockPush;
+const mockOpenURL = (jest.requireMock('react-native') as { __mockOpenURL: jest.Mock })
+  .__mockOpenURL;
+const mockUseCreatorLatestContent = (
+  jest.requireMock('@/hooks/use-creator') as { __mockUseCreatorLatestContent: jest.Mock }
+).__mockUseCreatorLatestContent;
+const mockUseColorScheme = (
+  jest.requireMock('@/hooks/use-color-scheme') as { __mockUseColorScheme: jest.Mock }
+).__mockUseColorScheme;
 
 jest.mock('@/constants/theme', () => ({
   Colors: {
@@ -122,6 +218,14 @@ describe('CreatorLatestContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseColorScheme.mockReturnValue('light');
+    mockUseCreatorLatestContent.mockReturnValue({
+      content: [],
+      reason: undefined,
+      connectUrl: undefined,
+      cacheStatus: undefined,
+      isLoading: false,
+      error: null,
+    });
   });
 
   const supportedProviders = ['YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK'];
@@ -211,6 +315,39 @@ describe('CreatorLatestContent', () => {
       expect(hookResult.connectUrl).toBe('https://auth.example.com/youtube');
     });
 
+    it('routes connect prompts into the subscriptions source screen', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      let renderer: Renderer;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          React.createElement(CreatorLatestContent, {
+            creatorId: 'creator-123',
+            provider: 'YOUTUBE',
+            stateOverride: {
+              content: [],
+              reason: 'NOT_CONNECTED',
+              connectUrl: undefined,
+              isLoading: false,
+              error: null,
+            },
+          })
+        );
+      });
+
+      const connectButton = renderer!.root.find(
+        (node: TestNode) => node.type === 'button' && getTextContent(node).includes('Connect')
+      );
+
+      act(() => {
+        connectButton.props.onPress();
+      });
+
+      expect(mockPush).toHaveBeenCalledWith('/subscriptions/youtube');
+      expect(mockOpenURL).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
     it('shows connect prompt without URL when connectUrl is undefined', () => {
       mockUseCreatorLatestContent.mockReturnValue({
         content: [],
@@ -239,6 +376,39 @@ describe('CreatorLatestContent', () => {
       const hookResult = mockUseCreatorLatestContent('creator-123');
       expect(hookResult.reason).toBe('TOKEN_EXPIRED');
       expect(hookResult.connectUrl).toBe('https://auth.example.com/youtube/reconnect');
+    });
+
+    it('routes reconnect prompts into the subscriptions source screen', () => {
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      let renderer: Renderer;
+
+      act(() => {
+        renderer = TestRenderer.create(
+          React.createElement(CreatorLatestContent, {
+            creatorId: 'creator-123',
+            provider: 'SPOTIFY',
+            stateOverride: {
+              content: [],
+              reason: 'TOKEN_EXPIRED',
+              connectUrl: 'https://auth.example.com/spotify/reconnect',
+              isLoading: false,
+              error: null,
+            },
+          })
+        );
+      });
+
+      const reconnectButton = renderer!.root.find(
+        (node: TestNode) => node.type === 'button' && getTextContent(node).includes('Reconnect')
+      );
+
+      act(() => {
+        reconnectButton.props.onPress();
+      });
+
+      expect(mockPush).toHaveBeenCalledWith('/subscriptions/spotify');
+      expect(mockOpenURL).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
     });
   });
 
