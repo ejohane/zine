@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { LoadingState } from '@/components/list-states';
-import { Surface, Text } from '@/components/primitives';
+import { IconButton, Surface, Text } from '@/components/primitives';
 import { SourceListRow } from '@/components/subscriptions';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { isReconnectRequired, type ConnectionStatus } from '@/lib/connection-status';
@@ -21,7 +23,26 @@ import { trpc } from '@/lib/trpc';
 const SUBSCRIPTION_SOURCES: SubscriptionSource[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL', 'RSS'];
 
 export default function SubscriptionsScreen() {
+  const navigation = useNavigation();
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const canGoBack = navigation.canGoBack();
+  const headerLeft = canGoBack
+    ? () => (
+        <View style={styles.headerLeftWrapper}>
+          <IconButton
+            size="sm"
+            variant="subtle"
+            colors={colors}
+            style={[styles.headerBackButton, { backgroundColor: colors.backgroundSecondary }]}
+            accessibilityLabel="Go back"
+            onPress={() => router.back()}
+          >
+            <Ionicons name="chevron-back" size={20} color={colors.text} />
+          </IconButton>
+        </View>
+      )
+    : undefined;
 
   const { data: connections, isLoading: connectionsLoading } = useConnections();
   const { subscriptions, isLoading: subscriptionsLoading } = useSubscriptions();
@@ -89,41 +110,55 @@ export default function SubscriptionsScreen() {
 
   if (isLoading) {
     return (
-      <Surface tone="canvas" style={styles.container}>
-        <LoadingState />
-      </Surface>
+      <>
+        <Stack.Screen
+          options={{
+            headerLeft,
+          }}
+        />
+        <Surface tone="canvas" style={styles.container}>
+          <LoadingState />
+        </Surface>
+      </>
     );
   }
 
   return (
-    <Surface tone="canvas" style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-      >
-        <Surface tone="elevated" border="subtle" radius="xl" style={styles.hero}>
-          <Text variant="labelSmallPlain" tone="tertiary" transform="uppercase">
-            Subscriptions
-          </Text>
-          <Text variant="headlineSmall">Manage each source in one place</Text>
-          <Text variant="bodyMedium" tone="subheader">
-            {buildSubscriptionsSummary(totalActiveCount, connectedIntegrations, attentionCount)}
-          </Text>
-        </Surface>
+    <>
+      <Stack.Screen
+        options={{
+          headerLeft,
+        }}
+      />
+      <Surface tone="canvas" style={styles.container} collapsable={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+        >
+          <Surface tone="elevated" border="subtle" radius="xl" style={styles.hero}>
+            <Text variant="labelSmallPlain" tone="tertiary" transform="uppercase">
+              Subscriptions
+            </Text>
+            <Text variant="headlineSmall">Manage each source in one place</Text>
+            <Text variant="bodyMedium" tone="subheader">
+              {buildSubscriptionsSummary(totalActiveCount, connectedIntegrations, attentionCount)}
+            </Text>
+          </Surface>
 
-        <View style={styles.rows}>
-          {sourceRows.map((row) => (
-            <SourceListRow
-              key={row.source}
-              source={row.source}
-              summary={row.summary}
-              onPress={() => router.push(row.route)}
-            />
-          ))}
-        </View>
-      </ScrollView>
-    </Surface>
+          <View style={styles.rows}>
+            {sourceRows.map((row) => (
+              <SourceListRow
+                key={row.source}
+                source={row.source}
+                summary={row.summary}
+                onPress={() => router.push(row.route)}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </Surface>
+    </>
   );
 }
 
@@ -139,12 +174,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
     gap: Spacing.lg,
     paddingBottom: Spacing['3xl'],
   },
+  headerBackButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerLeftWrapper: {
+    marginLeft: Spacing.md,
+    marginTop: Spacing.xs,
+  },
   hero: {
     gap: Spacing.sm,
+    marginTop: Spacing.sm,
     padding: Spacing.lg,
   },
   rows: {
