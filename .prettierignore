@@ -1,3 +1,5 @@
 apps/mobile/expo-env.d.ts
+apps/mobile/.rnstorybook/storybook.requires.ts
+apps/mobile/uniwind-types.d.ts
 apps/mobile/ios/
 .opencode/
