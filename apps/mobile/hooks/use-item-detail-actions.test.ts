@@ -123,20 +123,18 @@ describe('useItemDetailActions', () => {
     expect(mockToggleFinishedMutation.mutate).not.toHaveBeenCalled();
   });
 
-  it('marks an item opened when the detail view loads', () => {
+  it('does not mark an item opened when the detail view loads', () => {
     let currentItem: ItemDetailItem | undefined = baseItem;
     const { rerender } = renderHook(() => useItemDetailActions(currentItem));
 
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(1);
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
 
     rerender();
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(1);
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
 
     currentItem = { ...baseItem, id: 'item-2' } as unknown as ItemDetailItem;
     rerender();
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledTimes(2);
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenLastCalledWith({ id: 'item-2' });
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('opens in-app browser for articles and marks opened for bookmarked items', async () => {
@@ -216,15 +214,14 @@ describe('useItemDetailActions', () => {
     });
   });
 
-  it('marks opened after a successful open even when the item is not bookmarked', async () => {
+  it('does not mark opened after a successful open when the item is not bookmarked', async () => {
     const { result } = renderHook(() => useItemDetailActions(baseItem));
-    mockMarkOpenedMutation.mutate.mockClear();
 
     await act(async () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: baseItem.id });
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('logs errors when link opening fails', async () => {

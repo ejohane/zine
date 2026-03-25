@@ -1024,6 +1024,10 @@ export const itemsRouter = router({
         });
       }
 
+      if (existing[0].state !== UserItemState.BOOKMARKED) {
+        return { success: true as const, updated: false };
+      }
+
       await ctx.db
         .update(userItems)
         .set({
