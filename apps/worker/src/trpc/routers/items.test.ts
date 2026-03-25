@@ -281,7 +281,13 @@ function createMockItemsCaller(options: {
           message: `Item ${input.id} not found`,
         });
       }
-      return { success: true as const, updated: item.state === UserItemState.BOOKMARKED };
+
+      if (item.state === UserItemState.BOOKMARKED) {
+        item.lastOpenedAt = new Date().toISOString();
+        return { success: true as const, updated: true };
+      }
+
+      return { success: true as const, updated: false };
     },
 
     updateProgress: async (input: { id: string; position: number; duration: number }) => {
@@ -1217,6 +1223,27 @@ describe('Items Router', () => {
       const result = await caller.markOpened({ id: 'ui-002' });
 
       expect(result).toEqual({ success: true, updated: false });
+    });
+
+    it('should not add inbox items to jumpBackIn after markOpened', async () => {
+      const item = createMockItemView({
+        id: 'ui-inbox-opened',
+        state: UserItemState.INBOX,
+        lastOpenedAt: null,
+      });
+      const itemsMap = new Map<string, ItemView>();
+      itemsMap.set(item.id, item);
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        libraryItems: [item],
+        allItems: itemsMap,
+      });
+
+      await caller.markOpened({ id: item.id });
+      const home = await caller.home();
+
+      expect(home.jumpBackIn).toEqual([]);
     });
 
     it('should throw NOT_FOUND when item does not exist', async () => {
