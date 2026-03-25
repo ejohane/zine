@@ -30,7 +30,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { getFeaturedGridItemWidth, getVisibleFeaturedGridItems } from '@/lib/home-layout';
 import {
-  useInboxItems,
+  useInfiniteInboxItems,
   useHomeData,
   useLibraryItems,
   mapContentType,
@@ -53,6 +53,8 @@ function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; col
 // =============================================================================
 // Utility Functions
 // =============================================================================
+
+const INBOX_PAGE_SIZE = 20;
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -154,7 +156,9 @@ export default function HomeScreen() {
   useTabPrefetch('home');
 
   // Data hooks
-  const { data: inboxData, isLoading: isInboxLoading } = useInboxItems();
+  const { data: inboxPages, isLoading: isInboxLoading } = useInfiniteInboxItems({
+    limit: INBOX_PAGE_SIZE,
+  });
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
 
@@ -188,7 +192,9 @@ export default function HomeScreen() {
   }, [homeData?.recentBookmarks]);
 
   const inboxItems = useMemo((): ItemCardData[] => {
-    return (inboxData?.items ?? []).slice(0, 4).map((item) => ({
+    const allInboxItems = inboxPages?.pages.flatMap((page) => page.items) ?? [];
+
+    return allInboxItems.slice(0, 4).map((item) => ({
       id: item.id,
       title: item.title,
       creator: item.creator,
@@ -199,7 +205,7 @@ export default function HomeScreen() {
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
-  }, [inboxData?.items]);
+  }, [inboxPages?.pages]);
 
   const podcasts = useMemo((): ItemCardData[] => {
     return (homeData?.byContentType.podcasts ?? []).map((item) => ({

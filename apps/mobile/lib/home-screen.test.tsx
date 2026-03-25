@@ -142,6 +142,12 @@ jest.mock('@/lib/home-layout', () => ({
 
 jest.mock('@/hooks/use-items-trpc', () => ({
   useInboxItems: () => ({ data: { items: [] }, isLoading: false }),
+  useInfiniteInboxItems: () => ({
+    data: {
+      pages: [{ items: [], nextCursor: null }],
+    },
+    isLoading: false,
+  }),
   useHomeData: () => ({
     data: {
       jumpBackIn: [],
