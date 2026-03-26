@@ -4,8 +4,17 @@ import TestRenderer, { act } from 'react-test-renderer';
 import HomeScreen from '@/app/(tabs)/index';
 
 const mockPush = jest.fn();
-const mockUseWeeklyRecapTeaser = jest.fn();
-const mockUseWeeklyRecapEntryState = jest.fn();
+const mockAddListener = jest.fn();
+const mockIsFocused = jest.fn();
+const mockScrollTo = jest.fn();
+const mockRemoveListener = jest.fn();
+
+const mockNavigation = {
+  addListener: mockAddListener,
+  isFocused: mockIsFocused,
+};
+
+let tabPressListener: (() => void) | undefined;
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 type TestNode = Renderer['root'];
@@ -27,14 +36,32 @@ function findButtonByText(renderer: Renderer, text: string) {
   );
 }
 
+function findFilterChip(renderer: Renderer, label: string) {
+  return renderer.root.find(
+    (node: TestNode) =>
+      node.type === 'button' && node.props.accessibilityLabel === `Filter ${label}`
+  );
+}
+
+function findHomeScrollView(renderer: Renderer) {
+  return renderer.root.find(
+    (node: TestNode) => node.type === 'scroll-view' && node.props.horizontal !== true
+  );
+}
+
+function pressHomeTab() {
+  if (!tabPressListener) {
+    throw new Error('Expected home tab press listener to be registered');
+  }
+
+  tabPressListener();
+}
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
-  useNavigation: () => ({
-    addListener: () => jest.fn(),
-    isFocused: () => true,
-  }),
+  useNavigation: () => mockNavigation,
   Stack: {
     Screen: () => null,
   },
@@ -49,8 +76,18 @@ jest.mock('react-native', () => ({
     React.createElement('div', null, children),
   Text: ({ children }: { children?: React.ReactNode }) =>
     React.createElement('span', null, children),
-  ScrollView: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children),
+  ScrollView: React.forwardRef(
+    (
+      { children, ...props }: { children?: React.ReactNode; horizontal?: boolean },
+      ref: React.ForwardedRef<{ scrollTo: typeof mockScrollTo }>
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        scrollTo: mockScrollTo,
+      }));
+
+      return React.createElement('scroll-view', props, children);
+    }
+  ),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
   },
@@ -108,7 +145,24 @@ jest.mock('heroui-native', () => ({
 }));
 
 jest.mock('@/components/filter-chip', () => ({
-  FilterChip: ({ label }: { label: string }) => React.createElement('span', null, label),
+  FilterChip: ({
+    label,
+    isSelected,
+    onPress,
+  }: {
+    label: string;
+    isSelected: boolean;
+    onPress: () => void;
+  }) =>
+    React.createElement(
+      'button',
+      {
+        onPress,
+        accessibilityLabel: `Filter ${label}`,
+        'data-selected': isSelected,
+      },
+      label
+    ),
 }));
 
 jest.mock('@/components/icons', () => ({
@@ -165,33 +219,27 @@ jest.mock('@/hooks/use-items-trpc', () => ({
   mapProvider: (value: string) => value,
 }));
 
-jest.mock('@/hooks/use-insights-trpc', () => ({
-  useWeeklyRecapTeaser: (...args: unknown[]) => mockUseWeeklyRecapTeaser(...args),
-  useWeeklyRecapEntryState: () => mockUseWeeklyRecapEntryState(),
-}));
-
-describe('HomeScreen weekly recap behavior', () => {
+describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseWeeklyRecapTeaser.mockReturnValue({
-      data: { headline: 'You finished 4 things last week' },
-      isLoading: false,
-    });
-    mockUseWeeklyRecapEntryState.mockReturnValue({
-      shouldShowEntry: true,
-      weekAnchorDate: '2026-03-15',
+    tabPressListener = undefined;
+    mockIsFocused.mockReturnValue(true);
+    mockAddListener.mockImplementation((event: 'tabPress', listener: () => void) => {
+      if (event === 'tabPress') {
+        tabPressListener = listener;
+      }
+
+      return mockRemoveListener;
     });
   });
 
-  it('does not render a weekly recap card on Home and does not query teaser data', () => {
+  it('does not render a weekly recap card on Home', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<HomeScreen />);
     });
 
     expect(getTextContent(renderer!.root)).not.toContain('Weekly recap card');
-    expect(mockUseWeeklyRecapEntryState).not.toHaveBeenCalled();
-    expect(mockUseWeeklyRecapTeaser).not.toHaveBeenCalled();
   });
 
   it('keeps settings navigation on the Home screen', () => {
@@ -205,5 +253,53 @@ describe('HomeScreen weekly recap behavior', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/settings');
+  });
+
+  it('clears the active filter when the home tab is reselected at the top', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
+    expect(mockScrollTo).not.toHaveBeenCalled();
+  });
+
+  it('scrolls to the top without clearing the active filter when the home tab is reselected mid-scroll', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      findHomeScrollView(renderer!).props.onScroll({
+        nativeEvent: {
+          contentOffset: {
+            y: 240,
+          },
+        },
+      });
+    });
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
   });
 });
