@@ -10,6 +10,8 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -55,6 +57,7 @@ function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; col
 // =============================================================================
 
 const INBOX_PAGE_SIZE = 20;
+const HOME_TOP_THRESHOLD = 4;
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -146,6 +149,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const navigation = useNavigation() as HomeTabNavigation;
   const scrollViewRef = useRef<ScrollView>(null);
+  const scrollOffsetYRef = useRef(0);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const { width: windowWidth } = useWindowDimensions();
@@ -264,6 +268,10 @@ export default function HomeScreen() {
     router.push('/settings');
   }, [router]);
 
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
+
   const isLoading = isInboxLoading || isHomeLoading;
 
   const filteredJumpBackInItems = useMemo(
@@ -295,9 +303,16 @@ export default function HomeScreen() {
     return navigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
+      const isAtTop = scrollOffsetYRef.current <= HOME_TOP_THRESHOLD;
+
+      if (contentTypeFilter !== null && isAtTop) {
+        setContentTypeFilter(null);
+        return;
+      }
+
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
-  }, [navigation]);
+  }, [contentTypeFilter, navigation]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
@@ -307,6 +322,8 @@ export default function HomeScreen() {
           ref={scrollViewRef}
           style={styles.scrollView}
           contentContainerStyle={styles.content}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
