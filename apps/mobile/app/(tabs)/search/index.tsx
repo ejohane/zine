@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Stack, useNavigation } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, type ListRenderItemInfo, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, useLibraryItems } from '@/hooks/use-items-trpc';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 export default function SearchTabScreen() {
   const navigation = useNavigation();
-  const listScrollRef = useRef<ScrollView>(null);
+  const listScrollRef = useRef<FlatList<ItemCardData>>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -57,16 +57,40 @@ export default function SearchTabScreen() {
     return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
-      listScrollRef.current?.scrollTo({ y: 0, animated: true });
+      listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
   }, [navigation]);
+
+  const renderItem = useCallback(
+    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
+      <ItemCard item={item} shape="row" index={index} />
+    ),
+    []
+  );
+
+  const isShowingState = isLoading || Boolean(error) || libraryItems.length === 0;
+  const listEmptyComponent = isLoading ? (
+    <LoadingState />
+  ) : error ? (
+    <ErrorState message={error.message} />
+  ) : (
+    <EmptyState
+      title={debouncedSearchQuery ? 'No matches found' : 'Search your library'}
+      message={
+        debouncedSearchQuery
+          ? 'Try a different title or creator name.'
+          : 'Type in the search bar to find saved items by title or creator.'
+      }
+    />
+  );
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack.Screen
         options={{
-          title: 'Search',
+          title: '',
           headerSearchBarOptions: {
+            placement: 'automatic',
             placeholder: 'Search your library',
             hideWhenScrolling: false,
             onChangeText: (event) => {
@@ -76,33 +100,24 @@ export default function SearchTabScreen() {
         }}
       />
 
-      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
-        {isLoading ? (
-          <LoadingState />
-        ) : error ? (
-          <ErrorState message={error.message} />
-        ) : libraryItems.length === 0 ? (
-          <EmptyState
-            title={debouncedSearchQuery ? 'No matches found' : 'Search your library'}
-            message={
-              debouncedSearchQuery
-                ? 'Try a different title or creator name.'
-                : 'Type in the search bar to find saved items by title or creator.'
-            }
-          />
-        ) : (
-          <ScrollView
-            ref={listScrollRef}
-            style={styles.listContainer}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {libraryItems.map((item, index) => (
-              <ItemCard key={item.id} item={item} shape="row" index={index} />
-            ))}
-            <View style={styles.bottomSpacer} />
-          </ScrollView>
-        )}
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Search</Text>
+        </View>
+
+        <FlatList
+          ref={listScrollRef}
+          data={isShowingState ? [] : libraryItems}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          style={styles.listContainer}
+          contentContainerStyle={[styles.listContent, isShowingState && styles.emptyListContent]}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={listEmptyComponent}
+          ListFooterComponent={!isShowingState ? <View style={styles.bottomSpacer} /> : null}
+        />
       </SafeAreaView>
     </Surface>
   );
@@ -115,12 +130,24 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
+  header: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
+  },
+  headerTitle: {
+    ...Typography.displayMedium,
+  },
   listContainer: {
     flex: 1,
   },
   listContent: {
-    paddingTop: Spacing.md,
+    flexGrow: 1,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing['3xl'],
+  },
+  emptyListContent: {
+    justifyContent: 'center',
   },
   bottomSpacer: {
     height: Spacing.lg,

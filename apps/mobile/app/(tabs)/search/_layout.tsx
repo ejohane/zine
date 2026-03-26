@@ -5,7 +5,8 @@ export default function SearchLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerLargeTitle: true,
+        headerTransparent: true,
+        headerShadowVisible: false,
       }}
     />
   );
