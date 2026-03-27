@@ -51,6 +51,8 @@ export interface Bindings {
   SPOTIFY_MAX_SAFE_BATCH_SIZE?: string;
   /** Critical batch size threshold before logging error (default: 1000) */
   SPOTIFY_CRITICAL_BATCH_SIZE?: string;
+  /** Lock handoff wait for token refresh contention retries in milliseconds (default: 2000) */
+  TOKEN_REFRESH_LOCK_WAIT_MS?: string;
   /** Release git SHA for diagnostics correlation */
   RELEASE_GIT_SHA?: string;
   /** Release build identifier for diagnostics correlation */

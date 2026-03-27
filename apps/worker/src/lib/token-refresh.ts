@@ -29,8 +29,8 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 /** TTL for the distributed refresh lock (60 seconds - KV minimum) */
 const REFRESH_LOCK_TTL = 60;
 
-/** Time to wait before checking for updated token when lock is held by another worker */
-const LOCK_WAIT_MS = 2000;
+/** Default time to wait before checking for updated token when another worker holds the lock */
+const DEFAULT_LOCK_WAIT_MS = 2000;
 
 // ============================================================================
 // Error Types
@@ -96,6 +96,8 @@ export interface TokenRefreshEnv {
   GOOGLE_CLIENT_SECRET?: string;
   SPOTIFY_CLIENT_ID: string;
   SPOTIFY_CLIENT_SECRET: string;
+  /** Optional override for the lock handoff wait before re-reading the refreshed token (ms) */
+  TOKEN_REFRESH_LOCK_WAIT_MS?: string | number;
 }
 
 /**
@@ -166,7 +168,7 @@ async function refreshWithLock(
 
   if (!lockAcquired) {
     // Another worker is refreshing - wait and read updated token
-    await sleep(LOCK_WAIT_MS);
+    await sleep(getLockWaitMs(env));
 
     const updated = await getConnectionById(connection.id, env);
     if (updated && updated.tokenExpiresAt > Date.now()) {
@@ -335,6 +337,21 @@ async function persistRefreshedTokens(
     .update(providerConnections)
     .set(updateData)
     .where(eq(providerConnections.id, connectionId));
+}
+
+/**
+ * Resolve the lock handoff wait duration from the environment.
+ *
+ * Invalid values fall back to the production default to preserve existing behavior.
+ */
+function getLockWaitMs(env: TokenRefreshEnv): number {
+  const configured = env.TOKEN_REFRESH_LOCK_WAIT_MS;
+  if (configured === undefined || (typeof configured === 'string' && configured.trim() === '')) {
+    return DEFAULT_LOCK_WAIT_MS;
+  }
+
+  const parsed = Number(configured);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_LOCK_WAIT_MS;
 }
 
 /**

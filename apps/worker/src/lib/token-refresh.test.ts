@@ -114,6 +114,8 @@ function createMockEnv(overrides?: Partial<TokenRefreshEnv>): TokenRefreshEnv {
     GOOGLE_CLIENT_SECRET: 'google-secret',
     SPOTIFY_CLIENT_ID: 'spotify-client-id',
     SPOTIFY_CLIENT_SECRET: 'spotify-secret',
+    // Keep lock-contention tests fast while preserving production defaults in real envs.
+    TOKEN_REFRESH_LOCK_WAIT_MS: 0,
     ...overrides,
   };
 }
@@ -127,6 +129,17 @@ function createSuccessfulTokenResponse(overrides?: { refresh_token?: string }) {
       refresh_token: overrides?.refresh_token,
     }),
   };
+}
+
+function mockImmediateSetTimeout() {
+  return vi.spyOn(globalThis, 'setTimeout').mockImplementation(((handler: TimerHandler) => {
+    if (typeof handler !== 'function') {
+      throw new Error('Unexpected string timer callback in token refresh test');
+    }
+
+    handler();
+    return 0 as unknown as ReturnType<typeof setTimeout>;
+  }) as unknown as typeof setTimeout);
 }
 
 // ============================================================================
@@ -350,22 +363,53 @@ describe('distributed locking behavior', () => {
       tokenExpiresAt: MOCK_NOW - 1000,
     });
     const env = createMockEnv();
+    const setTimeoutSpy = mockImmediateSetTimeout();
 
-    // Lock is held by another worker
-    mockTryAcquireLock.mockResolvedValue(false);
+    try {
+      // Lock is held by another worker
+      mockTryAcquireLock.mockResolvedValue(false);
 
-    // After waiting, the token is refreshed by other worker
-    const updatedConnection = createMockConnection({
-      id: 'conn-456',
-      tokenExpiresAt: MOCK_NOW + ONE_HOUR_MS,
-      accessToken: 'encrypted:refreshed-by-other',
+      // After waiting, the token is refreshed by other worker
+      const updatedConnection = createMockConnection({
+        id: 'conn-456',
+        tokenExpiresAt: MOCK_NOW + ONE_HOUR_MS,
+        accessToken: 'encrypted:refreshed-by-other',
+      });
+      mockSelectResult.push(updatedConnection);
+
+      const result = await getValidAccessToken(connection, env);
+
+      expect(result).toBe('refreshed-by-other');
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 0);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
+  it('should fall back to the default lock wait when env override is unset', async () => {
+    const connection = createMockConnection({
+      id: 'conn-override-unset',
+      tokenExpiresAt: MOCK_NOW - 1000,
     });
-    mockSelectResult.push(updatedConnection);
+    const env = createMockEnv({ TOKEN_REFRESH_LOCK_WAIT_MS: undefined });
+    const setTimeoutSpy = mockImmediateSetTimeout();
 
-    const result = await getValidAccessToken(connection, env);
+    try {
+      mockTryAcquireLock.mockResolvedValue(false);
 
-    expect(result).toBe('refreshed-by-other');
-    expect(mockFetch).not.toHaveBeenCalled();
+      const updatedConnection = createMockConnection({
+        id: 'conn-override-unset',
+        tokenExpiresAt: MOCK_NOW + ONE_HOUR_MS,
+        accessToken: 'encrypted:refreshed-by-other',
+      });
+      mockSelectResult.push(updatedConnection);
+
+      await expect(getValidAccessToken(connection, env)).resolves.toBe('refreshed-by-other');
+      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 2000);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
   });
 
   it('should throw REFRESH_IN_PROGRESS after wait if still locked and token not updated', async () => {
