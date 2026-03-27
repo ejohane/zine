@@ -316,76 +316,52 @@ describe('Items Router', () => {
   // ==========================================================================
 
   describe('Authentication', () => {
-    it('should reject unauthenticated requests to inbox', async () => {
-      const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.inbox()).rejects.toThrow(TRPCError);
-      await expect(caller.inbox()).rejects.toMatchObject({
+    async function expectUnauthorized(action: () => Promise<unknown>) {
+      const request = action();
+      await expect(request).rejects.toThrow(TRPCError);
+      await expect(request).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
       });
+    }
+
+    it('should reject unauthenticated requests to inbox', async () => {
+      const caller = createMockItemsCaller({ userId: null });
+      await expectUnauthorized(() => caller.inbox());
     });
 
     it('should reject unauthenticated requests to library', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.library()).rejects.toThrow(TRPCError);
-      await expect(caller.library()).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.library());
     });
 
     it('should reject unauthenticated requests to home', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.home()).rejects.toThrow(TRPCError);
-      await expect(caller.home()).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.home());
     });
 
     it('should reject unauthenticated requests to get', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.get({ id: 'ui-001' })).rejects.toThrow(TRPCError);
-      await expect(caller.get({ id: 'ui-001' })).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.get({ id: 'ui-001' }));
     });
 
     it('should reject unauthenticated requests to bookmark', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.bookmark({ id: 'ui-001' })).rejects.toThrow(TRPCError);
-      await expect(caller.bookmark({ id: 'ui-001' })).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.bookmark({ id: 'ui-001' }));
     });
 
     it('should reject unauthenticated requests to archive', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.archive({ id: 'ui-001' })).rejects.toThrow(TRPCError);
-      await expect(caller.archive({ id: 'ui-001' })).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.archive({ id: 'ui-001' }));
     });
 
     it('should reject unauthenticated requests to unbookmark', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.unbookmark({ id: 'ui-001' })).rejects.toThrow(TRPCError);
-      await expect(caller.unbookmark({ id: 'ui-001' })).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.unbookmark({ id: 'ui-001' }));
     });
 
     it('should reject unauthenticated requests to mark opened', async () => {
       const caller = createMockItemsCaller({ userId: null });
-
-      await expect(caller.markOpened({ id: 'ui-001' })).rejects.toThrow(TRPCError);
-      await expect(caller.markOpened({ id: 'ui-001' })).rejects.toMatchObject({
-        code: 'UNAUTHORIZED',
-      });
+      await expectUnauthorized(() => caller.markOpened({ id: 'ui-001' }));
     });
   });
 
