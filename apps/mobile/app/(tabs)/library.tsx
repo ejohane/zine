@@ -12,11 +12,14 @@ import {
   Pressable,
   TextInput,
   FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ListRenderItemInfo,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
+import { ContentType as ApiContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import {
@@ -39,7 +42,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import type { ContentType as ApiContentType, UIContentType, Provider } from '@/lib/content-utils';
+import type { UIContentType, UIProvider } from '@/lib/content-utils';
 
 // =============================================================================
 // Icons
@@ -70,6 +73,7 @@ function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: str
 // =============================================================================
 
 const LIBRARY_PAGE_SIZE = 20;
+const LIBRARY_TOP_THRESHOLD = 4;
 
 const filterOptions: {
   id: string;
@@ -88,7 +92,7 @@ const filterOptions: {
     icon: ArticleIcon,
     selectedColor: FilterChipPalette.article.accent,
     selectedSurfaceColor: FilterChipPalette.article.surface,
-    contentType: 'ARTICLE',
+    contentType: ApiContentType.ARTICLE,
   },
   {
     id: 'podcast',
@@ -97,7 +101,7 @@ const filterOptions: {
     icon: HeadphonesIcon,
     selectedColor: FilterChipPalette.podcast.accent,
     selectedSurfaceColor: FilterChipPalette.podcast.surface,
-    contentType: 'PODCAST',
+    contentType: ApiContentType.PODCAST,
   },
   {
     id: 'video',
@@ -106,7 +110,7 @@ const filterOptions: {
     icon: VideoIcon,
     selectedColor: FilterChipPalette.video.accent,
     selectedSurfaceColor: FilterChipPalette.video.surface,
-    contentType: 'VIDEO',
+    contentType: ApiContentType.VIDEO,
   },
   {
     id: 'post',
@@ -115,7 +119,7 @@ const filterOptions: {
     icon: PostIcon,
     selectedColor: FilterChipPalette.post.accent,
     selectedSurfaceColor: FilterChipPalette.post.surface,
-    contentType: 'POST',
+    contentType: ApiContentType.POST,
   },
 ];
 
@@ -123,10 +127,16 @@ const filterOptions: {
 // Main Screen
 // =============================================================================
 
+type LibraryTabNavigation = {
+  addListener: (event: 'tabPress', listener: () => void) => () => void;
+  isFocused: () => boolean;
+};
+
 export default function LibraryScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
+  const navigation = useNavigation() as LibraryTabNavigation;
   const listScrollRef = useRef<FlatList<ItemCardData>>(null);
+  const scrollOffsetYRef = useRef(0);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -207,7 +217,7 @@ export default function LibraryScreen() {
         creatorImageUrl: item.creatorImageUrl ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
         contentType: mapContentType(item.contentType) as UIContentType,
-        provider: mapProvider(item.provider) as Provider,
+        provider: mapProvider(item.provider) as UIProvider,
         duration: item.duration ?? null,
         readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: item.bookmarkedAt ?? null,
@@ -224,6 +234,10 @@ export default function LibraryScreen() {
 
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
+  }, []);
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
@@ -242,9 +256,17 @@ export default function LibraryScreen() {
     return navigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
+      const isAtTop = scrollOffsetYRef.current <= LIBRARY_TOP_THRESHOLD;
+
+      if (isAtTop && (showCompletedOnly || contentTypeFilter !== null)) {
+        setShowCompletedOnly(false);
+        setContentTypeFilter(null);
+        return;
+      }
+
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [navigation]);
+  }, [contentTypeFilter, navigation, showCompletedOnly]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]}>
@@ -309,7 +331,11 @@ export default function LibraryScreen() {
                 key={option.id}
                 label={option.label}
                 isSelected={contentTypeFilter === option.contentType}
-                onPress={() => setContentTypeFilter(option.contentType)}
+                onPress={() =>
+                  setContentTypeFilter((current) =>
+                    current === option.contentType ? null : option.contentType
+                  )
+                }
                 icon={option.icon}
                 dotColor={option.color}
                 selectedColor={option.selectedColor}
@@ -342,6 +368,8 @@ export default function LibraryScreen() {
             style={styles.listContainer}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.6}
             ListFooterComponent={
