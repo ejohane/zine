@@ -40,6 +40,11 @@ jest.mock('react-native', () => ({
   },
 }));
 
+jest.mock('@expo/vector-icons', () => {
+  const Icon = (props: Record<string, unknown>) => React.createElement('svg', props);
+  return { Ionicons: Icon, FontAwesome5: Icon };
+});
+
 jest.mock('lucide-react-native', () => {
   const Icon = ({ children }: { children?: React.ReactNode }) =>
     React.createElement('svg', null, children);

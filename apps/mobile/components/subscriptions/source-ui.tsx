@@ -1,5 +1,6 @@
+import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { View, Image, Pressable, StyleSheet, TextInput } from 'react-native';
-import { FileText, Headphones, Play, Rss } from 'lucide-react-native';
+import { Rss } from 'lucide-react-native';
 
 import { Badge, Button, Surface, Text } from '@/components/primitives';
 import { ChevronRightIcon, SearchIcon } from '@/components/icons';
@@ -12,24 +13,28 @@ import {
   getSubscriptionSourceConfig,
 } from '@/lib/subscription-sources';
 
+// design-system-exception: brand colors matching FAB config in item-detail-helpers.tsx
+const SOURCE_BRAND: Record<SubscriptionSource, { bg: string; icon: React.ReactNode }> = {
+  YOUTUBE: {
+    bg: '#FF0000', // design-system-exception: YouTube brand color
+    icon: <Ionicons name="logo-youtube" size={22} color="#FFFFFF" />, // design-system-exception: white on brand
+  },
+  SPOTIFY: {
+    bg: '#1DB954', // design-system-exception: Spotify brand color
+    icon: <FontAwesome5 name="spotify" size={22} color="#FFFFFF" />, // design-system-exception: white on brand
+  },
+  GMAIL: {
+    bg: '#1A73E8', // design-system-exception: Gmail brand color
+    icon: <Ionicons name="newspaper-outline" size={22} color="#FFFFFF" />, // design-system-exception: white on brand
+  },
+  RSS: {
+    bg: '#F59E0B', // design-system-exception: RSS accent color
+    icon: <Rss size={20} color="#FFFFFF" strokeWidth={2.5} />, // design-system-exception: white on brand
+  },
+};
+
 function SourceGlyph({ source }: { source: SubscriptionSource }) {
-  const { colors } = useAppTheme();
-  const iconColor = source === 'GMAIL' ? colors.statusInfo : colors.textPrimary;
-  const iconSize = 20;
-
-  if (source === 'YOUTUBE') {
-    return <Play size={iconSize} color={iconColor} fill={iconColor} strokeWidth={0} />;
-  }
-
-  if (source === 'SPOTIFY') {
-    return <Headphones size={iconSize} color={iconColor} fill={iconColor} strokeWidth={0} />;
-  }
-
-  if (source === 'GMAIL') {
-    return <FileText size={iconSize} color={iconColor} fill={iconColor} strokeWidth={0} />;
-  }
-
-  return <Rss size={iconSize} color={iconColor} strokeWidth={2} />;
+  return SOURCE_BRAND[source].icon;
 }
 
 function getBadgeTone(state: IntegrationState): 'subtle' | 'success' | 'warning' | 'info' {
@@ -84,7 +89,7 @@ export function SourceListRow({
       style={({ pressed }) => [pressed && { opacity: motion.opacity.pressed }]}
     >
       <Surface tone="elevated" border="subtle" radius="xl" style={styles.sourceRow}>
-        <View style={[styles.glyphContainer, { backgroundColor: colors.surfaceRaised }]}>
+        <View style={[styles.glyphContainer, { backgroundColor: SOURCE_BRAND[source].bg }]}>
           <SourceGlyph source={source} />
         </View>
         <View style={styles.sourceRowCopy}>
@@ -108,12 +113,11 @@ export function SourceHero({
   title?: string;
   summary: string;
 }) {
-  const { colors } = useAppTheme();
   const config = getSubscriptionSourceConfig(source);
 
   return (
     <Surface tone="elevated" border="subtle" radius="xl" style={styles.hero}>
-      <View style={[styles.heroGlyph, { backgroundColor: colors.surfaceRaised }]}>
+      <View style={[styles.heroGlyph, { backgroundColor: SOURCE_BRAND[source].bg }]}>
         <SourceGlyph source={source} />
       </View>
       <View style={styles.heroCopy}>
@@ -401,7 +405,7 @@ const styles = StyleSheet.create({
   glyphContainer: {
     width: 48,
     height: 48,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
   heroGlyph: {
     width: 56,
     height: 56,
-    borderRadius: Radius.xl,
+    borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
   },
