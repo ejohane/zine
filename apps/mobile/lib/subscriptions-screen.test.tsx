@@ -41,6 +41,15 @@ jest.mock('react-native', () => ({
   Platform: {
     select: (options: Record<string, unknown>) => options.ios ?? options.default,
   },
+  Pressable: ({
+    children,
+    onPress,
+    accessibilityLabel,
+  }: {
+    children?: React.ReactNode;
+    onPress?: () => void;
+    accessibilityLabel?: string;
+  }) => React.createElement('button', { onClick: onPress, onPress, accessibilityLabel }, children),
   View: ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children),
   ScrollView: ({ children }: { children?: React.ReactNode }) =>
@@ -161,13 +170,10 @@ describe('SubscriptionsScreen header', () => {
     expect(stackScreenProps.options.headerLeft).toBeDefined();
 
     const headerLeft = stackScreenProps.options.headerLeft!;
-    const backButtonWrapper = headerLeft({ tintColor: '#111111' }) as React.ReactElement<{
-      children: React.ReactElement<{
-        onPress: () => void;
-        accessibilityLabel?: string;
-      }>;
+    const backButton = headerLeft({ tintColor: '#111111' }) as React.ReactElement<{
+      onPress: () => void;
+      accessibilityLabel?: string;
     }>;
-    const backButton = backButtonWrapper.props.children;
 
     expect(backButton.props.accessibilityLabel).toBe('Go back');
 

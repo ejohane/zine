@@ -1,18 +1,16 @@
 import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useNavigation, useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { LoadingState } from '@/components/list-states';
-import { IconButton, Surface, Text } from '@/components/primitives';
+import { Surface } from '@/components/primitives';
 import { SourceListRow } from '@/components/subscriptions';
-import { Radius, Spacing } from '@/constants/theme';
-import { useAppTheme } from '@/hooks/use-app-theme';
+import { Spacing } from '@/constants/theme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
-import { isReconnectRequired, type ConnectionStatus } from '@/lib/connection-status';
+import { type ConnectionStatus } from '@/lib/connection-status';
 import {
-  buildSubscriptionsSummary,
   getHubStatusText,
   getIntegrationState,
   getSubscriptionSourceConfig,
@@ -25,22 +23,17 @@ const SUBSCRIPTION_SOURCES: SubscriptionSource[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL
 export default function SubscriptionsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
-  const { colors } = useAppTheme();
   const canGoBack = navigation.canGoBack();
   const headerLeft = canGoBack
     ? () => (
-        <View style={styles.headerLeftWrapper}>
-          <IconButton
-            size="sm"
-            variant="subtle"
-            colors={colors}
-            style={[styles.headerBackButton, { backgroundColor: colors.backgroundSecondary }]}
-            accessibilityLabel="Go back"
-            onPress={() => router.back()}
-          >
-            <Ionicons name="chevron-back" size={20} color={colors.text} />
-          </IconButton>
-        </View>
+        <Pressable
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={styles.headerBack}
+        >
+          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+        </Pressable>
       )
     : undefined;
 
@@ -71,13 +64,6 @@ export default function SubscriptionsScreen() {
   ).length;
   const gmailCount = newsletterStatsQuery.data?.active ?? 0;
   const rssCount = rssStatsQuery.data?.active ?? 0;
-
-  const totalActiveCount = youtubeCount + spotifyCount + gmailCount + rssCount;
-  const connectedIntegrations =
-    connections?.filter((connection: Connection) => connection.status === 'ACTIVE').length ?? 0;
-  const attentionCount =
-    connections?.filter((connection: Connection) => isReconnectRequired(connection.status))
-      .length ?? 0;
 
   const sourceRows = useMemo(
     () =>
@@ -111,11 +97,7 @@ export default function SubscriptionsScreen() {
   if (isLoading) {
     return (
       <>
-        <Stack.Screen
-          options={{
-            headerLeft,
-          }}
-        />
+        <Stack.Screen options={{ headerLeft }} />
         <Surface tone="canvas" style={styles.container}>
           <LoadingState />
         </Surface>
@@ -125,27 +107,13 @@ export default function SubscriptionsScreen() {
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerLeft,
-        }}
-      />
+      <Stack.Screen options={{ headerLeft }} />
       <Surface tone="canvas" style={styles.container} collapsable={false}>
         <ScrollView
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
         >
-          <Surface tone="elevated" border="subtle" radius="xl" style={styles.hero}>
-            <Text variant="labelSmallPlain" tone="tertiary" transform="uppercase">
-              Subscriptions
-            </Text>
-            <Text variant="headlineSmall">Manage each source in one place</Text>
-            <Text variant="bodyMedium" tone="subheader">
-              {buildSubscriptionsSummary(totalActiveCount, connectedIntegrations, attentionCount)}
-            </Text>
-          </Surface>
-
           <View style={styles.rows}>
             {sourceRows.map((row) => (
               <SourceListRow
@@ -175,26 +143,14 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: Spacing.lg,
-    gap: Spacing.lg,
+    gap: Spacing.md,
     paddingBottom: Spacing['3xl'],
+    paddingTop: Spacing.sm,
   },
-  headerBackButton: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerLeftWrapper: {
-    marginLeft: Spacing.md,
-    marginTop: Spacing.xs,
-  },
-  hero: {
-    gap: Spacing.sm,
-    marginTop: Spacing.sm,
-    padding: Spacing.lg,
+  headerBack: {
+    marginLeft: -Spacing.xs,
   },
   rows: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
 });
