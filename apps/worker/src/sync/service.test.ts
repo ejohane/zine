@@ -230,6 +230,21 @@ describe('getJobStatus', () => {
     expect(result).toBeNull();
   });
 
+  it('should return null for invalid job status shape', async () => {
+    mockKV._store.set(
+      getJobStatusKey(TEST_JOB_ID),
+      JSON.stringify({
+        jobId: TEST_JOB_ID,
+        userId: TEST_USER_ID,
+        status: 'processing',
+      })
+    );
+
+    const result = await getJobStatus(TEST_JOB_ID, mockKV);
+
+    expect(result).toBeNull();
+  });
+
   it('should use correct key format', async () => {
     await getJobStatus(TEST_JOB_ID, mockKV);
 
@@ -485,6 +500,24 @@ describe('updateJobProgress', () => {
     // Should not have called put (only get)
     expect(mockKV.put).not.toHaveBeenCalled();
     expect(mockLogger.warn).toHaveBeenCalledWith('Job status not found for update', {
+      jobId: TEST_JOB_ID,
+      subscriptionId: 'sub_1',
+    });
+  });
+
+  it('should return early when job status payload is invalid', async () => {
+    mockKV._store.set(
+      getJobStatusKey(TEST_JOB_ID),
+      JSON.stringify({
+        jobId: TEST_JOB_ID,
+        userId: TEST_USER_ID,
+      })
+    );
+
+    await updateJobProgress(TEST_JOB_ID, 'sub_1', true, 5, null, mockKV);
+
+    expect(mockKV.put).not.toHaveBeenCalled();
+    expect(mockLogger.warn).toHaveBeenCalledWith('Job status payload invalid; skipping update', {
       jobId: TEST_JOB_ID,
       subscriptionId: 'sub_1',
     });
