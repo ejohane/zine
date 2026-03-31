@@ -8,6 +8,8 @@ const mockAddListener = jest.fn();
 const mockIsFocused = jest.fn();
 const mockScrollTo = jest.fn();
 const mockRemoveListener = jest.fn();
+let mockConnections: Array<{ provider: string; status: string }> = [];
+let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
 
 const mockNavigation = {
   addListener: mockAddListener,
@@ -72,10 +74,10 @@ jest.mock('react-native', () => ({
   Platform: {
     select: (options: Record<string, unknown>) => options.ios ?? options.default,
   },
-  View: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children),
-  Text: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('span', null, children),
+  View: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children),
+  Text: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('span', props, children),
   ScrollView: React.forwardRef(
     (
       { children, ...props }: { children?: React.ReactNode; horizontal?: boolean },
@@ -94,13 +96,14 @@ jest.mock('react-native', () => ({
   Pressable: ({
     children,
     onPress,
+    ...props
   }: {
     children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
     onPress?: () => void;
   }) =>
     React.createElement(
       'button',
-      { onClick: onPress, onPress },
+      { onClick: onPress, onPress, ...props },
       typeof children === 'function' ? children({ pressed: false }) : children
     ),
   FlatList: ({
@@ -189,6 +192,14 @@ jest.mock('@/hooks/use-prefetch', () => ({
   useTabPrefetch: jest.fn(),
 }));
 
+jest.mock('@/hooks/use-connections', () => ({
+  useConnections: () => ({ data: mockConnections }),
+}));
+
+jest.mock('@/hooks/use-subscriptions-query', () => ({
+  useSubscriptions: () => ({ data: mockSubscriptionsData }),
+}));
+
 jest.mock('@/lib/home-layout', () => ({
   getFeaturedGridItemWidth: () => 160,
   getVisibleFeaturedGridItems: (items: unknown[]) => items,
@@ -223,6 +234,8 @@ describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     tabPressListener = undefined;
+    mockConnections = [];
+    mockSubscriptionsData = { items: [] };
     mockIsFocused.mockReturnValue(true);
     mockAddListener.mockImplementation((event: 'tabPress', listener: () => void) => {
       if (event === 'tabPress') {
@@ -253,6 +266,19 @@ describe('HomeScreen', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/settings');
+  });
+
+  it('shows an alert dot on the settings button when an integration is disconnected', () => {
+    mockSubscriptionsData = {
+      items: [{ provider: 'YOUTUBE', status: 'DISCONNECTED' }],
+    };
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    expect(() => renderer!.root.findByProps({ testID: 'home-settings-alert-dot' })).not.toThrow();
   });
 
   it('clears the active filter when the home tab is reselected at the top', () => {

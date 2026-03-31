@@ -38,6 +38,9 @@ import {
   mapContentType,
   mapProvider,
 } from '@/hooks/use-items-trpc';
+import { useConnections } from '@/hooks/use-connections';
+import { useSubscriptions } from '@/hooks/use-subscriptions-query';
+import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 // =============================================================================
@@ -165,6 +168,12 @@ export default function HomeScreen() {
   });
   const { data: homeData, isLoading: isHomeLoading } = useHomeData();
   const { data: libraryData } = useLibraryItems();
+  const { data: connections } = useConnections();
+  const { data: subscriptionsData } = useSubscriptions();
+  const { hasAttention: hasSettingsAlert } = useMemo(
+    () => getSubscriptionIntegrationAttention(connections, subscriptionsData?.items),
+    [connections, subscriptionsData?.items]
+  );
 
   // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
@@ -340,10 +349,27 @@ export default function HomeScreen() {
                   { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
                   pressed && { opacity: 0.75 },
                 ]}
-                accessibilityLabel="Open settings"
+                accessibilityLabel={
+                  hasSettingsAlert
+                    ? 'Open settings. Subscription integrations need attention'
+                    : 'Open settings'
+                }
                 accessibilityRole="button"
               >
                 <SettingsIcon size={20} color={colors.text} />
+                {hasSettingsAlert ? (
+                  <View
+                    testID="home-settings-alert-dot"
+                    pointerEvents="none"
+                    style={[
+                      styles.settingsAlertDot,
+                      {
+                        backgroundColor: colors.warning,
+                        borderColor: colors.backgroundSecondary,
+                      },
+                    ]}
+                  />
+                ) : null}
               </Pressable>
             </View>
           </Animated.View>
@@ -542,9 +568,19 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  settingsAlertDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 10,
+    height: 10,
+    borderRadius: Radius.full,
+    borderWidth: 2,
   },
   filterContainer: {
     paddingHorizontal: Spacing.md,
