@@ -9,6 +9,7 @@
  * @see features/subscriptions/frontend-spec.md Section 3 (Settings Screen)
  */
 
+import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,9 +20,9 @@ import { Colors, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
-import { isReconnectRequired } from '@/lib/connection-status';
 import { buildMobileDiagnosticBundle } from '@/lib/diagnostics';
 import { settingsLogger } from '@/lib/logger';
+import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
 import { buildSubscriptionsSummary } from '@/lib/subscription-sources';
 import { trpc } from '@/lib/trpc';
 import { useAuthAvailability } from '@/providers/auth-provider';
@@ -38,6 +39,8 @@ interface SettingsRowProps {
   rightTextColor?: string;
   onPress?: () => void;
   titleColor?: string;
+  showAlertDot?: boolean;
+  alertDotTestID?: string;
 }
 
 // ============================================================================
@@ -55,6 +58,8 @@ function SettingsRow({
   rightTextColor,
   onPress,
   titleColor,
+  showAlertDot,
+  alertDotTestID,
 }: SettingsRowProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -70,8 +75,18 @@ function SettingsRow({
           )}
         </View>
       </View>
-      {rightText && (
-        <Text style={{ color: rightTextColor ?? colors.textTertiary }}>{rightText}</Text>
+      {(showAlertDot || rightText) && (
+        <View style={styles.rowRight}>
+          {showAlertDot ? (
+            <View
+              testID={alertDotTestID}
+              style={[styles.alertDot, { backgroundColor: colors.warning }]}
+            />
+          ) : null}
+          {rightText ? (
+            <Text style={{ color: rightTextColor ?? colors.textTertiary }}>{rightText}</Text>
+          ) : null}
+        </View>
       )}
     </View>
   );
@@ -135,8 +150,10 @@ function SettingsScreenContent({
     (rssStatsQuery.data?.active ?? 0);
   const activeIntegrationCount =
     connections?.filter((connection) => connection.status === 'ACTIVE')?.length ?? 0;
-  const needsAttentionCount =
-    connections?.filter((connection) => isReconnectRequired(connection.status))?.length ?? 0;
+  const { attentionCount: needsAttentionCount, hasAttention: hasSubscriptionsAlert } = useMemo(
+    () => getSubscriptionIntegrationAttention(connections, subscriptionsData?.items),
+    [connections, subscriptionsData?.items]
+  );
 
   // Get app version from expo-constants
   const appVersion = Constants.expoConfig?.version ?? '1.0.0';
@@ -192,6 +209,8 @@ function SettingsScreenContent({
                 : 'Manage your subscriptions and integrations'
             }
             rightText="→"
+            showAlertDot={hasSubscriptionsAlert}
+            alertDotTestID="settings-subscriptions-alert-dot"
             onPress={() => router.push('/subscriptions')}
           />
         </View>
@@ -298,8 +317,18 @@ const styles = StyleSheet.create({
   rowTextContainer: {
     flex: 1,
   },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   providerIcon: {
     fontSize: 24,
+  },
+  alertDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
   },
   rowTitle: {
     fontSize: 16,

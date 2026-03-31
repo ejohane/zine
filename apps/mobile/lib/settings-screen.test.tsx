@@ -31,22 +31,23 @@ jest.mock('react-native', () => ({
   Platform: {
     select: (options: Record<string, unknown>) => options.ios ?? options.default,
   },
-  View: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children),
-  Text: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('span', null, children),
-  ScrollView: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children),
+  View: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children),
+  Text: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('span', props, children),
+  ScrollView: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children),
   Pressable: ({
     children,
     onPress,
+    ...props
   }: {
     children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
     onPress?: () => void;
   }) =>
     React.createElement(
       'button',
-      { onClick: onPress, onPress },
+      { onClick: onPress, onPress, ...props },
       typeof children === 'function' ? children({ pressed: false }) : children
     ),
   StyleSheet: {
@@ -176,6 +177,19 @@ describe('SettingsScreen subscriptions entrypoint', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith('/subscriptions');
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('shows an alert dot on the subscriptions row when an integration needs attention', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<SettingsScreen />);
+    });
+
+    expect(() =>
+      renderer!.root.findByProps({ testID: 'settings-subscriptions-alert-dot' })
+    ).not.toThrow();
     consoleErrorSpy.mockRestore();
   });
 });
