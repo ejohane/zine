@@ -20,6 +20,7 @@ import {
   getDLQEntryKey,
   getDLQIndexKey,
   DLQ_ENTRY_TTL_SECONDS,
+  parseDLQEntry,
 } from './types';
 import { updateJobProgress } from './service';
 
@@ -48,6 +49,28 @@ function parseDLQIndex(indexData: string | null, operation: string): string[] {
     });
     return [];
   }
+}
+
+async function getStoredDLQEntry(
+  id: string,
+  kv: KVNamespace,
+  operation: 'list' | 'summary'
+): Promise<DLQEntry | null> {
+  const data = await kv.get(getDLQEntryKey(id));
+  if (!data) {
+    return null;
+  }
+
+  const entry = parseDLQEntry(data);
+  if (!entry) {
+    dlqLogger.warn('DLQ entry data invalid; skipping', {
+      operation,
+      entryId: id,
+    });
+    return null;
+  }
+
+  return entry;
 }
 
 /**
@@ -242,15 +265,7 @@ export async function getDLQEntries(kv: KVNamespace, limit: number = 20): Promis
   const idsToFetch = entryIds.slice(0, limit);
 
   // Fetch entries in parallel
-  const entryPromises = idsToFetch.map(async (id) => {
-    const data = await kv.get(getDLQEntryKey(id));
-    if (!data) return null;
-    try {
-      return JSON.parse(data) as DLQEntry;
-    } catch {
-      return null;
-    }
-  });
+  const entryPromises = idsToFetch.map((id) => getStoredDLQEntry(id, kv, 'list'));
 
   const entries = await Promise.all(entryPromises);
   return entries.filter((e): e is DLQEntry => e !== null);
@@ -285,15 +300,7 @@ export async function getDLQSummary(kv: KVNamespace): Promise<{
 
   // Fetch recent entries (last 10)
   const recentIds = entryIds.slice(0, 10);
-  const entryPromises = recentIds.map(async (id) => {
-    const data = await kv.get(getDLQEntryKey(id));
-    if (!data) return null;
-    try {
-      return JSON.parse(data) as DLQEntry;
-    } catch {
-      return null;
-    }
-  });
+  const entryPromises = recentIds.map((id) => getStoredDLQEntry(id, kv, 'summary'));
 
   const recent = (await Promise.all(entryPromises)).filter((e): e is DLQEntry => e !== null);
 

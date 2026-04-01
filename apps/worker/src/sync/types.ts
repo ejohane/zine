@@ -125,6 +125,24 @@ export const SyncJobStatusSchema = z.object({
   telemetry: SyncJobTelemetrySchema.optional(),
 });
 
+function parseStoredJson(value: string | null | undefined, schema: z.ZodTypeAny): unknown | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    const result = schema.safeParse(parsed);
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export function parseSyncJobStatus(value: string | null | undefined): SyncJobStatus | null {
+  return parseStoredJson(value, SyncJobStatusSchema) as SyncJobStatus | null;
+}
+
 // ============================================================================
 // API Response Types
 // ============================================================================
@@ -250,6 +268,10 @@ export const DLQEntrySchema = z.object({
   attempts: z.number(),
   environment: z.string(),
 });
+
+export function parseDLQEntry(value: string | null | undefined): DLQEntry | null {
+  return parseStoredJson(value, DLQEntrySchema) as DLQEntry | null;
+}
 
 /**
  * DLQ summary for monitoring dashboard

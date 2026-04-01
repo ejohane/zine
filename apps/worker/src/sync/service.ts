@@ -31,6 +31,7 @@ import {
   getJobStatusKey,
   JOB_STATUS_TTL_SECONDS,
   ACTIVE_JOB_TTL_SECONDS,
+  parseSyncJobStatus,
 } from './types';
 // Note: Provider and polling imports are done dynamically in processSyncFallback
 // to avoid loading googleapis at module init time (breaks workerd test environment)
@@ -315,13 +316,7 @@ export async function initiateSyncJob(
  */
 export async function getJobStatus(jobId: string, kv: KVNamespace): Promise<SyncJobStatus | null> {
   const data = await kv.get(getJobStatusKey(jobId));
-  if (!data) return null;
-
-  try {
-    return JSON.parse(data) as SyncJobStatus;
-  } catch {
-    return null;
-  }
+  return parseSyncJobStatus(data);
 }
 
 /**
@@ -417,7 +412,11 @@ export async function updateJobProgress(
     return;
   }
 
-  const status: SyncJobStatus = JSON.parse(data);
+  const status = parseSyncJobStatus(data);
+  if (!status) {
+    syncLogger.warn('Job status payload invalid; skipping update', { jobId, subscriptionId });
+    return;
+  }
 
   // Update counters
   status.completed++;

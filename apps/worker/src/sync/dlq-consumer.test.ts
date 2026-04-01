@@ -131,6 +131,32 @@ const TEST_USER_ID = 'user_test_123';
 const TEST_JOB_ID = '01HQXYZ123456789ABCDEFGHIJ';
 const MOCK_NOW = 1705320000000;
 
+function createDLQEntry(
+  id: string,
+  overrides?: Partial<{
+    deadLetteredAt: number;
+    attempts: number;
+    environment: string;
+    message: Partial<SyncQueueMessage>;
+  }>
+) {
+  return {
+    id,
+    message: {
+      jobId: TEST_JOB_ID,
+      userId: TEST_USER_ID,
+      subscriptionId: `sub_${id}`,
+      provider: 'YOUTUBE' as const,
+      providerChannelId: 'UC123',
+      enqueuedAt: MOCK_NOW - 60000,
+      ...(overrides?.message ?? {}),
+    },
+    deadLetteredAt: overrides?.deadLetteredAt ?? MOCK_NOW,
+    attempts: overrides?.attempts ?? 3,
+    environment: overrides?.environment ?? 'development',
+  };
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -429,20 +455,12 @@ describe('getDLQEntries', () => {
   });
 
   it('should return stored DLQ entries', async () => {
-    const entry1 = {
-      id: 'entry_1',
+    const entry1 = createDLQEntry('entry_1', {
       message: {
-        jobId: TEST_JOB_ID,
-        userId: TEST_USER_ID,
         subscriptionId: 'sub_1',
-        provider: 'YOUTUBE',
-        providerChannelId: 'UC123',
         enqueuedAt: MOCK_NOW,
       },
-      deadLetteredAt: MOCK_NOW,
-      attempts: 3,
-      environment: 'development',
-    };
+    });
 
     const kv = createMockKV({
       [getDLQIndexKey()]: JSON.stringify(['entry_1']),
@@ -458,9 +476,9 @@ describe('getDLQEntries', () => {
   it('should respect limit parameter', async () => {
     const kv = createMockKV({
       [getDLQIndexKey()]: JSON.stringify(['entry_1', 'entry_2', 'entry_3']),
-      [getDLQEntryKey('entry_1')]: JSON.stringify({ id: 'entry_1' }),
-      [getDLQEntryKey('entry_2')]: JSON.stringify({ id: 'entry_2' }),
-      [getDLQEntryKey('entry_3')]: JSON.stringify({ id: 'entry_3' }),
+      [getDLQEntryKey('entry_1')]: JSON.stringify(createDLQEntry('entry_1')),
+      [getDLQEntryKey('entry_2')]: JSON.stringify(createDLQEntry('entry_2')),
+      [getDLQEntryKey('entry_3')]: JSON.stringify(createDLQEntry('entry_3')),
     });
 
     const entries = await getDLQEntries(kv, 2);
@@ -473,8 +491,8 @@ describe('getDLQEntries', () => {
   it('should handle missing entries gracefully', async () => {
     const kv = createMockKV({
       [getDLQIndexKey()]: JSON.stringify(['entry_1', 'missing_entry', 'entry_2']),
-      [getDLQEntryKey('entry_1')]: JSON.stringify({ id: 'entry_1' }),
-      [getDLQEntryKey('entry_2')]: JSON.stringify({ id: 'entry_2' }),
+      [getDLQEntryKey('entry_1')]: JSON.stringify(createDLQEntry('entry_1')),
+      [getDLQEntryKey('entry_2')]: JSON.stringify(createDLQEntry('entry_2')),
       // 'missing_entry' doesn't exist in KV
     });
 
@@ -483,6 +501,23 @@ describe('getDLQEntries', () => {
     // Should filter out null entries
     expect(entries).toHaveLength(2);
     expect(entries.map((e) => e.id)).toEqual(['entry_1', 'entry_2']);
+  });
+
+  it('should skip invalid entry payloads and warn', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: JSON.stringify(['entry_1', 'entry_2']),
+      [getDLQEntryKey('entry_1')]: JSON.stringify(createDLQEntry('entry_1')),
+      [getDLQEntryKey('entry_2')]: JSON.stringify({ id: 'entry_2' }),
+    });
+
+    const entries = await getDLQEntries(kv, 10);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.id).toBe('entry_1');
+    expect(mockLogger.warn).toHaveBeenCalledWith('DLQ entry data invalid; skipping', {
+      operation: 'list',
+      entryId: 'entry_2',
+    });
   });
 
   it('should return empty array when index JSON is corrupted', async () => {
@@ -503,7 +538,7 @@ describe('getDLQEntries', () => {
   it('should return empty array and warn when index data has invalid shape', async () => {
     const kv = createMockKV({
       [getDLQIndexKey()]: JSON.stringify(['entry_1', 42]),
-      [getDLQEntryKey('entry_1')]: JSON.stringify({ id: 'entry_1' }),
+      [getDLQEntryKey('entry_1')]: JSON.stringify(createDLQEntry('entry_1')),
     });
 
     await expect(getDLQEntries(kv)).resolves.toEqual([]);
@@ -534,21 +569,15 @@ describe('getDLQSummary', () => {
   });
 
   it('should return summary with count and recent entries', async () => {
-    const entry1 = {
-      id: 'entry_1',
-      message: { jobId: 'job1' },
+    const entry1 = createDLQEntry('entry_1', {
       deadLetteredAt: MOCK_NOW - 60000,
-      attempts: 3,
-      environment: 'development',
-    };
+      message: { jobId: 'job1' },
+    });
 
-    const entry2 = {
-      id: 'entry_2',
-      message: { jobId: 'job2' },
+    const entry2 = createDLQEntry('entry_2', {
       deadLetteredAt: MOCK_NOW,
-      attempts: 3,
-      environment: 'development',
-    };
+      message: { jobId: 'job2' },
+    });
 
     const kv = createMockKV({
       [getDLQIndexKey()]: JSON.stringify(['entry_2', 'entry_1']),
@@ -572,10 +601,11 @@ describe('getDLQSummary', () => {
     };
 
     for (let i = 0; i < 15; i++) {
-      kvData[getDLQEntryKey(`entry_${i}`)] = JSON.stringify({
-        id: `entry_${i}`,
-        deadLetteredAt: MOCK_NOW - i * 1000,
-      });
+      kvData[getDLQEntryKey(`entry_${i}`)] = JSON.stringify(
+        createDLQEntry(`entry_${i}`, {
+          deadLetteredAt: MOCK_NOW - i * 1000,
+        })
+      );
     }
 
     const kv = createMockKV(kvData);
@@ -583,6 +613,24 @@ describe('getDLQSummary', () => {
 
     expect(summary.count).toBe(15);
     expect(summary.recent).toHaveLength(10);
+  });
+
+  it('should skip invalid recent entry payloads and warn', async () => {
+    const kv = createMockKV({
+      [getDLQIndexKey()]: JSON.stringify(['entry_1', 'entry_2']),
+      [getDLQEntryKey('entry_1')]: JSON.stringify(createDLQEntry('entry_1')),
+      [getDLQEntryKey('entry_2')]: JSON.stringify({ id: 'entry_2' }),
+    });
+
+    const summary = await getDLQSummary(kv);
+
+    expect(summary.count).toBe(2);
+    expect(summary.recent).toHaveLength(1);
+    expect(summary.recent[0]?.id).toBe('entry_1');
+    expect(mockLogger.warn).toHaveBeenCalledWith('DLQ entry data invalid; skipping', {
+      operation: 'summary',
+      entryId: 'entry_2',
+    });
   });
 
   it('should return empty summary when index JSON is corrupted', async () => {
