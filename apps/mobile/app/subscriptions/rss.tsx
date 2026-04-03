@@ -145,8 +145,9 @@ export default function RssSubscriptionsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: sourceConfig.name }} />
-      <Surface tone="canvas" style={styles.container}>
+      <Surface tone="canvas" style={styles.container} collapsable={false}>
         <FlatList
+          style={styles.list}
           data={filteredFeeds}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
@@ -285,7 +286,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  list: {
+    flex: 1,
+  },
   content: {
+    flexGrow: 1,
     padding: Spacing.lg,
     gap: Spacing.md,
     paddingBottom: Spacing['3xl'],

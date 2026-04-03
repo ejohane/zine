@@ -6,35 +6,27 @@
  */
 
 import { Stack } from 'expo-router';
+import {
+  createNativeLargeTitleScreenOptions,
+  nativeLargeTitleStackScreenOptions,
+} from '@/lib/native-large-title-header';
 
 export default function SubscriptionsLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerBackButtonDisplayMode: 'minimal',
-        headerLargeTitleShadowVisible: false,
-      }}
-    >
+    <Stack screenOptions={nativeLargeTitleStackScreenOptions}>
       <Stack.Screen
         name="index"
-        options={{
+        options={createNativeLargeTitleScreenOptions({
           title: 'Subscriptions',
-          headerLargeTitle: true,
-        }}
+        })}
       />
       <Stack.Screen
         name="rss"
-        options={{
+        options={createNativeLargeTitleScreenOptions({
           title: 'RSS',
-          headerLargeTitle: true,
-        }}
+        })}
       />
-      <Stack.Screen
-        name="[provider]"
-        options={{
-          headerLargeTitle: true,
-        }}
-      />
+      <Stack.Screen name="[provider]" options={createNativeLargeTitleScreenOptions()} />
       <Stack.Screen
         name="connect"
         options={{
