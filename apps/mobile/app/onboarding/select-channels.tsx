@@ -146,7 +146,7 @@ export default function SelectChannelsScreen() {
 
       // Navigate to tabs after a short delay to allow subscriptions to process
       setTimeout(() => {
-        router.replace('/(tabs)');
+        router.replace('/index');
       }, 500);
     } catch (err) {
       showError(toast, err, 'Failed to subscribe', 'SelectChannels');
@@ -157,7 +157,7 @@ export default function SelectChannelsScreen() {
 
   // Skip and go to tabs without subscribing
   const handleSkip = useCallback(() => {
-    router.replace('/(tabs)');
+    router.replace('/index');
   }, [router]);
 
   // If provider is invalid, redirect to onboarding connect screen

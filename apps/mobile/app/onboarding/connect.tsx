@@ -171,12 +171,12 @@ export default function OnboardingConnectScreen() {
 
   const handleSkip = useCallback(() => {
     // Navigate to main app (tabs)
-    router.replace('/(tabs)');
+    router.replace('/index');
   }, [router]);
 
   const handleContinue = useCallback(() => {
     // Navigate to main app (tabs)
-    router.replace('/(tabs)');
+    router.replace('/index');
   }, [router]);
 
   return (
