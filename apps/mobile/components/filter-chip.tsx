@@ -6,6 +6,8 @@
  */
 
 import type { ComponentType } from 'react';
+
+import * as Haptics from 'expo-haptics';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Radius, Spacing, Typography } from '@/constants/theme';
@@ -103,10 +105,14 @@ export function FilterChip({
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
   const iconSize = size === 'small' ? 12 : 14;
+  const handlePress = () => {
+    void Haptics.selectionAsync();
+    onPress();
+  };
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.chip,
         sizeStyles,
