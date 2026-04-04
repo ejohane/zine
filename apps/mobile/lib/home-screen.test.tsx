@@ -65,7 +65,13 @@ jest.mock('expo-router', () => ({
   }),
   useNavigation: () => mockNavigation,
   Stack: {
-    Screen: () => null,
+    Screen: ({
+      options,
+    }: {
+      options?: {
+        headerRight?: () => React.ReactNode;
+      };
+    }) => React.createElement(React.Fragment, null, options?.headerRight?.()),
   },
 }));
 

@@ -110,6 +110,7 @@ export default function SubscriptionsScreen() {
       <Stack.Screen options={{ headerLeft }} />
       <Surface tone="canvas" style={styles.container} collapsable={false}>
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
@@ -141,7 +142,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   content: {
+    flexGrow: 1,
     paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
     paddingBottom: Spacing['3xl'],

@@ -14,7 +14,6 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { FilterChip } from '@/components/filter-chip';
@@ -43,10 +42,6 @@ import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
-// =============================================================================
-// Icons
-// =============================================================================
-
 function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2}>
@@ -54,10 +49,6 @@ function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; col
     </Svg>
   );
 }
-
-// =============================================================================
-// Utility Functions
-// =============================================================================
 
 const INBOX_PAGE_SIZE = 20;
 const HOME_TOP_THRESHOLD = 4;
@@ -111,10 +102,6 @@ const contentTypeFilters: {
   },
 ];
 
-// =============================================================================
-// Components
-// =============================================================================
-
 function SectionHeader({
   title,
   count,
@@ -139,10 +126,6 @@ function SectionHeader({
   );
 }
 
-// =============================================================================
-// Main Screen
-// =============================================================================
-
 type HomeTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
   isFocused: () => boolean;
@@ -162,7 +145,6 @@ export default function HomeScreen() {
 
   useTabPrefetch('home');
 
-  // Data hooks
   const { data: inboxPages, isLoading: isInboxLoading } = useInfiniteInboxItems({
     limit: INBOX_PAGE_SIZE,
   });
@@ -175,7 +157,6 @@ export default function HomeScreen() {
     [connections, subscriptionsData?.items]
   );
 
-  // Transform to ItemCardData format for use with ItemCard component
   const jumpBackInItems = useMemo((): ItemCardData[] => {
     return (homeData?.jumpBackIn ?? []).map((item) => ({
       id: item.id,
@@ -262,7 +243,6 @@ export default function HomeScreen() {
     }));
   }, [homeData?.byContentType.articles]);
 
-  // Category counts
   const categoryCounts = useMemo(() => {
     const items = libraryData?.items ?? [];
     return {
@@ -324,250 +304,222 @@ export default function HomeScreen() {
   }, [contentTypeFilter, navigation]);
 
   return (
-    <Surface style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Header */}
-          <Animated.View style={styles.header}>
-            <View style={styles.headerTopRow}>
-              <View style={styles.headerTitleWrap}>
-                <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Home</Text>
-              </View>
-              <Pressable
-                onPress={handleOpenSettings}
-                style={({ pressed }) => [
-                  styles.settingsButton,
-                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                  pressed && { opacity: 0.75 },
-                ]}
-                accessibilityLabel={
-                  hasSettingsAlert
-                    ? 'Open settings. Subscription integrations need attention'
-                    : 'Open settings'
-                }
-                accessibilityRole="button"
-              >
-                <SettingsIcon size={20} color={colors.text} />
-                {hasSettingsAlert ? (
-                  <View
-                    testID="home-settings-alert-dot"
-                    pointerEvents="none"
-                    style={[
-                      styles.settingsAlertDot,
-                      {
-                        backgroundColor: colors.warning,
-                        borderColor: colors.backgroundSecondary,
-                      },
-                    ]}
-                  />
-                ) : null}
-              </Pressable>
-            </View>
-          </Animated.View>
-
-          <Animated.View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterContainer}
+    <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={handleOpenSettings}
+              style={({ pressed }) => [
+                styles.settingsButton,
+                { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
+                pressed && { opacity: 0.75 },
+              ]}
+              accessibilityLabel={
+                hasSettingsAlert
+                  ? 'Open settings. Subscription integrations need attention'
+                  : 'Open settings'
+              }
+              accessibilityRole="button"
             >
-              {contentTypeFilters.map((filter) => (
-                <FilterChip
-                  key={filter.id}
-                  label={filter.label}
-                  isSelected={contentTypeFilter === filter.id}
-                  onPress={() =>
-                    setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
-                  }
-                  icon={filter.icon}
-                  dotColor={filter.dotColor}
-                  selectedColor={filter.selectedColor}
-                  selectedSurfaceColor={filter.selectedSurfaceColor}
-                  count={categoryCounts[filter.id]}
+              <SettingsIcon size={20} color={colors.text} />
+              {hasSettingsAlert ? (
+                <View
+                  testID="home-settings-alert-dot"
+                  pointerEvents="none"
+                  style={[
+                    styles.settingsAlertDot,
+                    {
+                      backgroundColor: colors.warning,
+                      borderColor: colors.backgroundSecondary,
+                    },
+                  ]}
                 />
-              ))}
-            </ScrollView>
-          </Animated.View>
-          {isLoading ? (
-            <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : (
-            <>
-              {/* Jump Back In - Recently Opened Bookmarks */}
-              {filteredJumpBackInItems.length > 0 && (
-                <Animated.View>
-                  <SectionHeader
-                    title="Jump Back In"
-                    count={filteredJumpBackInItems.length}
-                    colors={colors}
-                  />
-                  <View style={styles.jumpBackInGrid}>
-                    {filteredJumpBackInItems.map((item) => (
-                      <View
-                        key={item.id}
-                        style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
-                      >
-                        <ItemCard item={item} shape="row" rowStyle="featured" />
-                      </View>
-                    ))}
-                  </View>
-                </Animated.View>
-              )}
+              ) : null}
+            </Pressable>
+          ),
+        }}
+      />
 
-              {/* Recently Bookmarked - Horizontal Cards */}
-              {filteredRecentlyBookmarked.length > 0 && (
-                <Animated.View>
-                  <SectionHeader
-                    title="Recently Bookmarked"
-                    count={filteredRecentlyBookmarked.length}
-                    colors={colors}
-                  />
-                  <FlatList
-                    horizontal
-                    data={filteredRecentlyBookmarked}
-                    renderItem={({ item, index }) => (
-                      <ItemCard item={item} shape="stack" index={index} />
-                    )}
-                    keyExtractor={(item) => item.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalList}
-                  />
-                </Animated.View>
-              )}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        contentInsetAdjustmentBehavior="automatic"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      >
+        <Animated.View style={styles.header}>
+          <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
+        </Animated.View>
 
-              {/* Inbox Section - Condensed List using compact ItemCard */}
-              {filteredInboxItems.length > 0 && (
-                <Animated.View style={styles.section}>
-                  <SectionHeader
-                    title="Inbox"
-                    count={filteredInboxItems.length}
-                    colors={colors}
-                    onPress={() => router.push('/(tabs)/inbox')}
-                  />
-                  <View
-                    style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
-                  >
-                    {filteredInboxItems.map((item, index) => (
-                      <ItemCard key={item.id} item={item} shape="row" index={index} />
-                    ))}
-                  </View>
-                </Animated.View>
-              )}
+        <Animated.View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContainer}
+          >
+            {contentTypeFilters.map((filter) => (
+              <FilterChip
+                key={filter.id}
+                label={filter.label}
+                isSelected={contentTypeFilter === filter.id}
+                onPress={() =>
+                  setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
+                }
+                icon={filter.icon}
+                dotColor={filter.dotColor}
+                selectedColor={filter.selectedColor}
+                selectedSurfaceColor={filter.selectedSurfaceColor}
+                count={categoryCounts[filter.id]}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (
+          <>
+            {filteredJumpBackInItems.length > 0 && (
+              <Animated.View>
+                <SectionHeader
+                  title="Jump Back In"
+                  count={filteredJumpBackInItems.length}
+                  colors={colors}
+                />
+                <View style={styles.jumpBackInGrid}>
+                  {filteredJumpBackInItems.map((item) => (
+                    <View
+                      key={item.id}
+                      style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                    >
+                      <ItemCard item={item} shape="row" rowStyle="featured" />
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            )}
 
-              {/* Category Collection - Large Cards with overlay */}
-              {showPodcastsSection && podcasts.length > 0 && (
-                <Animated.View>
-                  <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
-                  <FlatList
-                    horizontal
-                    data={podcasts.slice(0, 5)}
-                    renderItem={({ item, index }) => (
-                      <ItemCard item={item} shape="cover" index={index} />
-                    )}
-                    keyExtractor={(item) => item.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalList}
-                  />
-                </Animated.View>
-              )}
+            {filteredRecentlyBookmarked.length > 0 && (
+              <Animated.View>
+                <SectionHeader
+                  title="Recently Bookmarked"
+                  count={filteredRecentlyBookmarked.length}
+                  colors={colors}
+                />
+                <FlatList
+                  horizontal
+                  data={filteredRecentlyBookmarked}
+                  renderItem={({ item, index }) => (
+                    <ItemCard item={item} shape="stack" index={index} />
+                  )}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </Animated.View>
+            )}
 
-              {showArticlesSection && articles.length > 0 && (
-                <Animated.View>
-                  <SectionHeader title="Articles" count={articles.length} colors={colors} />
-                  <FlatList
-                    horizontal
-                    data={articles}
-                    renderItem={({ item, index }) => (
-                      <ItemCard item={item} shape="stack" index={index} />
-                    )}
-                    keyExtractor={(item) => item.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalList}
-                  />
-                </Animated.View>
-              )}
+            {filteredInboxItems.length > 0 && (
+              <Animated.View style={styles.section}>
+                <SectionHeader
+                  title="Inbox"
+                  count={filteredInboxItems.length}
+                  colors={colors}
+                  onPress={() => router.push('/(tabs)/inbox')}
+                />
+                <View
+                  style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
+                >
+                  {filteredInboxItems.map((item, index) => (
+                    <ItemCard key={item.id} item={item} shape="row" index={index} />
+                  ))}
+                </View>
+              </Animated.View>
+            )}
 
-              {/* Videos - Horizontal Cards */}
-              {showVideosSection && videos.length > 0 && (
-                <Animated.View>
-                  <SectionHeader title="Videos" count={videos.length} colors={colors} />
-                  <FlatList
-                    horizontal
-                    data={videos}
-                    renderItem={({ item, index }) => (
-                      <ItemCard item={item} shape="stack" index={index} />
-                    )}
-                    keyExtractor={(item) => item.id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.horizontalList}
-                  />
-                </Animated.View>
-              )}
-            </>
-          )}
+            {showPodcastsSection && podcasts.length > 0 && (
+              <Animated.View>
+                <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
+                <FlatList
+                  horizontal
+                  data={podcasts.slice(0, 5)}
+                  renderItem={({ item, index }) => (
+                    <ItemCard item={item} shape="cover" index={index} />
+                  )}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </Animated.View>
+            )}
 
-          {/* Bottom spacing for tab bar */}
-          <View style={styles.bottomSpacer} />
-        </ScrollView>
-      </SafeAreaView>
+            {showArticlesSection && articles.length > 0 && (
+              <Animated.View>
+                <SectionHeader title="Articles" count={articles.length} colors={colors} />
+                <FlatList
+                  horizontal
+                  data={articles}
+                  renderItem={({ item, index }) => (
+                    <ItemCard item={item} shape="stack" index={index} />
+                  )}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </Animated.View>
+            )}
+
+            {showVideosSection && videos.length > 0 && (
+              <Animated.View>
+                <SectionHeader title="Videos" count={videos.length} colors={colors} />
+                <FlatList
+                  horizontal
+                  data={videos}
+                  renderItem={({ item, index }) => (
+                    <ItemCard item={item} shape="stack" index={index} />
+                  )}
+                  keyExtractor={(item) => item.id}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                />
+              </Animated.View>
+            )}
+          </>
+        )}
+
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
     </Surface>
   );
 }
 
-// =============================================================================
-// Styles
-// =============================================================================
-
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  safeArea: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
   },
   content: {
+    flexGrow: 1,
     paddingBottom: 32,
   },
-
-  // Header
   header: {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.xl,
-  },
-  headerTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  headerTitleWrap: {
-    flex: 1,
   },
   greeting: {
     ...Typography.labelMedium,
-    marginBottom: Spacing.xs,
-  },
-  headerTitle: {
-    ...Typography.displayMedium,
   },
   settingsButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
@@ -575,8 +527,8 @@ const styles = StyleSheet.create({
   },
   settingsAlertDot: {
     position: 'absolute',
-    top: 7,
-    right: 7,
+    top: 5,
+    right: 5,
     width: 10,
     height: 10,
     borderRadius: Radius.full,
@@ -587,8 +539,6 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.lg,
   },
-
-  // Section
   section: {
     marginBottom: Spacing.xl,
   },
@@ -610,15 +560,11 @@ const styles = StyleSheet.create({
   sectionCount: {
     ...Typography.bodySmall,
   },
-
-  // Horizontal List
   horizontalList: {
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
     marginBottom: Spacing.xl,
   },
-
-  // Jump Back In Grid
   jumpBackInGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -629,23 +575,17 @@ const styles = StyleSheet.create({
   jumpBackInGridItem: {
     minWidth: 0,
   },
-
-  // Inbox Container
   inboxContainer: {
     marginHorizontal: Spacing.md,
     borderRadius: Radius.lg,
     overflow: 'hidden',
   },
-
-  // Loading state
   loadingState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: Spacing['5xl'],
   },
-
-  // Bottom spacer
   bottomSpacer: {
     height: 40,
   },

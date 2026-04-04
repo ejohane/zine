@@ -49,6 +49,15 @@ jest.mock('expo-router', () => ({
   }),
   useNavigation: () => mockNavigation,
   useLocalSearchParams: () => ({}),
+  Stack: {
+    Screen: ({
+      options,
+    }: {
+      options?: {
+        headerRight?: () => React.ReactNode;
+      };
+    }) => React.createElement(React.Fragment, null, options?.headerRight?.()),
+  },
 }));
 
 jest.mock('react-native', () => ({
@@ -90,10 +99,14 @@ jest.mock('react-native', () => ({
       {
         data,
         renderItem,
+        ListHeaderComponent,
+        ListFooterComponent,
         ...props
       }: {
         data?: unknown[];
         renderItem?: (args: { item: unknown; index: number }) => React.ReactNode;
+        ListHeaderComponent?: React.ReactNode;
+        ListFooterComponent?: React.ReactNode;
       },
       ref: React.ForwardedRef<{ scrollToOffset: typeof mockScrollToOffset }>
     ) => {
@@ -104,9 +117,11 @@ jest.mock('react-native', () => ({
       return React.createElement(
         'flat-list',
         props,
+        ListHeaderComponent,
         data?.map((item, index) =>
           React.createElement(React.Fragment, { key: index }, renderItem?.({ item, index }))
-        )
+        ),
+        ListFooterComponent
       );
     }
   ),

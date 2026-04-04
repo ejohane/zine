@@ -12,7 +12,6 @@
 import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useClerk } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 
@@ -194,8 +193,13 @@ function SettingsScreenContent({
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsRow
             title="Subscriptions"
@@ -269,7 +273,7 @@ function SettingsScreenContent({
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -281,7 +285,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     padding: Spacing.lg,
     paddingBottom: Spacing['3xl'],
   },
