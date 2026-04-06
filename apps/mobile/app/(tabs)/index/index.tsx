@@ -306,6 +306,8 @@ export default function HomeScreen() {
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
         options={{
+          title: 'Home',
+          headerLargeTitle: true,
           headerRight: () => (
             <Pressable
               onPress={handleOpenSettings}

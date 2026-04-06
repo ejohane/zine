@@ -264,6 +264,8 @@ export default function LibraryScreen() {
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
         options={{
+          title: 'Library',
+          headerLargeTitle: true,
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}

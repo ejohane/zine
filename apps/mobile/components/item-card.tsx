@@ -262,8 +262,8 @@ export function ItemCard({
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [
-          styles.rowFeaturedWrapper,
           styles.rowFeaturedCard,
+          styles.rowFeaturedWrapper,
           { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDefault },
           pressed && { opacity: motion.opacity.pressed },
         ]}
