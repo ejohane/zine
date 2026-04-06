@@ -10,6 +10,7 @@ import {
   FlatList,
   ActivityIndicator,
   useWindowDimensions,
+  type ListRenderItemInfo,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -131,10 +132,40 @@ type HomeTabNavigation = {
   isFocused: () => boolean;
 };
 
+type HomeSectionItem =
+  | {
+      key: 'jump-back-in';
+      type: 'jump-back-in';
+      title: string;
+      count: number;
+      items: ItemCardData[];
+    }
+  | {
+      key: 'recently-bookmarked';
+      type: 'recently-bookmarked';
+      title: string;
+      count: number;
+      items: ItemCardData[];
+    }
+  | {
+      key: 'inbox';
+      type: 'inbox';
+      title: string;
+      count: number;
+      items: ItemCardData[];
+    }
+  | {
+      key: 'podcasts' | 'articles' | 'videos';
+      type: 'cover-rail' | 'stack-rail';
+      title: string;
+      count: number;
+      items: ItemCardData[];
+    };
+
 export default function HomeScreen() {
   const router = useRouter();
   const navigation = useNavigation() as HomeTabNavigation;
-  const scrollViewRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<HomeSectionItem>>(null);
   const scrollOffsetYRef = useRef(0);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
@@ -288,6 +319,205 @@ export default function HomeScreen() {
   const showVideosSection = contentTypeFilter === null || contentTypeFilter === 'video';
   const showArticlesSection = contentTypeFilter === null || contentTypeFilter === 'article';
 
+  const sections = useMemo((): HomeSectionItem[] => {
+    const items: HomeSectionItem[] = [];
+
+    if (filteredJumpBackInItems.length > 0) {
+      items.push({
+        key: 'jump-back-in',
+        type: 'jump-back-in',
+        title: 'Jump Back In',
+        count: filteredJumpBackInItems.length,
+        items: filteredJumpBackInItems,
+      });
+    }
+
+    if (filteredRecentlyBookmarked.length > 0) {
+      items.push({
+        key: 'recently-bookmarked',
+        type: 'recently-bookmarked',
+        title: 'Recently Bookmarked',
+        count: filteredRecentlyBookmarked.length,
+        items: filteredRecentlyBookmarked,
+      });
+    }
+
+    if (filteredInboxItems.length > 0) {
+      items.push({
+        key: 'inbox',
+        type: 'inbox',
+        title: 'Inbox',
+        count: filteredInboxItems.length,
+        items: filteredInboxItems,
+      });
+    }
+
+    if (showPodcastsSection && podcasts.length > 0) {
+      items.push({
+        key: 'podcasts',
+        type: 'cover-rail',
+        title: 'Podcasts',
+        count: podcasts.length,
+        items: podcasts.slice(0, 5),
+      });
+    }
+
+    if (showArticlesSection && articles.length > 0) {
+      items.push({
+        key: 'articles',
+        type: 'stack-rail',
+        title: 'Articles',
+        count: articles.length,
+        items: articles,
+      });
+    }
+
+    if (showVideosSection && videos.length > 0) {
+      items.push({
+        key: 'videos',
+        type: 'stack-rail',
+        title: 'Videos',
+        count: videos.length,
+        items: videos,
+      });
+    }
+
+    return items;
+  }, [
+    articles,
+    filteredInboxItems,
+    filteredJumpBackInItems,
+    filteredRecentlyBookmarked,
+    podcasts,
+    showArticlesSection,
+    showPodcastsSection,
+    showVideosSection,
+    videos,
+  ]);
+
+  const listHeader = useMemo(
+    () => (
+      <>
+        <View style={styles.header}>
+          <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContainer}
+        >
+          {contentTypeFilters.map((filter) => (
+            <FilterChip
+              key={filter.id}
+              label={filter.label}
+              isSelected={contentTypeFilter === filter.id}
+              onPress={() =>
+                setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
+              }
+              icon={filter.icon}
+              dotColor={filter.dotColor}
+              selectedColor={filter.selectedColor}
+              selectedSurfaceColor={filter.selectedSurfaceColor}
+              count={categoryCounts[filter.id]}
+            />
+          ))}
+        </ScrollView>
+      </>
+    ),
+    [categoryCounts, colors.textSubheader, contentTypeFilter, greeting]
+  );
+
+  const renderSection = useCallback(
+    ({ item }: ListRenderItemInfo<HomeSectionItem>) => {
+      switch (item.type) {
+        case 'jump-back-in':
+          return (
+            <View>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <View style={styles.jumpBackInGrid}>
+                {item.items.map((sectionItem) => (
+                  <View
+                    key={sectionItem.id}
+                    style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                  >
+                    <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        case 'recently-bookmarked':
+          return (
+            <View>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <FlatList
+                horizontal
+                data={item.items}
+                renderItem={({ item: sectionItem, index }) => (
+                  <ItemCard item={sectionItem} shape="stack" index={index} />
+                )}
+                keyExtractor={(sectionItem) => sectionItem.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              />
+            </View>
+          );
+        case 'inbox':
+          return (
+            <View style={styles.section}>
+              <SectionHeader
+                title={item.title}
+                count={item.count}
+                colors={colors}
+                onPress={() => router.push('/(tabs)/inbox')}
+              />
+              <View
+                style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
+              >
+                {item.items.map((sectionItem, index) => (
+                  <ItemCard key={sectionItem.id} item={sectionItem} shape="row" index={index} />
+                ))}
+              </View>
+            </View>
+          );
+        case 'cover-rail':
+          return (
+            <View>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <FlatList
+                horizontal
+                data={item.items}
+                renderItem={({ item: sectionItem, index }) => (
+                  <ItemCard item={sectionItem} shape="cover" index={index} />
+                )}
+                keyExtractor={(sectionItem) => sectionItem.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              />
+            </View>
+          );
+        case 'stack-rail':
+          return (
+            <View>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <FlatList
+                horizontal
+                data={item.items}
+                renderItem={({ item: sectionItem, index }) => (
+                  <ItemCard item={sectionItem} shape="stack" index={index} />
+                )}
+                keyExtractor={(sectionItem) => sectionItem.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalList}
+              />
+            </View>
+          );
+      }
+    },
+    [colors, featuredGridItemWidth, router]
+  );
+
   useEffect(() => {
     return navigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
@@ -299,7 +529,7 @@ export default function HomeScreen() {
         return;
       }
 
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
   }, [contentTypeFilter, navigation]);
 
@@ -342,156 +572,31 @@ export default function HomeScreen() {
         })}
       />
 
-      <ScrollView
-        ref={scrollViewRef}
+      <FlatList
+        ref={listRef}
+        data={sections}
+        renderItem={renderSection}
+        keyExtractor={(item) => item.key}
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         onScroll={handleScroll}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
-        >
-          {contentTypeFilters.map((filter) => (
-            <FilterChip
-              key={filter.id}
-              label={filter.label}
-              isSelected={contentTypeFilter === filter.id}
-              onPress={() =>
-                setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
-              }
-              icon={filter.icon}
-              dotColor={filter.dotColor}
-              selectedColor={filter.selectedColor}
-              selectedSurfaceColor={filter.selectedSurfaceColor}
-              count={categoryCounts[filter.id]}
-            />
-          ))}
-        </ScrollView>
-        {isLoading ? (
-          <View style={styles.loadingState}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (
-          <>
-            {filteredJumpBackInItems.length > 0 && (
-              <>
-                <SectionHeader
-                  title="Jump Back In"
-                  count={filteredJumpBackInItems.length}
-                  colors={colors}
-                />
-                <View style={styles.jumpBackInGrid}>
-                  {filteredJumpBackInItems.map((item) => (
-                    <View
-                      key={item.id}
-                      style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
-                    >
-                      <ItemCard item={item} shape="row" rowStyle="featured" />
-                    </View>
-                  ))}
-                </View>
-              </>
-            )}
-
-            {filteredRecentlyBookmarked.length > 0 && (
-              <>
-                <SectionHeader
-                  title="Recently Bookmarked"
-                  count={filteredRecentlyBookmarked.length}
-                  colors={colors}
-                />
-                <FlatList
-                  horizontal
-                  data={filteredRecentlyBookmarked}
-                  renderItem={({ item, index }) => (
-                    <ItemCard item={item} shape="stack" index={index} />
-                  )}
-                  keyExtractor={(item) => item.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </>
-            )}
-
-            {filteredInboxItems.length > 0 && (
-              <View style={styles.section}>
-                <SectionHeader
-                  title="Inbox"
-                  count={filteredInboxItems.length}
-                  colors={colors}
-                  onPress={() => router.push('/(tabs)/inbox')}
-                />
-                <View
-                  style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
-                >
-                  {filteredInboxItems.map((item, index) => (
-                    <ItemCard key={item.id} item={item} shape="row" index={index} />
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {showPodcastsSection && podcasts.length > 0 && (
-              <>
-                <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
-                <FlatList
-                  horizontal
-                  data={podcasts.slice(0, 5)}
-                  renderItem={({ item, index }) => (
-                    <ItemCard item={item} shape="cover" index={index} />
-                  )}
-                  keyExtractor={(item) => item.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </>
-            )}
-
-            {showArticlesSection && articles.length > 0 && (
-              <>
-                <SectionHeader title="Articles" count={articles.length} colors={colors} />
-                <FlatList
-                  horizontal
-                  data={articles}
-                  renderItem={({ item, index }) => (
-                    <ItemCard item={item} shape="stack" index={index} />
-                  )}
-                  keyExtractor={(item) => item.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </>
-            )}
-
-            {showVideosSection && videos.length > 0 && (
-              <>
-                <SectionHeader title="Videos" count={videos.length} colors={colors} />
-                <FlatList
-                  horizontal
-                  data={videos}
-                  renderItem={({ item, index }) => (
-                    <ItemCard item={item} shape="stack" index={index} />
-                  )}
-                  keyExtractor={(item) => item.id}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </>
-            )}
-          </>
-        )}
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={<View style={styles.bottomSpacer} />}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : null
+        }
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        updateCellsBatchingPeriod={16}
+        windowSize={5}
+      />
     </Surface>
   );
 }

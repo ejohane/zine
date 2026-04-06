@@ -45,10 +45,18 @@ function findFilterChip(renderer: Renderer, label: string) {
   );
 }
 
-function findHomeScrollView(renderer: Renderer) {
+function findHomeList(renderer: Renderer) {
   return renderer.root.find(
-    (node: TestNode) => node.type === 'scroll-view' && node.props.horizontal !== true
+    (node: TestNode) => node.type === 'flat-list' && node.props.horizontal !== true
   );
+}
+
+function renderListBoundary(boundary: React.ReactNode | (() => React.ReactNode) | undefined) {
+  if (!boundary) {
+    return null;
+  }
+
+  return typeof boundary === 'function' ? boundary() : boundary;
 }
 
 function pressHomeTab() {
@@ -112,18 +120,45 @@ jest.mock('react-native', () => ({
       { onClick: onPress, onPress, ...props },
       typeof children === 'function' ? children({ pressed: false }) : children
     ),
-  FlatList: ({
-    data,
-    renderItem,
-  }: {
-    data?: unknown[];
-    renderItem?: (args: { item: unknown; index: number }) => React.ReactNode;
-  }) =>
-    React.createElement(
-      'div',
-      null,
-      data?.map((item, index) => renderItem?.({ item, index }))
-    ),
+  FlatList: React.forwardRef(
+    (
+      {
+        data,
+        renderItem,
+        ListHeaderComponent,
+        ListFooterComponent,
+        ListEmptyComponent,
+        ...props
+      }: {
+        data?: unknown[];
+        renderItem?: (args: { item: unknown; index: number }) => React.ReactNode;
+        ListHeaderComponent?: React.ReactNode | (() => React.ReactNode);
+        ListFooterComponent?: React.ReactNode | (() => React.ReactNode);
+        ListEmptyComponent?: React.ReactNode | (() => React.ReactNode);
+        horizontal?: boolean;
+      },
+      ref: React.ForwardedRef<{
+        scrollToOffset: (args: { offset: number; animated: boolean }) => void;
+      }>
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        scrollToOffset: mockScrollTo,
+      }));
+
+      const renderedItems =
+        data && data.length > 0
+          ? data.map((item, index) => renderItem?.({ item, index }))
+          : renderListBoundary(ListEmptyComponent);
+
+      return React.createElement(
+        'flat-list',
+        props,
+        renderListBoundary(ListHeaderComponent),
+        renderedItems,
+        renderListBoundary(ListFooterComponent)
+      );
+    }
+  ),
   ActivityIndicator: () => React.createElement('span', null, 'loading'),
   useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
 }));
@@ -318,7 +353,7 @@ describe('HomeScreen', () => {
     });
 
     act(() => {
-      findHomeScrollView(renderer!).props.onScroll({
+      findHomeList(renderer!).props.onScroll({
         nativeEvent: {
           contentOffset: {
             y: 240,
@@ -331,7 +366,7 @@ describe('HomeScreen', () => {
       pressHomeTab();
     });
 
-    expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    expect(mockScrollTo).toHaveBeenCalledWith({ offset: 0, animated: true });
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
   });
 });
