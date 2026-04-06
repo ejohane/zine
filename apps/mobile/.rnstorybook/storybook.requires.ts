@@ -15,6 +15,7 @@ const normalizedStories = [
     files: '**/*.stories.?(ts|tsx|js|jsx)',
     importPathMatcher:
       /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/,
+    // @ts-expect-error Storybook's generated require.context typing is not available in Metro.
     req: require.context(
       '../components',
       true,
@@ -33,8 +34,7 @@ const annotations = [require('./preview'), require('@storybook/react-native/prev
 
 globalThis.STORIES = normalizedStories;
 
-declare const module: { hot?: { accept?: () => void } } | undefined;
-
+// @ts-expect-error Fast refresh injects module.hot in development builds.
 module?.hot?.accept?.();
 
 if (!globalThis.view) {
