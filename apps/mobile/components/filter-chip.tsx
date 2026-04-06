@@ -106,7 +106,13 @@ export function FilterChip({
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
   const iconSize = size === 'small' ? 12 : 14;
   const handlePress = () => {
-    void Haptics.selectionAsync();
+    try {
+      const hapticsResult = Haptics.selectionAsync();
+      void hapticsResult?.catch?.(() => undefined);
+    } catch {
+      // Ignore haptic availability errors so chip interactions still complete.
+    }
+
     onPress();
   };
 

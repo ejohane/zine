@@ -1,4 +1,5 @@
 import React from 'react';
+import * as Haptics from 'expo-haptics';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { FilterChip } from './filter-chip';
@@ -7,9 +8,7 @@ jest.mock('expo-haptics', () => ({
   selectionAsync: jest.fn(),
 }));
 
-const { selectionAsync: mockSelectionAsync } = jest.requireMock('expo-haptics') as {
-  selectionAsync: jest.Mock;
-};
+const mockSelectionAsync = jest.mocked(Haptics.selectionAsync);
 
 jest.mock('react-native', () => ({
   __esModule: true,
@@ -67,6 +66,32 @@ describe('FilterChip', () => {
   it('triggers selection haptics and calls onPress', () => {
     const onPress = jest.fn();
     let renderer: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(FilterChip, {
+          label: 'Articles',
+          isSelected: false,
+          onPress,
+        })
+      );
+    });
+
+    act(() => {
+      renderer.root.findByType('button').props.onPress();
+    });
+
+    expect(mockSelectionAsync).toHaveBeenCalledTimes(1);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('still calls onPress when haptics throws synchronously', () => {
+    const onPress = jest.fn();
+    let renderer: ReturnType<typeof TestRenderer.create>;
+
+    mockSelectionAsync.mockImplementationOnce(() => {
+      throw new Error('haptics unavailable');
+    });
 
     act(() => {
       renderer = TestRenderer.create(
