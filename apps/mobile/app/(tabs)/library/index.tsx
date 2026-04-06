@@ -40,6 +40,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import { createNativeLargeTitleScreenOptions } from '@/lib/native-large-title-header';
 import type { UIContentType, UIProvider } from '@/lib/content-utils';
 
 function SearchIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: string }) {
@@ -263,9 +264,8 @@ export default function LibraryScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={{
+        options={createNativeLargeTitleScreenOptions({
           title: 'Library',
-          headerLargeTitle: true,
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}
@@ -276,7 +276,7 @@ export default function LibraryScreen() {
               <PlusIcon size={22} color={colors.text} />
             </Pressable>
           ),
-        }}
+        })}
       />
 
       {isLoading ? (

@@ -39,6 +39,7 @@ import {
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
+import { createNativeLargeTitleScreenOptions } from '@/lib/native-large-title-header';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; color?: string }) {
@@ -305,9 +306,8 @@ export default function HomeScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={{
+        options={createNativeLargeTitleScreenOptions({
           title: 'Home',
-          headerLargeTitle: true,
           headerRight: () => (
             <Pressable
               onPress={handleOpenSettings}
@@ -339,7 +339,7 @@ export default function HomeScreen() {
               ) : null}
             </Pressable>
           ),
-        }}
+        })}
       />
 
       <ScrollView
