@@ -11,7 +11,6 @@ import { useEffect, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Animated from 'react-native-reanimated';
 
 import { Typography, Spacing, Radius, IconSizes } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
@@ -155,113 +154,104 @@ export function ItemCard({
 
   if (shape === 'cover') {
     return (
-      <Animated.View>
-        <Pressable
-          onPress={handlePress}
-          style={({ pressed }) => [styles.coverCard, pressed && { opacity: 0.95 }]}
-        >
-          {mediaImageUrl ? (
-            <Image
-              source={{ uri: mediaImageUrl }}
-              style={styles.coverImage}
-              contentFit="cover"
-              transition={mediaTransition}
-              onError={handleMediaImageError}
-            />
-          ) : (
-            <View style={[styles.coverImage, { backgroundColor: colors.surfaceRaised }]} />
-          )}
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [styles.coverCard, pressed && { opacity: 0.95 }]}
+      >
+        {mediaImageUrl ? (
+          <Image
+            source={{ uri: mediaImageUrl }}
+            style={styles.coverImage}
+            contentFit="cover"
+            transition={mediaTransition}
+            onError={handleMediaImageError}
+          />
+        ) : (
+          <View style={[styles.coverImage, { backgroundColor: colors.surfaceRaised }]} />
+        )}
 
-          <View style={[styles.coverContent, { backgroundColor: colors.overlaySoft }]}>
-            <Text style={[styles.coverCreator, { color: colors.overlayForegroundSubtle }]}>
-              {item.creator}
+        <View style={[styles.coverContent, { backgroundColor: colors.overlaySoft }]}>
+          <Text style={[styles.coverCreator, { color: colors.overlayForegroundSubtle }]}>
+            {item.creator}
+          </Text>
+          <Text style={[styles.coverTitle, { color: colors.overlayForeground }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          {durationText && (
+            <Text style={[styles.coverDuration, { color: colors.overlayForegroundMuted }]}>
+              {durationText}
             </Text>
-            <Text
-              style={[styles.coverTitle, { color: colors.overlayForeground }]}
-              numberOfLines={2}
-            >
-              {item.title}
-            </Text>
-            {durationText && (
-              <Text style={[styles.coverDuration, { color: colors.overlayForegroundMuted }]}>
-                {durationText}
-              </Text>
-            )}
-          </View>
-        </Pressable>
-      </Animated.View>
+          )}
+        </View>
+      </Pressable>
     );
   }
 
   if (shape === 'stack') {
     return (
-      <Animated.View>
-        <Pressable
-          onPress={handlePress}
-          style={({ pressed }) => [
-            styles.stackCard,
-            { backgroundColor: colors.surfaceSubtle },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          {mediaImageUrl ? (
-            <Image
-              source={{ uri: mediaImageUrl }}
-              style={styles.stackImage}
-              contentFit="cover"
-              transition={mediaTransition}
-              onError={handleMediaImageError}
-            />
-          ) : (
-            <View style={[styles.stackImage, { backgroundColor: colors.surfaceRaised }]} />
-          )}
+      <Pressable
+        onPress={handlePress}
+        style={({ pressed }) => [
+          styles.stackCard,
+          { backgroundColor: colors.surfaceSubtle },
+          pressed && { opacity: 0.7 },
+        ]}
+      >
+        {mediaImageUrl ? (
+          <Image
+            source={{ uri: mediaImageUrl }}
+            style={styles.stackImage}
+            contentFit="cover"
+            transition={mediaTransition}
+            onError={handleMediaImageError}
+          />
+        ) : (
+          <View style={[styles.stackImage, { backgroundColor: colors.surfaceRaised }]} />
+        )}
 
-          <View style={styles.stackContent}>
-            <Text style={[styles.stackTitle, { color: colors.text }]} numberOfLines={1}>
-              {item.title}
-            </Text>
-            <View style={styles.stackMeta}>
-              <View style={styles.stackMetaIcon}>{renderSubtitleLeadingVisual()}</View>
-              <View style={styles.stackMetaTextGroup}>
-                <View
+        <View style={styles.stackContent}>
+          <Text style={[styles.stackTitle, { color: colors.text }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <View style={styles.stackMeta}>
+            <View style={styles.stackMetaIcon}>{renderSubtitleLeadingVisual()}</View>
+            <View style={styles.stackMetaTextGroup}>
+              <View
+                style={[
+                  styles.stackMetaCreatorContainer,
+                  inlineLengthText ? styles.stackMetaCreatorContainerWithLength : null,
+                ]}
+              >
+                <Text
                   style={[
-                    styles.stackMetaCreatorContainer,
-                    inlineLengthText ? styles.stackMetaCreatorContainerWithLength : null,
+                    styles.stackSource,
+                    styles.stackMetaCreator,
+                    { color: colors.textSubheader },
                   ]}
+                  numberOfLines={1}
                 >
+                  {item.creator}
+                </Text>
+              </View>
+              {inlineLengthText ? (
+                <>
+                  <View style={[styles.stackTypeDot, { backgroundColor: colors.textSubheader }]} />
                   <Text
                     style={[
                       styles.stackSource,
-                      styles.stackMetaCreator,
+                      styles.stackMetaLength,
                       { color: colors.textSubheader },
                     ]}
                     numberOfLines={1}
                   >
-                    {item.creator}
+                    {inlineLengthText}
                   </Text>
-                </View>
-                {inlineLengthText ? (
-                  <>
-                    <View
-                      style={[styles.stackTypeDot, { backgroundColor: colors.textSubheader }]}
-                    />
-                    <Text
-                      style={[
-                        styles.stackSource,
-                        styles.stackMetaLength,
-                        { color: colors.textSubheader },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {inlineLengthText}
-                    </Text>
-                  </>
-                ) : null}
-              </View>
+                </>
+              ) : null}
             </View>
           </View>
-        </Pressable>
-      </Animated.View>
+        </View>
+      </Pressable>
     );
   }
 
@@ -269,100 +259,92 @@ export function ItemCard({
 
   if (isFeaturedRow) {
     return (
-      <Animated.View style={styles.rowFeaturedWrapper}>
-        <Pressable
-          onPress={handlePress}
-          style={({ pressed }) => [
-            styles.rowFeaturedCard,
-            { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDefault },
-            pressed && { opacity: motion.opacity.pressed },
-          ]}
-        >
-          <View
-            style={[
-              styles.rowFeaturedThumbnailContainer,
-              { backgroundColor: colors.surfaceRaised },
-            ]}
-          >
-            {mediaImageUrl ? (
-              <Image
-                source={{ uri: mediaImageUrl }}
-                style={styles.rowFeaturedThumbnailImage}
-                contentFit="cover"
-                transition={mediaTransition}
-                onError={handleMediaImageError}
-              />
-            ) : null}
-          </View>
-          <View style={styles.rowFeaturedContent}>
-            <Text style={[styles.rowFeaturedTitle, { color: colors.text }]} numberOfLines={2}>
-              {item.title}
-            </Text>
-          </View>
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View>
       <Pressable
         onPress={handlePress}
-        style={({ pressed }) => [styles.rowCompactCard, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [
+          styles.rowFeaturedCard,
+          styles.rowFeaturedWrapper,
+          { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDefault },
+          pressed && { opacity: motion.opacity.pressed },
+        ]}
       >
-        <View style={styles.rowCompactThumbnailContainer}>
+        <View
+          style={[styles.rowFeaturedThumbnailContainer, { backgroundColor: colors.surfaceRaised }]}
+        >
           {mediaImageUrl ? (
             <Image
               source={{ uri: mediaImageUrl }}
-              style={styles.rowCompactThumbnailImage}
+              style={styles.rowFeaturedThumbnailImage}
               contentFit="cover"
               transition={mediaTransition}
               onError={handleMediaImageError}
             />
-          ) : (
-            <View
-              style={[styles.rowCompactThumbnailImage, { backgroundColor: colors.surfaceRaised }]}
-            />
-          )}
+          ) : null}
         </View>
-
-        <View style={styles.rowCompactContent}>
-          <Text style={[styles.rowCompactTitle, { color: colors.text }]} numberOfLines={1}>
+        <View style={styles.rowFeaturedContent}>
+          <Text style={[styles.rowFeaturedTitle, { color: colors.text }]} numberOfLines={2}>
             {item.title}
           </Text>
-          <View style={styles.rowCompactMeta}>
-            <View style={styles.rowCompactMetaIcon}>{renderSubtitleLeadingVisual()}</View>
-            <Text
-              style={[
-                styles.rowCompactMetaText,
-                styles.rowCompactMetaCreator,
-                { color: colors.textSubheader },
-              ]}
-              numberOfLines={1}
-            >
-              {item.creator}
-            </Text>
-            {inlineLengthText ? (
-              <>
-                <View
-                  style={[styles.rowCompactMetaDot, { backgroundColor: colors.textSubheader }]}
-                />
-                <Text
-                  style={[
-                    styles.rowCompactMetaText,
-                    styles.rowCompactMetaLength,
-                    { color: colors.textSubheader },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {inlineLengthText}
-                </Text>
-              </>
-            ) : null}
-          </View>
         </View>
       </Pressable>
-    </Animated.View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      style={({ pressed }) => [styles.rowCompactCard, pressed && { opacity: 0.7 }]}
+    >
+      <View style={styles.rowCompactThumbnailContainer}>
+        {mediaImageUrl ? (
+          <Image
+            source={{ uri: mediaImageUrl }}
+            style={styles.rowCompactThumbnailImage}
+            contentFit="cover"
+            transition={mediaTransition}
+            onError={handleMediaImageError}
+          />
+        ) : (
+          <View
+            style={[styles.rowCompactThumbnailImage, { backgroundColor: colors.surfaceRaised }]}
+          />
+        )}
+      </View>
+
+      <View style={styles.rowCompactContent}>
+        <Text style={[styles.rowCompactTitle, { color: colors.text }]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <View style={styles.rowCompactMeta}>
+          <View style={styles.rowCompactMetaIcon}>{renderSubtitleLeadingVisual()}</View>
+          <Text
+            style={[
+              styles.rowCompactMetaText,
+              styles.rowCompactMetaCreator,
+              { color: colors.textSubheader },
+            ]}
+            numberOfLines={1}
+          >
+            {item.creator}
+          </Text>
+          {inlineLengthText ? (
+            <>
+              <View style={[styles.rowCompactMetaDot, { backgroundColor: colors.textSubheader }]} />
+              <Text
+                style={[
+                  styles.rowCompactMetaText,
+                  styles.rowCompactMetaLength,
+                  { color: colors.textSubheader },
+                ]}
+                numberOfLines={1}
+              >
+                {inlineLengthText}
+              </Text>
+            </>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
   );
 }
 

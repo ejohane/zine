@@ -16,7 +16,6 @@ import {
   type NativeSyntheticEvent,
   type ListRenderItemInfo,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { ContentType as ApiContentType } from '@zine/shared';
 
@@ -41,6 +40,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import { createNativeLargeTitleScreenOptions } from '@/lib/native-large-title-header';
 import type { UIContentType, UIProvider } from '@/lib/content-utils';
 
 function SearchIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: string }) {
@@ -264,7 +264,8 @@ export default function LibraryScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={{
+        options={createNativeLargeTitleScreenOptions({
+          title: 'Library',
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}
@@ -275,7 +276,7 @@ export default function LibraryScreen() {
               <PlusIcon size={22} color={colors.text} />
             </Pressable>
           ),
-        }}
+        })}
       />
 
       {isLoading ? (
@@ -293,7 +294,7 @@ export default function LibraryScreen() {
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={32}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.6}
           ListHeaderComponent={
@@ -302,7 +303,7 @@ export default function LibraryScreen() {
                 {libraryCountLabel}
               </Text>
 
-              <Animated.View style={styles.searchContainer}>
+              <View style={styles.searchContainer}>
                 <View
                   style={[
                     styles.searchBar,
@@ -321,40 +322,38 @@ export default function LibraryScreen() {
                     onChangeText={setSearchQuery}
                   />
                 </View>
-              </Animated.View>
+              </View>
 
-              <Animated.View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterContainer}
-                >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterContainer}
+              >
+                <FilterChip
+                  label="Completed"
+                  isSelected={showCompletedOnly}
+                  onPress={() => setShowCompletedOnly((prev) => !prev)}
+                  icon={CheckOutlineIcon}
+                  selectedColor={FilterChipPalette.completed.accent}
+                  selectedSurfaceColor={FilterChipPalette.completed.surface}
+                />
+                {filterOptions.map((option) => (
                   <FilterChip
-                    label="Completed"
-                    isSelected={showCompletedOnly}
-                    onPress={() => setShowCompletedOnly((prev) => !prev)}
-                    icon={CheckOutlineIcon}
-                    selectedColor={FilterChipPalette.completed.accent}
-                    selectedSurfaceColor={FilterChipPalette.completed.surface}
+                    key={option.id}
+                    label={option.label}
+                    isSelected={contentTypeFilter === option.contentType}
+                    onPress={() =>
+                      setContentTypeFilter((current) =>
+                        current === option.contentType ? null : option.contentType
+                      )
+                    }
+                    icon={option.icon}
+                    dotColor={option.color}
+                    selectedColor={option.selectedColor}
+                    selectedSurfaceColor={option.selectedSurfaceColor}
                   />
-                  {filterOptions.map((option) => (
-                    <FilterChip
-                      key={option.id}
-                      label={option.label}
-                      isSelected={contentTypeFilter === option.contentType}
-                      onPress={() =>
-                        setContentTypeFilter((current) =>
-                          current === option.contentType ? null : option.contentType
-                        )
-                      }
-                      icon={option.icon}
-                      dotColor={option.color}
-                      selectedColor={option.selectedColor}
-                      selectedSurfaceColor={option.selectedSurfaceColor}
-                    />
-                  ))}
-                </ScrollView>
-              </Animated.View>
+                ))}
+              </ScrollView>
             </View>
           }
           ListEmptyComponent={listEmptyComponent}
