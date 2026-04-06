@@ -1,4 +1,12 @@
-import { useState, useMemo, useCallback, useEffect, useRef, type ComponentType } from 'react';
+import {
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  type ComponentType,
+  type SetStateAction,
+} from 'react';
 
 import * as Haptics from 'expo-haptics';
 import { Surface } from 'heroui-native';
@@ -117,11 +125,13 @@ const filterOptions: {
 type LibraryTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
   isFocused: () => boolean;
+  getParent?: () => LibraryTabNavigation | undefined;
 };
 
 export default function LibraryScreen() {
   const router = useRouter();
   const navigation = useNavigation() as LibraryTabNavigation;
+  const tabNavigation = navigation.getParent?.() ?? navigation;
   const listScrollRef = useRef<FlatList<ItemCardData>>(null);
   const scrollOffsetYRef = useRef(0);
   const params = useLocalSearchParams<{ contentType?: string }>();
@@ -154,14 +164,43 @@ export default function LibraryScreen() {
     () => preselectedContentType ?? null
   );
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
+  const contentTypeFilterRef = useRef<ApiContentType | null>(contentTypeFilter);
+  const showCompletedOnlyRef = useRef(showCompletedOnly);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
+  const updateContentTypeFilter = useCallback(
+    (nextValue: SetStateAction<ApiContentType | null>) => {
+      setContentTypeFilter((current) => {
+        const nextFilter =
+          typeof nextValue === 'function'
+            ? (nextValue as (value: ApiContentType | null) => ApiContentType | null)(current)
+            : nextValue;
+
+        contentTypeFilterRef.current = nextFilter;
+        return nextFilter;
+      });
+    },
+    []
+  );
+
+  const updateShowCompletedOnly = useCallback((nextValue: SetStateAction<boolean>) => {
+    setShowCompletedOnly((current) => {
+      const nextCompleted =
+        typeof nextValue === 'function'
+          ? (nextValue as (value: boolean) => boolean)(current)
+          : nextValue;
+
+      showCompletedOnlyRef.current = nextCompleted;
+      return nextCompleted;
+    });
+  }, []);
+
   useEffect(() => {
     if (preselectedContentType !== undefined) {
-      setContentTypeFilter(preselectedContentType);
+      updateContentTypeFilter(preselectedContentType);
     }
-  }, [preselectedContentType]);
+  }, [preselectedContentType, updateContentTypeFilter]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -235,20 +274,20 @@ export default function LibraryScreen() {
       : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= LIBRARY_TOP_THRESHOLD;
 
-      if (isAtTop && (showCompletedOnly || contentTypeFilter !== null)) {
-        setShowCompletedOnly(false);
-        setContentTypeFilter(null);
+      if (isAtTop && (showCompletedOnlyRef.current || contentTypeFilterRef.current !== null)) {
+        updateShowCompletedOnly(false);
+        updateContentTypeFilter(null);
         return;
       }
 
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [contentTypeFilter, navigation, showCompletedOnly]);
+  }, [navigation, tabNavigation, updateContentTypeFilter, updateShowCompletedOnly]);
 
   const listEmptyComponent = (
     <EmptyState
@@ -332,7 +371,7 @@ export default function LibraryScreen() {
                   <FilterChip
                     label="Completed"
                     isSelected={showCompletedOnly}
-                    onPress={() => setShowCompletedOnly((prev) => !prev)}
+                    onPress={() => updateShowCompletedOnly((prev) => !prev)}
                     icon={CheckOutlineIcon}
                     selectedColor={FilterChipPalette.completed.accent}
                     selectedSurfaceColor={FilterChipPalette.completed.surface}
@@ -343,7 +382,7 @@ export default function LibraryScreen() {
                       label={option.label}
                       isSelected={contentTypeFilter === option.contentType}
                       onPress={() =>
-                        setContentTypeFilter((current) =>
+                        updateContentTypeFilter((current) =>
                           current === option.contentType ? null : option.contentType
                         )
                       }

@@ -5,14 +5,21 @@ import HomeScreen from '@/app/(tabs)/index';
 
 const mockPush = jest.fn();
 const mockAddListener = jest.fn();
+const mockChildAddListener = jest.fn();
 const mockIsFocused = jest.fn();
 const mockScrollTo = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockConnections: Array<{ provider: string; status: string }> = [];
 let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
 
-const mockNavigation = {
+const mockTabNavigation = {
   addListener: mockAddListener,
+  isFocused: mockIsFocused,
+};
+
+const mockNavigation = {
+  addListener: mockChildAddListener,
+  getParent: () => mockTabNavigation,
   isFocused: mockIsFocused,
 };
 
@@ -250,6 +257,7 @@ describe('HomeScreen', () => {
 
       return mockRemoveListener;
     });
+    mockChildAddListener.mockReturnValue(mockRemoveListener);
   });
 
   it('does not render a weekly recap card on Home', () => {
@@ -307,6 +315,29 @@ describe('HomeScreen', () => {
     expect(mockScrollTo).not.toHaveBeenCalled();
   });
 
+  it('keeps a stable home tab listener after toggling filters', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    expect(mockAddListener).toHaveBeenCalledTimes(1);
+    expect(mockChildAddListener).not.toHaveBeenCalled();
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    expect(mockAddListener).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
+    expect(mockScrollTo).not.toHaveBeenCalled();
+  });
+
   it('scrolls to the top without clearing the active filter when the home tab is reselected mid-scroll', () => {
     let renderer: Renderer;
     act(() => {
@@ -333,5 +364,49 @@ describe('HomeScreen', () => {
 
     expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+  });
+
+  it('scrolls to the top on the first home tab reselect and clears the filter on the second', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      findHomeScrollView(renderer!).props.onScroll({
+        nativeEvent: {
+          contentOffset: {
+            y: 240,
+          },
+        },
+      });
+    });
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(mockScrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+
+    act(() => {
+      findHomeScrollView(renderer!).props.onScroll({
+        nativeEvent: {
+          contentOffset: {
+            y: 0,
+          },
+        },
+      });
+    });
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
   });
 });

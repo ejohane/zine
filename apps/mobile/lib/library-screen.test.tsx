@@ -3,12 +3,19 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 const mockPush = jest.fn();
 const mockAddListener = jest.fn();
+const mockChildAddListener = jest.fn();
 const mockIsFocused = jest.fn();
 const mockScrollToOffset = jest.fn();
 const mockRemoveListener = jest.fn();
 
-const mockNavigation = {
+const mockTabNavigation = {
   addListener: mockAddListener,
+  isFocused: mockIsFocused,
+};
+
+const mockNavigation = {
+  addListener: mockChildAddListener,
+  getParent: () => mockTabNavigation,
   isFocused: mockIsFocused,
 };
 
@@ -234,7 +241,7 @@ jest.mock('@/hooks/use-items-trpc', () => ({
   mapProvider: (value: string) => value,
 }));
 
-const LibraryScreen = jest.requireActual('@/app/(tabs)/library').default;
+import LibraryScreen from '@/app/(tabs)/library';
 
 describe('LibraryScreen', () => {
   beforeEach(() => {
@@ -248,6 +255,7 @@ describe('LibraryScreen', () => {
 
       return mockRemoveListener;
     });
+    mockChildAddListener.mockReturnValue(mockRemoveListener);
   });
 
   it('clears the active filter when the library tab is reselected at the top', () => {
@@ -261,6 +269,29 @@ describe('LibraryScreen', () => {
     });
 
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+
+    act(() => {
+      pressLibraryTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
+    expect(mockScrollToOffset).not.toHaveBeenCalled();
+  });
+
+  it('keeps a stable library tab listener after toggling filters', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<LibraryScreen />);
+    });
+
+    expect(mockAddListener).toHaveBeenCalledTimes(1);
+    expect(mockChildAddListener).not.toHaveBeenCalled();
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    expect(mockAddListener).toHaveBeenCalledTimes(1);
 
     act(() => {
       pressLibraryTab();
@@ -316,5 +347,49 @@ describe('LibraryScreen', () => {
 
     expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+  });
+
+  it('scrolls to the top on the first library tab reselect and clears the filter on the second', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<LibraryScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      findLibraryList(renderer!).props.onScroll({
+        nativeEvent: {
+          contentOffset: {
+            y: 240,
+          },
+        },
+      });
+    });
+
+    act(() => {
+      pressLibraryTab();
+    });
+
+    expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+
+    act(() => {
+      findLibraryList(renderer!).props.onScroll({
+        nativeEvent: {
+          contentOffset: {
+            y: 0,
+          },
+        },
+      });
+    });
+
+    act(() => {
+      pressLibraryTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
   });
 });

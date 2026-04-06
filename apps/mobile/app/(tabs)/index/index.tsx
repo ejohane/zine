@@ -1,6 +1,14 @@
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type SetStateAction,
+} from 'react';
 import {
   View,
   Text,
@@ -129,11 +137,13 @@ function SectionHeader({
 type HomeTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
   isFocused: () => boolean;
+  getParent?: () => HomeTabNavigation | undefined;
 };
 
 export default function HomeScreen() {
   const router = useRouter();
   const navigation = useNavigation() as HomeTabNavigation;
+  const tabNavigation = navigation.getParent?.() ?? navigation;
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetYRef = useRef(0);
   const colorScheme = useColorScheme();
@@ -141,6 +151,7 @@ export default function HomeScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
+  const contentTypeFilterRef = useRef<UIContentType | null>(contentTypeFilter);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
 
   useTabPrefetch('home');
@@ -261,6 +272,18 @@ export default function HomeScreen() {
     scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
   }, []);
 
+  const updateContentTypeFilter = useCallback((nextValue: SetStateAction<UIContentType | null>) => {
+    setContentTypeFilter((current) => {
+      const nextFilter =
+        typeof nextValue === 'function'
+          ? (nextValue as (value: UIContentType | null) => UIContentType | null)(current)
+          : nextValue;
+
+      contentTypeFilterRef.current = nextFilter;
+      return nextFilter;
+    });
+  }, []);
+
   const isLoading = isInboxLoading || isHomeLoading;
 
   const filteredJumpBackInItems = useMemo(
@@ -289,19 +312,19 @@ export default function HomeScreen() {
   const showArticlesSection = contentTypeFilter === null || contentTypeFilter === 'article';
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= HOME_TOP_THRESHOLD;
 
-      if (contentTypeFilter !== null && isAtTop) {
-        setContentTypeFilter(null);
+      if (contentTypeFilterRef.current !== null && isAtTop) {
+        updateContentTypeFilter(null);
         return;
       }
 
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
-  }, [contentTypeFilter, navigation]);
+  }, [navigation, tabNavigation, updateContentTypeFilter]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
@@ -366,7 +389,7 @@ export default function HomeScreen() {
                 label={filter.label}
                 isSelected={contentTypeFilter === filter.id}
                 onPress={() =>
-                  setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
+                  updateContentTypeFilter((current) => (current === filter.id ? null : filter.id))
                 }
                 icon={filter.icon}
                 dotColor={filter.dotColor}

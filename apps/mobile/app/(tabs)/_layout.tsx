@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { Platform, DynamicColorIOS } from 'react-native';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { AuthGuard } from '@/components/auth-guard';
@@ -5,6 +6,15 @@ import { AuthGuard } from '@/components/auth-guard';
 // =============================================================================
 // Tab Layout - iOS 26 Native Tabs with Liquid Glass
 // =============================================================================
+
+export function triggerTabPressHaptics() {
+  try {
+    const hapticsResult = Haptics.selectionAsync();
+    void hapticsResult?.catch?.(() => undefined);
+  } catch {
+    // Ignore haptic availability errors so navigation still completes.
+  }
+}
 
 export default function TabLayout() {
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
@@ -36,6 +46,9 @@ export default function TabLayout() {
         // Dynamic label styling
         labelStyle={{
           color: dynamicLabelColor,
+        }}
+        screenListeners={{
+          tabPress: triggerTabPressHaptics,
         }}
       >
         <NativeTabs.Trigger name="index">
