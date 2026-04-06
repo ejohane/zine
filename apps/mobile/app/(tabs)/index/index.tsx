@@ -13,7 +13,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 
 import { FilterChip } from '@/components/filter-chip';
@@ -347,36 +346,34 @@ export default function HomeScreen() {
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
         onScroll={handleScroll}
-        scrollEventThrottle={16}
+        scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
       >
-        <Animated.View style={styles.header}>
+        <View style={styles.header}>
           <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
-        </Animated.View>
+        </View>
 
-        <Animated.View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterContainer}
-          >
-            {contentTypeFilters.map((filter) => (
-              <FilterChip
-                key={filter.id}
-                label={filter.label}
-                isSelected={contentTypeFilter === filter.id}
-                onPress={() =>
-                  setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
-                }
-                icon={filter.icon}
-                dotColor={filter.dotColor}
-                selectedColor={filter.selectedColor}
-                selectedSurfaceColor={filter.selectedSurfaceColor}
-                count={categoryCounts[filter.id]}
-              />
-            ))}
-          </ScrollView>
-        </Animated.View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContainer}
+        >
+          {contentTypeFilters.map((filter) => (
+            <FilterChip
+              key={filter.id}
+              label={filter.label}
+              isSelected={contentTypeFilter === filter.id}
+              onPress={() =>
+                setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
+              }
+              icon={filter.icon}
+              dotColor={filter.dotColor}
+              selectedColor={filter.selectedColor}
+              selectedSurfaceColor={filter.selectedSurfaceColor}
+              count={categoryCounts[filter.id]}
+            />
+          ))}
+        </ScrollView>
         {isLoading ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={colors.primary} />
@@ -384,7 +381,7 @@ export default function HomeScreen() {
         ) : (
           <>
             {filteredJumpBackInItems.length > 0 && (
-              <Animated.View>
+              <>
                 <SectionHeader
                   title="Jump Back In"
                   count={filteredJumpBackInItems.length}
@@ -400,11 +397,11 @@ export default function HomeScreen() {
                     </View>
                   ))}
                 </View>
-              </Animated.View>
+              </>
             )}
 
             {filteredRecentlyBookmarked.length > 0 && (
-              <Animated.View>
+              <>
                 <SectionHeader
                   title="Recently Bookmarked"
                   count={filteredRecentlyBookmarked.length}
@@ -420,11 +417,11 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalList}
                 />
-              </Animated.View>
+              </>
             )}
 
             {filteredInboxItems.length > 0 && (
-              <Animated.View style={styles.section}>
+              <View style={styles.section}>
                 <SectionHeader
                   title="Inbox"
                   count={filteredInboxItems.length}
@@ -438,11 +435,11 @@ export default function HomeScreen() {
                     <ItemCard key={item.id} item={item} shape="row" index={index} />
                   ))}
                 </View>
-              </Animated.View>
+              </View>
             )}
 
             {showPodcastsSection && podcasts.length > 0 && (
-              <Animated.View>
+              <>
                 <SectionHeader title="Podcasts" count={podcasts.length} colors={colors} />
                 <FlatList
                   horizontal
@@ -454,11 +451,11 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalList}
                 />
-              </Animated.View>
+              </>
             )}
 
             {showArticlesSection && articles.length > 0 && (
-              <Animated.View>
+              <>
                 <SectionHeader title="Articles" count={articles.length} colors={colors} />
                 <FlatList
                   horizontal
@@ -470,11 +467,11 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalList}
                 />
-              </Animated.View>
+              </>
             )}
 
             {showVideosSection && videos.length > 0 && (
-              <Animated.View>
+              <>
                 <SectionHeader title="Videos" count={videos.length} colors={colors} />
                 <FlatList
                   horizontal
@@ -486,7 +483,7 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.horizontalList}
                 />
-              </Animated.View>
+              </>
             )}
           </>
         )}

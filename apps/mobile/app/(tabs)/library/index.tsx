@@ -16,7 +16,6 @@ import {
   type NativeSyntheticEvent,
   type ListRenderItemInfo,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { ContentType as ApiContentType } from '@zine/shared';
 
@@ -293,7 +292,7 @@ export default function LibraryScreen() {
           contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
           onScroll={handleScroll}
-          scrollEventThrottle={16}
+          scrollEventThrottle={32}
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.6}
           ListHeaderComponent={
@@ -302,7 +301,7 @@ export default function LibraryScreen() {
                 {libraryCountLabel}
               </Text>
 
-              <Animated.View style={styles.searchContainer}>
+              <View style={styles.searchContainer}>
                 <View
                   style={[
                     styles.searchBar,
@@ -321,40 +320,38 @@ export default function LibraryScreen() {
                     onChangeText={setSearchQuery}
                   />
                 </View>
-              </Animated.View>
+              </View>
 
-              <Animated.View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.filterContainer}
-                >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterContainer}
+              >
+                <FilterChip
+                  label="Completed"
+                  isSelected={showCompletedOnly}
+                  onPress={() => setShowCompletedOnly((prev) => !prev)}
+                  icon={CheckOutlineIcon}
+                  selectedColor={FilterChipPalette.completed.accent}
+                  selectedSurfaceColor={FilterChipPalette.completed.surface}
+                />
+                {filterOptions.map((option) => (
                   <FilterChip
-                    label="Completed"
-                    isSelected={showCompletedOnly}
-                    onPress={() => setShowCompletedOnly((prev) => !prev)}
-                    icon={CheckOutlineIcon}
-                    selectedColor={FilterChipPalette.completed.accent}
-                    selectedSurfaceColor={FilterChipPalette.completed.surface}
+                    key={option.id}
+                    label={option.label}
+                    isSelected={contentTypeFilter === option.contentType}
+                    onPress={() =>
+                      setContentTypeFilter((current) =>
+                        current === option.contentType ? null : option.contentType
+                      )
+                    }
+                    icon={option.icon}
+                    dotColor={option.color}
+                    selectedColor={option.selectedColor}
+                    selectedSurfaceColor={option.selectedSurfaceColor}
                   />
-                  {filterOptions.map((option) => (
-                    <FilterChip
-                      key={option.id}
-                      label={option.label}
-                      isSelected={contentTypeFilter === option.contentType}
-                      onPress={() =>
-                        setContentTypeFilter((current) =>
-                          current === option.contentType ? null : option.contentType
-                        )
-                      }
-                      icon={option.icon}
-                      dotColor={option.color}
-                      selectedColor={option.selectedColor}
-                      selectedSurfaceColor={option.selectedSurfaceColor}
-                    />
-                  ))}
-                </ScrollView>
-              </Animated.View>
+                ))}
+              </ScrollView>
             </View>
           }
           ListEmptyComponent={listEmptyComponent}

@@ -13,7 +13,7 @@ export const nativeLargeTitleHeaderAppearance: NativeStackNavigationOptions = {
     backgroundColor: Colors.dark.background,
   },
   headerLargeStyle: {
-    backgroundColor: 'transparent',
+    backgroundColor: Colors.dark.background,
   },
   headerTitleStyle: {
     color: Colors.dark.text,
