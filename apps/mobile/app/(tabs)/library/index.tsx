@@ -125,11 +125,13 @@ const filterOptions: {
 type LibraryTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
   isFocused: () => boolean;
+  getParent?: () => LibraryTabNavigation | undefined;
 };
 
 export default function LibraryScreen() {
   const router = useRouter();
   const navigation = useNavigation() as LibraryTabNavigation;
+  const tabNavigation = navigation.getParent?.() ?? navigation;
   const listScrollRef = useRef<FlatList<ItemCardData>>(null);
   const scrollOffsetYRef = useRef(0);
   const params = useLocalSearchParams<{ contentType?: string }>();
@@ -272,7 +274,7 @@ export default function LibraryScreen() {
       : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= LIBRARY_TOP_THRESHOLD;
@@ -285,7 +287,7 @@ export default function LibraryScreen() {
 
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [navigation, updateContentTypeFilter, updateShowCompletedOnly]);
+  }, [navigation, tabNavigation, updateContentTypeFilter, updateShowCompletedOnly]);
 
   const listEmptyComponent = (
     <EmptyState

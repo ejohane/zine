@@ -137,11 +137,13 @@ function SectionHeader({
 type HomeTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
   isFocused: () => boolean;
+  getParent?: () => HomeTabNavigation | undefined;
 };
 
 export default function HomeScreen() {
   const router = useRouter();
   const navigation = useNavigation() as HomeTabNavigation;
+  const tabNavigation = navigation.getParent?.() ?? navigation;
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetYRef = useRef(0);
   const colorScheme = useColorScheme();
@@ -310,7 +312,7 @@ export default function HomeScreen() {
   const showArticlesSection = contentTypeFilter === null || contentTypeFilter === 'article';
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= HOME_TOP_THRESHOLD;
@@ -322,7 +324,7 @@ export default function HomeScreen() {
 
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     });
-  }, [navigation, updateContentTypeFilter]);
+  }, [navigation, tabNavigation, updateContentTypeFilter]);
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>

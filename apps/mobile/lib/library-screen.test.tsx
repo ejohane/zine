@@ -3,12 +3,19 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 const mockPush = jest.fn();
 const mockAddListener = jest.fn();
+const mockChildAddListener = jest.fn();
 const mockIsFocused = jest.fn();
 const mockScrollToOffset = jest.fn();
 const mockRemoveListener = jest.fn();
 
-const mockNavigation = {
+const mockTabNavigation = {
   addListener: mockAddListener,
+  isFocused: mockIsFocused,
+};
+
+const mockNavigation = {
+  addListener: mockChildAddListener,
+  getParent: () => mockTabNavigation,
   isFocused: mockIsFocused,
 };
 
@@ -248,6 +255,7 @@ describe('LibraryScreen', () => {
 
       return mockRemoveListener;
     });
+    mockChildAddListener.mockReturnValue(mockRemoveListener);
   });
 
   it('clears the active filter when the library tab is reselected at the top', () => {
@@ -277,6 +285,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(mockAddListener).toHaveBeenCalledTimes(1);
+    expect(mockChildAddListener).not.toHaveBeenCalled();
 
     act(() => {
       findFilterChip(renderer!, 'Articles').props.onPress();

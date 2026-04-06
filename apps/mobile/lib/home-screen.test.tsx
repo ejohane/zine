@@ -5,14 +5,21 @@ import HomeScreen from '@/app/(tabs)/index';
 
 const mockPush = jest.fn();
 const mockAddListener = jest.fn();
+const mockChildAddListener = jest.fn();
 const mockIsFocused = jest.fn();
 const mockScrollTo = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockConnections: Array<{ provider: string; status: string }> = [];
 let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
 
-const mockNavigation = {
+const mockTabNavigation = {
   addListener: mockAddListener,
+  isFocused: mockIsFocused,
+};
+
+const mockNavigation = {
+  addListener: mockChildAddListener,
+  getParent: () => mockTabNavigation,
   isFocused: mockIsFocused,
 };
 
@@ -250,6 +257,7 @@ describe('HomeScreen', () => {
 
       return mockRemoveListener;
     });
+    mockChildAddListener.mockReturnValue(mockRemoveListener);
   });
 
   it('does not render a weekly recap card on Home', () => {
@@ -314,6 +322,7 @@ describe('HomeScreen', () => {
     });
 
     expect(mockAddListener).toHaveBeenCalledTimes(1);
+    expect(mockChildAddListener).not.toHaveBeenCalled();
 
     act(() => {
       findFilterChip(renderer!, 'Articles').props.onPress();
