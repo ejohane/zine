@@ -87,6 +87,21 @@ export type ItemView = {
   tags: ItemTag[];
 };
 
+type HomeItemView = Pick<
+  ItemView,
+  | 'id'
+  | 'title'
+  | 'thumbnailUrl'
+  | 'contentType'
+  | 'provider'
+  | 'creator'
+  | 'creatorImageUrl'
+  | 'publisher'
+  | 'duration'
+  | 'readingTimeMinutes'
+  | 'lastOpenedAt'
+>;
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -296,6 +311,32 @@ async function toItemViewsWithTags(
   const tagsByItemId = await getTagsForUserItems(ctx, userItemIds);
 
   return rows.map((row) => toItemView(row, tagsByItemId.get(row.user_items.id) ?? []));
+}
+
+function toHomeItemViews(
+  rows: Array<{
+    user_items: typeof userItems.$inferSelect;
+    items: typeof items.$inferSelect;
+    creators: typeof creators.$inferSelect | null;
+  }>
+): HomeItemView[] {
+  return rows.map((row) => {
+    const itemView = toItemView(row);
+
+    return {
+      id: itemView.id,
+      title: itemView.title,
+      thumbnailUrl: itemView.thumbnailUrl,
+      contentType: itemView.contentType,
+      provider: itemView.provider,
+      creator: itemView.creator,
+      creatorImageUrl: itemView.creatorImageUrl,
+      publisher: itemView.publisher,
+      duration: itemView.duration,
+      readingTimeMinutes: itemView.readingTimeMinutes,
+      lastOpenedAt: itemView.lastOpenedAt,
+    };
+  });
 }
 
 type ConsumptionEventType = 'OPENED' | 'FINISHED' | 'UNFINISHED' | 'PROGRESS_DELTA';
@@ -606,14 +647,11 @@ export const itemsRouter = router({
       articlesQuery,
     ]);
 
-    const [recentBookmarksViews, jumpBackInViews, videosViews, podcastsViews, articlesViews] =
-      await Promise.all([
-        toItemViewsWithTags(ctx, recentBookmarks),
-        toItemViewsWithTags(ctx, jumpBackIn),
-        toItemViewsWithTags(ctx, videos),
-        toItemViewsWithTags(ctx, podcasts),
-        toItemViewsWithTags(ctx, articles),
-      ]);
+    const recentBookmarksViews = toHomeItemViews(recentBookmarks);
+    const jumpBackInViews = toHomeItemViews(jumpBackIn);
+    const videosViews = toHomeItemViews(videos);
+    const podcastsViews = toHomeItemViews(podcasts);
+    const articlesViews = toHomeItemViews(articles);
 
     return {
       recentBookmarks: recentBookmarksViews,
