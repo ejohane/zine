@@ -40,7 +40,6 @@ import {
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
-import { createNativeLargeTitleScreenOptions } from '@/lib/native-large-title-header';
 import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; color?: string }) {
@@ -53,6 +52,7 @@ function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; col
 
 const INBOX_PAGE_SIZE = 20;
 const HOME_TOP_THRESHOLD = 4;
+const HOME_COLLAPSED_TITLE_THRESHOLD = 44;
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -172,6 +172,7 @@ export default function HomeScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
+  const [showCollapsedTitle, setShowCollapsedTitle] = useState(false);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
 
   useTabPrefetch('home');
@@ -289,7 +290,13 @@ export default function HomeScreen() {
   }, [router]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
+    const offsetY = event.nativeEvent.contentOffset.y;
+    scrollOffsetYRef.current = offsetY;
+
+    const shouldShowCollapsedTitle = offsetY > HOME_COLLAPSED_TITLE_THRESHOLD;
+    setShowCollapsedTitle((current) =>
+      current === shouldShowCollapsedTitle ? current : shouldShowCollapsedTitle
+    );
   }, []);
 
   const isLoading = isInboxLoading || isHomeLoading;
@@ -399,6 +406,7 @@ export default function HomeScreen() {
     () => (
       <>
         <View style={styles.header}>
+          <Text style={[styles.homeTitle, { color: colors.text }]}>Home</Text>
           <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
         </View>
 
@@ -425,7 +433,7 @@ export default function HomeScreen() {
         </ScrollView>
       </>
     ),
-    [categoryCounts, colors.textSubheader, contentTypeFilter, greeting]
+    [categoryCounts, colors.text, colors.textSubheader, contentTypeFilter, greeting]
   );
 
   const renderSection = useCallback(
@@ -536,8 +544,18 @@ export default function HomeScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={createNativeLargeTitleScreenOptions({
-          title: 'Home',
+        options={{
+          title: showCollapsedTitle ? 'Home' : '',
+          headerLargeTitle: false,
+          headerTransparent: false,
+          headerShadowVisible: false,
+          headerTintColor: colors.text,
+          headerStyle: {
+            backgroundColor: colors.background,
+          },
+          headerTitleStyle: {
+            color: colors.text,
+          },
           headerRight: () => (
             <Pressable
               onPress={handleOpenSettings}
@@ -569,7 +587,7 @@ export default function HomeScreen() {
               ) : null}
             </Pressable>
           ),
-        })}
+        }}
       />
 
       <FlatList
@@ -616,6 +634,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xl,
+  },
+  homeTitle: {
+    ...Typography.displayMedium,
+    marginBottom: Spacing.xs,
   },
   greeting: {
     ...Typography.labelMedium,

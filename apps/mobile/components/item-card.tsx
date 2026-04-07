@@ -7,7 +7,7 @@
  * - cover: full-bleed image with text overlay
  */
 
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
@@ -79,11 +79,35 @@ export interface ItemCardProps {
   onPress?: () => void;
 }
 
+function areItemCardItemsEqual(previous: ItemCardData, next: ItemCardData): boolean {
+  return (
+    previous.id === next.id &&
+    previous.title === next.title &&
+    previous.creator === next.creator &&
+    previous.creatorImageUrl === next.creatorImageUrl &&
+    previous.thumbnailUrl === next.thumbnailUrl &&
+    previous.contentType === next.contentType &&
+    previous.provider === next.provider &&
+    previous.duration === next.duration &&
+    previous.readingTimeMinutes === next.readingTimeMinutes
+  );
+}
+
+function areItemCardPropsEqual(previous: ItemCardProps, next: ItemCardProps): boolean {
+  return (
+    previous.shape === next.shape &&
+    previous.rowStyle === next.rowStyle &&
+    previous.index === next.index &&
+    previous.onPress === next.onPress &&
+    areItemCardItemsEqual(previous.item, next.item)
+  );
+}
+
 // ============================================================================
 // Component
 // ============================================================================
 
-export function ItemCard({
+function ItemCardComponent({
   item,
   shape = 'row',
   rowStyle = 'compact',
@@ -94,17 +118,26 @@ export function ItemCard({
   const { colors, motion } = useAppTheme();
   const prefetchItemDetail = usePrefetchItemDetail();
   const mediaTransition = motion.duration.normal;
-  const creatorImageUrl = normalizeItemCardImageUrl(item.creatorImageUrl);
-  const mediaImageCandidates = getItemCardImageCandidates({
-    thumbnailUrl: item.thumbnailUrl,
-    creatorImageUrl: item.creatorImageUrl,
-  });
+  const creatorImageUrl = useMemo(
+    () => normalizeItemCardImageUrl(item.creatorImageUrl),
+    [item.creatorImageUrl]
+  );
+  const mediaImageCandidates = useMemo(
+    () =>
+      getItemCardImageCandidates({
+        thumbnailUrl: item.thumbnailUrl,
+        creatorImageUrl: item.creatorImageUrl,
+      }),
+    [item.creatorImageUrl, item.thumbnailUrl]
+  );
   const [mediaImageCandidateIndex, setMediaImageCandidateIndex] = useState(0);
   const [subtitleAvatarFailed, setSubtitleAvatarFailed] = useState(false);
 
-  const durationText = formatDuration(item.duration) || null;
-  const readingTimeText =
-    item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null;
+  const durationText = useMemo(() => formatDuration(item.duration) || null, [item.duration]);
+  const readingTimeText = useMemo(
+    () => (item.readingTimeMinutes && !item.duration ? `${item.readingTimeMinutes} min` : null),
+    [item.duration, item.readingTimeMinutes]
+  );
   const inlineLengthText = durationText ?? readingTimeText;
   const mediaImageUrl = mediaImageCandidates[mediaImageCandidateIndex] ?? null;
 
@@ -116,7 +149,11 @@ export function ItemCard({
     setSubtitleAvatarFailed(false);
   }, [item.id, creatorImageUrl]);
 
-  const handleMediaImageError = () => {
+  const handleSubtitleAvatarError = useCallback(() => {
+    setSubtitleAvatarFailed(true);
+  }, []);
+
+  const handleMediaImageError = useCallback(() => {
     if (mediaImageUrl === creatorImageUrl) {
       setSubtitleAvatarFailed(true);
     }
@@ -124,7 +161,7 @@ export function ItemCard({
     setMediaImageCandidateIndex((currentIndex) =>
       Math.min(currentIndex + 1, mediaImageCandidates.length)
     );
-  };
+  }, [creatorImageUrl, mediaImageCandidates.length, mediaImageUrl]);
 
   const renderSubtitleLeadingVisual = () => {
     if (creatorImageUrl && !subtitleAvatarFailed) {
@@ -134,7 +171,7 @@ export function ItemCard({
           style={styles.subtitleAvatar}
           contentFit="cover"
           transition={mediaTransition}
-          onError={() => setSubtitleAvatarFailed(true)}
+          onError={handleSubtitleAvatarError}
         />
       );
     }
@@ -142,7 +179,7 @@ export function ItemCard({
     return getContentIcon(item.contentType, IconSizes.xs, colors.textSubheader);
   };
 
-  const handlePress = () => {
+  const handlePress = useCallback(() => {
     if (onPress) {
       onPress();
       return;
@@ -150,7 +187,7 @@ export function ItemCard({
 
     prefetchItemDetail(item.id);
     router.push(`/item/${item.id}` as Href);
-  };
+  }, [item.id, onPress, prefetchItemDetail, router]);
 
   if (shape === 'cover') {
     return (
@@ -347,6 +384,8 @@ export function ItemCard({
     </Pressable>
   );
 }
+
+export const ItemCard = memo(ItemCardComponent, areItemCardPropsEqual);
 
 // ============================================================================
 // Styles
