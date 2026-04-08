@@ -13,8 +13,13 @@ import {
   SourceSubscriptionRow,
 } from '@/components/subscriptions';
 import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useConnections, useDisconnectConnection, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import { validateAndConvertProvider } from '@/lib/route-validation';
 import {
   formatSourceCount,
@@ -43,6 +48,8 @@ export default function ProviderDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ provider: string }>();
   const utils = trpc.useUtils();
+  const { colors } = useAppTheme();
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   const providerValidation = validateAndConvertProvider(params.provider);
   const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
@@ -293,32 +300,21 @@ export default function ProviderDetailScreen() {
     newslettersSyncMutation.mutate();
   }, [isConnected, newslettersSyncMutation]);
 
-  if (!providerValidation.success) {
-    return (
-      <>
-        <Stack.Screen options={{ title: 'Invalid source' }} />
-        <Surface tone="canvas" style={styles.container}>
-          <ErrorState title="Invalid source" message={providerValidation.message} />
-        </Surface>
-      </>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <>
-        <Stack.Screen options={{ title: sourceConfig.name }} />
-        <Surface tone="canvas" style={styles.container}>
-          <LoadingState message={`Loading ${sourceConfig.name.toLowerCase()}...`} />
-        </Surface>
-      </>
-    );
-  }
-
   return (
-    <>
-      <Stack.Screen options={{ title: sourceConfig.name }} />
-      <Surface tone="canvas" style={styles.container} collapsable={false}>
+    <Surface tone="canvas" style={styles.container} collapsable={false}>
+      <Stack.Screen
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.surfaceCanvas,
+          tintColor: colors.textPrimary,
+          screenTitle: providerValidation.success ? sourceConfig.name : 'Invalid source',
+          showScreenTitle: !providerValidation.success || isLoading || showCollapsedTitle,
+        })}
+      />
+      {!providerValidation.success ? (
+        <ErrorState title="Invalid source" message={providerValidation.message} />
+      ) : isLoading ? (
+        <LoadingState message={`Loading ${sourceConfig.name.toLowerCase()}...`} />
+      ) : (
         <FlatList
           style={styles.list}
           data={provider === 'GMAIL' ? newsletterFeeds : filteredSubscriptions}
@@ -327,6 +323,8 @@ export default function ProviderDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
           ListHeaderComponent={
             <View style={styles.header}>
               <SourceHero source={provider} summary={hubSummary} />
@@ -417,8 +415,8 @@ export default function ProviderDetailScreen() {
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
-      </Surface>
-    </>
+      )}
+    </Surface>
   );
 }
 

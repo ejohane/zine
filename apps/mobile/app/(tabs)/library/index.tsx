@@ -12,8 +12,6 @@ import {
   Pressable,
   TextInput,
   FlatList,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   type ListRenderItemInfo,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -40,7 +38,10 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import { createNativeLargeTitleScreenOptions } from '@/lib/native-large-title-header';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import type { UIContentType, UIProvider } from '@/lib/content-utils';
 
 function SearchIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: string }) {
@@ -123,10 +124,10 @@ export default function LibraryScreen() {
   const router = useRouter();
   const navigation = useNavigation() as LibraryTabNavigation;
   const listScrollRef = useRef<FlatList<ItemCardData>>(null);
-  const scrollOffsetYRef = useRef(0);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { handleScroll, scrollOffsetYRef, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   useTabPrefetch('library');
 
@@ -217,10 +218,6 @@ export default function LibraryScreen() {
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
-  }, []);
-
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
       <ItemCard item={item} shape="row" index={index} />
@@ -250,7 +247,11 @@ export default function LibraryScreen() {
     });
   }, [contentTypeFilter, navigation, showCompletedOnly]);
 
-  const listEmptyComponent = (
+  const listEmptyComponent = isLoading ? (
+    <LoadingState />
+  ) : error ? (
+    <ErrorState message={error.message} />
+  ) : (
     <EmptyState
       title={searchQuery.trim() ? 'No matches found' : 'No bookmarked items'}
       message={
@@ -264,8 +265,11 @@ export default function LibraryScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={createNativeLargeTitleScreenOptions({
-          title: 'Library',
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.background,
+          tintColor: colors.text,
+          screenTitle: 'Library',
+          showScreenTitle: isLoading || Boolean(error) || showCollapsedTitle,
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}
@@ -279,93 +283,88 @@ export default function LibraryScreen() {
         })}
       />
 
-      {isLoading ? (
-        <LoadingState />
-      ) : error ? (
-        <ErrorState message={error.message} />
-      ) : (
-        <FlatList
-          ref={listScrollRef}
-          data={libraryItems}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          style={styles.listContainer}
-          contentContainerStyle={styles.listContent}
-          contentInsetAdjustmentBehavior="automatic"
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={32}
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.6}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
-                {libraryCountLabel}
-              </Text>
+      <FlatList
+        ref={listScrollRef}
+        data={isLoading || error ? [] : libraryItems}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        style={styles.listContainer}
+        contentContainerStyle={styles.listContent}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.6}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
+              {libraryCountLabel}
+            </Text>
 
-              <View style={styles.searchContainer}>
-                <View
-                  style={[
-                    styles.searchBar,
-                    {
-                      backgroundColor: colors.backgroundSecondary,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <SearchIcon size={18} color={colors.textTertiary} />
-                  <TextInput
-                    placeholder="Search your library..."
-                    placeholderTextColor={colors.textTertiary}
-                    style={[styles.searchInput, { color: colors.text }]}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                  />
-                </View>
-              </View>
-
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterContainer}
+            <View style={styles.searchContainer}>
+              <View
+                style={[
+                  styles.searchBar,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                <FilterChip
-                  label="Completed"
-                  isSelected={showCompletedOnly}
-                  onPress={() => setShowCompletedOnly((prev) => !prev)}
-                  icon={CheckOutlineIcon}
-                  selectedColor={FilterChipPalette.completed.accent}
-                  selectedSurfaceColor={FilterChipPalette.completed.surface}
+                <SearchIcon size={18} color={colors.textTertiary} />
+                <TextInput
+                  placeholder="Search your library..."
+                  placeholderTextColor={colors.textTertiary}
+                  style={[styles.searchInput, { color: colors.text }]}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                 />
-                {filterOptions.map((option) => (
-                  <FilterChip
-                    key={option.id}
-                    label={option.label}
-                    isSelected={contentTypeFilter === option.contentType}
-                    onPress={() =>
-                      setContentTypeFilter((current) =>
-                        current === option.contentType ? null : option.contentType
-                      )
-                    }
-                    icon={option.icon}
-                    dotColor={option.color}
-                    selectedColor={option.selectedColor}
-                    selectedSurfaceColor={option.selectedSurfaceColor}
-                  />
-                ))}
-              </ScrollView>
+              </View>
             </View>
-          }
-          ListEmptyComponent={listEmptyComponent}
-          ListFooterComponent={
-            <View style={styles.listFooter}>
-              {isFetchingNextPage ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : null}
-            </View>
-          }
-        />
-      )}
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContainer}
+            >
+              <FilterChip
+                label="Completed"
+                isSelected={showCompletedOnly}
+                onPress={() => setShowCompletedOnly((prev) => !prev)}
+                icon={CheckOutlineIcon}
+                selectedColor={FilterChipPalette.completed.accent}
+                selectedSurfaceColor={FilterChipPalette.completed.surface}
+              />
+              {filterOptions.map((option) => (
+                <FilterChip
+                  key={option.id}
+                  label={option.label}
+                  isSelected={contentTypeFilter === option.contentType}
+                  onPress={() =>
+                    setContentTypeFilter((current) =>
+                      current === option.contentType ? null : option.contentType
+                    )
+                  }
+                  icon={option.icon}
+                  dotColor={option.color}
+                  selectedColor={option.selectedColor}
+                  selectedSurfaceColor={option.selectedSurfaceColor}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        }
+        ListEmptyComponent={listEmptyComponent}
+        ListFooterComponent={
+          <View style={styles.listFooter}>
+            {!isLoading && !error && isFetchingNextPage ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : null}
+          </View>
+        }
+      />
     </Surface>
   );
 }
@@ -376,6 +375,11 @@ const styles = StyleSheet.create({
   },
   listHeader: {
     paddingTop: Spacing.sm,
+  },
+  headerTitle: {
+    ...Typography.displayMedium,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   headerSubtitle: {
     ...Typography.bodyMedium,

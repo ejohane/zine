@@ -9,6 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, useLibraryItems } from '@/hooks/use-items-trpc';
+import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 export default function SearchTabScreen() {
@@ -86,7 +87,10 @@ export default function SearchTabScreen() {
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
-        options={{
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.background,
+          tintColor: colors.text,
+          screenTitle: 'Search',
           headerSearchBarOptions: {
             placement: 'automatic',
             placeholder: 'Search your library',
@@ -95,7 +99,7 @@ export default function SearchTabScreen() {
               setSearchQuery(event.nativeEvent.text);
             },
           },
-        }}
+        })}
       />
 
       <FlatList

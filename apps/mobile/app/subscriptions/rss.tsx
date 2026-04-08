@@ -16,6 +16,10 @@ import { Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useRssFeeds, type RssFeed } from '@/hooks/use-rss-feeds';
 import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
+import {
   formatSourceCount,
   getHubStatusText,
   getIntegrationCardCopy,
@@ -24,6 +28,7 @@ import {
 
 export default function RssSubscriptionsScreen() {
   const { colors } = useAppTheme();
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
   const {
     feeds,
     stats,
@@ -131,21 +136,19 @@ export default function RssSubscriptionsScreen() {
     ]);
   };
 
-  if (isLoading) {
-    return (
-      <>
-        <Stack.Screen options={{ title: sourceConfig.name }} />
-        <Surface tone="canvas" style={styles.container}>
-          <LoadingState message="Loading RSS subscriptions..." />
-        </Surface>
-      </>
-    );
-  }
-
   return (
-    <>
-      <Stack.Screen options={{ title: sourceConfig.name }} />
-      <Surface tone="canvas" style={styles.container} collapsable={false}>
+    <Surface tone="canvas" style={styles.container} collapsable={false}>
+      <Stack.Screen
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.surfaceCanvas,
+          tintColor: colors.textPrimary,
+          screenTitle: sourceConfig.name,
+          showScreenTitle: isLoading || showCollapsedTitle,
+        })}
+      />
+      {isLoading ? (
+        <LoadingState message="Loading RSS subscriptions..." />
+      ) : (
         <FlatList
           style={styles.list}
           data={filteredFeeds}
@@ -154,6 +157,8 @@ export default function RssSubscriptionsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
           ListHeaderComponent={
             <View style={styles.header}>
               <SourceHero source="RSS" summary={heroSummary} />
@@ -240,8 +245,8 @@ export default function RssSubscriptionsScreen() {
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
-      </Surface>
-    </>
+      )}
+    </Surface>
   );
 }
 

@@ -7,21 +7,13 @@
  * @see features/subscriptions/frontend-spec.md Section 2.1 (Settings Stack)
  */
 
-import {
-  createNativeLargeTitleScreenOptions,
-  nativeLargeTitleStackScreenOptions,
-} from '@/lib/native-large-title-header';
+import { lightweightHeaderStackScreenOptions } from '@/lib/native-large-title-header';
 import { Stack } from 'expo-router';
 
 export default function SettingsLayout() {
   return (
-    <Stack screenOptions={nativeLargeTitleStackScreenOptions}>
-      <Stack.Screen
-        name="index"
-        options={createNativeLargeTitleScreenOptions({
-          title: 'Settings',
-        })}
-      />
+    <Stack screenOptions={lightweightHeaderStackScreenOptions}>
+      <Stack.Screen name="index" />
       <Stack.Screen
         name="connections"
         options={{
