@@ -20,6 +20,9 @@ function getTextContent(node: TestNode): string {
 }
 
 jest.mock('expo-router', () => ({
+  Stack: {
+    Screen: (props: Record<string, unknown>) => React.createElement('stack-screen', props),
+  },
   useRouter: () => ({
     push: mockPush,
     replace: jest.fn(),
