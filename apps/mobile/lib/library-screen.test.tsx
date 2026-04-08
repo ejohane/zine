@@ -7,9 +7,18 @@ const mockIsFocused = jest.fn();
 const mockScrollToOffset = jest.fn();
 const mockRemoveListener = jest.fn();
 
-const mockNavigation = {
+const mockTabNavigation = {
+  addListener: mockAddListener,
+};
+
+const mockNavigation: {
+  addListener: typeof mockAddListener;
+  isFocused: typeof mockIsFocused;
+  getParent: () => typeof mockTabNavigation | undefined;
+} = {
   addListener: mockAddListener,
   isFocused: mockIsFocused,
+  getParent: () => mockTabNavigation,
 };
 
 let tabPressListener: (() => void) | undefined;
@@ -316,5 +325,25 @@ describe('LibraryScreen', () => {
 
     expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+  });
+
+  it('handles library tab reselection when the screen navigation emits tabPress directly', () => {
+    mockNavigation.getParent = () => undefined;
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<LibraryScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      pressLibraryTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
+    expect(mockScrollToOffset).not.toHaveBeenCalled();
   });
 });

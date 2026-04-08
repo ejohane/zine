@@ -129,6 +129,11 @@ function SectionHeader({
 
 type HomeTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
+};
+
+type HomeScreenNavigation = {
+  addListener: HomeTabNavigation['addListener'];
+  getParent?: () => HomeTabNavigation | undefined;
   isFocused: () => boolean;
 };
 
@@ -164,7 +169,7 @@ type HomeSectionItem =
 
 export default function HomeScreen() {
   const router = useRouter();
-  const navigation = useNavigation() as HomeTabNavigation;
+  const navigation = useNavigation() as HomeScreenNavigation;
   const listRef = useRef<FlatList<HomeSectionItem>>(null);
   const scrollOffsetYRef = useRef(0);
   const colorScheme = useColorScheme();
@@ -527,7 +532,9 @@ export default function HomeScreen() {
   );
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    const tabNavigation = navigation.getParent?.() ?? navigation;
+
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= HOME_TOP_THRESHOLD;
