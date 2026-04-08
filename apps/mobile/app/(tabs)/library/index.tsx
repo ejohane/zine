@@ -117,12 +117,17 @@ const filterOptions: {
 
 type LibraryTabNavigation = {
   addListener: (event: 'tabPress', listener: () => void) => () => void;
+};
+
+type LibraryScreenNavigation = {
+  addListener: LibraryTabNavigation['addListener'];
+  getParent?: () => LibraryTabNavigation | undefined;
   isFocused: () => boolean;
 };
 
 export default function LibraryScreen() {
   const router = useRouter();
-  const navigation = useNavigation() as LibraryTabNavigation;
+  const navigation = useNavigation() as LibraryScreenNavigation;
   const listScrollRef = useRef<FlatList<ItemCardData>>(null);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
@@ -232,7 +237,9 @@ export default function LibraryScreen() {
       : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    const tabNavigation = navigation.getParent?.() ?? navigation;
+
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       const isAtTop = scrollOffsetYRef.current <= LIBRARY_TOP_THRESHOLD;

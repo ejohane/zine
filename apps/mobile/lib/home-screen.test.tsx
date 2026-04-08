@@ -11,9 +11,18 @@ const mockRemoveListener = jest.fn();
 let mockConnections: Array<{ provider: string; status: string }> = [];
 let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
 
-const mockNavigation = {
+const mockNavigation: {
+  addListener: typeof mockAddListener;
+  isFocused: typeof mockIsFocused;
+  getParent: () => typeof mockTabNavigation | undefined;
+} = {
   addListener: mockAddListener,
   isFocused: mockIsFocused,
+  getParent: () => mockTabNavigation,
+};
+
+const mockTabNavigation = {
+  addListener: mockAddListener,
 };
 
 let tabPressListener: (() => void) | undefined;
@@ -368,5 +377,25 @@ describe('HomeScreen', () => {
 
     expect(mockScrollTo).toHaveBeenCalledWith({ offset: 0, animated: true });
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
+  });
+
+  it('handles home tab reselection when the screen navigation emits tabPress directly', () => {
+    mockNavigation.getParent = () => undefined;
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      pressHomeTab();
+    });
+
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
+    expect(mockScrollTo).not.toHaveBeenCalled();
   });
 });
