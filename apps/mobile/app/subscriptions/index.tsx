@@ -4,12 +4,17 @@ import { Stack, useNavigation, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { LoadingState } from '@/components/list-states';
-import { Surface } from '@/components/primitives';
+import { Surface, Text } from '@/components/primitives';
 import { SourceListRow } from '@/components/subscriptions';
 import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { type ConnectionStatus } from '@/lib/connection-status';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import {
   getHubStatusText,
   getIntegrationState,
@@ -23,6 +28,8 @@ const SUBSCRIPTION_SOURCES: SubscriptionSource[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL
 export default function SubscriptionsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
+  const { colors } = useAppTheme();
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
   const canGoBack = navigation.canGoBack();
   const headerLeft = canGoBack
     ? () => (
@@ -32,7 +39,7 @@ export default function SubscriptionsScreen() {
           hitSlop={8}
           style={styles.headerBack}
         >
-          <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+          <Ionicons name="chevron-back" size={28} color={colors.textPrimary} />
         </Pressable>
       )
     : undefined;
@@ -94,27 +101,35 @@ export default function SubscriptionsScreen() {
     [gmailCount, gmailStatus, rssCount, spotifyCount, spotifyStatus, youtubeCount, youtubeStatus]
   );
 
-  if (isLoading) {
-    return (
-      <>
-        <Stack.Screen options={{ headerLeft }} />
-        <Surface tone="canvas" style={styles.container}>
-          <LoadingState />
-        </Surface>
-      </>
-    );
-  }
-
   return (
-    <>
-      <Stack.Screen options={{ headerLeft }} />
-      <Surface tone="canvas" style={styles.container} collapsable={false}>
+    <Surface tone="canvas" style={styles.container} collapsable={false}>
+      <Stack.Screen
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.surfaceCanvas,
+          tintColor: colors.textPrimary,
+          screenTitle: 'Subscriptions',
+          showScreenTitle: isLoading || showCollapsedTitle,
+          headerLeft,
+        })}
+      />
+      {isLoading ? (
+        <LoadingState />
+      ) : (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           contentInsetAdjustmentBehavior="automatic"
+          onScroll={handleScroll}
+          scrollEventThrottle={32}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.screenHeader}>
+            <Text variant="displayMedium">Subscriptions</Text>
+            <Text variant="bodyMedium" tone="subheader">
+              Manage your sources and integrations.
+            </Text>
+          </View>
+
           <View style={styles.rows}>
             {sourceRows.map((row) => (
               <SourceListRow
@@ -126,8 +141,8 @@ export default function SubscriptionsScreen() {
             ))}
           </View>
         </ScrollView>
-      </Surface>
-    </>
+      )}
+    </Surface>
   );
 }
 
@@ -151,6 +166,9 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingBottom: Spacing['3xl'],
     paddingTop: Spacing.sm,
+  },
+  screenHeader: {
+    gap: Spacing.xs,
   },
   headerBack: {
     marginLeft: -Spacing.xs,

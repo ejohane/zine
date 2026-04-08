@@ -1,34 +1,59 @@
+import { useCallback, useRef, useState } from 'react';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+const COLLAPSED_TITLE_THRESHOLD = 44;
 
-export const nativeLargeTitleStackScreenOptions: NativeStackNavigationOptions = {
+export const lightweightHeaderStackScreenOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
-  headerLargeTitleShadowVisible: false,
+  headerShadowVisible: false,
 };
 
-export const nativeLargeTitleHeaderAppearance: NativeStackNavigationOptions = {
-  headerTintColor: Colors.dark.text,
-  headerStyle: {
-    backgroundColor: Colors.dark.background,
-  },
-  headerLargeStyle: {
-    backgroundColor: 'transparent',
-  },
-  headerTitleStyle: {
-    color: Colors.dark.text,
-  },
-  headerLargeTitleStyle: {
-    color: Colors.dark.text,
-  },
-};
-
-export function createNativeLargeTitleScreenOptions(
-  options: NativeStackNavigationOptions = {}
-): NativeStackNavigationOptions {
+export function createLightweightHeaderScreenOptions({
+  backgroundColor,
+  tintColor,
+  screenTitle,
+  showScreenTitle = true,
+  ...options
+}: NativeStackNavigationOptions & {
+  backgroundColor: string;
+  tintColor: string;
+  screenTitle: string;
+  showScreenTitle?: boolean;
+}): NativeStackNavigationOptions {
   return {
-    ...nativeLargeTitleHeaderAppearance,
-    headerLargeTitle: true,
     ...options,
+    title: showScreenTitle ? screenTitle : '',
+    headerLargeTitle: false,
+    headerTransparent: false,
+    headerShadowVisible: false,
+    headerTintColor: tintColor,
+    headerStyle: {
+      backgroundColor,
+    },
+    headerTitleStyle: {
+      color: tintColor,
+    },
+  };
+}
+
+export function useCollapsedHeaderTitle() {
+  const scrollOffsetYRef = useRef(0);
+  const [showCollapsedTitle, setShowCollapsedTitle] = useState(false);
+
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    scrollOffsetYRef.current = offsetY;
+
+    const shouldShowCollapsedTitle = offsetY > COLLAPSED_TITLE_THRESHOLD;
+    setShowCollapsedTitle((current) =>
+      current === shouldShowCollapsedTitle ? current : shouldShowCollapsedTitle
+    );
+  }, []);
+
+  return {
+    handleScroll,
+    scrollOffsetYRef,
+    showCollapsedTitle,
   };
 }

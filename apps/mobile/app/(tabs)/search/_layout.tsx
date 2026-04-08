@@ -1,16 +1,10 @@
-import {
-  createNativeLargeTitleScreenOptions,
-  nativeLargeTitleStackScreenOptions,
-} from '@/lib/native-large-title-header';
+import { lightweightHeaderStackScreenOptions } from '@/lib/native-large-title-header';
 import { Stack } from 'expo-router';
 
 export default function SearchLayout() {
   return (
-    <Stack screenOptions={nativeLargeTitleStackScreenOptions}>
-      <Stack.Screen
-        name="index"
-        options={createNativeLargeTitleScreenOptions({ title: 'Search' })}
-      />
+    <Stack screenOptions={lightweightHeaderStackScreenOptions}>
+      <Stack.Screen name="index" />
     </Stack>
   );
 }

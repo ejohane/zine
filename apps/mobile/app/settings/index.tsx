@@ -11,15 +11,19 @@
 
 import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useClerk } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 
-import { Colors, Spacing, Radius } from '@/constants/theme';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { buildMobileDiagnosticBundle } from '@/lib/diagnostics';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import { settingsLogger } from '@/lib/logger';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
 import { buildSubscriptionsSummary } from '@/lib/subscription-sources';
@@ -130,6 +134,7 @@ function SettingsScreenContent({
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
   const isDeveloperDiagnosticsEnabled = __DEV__ || isStorybookEnabled;
 
@@ -194,12 +199,26 @@ function SettingsScreenContent({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
+      <Stack.Screen
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.background,
+          tintColor: colors.text,
+          screenTitle: 'Settings',
+          showScreenTitle: showCollapsedTitle,
+        })}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         contentInsetAdjustmentBehavior="automatic"
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.screenHeader}>
+          <Text style={[styles.screenTitle, { color: colors.text }]}>Settings</Text>
+        </View>
+
         <View style={[styles.section, { backgroundColor: colors.card }]}>
           <SettingsRow
             title="Subscriptions"
@@ -292,6 +311,12 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: Spacing.lg,
     paddingBottom: Spacing['3xl'],
+  },
+  screenHeader: {
+    marginBottom: Spacing.sm,
+  },
+  screenTitle: {
+    ...Typography.displayMedium,
   },
   sectionTitle: {
     fontSize: 12,

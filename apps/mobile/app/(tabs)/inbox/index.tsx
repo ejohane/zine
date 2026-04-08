@@ -1,4 +1,4 @@
-import { useNavigation } from 'expo-router';
+import { Stack, useNavigation } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, View, Text, StyleSheet, type ListRenderItemInfo } from 'react-native';
@@ -27,6 +27,10 @@ import {
 } from '@/lib/inbox-optimistic-dismissal';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { showSuccess, showWarning, showError } from '@/lib/toast-utils';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import type { ContentType, Provider } from '@/lib/content-utils';
 
 const REENTRY_CLEANUP_DELAY = 500;
@@ -57,6 +61,7 @@ export default function InboxScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   useTabPrefetch('inbox');
 
@@ -230,37 +235,40 @@ export default function InboxScreen() {
     });
   }, [navigation]);
 
-  if (isLoading) {
-    return (
-      <Surface style={[styles.container, { backgroundColor: colors.background }]}>
-        <LoadingState />
-      </Surface>
-    );
-  }
-
-  if (error) {
-    return (
-      <Surface style={[styles.container, { backgroundColor: colors.background }]}>
-        <ErrorState message={error.message} />
-      </Surface>
-    );
-  }
+  const listEmptyComponent = isLoading ? (
+    <LoadingState />
+  ) : error ? (
+    <ErrorState message={error.message} />
+  ) : (
+    <InboxEmptyState colors={colors} />
+  );
 
   return (
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
+      <Stack.Screen
+        options={createLightweightHeaderScreenOptions({
+          backgroundColor: colors.background,
+          tintColor: colors.text,
+          screenTitle: 'Inbox',
+          showScreenTitle: isLoading || showCollapsedTitle,
+        })}
+      />
       <Animated.FlatList
         ref={listRef}
         style={styles.list}
-        data={visibleInboxItems}
+        data={isLoading || error ? [] : visibleInboxItems}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
         onRefresh={handleRefresh}
         refreshing={isSyncing}
         ListHeaderComponent={
           <View style={styles.listHeader}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
             {syncProgress && syncProgress.total > 0 ? (
               <Animated.View exiting={FadeOut.duration(200)}>
                 <Text style={[styles.headerSubtitle, { color: colors.primary }]}>
@@ -274,12 +282,12 @@ export default function InboxScreen() {
             )}
           </View>
         }
-        ListEmptyComponent={<InboxEmptyState colors={colors} />}
+        ListEmptyComponent={listEmptyComponent}
         itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
         ListFooterComponent={
-          isFetchingNextPage ? (
+          !isLoading && !error && isFetchingNextPage ? (
             <View style={styles.loadingFooter}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
@@ -301,6 +309,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
+  },
+  headerTitle: {
+    ...Typography.displayMedium,
+    marginBottom: Spacing.xs,
   },
   headerSubtitle: {
     ...Typography.bodyMedium,
