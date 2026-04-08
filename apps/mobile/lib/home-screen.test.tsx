@@ -318,6 +318,19 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/settings');
   });
 
+  it('keeps the home settings button background transparent without custom press feedback', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const settingsButton = renderer!.root.findByProps({ accessibilityLabel: 'Open settings' });
+
+    expect(settingsButton.props.style).toEqual(
+      expect.objectContaining({ backgroundColor: 'transparent' })
+    );
+  });
+
   it('shows an alert dot on the settings button when an integration is disconnected', () => {
     mockSubscriptionsData = {
       items: [{ provider: 'YOUTUBE', status: 'DISCONNECTED' }],

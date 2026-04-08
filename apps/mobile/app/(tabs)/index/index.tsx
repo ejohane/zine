@@ -566,11 +566,7 @@ export default function HomeScreen() {
           headerRight: () => (
             <Pressable
               onPress={handleOpenSettings}
-              style={({ pressed }) => [
-                styles.settingsButton,
-                { backgroundColor: colors.backgroundSecondary, borderColor: colors.border },
-                pressed && { opacity: 0.75 },
-              ]}
+              style={styles.settingsButton}
               accessibilityLabel={
                 hasSettingsAlert
                   ? 'Open settings. Subscription integrations need attention'
@@ -587,7 +583,7 @@ export default function HomeScreen() {
                     styles.settingsAlertDot,
                     {
                       backgroundColor: colors.warning,
-                      borderColor: colors.backgroundSecondary,
+                      borderColor: colors.background,
                     },
                   ]}
                 />
@@ -656,7 +652,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    backgroundColor: 'transparent',
   },
   settingsAlertDot: {
     position: 'absolute',

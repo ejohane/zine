@@ -280,7 +280,7 @@ export default function LibraryScreen() {
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}
-              style={[styles.addButton, { backgroundColor: colors.backgroundSecondary }]}
+              style={styles.addButton}
               accessibilityLabel="Add bookmark"
               accessibilityRole="button"
             >
@@ -399,6 +399,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   searchContainer: {
     paddingHorizontal: Spacing.md,

@@ -86,13 +86,14 @@ jest.mock('react-native', () => ({
   Pressable: ({
     children,
     onPress,
+    ...props
   }: {
     children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
     onPress?: () => void;
   }) =>
     React.createElement(
       'button',
-      { onClick: onPress, onPress },
+      { onClick: onPress, onPress, ...props },
       typeof children === 'function' ? children({ pressed: false }) : children
     ),
   TextInput: ({
@@ -257,6 +258,19 @@ describe('LibraryScreen', () => {
 
       return mockRemoveListener;
     });
+  });
+
+  it('keeps the library add bookmark button background transparent', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<LibraryScreen />);
+    });
+
+    const addBookmarkButton = renderer!.root.findByProps({ accessibilityLabel: 'Add bookmark' });
+
+    expect(addBookmarkButton.props.style).toEqual(
+      expect.objectContaining({ backgroundColor: 'transparent' })
+    );
   });
 
   it('clears the active filter when the library tab is reselected at the top', () => {
