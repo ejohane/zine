@@ -19,6 +19,9 @@ export default function OnboardingLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
         headerStyle: {
           backgroundColor: colors.background,
         },

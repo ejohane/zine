@@ -20,6 +20,9 @@ export default function DiscoverLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
         headerStyle: {
           backgroundColor: colors.background,
         },

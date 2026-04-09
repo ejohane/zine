@@ -2,11 +2,23 @@ import { useCallback, useRef, useState } from 'react';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
+import { Colors } from '@/constants/theme';
+
 const COLLAPSED_TITLE_THRESHOLD = 44;
 
 export const lightweightHeaderStackScreenOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
   headerShadowVisible: false,
+  contentStyle: {
+    backgroundColor: Colors.dark.background,
+  },
+  headerStyle: {
+    backgroundColor: Colors.dark.background,
+  },
+  headerTintColor: Colors.dark.text,
+  headerTitleStyle: {
+    color: Colors.dark.text,
+  },
 };
 
 export function createLightweightHeaderScreenOptions({

@@ -1,12 +1,14 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native';
+import * as SystemUI from 'expo-system-ui';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { HeroUINativeProvider, ToastProvider } from 'heroui-native';
+import { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 import { AuthProvider } from '@/providers/auth-provider';
 import { TRPCProvider } from '@/providers/trpc-provider';
 import { useBaselinePrefetchOnFocus } from '@/hooks/use-prefetch';
@@ -21,18 +23,43 @@ function PrefetchManager() {
   return null;
 }
 
+const navigationTheme: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: Colors.dark.tint,
+    background: Colors.dark.background,
+    card: Colors.dark.background,
+    text: Colors.dark.text,
+    border: Colors.dark.borderSubtle,
+    notification: Colors.dark.tint,
+  },
+};
+
+const rootStackScreenOptions = {
+  contentStyle: {
+    backgroundColor: Colors.dark.background,
+  },
+  headerStyle: {
+    backgroundColor: Colors.dark.background,
+  },
+  headerTintColor: Colors.dark.text,
+};
+
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    void SystemUI.setBackgroundColorAsync(Colors.dark.background);
+  }, []);
 
   return (
     <GestureHandlerRootView style={styles.root}>
       <AuthProvider>
         <TRPCProvider>
           <PrefetchManager />
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <ThemeProvider value={navigationTheme}>
             <HeroUINativeProvider>
               <ToastProvider defaultProps={{ placement: 'bottom' }} maxVisibleToasts={3}>
-                <Stack>
+                <Stack screenOptions={rootStackScreenOptions}>
                   <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
                   <Stack.Screen name="(auth)" options={{ headerShown: false }} />
                   <Stack.Screen name="settings" options={{ headerShown: false }} />
@@ -69,7 +96,7 @@ export default function RootLayout() {
                     }}
                   />
                 </Stack>
-                <StatusBar style="auto" />
+                <StatusBar style="light" />
               </ToastProvider>
             </HeroUINativeProvider>
           </ThemeProvider>
@@ -82,5 +109,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+    backgroundColor: Colors.dark.background,
   },
 });
