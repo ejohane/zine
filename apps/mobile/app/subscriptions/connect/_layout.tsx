@@ -16,6 +16,9 @@ export default function ConnectLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: {
+          backgroundColor: colors.background,
+        },
         headerStyle: {
           backgroundColor: colors.background,
         },

@@ -6,6 +6,8 @@
 
 import { useAuth } from '@clerk/clerk-expo';
 import { Redirect, Stack } from 'expo-router';
+
+import { Colors } from '@/constants/theme';
 import { useAuthAvailability } from '@/providers/auth-provider';
 
 export default function AuthLayout() {
@@ -35,7 +37,7 @@ function ClerkAuthLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: 'transparent' },
+        contentStyle: { backgroundColor: Colors.dark.background },
       }}
     >
       <Stack.Screen name="sign-in" />
