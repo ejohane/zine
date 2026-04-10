@@ -28,6 +28,7 @@ import {
 } from '../../db/schema';
 import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
+import { parseSpotifyDate } from '../../lib/timestamps';
 import { toItemView, type ItemView } from './items';
 import { getLatestContentItemContentType } from './latest-content-content-type';
 import {
@@ -1372,27 +1373,6 @@ async function fetchSpotifyContent(
       externalUrl: episode.externalUrl,
       duration: Math.round(episode.durationMs / 1000),
     }));
-}
-
-/**
- * Parse Spotify date string to Unix milliseconds
- *
- * Spotify dates can be in various formats:
- * - YYYY-MM-DD (full date)
- * - YYYY-MM (month precision)
- * - YYYY (year precision)
- */
-function parseSpotifyDate(dateStr: string): number {
-  // Handle YYYY-MM-DD, YYYY-MM, or YYYY formats
-  if (dateStr.length === 4) {
-    // YYYY -> January 1st
-    return new Date(`${dateStr}-01-01`).getTime();
-  } else if (dateStr.length === 7) {
-    // YYYY-MM -> 1st of month
-    return new Date(`${dateStr}-01`).getTime();
-  }
-  // YYYY-MM-DD
-  return new Date(dateStr).getTime();
 }
 
 /**

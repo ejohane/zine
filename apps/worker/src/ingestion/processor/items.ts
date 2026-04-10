@@ -3,24 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Database } from '../../db';
 import { items } from '../../db/schema';
 import type { NewItem } from '../transformers';
-
-// ============================================================================
-// Timestamp Conversion Helpers
-// ============================================================================
-
-/**
- * Convert Unix milliseconds to ISO8601 string.
- *
- * CRITICAL: This function bridges the timestamp gap between:
- * - New tables (subscriptions, subscription_items): Unix milliseconds (INTEGER)
- * - Existing tables (items, user_items, provider_items_seen): ISO8601 strings (TEXT)
- *
- * @param timestamp - Unix timestamp in milliseconds
- * @returns ISO8601 formatted string (e.g., "2024-01-15T10:00:00.000Z")
- */
-function toISO8601(timestamp: number): string {
-  return new Date(timestamp).toISOString();
-}
+import { nowIso, unixToIso } from '../../lib/timestamps';
 
 // ============================================================================
 // Canonical Item Helpers
@@ -62,7 +45,7 @@ export async function findOrCreateCanonicalItem(
     if (!existing[0].creatorId && creatorId) {
       await db
         .update(items)
-        .set({ creatorId, updatedAt: new Date().toISOString() })
+        .set({ creatorId, updatedAt: nowIso() })
         .where(eq(items.id, existing[0].id));
     }
     return { id: existing[0].id };
@@ -70,8 +53,8 @@ export async function findOrCreateCanonicalItem(
 
   // Create new canonical item
   // Convert timestamps to ISO8601 for existing items table
-  const now = new Date().toISOString();
-  const publishedAtISO = newItem.publishedAt ? toISO8601(newItem.publishedAt) : null;
+  const now = nowIso();
+  const publishedAtISO = newItem.publishedAt ? unixToIso(newItem.publishedAt) : null;
 
   // Use onConflictDoNothing() to handle race conditions where another worker
   // creates the same canonical item concurrently. The unique constraint on
