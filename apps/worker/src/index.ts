@@ -21,6 +21,7 @@ import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
 import { logger } from './lib/logger';
+import { resolveCorsOrigin } from './lib/cors';
 import { createWorkerRequestTelemetry, getWorkerRelease } from './lib/telemetry';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
@@ -89,22 +90,7 @@ app.use('*', async (c, next) => {
 app.use(
   '*',
   cors({
-    origin: (origin) => {
-      // Development: Allow any localhost port (for worktree isolation)
-      // This covers Expo dev server, any webpack dev server, etc.
-      if (origin?.match(/^http:\/\/localhost:\d+$/)) return origin;
-
-      // Android emulator: 10.0.2.2 is the special alias for host machine
-      // This is only needed for Expo web running in Android emulator's Chrome
-      if (origin?.match(/^http:\/\/10\.0\.2\.2:\d+$/)) return origin;
-
-      // Production: Explicit allowlist
-      if (origin === 'https://myzine.app') return origin;
-      if (origin === 'https://www.myzine.app') return origin;
-
-      // Reject all other origins
-      return null;
-    },
+    origin: (origin, c) => resolveCorsOrigin(origin, c.env.ENVIRONMENT),
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: [
       'Content-Type',
