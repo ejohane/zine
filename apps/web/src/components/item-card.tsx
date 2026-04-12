@@ -163,7 +163,7 @@ export function ItemCardView({
   const summary =
     formatPlainText(item.summary) ?? item.creator ?? item.publisher ?? 'Untitled source';
   const creatorLabel = item.creator || item.publisher || 'Unknown creator';
-  const href = `/item/${item.id}`;
+  const href = '/bookmarks';
   const inlineLengthLabel = getLengthLabel(item);
   const relativeLabel = getRelativeLabel(item);
 
