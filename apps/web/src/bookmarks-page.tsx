@@ -148,28 +148,39 @@ export function BookmarksPage() {
     filter: { contentType: bookmarkFilter },
   });
   const bookmarks = bookmarksQuery.data?.items ?? [];
-
-  useEffect(() => {
-    if (!bookmarkId || bookmarksQuery.isLoading) {
-      return;
-    }
-
-    if (bookmarks.some((item) => item.id === bookmarkId)) {
-      return;
-    }
-
-    navigate('/bookmarks', { replace: true });
-  }, [bookmarkId, bookmarks, bookmarksQuery.isLoading, navigate]);
-
+  const selectedBookmarkId = bookmarkId ?? null;
   const selectedBookmark = useMemo(
     () => bookmarks.find((item) => item.id === bookmarkId) ?? null,
     [bookmarkId, bookmarks]
   );
-  const selectedBookmarkId = bookmarkId ?? null;
   const selectedBookmarkDetailQuery = trpc.items.get.useQuery(
     { id: selectedBookmarkId ?? '' },
     { enabled: Boolean(selectedBookmarkId) }
   );
+
+  useEffect(() => {
+    if (!bookmarkId || selectedBookmark || selectedBookmarkDetailQuery.isLoading) {
+      return;
+    }
+
+    if (selectedBookmarkDetailQuery.data) {
+      return;
+    }
+
+    if (!selectedBookmarkDetailQuery.error) {
+      return;
+    }
+
+    navigate('/bookmarks', { replace: true });
+  }, [
+    bookmarkId,
+    navigate,
+    selectedBookmark,
+    selectedBookmarkDetailQuery.data,
+    selectedBookmarkDetailQuery.error,
+    selectedBookmarkDetailQuery.isLoading,
+  ]);
+
   const displayBookmark = selectedBookmarkDetailQuery.data ?? selectedBookmark;
   const selectedBookmarkLength = displayBookmark ? getLibraryLengthLabel(displayBookmark) : null;
   const selectedBookmarkSource = displayBookmark

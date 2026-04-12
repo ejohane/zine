@@ -1,11 +1,12 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
+import { Navigate } from 'react-router-dom';
 
 import { StatCard, Surface } from './components';
 import { AppWordmark } from './app-wordmark';
 import { useAuthAvailability } from './lib/trpc';
 
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
-  const { isEnabled } = useAuthAvailability();
+  const { isEnabled, mode: authMode } = useAuthAvailability();
 
   if (!isEnabled) {
     return (
@@ -16,6 +17,10 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         </div>
       </main>
     );
+  }
+
+  if (authMode === 'development-bypass') {
+    return <Navigate to="/bookmarks" replace />;
   }
 
   return (
