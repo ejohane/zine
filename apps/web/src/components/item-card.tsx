@@ -5,6 +5,7 @@ import { Radius, Typography } from '@zine/design-system';
 import type { ContentType, Provider } from '@zine/shared';
 
 import { formatDuration, formatRelativeDate, mapContentType, mapProvider } from '@/lib/format';
+import { typographyStyle } from '@/lib/utils';
 
 import { Surface } from '@/components';
 
@@ -173,7 +174,7 @@ export function ItemCardView({
                 <p
                   className="m-0 line-clamp-2 text-foreground"
                   style={{
-                    ...Typography.titleMedium,
+                    ...typographyStyle(Typography.titleMedium),
                     letterSpacing: '-0.03em',
                   }}
                 >
@@ -183,7 +184,7 @@ export function ItemCardView({
 
               <div
                 className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[var(--text-subheader)]"
-                style={Typography.bodySmall}
+                style={typographyStyle(Typography.bodySmall)}
               >
                 <span className="truncate">{creatorLabel}</span>
                 {inlineLengthLabel ? (
@@ -211,7 +212,7 @@ export function ItemCardView({
               <p
                 className="m-0 line-clamp-2 text-foreground"
                 style={{
-                  ...Typography.titleLarge,
+                  ...typographyStyle(Typography.titleLarge),
                   letterSpacing: '-0.04em',
                 }}
               >
@@ -230,7 +231,7 @@ export function ItemCardView({
 
             <div
               className="flex items-center gap-3 border-t border-border pt-4 text-[var(--text-subheader)]"
-              style={Typography.bodySmall}
+              style={typographyStyle(Typography.bodySmall)}
             >
               <div className="flex min-w-0 items-center gap-2">
                 <IdentityMark item={item} />
@@ -263,7 +264,7 @@ export function ItemCardView({
               <Link
                 className="block text-foreground transition-opacity duration-150 hover:opacity-90"
                 style={{
-                  ...Typography.titleMedium,
+                  ...typographyStyle(Typography.titleMedium),
                   letterSpacing: '-0.03em',
                 }}
                 to={href}
@@ -288,7 +289,7 @@ export function ItemCardView({
                   <div
                     className="truncate text-foreground"
                     style={{
-                      ...Typography.bodySmall,
+                      ...typographyStyle(Typography.bodySmall),
                       fontWeight: 500,
                     }}
                   >
@@ -296,7 +297,7 @@ export function ItemCardView({
                   </div>
                   <div
                     className="truncate text-[var(--text-tertiary)]"
-                    style={Typography.bodySmall}
+                    style={typographyStyle(Typography.bodySmall)}
                   >
                     {sourceLabel}
                   </div>

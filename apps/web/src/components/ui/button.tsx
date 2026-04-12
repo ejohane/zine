@@ -10,7 +10,7 @@ import {
   type ButtonVariant,
 } from '@zine/design-system';
 
-import { cn } from '@/lib/utils';
+import { cn, typographyStyle } from '@/lib/utils';
 
 type ButtonVariantProp = ButtonVariant | 'default';
 type ButtonSizeProp = ButtonSize | 'icon';
@@ -42,6 +42,7 @@ function Button({
   const metrics = getButtonMetrics(resolvedSize);
   const palette = getButtonPalette(Colors.dark, resolvedVariant, tone, Boolean(disabled));
   const iconStyle = size === 'icon';
+  const textStyle = typographyStyle(metrics);
 
   return (
     <Comp
@@ -60,11 +61,7 @@ function Button({
         color: palette.foregroundColor,
         borderColor: palette.borderColor ?? 'transparent',
         borderWidth: palette.borderColor ? 1 : 0,
-        fontSize: metrics.fontSize,
-        lineHeight: metrics.lineHeight,
-        fontWeight: metrics.fontWeight,
-        letterSpacing: metrics.letterSpacing,
-        textTransform: metrics.textTransform,
+        ...textStyle,
         ...style,
       }}
       disabled={disabled}

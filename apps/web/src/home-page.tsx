@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FilterChip } from '@/components/ui/filter-chip';
 import { ItemCardView } from '@/components/item-card';
+import { typographyStyle } from '@/lib/utils';
 
 import { trpc } from './lib/trpc';
 
@@ -65,7 +66,7 @@ function SurfaceSection({
           <h2
             className="text-foreground"
             style={{
-              ...Typography.headlineSmall,
+              ...typographyStyle(Typography.headlineSmall),
               letterSpacing: '-0.03em',
             }}
           >

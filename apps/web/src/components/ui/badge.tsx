@@ -9,7 +9,7 @@ import {
   type BadgeTone,
 } from '@zine/design-system';
 
-import { cn } from '@/lib/utils';
+import { cn, typographyStyle } from '@/lib/utils';
 
 type LegacyBadgeVariant = 'default' | 'muted' | 'success' | 'warning' | 'danger' | 'info';
 
@@ -54,6 +54,7 @@ function Badge({
   const resolvedTone = resolveBadgeTone(tone, variant);
   const metrics = getBadgeMetrics(size);
   const palette = getBadgePalette(Colors.dark, resolvedTone);
+  const textStyle = typographyStyle(metrics);
 
   return (
     <span
@@ -67,11 +68,7 @@ function Badge({
         color: palette.foregroundColor,
         borderColor: palette.borderColor ?? 'transparent',
         borderWidth: palette.borderColor ? 1 : 0,
-        fontSize: metrics.fontSize,
-        lineHeight: metrics.lineHeight,
-        fontWeight: metrics.fontWeight,
-        letterSpacing: metrics.letterSpacing,
-        textTransform: metrics.textTransform,
+        ...textStyle,
         ...style,
       }}
       {...props}

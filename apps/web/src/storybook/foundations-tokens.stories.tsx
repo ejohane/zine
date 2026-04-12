@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { CSSProperties } from 'react';
 
 import { Colors, IconSizes, Motion, Radius, Spacing, Typography } from '@zine/design-system';
+
+import { typographyStyle } from '@/lib/utils';
 
 import { createDarkCanvasDecorator } from './decorators';
 
@@ -66,17 +67,17 @@ function FoundationsTokensReference() {
           Typography Scale
         </h2>
         <div className="rounded-[24px] border border-border bg-card p-6">
-          <div style={Typography.displayMedium as CSSProperties}>Display Medium</div>
-          <div className="mt-4" style={Typography.headlineLarge as CSSProperties}>
+          <div style={typographyStyle(Typography.displayMedium)}>Display Medium</div>
+          <div className="mt-4" style={typographyStyle(Typography.headlineLarge)}>
             Headline Large
           </div>
-          <div className="mt-4" style={Typography.titleLarge as CSSProperties}>
+          <div className="mt-4" style={typographyStyle(Typography.titleLarge)}>
             Title Large
           </div>
-          <div className="mt-4" style={Typography.bodyMedium as CSSProperties}>
+          <div className="mt-4" style={typographyStyle(Typography.bodyMedium)}>
             Body Medium keeps the dense editorial rhythm from mobile.
           </div>
-          <div className="mt-4" style={Typography.labelSmall as CSSProperties}>
+          <div className="mt-4" style={typographyStyle(Typography.labelSmall)}>
             Label Small
           </div>
         </div>

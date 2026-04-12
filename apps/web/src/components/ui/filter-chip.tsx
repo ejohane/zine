@@ -8,7 +8,7 @@ import {
 } from '@zine/design-system';
 import { ContentType } from '@zine/shared';
 
-import { cn } from '@/lib/utils';
+import { cn, typographyStyle } from '@/lib/utils';
 
 type FilterChipIconProps = {
   className?: string;
@@ -56,6 +56,7 @@ export function FilterChip({
   const displayedCount = typeof count === 'number' ? (count > 99 ? '99+' : String(count)) : null;
   const metrics = getFilterChipMetrics(size);
   const palette = getFilterChipPalette(Colors.dark, resolveFilterChipTone(tone), selected);
+  const textStyle = typographyStyle(metrics);
 
   return (
     <button
@@ -75,11 +76,7 @@ export function FilterChip({
         color: palette.foregroundColor,
         borderColor: palette.borderColor,
         borderWidth: 1,
-        fontSize: metrics.fontSize,
-        lineHeight: metrics.lineHeight,
-        fontWeight: metrics.fontWeight,
-        letterSpacing: metrics.letterSpacing,
-        textTransform: metrics.textTransform,
+        ...textStyle,
         ...style,
       }}
       {...props}
