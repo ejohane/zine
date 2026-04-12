@@ -1,6 +1,19 @@
 import { SignIn, SignUp, UserButton } from '@clerk/clerk-react';
-import { BookOpen, House, Inbox, Rss, Settings, type LucideIcon } from 'lucide-react';
-import { useEffect, useState, useTransition, type ReactNode } from 'react';
+import {
+  Archive,
+  BookOpen,
+  BookmarkCheck,
+  ChevronRight,
+  ExternalLink,
+  House,
+  Inbox,
+  Link2,
+  Plus,
+  Rss,
+  Settings,
+  type LucideIcon,
+} from 'lucide-react';
+import { useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import {
   Link,
   NavLink,
@@ -9,6 +22,7 @@ import {
   useLocation,
   useNavigate,
   useParams,
+  useSearchParams,
 } from 'react-router-dom';
 
 import { ContentType, Provider, UserItemState } from '@zine/shared';
@@ -33,8 +47,10 @@ import {
   formatDeltaLabel,
   formatDuration,
   formatEstimatedMinutes,
+  formatPlainText,
   formatRelativeDate,
   isValidUrl,
+  mapContentType,
   mapProvider,
 } from './lib/format';
 import { completeOAuthFlow, connectProvider, type OAuthProvider } from './lib/oauth';
@@ -76,11 +92,70 @@ const SHELL_NAV_ITEMS: Array<{ to: string; label: string; icon: LucideIcon }> = 
   { to: '/subscriptions', label: 'Subscriptions', icon: Rss },
 ];
 
-function AppWordmark() {
+type ShellSection = {
+  parentLabel: string;
+  label: string;
+  icon: LucideIcon;
+};
+
+function getShellSection(pathname: string): ShellSection {
+  if (pathname === '/') {
+    return { parentLabel: 'All spaces', label: 'Home', icon: House };
+  }
+
+  if (pathname.startsWith('/inbox')) {
+    return { parentLabel: 'All inboxes', label: 'Inbox', icon: Inbox };
+  }
+
+  if (pathname.startsWith('/library') || pathname.startsWith('/item/')) {
+    return { parentLabel: 'Saved shelf', label: 'Library', icon: BookOpen };
+  }
+
+  if (pathname.startsWith('/subscriptions')) {
+    return { parentLabel: 'Source view', label: 'Subscriptions', icon: Rss };
+  }
+
+  if (pathname.startsWith('/add-link')) {
+    return { parentLabel: 'Capture', label: 'Add link', icon: Link2 };
+  }
+
+  if (pathname.startsWith('/settings')) {
+    return { parentLabel: 'Account', label: 'Settings', icon: Settings };
+  }
+
+  if (pathname.startsWith('/recap/')) {
+    return { parentLabel: 'Insights', label: 'Weekly recap', icon: BookOpen };
+  }
+
+  return { parentLabel: 'Workspace', label: 'Browse', icon: House };
+}
+
+function getInboxSummary(item: InboxItem) {
+  return formatPlainText(item.summary) ?? item.creator ?? 'No preview available yet.';
+}
+
+function getInboxSearchValue(item: InboxItem) {
+  return [
+    item.title,
+    formatPlainText(item.summary),
+    item.creator,
+    mapProvider(item.provider),
+    item.contentType,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function getInboxLengthLabel(item: InboxItem) {
+  return item.duration ? formatDuration(item.duration) : null;
+}
+
+function AppWordmark({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="wordmark">
+    <div className={cn('wordmark', compact && 'wordmark--compact')}>
       <span className="wordmark__disc" />
-      <div>
+      <div className="wordmark__text">
         <p>Zine</p>
         <small>editorial browser</small>
       </div>
@@ -175,46 +250,88 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
 function ShellChrome() {
   const { mode } = useAuthAvailability();
+  const location = useLocation();
+  const shellSection = getShellSection(location.pathname);
+  const SectionIcon = shellSection.icon;
 
   return (
     <div className="app-shell">
-      <header className="shell-header">
-        <Link to="/" className="shell-header__brand" aria-label="Go to home">
-          <AppWordmark />
-        </Link>
-        <div className="shell-header__actions">
-          <Link className="shell-icon-button" to="/settings" aria-label="Open settings">
-            <Settings size={18} strokeWidth={2.1} />
+      <aside className="shell-rail" aria-label="Workspace navigation">
+        <div className="shell-rail__top">
+          <Link to="/" className="shell-rail__brand" aria-label="Go to home">
+            <AppWordmark compact />
           </Link>
+
+          <nav className="shell-rail__nav" aria-label="Primary">
+            {SHELL_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                aria-label={label}
+                title={label}
+                className={({ isActive }) =>
+                  cn('shell-rail__link', isActive && 'shell-rail__link--active')
+                }
+              >
+                <Icon size={18} strokeWidth={2.15} />
+                <span className="shell-rail__link-label">{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+
+        <div className="shell-rail__bottom">
+          <Link
+            className={cn(
+              'shell-rail__link',
+              location.pathname.startsWith('/settings') && 'shell-rail__link--active'
+            )}
+            to="/settings"
+            aria-label="Open settings"
+            title="Settings"
+          >
+            <Settings size={18} strokeWidth={2.1} />
+            <span className="shell-rail__link-label">Settings</span>
+          </Link>
+
           {mode === 'clerk' ? (
             <div className="shell-user-button">
               <UserButton />
             </div>
           ) : (
-            <Badge tone="warning">Dev mode</Badge>
+            <Badge className="shell-rail__badge" tone="warning">
+              Dev
+            </Badge>
           )}
         </div>
-      </header>
+      </aside>
 
-      <main className="page-frame">
-        <Outlet />
-      </main>
+      <div className="shell-main">
+        <header className="shell-topbar">
+          <div className="shell-topbar__crumbs">
+            <span>{shellSection.parentLabel}</span>
+            <ChevronRight className="shell-topbar__separator" size={14} strokeWidth={2.2} />
+            <span className="shell-topbar__current">
+              <SectionIcon size={15} strokeWidth={2.2} />
+              {shellSection.label}
+            </span>
+          </div>
+          <div className="shell-topbar__actions">
+            {!location.pathname.startsWith('/add-link') ? (
+              <LinkButton className="shell-topbar__shortcut" to="/add-link" tone="ghost">
+                <Plus size={16} strokeWidth={2.15} />
+                Add link
+              </LinkButton>
+            ) : null}
+            <p className="topbar__note">v{WEB_APP_VERSION}</p>
+          </div>
+        </header>
 
-      <nav className="shell-dock" aria-label="Primary">
-        {SHELL_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              cn('shell-dock__link', isActive && 'shell-dock__link--active')
-            }
-          >
-            <Icon size={18} strokeWidth={2.15} />
-            <span className="shell-dock__label">{label}</span>
-          </NavLink>
-        ))}
-      </nav>
+        <main className="page-frame">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
@@ -231,6 +348,8 @@ export function InboxPage() {
   const utils = trpc.useUtils();
   const inboxQuery = trpc.items.inbox.useQuery({ limit: 50 });
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const bookmarkMutation = trpc.items.bookmark.useMutation({
     onSettled: () => {
@@ -250,15 +369,24 @@ export function InboxPage() {
   });
 
   const inboxItems: InboxItem[] = inboxQuery.data?.items ?? [];
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return inboxItems;
+    }
+
+    return inboxItems.filter((item) => getInboxSearchValue(item).includes(query));
+  }, [inboxItems, search]);
+  const selectedItemId = searchParams.get('item');
+  const selectedItem = filteredItems.find((item) => item.id === selectedItemId) ?? filteredItems[0];
+  const selectedLengthLabel = selectedItem
+    ? (getInboxLengthLabel(selectedItem) ??
+      (selectedItem.readingTimeMinutes ? `${selectedItem.readingTimeMinutes} min read` : null))
+    : null;
 
   return (
     <div className="page-stack">
-      <PageHeader
-        eyebrow="Inbox"
-        title="Decisions first."
-        description="Treat new items like a finite queue: save what matters, archive the rest, move on cleanly."
-      />
-
       <QueryBoundary
         isLoading={inboxQuery.isLoading}
         error={inboxQuery.error}
@@ -270,37 +398,159 @@ export function InboxPage() {
           />
         }
       >
-        <div className="item-list">
-          {inboxItems.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              actionSlot={
-                <div className="button-row">
-                  <Button
-                    tone="ghost"
-                    disabled={pendingId === item.id}
-                    onClick={() => {
-                      setPendingId(item.id);
-                      archiveMutation.mutate({ id: item.id });
-                    }}
-                  >
-                    Archive
-                  </Button>
-                  <Button
-                    disabled={pendingId === item.id}
-                    onClick={() => {
-                      setPendingId(item.id);
-                      bookmarkMutation.mutate({ id: item.id });
-                    }}
-                  >
-                    Keep
-                  </Button>
+        {filteredItems.length === 0 ? (
+          <Surface className="inbox-empty-search">
+            <p className="eyebrow">No matches</p>
+            <h2>Nothing in the inbox matches that search.</h2>
+            <p>Try a different title, source, or creator.</p>
+          </Surface>
+        ) : (
+          <div className="inbox-workspace">
+            <Surface className="inbox-sidebar">
+              <div className="inbox-sidebar__header">
+                <div>
+                  <p className="eyebrow">Inbox</p>
+                  <h2>Decisions first.</h2>
+                  <p>
+                    Treat new items like a finite queue: save what matters, archive the rest, and
+                    move on cleanly.
+                  </p>
                 </div>
-              }
-            />
-          ))}
-        </div>
+                <Badge>{filteredItems.length}</Badge>
+              </div>
+
+              <Field label="Search" hint="Title, creator, or source">
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search inbox"
+                />
+              </Field>
+
+              <div className="inbox-list" role="list">
+                {filteredItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={cn(
+                      'inbox-list-item',
+                      selectedItem?.id === item.id && 'inbox-list-item--active'
+                    )}
+                    onClick={() => {
+                      setSearchParams((current) => {
+                        const next = new URLSearchParams(current);
+                        next.set('item', item.id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <div className="inbox-list-item__meta">
+                      <span>{item.creator || mapProvider(item.provider)}</span>
+                      <span>{formatRelativeDate(item.publishedAt ?? item.ingestedAt)}</span>
+                    </div>
+                    <p className="inbox-list-item__title">{item.title}</p>
+                    <p className="inbox-list-item__summary">{getInboxSummary(item)}</p>
+                  </button>
+                ))}
+              </div>
+            </Surface>
+
+            {selectedItem ? (
+              <Surface className="inbox-detail">
+                <div className="inbox-detail__header">
+                  <div>
+                    <div className="inbox-detail__eyebrow">
+                      <Badge tone="warning">In inbox</Badge>
+                      <span>{mapProvider(selectedItem.provider)}</span>
+                      <span>{mapContentType(selectedItem.contentType)}</span>
+                    </div>
+                    <h2>{selectedItem.title}</h2>
+                    <p className="inbox-detail__summary">{getInboxSummary(selectedItem)}</p>
+                  </div>
+
+                  <div className="button-row button-row--wrap">
+                    <Button
+                      tone="ghost"
+                      disabled={pendingId === selectedItem.id}
+                      onClick={() => {
+                        setPendingId(selectedItem.id);
+                        archiveMutation.mutate({ id: selectedItem.id });
+                      }}
+                    >
+                      <Archive size={16} strokeWidth={2.15} />
+                      Archive
+                    </Button>
+                    <Button
+                      disabled={pendingId === selectedItem.id}
+                      onClick={() => {
+                        setPendingId(selectedItem.id);
+                        bookmarkMutation.mutate({ id: selectedItem.id });
+                      }}
+                    >
+                      <BookmarkCheck size={16} strokeWidth={2.15} />
+                      Keep
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="inbox-detail__body">
+                  <div className="inbox-detail__content">
+                    <div className="inbox-detail__meta">
+                      <span>{selectedItem.creator || 'Unknown creator'}</span>
+                      {selectedLengthLabel ? <span>{selectedLengthLabel}</span> : null}
+                      <span>
+                        {formatRelativeDate(selectedItem.publishedAt ?? selectedItem.ingestedAt)}
+                      </span>
+                    </div>
+
+                    <div className="inbox-detail__context-grid">
+                      <div className="inbox-detail__context">
+                        <strong>Creator</strong>
+                        <span>{selectedItem.creator || 'Unknown creator'}</span>
+                      </div>
+                      <div className="inbox-detail__context">
+                        <strong>Source</strong>
+                        <span>{mapProvider(selectedItem.provider)}</span>
+                      </div>
+                      <div className="inbox-detail__context">
+                        <strong>Saved</strong>
+                        <span>{formatAbsoluteDate(selectedItem.ingestedAt)}</span>
+                      </div>
+                      <div className="inbox-detail__context">
+                        <strong>Length</strong>
+                        <span>{selectedLengthLabel ?? 'Open item for details'}</span>
+                      </div>
+                    </div>
+
+                    <div className="inbox-detail__footer">
+                      <LinkButton to={`/item/${selectedItem.id}`} tone="ghost">
+                        Open detail
+                      </LinkButton>
+                      {selectedItem.canonicalUrl ? (
+                        <AnchorButton
+                          href={selectedItem.canonicalUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open original
+                          <ExternalLink size={16} strokeWidth={2.15} />
+                        </AnchorButton>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="inbox-detail__media">
+                    {selectedItem.thumbnailUrl ? (
+                      <img src={selectedItem.thumbnailUrl} alt="" />
+                    ) : (
+                      <div className="inbox-detail__placeholder" />
+                    )}
+                  </div>
+                </div>
+              </Surface>
+            ) : null}
+          </div>
+        )}
       </QueryBoundary>
     </div>
   );
@@ -479,7 +729,7 @@ export function AddLinkPage() {
           <Surface className="preview-panel">
             <p className="eyebrow">Preview</p>
             <h2>{preview?.title}</h2>
-            <p>{preview?.description ?? preview?.creator}</p>
+            <p>{formatPlainText(preview?.description) ?? preview?.creator}</p>
             <div className="meta-row">
               <Badge>{preview?.provider.toLowerCase()}</Badge>
               <span>{preview?.contentType.toLowerCase()}</span>
@@ -570,7 +820,10 @@ export function ItemDetailPage() {
               eyebrow="Item detail"
               title={item.title}
               description={
-                item.summary ?? item.creator ?? item.publisher ?? 'Saved from the original source.'
+                formatPlainText(item.summary) ??
+                item.creator ??
+                item.publisher ??
+                'Saved from the original source.'
               }
               actions={<div className="button-row">{stateBadge(item.state)}</div>}
             />
@@ -634,7 +887,7 @@ export function ItemDetailPage() {
               <Surface className="preview-panel">
                 <p className="eyebrow">Context</p>
                 <h2>{item.title}</h2>
-                <p>{item.summary ?? 'No summary available for this item yet.'}</p>
+                <p>{formatPlainText(item.summary) ?? 'No summary available for this item yet.'}</p>
                 {item.thumbnailUrl ? (
                   <img className="preview-panel__image" src={item.thumbnailUrl} alt="" />
                 ) : null}
