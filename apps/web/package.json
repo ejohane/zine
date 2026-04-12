@@ -1,0 +1,44 @@
+{
+  "name": "@zine/web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port ${WEB_PORT:-5173}",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port ${WEB_PORT:-4173}",
+    "storybook": "storybook dev -p ${STORYBOOK_PORT:-6006} --host 0.0.0.0",
+    "storybook:build": "storybook build",
+    "lint": "eslint src --ext .ts,.tsx --cache --cache-location .eslintcache",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tanstack/react-query": "^5.60.0",
+    "@trpc/client": "^11.0.0",
+    "@trpc/react-query": "^11.0.0",
+    "@zine/design-system": "workspace:*",
+    "@zine/shared": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.8.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-router-dom": "^7.14.0",
+    "superjson": "^2.2.0",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.2.10",
+    "@storybook/addon-docs": "^10.2.10",
+    "@storybook/react-vite": "^10.2.10",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "storybook": "^10.2.10",
+    "tailwindcss": "^4.2.2",
+    "typescript": "~5.9.2",
+    "vite": "^8.0.8"
+  }
+}

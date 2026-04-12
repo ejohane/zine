@@ -33,6 +33,7 @@
     "@tanstack/react-query-persist-client": "^5.60.0",
     "@trpc/client": "^11.0.0",
     "@trpc/react-query": "^11.0.0",
+    "@zine/design-system": "workspace:*",
     "@zine/shared": "workspace:*",
     "expo": "~55.0.5",
     "expo-auth-session": "~55.0.7",

@@ -1,0 +1,80 @@
+@layer theme {
+  :root {
+    color-scheme: dark;
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #1A1A1A;
+    --card-foreground: #ffffff;
+    --popover: #111111;
+    --popover-foreground: #ffffff;
+    --primary: #FFFFFF;
+    --primary-foreground: #000000;
+    --secondary: #1A1A1A;
+    --secondary-foreground: #ffffff;
+    --muted: #1A1A1A;
+    --muted-foreground: #A0A0A0;
+    --accent: #1A1A1A;
+    --accent-foreground: #ffffff;
+    --destructive: #EF4444;
+    --destructive-foreground: #ffffff;
+    --border: #2A2A2A;
+    --input: #2A2A2A;
+    --ring: rgba(255, 255, 255, 0.16);
+    --radius: 1rem;
+    --surface-canvas: #000000;
+    --surface-subtle: #1A1A1A;
+    --surface-elevated: #1A1A1A;
+    --surface-raised: #2A2A2A;
+    --line: #1A1A1A;
+    --line-strong: #2A2A2A;
+    --text: #ffffff;
+    --text-subheader: rgba(255, 255, 255, 0.82);
+    --text-dim: #A0A0A0;
+    --text-tertiary: #6A6A6A;
+    --danger: #EF4444;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --info: #3B82F6;
+    --status-success-surface: rgba(16, 185, 129, 0.16);
+    --status-warning-surface: rgba(245, 158, 11, 0.16);
+    --status-error-surface: rgba(239, 68, 68, 0.16);
+    --status-info-surface: rgba(59, 130, 246, 0.16);
+    --filter-chip-article-accent: #3B82F6;
+    --filter-chip-article-foreground: #BFDBFE;
+    --filter-chip-article-surface: rgba(59, 130, 246, 0.16);
+    --filter-chip-podcast-accent: #1DB954;
+    --filter-chip-podcast-foreground: #BBF7D0;
+    --filter-chip-podcast-surface: rgba(29, 185, 84, 0.16);
+    --filter-chip-video-accent: #FF3B30;
+    --filter-chip-video-foreground: #FCA5A5;
+    --filter-chip-video-surface: rgba(255, 59, 48, 0.16);
+    --filter-chip-post-accent: #CFCFCF;
+    --filter-chip-post-foreground: #F5F5F5;
+    --filter-chip-post-surface: rgba(255, 255, 255, 0.1);
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+    --frame-width: 70rem;
+  }
+
+  @theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}

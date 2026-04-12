@@ -1,16 +1,16 @@
 {
-  "extends": "expo/tsconfig.base",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "strict": true,
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@cloudflare/workers-types"],
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@zine/design-system": ["../../packages/design-system/src/index.ts"],
       "@zine/design-system/*": ["../../packages/design-system/src/*"],
       "@zine/shared": ["../../packages/shared/src/index.ts"],
       "@zine/shared/*": ["../../packages/shared/src/*"],
-      "@zine/worker/*": ["../worker/src/*"],
-      "@testing-library/react-hooks": ["./test-utils/react-hooks.ts"]
+      "@zine/worker/*": ["../worker/src/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
 }
