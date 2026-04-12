@@ -4,6 +4,8 @@
     "strict": true,
     "paths": {
       "@/*": ["./*"],
+      "@zine/design-system": ["../../packages/design-system/src/index.ts"],
+      "@zine/design-system/*": ["../../packages/design-system/src/*"],
       "@zine/shared": ["../../packages/shared/src/index.ts"],
       "@zine/shared/*": ["../../packages/shared/src/*"],
       "@zine/worker/*": ["../worker/src/*"],

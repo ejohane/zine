@@ -304,7 +304,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     const url = `${API_URL}/trpc`;
     trpcLogger.info('Connecting to tRPC server', { url });
 
-    const fetchWithAuthRecovery: typeof fetch = async (input, init) => {
+    const fetchWithAuthRecovery: typeof telemetryFetch = async (input, init) => {
       const response = await telemetryFetch(isRequest(input) ? input.clone() : input, init);
 
       if (!isUnauthorizedResponse(response)) {

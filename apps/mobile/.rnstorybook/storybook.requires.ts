@@ -3,26 +3,26 @@
 import type { View } from '@storybook/react-native';
 import { start, updateView } from '@storybook/react-native';
 
-import '@storybook/addon-ondevice-notes/register';
-import '@storybook/addon-ondevice-controls/register';
-import '@storybook/addon-ondevice-backgrounds/register';
-import '@storybook/addon-ondevice-actions/register';
+import "@storybook/addon-ondevice-notes/register";
+import "@storybook/addon-ondevice-controls/register";
+import "@storybook/addon-ondevice-backgrounds/register";
+import "@storybook/addon-ondevice-actions/register";
 
 const normalizedStories = [
   {
-    titlePrefix: '',
-    directory: './components',
-    files: '**/*.stories.?(ts|tsx|js|jsx)',
-    importPathMatcher:
-      /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/,
-    // @ts-expect-error Storybook's generated require.context typing is not available in Metro.
+    titlePrefix: "",
+    directory: "./components",
+    files: "**/*.stories.?(ts|tsx|js|jsx)",
+    importPathMatcher: /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/,
+    // @ts-expect-error Storybook RN injects require.context here.
     req: require.context(
       '../components',
       true,
       /^\.(?:(?:^|\/|(?:(?:(?!(?:^|\/)\.).)*?)\/)(?!\.)(?=.)[^/]*?\.stories\.(?:ts|tsx|js|jsx)?)$/
     ),
-  },
+  }
 ];
+
 
 declare global {
   var view: View;
@@ -30,17 +30,25 @@ declare global {
   var STORYBOOK_WEBSOCKET: { host: string; port: number } | undefined;
 }
 
-const annotations = [require('./preview'), require('@storybook/react-native/preview')];
+
+const annotations = [
+  require('./preview'),
+  require("@storybook/react-native/preview")
+];
 
 globalThis.STORIES = normalizedStories;
 
-// @ts-expect-error Fast refresh injects module.hot in development builds.
+
+// @ts-expect-error module.hot is provided by the Storybook runtime.
 module?.hot?.accept?.();
+
+
 
 if (!globalThis.view) {
   globalThis.view = start({
     annotations,
     storyEntries: normalizedStories,
+
   });
 } else {
   updateView(globalThis.view, annotations, normalizedStories);

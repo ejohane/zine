@@ -5,7 +5,7 @@
  * in the UI. Used by ProviderCard component on the subscriptions screen.
  */
 
-import type { Colors } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
 
 /**
  * Connection status from the API.
@@ -52,7 +52,7 @@ export function isReconnectRequired(connectionStatus: ConnectionStatus): boolean
  */
 export function getStatusDisplay(
   connectionStatus: ConnectionStatus,
-  colors: typeof Colors.dark
+  colors: ThemeColors
 ): StatusDisplay {
   switch (connectionStatus) {
     case 'ACTIVE':

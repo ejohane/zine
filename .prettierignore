@@ -3,3 +3,4 @@ apps/mobile/.rnstorybook/storybook.requires.ts
 apps/mobile/uniwind-types.d.ts
 apps/mobile/ios/
 .opencode/
+apps/web/storybook-static/
