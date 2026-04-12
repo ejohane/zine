@@ -11,6 +11,7 @@ import {
   generateSyntheticCreatorId,
   type CreatorParams,
 } from '../../db/helpers/creators';
+import { nowIso } from '../../lib/timestamps';
 
 // ============================================================================
 // Creator Extraction Helpers
@@ -138,7 +139,7 @@ export async function backfillCreatorIdIfMissing<T>(
     // Update the canonical item with the creatorId
     await db
       .update(items)
-      .set({ creatorId, updatedAt: new Date().toISOString() })
+      .set({ creatorId, updatedAt: nowIso() })
       .where(eq(items.id, existing[0].id));
 
     ingestionLogger.info('Backfilled creatorId for item', {

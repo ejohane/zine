@@ -10,6 +10,7 @@ import { serializeError } from '../../utils/error-utils';
 import { backfillCreatorIdIfMissing, getOrCreateCreator } from './creators';
 import { storeToDLQ } from './dlq';
 import type { IngestContext, PreparedItem, PreparedResult } from './types';
+import { nowIso } from '../../lib/timestamps';
 
 // ============================================================================
 // Preparation Helpers
@@ -75,7 +76,7 @@ export async function prepareItem<T>({
   if (existingCanonical.length > 0 && !existingCanonical[0].creatorId && creatorId) {
     await db
       .update(items)
-      .set({ creatorId, updatedAt: new Date().toISOString() })
+      .set({ creatorId, updatedAt: nowIso() })
       .where(eq(items.id, existingCanonical[0].id));
   }
 
