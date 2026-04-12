@@ -8,6 +8,27 @@ export function mapProvider(provider: Provider | string) {
   return provider.toString().toLowerCase();
 }
 
+export function formatPlainText(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const plainText = value
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(nbsp|#160);/gi, ' ')
+    .replace(/&(amp|#38);/gi, '&')
+    .replace(/&(quot|#34);/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return plainText.length > 0 ? plainText : null;
+}
+
 export function formatDuration(seconds?: number | null): string | undefined {
   if (seconds === undefined || seconds === null || !Number.isFinite(seconds) || seconds < 0) {
     return undefined;

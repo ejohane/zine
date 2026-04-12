@@ -134,7 +134,7 @@ export function HomePage() {
     filteredJumpBackIn.length > 0 || filteredRecentBookmarks.length > 0 || filteredInbox.length > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-[980px] flex-col gap-10">
+    <div className="flex w-full max-w-[1180px] flex-col gap-10">
       <header className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <h1 className="text-[3.35rem] font-semibold leading-none tracking-[-0.06em] text-foreground sm:text-[4.5rem]">

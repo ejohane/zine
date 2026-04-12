@@ -4,7 +4,13 @@ import type { ReactNode } from 'react';
 import { Radius, Typography } from '@zine/design-system';
 import type { ContentType, Provider } from '@zine/shared';
 
-import { formatDuration, formatRelativeDate, mapContentType, mapProvider } from '@/lib/format';
+import {
+  formatDuration,
+  formatPlainText,
+  formatRelativeDate,
+  mapContentType,
+  mapProvider,
+} from '@/lib/format';
 import { typographyStyle } from '@/lib/utils';
 
 import { Surface } from '@/components';
@@ -154,7 +160,8 @@ export function ItemCardView({
   const sourceLabel = item.canonicalUrl
     ? new URL(item.canonicalUrl).hostname.replace(/^www\./, '')
     : 'original source';
-  const summary = item.summary ?? item.creator ?? item.publisher ?? 'Untitled source';
+  const summary =
+    formatPlainText(item.summary) ?? item.creator ?? item.publisher ?? 'Untitled source';
   const creatorLabel = item.creator || item.publisher || 'Unknown creator';
   const href = `/item/${item.id}`;
   const inlineLengthLabel = getLengthLabel(item);
