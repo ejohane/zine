@@ -104,6 +104,23 @@
   - `docs/mobile/design-system/principles.md`
   - `docs/mobile/design-system/foundations.md`
   - `docs/mobile/design-system/components.md`
+- When editing shared web UI or `packages/design-system`, read:
+  - `docs/web/design-system.md`
+- Web design-system source of truth is layered:
+  - shared tokens/specs/recipes in `packages/design-system/src`
+  - web theme adapter in `packages/design-system/src/web/theme.ts` and `packages/design-system/src/web/theme.css`
+  - web primitives in `apps/web/src/components/ui/*`
+  - app-facing web wrappers/composites in `apps/web/src/components.tsx` and `apps/web/src/components/item-card.tsx`
+  - Storybook references in `apps/web/src/storybook/*`
+- In `apps/web`, prefer app-facing wrappers and semantic tokens over raw ad hoc styles.
+- Do not treat `apps/web/components.json` or shadcn-style structure as the source of truth for design semantics.
+- Do not add new raw hex/rgb colors, ad hoc typography literals, or duplicate palette logic in shared web components when `@zine/design-system` already provides the token or recipe.
+- When shared web design-system behavior changes, update Storybook coverage and the package tests in `packages/design-system/test/design-system.test.ts`.
+- Run these checks when web shared UI or `packages/design-system` changes:
+  - `bun test packages/design-system/test/design-system.test.ts`
+  - `bun run --cwd apps/web lint`
+  - `bun run --cwd apps/web typecheck`
+  - `bun run --cwd apps/web storybook:build`
 - In `apps/mobile/components`, prefer `@/components/primitives` (`Badge`, `Button`, `IconButton`, `Surface`, `Text`) plus semantic theme tokens before introducing new one-off shared styles.
 - For `apps/mobile/components`, prefer canonical components and semantic theme tokens over one-off styles.
 - Do not add new raw hex/rgb colors or ad hoc typography literals in shared mobile components unless the line is marked with `design-system-exception:` and a short reason.
