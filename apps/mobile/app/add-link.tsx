@@ -35,7 +35,7 @@ import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Typography, Spacing, Radius, Shadows } from '@/constants/theme';
+import { Colors, Typography, Spacing, Radius, Shadows, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePreview, useSaveBookmark, isValidUrl } from '@/hooks/use-bookmarks';
 import { LinkPreviewCard } from '@/components/link-preview-card';
@@ -125,13 +125,7 @@ function LinkIcon({ size = 48, color = '#94A3B8' }: { size?: number; color?: str
 // Empty State Component
 // ============================================================================
 
-function EmptyState({
-  colors,
-  compact = false,
-}: {
-  colors: typeof Colors.light;
-  compact?: boolean;
-}) {
+function EmptyState({ colors, compact = false }: { colors: ThemeColors; compact?: boolean }) {
   return (
     <Animated.View
       testID="add-link-empty-state"
@@ -152,7 +146,7 @@ function EmptyState({
 // Loading State Component
 // ============================================================================
 
-function LoadingState({ colors }: { colors: typeof Colors.light }) {
+function LoadingState({ colors }: { colors: ThemeColors }) {
   return (
     <Animated.View style={styles.stateContainer}>
       <ActivityIndicator size="large" color={colors.primary} />
@@ -170,7 +164,7 @@ function ErrorState({
   message,
   onRetry,
 }: {
-  colors: typeof Colors.light;
+  colors: ThemeColors;
   message: string;
   onRetry?: () => void;
 }) {

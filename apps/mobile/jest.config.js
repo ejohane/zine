@@ -38,6 +38,8 @@ module.exports = {
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^@zine/design-system$': '<rootDir>/../../packages/design-system/src/index.ts',
+    '^@zine/design-system/(.*)$': '<rootDir>/../../packages/design-system/src/$1',
     '^@zine/shared$': '<rootDir>/../../packages/shared/src/index.ts',
     '^@zine/shared/(.*)$': '<rootDir>/../../packages/shared/src/$1',
     '^@testing-library/react-hooks$': '<rootDir>/test-utils/react-hooks.ts',

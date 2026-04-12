@@ -14,7 +14,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path } from 'react-native-svg';
 
-import { Colors, Spacing, Radius, Typography, Shadows, ProviderColors } from '@/constants/theme';
+import {
+  Colors,
+  Spacing,
+  Radius,
+  Typography,
+  Shadows,
+  ProviderColors,
+  type ThemeColors,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 
@@ -70,7 +78,7 @@ interface ProviderCardProps {
   description: string;
   isConnected: boolean;
   onPress: () => void;
-  colors: typeof Colors.light;
+  colors: ThemeColors;
 }
 
 function ProviderCard({
@@ -124,7 +132,7 @@ function ProviderCard({
 // ============================================================================
 
 interface ComingSoonCardProps {
-  colors: typeof Colors.light;
+  colors: ThemeColors;
 }
 
 function ComingSoonCard({ colors }: ComingSoonCardProps) {
