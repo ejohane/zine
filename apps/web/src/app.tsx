@@ -1,20 +1,20 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
 
-import {
-  AddLinkPage,
-  AppShell,
-  AuthPage,
-  HomePage,
-  InboxPage,
-  ItemDetailPage,
-  LibraryPage,
-  OAuthCallbackPage,
-  ProtectedRoute,
-  SettingsPage,
-  SubscriptionSourcePage,
-  SubscriptionsHubPage,
-  WeeklyRecapPage,
-} from './pages';
+import { AuthPage } from './auth-page';
+import { BookmarksPage } from './bookmarks-page';
+import { OAuthCallbackPage } from './oauth-callback-page';
+import { ProtectedRoute } from './protected-route';
+import { SettingsPage } from './settings-page';
+
+function LegacyItemRedirect() {
+  const { bookmarkId } = useParams<{ bookmarkId: string }>();
+
+  if (!bookmarkId) {
+    return <Navigate to="/bookmarks" replace />;
+  }
+
+  return <Navigate to={`/bookmarks/${bookmarkId}`} replace />;
+}
 
 export default function App() {
   return (
@@ -31,23 +31,32 @@ export default function App() {
           }
         />
         <Route
+          path="/bookmarks"
           element={
             <ProtectedRoute>
-              <AppShell />
+              <BookmarksPage />
             </ProtectedRoute>
           }
-        >
-          <Route index element={<HomePage />} />
-          <Route path="/inbox" element={<InboxPage />} />
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/add-link" element={<AddLinkPage />} />
-          <Route path="/item/:id" element={<ItemDetailPage />} />
-          <Route path="/subscriptions" element={<SubscriptionsHubPage />} />
-          <Route path="/subscriptions/:source" element={<SubscriptionSourcePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/recap/weekly" element={<WeeklyRecapPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        />
+        <Route
+          path="/bookmarks/:bookmarkId"
+          element={
+            <ProtectedRoute>
+              <BookmarksPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/item/:bookmarkId" element={<LegacyItemRedirect />} />
+        <Route path="/" element={<Navigate to="/bookmarks" replace />} />
+        <Route path="*" element={<Navigate to="/bookmarks" replace />} />
       </Routes>
     </BrowserRouter>
   );
