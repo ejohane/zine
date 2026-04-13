@@ -37,5 +37,6 @@ For worktree-safe local development, use `bun run dev:worktree`. Keep app secret
 
 - `docs/zine-architecture.md`
 - `docs/zine-tech-stack.md`
+- `docs/web-cloudflare-deployment.md`
 - `apps/mobile/README.md`
 - `AGENTS.md`
