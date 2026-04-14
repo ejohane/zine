@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port ${WEB_PORT:-5173}",
     "build": "vite build",
+    "deploy": "bun run build && bunx wrangler@3.95.0 deploy",
+    "deploy:production": "bun run build && bunx wrangler@3.95.0 deploy --env production",
     "preview": "vite preview --host 0.0.0.0 --port ${WEB_PORT:-4173}",
     "storybook": "storybook dev -p ${STORYBOOK_PORT:-6006} --host 0.0.0.0",
     "storybook:build": "storybook build",
