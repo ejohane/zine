@@ -1,52 +1,52 @@
 # Web Deployment on Cloudflare
 
-This repo now supports production web deployment to Cloudflare Pages from GitHub Actions.
+This repo now supports production web deployment to Cloudflare Workers from GitHub Actions. Cloudflare Pages is no longer part of the intended production path.
 
 ## What is automated
 
 - `.github/workflows/deploy-web.yml` builds `apps/web` on every push to `main` when the web app or its shared dependencies change.
-- The build output from `apps/web/dist` is uploaded to Cloudflare Pages with `wrangler pages deploy`.
-- SPA route fallback is handled by `apps/web/public/_redirects`, so direct loads of routes like `/bookmarks`, `/settings`, `/sign-in`, and `/oauth/callback` resolve correctly on Pages.
+- `apps/web/wrangler.toml` declares the web app as a static-assets Worker and maps the production deployment to the `www.myzine.app` custom domain.
+- The build output from `apps/web/dist` is deployed with `wrangler deploy --env production`.
+- SPA route fallback is handled by `assets.not_found_handling = "single-page-application"`, so direct loads of routes like `/bookmarks`, `/settings`, `/sign-in`, and `/oauth/callback` resolve correctly on Workers.
 
 ## GitHub configuration
 
 Set these repository secrets:
 
-- `CLOUDFLARE_API_TOKEN`: API token with access to Pages deployments and Worker deployments.
+- `CLOUDFLARE_API_TOKEN`: API token with access to Worker deployments.
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID for the target zone.
-- `D1_DATABASE_ID`: Existing secret used by `.github/workflows/deploy-worker.yml` for production migrations.
 
 Set these repository variables:
 
-- `CLOUDFLARE_PAGES_PROJECT_NAME`: The Cloudflare Pages project name for the production web app.
 - `VITE_API_URL`: `https://api.myzine.app`
 - `VITE_CLERK_PUBLISHABLE_KEY`: Production Clerk publishable key for the web app.
 - `VITE_YOUTUBE_CLIENT_ID`: Google OAuth client ID used by both YouTube and Gmail web flows.
 - `VITE_SPOTIFY_CLIENT_ID`: Spotify OAuth client ID for the web flow.
 
-## Cloudflare Pages configuration
+## Cloudflare Worker configuration
 
-Create a Cloudflare Pages project manually before the first CI deployment.
+The web app now deploys as its own Worker from `apps/web/wrangler.toml`.
 
-- Framework preset: none required.
-- Production branch: `main`
-- Build command: not used by CI direct upload.
-- Build output directory: not used by CI direct upload.
+Production details:
 
-After the project exists, connect the custom domain:
+- Worker name: `zine-web-production`
+- Custom domain: `www.myzine.app`
+- Static asset directory: `apps/web/dist`
 
-- Attach `www.myzine.app` to the Pages project.
-- If you want the apex domain to resolve cleanly, add a redirect from `myzine.app` to `https://www.myzine.app`.
+Before the first deploy, remove any existing Cloudflare Pages attachment for `www.myzine.app`. A custom domain cannot be owned by both Pages and a Worker deployment at the same time.
+
+If you want the apex domain to resolve cleanly, add a Cloudflare Redirect Rule from `myzine.app` to `https://www.myzine.app`.
 
 ## Cloudflare DNS and Worker configuration
 
-The Worker production route is already declared in `apps/worker/wrangler.toml` for `api.myzine.app/*`.
+The API Worker production route is still declared separately in `apps/worker/wrangler.toml` for `api.myzine.app/*`.
 
 Manual checks still required:
 
 - Ensure the `myzine.app` zone exists in the same Cloudflare account used by CI.
-- Ensure `api.myzine.app` has a proxied DNS record in Cloudflare so the Worker route can resolve publicly.
-- Ensure `www.myzine.app` is attached to the Pages project and resolves through Cloudflare.
+- Ensure `api.myzine.app` is still routed to the backend Worker.
+- Ensure `www.myzine.app` is not attached to a Pages project or conflicting DNS target before the first web Worker deploy.
+- After the first deploy, confirm Cloudflare has provisioned the `www.myzine.app` custom domain and certificate for the web Worker.
 
 ## Worker production secrets and bindings
 
@@ -135,12 +135,12 @@ Scope requested by the app:
 ## First production deploy checklist
 
 1. Confirm the Worker is already deploying successfully from `.github/workflows/deploy-worker.yml`.
-2. Create the Cloudflare Pages project.
+2. Remove `www.myzine.app` from any existing Cloudflare Pages project.
 3. Set the GitHub secrets and variables listed above.
 4. Set the Worker production secrets in Cloudflare.
 5. Configure Clerk, Google, and Spotify dashboards.
-6. Attach `www.myzine.app` to the Pages project.
-7. Push to `main` or run the `Deploy Web` workflow manually.
+6. Push to `main` or run the `Deploy Web` workflow manually.
+7. Verify that the custom domain is attached to the deployed web Worker.
 
 ## Post-deploy verification
 

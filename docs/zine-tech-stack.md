@@ -606,7 +606,7 @@ jobs:
 
 - **Staging**: Auto-deploy on PR, uses `--env staging` in wrangler
 - **Production**: Deploy on merge to main, uses `--env production`
-- **Preview**: Optional per-PR preview URLs via Cloudflare Pages (if needed)
+- **Preview**: Optional per-PR preview URLs via Cloudflare Workers preview URLs (if needed)
 
 #### Wrangler Configuration
 
