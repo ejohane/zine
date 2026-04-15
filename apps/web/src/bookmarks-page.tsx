@@ -4,19 +4,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  Plus,
   Settings,
   Share2,
 } from 'lucide-react';
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 
 import { getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
 import { Badge, Button, EmptyState, cn } from './components';
+import { ManualBookmarkDialog } from './components/manual-bookmark-dialog';
 import { FilterChip } from './components/ui/filter-chip';
 import { AppWordmark } from './app-wordmark';
 import {
@@ -315,11 +317,25 @@ function useBookmarkDetailParallax(scrollKey: string | null) {
   return { articleRef, heroRef };
 }
 
+function getManualBookmarkNotice(status: 'created' | 'already_bookmarked' | 'rebookmarked') {
+  switch (status) {
+    case 'already_bookmarked':
+      return 'Already in your library';
+    case 'rebookmarked':
+      return 'Added back to library';
+    case 'created':
+    default:
+      return 'Saved to library';
+  }
+}
+
 export function BookmarksPage() {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
   const { bookmarkId } = useParams<{ bookmarkId?: string }>();
   const [bookmarkFilter, setBookmarkFilter] = useState<ContentType | undefined>();
+  const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
+  const [manualBookmarkNotice, setManualBookmarkNotice] = useState<string | null>(null);
 
   const bookmarksQuery = trpc.items.library.useQuery({
     limit: 50,
@@ -379,6 +395,7 @@ export function BookmarksPage() {
   const { articleRef: bookmarkDetailRef, heroRef: bookmarkHeroRef } = useBookmarkDetailParallax(
     displayBookmark?.id ?? null
   );
+  const libraryIsEmpty = bookmarks.length === 0;
 
   const invalidateSelectedBookmark = () => {
     if (!selectedBookmarkId) {
@@ -399,6 +416,34 @@ export function BookmarksPage() {
     onSuccess: invalidateSelectedBookmark,
   });
 
+  useEffect(() => {
+    if (!manualBookmarkNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setManualBookmarkNotice(null);
+    }, 4000);
+
+    return () => window.clearTimeout(timeout);
+  }, [manualBookmarkNotice]);
+
+  const handleManualBookmarkSaved = useCallback(
+    (result: { userItemId: string; status: 'created' | 'already_bookmarked' | 'rebookmarked' }) => {
+      setManualBookmarkOpen(false);
+      setManualBookmarkNotice(getManualBookmarkNotice(result.status));
+
+      void Promise.all([
+        utils.items.library.invalidate(),
+        utils.items.home.invalidate(),
+        utils.items.get.invalidate({ id: result.userItemId }),
+      ]);
+
+      navigate(`/bookmarks/${result.userItemId}`);
+    },
+    [navigate, utils.items.get, utils.items.home, utils.items.library]
+  );
+
   if (bookmarksQuery.isLoading) {
     return (
       <main className="new-page-screen">
@@ -413,17 +458,6 @@ export function BookmarksPage() {
         <EmptyState
           title="Could not load bookmarks"
           message={bookmarksQuery.error.message ?? 'Please refresh and try again.'}
-        />
-      </main>
-    );
-  }
-
-  if (bookmarks.length === 0) {
-    return (
-      <main className="new-page-screen">
-        <EmptyState
-          title="No bookmarks yet"
-          message="Save a few items first, then this desk becomes the main web surface for browsing them."
         />
       </main>
     );
@@ -495,6 +529,17 @@ export function BookmarksPage() {
               <strong>Bookmarks</strong>
             )}
           </nav>
+
+          <div className="new-page-inset__header-actions">
+            {manualBookmarkNotice ? (
+              <span className="new-page-inset__header-note">{manualBookmarkNotice}</span>
+            ) : null}
+
+            <Button type="button" onClick={() => setManualBookmarkOpen(true)}>
+              <Plus size={16} strokeWidth={2.2} />
+              Add bookmark
+            </Button>
+          </div>
         </header>
 
         <div className="new-page-inset__body">
@@ -516,44 +561,50 @@ export function BookmarksPage() {
             </div>
 
             <div className="new-page-column-card__list">
-              {bookmarks.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={selectedBookmark?.id === item.id}
-                  className={cn(
-                    'bookmark-row',
-                    selectedBookmark?.id === item.id && 'bookmark-row--selected'
-                  )}
-                  onClick={() => navigate(`/bookmarks/${item.id}`)}
-                >
-                  {item.thumbnailUrl ? (
-                    <img
-                      className="bookmark-row__cover"
-                      src={item.thumbnailUrl}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="bookmark-row__cover bookmark-row__cover--empty" />
-                  )}
-                  <div className="bookmark-row__info">
-                    <span className="bookmark-row__title">{item.title}</span>
-                    <div className="bookmark-row__author">
-                      {item.creatorImageUrl ? (
-                        <img className="bookmark-row__avatar" src={item.creatorImageUrl} alt="" />
-                      ) : (
-                        <div className="bookmark-row__avatar bookmark-row__avatar--fallback">
-                          {(item.creator || item.publisher || 'U')[0]}
-                        </div>
-                      )}
-                      <span className="bookmark-row__name">
-                        {item.creator || item.publisher || 'Unknown'}
-                      </span>
+              {libraryIsEmpty ? (
+                <p className="new-page-column-card__empty">
+                  Add a bookmark to start building your library.
+                </p>
+              ) : (
+                bookmarks.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-pressed={selectedBookmark?.id === item.id}
+                    className={cn(
+                      'bookmark-row',
+                      selectedBookmark?.id === item.id && 'bookmark-row--selected'
+                    )}
+                    onClick={() => navigate(`/bookmarks/${item.id}`)}
+                  >
+                    {item.thumbnailUrl ? (
+                      <img
+                        className="bookmark-row__cover"
+                        src={item.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="bookmark-row__cover bookmark-row__cover--empty" />
+                    )}
+                    <div className="bookmark-row__info">
+                      <span className="bookmark-row__title">{item.title}</span>
+                      <div className="bookmark-row__author">
+                        {item.creatorImageUrl ? (
+                          <img className="bookmark-row__avatar" src={item.creatorImageUrl} alt="" />
+                        ) : (
+                          <div className="bookmark-row__avatar bookmark-row__avatar--fallback">
+                            {(item.creator || item.publisher || 'U')[0]}
+                          </div>
+                        )}
+                        <span className="bookmark-row__name">
+                          {item.creator || item.publisher || 'Unknown'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))
+              )}
             </div>
           </aside>
 
@@ -754,9 +805,13 @@ export function BookmarksPage() {
               ) : (
                 <div className="new-page-bookmark-pane__empty">
                   <div>
-                    <p className="eyebrow">Bookmark view</p>
-                    <h2>Select a bookmark</h2>
-                    <p>Pick something from the list and its detail view will open here.</p>
+                    <p className="eyebrow">{libraryIsEmpty ? 'Your library' : 'Bookmark view'}</p>
+                    <h2>{libraryIsEmpty ? 'Add your first bookmark' : 'Select a bookmark'}</h2>
+                    <p>
+                      {libraryIsEmpty
+                        ? 'Use the add button in the header to save a link manually and start this shelf.'
+                        : 'Pick something from the list and its detail view will open here.'}
+                    </p>
                   </div>
                 </div>
               )}
@@ -764,6 +819,12 @@ export function BookmarksPage() {
           </div>
         </div>
       </div>
+
+      <ManualBookmarkDialog
+        open={manualBookmarkOpen}
+        onOpenChange={setManualBookmarkOpen}
+        onSaved={handleManualBookmarkSaved}
+      />
     </main>
   );
 }

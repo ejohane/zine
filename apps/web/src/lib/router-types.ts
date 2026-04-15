@@ -13,4 +13,5 @@ export type NewsletterItem = RouterOutputs['subscriptions']['newsletters']['list
 export type RssFeed = RouterOutputs['subscriptions']['rss']['list']['items'][number];
 export type WeeklyRecap = RouterOutputs['insights']['weeklyRecap'];
 export type WeeklyRecapTeaser = RouterOutputs['insights']['weeklyRecapTeaser'];
+export type BookmarkPreview = RouterOutputs['bookmarks']['preview'];
 export type BookmarkSaveResult = RouterOutputs['bookmarks']['save'];

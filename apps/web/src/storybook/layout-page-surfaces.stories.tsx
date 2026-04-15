@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
 import { ItemCardFixtures } from '@zine/design-system';
-import { ContentType } from '@zine/shared';
+import { ContentType, Provider } from '@zine/shared';
 
 import { Badge, Button, EmptyState, PageHeader, StatCard, Surface } from '@/components';
 import { ItemCard, ItemCardView } from '@/components/item-card';
+import { ManualBookmarkDialogView } from '@/components/manual-bookmark-dialog-view';
 import { FilterChip } from '@/components/ui/filter-chip';
 
 import { createDarkCanvasDecorator } from './decorators';
@@ -107,6 +108,28 @@ const subscriptionSources = [
     badge: '4 feeds',
   },
 ];
+
+const manualBookmarkPreview = {
+  provider: Provider.WEB,
+  contentType: ContentType.ARTICLE,
+  providerId: 'storybook-manual-bookmark',
+  title: 'Quiet browser surfaces need the same save rhythm as mobile.',
+  creator: 'Zine Editorial',
+  creatorImageUrl: undefined,
+  thumbnailUrl:
+    'https://images.unsplash.com/photo-1515879218367-8466d910aaa4?auto=format&fit=crop&w=1400&q=80',
+  duration: null,
+  canonicalUrl: 'https://zine.example/read/manual-bookmark-flow',
+  source: 'article_extractor' as const,
+  description:
+    'The manual save flow should feel native to the web shell: immediate, calm, and trustworthy before the item lands in the library.',
+  siteName: 'zine.example',
+  wordCount: 920,
+  readingTimeMinutes: 4,
+  hasArticleContent: true,
+  publishedAt: '2026-04-11T10:00:00.000Z',
+  rawMetadata: undefined,
+};
 
 function SectionHeader({
   title,
@@ -401,6 +424,44 @@ function WeeklyRecapSurfaceReference() {
   );
 }
 
+function ManualBookmarkSurfaceReference() {
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Bookmarks"
+        title="Manual save flow"
+        description="The web add-bookmark dialog should read like the same product as mobile: focused, editorial, and quiet under dark surfaces."
+        actions={
+          <div className="button-row">
+            <Button>Add bookmark</Button>
+          </div>
+        }
+      />
+
+      <div style={{ display: 'grid', placeItems: 'center', minHeight: 760 }}>
+        <div style={{ width: 'min(44rem, 100%)' }}>
+          <ManualBookmarkDialogView
+            url={manualBookmarkPreview.canonicalUrl}
+            isUrlValid
+            preview={manualBookmarkPreview}
+            isLoadingPreview={false}
+            isFetchingPreview={false}
+            previewErrorMessage={null}
+            saveErrorMessage={null}
+            isSaving={false}
+            onClose={() => {}}
+            onUrlChange={() => {}}
+            onPaste={() => {}}
+            onClear={() => {}}
+            onRetry={() => {}}
+            onSave={() => {}}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const meta = {
   title: 'Layout/Page Surfaces',
   decorators: [createDarkCanvasDecorator({ minHeight: 960, padding: 24 })],
@@ -424,4 +485,8 @@ export const SubscriptionsSurface: Story = {
 
 export const WeeklyRecapSurface: Story = {
   render: () => <WeeklyRecapSurfaceReference />,
+};
+
+export const ManualBookmarkSurface: Story = {
+  render: () => <ManualBookmarkSurfaceReference />,
 };
