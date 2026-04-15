@@ -572,15 +572,25 @@ img {
 }
 
 .new-page-bookmark-view {
+  --bookmark-hero-translate-y: 0px;
+  --bookmark-hero-scale: 1;
+  --bookmark-hero-opacity: 1;
+  position: relative;
   width: 100%;
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.new-page-bookmark-view::-webkit-scrollbar {
+  display: none;
 }
 
 .new-page-bookmark-view--pane {
+  height: 100%;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -594,6 +604,10 @@ img {
   flex-shrink: 0;
   background: #0d0d0d;
   overflow: hidden;
+  transform: translateY(var(--bookmark-hero-translate-y)) scale(var(--bookmark-hero-scale));
+  transform-origin: center top;
+  opacity: var(--bookmark-hero-opacity);
+  will-change: transform, opacity;
 }
 
 .new-page-bookmark-view__hero img,
@@ -671,12 +685,9 @@ img {
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  overflow: auto;
-  scrollbar-width: none;
-}
-
-.new-page-bookmark-view__body::-webkit-scrollbar {
-  display: none;
+  padding-bottom: 2rem;
+  position: relative;
+  z-index: 1;
 }
 
 .new-page-bookmark-view__creator,
