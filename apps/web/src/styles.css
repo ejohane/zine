@@ -363,6 +363,19 @@ img {
   background: var(--background, #000);
 }
 
+.new-page-inset__header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.new-page-inset__header-note {
+  font-size: 0.78rem;
+  color: var(--text-subheader);
+}
+
 .new-page-breadcrumb {
   display: flex;
   align-items: center;
@@ -878,6 +891,322 @@ img {
 
 .new-page-bookmark-view__empty h2 {
   margin: 0;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.dialog-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 61;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1.35rem;
+  background: rgba(10, 10, 10, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 24px 60px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+}
+
+.manual-bookmark-dialog__content {
+  padding: 0;
+}
+
+.manual-bookmark-dialog {
+  display: flex;
+  flex-direction: column;
+  min-height: min(42rem, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
+}
+
+.manual-bookmark-dialog__header,
+.manual-bookmark-dialog__footer {
+  flex-shrink: 0;
+}
+
+.manual-bookmark-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.manual-bookmark-dialog__header-copy {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.manual-bookmark-dialog__title {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.4vw, 2.1rem);
+  line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: var(--text);
+}
+
+.manual-bookmark-dialog__description {
+  max-width: 34rem;
+  color: var(--text-subheader);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.manual-bookmark-dialog__icon-button {
+  width: 2.9rem;
+  padding-inline: 0;
+}
+
+.manual-bookmark-dialog__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 0.85rem;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.manual-bookmark-dialog__input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.manual-bookmark-dialog__input-row[data-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.manual-bookmark-dialog__input-row input {
+  padding: 0.8rem 0.9rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.manual-bookmark-dialog__input-row input:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.manual-bookmark-dialog__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+}
+
+.manual-bookmark-dialog__hint--error {
+  color: var(--danger);
+}
+
+.manual-bookmark-dialog__preview {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.manual-bookmark-dialog__preview-stack {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.manual-bookmark-dialog__state {
+  min-height: 16rem;
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.manual-bookmark-dialog__state svg {
+  color: var(--text-tertiary);
+}
+
+.manual-bookmark-dialog__state h3,
+.manual-bookmark-preview-card__copy h3 {
+  margin: 0;
+  color: var(--text);
+}
+
+.manual-bookmark-dialog__state p,
+.manual-bookmark-preview-card__copy p {
+  margin: 0;
+  color: var(--text-subheader);
+}
+
+.manual-bookmark-dialog__state--error {
+  gap: 1.1rem;
+}
+
+.manual-bookmark-dialog__state--error svg {
+  color: var(--danger);
+}
+
+.manual-bookmark-preview-card {
+  border: 1px solid var(--border);
+  border-radius: 1.2rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.manual-bookmark-preview-card__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.manual-bookmark-preview-card__media img,
+.manual-bookmark-preview-card__placeholder {
+  width: 100%;
+  height: 100%;
+}
+
+.manual-bookmark-preview-card__media img {
+  object-fit: cover;
+}
+
+.manual-bookmark-preview-card__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+}
+
+.manual-bookmark-preview-card__media-badges {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.manual-bookmark-preview-card__length {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.manual-bookmark-preview-card__body {
+  display: grid;
+  gap: 0.95rem;
+  padding: 1rem;
+}
+
+.manual-bookmark-preview-card__creator {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.manual-bookmark-preview-card__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.manual-bookmark-preview-card__avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-subheader);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.manual-bookmark-preview-card__creator-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.manual-bookmark-preview-card__creator-copy strong {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.manual-bookmark-preview-card__creator-copy span {
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+}
+
+.manual-bookmark-preview-card__copy {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.manual-bookmark-preview-card__copy h3 {
+  font-size: 1.15rem;
+  line-height: 1.25;
+}
+
+.manual-bookmark-preview-card__copy p {
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.manual-bookmark-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.manual-bookmark-dialog__footer-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-subheader);
+}
+
+.manual-bookmark-dialog__footer-note--error {
+  color: var(--danger);
+}
+
+.manual-bookmark-dialog__save {
+  margin-left: auto;
+}
+
+.manual-bookmark-dialog__spinner {
+  animation: manual-bookmark-spin 900ms linear infinite;
+}
+
+@keyframes manual-bookmark-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .shell-main {
@@ -2000,6 +2329,10 @@ input:focus {
     padding-right: 1rem;
   }
 
+  .new-page-inset__header-actions {
+    flex-wrap: wrap;
+  }
+
   .new-page-nav,
   .new-page-canvas {
     position: static;
@@ -2098,6 +2431,46 @@ input:focus {
   .new-page-inset__header,
   .new-page-inset__body {
     padding-right: 0.75rem;
+  }
+
+  .new-page-inset__header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-block: 0.75rem;
+  }
+
+  .new-page-breadcrumb {
+    width: 100%;
+  }
+
+  .new-page-inset__header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dialog-content {
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 1rem);
+    border-radius: 1rem;
+  }
+
+  .manual-bookmark-dialog {
+    min-height: calc(100vh - 1rem);
+    max-height: calc(100vh - 1rem);
+  }
+
+  .manual-bookmark-dialog__body {
+    padding-inline: 1rem;
+  }
+
+  .manual-bookmark-dialog__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .manual-bookmark-dialog__save {
+    width: 100%;
+    margin-left: 0;
   }
 
   .new-page-nav {
