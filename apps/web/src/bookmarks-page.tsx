@@ -13,6 +13,7 @@ import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/i
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 
+import { getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
 import { Badge, Button, EmptyState, cn } from './components';
@@ -35,6 +36,14 @@ const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
   { label: 'Videos', value: ContentType.VIDEO },
   { label: 'Posts', value: ContentType.POST },
 ];
+
+const BOOKMARK_ACTION_BUTTON_SIZE = 56;
+const BOOKMARK_ACTION_ICON_SIZE = 22;
+const bookmarkActionButtonStyle = {
+  minHeight: BOOKMARK_ACTION_BUTTON_SIZE,
+  width: BOOKMARK_ACTION_BUTTON_SIZE,
+  borderRadius: getButtonMetrics('lg').borderRadius,
+} as const;
 
 function getLibrarySummary(item: LibraryItem) {
   return (
@@ -552,6 +561,7 @@ export function BookmarksPage() {
                           tone="ghost"
                           size="icon"
                           className="new-page-bookmark-view__icon-action"
+                          style={bookmarkActionButtonStyle}
                           aria-label={`Remove bookmark for ${displayBookmark.title}`}
                           title="Remove bookmark"
                           disabled={!selectedBookmarkId || unbookmarkMutation.isPending}
@@ -563,13 +573,14 @@ export function BookmarksPage() {
                             unbookmarkMutation.mutate({ id: selectedBookmarkId });
                           }}
                         >
-                          <BookmarkCheck size={16} strokeWidth={2.15} />
+                          <BookmarkCheck size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                         </Button>
 
                         <Button
                           tone="ghost"
                           size="icon"
                           className="new-page-bookmark-view__icon-action"
+                          style={bookmarkActionButtonStyle}
                           aria-label={
                             selectedBookmarkIsFinished
                               ? `Mark ${displayBookmark.title} as unfinished`
@@ -585,13 +596,14 @@ export function BookmarksPage() {
                             toggleFinishedMutation.mutate({ id: selectedBookmarkId });
                           }}
                         >
-                          <Check size={16} strokeWidth={2.15} />
+                          <Check size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                         </Button>
 
                         <Button
                           tone="ghost"
                           size="icon"
                           className="new-page-bookmark-view__icon-action"
+                          style={bookmarkActionButtonStyle}
                           aria-label={`Share ${displayBookmark.title}`}
                           title="Share"
                           disabled={!selectedBookmarkSourceUrl}
@@ -623,18 +635,18 @@ export function BookmarksPage() {
                             }
                           }}
                         >
-                          <Share2 size={16} strokeWidth={2.15} />
+                          <Share2 size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                         </Button>
 
                         <Button
                           tone="ghost"
                           size="icon"
                           className="new-page-bookmark-view__icon-action"
+                          style={bookmarkActionButtonStyle}
                           aria-label={`More actions for ${displayBookmark.title}`}
                           title="More actions"
-                          disabled
                         >
-                          <Ellipsis size={16} strokeWidth={2.15} />
+                          <Ellipsis size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                         </Button>
                       </div>
 
