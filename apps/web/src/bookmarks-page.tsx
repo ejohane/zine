@@ -10,7 +10,7 @@ import {
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 
 import { ContentType, Provider } from '@zine/shared';
@@ -244,6 +244,68 @@ function getBookmarkFabConfig(provider: Provider | string): {
   }
 }
 
+function useBookmarkDetailParallax(scrollKey: string | null) {
+  const articleRef = useRef<HTMLElement | null>(null);
+  const heroRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const article = articleRef.current;
+    const hero = heroRef.current;
+
+    if (!article || !hero) {
+      return;
+    }
+
+    let frame = 0;
+
+    const syncParallax = () => {
+      frame = 0;
+
+      const heroHeight = Math.max(hero.offsetHeight, 1);
+      const scrollOffset = article.scrollTop;
+      const upwardOffset = Math.max(scrollOffset, 0);
+      const pullOffset = Math.max(-scrollOffset, 0);
+      const translateY = upwardOffset * 0.75 - pullOffset * 0.5;
+      const opacity = Math.max(1 - upwardOffset / Math.max(heroHeight / 2, 1), 0);
+      const scale = 1 + Math.min(pullOffset / heroHeight, 1);
+
+      article.style.setProperty('--bookmark-hero-translate-y', `${translateY.toFixed(2)}px`);
+      article.style.setProperty('--bookmark-hero-opacity', opacity.toFixed(3));
+      article.style.setProperty('--bookmark-hero-scale', scale.toFixed(3));
+    };
+
+    const scheduleSync = () => {
+      if (frame) {
+        return;
+      }
+
+      frame = window.requestAnimationFrame(syncParallax);
+    };
+
+    article.scrollTo({ top: 0, behavior: 'auto' });
+    scheduleSync();
+
+    article.addEventListener('scroll', scheduleSync, { passive: true });
+    window.addEventListener('resize', scheduleSync);
+
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => scheduleSync());
+    resizeObserver?.observe(hero);
+
+    return () => {
+      article.removeEventListener('scroll', scheduleSync);
+      window.removeEventListener('resize', scheduleSync);
+      resizeObserver?.disconnect();
+
+      if (frame) {
+        window.cancelAnimationFrame(frame);
+      }
+    };
+  }, [scrollKey]);
+
+  return { articleRef, heroRef };
+}
+
 export function BookmarksPage() {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
@@ -305,6 +367,9 @@ export function BookmarksPage() {
       : null;
   const selectedBookmarkIsFinished = Boolean(displayBookmark?.isFinished);
   const bookmarkFabConfig = displayBookmark ? getBookmarkFabConfig(displayBookmark.provider) : null;
+  const { articleRef: bookmarkDetailRef, heroRef: bookmarkHeroRef } = useBookmarkDetailParallax(
+    displayBookmark?.id ?? null
+  );
 
   const invalidateSelectedBookmark = () => {
     if (!selectedBookmarkId) {
@@ -486,8 +551,21 @@ export function BookmarksPage() {
           <div className="new-page-inset__content">
             <section className="new-page-column-card new-page-bookmark-pane">
               {displayBookmark ? (
-                <article className="new-page-bookmark-view new-page-bookmark-view--pane">
-                  <div className="new-page-bookmark-view__hero">
+                <article
+                  ref={bookmarkDetailRef}
+                  className="new-page-bookmark-view new-page-bookmark-view--pane"
+                >
+                  <button
+                    type="button"
+                    className="new-page-bookmark-view__back"
+                    onClick={() => navigate('/bookmarks')}
+                    aria-label="Back to bookmarks list"
+                    title="Back"
+                  >
+                    <ChevronLeft size={20} strokeWidth={2.4} />
+                  </button>
+
+                  <div ref={bookmarkHeroRef} className="new-page-bookmark-view__hero">
                     {displayBookmark.thumbnailUrl || displayBookmark.creatorImageUrl ? (
                       <img
                         src={displayBookmark.thumbnailUrl ?? displayBookmark.creatorImageUrl ?? ''}
@@ -496,16 +574,6 @@ export function BookmarksPage() {
                     ) : (
                       <div className="new-page-bookmark-view__hero-placeholder" />
                     )}
-
-                    <button
-                      type="button"
-                      className="new-page-bookmark-view__back"
-                      onClick={() => navigate('/bookmarks')}
-                      aria-label="Back to bookmarks list"
-                      title="Back"
-                    >
-                      <ChevronLeft size={20} strokeWidth={2.4} />
-                    </button>
 
                     <div className="new-page-bookmark-view__hero-content">
                       <div className="new-page-bookmark-view__badges">
