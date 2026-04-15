@@ -10,5 +10,6 @@ not_found_handling = "single-page-application"
 name = "zine-web-production"
 workers_dev = false
 routes = [
-  { pattern = "www.myzine.app", custom_domain = true }
+  { pattern = "www.myzine.app", custom_domain = true },
+  { pattern = "myzine.app", custom_domain = true }
 ]
