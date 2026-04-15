@@ -686,13 +686,19 @@ img {
   align-items: center;
 }
 
+.new-page-bookmark-view__creator-block {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .new-page-bookmark-view__creator {
-  gap: 0.875rem;
+  min-width: 0;
+  gap: 0.625rem;
 }
 
 .new-page-bookmark-view__creator-avatar {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex-shrink: 0;
   border-radius: 999px;
   object-fit: cover;
@@ -710,12 +716,12 @@ img {
 
 .new-page-bookmark-view__creator-copy {
   min-width: 0;
-  display: grid;
-  gap: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 .new-page-bookmark-view__creator-copy strong,
-.new-page-bookmark-view__creator-copy span,
 .new-page-bookmark-view__meta span,
 .new-page-bookmark-view__summary,
 .new-page-bookmark-view__empty p:last-child {
@@ -724,24 +730,22 @@ img {
 
 .new-page-bookmark-view__creator-copy strong {
   color: var(--text);
-  font-size: 1rem;
+  font-size: 1.02rem;
   font-weight: 600;
-}
-
-.new-page-bookmark-view__creator-copy span {
-  font-size: 0.875rem;
+  line-height: 1.2;
 }
 
 .new-page-bookmark-view__meta {
   flex-wrap: wrap;
-  gap: 0.55rem;
-  font-size: 0.82rem;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  line-height: 1.25;
 }
 
 .new-page-bookmark-view__meta span {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.45rem;
 }
 
 .new-page-bookmark-view__meta span:not(:first-child)::before {
@@ -2155,7 +2159,7 @@ input:focus {
     font-size: 1.95rem;
   }
 
-  .new-page-bookmark-view__creator,
+  .new-page-bookmark-view__creator-block,
   .new-page-bookmark-view__actions {
     align-items: stretch;
   }

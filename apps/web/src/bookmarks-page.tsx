@@ -23,12 +23,11 @@ import { AppWordmark } from './app-wordmark';
 import {
   formatDuration,
   formatPlainText,
-  formatRelativeDate,
   isValidUrl,
   mapContentType,
   mapProvider,
 } from './lib/format';
-import type { LibraryItem } from './lib/router-types';
+import type { LibraryItem, RouterOutputs } from './lib/router-types';
 import { trpc } from './lib/trpc';
 
 const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
@@ -66,16 +65,126 @@ function getLibraryLengthLabel(
   return null;
 }
 
-function getLibrarySourceHost(url?: string | null) {
-  if (!url || !isValidUrl(url)) {
+type BookmarkDetailItem = Pick<
+  LibraryItem,
+  | 'provider'
+  | 'duration'
+  | 'readingTimeMinutes'
+  | 'publishedAt'
+  | 'bookmarkedAt'
+  | 'ingestedAt'
+  | 'canonicalUrl'
+>;
+type CreatorProfile = RouterOutputs['creators']['get'];
+
+function formatBookmarkRelativeTime(value?: string | number | null) {
+  if (!value) {
+    return 'Just now';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'Just now';
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  if (diffMs < 0) {
+    return 'Just now';
+  }
+
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+
+  if (diffMinutes < 1) {
+    return 'Just now';
+  }
+
+  if (diffHours < 1) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  }
+
+  if (diffDays === 1) {
+    return 'Yesterday';
+  }
+
+  if (diffDays < 7) {
+    return `${diffDays} days ago`;
+  }
+
+  if (diffDays < 30) {
+    return `${diffWeeks} week${diffWeeks === 1 ? '' : 's'} ago`;
+  }
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+
+  return new Intl.DateTimeFormat(
+    'en',
+    sameYear
+      ? { month: 'short', day: 'numeric' }
+      : {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }
+  ).format(date);
+}
+
+function extractPodcastHosts(description?: string | null) {
+  if (!description) {
     return null;
   }
 
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
+  const patterns = [
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:\s+and\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)+)/i,
+    /(?:from|by|hosted by|with)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = description.match(pattern);
+    if (match?.[1]) {
+      return match[1];
+    }
+  }
+
+  return null;
+}
+
+function extractXHandle(url?: string | null) {
+  if (!url) {
     return null;
   }
+
+  const match = url.match(/(?:x\.com|twitter\.com)\/([^/]+)\//);
+  return match ? match[1] : null;
+}
+
+function getBookmarkSubtextBits(
+  item: BookmarkDetailItem,
+  creator: CreatorProfile | undefined
+): string[] {
+  const bits: Array<string | null> = [];
+
+  if (item.provider === Provider.SPOTIFY) {
+    bits.push(extractPodcastHosts(creator?.description));
+  }
+
+  if (item.provider === Provider.YOUTUBE || item.provider === Provider.X) {
+    bits.push(creator?.handle ?? extractXHandle(item.canonicalUrl));
+  }
+
+  bits.push(formatBookmarkRelativeTime(item.publishedAt ?? item.bookmarkedAt ?? item.ingestedAt));
+  bits.push(getLibraryLengthLabel(item));
+
+  return bits.filter((bit): bit is string => Boolean(bit));
 }
 
 function getBookmarkAboutLabel(contentType: ContentType) {
@@ -182,17 +291,15 @@ export function BookmarksPage() {
   ]);
 
   const displayBookmark = selectedBookmarkDetailQuery.data ?? selectedBookmark;
-  const selectedBookmarkLength = displayBookmark ? getLibraryLengthLabel(displayBookmark) : null;
-  const selectedBookmarkSource = displayBookmark
-    ? (getLibrarySourceHost(displayBookmark.canonicalUrl) ?? mapProvider(displayBookmark.provider))
-    : null;
+  const selectedBookmarkCreatorQuery = trpc.creators.get.useQuery(
+    { creatorId: displayBookmark?.creatorId ?? '' },
+    {
+      enabled: Boolean(displayBookmark?.creatorId),
+      staleTime: 5 * 60 * 1000,
+    }
+  );
   const selectedBookmarkMeta = displayBookmark
-    ? [
-        formatRelativeDate(
-          displayBookmark.publishedAt ?? displayBookmark.bookmarkedAt ?? displayBookmark.ingestedAt
-        ),
-        selectedBookmarkLength,
-      ].filter(Boolean)
+    ? getBookmarkSubtextBits(displayBookmark, selectedBookmarkCreatorQuery.data)
     : [];
   const selectedBookmarkSourceUrl =
     displayBookmark?.canonicalUrl && isValidUrl(displayBookmark.canonicalUrl)
@@ -413,30 +520,33 @@ export function BookmarksPage() {
                   </div>
 
                   <div className="new-page-bookmark-view__body">
-                    <div className="new-page-bookmark-view__creator">
-                      {displayBookmark.creatorImageUrl ? (
-                        <img
-                          className="new-page-bookmark-view__creator-avatar"
-                          src={displayBookmark.creatorImageUrl}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="new-page-bookmark-view__creator-avatar new-page-bookmark-view__creator-avatar--fallback">
-                          {getLibraryCreatorLabel(displayBookmark).slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
+                    <div className="new-page-bookmark-view__creator-block">
+                      <div className="new-page-bookmark-view__creator">
+                        {displayBookmark.creatorImageUrl ? (
+                          <img
+                            className="new-page-bookmark-view__creator-avatar"
+                            src={displayBookmark.creatorImageUrl}
+                            alt=""
+                          />
+                        ) : (
+                          <div className="new-page-bookmark-view__creator-avatar new-page-bookmark-view__creator-avatar--fallback">
+                            {getLibraryCreatorLabel(displayBookmark).slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
 
-                      <div className="new-page-bookmark-view__creator-copy">
-                        <strong>{getLibraryCreatorLabel(displayBookmark)}</strong>
-                        <span>{selectedBookmarkSource ?? 'Unknown source'}</span>
+                        <div className="new-page-bookmark-view__creator-copy">
+                          <strong>{getLibraryCreatorLabel(displayBookmark)}</strong>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="new-page-bookmark-view__meta" aria-label="Bookmark metadata">
-                      {selectedBookmarkMeta.map((bit) => (
-                        <span key={bit}>{bit}</span>
-                      ))}
-                    </div>
+                    {selectedBookmarkMeta.length > 0 ? (
+                      <div className="new-page-bookmark-view__meta" aria-label="Bookmark metadata">
+                        {selectedBookmarkMeta.map((bit, index) => (
+                          <span key={`${bit}-${index}`}>{bit}</span>
+                        ))}
+                      </div>
+                    ) : null}
 
                     <div className="new-page-bookmark-view__actions">
                       <div className="new-page-bookmark-view__actions-left">
