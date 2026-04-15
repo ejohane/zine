@@ -4,14 +4,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
-  Globe2,
-  Mail,
-  Music2,
-  Play,
-  Rss,
   Settings,
   Share2,
 } from 'lucide-react';
+import { FaSpotify } from 'react-icons/fa';
+import { FaXTwitter } from 'react-icons/fa6';
+import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
 
@@ -101,37 +99,37 @@ function getBookmarkFabConfig(provider: Provider | string): {
     case Provider.SPOTIFY:
       return {
         label: 'Open in Spotify',
-        icon: <Music2 size={20} strokeWidth={2.2} />,
+        icon: <FaSpotify size={22} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--spotify',
       };
     case Provider.YOUTUBE:
       return {
         label: 'Open in YouTube',
-        icon: <Play size={20} strokeWidth={2.2} />,
+        icon: <IoLogoYoutube size={22} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--youtube',
       };
     case Provider.GMAIL:
       return {
         label: 'Open source newsletter',
-        icon: <Mail size={20} strokeWidth={2.2} />,
+        icon: <IoNewspaperOutline size={22} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--gmail',
       };
     case Provider.SUBSTACK:
       return {
         label: 'Open in Substack',
-        icon: <Rss size={20} strokeWidth={2.2} />,
+        icon: <IoGlobeOutline size={22} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--substack',
       };
     case Provider.X:
       return {
         label: 'Open on X',
-        icon: <span className="new-page-bookmark-view__fab-x">X</span>,
+        icon: <FaXTwitter size={20} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--x',
       };
     default:
       return {
         label: 'Open source',
-        icon: <Globe2 size={20} strokeWidth={2.2} />,
+        icon: <IoGlobeOutline size={22} aria-hidden="true" />,
         toneClassName: 'new-page-bookmark-view__fab--default',
       };
   }
