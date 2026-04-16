@@ -358,7 +358,9 @@ img {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
   min-height: 4.5rem;
+  overflow: hidden;
   padding: 0 1rem 0 0;
   background: var(--background, #000);
 }
@@ -366,6 +368,7 @@ img {
 .new-page-inset__header-actions {
   margin-left: auto;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: flex-end;
   gap: 0.75rem;
@@ -380,9 +383,15 @@ img {
   display: flex;
   align-items: center;
   gap: 0.375rem;
+  flex: 1 1 0%;
   min-width: 0;
+  overflow: hidden;
   font-size: 0.875rem;
   color: var(--text-dim);
+}
+
+.new-page-breadcrumb > svg {
+  flex-shrink: 0;
 }
 
 .new-page-breadcrumb__link {
@@ -400,6 +409,9 @@ img {
 }
 
 .new-page-breadcrumb__title {
+  display: block;
+  flex: 1 1 0%;
+  max-width: 100%;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
