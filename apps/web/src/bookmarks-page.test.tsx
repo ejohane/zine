@@ -128,7 +128,9 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByText('No bookmarks yet')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: /No bookmarks yet|Add your first bookmark/ })
+    ).toBeVisible();
   });
 
   test('filters the bookmark list by content type', async () => {

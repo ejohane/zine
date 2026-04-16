@@ -28,3 +28,7 @@ class ResizeObserverMock {
 
 vi.stubGlobal('ResizeObserver', ResizeObserverMock);
 vi.stubGlobal('scrollTo', vi.fn());
+
+if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollTo) {
+  HTMLElement.prototype.scrollTo = vi.fn();
+}

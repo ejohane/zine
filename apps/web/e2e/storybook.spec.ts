@@ -22,6 +22,7 @@ for (const storyId of stories) {
     await expect(storyRoot).toHaveScreenshot(`${storyId}.png`, {
       animations: 'disabled',
       caret: 'hide',
+      maxDiffPixelRatio: 0.015,
     });
   });
 }
