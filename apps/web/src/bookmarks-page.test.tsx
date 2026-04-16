@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 import { ContentType, Provider } from '@zine/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -39,6 +40,12 @@ const podcastItem = createLibraryItem({
 });
 
 const libraryItems = [articleItem, videoItem, podcastItem];
+
+function LocationProbe() {
+  const location = useLocation();
+
+  return <output data-testid="location-search">{location.search}</output>;
+}
 
 function installDefaultBookmarkMocks() {
   hookSpies.itemsLibraryUseQuery.mockImplementation((input) => ({
@@ -133,30 +140,72 @@ describe('BookmarksPage', () => {
     ).toBeVisible();
   });
 
-  test('filters the bookmark list by content type', async () => {
+  test('filters locally and syncs the selected filter to the URL', async () => {
     const user = userEvent.setup();
+
+    renderRoute(
+      <>
+        <BookmarksPage />
+        <LocationProbe />
+      </>,
+      {
+        route: '/bookmarks?contentType=video',
+        path: '/bookmarks',
+      }
+    );
+
+    expect(screen.queryByText(articleItem.title)).not.toBeInTheDocument();
+    expect(screen.getByText(videoItem.title)).toBeVisible();
+    expect(screen.queryByText(podcastItem.title)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Videos' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('location-search')).toHaveTextContent('?contentType=video');
+    expect(
+      hookSpies.itemsLibraryUseQuery.mock.calls.some(
+        ([input]) => input.filter.contentType === ContentType.VIDEO
+      )
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'Articles' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toHaveTextContent('?contentType=article');
+    });
+
+    expect(screen.getByText(articleItem.title)).toBeVisible();
+    expect(screen.queryByText(videoItem.title)).not.toBeInTheDocument();
+    expect(screen.queryByText(podcastItem.title)).not.toBeInTheDocument();
+    expect(
+      hookSpies.itemsLibraryUseQuery.mock.calls.some(
+        ([input]) => input.filter.contentType === ContentType.ARTICLE
+      )
+    ).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search')).toHaveTextContent('');
+    });
+
+    expect(screen.getByText(articleItem.title)).toBeVisible();
+    expect(screen.getByText(videoItem.title)).toBeVisible();
+    expect(screen.getByText(podcastItem.title)).toBeVisible();
+  });
+
+  test('keeps the page shell visible while bookmark data is refreshing', () => {
+    hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
+      data: { items: libraryItems },
+      isLoading: true,
+      error: null,
+    });
 
     renderRoute(<BookmarksPage />, {
       route: '/bookmarks',
       path: '/bookmarks',
     });
 
+    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
     expect(screen.getByText(articleItem.title)).toBeVisible();
-    expect(screen.getByText(videoItem.title)).toBeVisible();
-    expect(screen.getByText(podcastItem.title)).toBeVisible();
-
-    await user.click(screen.getByRole('button', { name: 'Videos' }));
-
-    await waitFor(() => {
-      expect(hookSpies.itemsLibraryUseQuery).toHaveBeenLastCalledWith({
-        limit: 50,
-        filter: { contentType: ContentType.VIDEO },
-      });
-    });
-
-    expect(screen.queryByText(articleItem.title)).not.toBeInTheDocument();
-    expect(screen.getByText(videoItem.title)).toBeVisible();
-    expect(screen.queryByText(podcastItem.title)).not.toBeInTheDocument();
+    expect(screen.queryByText('Loading bookmarks')).not.toBeInTheDocument();
   });
 
   test('recovers to the list when a selected bookmark cannot be loaded', async () => {
