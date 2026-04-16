@@ -174,8 +174,6 @@ class Analytics {
         properties: formatProperties(properties as Record<string, unknown>),
       });
     }
-
-    // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).
   }
 
   /**
@@ -191,8 +189,6 @@ class Analytics {
     if (isDev()) {
       analyticsLogger.info('Identify user', { userId, traits });
     }
-
-    // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).
   }
 
   /**
@@ -202,8 +198,6 @@ class Analytics {
     if (isDev()) {
       analyticsLogger.info('Analytics reset');
     }
-
-    // Production analytics intentionally no-op until a provider is selected (zine-x5ut.4.3).
   }
 }
 

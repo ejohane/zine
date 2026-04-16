@@ -9,8 +9,6 @@
  * - Error state
  * - Empty state
  * - Success state with content carousel
- *
- * @see Task zine-1yfa for requirements
  */
 
 import React from 'react';

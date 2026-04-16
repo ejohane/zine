@@ -8,8 +8,6 @@
  * - Showing published date
  * - Showing "Saved" badge when bookmarked
  * - Handling press to open URL
- *
- * @see Task zine-1yfa for requirements
  */
 
 import { type LatestContentItem } from './LatestContentCard';

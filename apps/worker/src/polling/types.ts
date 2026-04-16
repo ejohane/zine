@@ -7,8 +7,7 @@
  * @see /features/subscriptions/backend-spec.md Section 3: Polling Architecture
  */
 
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import type * as schema from '../db/schema';
+import type { Database } from '../db';
 import type { subscriptions, creators } from '../db/schema';
 import type { Bindings } from '../types';
 import { YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
@@ -20,7 +19,7 @@ import { YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 /**
  * Database type with full schema inference
  */
-export type DrizzleDB = DrizzleD1Database<typeof schema>;
+export type DrizzleDB = Database;
 
 /**
  * Subscription row from database (normalized - no name/imageUrl fields)

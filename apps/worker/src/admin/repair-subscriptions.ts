@@ -23,7 +23,7 @@
  */
 
 import { eq, sql, and } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
+import type { Database } from '../db';
 import { subscriptions, subscriptionItems, items } from '../db/schema';
 import { logger } from '../lib/logger';
 
@@ -121,7 +121,7 @@ const repairLogger = logger.child('admin:repair');
  * @returns List of corrupted subscriptions with diagnosis info
  */
 export async function findCorruptedSubscriptions(
-  db: DrizzleD1Database,
+  db: Database,
   options?: {
     /** Filter by provider (default: 'SPOTIFY') */
     provider?: string;
@@ -277,7 +277,7 @@ export function generateRepairReport(result: FindCorruptedResult): string {
  * @returns Repair operation result
  */
 export async function repairCorruptedSubscriptions(
-  db: DrizzleD1Database,
+  db: Database,
   options?: {
     /** If true, only report what would be done without making changes */
     dryRun?: boolean;
@@ -409,7 +409,7 @@ export async function repairCorruptedSubscriptions(
  * @returns Verification result
  */
 export async function verifyRepairs(
-  db: DrizzleD1Database,
+  db: Database,
   options?: {
     provider?: string;
     userId?: string;

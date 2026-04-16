@@ -21,7 +21,6 @@ import {
   createYouTubeClient,
   getChannelDetails,
   getUploadsPlaylistId,
-  getChannelUploadsPlaylistId,
   getYouTubeClientForConnection,
   fetchRecentVideos,
   fetchVideoDetails,
@@ -30,7 +29,6 @@ import {
   getAllUserSubscriptions,
   searchChannels,
   extractVideoInfo,
-  parseISO8601Duration,
 } from './youtube';
 import { mockLogger } from '../test/mock-logger';
 
@@ -417,29 +415,6 @@ describe('getUploadsPlaylistId', () => {
   it('should throw for empty string', () => {
     expect(() => getUploadsPlaylistId('')).toThrow(
       'Invalid YouTube channel ID: . Expected UC prefix.'
-    );
-  });
-});
-
-// ============================================================================
-// getChannelUploadsPlaylistId Tests (Deprecated API-based function)
-// ============================================================================
-
-describe('getChannelUploadsPlaylistId (deprecated)', () => {
-  it('should return uploads playlist ID via deterministic mapping', async () => {
-    const client = createMockYouTubeClient();
-
-    const result = await getChannelUploadsPlaylistId(client, 'UCxxxxxx');
-
-    expect(result).toBe('UUxxxxxx');
-    expect(mockChannelsList).not.toHaveBeenCalled();
-  });
-
-  it('should throw for invalid channel ID', async () => {
-    const client = createMockYouTubeClient();
-
-    await expect(getChannelUploadsPlaylistId(client, 'invalid123')).rejects.toThrow(
-      'Invalid YouTube channel ID: invalid123. Expected UC prefix.'
     );
   });
 });
@@ -1414,29 +1389,6 @@ describe('extractVideoInfo', () => {
     const result = extractVideoInfo(item);
 
     expect(result.videoId).toBeNull();
-  });
-});
-
-// ============================================================================
-// parseISO8601Duration Tests (re-exported from duration module)
-// ============================================================================
-
-describe('parseISO8601Duration (re-export)', () => {
-  it('should parse minutes and seconds', () => {
-    expect(parseISO8601Duration('PT1M30S')).toBe(90);
-  });
-
-  it('should parse hours', () => {
-    expect(parseISO8601Duration('PT1H')).toBe(3600);
-  });
-
-  it('should parse full format', () => {
-    expect(parseISO8601Duration('PT1H30M45S')).toBe(5445);
-  });
-
-  it('should handle edge cases gracefully', () => {
-    expect(parseISO8601Duration('')).toBe(0);
-    expect(parseISO8601Duration('invalid')).toBe(0);
   });
 });
 

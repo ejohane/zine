@@ -36,7 +36,7 @@ import {
 // Note: Provider and polling imports are done dynamically in processSyncFallback
 // to avoid loading googleapis at module init time (breaks workerd test environment)
 import type { ProviderConnection } from '../lib/token-refresh';
-import type { Subscription as PollingSubscription, DrizzleDB } from '../polling/types';
+import type { Subscription as PollingSubscription } from '../polling/types';
 
 // ============================================================================
 // Constants
@@ -521,7 +521,7 @@ async function processSyncFallback(
           client,
           userId,
           env,
-          db as unknown as DrizzleDB
+          db
         );
 
         totalSucceeded += result.processed - (result.errors?.length ?? 0);
@@ -579,7 +579,7 @@ async function processSyncFallback(
           client,
           userId,
           env,
-          db as unknown as DrizzleDB
+          db
         );
 
         totalSucceeded += result.processed - (result.errors?.length ?? 0);

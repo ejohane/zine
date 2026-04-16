@@ -17,9 +17,6 @@ import { decrypt } from '../lib/crypto';
 import { parseISO8601Duration } from '../lib/duration';
 import { logger } from '../lib/logger';
 
-// Re-export for external consumers
-export { parseISO8601Duration } from '../lib/duration';
-
 const youtubeLogger = logger.child('provider:youtube');
 
 // The OAuth2Client type comes from google.auth.OAuth2 instance
@@ -166,24 +163,6 @@ export function getUploadsPlaylistId(channelId: string): string {
     throw new Error(`Invalid YouTube channel ID: ${channelId}. Expected UC prefix.`);
   }
   return 'UU' + channelId.slice(2);
-}
-
-/**
- * Get the uploads playlist ID for a YouTube channel via legacy API signature.
- *
- * @deprecated Use getUploadsPlaylistId() instead - it's deterministic and requires no API call.
- * This wrapper now avoids the deprecated API call and uses the deterministic mapping.
- *
- * @param _client - Unused (kept for backward compatibility)
- * @param channelId - YouTube channel ID (starts with UC)
- * @returns Uploads playlist ID (starts with UU)
- * @throws Error if channelId doesn't start with UC
- */
-export async function getChannelUploadsPlaylistId(
-  _client: YouTubeClient,
-  channelId: string
-): Promise<string> {
-  return getUploadsPlaylistId(channelId);
 }
 
 /**
@@ -397,9 +376,6 @@ export function extractVideoInfo(item: youtube_v3.Schema$PlaylistItem): {
       null,
   };
 }
-
-// Note: parseISO8601Duration has been moved to ../lib/duration.ts
-// and is re-exported from this file for backward compatibility
 
 /**
  * Video details returned from fetchVideoDetails.

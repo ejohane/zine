@@ -25,7 +25,7 @@ import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib
  *
  * @template TPayload - The type of payload the mutation accepts
  */
-export interface UseOfflineMutationOptions<TPayload> {
+export interface UseOfflineMutationOptions<TPayload extends object> {
   /**
    * The action type for offline queue identification.
    * Maps to tRPC mutation endpoints when queue is processed.
@@ -69,7 +69,7 @@ export interface UseOfflineMutationOptions<TPayload> {
 /**
  * Return type of useOfflineMutation hook.
  */
-export interface UseOfflineMutationResult<TPayload> {
+export interface UseOfflineMutationResult<TPayload extends object> {
   /**
    * Execute the mutation. Will either run immediately (if online)
    * or queue for later execution (if offline).
@@ -103,8 +103,7 @@ export interface UseOfflineMutationResult<TPayload> {
  *
  * In both cases, onOptimisticUpdate is called first to provide immediate UI feedback.
  *
- * @template TPayload - The mutation payload type (must extend Record<string, unknown>
- *                      for serialization to offline queue)
+ * @template TPayload - The mutation payload type
  *
  * @example
  * ```tsx
@@ -140,7 +139,7 @@ export interface UseOfflineMutationResult<TPayload> {
  * </Button>
  * ```
  */
-export function useOfflineMutation<TPayload extends Record<string, unknown>>({
+export function useOfflineMutation<TPayload extends object>({
   actionType,
   mutationFn,
   onOptimisticUpdate,

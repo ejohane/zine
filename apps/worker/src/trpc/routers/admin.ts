@@ -17,7 +17,6 @@ import {
   generateRepairReport,
 } from '../../admin/repair-subscriptions';
 import { logger } from '../../lib/logger';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 const adminLogger = logger.child('admin');
 
@@ -75,7 +74,7 @@ export const adminRouter = router({
         provider: input?.provider,
       });
 
-      const result = await findCorruptedSubscriptions(ctx.db as unknown as DrizzleD1Database, {
+      const result = await findCorruptedSubscriptions(ctx.db, {
         provider: input?.provider,
         userId: ctx.userId,
       });
@@ -108,7 +107,7 @@ export const adminRouter = router({
         provider: input?.provider,
       });
 
-      const result = await findCorruptedSubscriptions(ctx.db as unknown as DrizzleD1Database, {
+      const result = await findCorruptedSubscriptions(ctx.db, {
         provider: input?.provider,
         userId: ctx.userId,
       });
@@ -135,7 +134,7 @@ export const adminRouter = router({
       subscriptionIds: input.subscriptionIds?.length,
     });
 
-    const result = await repairCorruptedSubscriptions(ctx.db as unknown as DrizzleD1Database, {
+    const result = await repairCorruptedSubscriptions(ctx.db, {
       provider: input.provider,
       userId: ctx.userId,
       dryRun: input.dryRun,
@@ -167,7 +166,7 @@ export const adminRouter = router({
         provider: input?.provider,
       });
 
-      const result = await verifyRepairs(ctx.db as unknown as DrizzleD1Database, {
+      const result = await verifyRepairs(ctx.db, {
         provider: input?.provider,
         userId: ctx.userId,
       });

@@ -29,7 +29,7 @@ import {
 } from '../polling/spotify-poller';
 import type { ProviderConnection } from '../lib/token-refresh';
 import type { Bindings } from '../types';
-import type { Subscription as PollingSubscription, DrizzleDB } from '../polling/types';
+import type { Subscription as PollingSubscription } from '../polling/types';
 import { SyncQueueMessageSchema, type SyncQueueMessage } from './types';
 import { updateJobProgress } from './service';
 
@@ -264,7 +264,7 @@ async function processProviderMessages(
           client,
           userId,
           env,
-          db as unknown as DrizzleDB
+          db
         );
 
         // Update progress for each subscription
@@ -301,7 +301,7 @@ async function processProviderMessages(
             client,
             userId,
             env,
-            db as unknown as DrizzleDB
+            db
           );
 
           await updateJobProgress(jobId, sub.id, true, result.newItems, null, env.OAUTH_STATE_KV);
@@ -328,7 +328,7 @@ async function processProviderMessages(
           client,
           userId,
           env,
-          db as unknown as DrizzleDB
+          db
         );
 
         // Update progress for each subscription
@@ -365,7 +365,7 @@ async function processProviderMessages(
             client,
             userId,
             env,
-            db as unknown as DrizzleDB
+            db
           );
 
           await updateJobProgress(jobId, sub.id, true, result.newItems, null, env.OAUTH_STATE_KV);
