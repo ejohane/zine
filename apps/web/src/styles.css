@@ -975,6 +975,21 @@ img {
 
 .new-page-bookmark-view__icon-action {
   flex-shrink: 0;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.new-page-bookmark-view__icon-action:hover:not(:disabled),
+.new-page-bookmark-view__icon-action:focus-visible:not(:disabled) {
+  --bookmark-action-bg: var(--bookmark-action-hover-bg);
+  --bookmark-action-border: var(--bookmark-action-hover-border);
+}
+
+.new-page-bookmark-view__icon-action:active:not(:disabled) {
+  --bookmark-action-bg: var(--bookmark-action-active-bg);
+  --bookmark-action-border: var(--bookmark-action-active-border);
 }
 
 .new-page-bookmark-view__actions-left {
