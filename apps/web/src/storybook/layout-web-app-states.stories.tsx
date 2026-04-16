@@ -1,8 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import {
+  BookmarkCheck,
+  ChevronRight,
+  LogOut,
+  Newspaper,
+  Settings as SettingsIcon,
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { ContentType } from '@zine/shared';
 
-import { Badge, Button, EmptyState, LinkButton, StatCard, Surface } from '@/components';
+import { Badge, Button, EmptyState, StatCard, Surface } from '@/components';
 import { AppWordmark } from '@/app-wordmark';
 import { FilterChip } from '@/components/ui/filter-chip';
 
@@ -224,21 +232,82 @@ function BookmarkEmptyReference() {
 
 function SettingsReference() {
   return (
-    <main className="shell-loading">
-      <Surface className="empty-state">
-        <p className="eyebrow">Settings</p>
-        <h2>Settings are pared back in this web pass.</h2>
-        <p>
-          Use the bookmarks desk for now. Account controls can come back once the browser channel
-          expands.
-        </p>
-        <div className="button-row">
-          <LinkButton to="/bookmarks" tone="ghost">
-            Back to bookmarks
-          </LinkButton>
-          <Button tone="ghost">Sign out</Button>
+    <main className="new-page-screen">
+      <div className="new-page-sidebar">
+        <div className="new-page-sidebar__rail">
+          <div className="new-page-sidebar__rail-top">
+            <div className="new-page-sidebar__rail-header">
+              <Link
+                to="/bookmarks"
+                className="new-page-sidebar__brand"
+                aria-label="Go to bookmarks"
+              >
+                <div className="new-page-sidebar__brand-icon">
+                  <AppWordmark compact />
+                </div>
+              </Link>
+            </div>
+
+            <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
+              <Link to="/bookmarks" className="new-page-sidebar__rail-btn" aria-label="Bookmarks">
+                <BookmarkCheck size={18} strokeWidth={2.15} />
+                <span>Bookmarks</span>
+              </Link>
+            </nav>
+          </div>
+
+          <div className="new-page-sidebar__rail-footer">
+            <Link
+              to="/settings"
+              className="new-page-sidebar__rail-btn new-page-sidebar__rail-btn--active"
+              aria-label="Settings"
+            >
+              <SettingsIcon size={18} strokeWidth={2.15} />
+              <span>Settings</span>
+            </Link>
+          </div>
         </div>
-      </Surface>
+      </div>
+
+      <div className="new-page-inset">
+        <header className="new-page-inset__header">
+          <nav className="new-page-breadcrumb" aria-label="Current page location">
+            <span>Library</span>
+            <ChevronRight size={14} strokeWidth={2.2} />
+            <strong>Settings</strong>
+          </nav>
+        </header>
+
+        <div className="new-page-inset__body">
+          <section className="new-page-column-card new-page-column-card--full">
+            <div className="new-page-column-card__header">
+              <h1 className="new-page-column-card__title">Settings</h1>
+            </div>
+
+            <div className="settings-page__layout">
+              <nav className="settings-page__nav" aria-label="Settings sections">
+                <button className="settings-page__nav-item settings-page__nav-item--active">
+                  <Newspaper size={16} strokeWidth={2} />
+                  Subscriptions
+                </button>
+                <button className="settings-page__nav-item settings-page__nav-item--danger">
+                  <LogOut size={16} strokeWidth={2} />
+                  Sign out
+                </button>
+              </nav>
+
+              <div className="settings-page__content">
+                <div className="settings-page__section">
+                  <h2 className="settings-page__section-title">Subscriptions</h2>
+                  <p className="settings-page__section-copy">
+                    Manage your subscriptions here. Subscription controls are coming soon.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
   );
 }

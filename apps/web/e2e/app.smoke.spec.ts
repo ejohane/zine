@@ -28,9 +28,8 @@ test('loads the bookmarks desk, filters content, opens detail, and navigates to 
 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/\/settings$/);
-  await expect(
-    page.getByRole('heading', { name: 'Settings are pared back in this web pass.' })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Subscriptions' })).toBeVisible();
 });
 
 test('renders the empty state when no bookmarks exist', async ({ page }) => {
