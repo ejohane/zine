@@ -123,8 +123,9 @@ img {
 
 .auth-screen {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(24rem, 34rem);
+  place-items: center;
   position: relative;
+  padding: 2rem;
 }
 
 .auth-screen__backdrop {
@@ -136,23 +137,8 @@ img {
   pointer-events: none;
 }
 
-.auth-hero,
-.auth-panel {
-  position: relative;
-  z-index: 1;
-  padding: 4.5rem;
-}
-
-.auth-hero {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1.6rem;
-}
-
-.auth-hero h1,
 .page-header h1,
-.hero-panel h2,
+.auth-panel h1,
 .surface h2,
 .shell-loading h1 {
   margin: 0;
@@ -162,7 +148,6 @@ img {
   letter-spacing: -0.06em;
 }
 
-.auth-hero p,
 .page-header__description,
 .topbar__note,
 .surface p,
@@ -174,15 +159,23 @@ img {
 .auth-panel {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 1.6rem;
-  border-left: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.52);
-  backdrop-filter: blur(18px);
+  gap: 1rem;
+  width: min(100%, 28rem);
+  position: relative;
+  z-index: 1;
 }
 
 .auth-panel__surface {
-  padding: 1.25rem;
+  width: 100%;
+  padding: 1.5rem;
+  background: #ffffff;
+  border: 1px solid #E5E7EB;
+  border-radius: 1.45rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
+}
+
+.auth-panel > .wordmark {
+  align-self: center;
 }
 
 .surface {
@@ -194,17 +187,76 @@ img {
     var(--shadow);
 }
 
+.auth-panel__surface [class^='cl-'] {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .auth-panel__surface .cl-card,
+.auth-panel__surface .cl-cardBox,
 .auth-panel__surface .cl-rootBox,
 .auth-panel__surface .cl-signIn-root,
 .auth-panel__surface .cl-signUp-root {
   width: 100%;
-  box-shadow: none;
-  background: transparent;
 }
 
 .auth-panel__surface .cl-card {
-  background: transparent;
+  padding: 0;
+}
+
+.auth-panel__surface .cl-internal {
+  display: none !important;
+}
+
+.auth-panel__surface .cl-headerTitle,
+.auth-panel__surface .cl-formFieldLabel,
+.auth-panel__surface .cl-identityPreviewText,
+.auth-panel__surface .cl-formFieldSuccessText,
+.auth-panel__surface .cl-alertText,
+.auth-panel__surface .cl-footerActionLink,
+.auth-panel__surface .cl-formResendCodeLink,
+.auth-panel__surface .cl-identityPreviewEditButton {
+  color: #111111 !important;
+}
+
+.auth-panel__surface .cl-headerSubtitle,
+.auth-panel__surface .cl-dividerText,
+.auth-panel__surface .cl-footerActionText,
+.auth-panel__surface .cl-formFieldHintText {
+  color: #6B7280 !important;
+}
+
+.auth-panel__surface .cl-formFieldErrorText {
+  color: #DC2626 !important;
+}
+
+.auth-panel__surface .cl-socialButtonsBlockButton {
+  background: #ffffff !important;
+  border: 1px solid #E5E7EB !important;
+  color: #111111 !important;
+}
+
+.auth-panel__surface .cl-socialButtonsBlockButton:hover {
+  background: #F9FAFB !important;
+}
+
+.auth-panel__surface .cl-dividerLine {
+  background: #E5E7EB !important;
+}
+
+.auth-panel__surface .cl-formFieldInput {
+  background: #F9FAFB !important;
+  color: #111111 !important;
+  border-color: #E5E7EB !important;
+}
+
+.auth-panel__surface .cl-formButtonPrimary {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+.auth-panel__surface .cl-formButtonPrimary:hover {
+  background: #333333 !important;
 }
 
 .app-shell {
@@ -2272,8 +2324,7 @@ input:focus {
   .inbox-detail__context-grid,
   .group-grid,
   .source-grid,
-  .stats-grid,
-  .auth-screen {
+  .stats-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2685,8 +2736,7 @@ input:focus {
     max-width: none;
   }
 
-  .auth-hero,
-  .auth-panel {
+  .auth-screen {
     padding: 1.2rem;
   }
 }
