@@ -9,6 +9,7 @@ import { API_URL, SPOTIFY_CLIENT_ID, YOUTUBE_CLIENT_ID } from './env';
 export type OAuthProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
 
 type TokenGetter = () => Promise<string | null>;
+type RedirectHandler = (url: string) => void;
 
 const OAUTH_CONFIG: Record<OAuthProvider, { clientId: string; authUrl: string; scopes: string[] }> =
   {
@@ -102,7 +103,11 @@ async function clearOAuthState(provider: OAuthProvider) {
   sessionStorage.removeItem(getStorageKey(provider, 'state'));
 }
 
-export async function connectProvider(provider: OAuthProvider, getToken: TokenGetter) {
+export async function connectProvider(
+  provider: OAuthProvider,
+  getToken: TokenGetter,
+  redirect: RedirectHandler = (url) => window.location.assign(url)
+) {
   const config = OAUTH_CONFIG[provider];
   if (!config.clientId) {
     throw new Error(
@@ -136,7 +141,7 @@ export async function connectProvider(provider: OAuthProvider, getToken: TokenGe
     authUrl.searchParams.set('prompt', 'consent');
   }
 
-  window.location.assign(authUrl.toString());
+  redirect(authUrl.toString());
 }
 
 export async function completeOAuthFlow(

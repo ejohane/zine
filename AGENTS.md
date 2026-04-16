@@ -16,9 +16,14 @@
 
 - Install dependencies: `bun install`
 - Start all dev tasks: `bun run dev`
+- Start the web app only: `bun run dev:web`
 - Worktree-safe dev startup: `bun run dev:worktree`
 - Reset worktree state before re-seeding: `bun run dev:reset`
-- Run tests (mobile + worker): `bun run test`
+- Run tests (mobile + worker + web unit/component): `bun run test`
+- Run web unit/component tests: `bun run test:web`
+- Run Storybook browser checks: `bun run test:web:storybook`
+- Run web smoke tests: `bun run test:web:e2e`
+- Run the full web CI-parity suite: `bun run test:web:ci`
 - Lint: `bun run lint`
 - Design system checks: `bun run design-system:check`
 - Typecheck: `bun run typecheck`
@@ -30,9 +35,16 @@
 - Root test command (`bun run test`) runs:
   - `bun run --cwd apps/mobile test`
   - `bun run --cwd apps/worker test:run`
+  - `bun run --cwd apps/web test`
 - Worker CI/parity test subset:
   - `bun run test:worker:ci`
   - Excludes `**/user-do.test.ts` and `**/scheduler.test.ts`
+- Web test commands:
+  - `bun run test:web` → `apps/web` Vitest unit/component suite
+  - `bun run test:web:storybook` → Storybook build + Playwright accessibility/visual checks
+  - `bun run test:web:e2e` → Playwright smoke coverage against the real Vite app
+  - `bun run test:web:ci` → all web lanes together
+- Full web testing workflow, debugging notes, and manual verification guidance live in `docs/web/testing.md`.
 
 ## Worktree Behavior
 
@@ -87,16 +99,18 @@
   - `bun run format:check`
   - `bun run design-system:check`
   - `bun run typecheck`
+  - `bun run test:web`
   - `cd apps/worker && bun run test:run --exclude='**/user-do.test.ts' --exclude='**/scheduler.test.ts'`
 
 ## CI and Deploy Parity
 
-- CI workflow: `.github/workflows/ci.yml` (lint, typecheck, worker tests, build).
+- CI workflow: `.github/workflows/ci.yml` (lint, typecheck, mobile tests, worker tests, web unit tests, web browser tests, build).
 - Worker deploy workflow: `.github/workflows/deploy-worker.yml` (shared build, DB migrate, production deploy).
 
 ## Additional Agent Context
 
 - Mobile-specific guidance lives in `apps/mobile/AGENTS.md`.
+- Web testing guidance lives in `docs/web/testing.md`.
 
 ## Design System Workflow
 
@@ -106,6 +120,7 @@
   - `docs/mobile/design-system/components.md`
 - When editing shared web UI or `packages/design-system`, read:
   - `docs/web/design-system.md`
+  - `docs/web/testing.md`
 - Web design-system source of truth is layered:
   - shared tokens/specs/recipes in `packages/design-system/src`
   - web theme adapter in `packages/design-system/src/web/theme.ts` and `packages/design-system/src/web/theme.css`

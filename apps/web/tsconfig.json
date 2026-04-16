@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["vite/client", "@cloudflare/workers-types"],
+    "types": [
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom",
+      "@cloudflare/workers-types"
+    ],
     "paths": {
       "@/*": ["./src/*"],
       "@zine/design-system": ["../../packages/design-system/src/index.ts"],
@@ -12,5 +17,5 @@
       "@zine/worker/*": ["../worker/src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "vitest.config.ts"]
 }
