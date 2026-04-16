@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -14,34 +14,101 @@ describe('SettingsPage', () => {
     resetTrpcMocks();
   });
 
-  test('always links back to bookmarks', () => {
-    renderRoute(<SettingsPage />);
+  test('renders the bookmarks shell with a settings breadcrumb and a single card', () => {
+    const { container } = renderRoute(<SettingsPage />, {
+      route: '/settings',
+      path: '/settings',
+    });
 
-    expect(screen.getByRole('link', { name: 'Back to bookmarks' })).toHaveAttribute(
-      'href',
-      '/bookmarks'
+    expect(screen.getByRole('link', { name: 'Bookmarks' })).toHaveAttribute('href', '/bookmarks');
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveClass(
+      'new-page-sidebar__rail-btn--active'
     );
+    expect(screen.getByLabelText('Current page location')).toHaveTextContent('Library');
+    expect(screen.getByLabelText('Current page location')).toHaveTextContent('Settings');
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    expect(container.querySelectorAll('.new-page-column-card')).toHaveLength(1);
+    expect(container.querySelector('.new-page-column-card--full')).not.toBeNull();
+    expect(container.querySelector('.new-page-inset__content')).toBeNull();
   });
 
-  test('shows sign out controls only for clerk mode', () => {
-    setAuthAvailability({ mode: 'development-bypass', isEnabled: true });
+  describe('two-column layout', () => {
+    test('has a settings nav on the left and a content area on the right', () => {
+      const { container } = renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
 
-    renderRoute(<SettingsPage />);
+      const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+      expect(nav).toBeVisible();
+      expect(container.querySelector('.settings-page__layout')).not.toBeNull();
+      expect(container.querySelector('.settings-page__nav')).not.toBeNull();
+      expect(container.querySelector('.settings-page__content')).not.toBeNull();
+    });
 
-    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
-  });
+    test('nav contains Subscriptions item that is active by default', () => {
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
 
-  test('signs out through the app session in clerk mode', async () => {
-    const user = userEvent.setup();
-    const signOut = vi.fn(async () => {});
+      const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+      const subscriptionsBtn = within(nav).getByRole('button', { name: 'Subscriptions' });
+      expect(subscriptionsBtn).toBeVisible();
+      expect(subscriptionsBtn).toHaveAttribute('aria-current', 'true');
+    });
 
-    setAuthAvailability({ mode: 'clerk', isEnabled: true });
-    setSessionState({ signOut });
+    test('shows subscriptions content by default', () => {
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
 
-    renderRoute(<SettingsPage />);
+      expect(screen.getByRole('heading', { name: 'Subscriptions' })).toBeVisible();
+      expect(screen.getByText(/manage your subscriptions/i)).toBeVisible();
+    });
 
-    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    test('nav contains a sign out button in clerk mode', () => {
+      setAuthAvailability({ mode: 'clerk', isEnabled: true });
 
-    expect(signOut).toHaveBeenCalledWith({ redirectUrl: '/sign-in' });
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+      const signOutBtn = within(nav).getByRole('button', { name: 'Sign out' });
+      expect(signOutBtn).toBeVisible();
+    });
+
+    test('hides sign out button in development-bypass mode', () => {
+      setAuthAvailability({ mode: 'development-bypass', isEnabled: true });
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+      expect(within(nav).queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+    });
+
+    test('sign out button triggers signOut in clerk mode', async () => {
+      const user = userEvent.setup();
+      const signOut = vi.fn(async () => {});
+
+      setAuthAvailability({ mode: 'clerk', isEnabled: true });
+      setSessionState({ signOut });
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+      await user.click(within(nav).getByRole('button', { name: 'Sign out' }));
+
+      expect(signOut).toHaveBeenCalledWith({ redirectUrl: '/sign-in' });
+    });
   });
 });

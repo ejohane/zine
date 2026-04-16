@@ -1,6 +1,6 @@
-import { screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ContentType, Provider } from '@zine/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -9,6 +9,7 @@ import { renderRoute } from './test/render-router';
 vi.mock('./lib/trpc', () => import('./test/mocks/trpc'));
 
 import { BookmarksPage } from './bookmarks-page';
+import { SettingsPage } from './settings-page';
 import { createCreator, createLibraryItem } from './test/fixtures';
 import { hookSpies, invalidateSpies, mutationSpies, resetTrpcMocks } from './test/mocks/trpc';
 
@@ -44,7 +45,12 @@ const libraryItems = [articleItem, videoItem, podcastItem];
 function LocationProbe() {
   const location = useLocation();
 
-  return <output data-testid="location-search">{location.search}</output>;
+  return (
+    <>
+      <output data-testid="location-pathname">{location.pathname}</output>
+      <output data-testid="location-search">{location.search}</output>
+    </>
+  );
 }
 
 function installDefaultBookmarkMocks() {
@@ -189,6 +195,40 @@ describe('BookmarksPage', () => {
     expect(screen.getByText(articleItem.title)).toBeVisible();
     expect(screen.getByText(videoItem.title)).toBeVisible();
     expect(screen.getByText(podcastItem.title)).toBeVisible();
+  });
+
+  test('navigates to the settings page from the sidebar', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={['/bookmarks']}>
+        <Routes>
+          <Route
+            path="/bookmarks"
+            element={
+              <>
+                <BookmarksPage />
+                <LocationProbe />
+              </>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <>
+                <SettingsPage />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('link', { name: 'Settings' }));
+
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeVisible();
+    expect(screen.getByTestId('location-pathname')).toHaveTextContent('/settings');
   });
 
   test('keeps the page shell visible while bookmark data is refreshing', () => {
