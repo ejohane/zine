@@ -30,6 +30,9 @@ type ItemDetailContentProps = {
   onOpenLink: () => void;
   useAnimatedDescription: boolean;
   useAnimatedActions: boolean;
+  onContentLayout?: (contentTopY: number) => void;
+  onTitleLayout?: (titleOffsetY: number) => void;
+  onActionRowLayout?: (actionRowStartY: number) => void;
 };
 
 export function ItemDetailContent({
@@ -52,13 +55,19 @@ export function ItemDetailContent({
   onOpenLink,
   useAnimatedActions,
   useAnimatedDescription,
+  onContentLayout,
+  onTitleLayout,
+  onActionRowLayout,
 }: ItemDetailContentProps) {
   const DescriptionContainer = useAnimatedDescription ? Animated.View : View;
 
   return (
     <>
-      <Animated.View style={styles.contentContainer}>
-        <ItemDetailHeader item={item} colors={colors} />
+      <Animated.View
+        style={styles.contentContainer}
+        onLayout={({ nativeEvent }) => onContentLayout?.(nativeEvent.layout.y)}
+      >
+        <ItemDetailHeader item={item} colors={colors} onTitleLayout={onTitleLayout} />
         <ItemDetailCreatorRow
           item={item}
           colors={colors}
@@ -83,6 +92,7 @@ export function ItemDetailContent({
         onShare={onShare}
         onOpenLink={onOpenLink}
         useAnimatedContainer={useAnimatedActions}
+        onLayout={onActionRowLayout}
       />
 
       {item.summary && (

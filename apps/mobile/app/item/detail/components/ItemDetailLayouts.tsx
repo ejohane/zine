@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import type { ReactElement, ReactNode } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, View, type ScrollViewProps } from 'react-native';
 import Animated from 'react-native-reanimated';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +15,13 @@ type ItemDetailLayoutBaseProps = {
   insets: EdgeInsets;
   onBack: () => void;
   children: ReactNode;
+  onScroll: ScrollViewProps['onScroll'];
+  screenTitle: string;
+  showCollapsedTitle: boolean;
+  showStickyActions?: boolean;
+  stickyActions?: ReactNode;
+  stickyActionsTop?: number;
+  stickyBackdropHeight?: number;
 };
 
 export function ItemDetailParallaxLayout({
@@ -22,6 +29,13 @@ export function ItemDetailParallaxLayout({
   insets,
   onBack,
   children,
+  onScroll,
+  screenTitle,
+  showCollapsedTitle,
+  showStickyActions,
+  stickyActions,
+  stickyActionsTop,
+  stickyBackdropHeight,
   headerImage,
   headerAspectRatio,
 }: ItemDetailLayoutBaseProps & {
@@ -33,12 +47,26 @@ export function ItemDetailParallaxLayout({
       <Stack.Screen options={{ title: '', headerShown: false }} />
 
       <Animated.View style={styles.animatedContainer}>
-        <ParallaxScrollView headerImage={headerImage} headerAspectRatio={headerAspectRatio}>
+        <ParallaxScrollView
+          headerImage={headerImage}
+          headerAspectRatio={headerAspectRatio}
+          onScroll={onScroll}
+        >
           {children}
         </ParallaxScrollView>
       </Animated.View>
 
-      <ItemDetailFloatingBack colors={colors} insets={insets} onBack={onBack} />
+      <ItemDetailFloatingBack
+        colors={colors}
+        insets={insets}
+        onBack={onBack}
+        screenTitle={screenTitle}
+        showCollapsedTitle={showCollapsedTitle}
+        showStickyActions={showStickyActions}
+        stickyActions={stickyActions}
+        stickyActionsTop={stickyActionsTop}
+        stickyBackdropHeight={stickyBackdropHeight}
+      />
     </View>
   );
 }
@@ -48,6 +76,13 @@ export function ItemDetailScrollLayout({
   insets,
   onBack,
   children,
+  onScroll,
+  screenTitle,
+  showCollapsedTitle,
+  showStickyActions,
+  stickyActions,
+  stickyActionsTop,
+  stickyBackdropHeight,
 }: ItemDetailLayoutBaseProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -57,11 +92,23 @@ export function ItemDetailScrollLayout({
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 56 }]}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
       >
         {children}
       </ScrollView>
 
-      <ItemDetailFloatingBack colors={colors} insets={insets} onBack={onBack} />
+      <ItemDetailFloatingBack
+        colors={colors}
+        insets={insets}
+        onBack={onBack}
+        screenTitle={screenTitle}
+        showCollapsedTitle={showCollapsedTitle}
+        showStickyActions={showStickyActions}
+        stickyActions={stickyActions}
+        stickyActionsTop={stickyActionsTop}
+        stickyBackdropHeight={stickyBackdropHeight}
+      />
     </View>
   );
 }

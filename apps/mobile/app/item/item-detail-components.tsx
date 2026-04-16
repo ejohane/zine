@@ -1,21 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { View, Text, ScrollView, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, type ScrollViewProps } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { SourceBadge, TypeBadge } from '@/components/badges';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { IconButton } from '@/components/primitives';
 import type { Colors } from '@/constants/theme';
 import { Spacing } from '@/constants/theme';
-import type { Provider } from '@/hooks/use-items-trpc';
-import { ContentType, UserItemState } from '@/hooks/use-items-trpc';
+import type { Provider, UserItemState } from '@/hooks/use-items-trpc';
+import { ContentType } from '@/hooks/use-items-trpc';
 import { formatRelativeTime } from '@/lib/format';
 import { logger } from '@/lib/logger';
 
-import { extractXHandle, getFabConfig } from './item-detail-helpers';
+import { ItemDetailActions } from './detail/components/ItemDetailActions';
+import { ItemDetailFloatingBack } from './detail/components/ItemDetailFloatingBack';
+import { extractXHandle } from './item-detail-helpers';
 import { styles, xPostStyles } from './item-detail-styles';
 
 // ============================================================================
@@ -69,67 +69,6 @@ export function LinkedText({
 }
 
 // ============================================================================
-// Icon Action Button
-// ============================================================================
-
-export function IconActionButton({
-  icon,
-  color,
-  onPress,
-  disabled = false,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  color: string;
-  onPress?: () => void;
-  disabled?: boolean;
-}) {
-  const handlePress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress?.();
-  };
-
-  return (
-    <IconButton
-      onPress={handlePress}
-      disabled={disabled}
-      size="md"
-      variant="ghost"
-      style={styles.iconActionButton}
-      accessibilityLabel={icon}
-    >
-      <Ionicons name={icon} size={24} color={color} style={{ fontWeight: '700' }} />
-    </IconButton>
-  );
-}
-
-// ============================================================================
-// Floating Header Button
-// ============================================================================
-
-export function HeaderIconButton({
-  icon,
-  colors,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  colors: typeof Colors.dark;
-  onPress?: () => void;
-}) {
-  return (
-    <IconButton
-      onPress={onPress}
-      size="md"
-      variant="subtle"
-      colors={colors}
-      style={[styles.headerIconButton, { backgroundColor: colors.backgroundSecondary }]}
-      accessibilityLabel={icon}
-    >
-      <Ionicons name={icon} size={20} color={colors.text} />
-    </IconButton>
-  );
-}
-
-// ============================================================================
 // X Post Body Component
 // ============================================================================
 
@@ -162,6 +101,14 @@ export function XPostBookmarkView({
   secondaryActionColor,
   isSecondaryActionDisabled,
   creatorData,
+  showCollapsedTitle,
+  showStickyActions,
+  stickyActionsTop,
+  stickyBackdropHeight,
+  onScroll,
+  onContentLayout,
+  onTitleLayout,
+  onActionRowLayout,
 }: {
   item: {
     id: string;
@@ -192,14 +139,17 @@ export function XPostBookmarkView({
   secondaryActionColor: string;
   isSecondaryActionDisabled: boolean;
   creatorData?: { handle?: string | null } | null;
+  showCollapsedTitle: boolean;
+  showStickyActions: boolean;
+  stickyActionsTop: number;
+  stickyBackdropHeight: number;
+  onScroll: ScrollViewProps['onScroll'];
+  onContentLayout: (contentTopY: number) => void;
+  onTitleLayout: (titleOffsetY: number) => void;
+  onActionRowLayout: (actionRowStartY: number) => void;
 }) {
-  const canManageTags = item.state === UserItemState.BOOKMARKED;
-
   // Extract @handle from URL as fallback if creatorData.handle not available
   const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
-
-  // Get FAB config for X
-  const fabConfig = getFabConfig(item.provider);
 
   // Check if we have a thumbnail for parallax
   const hasThumbnail = !!item.thumbnailUrl;
@@ -276,43 +226,29 @@ export function XPostBookmarkView({
         </View>
       </Animated.View>
 
-      {/* Icon Action Row */}
-      <Animated.View style={styles.actionRow}>
-        <View style={styles.actionRowLeft}>
-          <IconActionButton
-            icon={bookmarkActionIcon}
-            color={bookmarkActionColor}
-            onPress={onBookmarkToggle}
-            disabled={isBookmarkActionDisabled}
-          />
-          <IconActionButton
-            icon={secondaryActionIcon}
-            color={secondaryActionColor}
-            onPress={onSecondaryAction}
-            disabled={isSecondaryActionDisabled}
-          />
-          <IconActionButton
-            icon="add-circle-outline"
-            color={colors.textSecondary}
-            onPress={onManageTags}
-            disabled={!canManageTags}
-          />
-          <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
-          <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
-        </View>
-        <IconButton
-          onPress={onOpenLink}
-          size="lg"
-          variant="solid"
-          style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
-          accessibilityLabel="Open original source"
-        >
-          {fabConfig.providerIcon}
-        </IconButton>
-      </Animated.View>
+      <ItemDetailActions
+        item={item}
+        colors={colors}
+        bookmarkActionIcon={bookmarkActionIcon}
+        bookmarkActionColor={bookmarkActionColor}
+        isBookmarkActionDisabled={isBookmarkActionDisabled}
+        secondaryActionIcon={secondaryActionIcon}
+        secondaryActionColor={secondaryActionColor}
+        isSecondaryActionDisabled={isSecondaryActionDisabled}
+        onBookmarkToggle={onBookmarkToggle}
+        onSecondaryAction={onSecondaryAction}
+        onManageTags={onManageTags}
+        onShare={onShare}
+        onOpenLink={onOpenLink}
+        useAnimatedContainer
+        onLayout={onActionRowLayout}
+      />
 
       {/* Tweet Content Section - Twitter-like layout */}
-      <Animated.View style={xPostStyles.tweetContentSection}>
+      <Animated.View
+        style={xPostStyles.tweetContentSection}
+        onLayout={({ nativeEvent }) => onContentLayout(nativeEvent.layout.y)}
+      >
         <View style={xPostStyles.tweetRow}>
           {/* Avatar on the left */}
           {item.creatorImageUrl ? (
@@ -359,12 +295,14 @@ export function XPostBookmarkView({
             </View>
 
             {/* Tweet text with link detection */}
-            <LinkedText
-              style={[xPostStyles.postText, { color: colors.text }]}
-              linkColor={colors.primary}
-            >
-              {item.title}
-            </LinkedText>
+            <View onLayout={({ nativeEvent }) => onTitleLayout(nativeEvent.layout.y)}>
+              <LinkedText
+                style={[xPostStyles.postText, { color: colors.text }]}
+                linkColor={colors.primary}
+              >
+                {item.title}
+              </LinkedText>
+            </View>
 
             {/* Additional content from summary if different from title */}
             {item.summary && item.summary !== item.title && (
@@ -398,17 +336,41 @@ export function XPostBookmarkView({
               />
             }
             headerAspectRatio={16 / 9}
+            onScroll={onScroll}
           >
             {renderContent()}
           </ParallaxScrollView>
         </Animated.View>
 
-        {/* Floating Back Button */}
-        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-          <Animated.View>
-            <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
-          </Animated.View>
-        </View>
+        <ItemDetailFloatingBack
+          colors={colors}
+          insets={insets}
+          onBack={onBack}
+          screenTitle={item.title}
+          showCollapsedTitle={showCollapsedTitle}
+          showStickyActions={showStickyActions}
+          stickyActionsTop={stickyActionsTop}
+          stickyBackdropHeight={stickyBackdropHeight}
+          stickyActions={
+            <ItemDetailActions
+              item={item}
+              colors={colors}
+              bookmarkActionIcon={bookmarkActionIcon}
+              bookmarkActionColor={bookmarkActionColor}
+              isBookmarkActionDisabled={isBookmarkActionDisabled}
+              secondaryActionIcon={secondaryActionIcon}
+              secondaryActionColor={secondaryActionColor}
+              isSecondaryActionDisabled={isSecondaryActionDisabled}
+              onBookmarkToggle={onBookmarkToggle}
+              onSecondaryAction={onSecondaryAction}
+              onManageTags={onManageTags}
+              onShare={onShare}
+              onOpenLink={onOpenLink}
+              useAnimatedContainer={false}
+              style={styles.stickyActionRow}
+            />
+          }
+        />
       </View>
     );
   }
@@ -423,17 +385,42 @@ export function XPostBookmarkView({
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 56 }]}
           showsVerticalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={32}
         >
           {renderContent()}
         </ScrollView>
       </Animated.View>
 
-      {/* Floating Back Button */}
-      <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Animated.View>
-          <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
-        </Animated.View>
-      </View>
+      <ItemDetailFloatingBack
+        colors={colors}
+        insets={insets}
+        onBack={onBack}
+        screenTitle={item.title}
+        showCollapsedTitle={showCollapsedTitle}
+        showStickyActions={showStickyActions}
+        stickyActionsTop={stickyActionsTop}
+        stickyBackdropHeight={stickyBackdropHeight}
+        stickyActions={
+          <ItemDetailActions
+            item={item}
+            colors={colors}
+            bookmarkActionIcon={bookmarkActionIcon}
+            bookmarkActionColor={bookmarkActionColor}
+            isBookmarkActionDisabled={isBookmarkActionDisabled}
+            secondaryActionIcon={secondaryActionIcon}
+            secondaryActionColor={secondaryActionColor}
+            isSecondaryActionDisabled={isSecondaryActionDisabled}
+            onBookmarkToggle={onBookmarkToggle}
+            onSecondaryAction={onSecondaryAction}
+            onManageTags={onManageTags}
+            onShare={onShare}
+            onOpenLink={onOpenLink}
+            useAnimatedContainer={false}
+            style={styles.stickyActionRow}
+          />
+        }
+      />
     </View>
   );
 }
