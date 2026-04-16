@@ -113,7 +113,7 @@ describe('BookmarksPage', () => {
     expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
     expect(screen.getByTestId('bookmark-detail-skeleton')).toBeVisible();
     expect(screen.getAllByTestId('bookmark-row-skeleton')).toHaveLength(6);
-    expect(screen.queryByText('Loading bookmarks')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { hidden: true })).toHaveTextContent('Loading bookmarks');
     loadingView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
