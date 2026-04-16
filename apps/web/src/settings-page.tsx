@@ -85,6 +85,7 @@ export function SettingsPage() {
             </div>
 
             <div className="settings-page__layout">
+              {/* Keep the settings nav fixed on the left while the content pane changes on the right. */}
               <nav className="settings-page__nav" aria-label="Settings sections">
                 <button
                   className="settings-page__nav-item settings-page__nav-item--active"
