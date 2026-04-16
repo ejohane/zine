@@ -856,13 +856,13 @@ img {
 
 .new-page-bookmark-view__icon-action:hover:not(:disabled),
 .new-page-bookmark-view__icon-action:focus-visible:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.12) !important;
+  --bookmark-action-bg: var(--bookmark-action-hover-bg);
+  --bookmark-action-border: var(--bookmark-action-hover-border);
 }
 
 .new-page-bookmark-view__icon-action:active:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.14) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  --bookmark-action-bg: var(--bookmark-action-active-bg);
+  --bookmark-action-border: var(--bookmark-action-active-border);
 }
 
 .new-page-bookmark-view__actions-left {

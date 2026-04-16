@@ -11,7 +11,15 @@ import {
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Colors, getButtonMetrics } from '@zine/design-system';
@@ -42,11 +50,28 @@ const CONTENT_FILTER_SEARCH_PARAM = 'contentType';
 
 const BOOKMARK_ACTION_BUTTON_SIZE = 56;
 const BOOKMARK_ACTION_ICON_SIZE = 22;
-const bookmarkActionButtonStyle = {
+type BookmarkActionButtonStyle = CSSProperties & {
+  '--bookmark-action-bg': string;
+  '--bookmark-action-border': string;
+  '--bookmark-action-hover-bg': string;
+  '--bookmark-action-hover-border': string;
+  '--bookmark-action-active-bg': string;
+  '--bookmark-action-active-border': string;
+};
+
+const bookmarkActionButtonStyle: BookmarkActionButtonStyle = {
   minHeight: BOOKMARK_ACTION_BUTTON_SIZE,
   width: BOOKMARK_ACTION_BUTTON_SIZE,
   borderRadius: getButtonMetrics('lg').borderRadius,
-} as const;
+  backgroundColor: 'var(--bookmark-action-bg)',
+  borderColor: 'var(--bookmark-action-border)',
+  '--bookmark-action-bg': 'transparent',
+  '--bookmark-action-border': 'transparent',
+  '--bookmark-action-hover-bg': Colors.dark.surfaceRaised,
+  '--bookmark-action-hover-border': Colors.dark.borderDefault,
+  '--bookmark-action-active-bg': Colors.dark.cardHover,
+  '--bookmark-action-active-border': Colors.dark.borderDefault,
+};
 
 function getLibrarySummary(item: LibraryItem) {
   return (
