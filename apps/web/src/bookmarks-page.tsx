@@ -12,7 +12,7 @@ import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate, useParams } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
@@ -38,6 +38,7 @@ const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
   { label: 'Videos', value: ContentType.VIDEO },
   { label: 'Posts', value: ContentType.POST },
 ];
+const CONTENT_FILTER_SEARCH_PARAM = 'contentType';
 
 const BOOKMARK_ACTION_BUTTON_SIZE = 56;
 const BOOKMARK_ACTION_ICON_SIZE = 22;
@@ -72,6 +73,43 @@ function getLibraryLengthLabel(
   }
 
   return null;
+}
+
+function parseBookmarkFilter(rawValue: string | null): ContentType | undefined {
+  switch (rawValue?.toLowerCase()) {
+    case 'article':
+      return ContentType.ARTICLE;
+    case 'podcast':
+      return ContentType.PODCAST;
+    case 'video':
+      return ContentType.VIDEO;
+    case 'post':
+      return ContentType.POST;
+    default:
+      return undefined;
+  }
+}
+
+function serializeBookmarkFilter(value: ContentType | undefined): string | null {
+  switch (value) {
+    case ContentType.ARTICLE:
+      return 'article';
+    case ContentType.PODCAST:
+      return 'podcast';
+    case ContentType.VIDEO:
+      return 'video';
+    case ContentType.POST:
+      return 'post';
+    default:
+      return null;
+  }
+}
+
+function buildBookmarksLocation(bookmarkId: string | null | undefined, search: string) {
+  return {
+    pathname: bookmarkId ? `/bookmarks/${bookmarkId}` : '/bookmarks',
+    search,
+  };
 }
 
 type BookmarkDetailItem = Pick<
@@ -333,15 +371,28 @@ export function BookmarksPage() {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
   const { bookmarkId } = useParams<{ bookmarkId?: string }>();
-  const [bookmarkFilter, setBookmarkFilter] = useState<ContentType | undefined>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
   const [manualBookmarkNotice, setManualBookmarkNotice] = useState<string | null>(null);
+  const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
+  const bookmarkSearch = searchParams.toString();
+  const bookmarkSearchString = bookmarkSearch ? `?${bookmarkSearch}` : '';
 
-  const bookmarksQuery = trpc.items.library.useQuery({
-    limit: 50,
-    filter: { contentType: bookmarkFilter },
-  });
+  const bookmarksQuery = trpc.items.library.useQuery(
+    {
+      limit: 50,
+      filter: {},
+    },
+    {
+      placeholderData: (previousData) => previousData,
+    }
+  );
   const bookmarks = bookmarksQuery.data?.items ?? [];
+  const filteredBookmarks = useMemo(
+    () =>
+      bookmarkFilter ? bookmarks.filter((item) => item.contentType === bookmarkFilter) : bookmarks,
+    [bookmarkFilter, bookmarks]
+  );
   const selectedBookmarkId = bookmarkId ?? null;
   const selectedBookmark = useMemo(
     () => bookmarks.find((item) => item.id === bookmarkId) ?? null,
@@ -365,8 +416,9 @@ export function BookmarksPage() {
       return;
     }
 
-    navigate('/bookmarks', { replace: true });
+    navigate(buildBookmarksLocation(null, bookmarkSearchString), { replace: true });
   }, [
+    bookmarkSearchString,
     bookmarkId,
     navigate,
     selectedBookmark,
@@ -395,7 +447,19 @@ export function BookmarksPage() {
   const { articleRef: bookmarkDetailRef, heroRef: bookmarkHeroRef } = useBookmarkDetailParallax(
     displayBookmark?.id ?? null
   );
-  const libraryIsEmpty = bookmarks.length === 0;
+  const bookmarkFilterLabel = CONTENT_FILTERS.find(
+    (filter) => filter.value === bookmarkFilter
+  )?.label;
+  const libraryIsEmpty = filteredBookmarks.length === 0;
+  const hasBookmarkData = Boolean(bookmarksQuery.data);
+  const bookmarksAreRefreshing = bookmarksQuery.isFetching;
+  const showInitialBookmarksLoadingState = !hasBookmarkData && bookmarksQuery.isLoading;
+  const refreshNotice = bookmarksQuery.error
+    ? (bookmarksQuery.error.message ?? 'Could not refresh bookmarks.')
+    : bookmarksAreRefreshing
+      ? 'Refreshing bookmarks...'
+      : null;
+  const headerNotice = manualBookmarkNotice ?? refreshNotice;
 
   const invalidateSelectedBookmark = () => {
     if (!selectedBookmarkId) {
@@ -439,12 +503,12 @@ export function BookmarksPage() {
         utils.items.get.invalidate({ id: result.userItemId }),
       ]);
 
-      navigate(`/bookmarks/${result.userItemId}`);
+      navigate(buildBookmarksLocation(result.userItemId, bookmarkSearchString));
     },
-    [navigate, utils.items.get, utils.items.home, utils.items.library]
+    [bookmarkSearchString, navigate, utils.items.get, utils.items.home, utils.items.library]
   );
 
-  if (bookmarksQuery.isLoading) {
+  if (showInitialBookmarksLoadingState) {
     return (
       <main className="new-page-screen">
         <EmptyState title="Loading bookmarks" message="Pulling your saved items into the desk." />
@@ -452,7 +516,7 @@ export function BookmarksPage() {
     );
   }
 
-  if (bookmarksQuery.error) {
+  if (bookmarksQuery.error && !hasBookmarkData) {
     return (
       <main className="new-page-screen">
         <EmptyState
@@ -470,7 +534,7 @@ export function BookmarksPage() {
           <div className="new-page-sidebar__rail-top">
             <div className="new-page-sidebar__rail-header">
               <Link
-                to="/bookmarks"
+                to={buildBookmarksLocation(null, bookmarkSearchString)}
                 className="new-page-sidebar__brand"
                 aria-label="Go to bookmarks"
               >
@@ -482,7 +546,7 @@ export function BookmarksPage() {
 
             <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
               <NavLink
-                to="/bookmarks"
+                to={buildBookmarksLocation(null, bookmarkSearchString)}
                 end
                 className={({ isActive }) =>
                   cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
@@ -519,7 +583,10 @@ export function BookmarksPage() {
             <ChevronRight size={14} strokeWidth={2.2} />
             {displayBookmark ? (
               <>
-                <Link to="/bookmarks" className="new-page-breadcrumb__link">
+                <Link
+                  to={buildBookmarksLocation(null, bookmarkSearchString)}
+                  className="new-page-breadcrumb__link"
+                >
                   Bookmarks
                 </Link>
                 <ChevronRight size={14} strokeWidth={2.2} />
@@ -531,8 +598,8 @@ export function BookmarksPage() {
           </nav>
 
           <div className="new-page-inset__header-actions">
-            {manualBookmarkNotice ? (
-              <span className="new-page-inset__header-note">{manualBookmarkNotice}</span>
+            {headerNotice ? (
+              <span className="new-page-inset__header-note">{headerNotice}</span>
             ) : null}
 
             <Button type="button" onClick={() => setManualBookmarkOpen(true)}>
@@ -554,7 +621,18 @@ export function BookmarksPage() {
                     size="small"
                     selected={bookmarkFilter === filter.value}
                     tone={filter.value ?? 'default'}
-                    onClick={() => setBookmarkFilter(filter.value)}
+                    onClick={() => {
+                      const nextSearchParams = new URLSearchParams(searchParams);
+                      const nextFilter = serializeBookmarkFilter(filter.value);
+
+                      if (nextFilter) {
+                        nextSearchParams.set(CONTENT_FILTER_SEARCH_PARAM, nextFilter);
+                      } else {
+                        nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+                      }
+
+                      setSearchParams(nextSearchParams);
+                    }}
                   />
                 ))}
               </div>
@@ -563,10 +641,14 @@ export function BookmarksPage() {
             <div className="new-page-column-card__list">
               {libraryIsEmpty ? (
                 <p className="new-page-column-card__empty">
-                  Add a bookmark to start building your library.
+                  {bookmarks.length === 0
+                    ? 'Add a bookmark to start building your library.'
+                    : bookmarkFilterLabel
+                      ? `No ${bookmarkFilterLabel.toLowerCase()} bookmarks match this filter.`
+                      : 'No bookmarks match this filter.'}
                 </p>
               ) : (
-                bookmarks.map((item) => (
+                filteredBookmarks.map((item) => (
                   <button
                     key={item.id}
                     type="button"
@@ -575,7 +657,7 @@ export function BookmarksPage() {
                       'bookmark-row',
                       selectedBookmark?.id === item.id && 'bookmark-row--selected'
                     )}
-                    onClick={() => navigate(`/bookmarks/${item.id}`)}
+                    onClick={() => navigate(buildBookmarksLocation(item.id, bookmarkSearchString))}
                   >
                     {item.thumbnailUrl ? (
                       <img
@@ -618,7 +700,7 @@ export function BookmarksPage() {
                   <button
                     type="button"
                     className="new-page-bookmark-view__back"
-                    onClick={() => navigate('/bookmarks')}
+                    onClick={() => navigate(buildBookmarksLocation(null, bookmarkSearchString))}
                     aria-label="Back to bookmarks list"
                     title="Back"
                   >

@@ -19,7 +19,7 @@ test('loads the bookmarks desk, filters content, opens detail, and navigates to 
   await expect(page.getByText('Design systems at scale')).toBeVisible();
 
   await page.getByRole('button', { name: /Design systems at scale/ }).click();
-  await expect(page).toHaveURL(/\/bookmarks\/video-1$/);
+  await expect(page).toHaveURL(/\/bookmarks\/video-1\?contentType=video$/);
   await expect(page.getByRole('heading', { name: 'Design systems at scale' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open in YouTube' })).toHaveAttribute(
     'href',
