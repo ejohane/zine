@@ -50,6 +50,19 @@
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
 
+### Agent Browser Verification
+
+- When manually verifying the web app with `agent-browser`, prefer the local development auth bypass instead of trying to sign into Clerk.
+- Start the local stack with `bun run dev:worktree` so the worktree gets:
+  - a seeded `apps/worker/.wrangler/state` copied from the main worktree when available
+  - local D1 migrations applied before the app starts
+  - generated `apps/web/.env.local` pointing the web app at the correct local worker
+- For local web verification, keep Clerk disabled in the local dev env:
+  - leave `VITE_CLERK_PUBLISHABLE_KEY` unset in `apps/web/.env.local` so `apps/web/src/lib/trpc.tsx` uses `development-bypass` on localhost
+  - leave `CLERK_JWKS_URL` unset in local worker development so `apps/worker/src/middleware/auth.ts` uses `dev-user-001`
+- This bypass is the preferred path for `agent-browser` screenshots and UI checks on localhost because it exercises protected routes without needing an interactive Clerk login flow.
+- If `/bookmarks` or other protected pages load but show empty state unexpectedly, do not assume auth is broken; first follow **Empty Local Data Recovery** below to verify the worktree D1 file actually contains the expected local data for `dev-user-001`.
+
 ### Empty Local Data Recovery
 
 - Symptom: Expo Go loads, but Home/Inbox/Library are empty even though local test data should exist.
