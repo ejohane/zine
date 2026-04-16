@@ -5,6 +5,21 @@ import { StatCard, Surface } from './components';
 import { AppWordmark } from './app-wordmark';
 import { useAuthAvailability } from './lib/trpc';
 
+const clerkAppearance = {
+  variables: {
+    colorBackground: 'transparent',
+    colorPrimary: '#111111',
+    colorText: '#111111',
+    colorTextSecondary: '#6B7280',
+    colorDanger: '#DC2626',
+    colorSuccess: '#059669',
+    colorInputBackground: '#F9FAFB',
+    colorInputText: '#111111',
+    colorNeutral: '#111111',
+    borderRadius: '0.75rem',
+  },
+};
+
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const { isEnabled, mode: authMode } = useAuthAvailability();
 
@@ -43,6 +58,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
         <Surface className="auth-panel__surface">
           {mode === 'sign-in' ? (
             <SignIn
+              appearance={clerkAppearance}
               path="/sign-in"
               routing="path"
               signUpUrl="/sign-up"
@@ -50,6 +66,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             />
           ) : (
             <SignUp
+              appearance={clerkAppearance}
               path="/sign-up"
               routing="path"
               signInUrl="/sign-in"
