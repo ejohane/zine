@@ -63,6 +63,7 @@ export const invalidateSpies = {
 export const mutationSpies = {
   toggleFinished: vi.fn<(input: unknown) => void>(),
   unbookmark: vi.fn<(input: unknown) => void>(),
+  bookmarkSave: vi.fn<(input: unknown) => void>(),
 };
 
 export const hookSpies = {
@@ -78,6 +79,9 @@ export const hookSpies = {
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
   >((_input) => createQueryResult({})),
+  bookmarksSaveUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.bookmarkSave, options)
+  ),
   toggleFinishedUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.toggleFinished, options)
   ),
@@ -135,6 +139,11 @@ export function resetTrpcMocks() {
   hookSpies.bookmarksPreviewUseQuery.mockReset();
   hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
 
+  hookSpies.bookmarksSaveUseMutation.mockReset();
+  hookSpies.bookmarksSaveUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.bookmarkSave, options)
+  );
+
   hookSpies.toggleFinishedUseMutation.mockReset();
   hookSpies.toggleFinishedUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.toggleFinished, options)
@@ -187,6 +196,9 @@ export const trpc = {
     preview: {
       useQuery: (input: BookmarkPreviewInput, options?: unknown) =>
         hookSpies.bookmarksPreviewUseQuery(input, options),
+    },
+    save: {
+      useMutation: (options?: MutationOptions) => hookSpies.bookmarksSaveUseMutation(options),
     },
   },
 };

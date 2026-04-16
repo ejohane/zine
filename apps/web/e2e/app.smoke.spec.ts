@@ -38,9 +38,16 @@ test('renders the empty state when no bookmarks exist', async ({ page }) => {
 
   await page.goto('/bookmarks');
 
-  await expect(page.getByRole('heading', { name: 'No bookmarks yet' })).toBeVisible({
+  await expect(
+    page.getByRole('heading', { name: /No bookmarks yet|Add your first bookmark/ })
+  ).toBeVisible({
     timeout: 15_000,
   });
+  await expect(
+    page.getByText(
+      /Save a few items first, then this desk becomes the main web surface for browsing them\.|Add a bookmark to start building your library\./
+    )
+  ).toBeVisible();
 });
 
 test('renders the error state when the bookmarks query fails', async ({ page }) => {
