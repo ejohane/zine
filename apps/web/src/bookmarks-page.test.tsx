@@ -99,7 +99,7 @@ describe('BookmarksPage', () => {
     });
   });
 
-  test('renders loading, error, and empty states from the library query', () => {
+  test('renders skeleton loading, error, and empty states from the library query', () => {
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
       data: undefined,
       isLoading: true,
@@ -110,7 +110,10 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByText('Loading bookmarks')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(screen.getByTestId('bookmark-detail-skeleton')).toBeVisible();
+    expect(screen.getAllByTestId('bookmark-row-skeleton')).toHaveLength(6);
+    expect(screen.queryByText('Loading bookmarks')).not.toBeInTheDocument();
     loadingView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
@@ -206,6 +209,28 @@ describe('BookmarksPage', () => {
     expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
     expect(screen.getByText(articleItem.title)).toBeVisible();
     expect(screen.queryByText('Loading bookmarks')).not.toBeInTheDocument();
+  });
+
+  test('shows the detail skeleton while a routed bookmark is still loading', () => {
+    hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
+      data: { items: [] },
+      isLoading: false,
+      error: null,
+    });
+    hookSpies.itemsGetUseQuery.mockReturnValueOnce({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    });
+
+    renderRoute(<BookmarksPage />, {
+      route: '/bookmarks/video-1',
+      path: '/bookmarks/:bookmarkId',
+      redirects: [{ path: '/bookmarks', element: <div>Bookmarks fallback</div> }],
+    });
+
+    expect(screen.getByTestId('bookmark-detail-skeleton')).toBeVisible();
+    expect(screen.queryByText('Select a bookmark')).not.toBeInTheDocument();
   });
 
   test('recovers to the list when a selected bookmark cannot be loaded', async () => {
