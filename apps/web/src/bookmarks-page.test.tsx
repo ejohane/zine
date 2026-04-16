@@ -116,10 +116,12 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
-    expect(screen.getByTestId('bookmark-detail-skeleton')).toBeVisible();
-    expect(screen.getAllByTestId('bookmark-row-skeleton')).toHaveLength(6);
-    expect(screen.getByRole('status', { hidden: true })).toHaveTextContent('Loading bookmarks');
+    expect(loadingView.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(loadingView.getByTestId('bookmark-detail-skeleton')).toBeVisible();
+    expect(loadingView.getAllByTestId('bookmark-row-skeleton')).toHaveLength(6);
+    expect(loadingView.getByRole('status', { hidden: true })).toHaveTextContent(
+      'Loading bookmarks'
+    );
     loadingView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
@@ -131,8 +133,8 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByText('Could not load bookmarks')).toBeVisible();
-    expect(screen.getByText('Network down')).toBeVisible();
+    expect(errorView.getByText('Could not load bookmarks')).toBeVisible();
+    expect(errorView.getByText('Network down')).toBeVisible();
     errorView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
