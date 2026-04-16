@@ -16,7 +16,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      'VITE_API_URL=http://127.0.0.1:8787 bunx vite --host 127.0.0.1 --port 45173 --strictPort',
+      'VITE_API_URL=http://127.0.0.1:8787 VITE_CLERK_PUBLISHABLE_KEY= bunx vite --host 127.0.0.1 --port 45173 --strictPort',
     cwd: __dirname,
     url: 'http://127.0.0.1:45173',
     reuseExistingServer: !process.env.CI,
