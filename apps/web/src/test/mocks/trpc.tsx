@@ -29,6 +29,10 @@ type CreatorGetInput = {
   creatorId: string;
 };
 
+type BookmarkPreviewInput = {
+  url: string;
+};
+
 type MutationSpy = ReturnType<typeof vi.fn<(input: unknown) => void>>;
 
 type SessionState = {
@@ -71,6 +75,9 @@ export const hookSpies = {
   creatorsGetUseQuery: vi.fn<(input: CreatorGetInput, options?: unknown) => QueryResult<unknown>>(
     (_input) => createQueryResult({})
   ),
+  bookmarksPreviewUseQuery: vi.fn<
+    (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
+  >((_input) => createQueryResult({})),
   toggleFinishedUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.toggleFinished, options)
   ),
@@ -125,6 +132,9 @@ export function resetTrpcMocks() {
   hookSpies.creatorsGetUseQuery.mockReset();
   hookSpies.creatorsGetUseQuery.mockImplementation((_input) => createQueryResult());
 
+  hookSpies.bookmarksPreviewUseQuery.mockReset();
+  hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
+
   hookSpies.toggleFinishedUseMutation.mockReset();
   hookSpies.toggleFinishedUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.toggleFinished, options)
@@ -171,6 +181,12 @@ export const trpc = {
     get: {
       useQuery: (input: CreatorGetInput, options?: unknown) =>
         hookSpies.creatorsGetUseQuery(input, options),
+    },
+  },
+  bookmarks: {
+    preview: {
+      useQuery: (input: BookmarkPreviewInput, options?: unknown) =>
+        hookSpies.bookmarksPreviewUseQuery(input, options),
     },
   },
 };
