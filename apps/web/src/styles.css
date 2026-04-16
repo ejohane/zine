@@ -588,6 +588,17 @@ img {
   animation: bookmark-skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .new-page-column-card__skeleton::after,
+  .bookmark-skeleton-block::after,
+  .bookmark-skeleton-line::after,
+  .bookmark-skeleton-pill::after,
+  .bookmark-skeleton-circle::after,
+  .bookmark-skeleton-action::after,
+  .new-page-bookmark-view__hero-placeholder--skeleton::after {
+    animation: none;
+  }
+}
 .bookmark-skeleton-line,
 .bookmark-skeleton-pill,
 .bookmark-skeleton-circle,
