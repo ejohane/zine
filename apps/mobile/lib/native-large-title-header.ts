@@ -1,10 +1,29 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 
-const COLLAPSED_TITLE_THRESHOLD = 44;
+export const COLLAPSED_TITLE_THRESHOLD = 44;
+
+export function getCollapsedHeaderTitleThreshold(
+  titleStartY: number,
+  collapsedTitleThreshold = COLLAPSED_TITLE_THRESHOLD
+) {
+  if (!Number.isFinite(titleStartY)) {
+    return collapsedTitleThreshold;
+  }
+
+  return Math.max(collapsedTitleThreshold, titleStartY - collapsedTitleThreshold);
+}
+
+export function getStickyActionRowThreshold(actionRowStartY: number, stickyTopY: number) {
+  if (!Number.isFinite(actionRowStartY) || !Number.isFinite(stickyTopY)) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return Math.max(0, actionRowStartY - stickyTopY);
+}
 
 export const lightweightHeaderStackScreenOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
@@ -26,6 +45,8 @@ export function createLightweightHeaderScreenOptions({
   tintColor,
   screenTitle,
   showScreenTitle = true,
+  headerStyle,
+  headerTitleStyle,
   ...options
 }: NativeStackNavigationOptions & {
   backgroundColor: string;
@@ -34,34 +55,50 @@ export function createLightweightHeaderScreenOptions({
   showScreenTitle?: boolean;
 }): NativeStackNavigationOptions {
   return {
-    ...options,
-    title: showScreenTitle ? screenTitle : '',
     headerLargeTitle: false,
     headerTransparent: false,
     headerShadowVisible: false,
+    ...options,
+    title: showScreenTitle ? screenTitle : '',
     headerTintColor: tintColor,
     headerStyle: {
       backgroundColor,
+      ...headerStyle,
     },
     headerTitleStyle: {
       color: tintColor,
+      ...headerTitleStyle,
     },
   };
 }
 
-export function useCollapsedHeaderTitle() {
+export function useCollapsedHeaderTitle({
+  threshold = COLLAPSED_TITLE_THRESHOLD,
+}: {
+  threshold?: number;
+} = {}) {
   const scrollOffsetYRef = useRef(0);
   const [showCollapsedTitle, setShowCollapsedTitle] = useState(false);
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    scrollOffsetYRef.current = offsetY;
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetY = event.nativeEvent.contentOffset.y;
+      scrollOffsetYRef.current = offsetY;
 
-    const shouldShowCollapsedTitle = offsetY > COLLAPSED_TITLE_THRESHOLD;
+      const shouldShowCollapsedTitle = offsetY > threshold;
+      setShowCollapsedTitle((current) =>
+        current === shouldShowCollapsedTitle ? current : shouldShowCollapsedTitle
+      );
+    },
+    [threshold]
+  );
+
+  useEffect(() => {
+    const shouldShowCollapsedTitle = scrollOffsetYRef.current > threshold;
     setShowCollapsedTitle((current) =>
       current === shouldShowCollapsedTitle ? current : shouldShowCollapsedTitle
     );
-  }, []);
+  }, [threshold]);
 
   return {
     handleScroll,

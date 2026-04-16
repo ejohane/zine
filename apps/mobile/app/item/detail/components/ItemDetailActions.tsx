@@ -1,16 +1,21 @@
 import type { Ionicons } from '@expo/vector-icons';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { Pressable, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { UserItemState } from '@/hooks/use-items-trpc';
 
-import { IconActionButton } from '../../item-detail-components';
 import { getFabConfig } from '../../item-detail-helpers';
 import { styles } from '../../item-detail-styles';
 import type { ItemDetailColors, ItemDetailItem } from '../types';
+import { IconActionButton } from './ItemDetailButtons';
+
+type ItemDetailActionItem = Pick<ItemDetailItem, 'state'> & {
+  provider: ItemDetailItem['provider'] | string;
+};
 
 type ItemDetailActionsProps = {
-  item: ItemDetailItem;
+  item: ItemDetailActionItem;
   colors: ItemDetailColors;
   bookmarkActionIcon: keyof typeof Ionicons.glyphMap;
   bookmarkActionColor: string;
@@ -24,6 +29,8 @@ type ItemDetailActionsProps = {
   onShare: () => void;
   onOpenLink: () => void;
   useAnimatedContainer: boolean;
+  onLayout?: (actionRowStartY: number) => void;
+  style?: StyleProp<ViewStyle>;
 };
 
 export function ItemDetailActions({
@@ -41,13 +48,18 @@ export function ItemDetailActions({
   onShare,
   onOpenLink,
   useAnimatedContainer,
+  onLayout,
+  style,
 }: ItemDetailActionsProps) {
   const fabConfig = getFabConfig(item.provider);
   const canManageTags = item.state === UserItemState.BOOKMARKED;
   const Container = useAnimatedContainer ? Animated.View : View;
 
   return (
-    <Container style={styles.actionRow}>
+    <Container
+      style={[styles.actionRow, style]}
+      onLayout={({ nativeEvent }) => onLayout?.(nativeEvent.layout.y)}
+    >
       <View style={styles.actionRowLeft}>
         <IconActionButton
           icon={bookmarkActionIcon}

@@ -53,6 +53,32 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 100,
   },
+  floatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+  },
+  floatingHeaderBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  floatingTitleContainer: {
+    position: 'absolute',
+    left: 72,
+    right: 72,
+    alignItems: 'center',
+    zIndex: 101,
+  },
+  floatingTitle: {
+    ...Typography.titleMedium,
+  },
+  stickyActionRowContainer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    zIndex: 101,
+  },
   headerIconButton: {
     width: 40,
     height: 40,
@@ -154,6 +180,9 @@ export const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     paddingLeft: Spacing.xl,
     paddingRight: Spacing.xl + Spacing.sm,
+  },
+  stickyActionRow: {
+    marginBottom: 0,
   },
   actionRowLeft: {
     flexDirection: 'row',

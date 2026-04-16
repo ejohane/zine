@@ -11,7 +11,15 @@ import {
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
 import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Colors, getButtonMetrics } from '@zine/design-system';
@@ -42,11 +50,28 @@ const CONTENT_FILTER_SEARCH_PARAM = 'contentType';
 
 const BOOKMARK_ACTION_BUTTON_SIZE = 56;
 const BOOKMARK_ACTION_ICON_SIZE = 22;
-const bookmarkActionButtonStyle = {
+type BookmarkActionButtonStyle = CSSProperties & {
+  '--bookmark-action-bg': string;
+  '--bookmark-action-border': string;
+  '--bookmark-action-hover-bg': string;
+  '--bookmark-action-hover-border': string;
+  '--bookmark-action-active-bg': string;
+  '--bookmark-action-active-border': string;
+};
+
+const bookmarkActionButtonStyle: BookmarkActionButtonStyle = {
   minHeight: BOOKMARK_ACTION_BUTTON_SIZE,
   width: BOOKMARK_ACTION_BUTTON_SIZE,
   borderRadius: getButtonMetrics('lg').borderRadius,
-} as const;
+  backgroundColor: 'var(--bookmark-action-bg)',
+  borderColor: 'var(--bookmark-action-border)',
+  '--bookmark-action-bg': 'transparent',
+  '--bookmark-action-border': 'transparent',
+  '--bookmark-action-hover-bg': Colors.dark.surfaceRaised,
+  '--bookmark-action-hover-border': Colors.dark.borderDefault,
+  '--bookmark-action-active-bg': Colors.dark.cardHover,
+  '--bookmark-action-active-border': Colors.dark.borderDefault,
+};
 
 function getLibrarySummary(item: LibraryItem) {
   return (
@@ -367,6 +392,100 @@ function getManualBookmarkNotice(status: 'created' | 'already_bookmarked' | 'reb
   }
 }
 
+const BOOKMARK_LOADING_ROW_COUNT = 6;
+
+function BookmarkRowSkeleton() {
+  return (
+    <div
+      className="bookmark-row bookmark-row--skeleton"
+      aria-hidden="true"
+      data-testid="bookmark-row-skeleton"
+    >
+      <div className="bookmark-row__cover bookmark-skeleton-block" />
+      <div className="bookmark-row__info">
+        <span
+          className="bookmark-skeleton-line bookmark-skeleton-line--title"
+          style={{ width: '78%' }}
+        />
+        <div className="bookmark-row__author">
+          <span className="bookmark-skeleton-circle bookmark-skeleton-circle--row-avatar" />
+          <span className="bookmark-skeleton-line" style={{ width: '42%' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookmarkDetailSkeleton() {
+  return (
+    <div
+      className="new-page-bookmark-view new-page-bookmark-view--pane new-page-bookmark-view--skeleton"
+      aria-hidden="true"
+      data-testid="bookmark-detail-skeleton"
+    >
+      <div className="new-page-bookmark-view__hero">
+        <div className="new-page-bookmark-view__hero-placeholder new-page-bookmark-view__hero-placeholder--skeleton" />
+      </div>
+
+      <div className="new-page-bookmark-view__body">
+        <div className="new-page-bookmark-view__header">
+          <div className="new-page-bookmark-view__badges">
+            <span className="bookmark-skeleton-pill" />
+            <span className="bookmark-skeleton-pill" style={{ width: '4rem' }} />
+          </div>
+
+          <span
+            className="bookmark-skeleton-line bookmark-skeleton-line--display"
+            style={{ width: '74%' }}
+          />
+          <span
+            className="bookmark-skeleton-line bookmark-skeleton-line--display"
+            style={{ width: '56%' }}
+          />
+        </div>
+
+        <div className="new-page-bookmark-view__creator-block">
+          <div className="new-page-bookmark-view__creator">
+            <span className="bookmark-skeleton-circle bookmark-skeleton-circle--detail-avatar" />
+            <div className="new-page-bookmark-view__creator-copy new-page-bookmark-view__creator-copy--skeleton">
+              <span className="bookmark-skeleton-line" style={{ width: '10rem' }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="new-page-bookmark-view__meta new-page-bookmark-view__meta--skeleton">
+          <span className="bookmark-skeleton-line" style={{ width: '5rem' }} />
+          <span className="bookmark-skeleton-line" style={{ width: '4.5rem' }} />
+          <span className="bookmark-skeleton-line" style={{ width: '3.75rem' }} />
+        </div>
+
+        <div className="new-page-bookmark-view__actions">
+          <div className="new-page-bookmark-view__actions-left">
+            {Array.from({ length: 4 }, (_, index) => (
+              <span key={index} className="bookmark-skeleton-action" />
+            ))}
+          </div>
+
+          <span className="bookmark-skeleton-circle bookmark-skeleton-circle--fab" />
+        </div>
+
+        <section className="new-page-bookmark-view__section">
+          <span className="bookmark-skeleton-line" style={{ width: '7rem', height: '0.7rem' }} />
+          <span className="bookmark-skeleton-line bookmark-skeleton-line--summary" />
+          <span
+            className="bookmark-skeleton-line bookmark-skeleton-line--summary"
+            style={{ width: '84%' }}
+          />
+          <span
+            className="bookmark-skeleton-line bookmark-skeleton-line--summary"
+            style={{ width: '68%' }}
+          />
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export function BookmarksPage() {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
@@ -454,6 +573,9 @@ export function BookmarksPage() {
   const hasBookmarkData = Boolean(bookmarksQuery.data);
   const bookmarksAreRefreshing = bookmarksQuery.isFetching;
   const showInitialBookmarksLoadingState = !hasBookmarkData && bookmarksQuery.isLoading;
+  const showBookmarkDetailSkeleton =
+    showInitialBookmarksLoadingState ||
+    Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
   const refreshNotice = bookmarksQuery.error
     ? (bookmarksQuery.error.message ?? 'Could not refresh bookmarks.')
     : bookmarksAreRefreshing
@@ -507,14 +629,6 @@ export function BookmarksPage() {
     },
     [bookmarkSearchString, navigate, utils.items.get, utils.items.home, utils.items.library]
   );
-
-  if (showInitialBookmarksLoadingState) {
-    return (
-      <main className="new-page-screen">
-        <EmptyState title="Loading bookmarks" message="Pulling your saved items into the desk." />
-      </main>
-    );
-  }
 
   if (bookmarksQuery.error && !hasBookmarkData) {
     return (
@@ -647,8 +761,36 @@ export function BookmarksPage() {
               </div>
             </div>
 
-            <div className="new-page-column-card__list">
-              {libraryIsEmpty ? (
+            <div
+              className="new-page-column-card__list"
+              aria-busy={showInitialBookmarksLoadingState}
+            >
+              {showInitialBookmarksLoadingState ? (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  style={{
+                    position: 'absolute',
+                    width: '1px',
+                    height: '1px',
+                    padding: 0,
+                    margin: '-1px',
+                    overflow: 'hidden',
+                    clip: 'rect(0, 0, 0, 0)',
+                    whiteSpace: 'nowrap',
+                    border: 0,
+                  }}
+                >
+                  Loading bookmarks
+                </div>
+              ) : null}
+
+              {showInitialBookmarksLoadingState ? (
+                Array.from({ length: BOOKMARK_LOADING_ROW_COUNT }, (_, index) => (
+                  <BookmarkRowSkeleton key={index} />
+                ))
+              ) : libraryIsEmpty ? (
                 <p className="new-page-column-card__empty">
                   {bookmarks.length === 0
                     ? 'Add a bookmark to start building your library.'
@@ -700,8 +842,13 @@ export function BookmarksPage() {
           </aside>
 
           <div className="new-page-inset__content">
-            <section className="new-page-column-card new-page-bookmark-pane">
-              {displayBookmark ? (
+            <section
+              className="new-page-column-card new-page-bookmark-pane"
+              aria-busy={showBookmarkDetailSkeleton}
+            >
+              {showBookmarkDetailSkeleton ? (
+                <BookmarkDetailSkeleton />
+              ) : displayBookmark ? (
                 <article
                   ref={bookmarkDetailRef}
                   className="new-page-bookmark-view new-page-bookmark-view--pane"
