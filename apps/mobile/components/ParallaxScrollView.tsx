@@ -13,7 +13,7 @@
 
 import { LinearGradient } from 'expo-linear-gradient';
 import type { PropsWithChildren, ReactElement } from 'react';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View, type ScrollViewProps } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedRef,
@@ -31,6 +31,7 @@ type Props = PropsWithChildren<{
   headerAspectRatio?: number;
   /** Fraction of screen height to use for header when aspect ratio <= 1. Defaults to 0.33. */
   headerHeightFraction?: number;
+  onScroll?: ScrollViewProps['onScroll'];
 }>;
 
 export default function ParallaxScrollView({
@@ -39,6 +40,7 @@ export default function ParallaxScrollView({
   scrollEnabled = true,
   headerAspectRatio = 1,
   headerHeightFraction = 0.33,
+  onScroll,
 }: Props) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollViewOffset(scrollRef);
@@ -78,6 +80,7 @@ export default function ParallaxScrollView({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       scrollEnabled={scrollEnabled}
+      onScroll={onScroll}
     >
       <Animated.View
         style={[styles.headerContainer, { height: headerHeight }, headerAnimatedStyle]}
