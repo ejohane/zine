@@ -15,8 +15,7 @@
  */
 
 import { desc, eq } from 'drizzle-orm';
-import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import type * as schema from '../db/schema';
+import type { Database } from '../db';
 import { subscriptions, subscriptionItems } from '../db/schema';
 import { pollLogger } from '../lib/logger';
 
@@ -25,7 +24,7 @@ const adaptiveLogger = pollLogger.child('adaptive');
 /**
  * Database type with full schema inference
  */
-type DrizzleDB = DrizzleD1Database<typeof schema>;
+type DrizzleDB = Database;
 
 // ============================================================================
 // Types

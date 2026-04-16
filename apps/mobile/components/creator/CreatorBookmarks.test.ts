@@ -7,8 +7,6 @@
  * - Empty state
  * - Success state with items
  * - Infinite scroll pagination
- *
- * @see Task zine-k472 for requirements
  */
 
 // ============================================================================

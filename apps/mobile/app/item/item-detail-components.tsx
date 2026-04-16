@@ -68,10 +68,6 @@ export function LinkedText({
   );
 }
 
-// ============================================================================
-// Icon Action Button
-// ============================================================================
-
 export function IconActionButton({
   icon,
   color,
@@ -101,10 +97,6 @@ export function IconActionButton({
     </IconButton>
   );
 }
-
-// ============================================================================
-// Floating Header Button
-// ============================================================================
 
 export function HeaderIconButton({
   icon,

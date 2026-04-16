@@ -45,7 +45,7 @@ import { triggerInitialFetch, type InitialFetchEnv } from '../../subscriptions/i
 import { pollSingleYouTubeSubscription } from '../../polling/youtube-poller';
 import { pollSingleSpotifySubscription } from '../../polling/spotify-poller';
 import type { Bindings } from '../../types';
-import type { Subscription as PollingSubscription, DrizzleDB } from '../../polling/types';
+import type { Subscription as PollingSubscription } from '../../polling/types';
 import {
   initiateSyncJob,
   getSyncStatus,
@@ -603,7 +603,7 @@ export const subscriptionsRouter = router({
           client,
           ctx.userId,
           ctx.env as Bindings,
-          ctx.db as unknown as DrizzleDB
+          ctx.db
         );
       } else if (sub.provider === 'SPOTIFY') {
         const client = await getSpotifyClientForConnection(
@@ -615,7 +615,7 @@ export const subscriptionsRouter = router({
           client,
           ctx.userId,
           ctx.env as Bindings,
-          ctx.db as unknown as DrizzleDB
+          ctx.db
         );
       } else {
         throw new TRPCError({

@@ -25,14 +25,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { createTraceId } from '@zine/shared';
 import { ulid } from 'ulid';
-import type { createOfflineTRPCClient } from './trpc-offline-client';
 import { offlineLogger } from './logger';
 import { classifyErrorLegacy, type ErrorClassification } from './error-utils';
 import { CLERK_PUBLISHABLE_KEY, tokenCache } from './auth';
 import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
-
-// Re-export for backward compatibility
-export type { ErrorClassification } from './error-utils';
 
 // ============================================================================
 // Constants
@@ -52,16 +48,22 @@ const AUTH_RETRY_LIMIT = 1; // Only retry auth errors once after token refresh
  */
 export type OfflineActionType = 'SUBSCRIBE' | 'UNSUBSCRIBE';
 
+type SubscribeOfflineAction = {
+  type: 'SUBSCRIBE';
+  payload: AddSubscriptionInput;
+};
+
+type UnsubscribeOfflineAction = {
+  type: 'UNSUBSCRIBE';
+  payload: RemoveSubscriptionInput;
+};
+
 /**
  * A queued offline action with metadata for retry handling.
  */
-export interface OfflineAction {
+export type OfflineAction = (SubscribeOfflineAction | UnsubscribeOfflineAction) & {
   /** ULID for ordering (lexicographically sortable by creation time) */
   id: string;
-  /** The type of mutation to perform */
-  type: OfflineActionType;
-  /** Mutation payload (specific to action type) */
-  payload: Record<string, unknown>;
   /** Logical trace ID for the originating user action */
   traceId?: string;
   /** Timestamp when the action was created */
@@ -74,21 +76,12 @@ export interface OfflineAction {
   lastError?: string;
   /** Last error classification for UI display */
   lastErrorType?: ErrorClassification;
-}
+};
 
 /**
  * Callback type for queue change listeners.
  */
 type QueueListener = () => void;
-
-type LegacySourcesMutations = {
-  sources?: {
-    add?: { mutate: (input: AddSubscriptionInput) => Promise<unknown> };
-    remove?: { mutate: (input: RemoveSubscriptionInput) => Promise<unknown> };
-  };
-};
-
-type OfflineQueueTRPCClient = ReturnType<typeof createOfflineTRPCClient> & LegacySourcesMutations;
 
 /**
  * Result of processing a single action.
@@ -178,20 +171,30 @@ class OfflineActionQueue {
    */
   async enqueue(action: {
     type: OfflineActionType;
-    payload: Record<string, unknown>;
+    payload: object;
     traceId?: string;
   }): Promise<string> {
     const queue = await this.getQueue();
 
-    const queuedAction: OfflineAction = {
+    const metadata = {
       id: ulid(),
-      type: action.type,
-      payload: action.payload,
       traceId: action.traceId ?? createTraceId(),
       createdAt: Date.now(),
       retryCount: 0,
       authRetryCount: 0,
     };
+    const queuedAction: OfflineAction =
+      action.type === 'SUBSCRIBE'
+        ? {
+            ...metadata,
+            type: action.type,
+            payload: action.payload as AddSubscriptionInput,
+          }
+        : {
+            ...metadata,
+            type: action.type,
+            payload: action.payload as RemoveSubscriptionInput,
+          };
 
     queue.push(queuedAction);
     await this.saveQueue(queue);
@@ -515,32 +518,16 @@ class OfflineActionQueue {
     const client = createOfflineTRPCClient({
       traceId: action.traceId ?? `trc_offline_${action.id}`,
       clientRequestId: action.id,
-    }) as OfflineQueueTRPCClient;
+    });
 
-    // Map action types to tRPC mutations. Legacy `sources` route is kept as
-    // a fallback for older test/mocked clients.
     switch (action.type) {
       case 'SUBSCRIBE': {
-        const payload = action.payload as AddSubscriptionInput;
-        if (client.sources?.add?.mutate) {
-          // Legacy router path
-          await client.sources.add.mutate(payload);
-        } else {
-          // Current router path
-          await client.subscriptions.add.mutate(payload);
-        }
+        await client.subscriptions.add.mutate(action.payload);
         break;
       }
 
       case 'UNSUBSCRIBE': {
-        const payload = action.payload as RemoveSubscriptionInput;
-        if (client.sources?.remove?.mutate) {
-          // Legacy router path
-          await client.sources.remove.mutate(payload);
-        } else {
-          // Current router path
-          await client.subscriptions.remove.mutate(payload);
-        }
+        await client.subscriptions.remove.mutate(action.payload);
         break;
       }
     }
@@ -560,7 +547,7 @@ class OfflineActionQueue {
  *
  * await offlineQueue.enqueue({
  *   type: 'SUBSCRIBE',
- *   payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@channel' }
+ *   payload: { provider: 'YOUTUBE', providerChannelId: 'UC...' }
  * });
  * ```
  */

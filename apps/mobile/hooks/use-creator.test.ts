@@ -7,8 +7,6 @@
  * - useCreatorPublications hook behavior with pagination
  * - useCreatorLatestContent hook behavior
  * - useCreatorSubscription hook behavior with optimistic updates
- *
- * @see Task zine-8791 for requirements
  */
 
 import { renderHook, act } from '@testing-library/react-hooks';

@@ -5,8 +5,6 @@
  * - isValidUrl() validation function
  * - usePreview hook behavior
  * - useSaveBookmark hook behavior
- *
- * @see Task zine-e40.7 for requirements
  */
 
 import { renderHook, act } from '@testing-library/react-hooks';

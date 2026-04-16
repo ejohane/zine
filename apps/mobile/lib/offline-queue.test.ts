@@ -12,6 +12,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { Provider } from '@zine/shared';
 
 // ============================================================================
 // Module-level Mocks
@@ -52,14 +53,11 @@ process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'test-clerk-key';
 const QUEUE_KEY = 'zine:offline_action_queue';
 
 // Import after mocks are set up
-import {
-  offlineQueue,
-  type OfflineAction,
-  type OfflineActionType,
-  type ErrorClassification,
-} from './offline-queue';
+import { offlineQueue, type OfflineAction, type OfflineActionType } from './offline-queue';
 import { createOfflineTRPCClient, notifyQueueProcessed } from './trpc-offline-client';
 import { getClerkInstance } from '@clerk/clerk-expo';
+import type { ErrorClassification } from './error-utils';
+import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
 
 // Helper to reset queue state between tests
 async function resetQueue(): Promise<void> {
@@ -83,17 +81,50 @@ function getSavedQueue(): OfflineAction[] {
 }
 
 // Create a test action
-function createTestAction(overrides: Partial<OfflineAction> = {}): OfflineAction {
+function createSubscribePayload(
+  overrides: Partial<AddSubscriptionInput> = {}
+): AddSubscriptionInput {
   return {
+    provider: Provider.YOUTUBE,
+    providerChannelId: 'UC_TEST_CHANNEL',
+    name: 'Test Channel',
+    ...overrides,
+  };
+}
+
+function createUnsubscribePayload(
+  overrides: Partial<RemoveSubscriptionInput> = {}
+): RemoveSubscriptionInput {
+  return {
+    subscriptionId: 'sub-123',
+    ...overrides,
+  };
+}
+
+function createTestAction(overrides: Partial<OfflineAction> = {}): OfflineAction {
+  const base = {
     id: 'test-action-id',
-    type: 'SUBSCRIBE',
-    payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
     traceId: 'trc_test_action',
     createdAt: Date.now(),
     retryCount: 0,
     authRetryCount: 0,
-    ...overrides,
   };
+
+  if (overrides.type === 'UNSUBSCRIBE') {
+    return {
+      ...base,
+      type: 'UNSUBSCRIBE',
+      payload: createUnsubscribePayload(),
+      ...overrides,
+    } as OfflineAction;
+  }
+
+  return {
+    ...base,
+    type: 'SUBSCRIBE',
+    payload: createSubscribePayload(),
+    ...overrides,
+  } as OfflineAction;
 }
 
 // ============================================================================
@@ -134,7 +165,7 @@ describe('OfflineActionQueue', () => {
     it('adds action to queue with ULID', async () => {
       const id = await offlineQueue.enqueue({
         type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+        payload: createSubscribePayload(),
       });
 
       expect(id).toBeDefined();
@@ -145,7 +176,7 @@ describe('OfflineActionQueue', () => {
     it('persists action to AsyncStorage', async () => {
       await offlineQueue.enqueue({
         type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+        payload: createSubscribePayload(),
       });
 
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(
@@ -157,7 +188,7 @@ describe('OfflineActionQueue', () => {
     it('initializes retry counts to zero', async () => {
       await offlineQueue.enqueue({
         type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+        payload: createSubscribePayload(),
       });
 
       const savedQueue = getSavedQueue();
@@ -169,7 +200,7 @@ describe('OfflineActionQueue', () => {
     it('stores a trace ID for later replay correlation', async () => {
       await offlineQueue.enqueue({
         type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+        payload: createSubscribePayload(),
       });
 
       const savedQueue = getSavedQueue();
@@ -180,7 +211,7 @@ describe('OfflineActionQueue', () => {
       const beforeEnqueue = Date.now();
       await offlineQueue.enqueue({
         type: 'SUBSCRIBE',
-        payload: {},
+        payload: createSubscribePayload(),
       });
       const afterEnqueue = Date.now();
 
@@ -209,7 +240,10 @@ describe('OfflineActionQueue', () => {
 
       for (const type of actionTypes) {
         await resetQueue();
-        await offlineQueue.enqueue({ type, payload: {} });
+        await offlineQueue.enqueue({
+          type,
+          payload: type === 'SUBSCRIBE' ? createSubscribePayload() : createUnsubscribePayload(),
+        });
         const savedQueue = getSavedQueue();
         expect(savedQueue[0].type).toBe(type);
       }
@@ -285,7 +319,7 @@ describe('OfflineActionQueue', () => {
       const listener = jest.fn();
       const unsubscribe = offlineQueue.subscribe(listener);
 
-      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: {} });
+      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: createSubscribePayload() });
 
       expect(listener).toHaveBeenCalled();
 
@@ -301,7 +335,7 @@ describe('OfflineActionQueue', () => {
       // Clear previous calls
       listener.mockClear();
 
-      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: {} });
+      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: createSubscribePayload() });
 
       // Listener should not be called after unsubscribe
       expect(listener).not.toHaveBeenCalled();
@@ -314,7 +348,7 @@ describe('OfflineActionQueue', () => {
       const unsub1 = offlineQueue.subscribe(listener1);
       const unsub2 = offlineQueue.subscribe(listener2);
 
-      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: {} });
+      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: createSubscribePayload() });
 
       expect(listener1).toHaveBeenCalled();
       expect(listener2).toHaveBeenCalled();
@@ -333,7 +367,7 @@ describe('OfflineActionQueue', () => {
       const unsub2 = offlineQueue.subscribe(goodListener);
 
       // Should not throw
-      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: {} });
+      await offlineQueue.enqueue({ type: 'SUBSCRIBE', payload: createSubscribePayload() });
 
       // Both listeners should be called despite the error
       expect(errorListener).toHaveBeenCalled();
@@ -370,7 +404,7 @@ describe('OfflineActionQueue', () => {
 
 describe('Queue Processing', () => {
   let mockTrpcClient: {
-    sources: {
+    subscriptions: {
       add: { mutate: jest.Mock };
       remove: { mutate: jest.Mock };
     };
@@ -381,7 +415,7 @@ describe('Queue Processing', () => {
 
     // Set up mock tRPC client
     mockTrpcClient = {
-      sources: {
+      subscriptions: {
         add: { mutate: jest.fn().mockResolvedValue({}) },
         remove: { mutate: jest.fn().mockResolvedValue({}) },
       },
@@ -407,7 +441,7 @@ describe('Queue Processing', () => {
 
       await offlineQueue.processQueue();
 
-      expect(mockTrpcClient.sources.add.mutate).not.toHaveBeenCalled();
+      expect(mockTrpcClient.subscriptions.add.mutate).not.toHaveBeenCalled();
     });
 
     it('replays queued actions with the persisted trace ID', async () => {
@@ -433,7 +467,7 @@ describe('Queue Processing', () => {
 
       await offlineQueue.processQueue();
 
-      expect(mockTrpcClient.sources.add.mutate).not.toHaveBeenCalled();
+      expect(mockTrpcClient.subscriptions.add.mutate).not.toHaveBeenCalled();
     });
 
     it('processes when online and reachable', async () => {
@@ -442,7 +476,7 @@ describe('Queue Processing', () => {
 
       await offlineQueue.processQueue();
 
-      expect(mockTrpcClient.sources.add.mutate).toHaveBeenCalled();
+      expect(mockTrpcClient.subscriptions.add.mutate).toHaveBeenCalled();
     });
   });
 
@@ -450,25 +484,25 @@ describe('Queue Processing', () => {
     it('executes SUBSCRIBE action', async () => {
       const action = createTestAction({
         type: 'SUBSCRIBE',
-        payload: { provider: 'YOUTUBE', feedUrl: 'https://youtube.com/@test' },
+        payload: createSubscribePayload(),
       });
       mockQueueContents([action]);
 
       await offlineQueue.processQueue();
 
-      expect(mockTrpcClient.sources.add.mutate).toHaveBeenCalledWith(action.payload);
+      expect(mockTrpcClient.subscriptions.add.mutate).toHaveBeenCalledWith(action.payload);
     });
 
     it('executes UNSUBSCRIBE action', async () => {
       const action = createTestAction({
         type: 'UNSUBSCRIBE',
-        payload: { id: 'sub-123' },
+        payload: { subscriptionId: 'sub-123' },
       });
       mockQueueContents([action]);
 
       await offlineQueue.processQueue();
 
-      expect(mockTrpcClient.sources.remove.mutate).toHaveBeenCalledWith(action.payload);
+      expect(mockTrpcClient.subscriptions.remove.mutate).toHaveBeenCalledWith(action.payload);
     });
 
     it('removes successful action from queue', async () => {
@@ -492,19 +526,31 @@ describe('Queue Processing', () => {
 
     it('processes multiple actions in order', async () => {
       const actions = [
-        createTestAction({ id: 'action-1', type: 'SUBSCRIBE', payload: { order: 1 } }),
-        createTestAction({ id: 'action-2', type: 'SUBSCRIBE', payload: { order: 2 } }),
-        createTestAction({ id: 'action-3', type: 'SUBSCRIBE', payload: { order: 3 } }),
+        createTestAction({
+          id: 'action-1',
+          type: 'SUBSCRIBE',
+          payload: createSubscribePayload({ providerChannelId: 'channel-1', name: 'Channel 1' }),
+        }),
+        createTestAction({
+          id: 'action-2',
+          type: 'SUBSCRIBE',
+          payload: createSubscribePayload({ providerChannelId: 'channel-2', name: 'Channel 2' }),
+        }),
+        createTestAction({
+          id: 'action-3',
+          type: 'SUBSCRIBE',
+          payload: createSubscribePayload({ providerChannelId: 'channel-3', name: 'Channel 3' }),
+        }),
       ];
       mockQueueContents(actions);
 
       await offlineQueue.processQueue();
 
-      const calls = mockTrpcClient.sources.add.mutate.mock.calls;
+      const calls = mockTrpcClient.subscriptions.add.mutate.mock.calls;
       expect(calls).toHaveLength(3);
-      expect(calls[0][0].order).toBe(1);
-      expect(calls[1][0].order).toBe(2);
-      expect(calls[2][0].order).toBe(3);
+      expect(calls[0][0].providerChannelId).toBe('channel-1');
+      expect(calls[1][0].providerChannelId).toBe('channel-2');
+      expect(calls[2][0].providerChannelId).toBe('channel-3');
     });
   });
 
@@ -515,7 +561,7 @@ describe('Queue Processing', () => {
         mockQueueContents([action]);
 
         // Simulate 409 Conflict error
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 409, code: 'CONFLICT' },
           message: 'Already subscribed',
         });
@@ -533,7 +579,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 400 },
           message: 'Invalid payload',
         });
@@ -548,7 +594,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 400 },
           message: 'Invalid payload',
         });
@@ -564,7 +610,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue(
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(
           new TypeError('Network request failed')
         );
 
@@ -580,7 +626,7 @@ describe('Queue Processing', () => {
         const action = createTestAction({ retryCount: 3 }); // Already at MAX_RETRIES
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue(
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(
           new TypeError('Network request failed')
         );
 
@@ -595,7 +641,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue(new Error('Connection timeout'));
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(new Error('Connection timeout'));
 
         await offlineQueue.processQueue();
 
@@ -609,7 +655,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 500 },
           message: 'Internal server error',
         });
@@ -635,7 +681,7 @@ describe('Queue Processing', () => {
         });
 
         // First call fails with 401, second succeeds after refresh
-        mockTrpcClient.sources.add.mutate
+        mockTrpcClient.subscriptions.add.mutate
           .mockRejectedValueOnce({
             data: { httpStatus: 401, code: 'UNAUTHORIZED' },
             message: 'Token expired',
@@ -661,7 +707,7 @@ describe('Queue Processing', () => {
           },
         });
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 401, code: 'UNAUTHORIZED' },
           message: 'Token expired',
         });
@@ -678,7 +724,7 @@ describe('Queue Processing', () => {
         const action = createTestAction({ authRetryCount: 1 }); // Already at limit
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: 401, code: 'UNAUTHORIZED' },
           message: 'Token expired',
         });
@@ -696,7 +742,7 @@ describe('Queue Processing', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           someUnknownProperty: 'value',
         });
 
@@ -728,20 +774,26 @@ describe('Queue Processing', () => {
       await offlineQueue.processQueue();
 
       // Both calls should complete successfully
-      expect(mockTrpcClient.sources.add.mutate).toHaveBeenCalledTimes(2);
+      expect(mockTrpcClient.subscriptions.add.mutate).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('partial success handling', () => {
     it('processes remaining actions after one fails', async () => {
       const actions = [
-        createTestAction({ id: 'fail-action', payload: { fail: true } }),
-        createTestAction({ id: 'success-action', payload: { fail: false } }),
+        createTestAction({
+          id: 'fail-action',
+          payload: createSubscribePayload({ providerChannelId: 'UC_FAIL' }),
+        }),
+        createTestAction({
+          id: 'success-action',
+          payload: createSubscribePayload({ providerChannelId: 'UC_SUCCESS' }),
+        }),
       ];
       mockQueueContents(actions);
 
       // First action fails, second succeeds
-      mockTrpcClient.sources.add.mutate
+      mockTrpcClient.subscriptions.add.mutate
         .mockRejectedValueOnce(new TypeError('Network request failed'))
         .mockResolvedValueOnce({});
 
@@ -765,7 +817,7 @@ describe('Queue Processing', () => {
 
 describe('Error Classification Integration', () => {
   let mockTrpcClient: {
-    sources: {
+    subscriptions: {
       add: { mutate: jest.Mock };
       remove: { mutate: jest.Mock };
     };
@@ -775,7 +827,7 @@ describe('Error Classification Integration', () => {
     await resetQueue();
 
     mockTrpcClient = {
-      sources: {
+      subscriptions: {
         add: { mutate: jest.fn() },
         remove: { mutate: jest.fn() },
       },
@@ -793,7 +845,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue(new TypeError('Failed to fetch'));
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(new TypeError('Failed to fetch'));
 
       await offlineQueue.processQueue();
 
@@ -805,7 +857,9 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue(new Error('Request timeout exceeded'));
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(
+        new Error('Request timeout exceeded')
+      );
 
       await offlineQueue.processQueue();
 
@@ -817,7 +871,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue(new Error('Connection refused'));
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(new Error('Connection refused'));
 
       await offlineQueue.processQueue();
 
@@ -829,7 +883,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue(new Error('Request aborted'));
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue(new Error('Request aborted'));
 
       await offlineQueue.processQueue();
 
@@ -862,7 +916,7 @@ describe('Error Classification Integration', () => {
         const action = createTestAction();
         mockQueueContents([action]);
 
-        mockTrpcClient.sources.add.mutate.mockRejectedValue({
+        mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
           data: { httpStatus: status, code },
           message: `HTTP ${status} error`,
         });
@@ -892,7 +946,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue({
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
         data: { httpStatus: 500, code: 'INTERNAL_SERVER_ERROR' },
       });
 
@@ -906,7 +960,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue({
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
         data: { code: 'UNAUTHORIZED' },
       });
 
@@ -921,7 +975,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue({
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
         status: 503,
         message: 'Service unavailable',
       });
@@ -936,7 +990,7 @@ describe('Error Classification Integration', () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
-      mockTrpcClient.sources.add.mutate.mockRejectedValue({
+      mockTrpcClient.subscriptions.add.mutate.mockRejectedValue({
         statusCode: 404,
         message: 'Not found',
       });

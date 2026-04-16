@@ -29,42 +29,12 @@ import { mapSubscriptionsResponse } from './use-subscriptions-query';
 
 // Re-export types for convenience
 export type { Subscription, SubscriptionsResponse, SubscriptionProvider };
+export type SubscribePayload = AddSubscriptionInput;
+export type UnsubscribePayload = RemoveSubscriptionInput;
 
 // ============================================================================
 // Types
 // ============================================================================
-
-/**
- * Payload for subscribing to a channel/show.
- *
- * The index signature allows this interface to satisfy Record<string, unknown>
- * constraint required by useOfflineMutation for serialization to the offline queue.
- */
-export interface SubscribePayload {
-  /** The content provider */
-  provider: AddSubscriptionInput['provider'];
-  /** Provider-specific channel/show ID */
-  providerChannelId: string;
-  /** Display name of the channel/show */
-  name: string;
-  /** Optional thumbnail URL */
-  imageUrl?: string;
-  /** Index signature for Record<string, unknown> compatibility */
-  [key: string]: unknown;
-}
-
-/**
- * Payload for unsubscribing from a channel/show.
- *
- * The index signature allows this interface to satisfy Record<string, unknown>
- * constraint required by useOfflineMutation for serialization to the offline queue.
- */
-export interface UnsubscribePayload {
-  /** The subscription ID to remove */
-  subscriptionId: RemoveSubscriptionInput['subscriptionId'];
-  /** Index signature for Record<string, unknown> compatibility */
-  [key: string]: unknown;
-}
 
 /**
  * Return type for the useSubscriptions hook.
@@ -82,7 +52,7 @@ export interface UseSubscriptionsReturn {
 
   // Subscribe mutation
   /** Subscribe to a channel/show */
-  subscribe: (payload: SubscribePayload) => void;
+  subscribe: (payload: AddSubscriptionInput) => void;
   /** Whether a subscribe mutation is in progress */
   isSubscribing: boolean;
   /** Whether a subscribe action was queued for offline execution */
@@ -90,7 +60,7 @@ export interface UseSubscriptionsReturn {
 
   // Unsubscribe mutation
   /** Unsubscribe from a channel/show */
-  unsubscribe: (payload: UnsubscribePayload) => void;
+  unsubscribe: (payload: RemoveSubscriptionInput) => void;
   /** Whether an unsubscribe mutation is in progress */
   isUnsubscribing: boolean;
   /** Whether an unsubscribe action was queued for offline execution */
@@ -204,17 +174,12 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     mutate: subscribe,
     isPending: isSubscribing,
     isQueued: subscribeQueued,
-  } = useOfflineMutation<SubscribePayload>({
+  } = useOfflineMutation<AddSubscriptionInput>({
     actionType: 'SUBSCRIBE',
 
     // Execute the actual mutation when online
     mutationFn: async (payload) => {
-      await utils.client.subscriptions.add.mutate({
-        provider: payload.provider,
-        providerChannelId: payload.providerChannelId,
-        name: payload.name,
-        imageUrl: payload.imageUrl,
-      });
+      await utils.client.subscriptions.add.mutate(payload);
     },
 
     // Apply optimistic update to cache immediately
@@ -275,14 +240,12 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     mutate: unsubscribe,
     isPending: isUnsubscribing,
     isQueued: unsubscribeQueued,
-  } = useOfflineMutation<UnsubscribePayload>({
+  } = useOfflineMutation<RemoveSubscriptionInput>({
     actionType: 'UNSUBSCRIBE',
 
     // Execute the actual mutation when online
     mutationFn: async (payload) => {
-      await utils.client.subscriptions.remove.mutate({
-        subscriptionId: payload.subscriptionId,
-      });
+      await utils.client.subscriptions.remove.mutate(payload);
     },
 
     // Apply optimistic update to cache immediately
@@ -350,7 +313,7 @@ export function useSubscriptions(): UseSubscriptionsReturn {
  * All nullable fields are set to null, and status is ACTIVE.
  */
 function createTempSubscriptionRow(
-  payload: SubscribePayload
+  payload: AddSubscriptionInput
 ): SubscriptionsListOutput['items'][number] {
   return {
     id: `temp-${Date.now()}`,
@@ -358,7 +321,7 @@ function createTempSubscriptionRow(
     provider: payload.provider,
     providerChannelId: payload.providerChannelId,
     creatorId: null,
-    name: payload.name,
+    name: payload.name ?? 'Unknown',
     imageUrl: payload.imageUrl ?? null,
     description: null,
     externalUrl: null,
