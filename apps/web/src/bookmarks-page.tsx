@@ -14,7 +14,7 @@ import { IoGlobeOutline, IoLogoYoutube, IoNewspaperOutline } from 'react-icons/i
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { getButtonMetrics } from '@zine/design-system';
+import { Colors, getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
 import { Badge, Button, EmptyState, cn } from './components';
@@ -602,9 +602,18 @@ export function BookmarksPage() {
               <span className="new-page-inset__header-note">{headerNotice}</span>
             ) : null}
 
-            <Button type="button" onClick={() => setManualBookmarkOpen(true)}>
+            <Button
+              type="button"
+              size="icon"
+              variant="secondary"
+              aria-label="Add bookmark"
+              style={{
+                backgroundColor: Colors.dark.overlayForeground,
+                color: Colors.dark.accentForeground,
+              }}
+              onClick={() => setManualBookmarkOpen(true)}
+            >
               <Plus size={16} strokeWidth={2.2} />
-              Add bookmark
             </Button>
           </div>
         </header>
