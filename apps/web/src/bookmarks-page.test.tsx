@@ -116,7 +116,7 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByText('Loading bookmarks')).toBeVisible();
+    expect(loadingView.getByText('Loading bookmarks')).toBeVisible();
     loadingView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
@@ -128,8 +128,8 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(screen.getByText('Could not load bookmarks')).toBeVisible();
-    expect(screen.getByText('Network down')).toBeVisible();
+    expect(errorView.getByText('Could not load bookmarks')).toBeVisible();
+    expect(errorView.getByText('Network down')).toBeVisible();
     errorView.unmount();
 
     hookSpies.itemsLibraryUseQuery.mockReturnValueOnce({
