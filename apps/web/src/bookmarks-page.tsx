@@ -634,8 +634,10 @@ export function BookmarksPage() {
                     ) : (
                       <div className="new-page-bookmark-view__hero-placeholder" />
                     )}
+                  </div>
 
-                    <div className="new-page-bookmark-view__hero-content">
+                  <div className="new-page-bookmark-view__body">
+                    <div className="new-page-bookmark-view__header">
                       <div className="new-page-bookmark-view__badges">
                         <Badge>{mapProvider(displayBookmark.provider)}</Badge>
                         <Badge>{mapContentType(displayBookmark.contentType)}</Badge>
@@ -643,9 +645,6 @@ export function BookmarksPage() {
 
                       <h2 className="new-page-bookmark-view__title">{displayBookmark.title}</h2>
                     </div>
-                  </div>
-
-                  <div className="new-page-bookmark-view__body">
                     <div className="new-page-bookmark-view__creator-block">
                       <div className="new-page-bookmark-view__creator">
                         {displayBookmark.creatorImageUrl ? (
