@@ -132,9 +132,8 @@ test('uses a phone drill-in flow and keeps mobile chrome usable', async ({ page 
   await page.getByRole('link', { name: 'Settings' }).click();
 
   await expect(page).toHaveURL(/\/settings$/);
-  await expect(
-    page.getByRole('heading', { name: 'Settings are pared back in this web pass.' })
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Subscriptions' })).toBeVisible();
 });
 
 test('shows a bottom tab bar on phone viewports and hides the sidebar', async ({ page }) => {
