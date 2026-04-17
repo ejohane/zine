@@ -208,9 +208,8 @@ export const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingHorizontal: Spacing.xl,
   },
-  descriptionLabel: {
-    ...Typography.titleLarge,
-    marginBottom: Spacing.sm,
+  descriptionSurface: {
+    gap: Spacing.md,
   },
   description: {
     ...Typography.bodyMedium,

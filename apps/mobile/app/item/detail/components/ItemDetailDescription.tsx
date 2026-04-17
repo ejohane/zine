@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { Text } from '@/components/primitives/text';
 
 import { LinkedText } from '../../item-detail-components';
 import { styles } from '../../item-detail-styles';
@@ -13,7 +13,9 @@ type ItemDetailDescriptionProps = {
 export function ItemDetailDescription({ summary, label, colors }: ItemDetailDescriptionProps) {
   return (
     <>
-      <Text style={[styles.descriptionLabel, { color: colors.text }]}>{label}</Text>
+      <Text variant="labelSmall" tone="tertiary" colors={colors}>
+        {label}
+      </Text>
       <LinkedText
         style={[styles.description, { color: colors.textSubheader }]}
         linkColor={colors.primary}
