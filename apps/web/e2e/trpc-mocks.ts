@@ -60,6 +60,26 @@ const libraryItems = [
     ingestedAt: '2025-02-17T16:10:00.000Z',
     isFinished: true,
   },
+  {
+    id: 'post-1',
+    title: 'Notes on interface pace',
+    creator: 'Erik J',
+    creatorId: 'creator-3',
+    creatorImageUrl: null,
+    thumbnailUrl: null,
+    contentType: ContentType.POST,
+    provider: Provider.X,
+    duration: null,
+    readingTimeMinutes: null,
+    publisher: null,
+    summary:
+      'Ship the smallest interaction that still feels inevitable, then tighten it until it disappears.',
+    canonicalUrl: 'https://x.com/erik/status/1234567890',
+    publishedAt: '2025-02-19T08:30:00.000Z',
+    bookmarkedAt: '2025-02-19T08:35:00.000Z',
+    ingestedAt: '2025-02-19T08:35:00.000Z',
+    isFinished: false,
+  },
 ] as const;
 
 const creators = {
@@ -72,6 +92,11 @@ const creators = {
     id: 'creator-2',
     handle: 'studio-dispatch',
     description: 'Hosted by Alice Example and Bob Example',
+  },
+  'creator-3': {
+    id: 'creator-3',
+    handle: 'erik',
+    description: 'Writes about product and interface rhythm',
   },
 } as const;
 
