@@ -31,7 +31,9 @@ function InstallAppSection({
 
   return (
     <div className="settings-page__section settings-pwa-card">
-      <p className="eyebrow">{installAvailability === 'installed' ? 'Installed' : 'Install the app'}</p>
+      <p className="eyebrow">
+        {installAvailability === 'installed' ? 'Installed' : 'Install the app'}
+      </p>
       <h3>
         {installAvailability === 'installed'
           ? 'Zine is already on this device.'
