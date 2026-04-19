@@ -522,6 +522,18 @@ describe('BookmarksPage', () => {
     expect(document.body).not.toHaveClass('mobile-bookmarks-scroll-lock');
   });
 
+  test('hides the mobile tab bar on phone detail routes', () => {
+    setViewportWidth(390);
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${videoItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(screen.queryByRole('navigation', { name: 'Tab bar' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to bookmarks list' })).toBeVisible();
+  });
+
   test('hides the mobile tab bar on desktop widths', () => {
     setViewportWidth(1280);
 

@@ -24,10 +24,10 @@ import {
 } from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { Colors, getButtonMetrics } from '@zine/design-system';
+import { Colors, ContentColors, ProviderColors, getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
-import { Badge, Button, EmptyState, cn } from './components';
+import { Button, EmptyState, cn } from './components';
 import { BookmarkTagsDialog } from './components/bookmark-tags-dialog';
 import { ManualBookmarkDialog } from './components/manual-bookmark-dialog';
 import { MobileTabBar } from './components/mobile-tab-bar';
@@ -82,6 +82,51 @@ const mobileBookmarkActionButtonStyle = {
   width: 44,
   borderRadius: 999,
 } as const;
+
+function getBookmarkProviderBadgeColor(provider: Provider | string) {
+  switch (provider) {
+    case Provider.SPOTIFY:
+      return ProviderColors.spotify;
+    case Provider.YOUTUBE:
+      return ProviderColors.youtube;
+    case Provider.GMAIL:
+      return ProviderColors.gmail;
+    case Provider.SUBSTACK:
+      return ProviderColors.substack;
+    case Provider.X:
+      return ProviderColors.x;
+    default:
+      return ProviderColors.web;
+  }
+}
+
+function getBookmarkContentBadgeColor(contentType: ContentType) {
+  switch (contentType) {
+    case ContentType.PODCAST:
+      return ContentColors.podcast;
+    case ContentType.VIDEO:
+      return ContentColors.video;
+    case ContentType.POST:
+      return ContentColors.post;
+    case ContentType.ARTICLE:
+    default:
+      return ContentColors.article;
+  }
+}
+
+function BookmarkDetailBadge({
+  label,
+  backgroundColor,
+}: {
+  label: string;
+  backgroundColor: string;
+}) {
+  return (
+    <span className="new-page-bookmark-view__badge" style={{ backgroundColor }}>
+      {label}
+    </span>
+  );
+}
 
 function getLibrarySummary(item: LibraryItem) {
   return (
@@ -583,6 +628,7 @@ export function BookmarksPage() {
       : null;
   const selectedBookmarkIsFinished = Boolean(displayBookmark?.isFinished);
   const isPhonePostView = isPhoneLayout && displayBookmark?.contentType === ContentType.POST;
+  const isPhoneDetailView = isPhoneLayout && Boolean(selectedBookmarkId);
   const bookmarkPlainSummary = displayBookmark ? formatPlainText(displayBookmark.summary) : null;
   const bookmarkPostHandle =
     displayBookmark?.provider === Provider.X
@@ -620,6 +666,7 @@ export function BookmarksPage() {
     Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
   const showBookmarkListPane = !isPhoneLayout || !selectedBookmarkId;
   const showBookmarkDetailPane = !isPhoneLayout || Boolean(selectedBookmarkId);
+  const showMobileTabBar = isPhoneLayout && !selectedBookmarkId;
   const refreshNotice = bookmarksQuery.error
     ? (bookmarksQuery.error.message ?? 'Could not refresh bookmarks.')
     : bookmarksAreRefreshing
@@ -716,7 +763,7 @@ export function BookmarksPage() {
           title="Could not load bookmarks"
           message={bookmarksQuery.error.message ?? 'Please refresh and try again.'}
         />
-        <MobileTabBar />
+        {showMobileTabBar ? <MobileTabBar /> : null}
       </main>
     );
   }
@@ -775,7 +822,7 @@ export function BookmarksPage() {
         </div>
       ) : null}
 
-      <MobileTabBar />
+      {showMobileTabBar ? <MobileTabBar /> : null}
 
       <div className="new-page-inset">
         {showInsetHeader ? (
@@ -956,6 +1003,7 @@ export function BookmarksPage() {
                     className={cn(
                       'new-page-bookmark-view new-page-bookmark-view--pane',
                       isPhoneLayout && 'new-page-bookmark-view--phone',
+                      isPhoneDetailView && 'new-page-bookmark-view--phone-detail',
                       !showBookmarkHero && 'new-page-bookmark-view--no-hero',
                       displayBookmark.contentType === ContentType.POST &&
                         'new-page-bookmark-view--post'
@@ -991,8 +1039,18 @@ export function BookmarksPage() {
 
                         {showHeroBadges ? (
                           <div className="new-page-bookmark-view__hero-badges">
-                            <Badge>{mapProvider(displayBookmark.provider)}</Badge>
-                            <Badge>{mapContentType(displayBookmark.contentType)}</Badge>
+                            <BookmarkDetailBadge
+                              label={mapProvider(displayBookmark.provider)}
+                              backgroundColor={getBookmarkProviderBadgeColor(
+                                displayBookmark.provider
+                              )}
+                            />
+                            <BookmarkDetailBadge
+                              label={mapContentType(displayBookmark.contentType)}
+                              backgroundColor={getBookmarkContentBadgeColor(
+                                displayBookmark.contentType
+                              )}
+                            />
                           </div>
                         ) : null}
                       </div>
@@ -1002,8 +1060,18 @@ export function BookmarksPage() {
                       <div className="new-page-bookmark-view__header">
                         {showHeaderBadges ? (
                           <div className="new-page-bookmark-view__badges">
-                            <Badge>{mapProvider(displayBookmark.provider)}</Badge>
-                            <Badge>{mapContentType(displayBookmark.contentType)}</Badge>
+                            <BookmarkDetailBadge
+                              label={mapProvider(displayBookmark.provider)}
+                              backgroundColor={getBookmarkProviderBadgeColor(
+                                displayBookmark.provider
+                              )}
+                            />
+                            <BookmarkDetailBadge
+                              label={mapContentType(displayBookmark.contentType)}
+                              backgroundColor={getBookmarkContentBadgeColor(
+                                displayBookmark.contentType
+                              )}
+                            />
                           </div>
                         ) : null}
 
@@ -1028,6 +1096,13 @@ export function BookmarksPage() {
                           <div className="new-page-bookmark-view__creator-copy">
                             <strong>{getLibraryCreatorLabel(displayBookmark)}</strong>
                           </div>
+
+                          <ChevronRight
+                            className="new-page-bookmark-view__creator-chevron"
+                            size={14}
+                            strokeWidth={2.2}
+                            aria-hidden="true"
+                          />
                         </div>
                       </div>
 
@@ -1061,6 +1136,7 @@ export function BookmarksPage() {
                             }}
                           >
                             <Bookmark
+                              className="new-page-bookmark-view__bookmark-icon"
                               size={BOOKMARK_ACTION_ICON_SIZE}
                               strokeWidth={1.85}
                               fill="currentColor"
@@ -1228,15 +1304,9 @@ export function BookmarksPage() {
                         </section>
                       ) : (
                         <section className="new-page-bookmark-view__section">
-                          {isPhoneLayout ? (
-                            <h3 className="new-page-bookmark-view__section-title">
-                              {getBookmarkAboutLabel(displayBookmark.contentType)}
-                            </h3>
-                          ) : (
-                            <p className="eyebrow">
-                              {getBookmarkAboutLabel(displayBookmark.contentType)}
-                            </p>
-                          )}
+                          <p className="eyebrow new-page-bookmark-view__section-label">
+                            {getBookmarkAboutLabel(displayBookmark.contentType)}
+                          </p>
                           <p className="new-page-bookmark-view__summary">
                             {getLibrarySummary(displayBookmark)}
                           </p>
