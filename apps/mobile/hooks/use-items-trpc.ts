@@ -8,21 +8,22 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
-import { ContentType, Provider, UserItemState } from '@zine/shared';
+import {
+  ContentType,
+  Provider,
+  UserItemState,
+  formatDurationTimestamp,
+  mapContentType as mapSharedContentType,
+  mapProvider as mapSharedProvider,
+  type UIContentType,
+  type UIProvider,
+} from '@zine/shared';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/**
- * UI-friendly content type (lowercase for styling/display)
- */
-export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
-
-/**
- * UI-friendly provider type (lowercase for styling/display)
- */
-export type UIProvider = 'youtube' | 'spotify' | 'gmail' | 'rss' | 'substack' | 'web' | 'x';
+export type { UIContentType, UIProvider };
 
 // ============================================================================
 // Optimistic Update Types
@@ -274,7 +275,7 @@ function createOptimisticConfig<TInput extends { id: string }>(
  * mapContentType(ContentType.PODCAST) // => 'podcast'
  */
 export function mapContentType(contentType: ContentType): UIContentType {
-  return contentType.toLowerCase() as UIContentType;
+  return mapSharedContentType(contentType);
 }
 
 /**
@@ -288,7 +289,7 @@ export function mapContentType(contentType: ContentType): UIContentType {
  * mapProvider(Provider.SPOTIFY) // => 'spotify'
  */
 export function mapProvider(provider: Provider): UIProvider {
-  return provider.toLowerCase() as UIProvider;
+  return mapSharedProvider(provider);
 }
 
 /**
@@ -304,19 +305,7 @@ export function mapProvider(provider: Provider): UIProvider {
  * formatDuration(undefined) // => undefined
  */
 export function formatDuration(seconds?: number | null): string | undefined {
-  if (seconds === undefined || seconds === null) return undefined;
-  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
-
-  const totalSeconds = Math.floor(seconds);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
+  return formatDurationTimestamp(seconds);
 }
 
 function buildInboxItemsInput(options?: InboxItemsOptions) {

@@ -369,7 +369,7 @@ describe('extractCreatorFromMetadata', () => {
       expect(extractCreatorFromMetadata('YOUTUBE', true)).toBeNull();
     });
 
-    it('should handle metadata extraction errors gracefully', () => {
+    it('should surface unexpected metadata accessor errors', () => {
       // Create a getter that throws
       const metadata = {
         get snippet() {
@@ -377,9 +377,7 @@ describe('extractCreatorFromMetadata', () => {
         },
       };
 
-      // Should not throw, should return null
-      const result = extractCreatorFromMetadata('YOUTUBE', metadata);
-      expect(result).toBeNull();
+      expect(() => extractCreatorFromMetadata('YOUTUBE', metadata)).toThrow('Getter error');
     });
   });
 });

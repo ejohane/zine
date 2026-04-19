@@ -1,11 +1,17 @@
-import type { ContentType, Provider } from '@zine/shared';
+import {
+  formatDurationTimestamp,
+  isValidUrl as isValidSharedUrl,
+  mapContentType as mapSharedContentType,
+  mapProvider as mapSharedProvider,
+} from '@zine/shared/format';
+import type { ContentType, Provider } from '@zine/shared/types';
 
 export function mapContentType(contentType: ContentType | string) {
-  return contentType.toString().toLowerCase();
+  return mapSharedContentType(contentType);
 }
 
 export function mapProvider(provider: Provider | string) {
-  return provider.toString().toLowerCase();
+  return mapSharedProvider(provider);
 }
 
 export function formatPlainText(value?: string | null) {
@@ -30,20 +36,7 @@ export function formatPlainText(value?: string | null) {
 }
 
 export function formatDuration(seconds?: number | null): string | undefined {
-  if (seconds === undefined || seconds === null || !Number.isFinite(seconds) || seconds < 0) {
-    return undefined;
-  }
-
-  const totalSeconds = Math.floor(seconds);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const secs = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
+  return formatDurationTimestamp(seconds);
 }
 
 export function formatRelativeDate(value?: string | number | null) {
@@ -72,17 +65,6 @@ export function formatRelativeDate(value?: string | number | null) {
   return 'Just now';
 }
 
-export function formatAbsoluteDate(value?: string | number | null) {
-  if (!value) return 'Unknown date';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Unknown date';
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
-}
-
 export function formatEstimatedMinutes(totalMinutes: number) {
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
     return '0m';
@@ -102,26 +84,6 @@ export function formatEstimatedMinutes(totalMinutes: number) {
   return `${minutes}m`;
 }
 
-export function formatDeltaLabel(deltaPct: number | null | undefined) {
-  if (deltaPct === null || deltaPct === undefined) {
-    return null;
-  }
-  if (deltaPct > 0) {
-    return `Up ${deltaPct}% vs last week`;
-  }
-  if (deltaPct < 0) {
-    return `Down ${Math.abs(deltaPct)}% vs last week`;
-  }
-
-  return 'No change vs last week';
-}
-
 export function isValidUrl(urlString: string): boolean {
-  if (!urlString || urlString.trim().length === 0) return false;
-  try {
-    const url = new URL(urlString.trim());
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return isValidSharedUrl(urlString);
 }

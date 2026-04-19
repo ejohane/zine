@@ -244,14 +244,3 @@ export function RootProviders({ children }: { children: ReactNode }) {
 
   return <FallbackProviders>{children}</FallbackProviders>;
 }
-
-export function useRecapTimezone() {
-  return useMemo(() => {
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
-    } catch {
-      return undefined;
-    }
-  }, []);
-}

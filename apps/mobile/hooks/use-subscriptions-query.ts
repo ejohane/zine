@@ -13,12 +13,9 @@
  */
 
 import { keepPreviousData } from '@tanstack/react-query';
+import type { ProviderValue, SubscriptionStatusValue } from '@zine/shared/types';
 import { trpc } from '../lib/trpc';
-import type {
-  SubscriptionsListInput,
-  SubscriptionsListOutput,
-  SubscriptionListItemOutput,
-} from '../lib/trpc-types';
+import type { SubscriptionsListOutput, SubscriptionListItemOutput } from '../lib/trpc-types';
 
 // ============================================================================
 // Types
@@ -27,12 +24,12 @@ import type {
 /**
  * Subscription status values
  */
-export type SubscriptionStatus = 'ACTIVE' | 'PAUSED' | 'UNSUBSCRIBED' | 'DISCONNECTED';
+export type SubscriptionStatus = SubscriptionStatusValue;
 
 /**
  * Supported subscription providers
  */
-export type SubscriptionProvider = 'YOUTUBE' | 'SPOTIFY';
+export type SubscriptionProvider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY'>;
 
 /**
  * Subscription type returned from the backend.
@@ -69,7 +66,7 @@ export interface SubscriptionsResponse {
   hasMore: boolean;
 }
 
-export function mapSubscription(item: SubscriptionListItemOutput): Subscription {
+function mapSubscription(item: SubscriptionListItemOutput): Subscription {
   return {
     id: item.id,
     provider: item.provider as SubscriptionProvider,
@@ -144,51 +141,4 @@ export function useSubscriptions() {
       select: mapSubscriptionsResponse,
     }
   );
-}
-
-/**
- * Query hook for fetching subscriptions with filtering options.
- *
- * Extends the base useSubscriptions with support for provider filtering
- * and status filtering.
- *
- * @param options - Filter options for the query
- * @returns Query result with filtered subscriptions data
- *
- * @example
- * ```tsx
- * // Get only YouTube subscriptions
- * function YouTubeSubscriptions() {
- *   const { data } = useSubscriptionsFiltered({ provider: 'YOUTUBE' });
- *   return data?.items.map((sub) => <Card key={sub.id} sub={sub} />);
- * }
- * ```
- *
- * @example
- * ```tsx
- * // Get only active subscriptions
- * function ActiveSubscriptions() {
- *   const { data } = useSubscriptionsFiltered({ status: 'ACTIVE' });
- *   return <Text>Active: {data?.items.length ?? 0}</Text>;
- * }
- * ```
- */
-export function useSubscriptionsFiltered(options?: {
-  /** Filter by provider */
-  provider?: SubscriptionProvider;
-  /** Filter by status */
-  status?: SubscriptionStatus;
-  /** Number of items per page (1-100, default 50) */
-  limit?: number;
-  /** Pagination cursor */
-  cursor?: string;
-}) {
-  const input = (options ?? {}) as SubscriptionsListInput;
-
-  return trpc.subscriptions.list.useQuery(input, {
-    staleTime: 5 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    placeholderData: keepPreviousData,
-    select: mapSubscriptionsResponse,
-  });
 }

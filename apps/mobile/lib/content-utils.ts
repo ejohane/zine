@@ -6,6 +6,16 @@
  */
 
 import React from 'react';
+import {
+  mapContentType as mapSharedContentType,
+  mapProvider as mapSharedProvider,
+  type UIContentType,
+  type UIProvider,
+} from '@zine/shared/format';
+import type {
+  ContentTypeValue as SharedContentTypeValue,
+  ProviderValue as SharedProviderValue,
+} from '@zine/shared/types';
 
 import { ContentColors, ProviderColors } from '@/constants/theme';
 import { HeadphonesIcon, VideoIcon, ArticleIcon, PostIcon } from '@/components/icons';
@@ -17,22 +27,14 @@ import { HeadphonesIcon, VideoIcon, ArticleIcon, PostIcon } from '@/components/i
 /**
  * API content types (uppercase, from backend)
  */
-export type ContentType = 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST';
+export type ContentType = SharedContentTypeValue;
 
-/**
- * UI content types (lowercase, for display/styling)
- */
-export type UIContentType = 'video' | 'podcast' | 'article' | 'post';
+export type { UIContentType, UIProvider };
 
 /**
  * API provider types (uppercase, from backend)
  */
-export type Provider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'RSS' | 'SUBSTACK' | 'WEB' | 'X';
-
-/**
- * UI provider types (lowercase, for display/styling)
- */
-export type UIProvider = 'youtube' | 'spotify' | 'gmail' | 'rss' | 'substack' | 'web' | 'x';
+export type Provider = SharedProviderValue;
 
 // ============================================================================
 // Type Mapping
@@ -42,14 +44,14 @@ export type UIProvider = 'youtube' | 'spotify' | 'gmail' | 'rss' | 'substack' | 
  * Normalize content type to lowercase for consistent comparison
  */
 function normalizeContentType(type: ContentType | UIContentType): UIContentType {
-  return type.toLowerCase() as UIContentType;
+  return mapSharedContentType(type) as UIContentType;
 }
 
 /**
  * Normalize provider to lowercase for consistent comparison
  */
 function normalizeProvider(provider: Provider | UIProvider): UIProvider {
-  return provider.toLowerCase() as UIProvider;
+  return mapSharedProvider(provider) as UIProvider;
 }
 
 /**
@@ -63,7 +65,7 @@ function normalizeProvider(provider: Provider | UIProvider): UIProvider {
  * mapContentType('PODCAST') // 'podcast'
  */
 export function mapContentType(apiType: ContentType): UIContentType {
-  return apiType.toLowerCase() as UIContentType;
+  return mapSharedContentType(apiType) as UIContentType;
 }
 
 /**
@@ -78,7 +80,7 @@ export function mapContentType(apiType: ContentType): UIContentType {
  * mapProvider('GMAIL')   // 'gmail'
  */
 export function mapProvider(apiProvider: Provider): UIProvider {
-  return apiProvider.toLowerCase() as UIProvider;
+  return mapSharedProvider(apiProvider) as UIProvider;
 }
 
 // ============================================================================

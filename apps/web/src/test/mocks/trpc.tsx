@@ -1,8 +1,7 @@
 import type { PropsWithChildren } from 'react';
-import type { ContentType } from '@zine/shared';
+import type { ContentType } from '@zine/shared/types';
+import type { AuthMode } from '../../lib/trpc';
 import { vi } from 'vitest';
-
-type AuthMode = 'clerk' | 'development-bypass' | 'disabled';
 
 type QueryResult<T> = {
   data?: T;
@@ -261,8 +260,4 @@ export function useAppSession() {
 
 export function RootProviders({ children }: PropsWithChildren) {
   return <>{children}</>;
-}
-
-export function useRecapTimezone() {
-  return undefined;
 }

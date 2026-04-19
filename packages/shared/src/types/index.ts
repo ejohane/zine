@@ -2,6 +2,9 @@
  * Type Exports
  */
 
+// JSON-safe types
+export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from '../json';
+
 // Domain types and enums
 export {
   ContentType,
@@ -12,7 +15,19 @@ export {
 } from './domain';
 
 // Domain interfaces
-export type { Item, UserItem, Source, Creator, CreatorWithSubscription } from './domain';
+export type {
+  ContentTypeValue,
+  ProviderValue,
+  UserItemStateValue,
+  SubscriptionStatusValue,
+  ProviderConnectionStatusValue,
+  OAuthProvider,
+  Item,
+  UserItem,
+  Source,
+  Creator,
+  CreatorWithSubscription,
+} from './domain';
 
 // Type guards
 export {

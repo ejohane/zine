@@ -56,7 +56,7 @@ const QUEUE_KEY = 'zine:offline_action_queue';
 import { offlineQueue, type OfflineAction, type OfflineActionType } from './offline-queue';
 import { createOfflineTRPCClient, notifyQueueProcessed } from './trpc-offline-client';
 import { getClerkInstance } from '@clerk/clerk-expo';
-import type { ErrorClassification } from './error-utils';
+import type { ErrorType } from './error-utils';
 import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
 
 // Helper to reset queue state between tests
@@ -751,7 +751,7 @@ describe('Queue Processing', () => {
         const savedQueue = getSavedQueue();
         expect(savedQueue).toHaveLength(1);
         expect(savedQueue[0].retryCount).toBe(1);
-        expect(savedQueue[0].lastErrorType).toBe('UNKNOWN');
+        expect(savedQueue[0].lastErrorType).toBe('unknown');
       });
     });
   });
@@ -850,10 +850,10 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('NETWORK');
+      expect(savedQueue[0].lastErrorType).toBe('network');
     });
 
-    it('classifies timeout message as NETWORK', async () => {
+    it('classifies timeout message as timeout', async () => {
       const action = createTestAction();
       mockQueueContents([action]);
 
@@ -864,7 +864,7 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('NETWORK');
+      expect(savedQueue[0].lastErrorType).toBe('timeout');
     });
 
     it('classifies connection message as NETWORK', async () => {
@@ -876,7 +876,7 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('NETWORK');
+      expect(savedQueue[0].lastErrorType).toBe('network');
     });
 
     it('classifies aborted message as NETWORK', async () => {
@@ -888,7 +888,7 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('NETWORK');
+      expect(savedQueue[0].lastErrorType).toBe('network');
     });
   });
 
@@ -896,19 +896,19 @@ describe('Error Classification Integration', () => {
     const statusTestCases: Array<{
       status: number;
       code?: string;
-      expectedType: ErrorClassification;
+      expectedType: ErrorType;
     }> = [
-      { status: 401, expectedType: 'AUTH' },
-      { status: 401, code: 'UNAUTHORIZED', expectedType: 'AUTH' },
-      { status: 409, expectedType: 'CONFLICT' },
-      { status: 409, code: 'CONFLICT', expectedType: 'CONFLICT' },
-      { status: 400, expectedType: 'CLIENT' },
-      { status: 403, expectedType: 'CLIENT' },
-      { status: 404, expectedType: 'CLIENT' },
-      { status: 422, expectedType: 'CLIENT' },
-      { status: 500, expectedType: 'SERVER' },
-      { status: 502, expectedType: 'SERVER' },
-      { status: 503, expectedType: 'SERVER' },
+      { status: 401, expectedType: 'auth' },
+      { status: 401, code: 'UNAUTHORIZED', expectedType: 'auth' },
+      { status: 409, expectedType: 'conflict' },
+      { status: 409, code: 'CONFLICT', expectedType: 'conflict' },
+      { status: 400, expectedType: 'validation' },
+      { status: 403, expectedType: 'validation' },
+      { status: 404, expectedType: 'validation' },
+      { status: 422, expectedType: 'validation' },
+      { status: 500, expectedType: 'server' },
+      { status: 502, expectedType: 'server' },
+      { status: 503, expectedType: 'server' },
     ];
 
     for (const { status, code, expectedType } of statusTestCases) {
@@ -926,9 +926,9 @@ describe('Error Classification Integration', () => {
         const savedQueue = getSavedQueue();
 
         // CONFLICT and CLIENT errors are not retried, so queue will be empty
-        if (expectedType === 'CONFLICT' || expectedType === 'CLIENT') {
+        if (expectedType === 'conflict' || expectedType === 'validation') {
           expect(savedQueue).toHaveLength(0);
-        } else if (expectedType === 'AUTH') {
+        } else if (expectedType === 'auth') {
           // AUTH errors increment authRetryCount
           expect(savedQueue).toHaveLength(1);
           expect(savedQueue[0].authRetryCount).toBe(1);
@@ -953,7 +953,7 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('SERVER');
+      expect(savedQueue[0].lastErrorType).toBe('server');
     });
 
     it('extracts code from data.code', async () => {
@@ -983,7 +983,7 @@ describe('Error Classification Integration', () => {
       await offlineQueue.processQueue();
 
       const savedQueue = getSavedQueue();
-      expect(savedQueue[0].lastErrorType).toBe('SERVER');
+      expect(savedQueue[0].lastErrorType).toBe('server');
     });
 
     it('falls back to root statusCode property', async () => {
