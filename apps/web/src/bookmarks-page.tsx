@@ -1,12 +1,14 @@
 import {
+  Bookmark,
   BookmarkCheck,
-  Check,
+  CircleCheck,
+  CirclePlus,
   ChevronLeft,
   ChevronRight,
   Ellipsis,
   Plus,
   Settings,
-  Share2,
+  Share,
 } from 'lucide-react';
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
@@ -26,6 +28,7 @@ import { Colors, getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
 import { Badge, Button, EmptyState, cn } from './components';
+import { BookmarkTagsDialog } from './components/bookmark-tags-dialog';
 import { ManualBookmarkDialog } from './components/manual-bookmark-dialog';
 import { MobileTabBar } from './components/mobile-tab-bar';
 import { FilterChip } from './components/ui/filter-chip';
@@ -508,6 +511,7 @@ export function BookmarksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
   const [manualBookmarkNotice, setManualBookmarkNotice] = useState<string | null>(null);
+  const [bookmarkTagsOpen, setBookmarkTagsOpen] = useState(false);
   const isPhoneLayout = useMediaQuery('(max-width: 700px)');
   const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
   const bookmarkSearch = searchParams.toString();
@@ -642,6 +646,18 @@ export function BookmarksPage() {
   });
   const unbookmarkMutation = trpc.items.unbookmark.useMutation({
     onSuccess: invalidateSelectedBookmark,
+  });
+  const markOpenedMutation = trpc.items.markOpened.useMutation({
+    onSuccess: () => {
+      if (!selectedBookmarkId) {
+        return;
+      }
+
+      void Promise.all([
+        utils.items.get.invalidate({ id: selectedBookmarkId }),
+        utils.items.home.invalidate(),
+      ]);
+    },
   });
 
   useEffect(() => {
@@ -1044,7 +1060,11 @@ export function BookmarksPage() {
                               unbookmarkMutation.mutate({ id: selectedBookmarkId });
                             }}
                           >
-                            <BookmarkCheck size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                            <Bookmark
+                              size={BOOKMARK_ACTION_ICON_SIZE}
+                              strokeWidth={1.85}
+                              fill="currentColor"
+                            />
                           </Button>
 
                           <Button
@@ -1067,7 +1087,20 @@ export function BookmarksPage() {
                               toggleFinishedMutation.mutate({ id: selectedBookmarkId });
                             }}
                           >
-                            <Check size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                            <CircleCheck size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                          </Button>
+
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={`Manage tags for ${displayBookmark.title}`}
+                            title="Manage tags"
+                            disabled={!selectedBookmarkId}
+                            onClick={() => setBookmarkTagsOpen(true)}
+                          >
+                            <CirclePlus size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                           </Button>
 
                           <Button
@@ -1106,7 +1139,7 @@ export function BookmarksPage() {
                               }
                             }}
                           >
-                            <Share2 size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                            <Share size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
                           </Button>
 
                           <Button
@@ -1132,6 +1165,13 @@ export function BookmarksPage() {
                             rel="noreferrer"
                             aria-label={bookmarkFabConfig.label}
                             title={bookmarkFabConfig.label}
+                            onClick={() => {
+                              if (!selectedBookmarkId) {
+                                return;
+                              }
+
+                              markOpenedMutation.mutate({ id: selectedBookmarkId });
+                            }}
                           >
                             {bookmarkFabConfig.icon}
                           </a>
@@ -1234,6 +1274,13 @@ export function BookmarksPage() {
         onOpenChange={setManualBookmarkOpen}
         onSaved={handleManualBookmarkSaved}
       />
+      {displayBookmark ? (
+        <BookmarkTagsDialog
+          bookmark={displayBookmark}
+          open={bookmarkTagsOpen}
+          onOpenChange={setBookmarkTagsOpen}
+        />
+      ) : null}
     </main>
   );
 }

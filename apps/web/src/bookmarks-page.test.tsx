@@ -338,6 +338,17 @@ describe('BookmarksPage', () => {
 
     expect(screen.getByRole('heading', { name: videoItem.title })).toBeVisible();
     expect(screen.getByLabelText('Bookmark metadata')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: `Manage tags for ${videoItem.title}` })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: `More actions for ${videoItem.title}` })
+    ).toBeVisible();
+    expect(
+      screen
+        .getByRole('button', { name: `Remove bookmark for ${videoItem.title}` })
+        .querySelector('svg')
+    ).toHaveAttribute('fill', 'currentColor');
     expect(screen.getByRole('link', { name: 'Open in YouTube' })).toHaveAttribute(
       'href',
       videoItem.canonicalUrl
@@ -353,6 +364,90 @@ describe('BookmarksPage', () => {
 
     expect(invalidateSpies.itemsGetInvalidate).toHaveBeenCalledWith({ id: videoItem.id });
     expect(invalidateSpies.itemsLibraryInvalidate).toHaveBeenCalled();
+    expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
+  });
+
+  test('opens tag management from the action row and saves normalized tags', async () => {
+    const user = userEvent.setup();
+    const taggedVideoItem = createLibraryItem({
+      ...videoItem,
+      tags: [{ id: 'tag-design-systems', name: 'Design systems' }],
+    });
+
+    hookSpies.itemsLibraryUseQuery.mockImplementation((input) => ({
+      data: {
+        items: input.filter.contentType
+          ? [
+              taggedVideoItem,
+              ...libraryItems.filter((item) => item.id !== taggedVideoItem.id),
+            ].filter((item) => item.contentType === input.filter.contentType)
+          : [taggedVideoItem, ...libraryItems.filter((item) => item.id !== taggedVideoItem.id)],
+      },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.itemsGetUseQuery.mockImplementation((input) => {
+      if (!input.id) {
+        return { data: undefined, isLoading: false, error: null };
+      }
+
+      if (input.id === taggedVideoItem.id) {
+        return { data: taggedVideoItem, isLoading: false, error: null };
+      }
+
+      const item = libraryItems.find((candidate) => candidate.id === input.id);
+      return item
+        ? { data: item, isLoading: false, error: null }
+        : { data: undefined, isLoading: false, error: new Error('Missing bookmark') };
+    });
+    hookSpies.itemsListTagsUseQuery.mockReturnValue({
+      data: {
+        tags: [
+          { id: 'tag-design-systems', name: 'Design systems' },
+          { id: 'tag-research', name: 'Research' },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${taggedVideoItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: `Manage tags for ${taggedVideoItem.title}` })
+    );
+
+    expect(screen.getByRole('heading', { name: 'Tags' })).toBeVisible();
+
+    await user.type(screen.getByLabelText('Add or search tags'), '  Research   Notes  ');
+    await user.click(screen.getByRole('button', { name: 'Add tag Research Notes' }));
+    await user.click(screen.getByRole('button', { name: 'Save tags' }));
+
+    expect(mutationSpies.setTags).toHaveBeenCalledWith({
+      id: taggedVideoItem.id,
+      tags: ['Design systems', 'Research Notes'],
+    });
+    expect(invalidateSpies.itemsGetInvalidate).toHaveBeenCalledWith({ id: taggedVideoItem.id });
+    expect(invalidateSpies.itemsLibraryInvalidate).toHaveBeenCalled();
+    expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
+    expect(invalidateSpies.itemsListTagsInvalidate).toHaveBeenCalled();
+  });
+
+  test('marks a bookmark as opened when the provider FAB is used', async () => {
+    const user = userEvent.setup();
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${videoItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    await user.click(screen.getByRole('link', { name: 'Open in YouTube' }));
+
+    expect(mutationSpies.markOpened).toHaveBeenCalledWith({ id: videoItem.id });
+    expect(invalidateSpies.itemsGetInvalidate).toHaveBeenCalledWith({ id: videoItem.id });
     expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
   });
 
