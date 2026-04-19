@@ -11,7 +11,7 @@ type QueryResult<T> = {
 };
 
 type MutationOptions = {
-  onSuccess?: () => void;
+  onSuccess?: (data: unknown, input: unknown) => void;
 };
 
 type ItemsLibraryInput = {
@@ -27,6 +27,11 @@ type ItemsGetInput = {
 
 type CreatorGetInput = {
   creatorId: string;
+};
+
+type ItemTag = {
+  id: string;
+  name: string;
 };
 
 type BookmarkPreviewInput = {
@@ -58,11 +63,14 @@ export const invalidateSpies = {
   itemsGetInvalidate: vi.fn(async () => undefined),
   itemsLibraryInvalidate: vi.fn(async () => undefined),
   itemsHomeInvalidate: vi.fn(async () => undefined),
+  itemsListTagsInvalidate: vi.fn(async () => undefined),
 };
 
 export const mutationSpies = {
   toggleFinished: vi.fn<(input: unknown) => void>(),
   unbookmark: vi.fn<(input: unknown) => void>(),
+  setTags: vi.fn<(input: unknown) => void>(),
+  markOpened: vi.fn<(input: unknown) => void>(),
   bookmarkSave: vi.fn<(input: unknown) => void>(),
 };
 
@@ -76,6 +84,9 @@ export const hookSpies = {
   creatorsGetUseQuery: vi.fn<(input: CreatorGetInput, options?: unknown) => QueryResult<unknown>>(
     (_input) => createQueryResult({})
   ),
+  itemsListTagsUseQuery: vi.fn<() => QueryResult<{ tags: ItemTag[] }>>(() =>
+    createQueryResult({ data: { tags: [] } })
+  ),
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
   >((_input) => createQueryResult({})),
@@ -87,6 +98,12 @@ export const hookSpies = {
   ),
   unbookmarkUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.unbookmark, options)
+  ),
+  setTagsUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.setTags, options)
+  ),
+  markOpenedUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.markOpened, options)
   ),
 };
 
@@ -104,8 +121,14 @@ function createMutationResult(spy: MutationSpy, options?: MutationOptions) {
     isPending: false,
     mutate: (input: unknown) => {
       spy(input);
-      options?.onSuccess?.();
+      options?.onSuccess?.(undefined, input);
     },
+    mutateAsync: async (input: unknown) => {
+      spy(input);
+      options?.onSuccess?.(undefined, input);
+      return undefined;
+    },
+    reset: vi.fn(),
   };
 }
 
@@ -136,6 +159,11 @@ export function resetTrpcMocks() {
   hookSpies.creatorsGetUseQuery.mockReset();
   hookSpies.creatorsGetUseQuery.mockImplementation((_input) => createQueryResult());
 
+  hookSpies.itemsListTagsUseQuery.mockReset();
+  hookSpies.itemsListTagsUseQuery.mockImplementation(() =>
+    createQueryResult({ data: { tags: [] } })
+  );
+
   hookSpies.bookmarksPreviewUseQuery.mockReset();
   hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
 
@@ -153,6 +181,16 @@ export function resetTrpcMocks() {
   hookSpies.unbookmarkUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.unbookmark, options)
   );
+
+  hookSpies.setTagsUseMutation.mockReset();
+  hookSpies.setTagsUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.setTags, options)
+  );
+
+  hookSpies.markOpenedUseMutation.mockReset();
+  hookSpies.markOpenedUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.markOpened, options)
+  );
 }
 
 export function setAuthAvailability(nextState: Partial<typeof authAvailability>) {
@@ -169,6 +207,7 @@ export const trpc = {
       get: { invalidate: invalidateSpies.itemsGetInvalidate },
       library: { invalidate: invalidateSpies.itemsLibraryInvalidate },
       home: { invalidate: invalidateSpies.itemsHomeInvalidate },
+      listTags: { invalidate: invalidateSpies.itemsListTagsInvalidate },
     },
   }),
   items: {
@@ -179,11 +218,20 @@ export const trpc = {
       useQuery: (input: ItemsGetInput, options?: unknown) =>
         hookSpies.itemsGetUseQuery(input, options),
     },
+    listTags: {
+      useQuery: () => hookSpies.itemsListTagsUseQuery(),
+    },
     toggleFinished: {
       useMutation: (options?: MutationOptions) => hookSpies.toggleFinishedUseMutation(options),
     },
     unbookmark: {
       useMutation: (options?: MutationOptions) => hookSpies.unbookmarkUseMutation(options),
+    },
+    setTags: {
+      useMutation: (options?: MutationOptions) => hookSpies.setTagsUseMutation(options),
+    },
+    markOpened: {
+      useMutation: (options?: MutationOptions) => hookSpies.markOpenedUseMutation(options),
     },
   },
   creators: {

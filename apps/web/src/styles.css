@@ -23,8 +23,7 @@ body {
   color: var(--foreground);
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 24%),
-    radial-gradient(circle at 85% 8%, rgba(255, 255, 255, 0.03), transparent 18%),
-    #000000;
+    radial-gradient(circle at 85% 8%, rgba(255, 255, 255, 0.03), transparent 18%), #000000;
   font-family: var(--font-sans);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -276,7 +275,7 @@ img {
   width: 100%;
   padding: 1.5rem;
   background: #ffffff;
-  border: 1px solid #E5E7EB;
+  border: 1px solid #e5e7eb;
   border-radius: 1.45rem;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.2);
 }
@@ -330,31 +329,31 @@ img {
 .auth-panel__surface .cl-dividerText,
 .auth-panel__surface .cl-footerActionText,
 .auth-panel__surface .cl-formFieldHintText {
-  color: #6B7280 !important;
+  color: #6b7280 !important;
 }
 
 .auth-panel__surface .cl-formFieldErrorText {
-  color: #DC2626 !important;
+  color: #dc2626 !important;
 }
 
 .auth-panel__surface .cl-socialButtonsBlockButton {
   background: #ffffff !important;
-  border: 1px solid #E5E7EB !important;
+  border: 1px solid #e5e7eb !important;
   color: #111111 !important;
 }
 
 .auth-panel__surface .cl-socialButtonsBlockButton:hover {
-  background: #F9FAFB !important;
+  background: #f9fafb !important;
 }
 
 .auth-panel__surface .cl-dividerLine {
-  background: #E5E7EB !important;
+  background: #e5e7eb !important;
 }
 
 .auth-panel__surface .cl-formFieldInput {
-  background: #F9FAFB !important;
+  background: #f9fafb !important;
   color: #111111 !important;
-  border-color: #E5E7EB !important;
+  border-color: #e5e7eb !important;
 }
 
 .auth-panel__surface .cl-formButtonPrimary {
@@ -852,7 +851,9 @@ img {
   font-weight: 500;
   cursor: pointer;
   text-align: left;
-  transition: background 120ms ease, color 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .settings-page__nav-item:hover {
@@ -1075,7 +1076,12 @@ img {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.24) 40%, rgba(18, 18, 18, 0.98) 100%),
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.08) 0%,
+      rgba(0, 0, 0, 0.24) 40%,
+      rgba(18, 18, 18, 0.98) 100%
+    ),
     linear-gradient(90deg, rgba(18, 18, 18, 0.08), rgba(18, 18, 18, 0.22));
 }
 
@@ -1451,10 +1457,22 @@ img {
   padding: 0;
 }
 
+.bookmark-tags-dialog__content {
+  width: min(38rem, calc(100vw - 2rem));
+  padding: 0;
+}
+
 .manual-bookmark-dialog {
   display: flex;
   flex-direction: column;
   min-height: min(42rem, calc(100vh - 2rem));
+  max-height: calc(100vh - 2rem);
+}
+
+.bookmark-tags-dialog {
+  display: flex;
+  flex-direction: column;
+  min-height: min(34rem, calc(100vh - 2rem));
   max-height: calc(100vh - 2rem);
 }
 
@@ -1463,7 +1481,21 @@ img {
   flex-shrink: 0;
 }
 
+.bookmark-tags-dialog__header,
+.bookmark-tags-dialog__footer {
+  flex-shrink: 0;
+}
+
 .manual-bookmark-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bookmark-tags-dialog__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1477,10 +1509,23 @@ img {
   gap: 0.45rem;
 }
 
+.bookmark-tags-dialog__header-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .manual-bookmark-dialog__title {
   margin: 0;
   font-size: clamp(1.55rem, 2.4vw, 2.1rem);
   line-height: 0.98;
+  letter-spacing: -0.05em;
+  color: var(--text);
+}
+
+.bookmark-tags-dialog__title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  line-height: 1;
   letter-spacing: -0.05em;
   color: var(--text);
 }
@@ -1492,7 +1537,22 @@ img {
   line-height: 1.55;
 }
 
+.bookmark-tags-dialog__description,
+.bookmark-tags-dialog__bookmark-title {
+  margin: 0;
+  color: var(--text-subheader);
+}
+
+.bookmark-tags-dialog__bookmark-title {
+  font-size: 0.92rem;
+}
+
 .manual-bookmark-dialog__icon-button {
+  width: 2.9rem;
+  padding-inline: 0;
+}
+
+.bookmark-tags-dialog__close {
   width: 2.9rem;
   padding-inline: 0;
 }
@@ -1505,6 +1565,45 @@ img {
   gap: 0.85rem;
   padding: 1.25rem;
   overflow: auto;
+}
+
+.bookmark-tags-dialog__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  overflow: auto;
+}
+
+.bookmark-tags-dialog__field {
+  gap: 0.45rem;
+}
+
+.bookmark-tags-dialog__section {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.bookmark-tags-dialog__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--text-subheader);
+  font-size: 0.85rem;
+}
+
+.bookmark-tags-dialog__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bookmark-tags-dialog__empty {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
 }
 
 .manual-bookmark-dialog__input-row {
@@ -1710,7 +1809,22 @@ img {
   border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.bookmark-tags-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
 .manual-bookmark-dialog__footer-note {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-subheader);
+}
+
+.bookmark-tags-dialog__footer-note {
   margin: 0;
   font-size: 0.82rem;
   color: var(--text-subheader);
@@ -1720,7 +1834,15 @@ img {
   color: var(--danger);
 }
 
+.bookmark-tags-dialog__footer-note--error {
+  color: var(--danger);
+}
+
 .manual-bookmark-dialog__save {
+  margin-left: auto;
+}
+
+.bookmark-tags-dialog__save {
   margin-left: auto;
 }
 
@@ -3042,7 +3164,18 @@ input:focus {
     padding: 0.85rem 1rem 1rem;
   }
 
+  .bookmark-tags-dialog__footer {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0.85rem 1rem 1rem;
+  }
+
   .manual-bookmark-dialog__save {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .bookmark-tags-dialog__save {
     width: 100%;
     margin-left: 0;
   }
