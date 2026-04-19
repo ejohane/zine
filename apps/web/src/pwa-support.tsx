@@ -17,7 +17,7 @@ export function PwaSupport() {
   } = usePwaState();
 
   const hidesInstallPrompt = pathname.startsWith('/sign-in') || pathname.startsWith('/sign-up');
-  const usesBottomTabBar = pathname.startsWith('/bookmarks') || pathname.startsWith('/settings');
+  const usesBottomTabBar = pathname === '/bookmarks' || pathname === '/settings';
   const hasInlineInstallSurface = pathname.startsWith('/settings');
   const showInstallBanner =
     isPhoneLayout &&

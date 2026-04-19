@@ -120,10 +120,12 @@ test('uses a phone drill-in flow and keeps mobile chrome usable', async ({ page 
       return {
         backgroundColor: styles.backgroundColor,
         paddingLeft: styles.paddingLeft,
+        borderRadius: styles.borderRadius,
       };
     });
-  expect(descriptionSection.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-  expect(parseFloat(descriptionSection.paddingLeft)).toBeGreaterThanOrEqual(0);
+  expect(descriptionSection.backgroundColor).toBe('rgb(26, 26, 26)');
+  expect(parseFloat(descriptionSection.paddingLeft)).toBeGreaterThanOrEqual(16);
+  expect(parseFloat(descriptionSection.borderRadius)).toBeGreaterThanOrEqual(16);
 
   await page.getByRole('button', { name: 'Back to bookmarks list' }).click();
 
