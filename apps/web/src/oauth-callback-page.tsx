@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { LinkButton } from './components';
+import { getOnboardingOAuthContext } from './lib/onboarding';
 import { completeOAuthFlow } from './lib/oauth';
 import { useAppSession, useAuthAvailability } from './lib/trpc';
 
@@ -12,6 +13,8 @@ export function OAuthCallbackPage() {
   const location = useLocation();
   const [status, setStatus] = useState<'working' | 'error'>('working');
   const [message, setMessage] = useState('Finishing the provider connection...');
+  const pendingOnboardingContext = getOnboardingOAuthContext();
+  const returnPath = pendingOnboardingContext?.origin === 'welcome' ? '/welcome' : '/settings';
 
   useEffect(() => {
     if (mode !== 'clerk') {
@@ -28,7 +31,7 @@ export function OAuthCallbackPage() {
           return;
         }
 
-        navigate('/settings', { replace: true });
+        navigate(returnPath, { replace: true });
       })
       .catch((error) => {
         if (isCancelled) {
@@ -42,7 +45,7 @@ export function OAuthCallbackPage() {
     return () => {
       isCancelled = true;
     };
-  }, [getToken, location.search, mode, navigate]);
+  }, [getToken, location.search, mode, navigate, returnPath]);
 
   return (
     <main className="shell-loading">
@@ -53,7 +56,9 @@ export function OAuthCallbackPage() {
         <h1>{message}</h1>
         {status === 'error' ? (
           <div className="button-row">
-            <LinkButton to="/settings">Back to settings</LinkButton>
+            <LinkButton to={returnPath}>
+              {returnPath === '/welcome' ? 'Back to guided setup' : 'Back to settings'}
+            </LinkButton>
           </div>
         ) : null}
       </div>

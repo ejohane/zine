@@ -16,6 +16,7 @@ describe('OAuthCallbackPage', () => {
   beforeEach(() => {
     resetTrpcMocks();
     vi.mocked(completeOAuthFlow).mockReset();
+    sessionStorage.clear();
   });
 
   test('shows a configuration error when clerk auth is unavailable', async () => {
@@ -45,6 +46,27 @@ describe('OAuthCallbackPage', () => {
 
     expect(await screen.findByText('Settings destination')).toBeVisible();
     expect(completeOAuthFlow).toHaveBeenCalled();
+  });
+
+  test('returns to welcome when onboarding oauth context is pending', async () => {
+    setAuthAvailability({ mode: 'clerk', isEnabled: true });
+    setSessionState({ getToken: async () => 'token-123' });
+    vi.mocked(completeOAuthFlow).mockResolvedValue('YOUTUBE');
+    sessionStorage.setItem(
+      'zine:web:onboarding-oauth-context',
+      JSON.stringify({ origin: 'welcome', provider: 'YOUTUBE' })
+    );
+
+    renderRoute(<OAuthCallbackPage />, {
+      route: '/oauth/callback?code=abc&state=YOUTUBE:1',
+      path: '/oauth/callback',
+      redirects: [
+        { path: '/settings', element: <div>Settings destination</div> },
+        { path: '/welcome', element: <div>Welcome destination</div> },
+      ],
+    });
+
+    expect(await screen.findByText('Welcome destination')).toBeVisible();
   });
 
   test('renders oauth callback failures inline', async () => {

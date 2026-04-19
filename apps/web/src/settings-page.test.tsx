@@ -7,11 +7,57 @@ import { renderRoute } from './test/render-router';
 vi.mock('./lib/trpc', () => import('./test/mocks/trpc'));
 
 import { SettingsPage } from './settings-page';
-import { resetTrpcMocks, setAuthAvailability, setSessionState } from './test/mocks/trpc';
+import { hookSpies, resetTrpcMocks, setAuthAvailability, setSessionState } from './test/mocks/trpc';
 
 describe('SettingsPage', () => {
   beforeEach(() => {
     resetTrpcMocks();
+    hookSpies.connectionsListUseQuery.mockImplementation(() => ({
+      data: {
+        YOUTUBE: { provider: 'YOUTUBE', status: 'ACTIVE', connectedAt: Date.now() },
+        SPOTIFY: null,
+        GMAIL: { provider: 'GMAIL', status: 'ACTIVE', connectedAt: Date.now() },
+      },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.subscriptionsListUseQuery.mockImplementation(() => ({
+      data: {
+        items: [
+          { id: 'yt-1', provider: 'YOUTUBE' },
+          { id: 'sp-1', provider: 'SPOTIFY' },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.newslettersStatsUseQuery.mockImplementation(() => ({
+      data: {
+        total: 8,
+        active: 6,
+        hidden: 1,
+        unsubscribed: 1,
+        lastSyncAt: Date.now(),
+        lastSyncStatus: 'SUCCESS',
+        lastSyncError: null,
+      },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.rssStatsUseQuery.mockImplementation(() => ({
+      data: {
+        total: 3,
+        active: 2,
+        paused: 1,
+        unsubscribed: 0,
+        error: 0,
+        lastSuccessAt: Date.now(),
+      },
+      isLoading: false,
+      error: null,
+    }));
   });
 
   test('renders the bookmarks shell with a settings breadcrumb and a single card', () => {
@@ -64,8 +110,16 @@ describe('SettingsPage', () => {
         path: '/settings',
       });
 
-      expect(screen.getByRole('heading', { name: 'Subscriptions' })).toBeVisible();
-      expect(screen.getByText(/manage your subscriptions/i)).toBeVisible();
+      expect(screen.getByRole('heading', { name: 'Sources' })).toBeVisible();
+      expect(screen.getByText(/launch the guided setup/i)).toBeVisible();
+      expect(screen.getByRole('link', { name: /launch guided setup/i })).toHaveAttribute(
+        'href',
+        '/welcome?origin=settings'
+      );
+      expect(screen.getByText('YouTube')).toBeVisible();
+      expect(screen.getByText('Spotify')).toBeVisible();
+      expect(screen.getByText('Gmail')).toBeVisible();
+      expect(screen.getByText('RSS')).toBeVisible();
     });
 
     test('nav contains a sign out button in clerk mode', () => {
