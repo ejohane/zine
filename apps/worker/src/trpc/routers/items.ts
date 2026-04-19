@@ -6,6 +6,8 @@ import { eq, and, desc, or, lt, isNotNull, sql, inArray, type SQL } from 'drizzl
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
+  isJsonObject,
+  type JsonObject,
   type Provider,
   UserItemState,
   ProviderSchema,
@@ -145,15 +147,15 @@ function normalizeCanonicalUrlForResponse(url: string): string {
   }
 }
 
-function parseRawMetadata(rawMetadata: string | null): Record<string, unknown> {
+function parseRawMetadata(rawMetadata: string | null): JsonObject {
   if (!rawMetadata) {
     return {};
   }
 
   try {
     const parsed = JSON.parse(rawMetadata);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
+    if (isJsonObject(parsed)) {
+      return parsed;
     }
   } catch {
     // Ignore parse errors and fallback to an empty metadata object.
@@ -162,7 +164,7 @@ function parseRawMetadata(rawMetadata: string | null): Record<string, unknown> {
   return {};
 }
 
-function getStringMetadataField(metadata: Record<string, unknown>, key: string): string | null {
+function getStringMetadataField(metadata: JsonObject, key: string): string | null {
   const value = metadata[key];
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
 }
@@ -353,7 +355,7 @@ async function insertConsumptionEvent(
     durationSeconds?: number | null;
     deltaSeconds?: number | null;
     source: ConsumptionEventSource;
-    metadata?: Record<string, unknown> | null;
+    metadata?: JsonObject | null;
   }
 ) {
   await ctx.db.insert(userItemConsumptionEvents).values({

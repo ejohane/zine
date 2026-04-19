@@ -1,13 +1,13 @@
 /**
  * Subscription Polling Scheduler
  *
- * Main cron job handler for polling subscriptions with distributed locking.
+ * Provider-specific cron scheduler for subscription polling.
  * Prevents overlapping executions across multiple Cloudflare Worker instances.
  *
  * Key features:
- * - Distributed lock via KV prevents concurrent cron executions
+ * - Provider-specific distributed locks for failure isolation
  * - Processes only due subscriptions (based on lastPolledAt and pollIntervalSeconds)
- * - Groups by provider and user for efficient API usage
+ * - Groups subscriptions by user for efficient API usage
  * - Handles auth errors by marking connections/subscriptions as disconnected
  * - Updates lastPolledAt after each subscription poll
  *
@@ -44,9 +44,6 @@ const YOUTUBE_POLL_LOCK_KEY = 'cron:poll-youtube:lock';
 /** Distributed lock key for Spotify polling cron */
 const SPOTIFY_POLL_LOCK_KEY = 'cron:poll-spotify:lock';
 
-/** @deprecated Use provider-specific lock keys instead */
-const POLL_LOCK_KEY = 'cron:poll-subscriptions:lock';
-
 /** Lock TTL in seconds (15 minutes) - should cover worst case polling time */
 const POLL_LOCK_TTL = 900;
 
@@ -78,39 +75,6 @@ export interface PollResult {
 }
 
 /**
- * Metrics for a single poll cycle.
- * Used for optimization validation and monitoring.
- */
-interface PollCycleMetrics {
-  /** Wall-clock duration in milliseconds */
-  durationMs: number;
-  /** Total subscriptions found due for polling */
-  subscriptionsDue: number;
-  /** Subscriptions actually processed */
-  subscriptionsProcessed: number;
-  /** New items ingested */
-  newItemsIngested: number;
-  /** Provider-specific metrics */
-  providers: {
-    youtube?: ProviderMetrics;
-    spotify?: ProviderMetrics;
-  };
-}
-
-interface ProviderMetrics {
-  /** Subscriptions for this provider */
-  subscriptions: number;
-  /** Subscriptions processed */
-  processed: number;
-  /** Subscriptions skipped via delta detection */
-  skipped: number;
-  /** New items from this provider */
-  newItems: number;
-  /** Estimated API calls made */
-  estimatedApiCalls: number;
-}
-
-/**
  * Result of processing a single user's subscriptions.
  * Used for aggregating results across parallel user processing.
  */
@@ -130,179 +94,8 @@ interface UserBatchResult {
 }
 
 // ============================================================================
-// Metrics Helper Functions
+// Provider Polling Entrypoint
 // ============================================================================
-
-/**
- * Estimate YouTube API calls for batch polling.
- * - Playlist calls: N (all parallel)
- * - Video details calls: ceil(totalVideos / 50)
- */
-function estimateYouTubeApiCalls(subCount: number, result: BatchResult): number {
-  const avgVideosPerSub = 10;
-  const totalVideos = result.processed * avgVideosPerSub;
-  const detailsCalls = Math.ceil(totalVideos / 50);
-  return subCount + detailsCalls;
-}
-
-/**
- * Estimate Spotify API calls for batch polling with delta detection.
- * - Metadata calls: ceil(subCount / 50)
- * - Episode calls: only for changed subscriptions
- */
-function estimateSpotifyApiCalls(subCount: number, result: BatchResult): number {
-  const metadataCalls = Math.ceil(subCount / 50);
-  const episodeCalls = result.processed - (result.skipped ?? 0);
-  return metadataCalls + episodeCalls;
-}
-
-/**
- * Calculate percentage reduction from old to new call count.
- */
-function calculateReductionPercent(oldCalls: number, newCalls: number): string {
-  if (oldCalls === 0) return '0%';
-  const reduction = ((oldCalls - newCalls) / oldCalls) * 100;
-  return `${Math.round(reduction)}%`;
-}
-
-// ============================================================================
-// Main Polling Function
-// ============================================================================
-
-/**
- * Poll due subscriptions for new content.
- *
- * This is the main entry point called by the cron scheduled handler.
- * It acquires a distributed lock, finds due subscriptions, and processes them.
- *
- * @param env - Cloudflare Worker environment bindings
- * @param _ctx - Execution context (for waitUntil if needed)
- * @returns PollResult with processing statistics
- */
-export async function pollSubscriptions(
-  env: Bindings,
-  _ctx: ExecutionContext
-): Promise<PollResult> {
-  const startTime = Date.now();
-
-  // 1. Try to acquire distributed lock
-  const lockAcquired = await tryAcquireLock(env.OAUTH_STATE_KV, POLL_LOCK_KEY, POLL_LOCK_TTL);
-  if (!lockAcquired) {
-    pollLogger.info('Skipped: lock held by another worker');
-    return { skipped: true, reason: 'lock_held' };
-  }
-
-  try {
-    const db = drizzle(env.DB, { schema });
-    const now = Date.now();
-
-    // 2. Find due subscriptions
-    // A subscription is due when:
-    // - status is ACTIVE
-    // - AND either:
-    //   - lastPolledAt is NULL (never polled)
-    //   - OR lastPolledAt < (now - pollIntervalSeconds * 1000)
-    const dueSubscriptions = await db.query.subscriptions.findMany({
-      where: and(
-        eq(subscriptions.status, 'ACTIVE'),
-        or(
-          isNull(subscriptions.lastPolledAt),
-          sql`${subscriptions.lastPolledAt} < ${now} - (${subscriptions.pollIntervalSeconds} * 1000)`
-        )
-      ),
-      orderBy: [asc(subscriptions.lastPolledAt)],
-      limit: BATCH_SIZE,
-    });
-
-    if (dueSubscriptions.length === 0) {
-      pollLogger.info('No subscriptions due for polling');
-      return { skipped: false, processed: 0, reason: 'no_due_subscriptions' };
-    }
-
-    pollLogger.info('Found due subscriptions', { count: dueSubscriptions.length });
-
-    // 3. Group by provider
-    const youtube = dueSubscriptions.filter((s) => s.provider === 'YOUTUBE');
-    const spotify = dueSubscriptions.filter((s) => s.provider === 'SPOTIFY');
-
-    pollLogger.info('Subscriptions by provider', {
-      youtube: youtube.length,
-      spotify: spotify.length,
-    });
-
-    // 4. Process each provider's batch in parallel
-    const [ytResult, spResult] = await Promise.all([
-      processProviderBatch(youtube, youtubeProviderConfig, env, db),
-      processProviderBatch(spotify, spotifyProviderConfig, env, db),
-    ]);
-
-    const totalProcessed = ytResult.processed + spResult.processed;
-    const totalNewItems = ytResult.newItems + spResult.newItems;
-    const durationMs = Date.now() - startTime;
-
-    // Build metrics object
-    const metrics: PollCycleMetrics = {
-      durationMs,
-      subscriptionsDue: dueSubscriptions.length,
-      subscriptionsProcessed: totalProcessed,
-      newItemsIngested: totalNewItems,
-      providers: {
-        youtube:
-          youtube.length > 0
-            ? {
-                subscriptions: youtube.length,
-                processed: ytResult.processed,
-                skipped: ytResult.skipped ?? 0,
-                newItems: ytResult.newItems,
-                estimatedApiCalls: estimateYouTubeApiCalls(youtube.length, ytResult),
-              }
-            : undefined,
-        spotify:
-          spotify.length > 0
-            ? {
-                subscriptions: spotify.length,
-                processed: spResult.processed,
-                skipped: spResult.skipped ?? 0,
-                newItems: spResult.newItems,
-                estimatedApiCalls: estimateSpotifyApiCalls(spotify.length, spResult),
-              }
-            : undefined,
-      },
-    };
-
-    pollLogger.info('Poll cycle metrics', { metrics });
-
-    // Log summary with efficiency metrics
-    pollLogger.info('Polling complete', {
-      processed: totalProcessed,
-      newItems: totalNewItems,
-      durationMs,
-      spotifyCallsReduction:
-        spotify.length > 0
-          ? calculateReductionPercent(
-              spotify.length, // old: 1 call per sub
-              metrics.providers.spotify?.estimatedApiCalls ?? 0
-            )
-          : undefined,
-      youtubeCallsReduction:
-        youtube.length > 0
-          ? calculateReductionPercent(
-              youtube.length * 2, // old: 2 calls per sub
-              metrics.providers.youtube?.estimatedApiCalls ?? 0
-            )
-          : undefined,
-    });
-
-    return {
-      skipped: false,
-      processed: totalProcessed,
-      newItems: totalNewItems,
-    };
-  } finally {
-    // Always release the lock
-    await releaseLock(env.OAUTH_STATE_KV, POLL_LOCK_KEY);
-  }
-}
 
 /**
  * Poll due subscriptions for a specific provider.

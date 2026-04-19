@@ -1,19 +1,7 @@
-/**
- * OAuthErrorBoundary - Error boundary specifically for OAuth connection flows.
- *
- * Features:
- * - Catches React errors during OAuth flows
- * - Classifies errors using parseOAuthError for specialized UI
- * - Shows different emoji/title based on error type
- * - Provides provider-specific error messages
- * - Offers retry callback for recoverable errors
- *
- * @see frontend-spec.md Section 8.2
- */
-
 import type { ErrorInfo, ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import type { OAuthProvider } from '@zine/shared/types';
 
 import { Button, Text } from '@/components/primitives';
 import { ErrorBoundary, type FallbackRenderProps } from './error-boundary';
@@ -22,29 +10,21 @@ import { parseOAuthError, getOAuthErrorDisplay, type OAuthError } from '@/lib/oa
 import { oauthLogger } from '@/lib/logger';
 
 interface OAuthErrorFallbackProps {
-  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider: OAuthProvider;
   error: OAuthError;
   onRetry?: () => void;
 }
 
-/**
- * Get provider display name for user-facing messages.
- */
-function getProviderName(provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'): string {
+function getProviderName(provider: OAuthProvider): string {
   if (provider === 'YOUTUBE') return 'YouTube';
   if (provider === 'SPOTIFY') return 'Spotify';
   return 'Gmail';
 }
 
-/**
- * Fallback component displayed when OAuth-related errors occur.
- * Shows specialized UI based on the error type.
- */
 function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProps) {
   const providerName = getProviderName(provider);
   const display = getOAuthErrorDisplay(error.code, providerName);
 
-  // Determine button text based on action
   const buttonText =
     error.action === 'reauthorize'
       ? 'Reconnect'
@@ -73,7 +53,7 @@ function OAuthErrorFallback({ provider, error, onRetry }: OAuthErrorFallbackProp
 
 interface OAuthErrorBoundaryProps {
   children: ReactNode;
-  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider: OAuthProvider;
   onRetry?: () => void;
   /** Optional error to display directly (for non-React error flows) */
   error?: Error | string | OAuthError | null;
@@ -89,40 +69,14 @@ function isOAuthError(error: unknown): error is OAuthError {
   );
 }
 
-/**
- * Error boundary specifically for OAuth connection flows.
- *
- * Uses the base ErrorBoundary with a specialized fallbackRender that:
- * - Parses OAuth errors to determine type (USER_CANCELLED, NETWORK_ERROR, etc.)
- * - Shows provider-specific error messages
- * - Provides appropriate recovery actions
- *
- * @example
- * ```tsx
- * <OAuthErrorBoundary provider="YOUTUBE" onRetry={handleRetry}>
- *   <YouTubeConnectScreen />
- * </OAuthErrorBoundary>
- *
- * // With pre-existing error (from navigation params, etc.)
- * <OAuthErrorBoundary
- *   provider="SPOTIFY"
- *   error={route.params?.error}
- *   onRetry={handleRetry}
- * >
- *   <SpotifyConnectScreen />
- * </OAuthErrorBoundary>
- * ```
- */
 export function OAuthErrorBoundary({
   children,
   provider,
   onRetry,
   error: externalError,
 }: OAuthErrorBoundaryProps) {
-  // Track reset trigger for external errors
   const [resetTrigger, setResetTrigger] = useState(0);
 
-  // Handle error logging
   const handleError = useCallback(
     (error: Error, errorInfo: ErrorInfo) => {
       const parsedError = parseOAuthError(error);
@@ -136,13 +90,11 @@ export function OAuthErrorBoundary({
     [provider]
   );
 
-  // Handle retry - reset both internal and external error state
   const handleRetry = useCallback(() => {
     setResetTrigger((prev) => prev + 1);
     onRetry?.();
   }, [onRetry]);
 
-  // Render fallback with parsed OAuth error
   const renderFallback = useCallback(
     ({ error, resetError }: FallbackRenderProps) => {
       const parsedError = parseOAuthError(error);
@@ -157,7 +109,6 @@ export function OAuthErrorBoundary({
     [provider, onRetry]
   );
 
-  // Handle external errors (from navigation params, etc.)
   if (externalError) {
     const parsedExternalError = isOAuthError(externalError)
       ? externalError

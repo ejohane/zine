@@ -19,7 +19,7 @@ describe('redactDiagnosticValue', () => {
       nested: {
         accessToken: 'abc123',
       },
-    }) as Record<string, unknown>;
+    });
 
     expect(redacted).toEqual({
       headers: {

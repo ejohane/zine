@@ -59,7 +59,7 @@ describe('buildMobileDiagnosticBundle', () => {
         retryCount: 0,
         authRetryCount: 1,
         lastError: 'network down',
-        lastErrorType: 'NETWORK',
+        lastErrorType: 'network',
       },
     ]);
   });

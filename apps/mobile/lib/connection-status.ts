@@ -5,6 +5,7 @@
  * in the UI. Used by ProviderCard component on the subscriptions screen.
  */
 
+import type { ProviderConnectionStatusValue } from '@zine/shared/types';
 import type { ThemeColors } from '@/constants/theme';
 
 /**
@@ -14,13 +15,13 @@ import type { ThemeColors } from '@/constants/theme';
  * - REVOKED: User revoked access in the provider
  * - null: No connection exists
  */
-export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED' | null;
+export type ConnectionStatus = ProviderConnectionStatusValue | null;
 
 /**
  * Display configuration for a connection status.
  * Used to render the visual state in ProviderCard.
  */
-export interface StatusDisplay {
+interface StatusDisplay {
   /** Color for the status indicator dot */
   dotColor: string;
   /** Text to display (e.g., "Connected", "Reconnect required") */

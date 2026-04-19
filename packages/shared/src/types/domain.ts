@@ -1,16 +1,5 @@
-/**
- * Domain Types for Zine
- *
- * Core domain models representing Items, UserItems, and Sources.
- */
+import type { JsonObject } from '../json';
 
-// ============================================================================
-// Enums
-// ============================================================================
-
-/**
- * Types of content that can be saved to Zine
- */
 export enum ContentType {
   VIDEO = 'VIDEO',
   PODCAST = 'PODCAST',
@@ -18,9 +7,6 @@ export enum ContentType {
   POST = 'POST',
 }
 
-/**
- * Content providers/sources
- */
 export enum Provider {
   YOUTUBE = 'YOUTUBE',
   SPOTIFY = 'SPOTIFY',
@@ -31,285 +17,121 @@ export enum Provider {
   X = 'X',
 }
 
-/**
- * States for user items in the processing pipeline
- */
 export enum UserItemState {
-  /** New items awaiting triage */
   INBOX = 'INBOX',
-  /** Items marked for future consumption */
   BOOKMARKED = 'BOOKMARKED',
-  /** Items that have been consumed/dismissed */
   ARCHIVED = 'ARCHIVED',
 }
 
-/**
- * Status for OAuth-based subscriptions
- */
 export enum SubscriptionStatus {
-  /** Subscription is active and being polled */
   ACTIVE = 'ACTIVE',
-  /** Subscription is paused by user */
   PAUSED = 'PAUSED',
-  /** Provider connection was disconnected */
   DISCONNECTED = 'DISCONNECTED',
-  /** User unsubscribed (soft delete) */
   UNSUBSCRIBED = 'UNSUBSCRIBED',
 }
 
-/**
- * Status for OAuth provider connections
- */
 export enum ProviderConnectionStatus {
-  /** Connection is active with valid tokens */
   ACTIVE = 'ACTIVE',
-  /** Tokens have expired and need refresh */
   EXPIRED = 'EXPIRED',
-  /** User revoked access at provider */
   REVOKED = 'REVOKED',
 }
 
-// ============================================================================
-// Domain Models
-// ============================================================================
-
-/**
- * An Item represents a piece of content from any provider.
- * Items are shared across users - the same video/article/podcast
- * can be referenced by multiple UserItems.
- */
+export type ContentTypeValue = `${ContentType}`;
+export type ProviderValue = `${Provider}`;
+export type UserItemStateValue = `${UserItemState}`;
+export type SubscriptionStatusValue = `${SubscriptionStatus}`;
+export type ProviderConnectionStatusValue = `${ProviderConnectionStatus}`;
+export type OAuthProvider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'>;
 export interface Item {
-  /** Unique identifier (typically a ULID or UUID) */
   id: string;
-
-  /** Type of content */
   contentType: ContentType;
-
-  /** Content provider (required for D1 schema) */
   provider: Provider;
-
-  /** Provider-specific ID (e.g., YouTube video ID) */
   providerId: string;
-
-  /** Canonical URL to the content */
   canonicalUrl: string;
-
-  /** Title of the content */
   title: string;
-
-  /** Summary or description */
   summary?: string;
-
-  /** Creator/author name (computed from creators table JOIN, not stored in items) */
+  // Joined from creators; not stored on items.
   creator: string;
-
-  /** URL to creator/channel/podcast show image (computed from creators table JOIN, not stored in items) */
+  // Joined from creators; not stored on items.
   creatorImageUrl?: string;
-
-  /** Reference to the Creator entity (foreign key stored in items.creator_id) */
   creatorId?: string;
-
-  /** Publisher/channel name */
   publisher?: string;
-
-  /** When the content was originally published */
   publishedAt?: string;
-
-  /** URL to thumbnail image */
   thumbnailUrl?: string;
-
-  /** Duration in seconds (for video/audio content) */
   duration?: number;
-
-  /** Estimated word count (for articles) */
   wordCount?: number;
-
-  /** Estimated reading time in minutes (for articles) */
   readingTimeMinutes?: number;
-
-  /** When this Item record was created */
   createdAt: string;
-
-  /** When this Item record was last updated */
   updatedAt: string;
 }
 
-/**
- * A UserItem represents a user's relationship with an Item.
- * Each user has their own UserItem for each Item they interact with.
- */
 export interface UserItem {
-  /** Unique identifier for this user-item relationship */
   id: string;
-
-  /** User ID (required for D1 multi-tenant queries) */
+  // Required for D1 multi-tenant queries.
   userId: string;
-
-  /** Reference to the Item */
   itemId: string;
-
-  /** Current state in the user's workflow */
   state: UserItemState;
-
-  /** When the item was ingested into the user's queue */
   ingestedAt: string;
-
-  /** When the item was bookmarked (if ever) */
   bookmarkedAt?: string;
-
-  /** When the item was archived (if ever) */
   archivedAt?: string;
-
-  /** Whether the user has finished/consumed this content */
   isFinished: boolean;
-
-  /** Timestamp when marked finished (ISO8601), null if not finished */
   finishedAt?: string;
-
-  /** Current playback/reading position in seconds */
   progressPosition?: number;
-
-  /** Total duration in seconds */
   progressDuration?: number;
-
-  /** When progress was last updated */
   progressUpdatedAt?: string;
-
-  /** When this UserItem record was created */
   createdAt: string;
-
-  /** When this UserItem record was last updated */
   updatedAt: string;
 }
 
-/**
- * A Source represents a subscription to a content provider.
- * Users subscribe to Sources to automatically receive new content.
- */
 export interface Source {
-  /** Unique identifier */
   id: string;
-
-  /** User ID (required for D1 multi-tenant queries) */
+  // Required for D1 multi-tenant queries.
   userId: string;
-
-  /** The provider type */
   provider: Provider;
-
-  /** Provider-specific identifier (e.g., channel ID) */
   providerId: string;
-
-  /** Feed/channel URL (different from providerId) */
   feedUrl: string;
-
-  /** Display name for the source */
   name: string;
-
-  /** Provider-specific configuration */
-  config?: Record<string, unknown>;
-
-  /** When this source was created */
+  config?: JsonObject;
   createdAt: string;
-
-  /** When this source was last updated */
   updatedAt: string;
-
-  /** Soft delete timestamp (for unsubscribe without data loss) */
+  // Soft delete so unsubscribe can preserve history.
   deletedAt?: string;
 }
-
-// ============================================================================
-// Type Guards
-// ============================================================================
-
-/**
- * Type guard to check if a value is a valid ContentType
- */
 export function isContentType(value: unknown): value is ContentType {
   return Object.values(ContentType).includes(value as ContentType);
 }
 
-/**
- * Type guard to check if a value is a valid Provider
- */
 export function isProvider(value: unknown): value is Provider {
   return Object.values(Provider).includes(value as Provider);
 }
 
-/**
- * Type guard to check if a value is a valid UserItemState
- */
 export function isUserItemState(value: unknown): value is UserItemState {
   return Object.values(UserItemState).includes(value as UserItemState);
 }
 
-/**
- * Type guard to check if a value is a valid SubscriptionStatus
- */
 export function isSubscriptionStatus(value: unknown): value is SubscriptionStatus {
   return Object.values(SubscriptionStatus).includes(value as SubscriptionStatus);
 }
 
-/**
- * Type guard to check if a value is a valid ProviderConnectionStatus
- */
 export function isProviderConnectionStatus(value: unknown): value is ProviderConnectionStatus {
   return Object.values(ProviderConnectionStatus).includes(value as ProviderConnectionStatus);
 }
-
-// ============================================================================
-// Creator Models
-// ============================================================================
-
-/**
- * A Creator represents a content creator across providers.
- * Examples: YouTube channel, Spotify podcast, X/Twitter user, Substack author.
- * Creators are canonical entities shared across users.
- */
 export interface Creator {
-  /** Unique identifier (ULID) */
   id: string;
-
-  /** Content provider */
   provider: Provider;
-
-  /** Provider-specific creator ID (e.g., YouTube channel ID, Spotify show ID) */
   providerCreatorId: string;
-
-  /** Display name */
   name: string;
-
-  /** Lowercase, trimmed name for deduplication */
+  // Lowercase, trimmed name used for deduplication.
   normalizedName: string;
-
-  /** URL to creator's profile image */
   imageUrl?: string;
-
-  /** Creator's bio/description */
   description?: string;
-
-  /** External URL to creator's page on the provider */
   externalUrl?: string;
-
-  /** @username handle (for X/Twitter, YouTube, etc.) */
   handle?: string;
-
-  /** When this Creator record was created (Unix ms) */
   createdAt: number;
-
-  /** When this Creator record was last updated (Unix ms) */
   updatedAt: number;
 }
 
-/**
- * Creator with user-specific subscription status.
- * Used for API responses that include whether the current user
- * is subscribed to this creator.
- */
 export interface CreatorWithSubscription extends Creator {
-  /** Whether the current user is subscribed to this creator */
   isSubscribed: boolean;
-
-  /** The subscription ID if subscribed */
   subscriptionId?: string;
 }

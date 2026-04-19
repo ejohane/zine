@@ -1304,8 +1304,12 @@ The polling scheduler runs on a cron schedule (typically hourly) to fetch new co
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     if (event.cron === '0 * * * *') {
-      // Every hour
-      ctx.waitUntil(pollSubscriptions(env));
+      ctx.waitUntil(pollProviderSubscriptions('YOUTUBE', env, ctx));
+      return;
+    }
+
+    if (event.cron === '30 * * * *') {
+      ctx.waitUntil(pollProviderSubscriptions('SPOTIFY', env, ctx));
     }
   },
 };
@@ -1314,21 +1318,21 @@ export default {
 #### Main Polling Function
 
 ```typescript
-export async function pollSubscriptions(env: Env): Promise<PollResult> {
+export async function pollProviderSubscriptions(
+  provider: 'YOUTUBE' | 'SPOTIFY',
+  env: Env,
+  ctx: ExecutionContext
+): Promise<PollResult> {
   const db = drizzle(env.DB);
-
-  // Step 1: Acquire distributed lock
-  const lockKey = 'poll:subscriptions:lock';
-  const lockAcquired = await tryAcquireLock(env.KV, lockKey, 15 * 60 * 1000);
+  const lockKey = provider === 'YOUTUBE' ? 'cron:poll-youtube:lock' : 'cron:poll-spotify:lock';
+  const lockAcquired = await tryAcquireLock(env.KV, lockKey, 15 * 60);
 
   if (!lockAcquired) {
-    console.log('Another poll is in progress');
     return { skipped: true, reason: 'lock_held' };
   }
 
   try {
-    // Step 2: Find due subscriptions
-    const dueSubscriptions = await findDueSubscriptions(db);
+    const dueSubscriptions = await findDueSubscriptionsForProvider(db, provider);
 
     if (dueSubscriptions.length === 0) {
       return { processed: 0 };
@@ -2318,7 +2322,7 @@ This section traces the complete journey from a user connecting their YouTube ac
 │                          HOURLY CRON TRIGGER                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
-│  1. Cloudflare Worker cron triggers pollSubscriptions()                     │
+│  1. Cloudflare Worker cron triggers pollProviderSubscriptions()             │
 │     📦 apps/worker/src/polling/scheduler.ts:105-171                         │
 │                                                                             │
 │  2. Acquire distributed lock (prevent concurrent polls)                     │

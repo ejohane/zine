@@ -1,7 +1,37 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
-type JsonRecord = Record<string, unknown>;
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonRecord | JsonValue[];
+
+interface JsonRecord {
+  [key: string]: JsonValue;
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (value === null) {
+    return true;
+  }
+
+  switch (typeof value) {
+    case 'string':
+    case 'boolean':
+      return true;
+    case 'number':
+      return Number.isFinite(value);
+    case 'object':
+      if (Array.isArray(value)) {
+        return value.every(isJsonValue);
+      }
+      return value !== null && Object.values(value).every(isJsonValue);
+    default:
+      return false;
+  }
+}
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) && isJsonValue(value);
+}
 
 export interface DiagnosticFilters {
   traceId?: string;
@@ -25,7 +55,7 @@ export interface HealthCheckResult {
   ok: boolean;
   status: number;
   url: string;
-  body?: unknown;
+  body?: JsonValue;
   error?: string;
 }
 
@@ -123,7 +153,7 @@ function normalizePath(path: string): string {
   return path.replace(/\[\d+\]/g, '').toLowerCase();
 }
 
-function flattenScalarFields(value: unknown, prefix: string = ''): ScalarField[] {
+function flattenScalarFields(value: JsonValue, prefix: string = ''): ScalarField[] {
   if (value === null || value === undefined) {
     return [];
   }
@@ -142,7 +172,7 @@ function flattenScalarFields(value: unknown, prefix: string = ''): ScalarField[]
   }
 
   if (typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>).flatMap(([key, entry]) =>
+    return Object.entries(value).flatMap(([key, entry]) =>
       flattenScalarFields(entry, prefix ? `${prefix}.${key}` : key)
     );
   }
@@ -231,7 +261,7 @@ function redactString(value: string, path: string): string {
   return value;
 }
 
-export function redactDiagnosticValue(value: unknown, path: string = ''): unknown {
+export function redactDiagnosticValue(value: JsonValue, path: string = ''): JsonValue {
   if (value === null || value === undefined) {
     return value;
   }
@@ -250,17 +280,17 @@ export function redactDiagnosticValue(value: unknown, path: string = ''): unknow
 
   if (typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      Object.entries(value).map(([key, entry]) => [
         key,
         redactDiagnosticValue(entry, path ? `${path}.${key}` : key),
       ])
-    );
+    ) as JsonRecord;
   }
 
   return String(value);
 }
 
-export function parseJsonLines(payload: string): JsonRecord[] {
+function parseJsonLines(payload: string): JsonRecord[] {
   const trimmed = payload.trim();
   if (!trimmed) {
     return [];
@@ -269,12 +299,10 @@ export function parseJsonLines(payload: string): JsonRecord[] {
   try {
     const parsed = JSON.parse(trimmed);
     if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (entry): entry is JsonRecord => typeof entry === 'object' && entry !== null
-      );
+      return parsed.filter(isJsonRecord);
     }
-    if (typeof parsed === 'object' && parsed !== null) {
-      return [parsed as JsonRecord];
+    if (isJsonRecord(parsed)) {
+      return [parsed];
     }
   } catch {
     // Fall through to line-oriented parsing.
@@ -287,7 +315,7 @@ export function parseJsonLines(payload: string): JsonRecord[] {
     .flatMap((line) => {
       try {
         const parsed = JSON.parse(line);
-        return typeof parsed === 'object' && parsed !== null ? [parsed as JsonRecord] : [];
+        return isJsonRecord(parsed) ? [parsed] : [];
       } catch {
         return [];
       }
@@ -416,9 +444,10 @@ export async function fetchHealthReport(baseUrl: string): Promise<HealthReport> 
       const response = await fetch(url);
       const text = await response.text();
 
-      let body: unknown;
+      let body: JsonValue;
       try {
-        body = JSON.parse(text);
+        const parsed = JSON.parse(text);
+        body = isJsonValue(parsed) ? parsed : String(parsed);
       } catch {
         body = text;
       }
@@ -464,29 +493,29 @@ export function buildIncidentReport(input: {
     records: JsonRecord[];
   };
 }): IncidentReport {
-  const records = input.logs.records.map((record) => redactDiagnosticValue(record) as JsonRecord);
+  const records = input.logs.records.map((record) => redactDiagnosticValue(record));
   const summary = summarizeDiagnosticRecords(records);
   const evidence: DiagnosticEvidence[] = [];
   const candidateFixes: DiagnosticRecommendation[] = [];
   const nextQueries: string[] = [];
 
-  const healthStatus = input.health.results.health.body as Record<string, unknown> | undefined;
-  const depsStatus = input.health.results.deps.body as Record<string, unknown> | undefined;
-  const queuesStatus = input.health.results.queues.body as Record<string, unknown> | undefined;
+  const healthStatus = isJsonRecord(input.health.results.health.body)
+    ? input.health.results.health.body
+    : undefined;
+  const depsStatus = isJsonRecord(input.health.results.deps.body)
+    ? input.health.results.deps.body
+    : undefined;
+  const queuesStatus = isJsonRecord(input.health.results.queues.body)
+    ? input.health.results.queues.body
+    : undefined;
   const queueDlq =
-    queuesStatus?.queues && typeof queuesStatus.queues === 'object'
-      ? (queuesStatus.queues as Record<string, unknown>).dlq
+    queuesStatus && isJsonRecord(queuesStatus.queues) && isJsonRecord(queuesStatus.queues.dlq)
+      ? queuesStatus.queues.dlq
       : undefined;
-  const dlqCount =
-    queueDlq &&
-    typeof queueDlq === 'object' &&
-    typeof (queueDlq as Record<string, unknown>).count === 'number'
-      ? ((queueDlq as Record<string, unknown>).count as number)
-      : 0;
+  const dlqCount = typeof queueDlq?.count === 'number' ? queueDlq.count : 0;
   const errorLogCount = (summary.levels.find((entry) => entry.value === 'error')?.count ??
     0) as number;
-  const degradedDependency =
-    depsStatus && typeof depsStatus === 'object' && depsStatus.status === 'degraded';
+  const degradedDependency = depsStatus?.status === 'degraded';
 
   let verdict = 'no_obvious_worker_fault';
   let confidence = 0.42;

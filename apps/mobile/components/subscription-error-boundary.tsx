@@ -13,6 +13,7 @@
 import type { ErrorInfo, ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import type { OAuthProvider } from '@zine/shared/types';
 
 import { Button, Surface, Text } from '@/components/primitives';
 import { ErrorBoundary } from './error-boundary';
@@ -66,7 +67,7 @@ function isAuthError(error: Error | null): boolean {
 }
 
 interface SubscriptionErrorFallbackProps {
-  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider?: OAuthProvider;
   onRetry?: () => void;
 }
 
@@ -122,7 +123,7 @@ interface SubscriptionErrorBoundaryProps {
   /** Subscription ID for logging and reset key */
   subscriptionId?: string;
   /** Provider type for reconnection navigation */
-  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider?: OAuthProvider;
   /** Callback when retry is clicked */
   onRetry?: () => void;
 }

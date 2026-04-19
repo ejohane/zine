@@ -1,17 +1,3 @@
-/**
- * Subscriptions tRPC Router
- *
- * Handles OAuth-based channel/show subscriptions (YouTube, Spotify).
- * Supports add, remove, and list operations with pagination.
- *
- * Key behaviors:
- * - add: Validates active connection, creates/reactivates subscription
- * - remove: Soft deletes subscription, cleans up INBOX items (preserves SAVED)
- * - list: Returns paginated subscriptions with optional filters
- *
- * See: features/subscriptions/backend-spec.md
- */
-
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { ulid } from 'ulid';
@@ -55,14 +41,6 @@ import {
 import { getDLQSummary, getDLQEntries, deleteDLQEntry } from '../../sync/dlq-consumer';
 
 const SubscriptionProviderSchema = z.enum([Provider.YOUTUBE, Provider.SPOTIFY]);
-
-// ============================================================================
-// Zod Schemas
-// ============================================================================
-
-/**
- * Input schema for listing subscriptions with optional filters
- */
 const ListSubscriptionsInputSchema = z.object({
   provider: ProviderSchema.optional(),
   status: SubscriptionStatusSchema.optional(),
@@ -70,9 +48,6 @@ const ListSubscriptionsInputSchema = z.object({
   cursor: z.string().optional(),
 });
 
-/**
- * Input schema for adding a subscription
- */
 const AddSubscriptionInputSchema = z.object({
   provider: SubscriptionProviderSchema,
   providerChannelId: z.string().min(1),
@@ -80,55 +55,27 @@ const AddSubscriptionInputSchema = z.object({
   imageUrl: z.string().url().optional(),
 });
 
-/**
- * Input schema for removing a subscription
- */
 const RemoveSubscriptionInputSchema = z.object({
   subscriptionId: z.string().min(1),
 });
 
-/**
- * Input schema for pause/resume operations
- */
 const PauseResumeInputSchema = z.object({
   subscriptionId: z.string().min(1),
 });
 
-/**
- * Input schema for manual sync
- */
 const SyncNowInputSchema = z.object({
   subscriptionId: z.string().min(1),
 });
 
-/**
- * Input schema for discovering available subscriptions from provider
- */
 const DiscoverAvailableInputSchema = z.object({
   provider: SubscriptionProviderSchema,
 });
 
-/**
- * Input schema for searching channels/shows on a provider
- */
 const SearchInputSchema = z.object({
   provider: SubscriptionProviderSchema,
   query: z.string().min(2).max(100),
   limit: z.number().min(1).max(20).default(10),
 });
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Get an active provider connection for a user
- *
- * @param userId - The user's ID
- * @param provider - The provider to check
- * @param db - Drizzle database instance
- * @returns The active connection or null if not connected
- */
 async function getActiveConnection(
   userId: string,
   provider: Provider,
@@ -145,27 +92,13 @@ async function getActiveConnection(
   return connection as ProviderConnection | null;
 }
 
-// ============================================================================
-// Router
-// ============================================================================
-
 export const subscriptionsRouter = router({
-  /**
-   * List user's subscriptions (paginated)
-   *
-   * Supports filtering by provider and status.
-   * Uses cursor-based pagination sorted by subscription ID (ULID, chronological).
-   * Joins creators table to get normalized name, imageUrl, etc.
-   *
-   * @returns Paginated list of subscriptions with nextCursor and hasMore flags
-   */
   list: protectedProcedure
     .input(ListSubscriptionsInputSchema.optional())
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 50;
       const conditions = [eq(subscriptions.userId, ctx.userId)];
 
-      // Apply optional filters
       if (input?.provider) {
         conditions.push(eq(subscriptions.provider, input.provider));
       }
@@ -173,12 +106,10 @@ export const subscriptionsRouter = router({
         conditions.push(eq(subscriptions.status, input.status));
       }
 
-      // Apply cursor-based pagination (ULID sorting is chronological)
       if (input?.cursor) {
         conditions.push(gt(subscriptions.id, input.cursor));
       }
 
-      // Query with JOIN to creators for normalized data
       const results = await ctx.db
         .select({
           subscription: subscriptions,
@@ -193,28 +124,23 @@ export const subscriptionsRouter = router({
       const hasMore = results.length > limit;
       const rows = hasMore ? results.slice(0, -1) : results;
 
-      // Transform to include creator data
       const items = rows.map((row) => ({
         id: row.subscription.id,
         userId: row.subscription.userId,
         provider: row.subscription.provider,
         providerChannelId: row.subscription.providerChannelId,
         creatorId: row.subscription.creatorId,
-        // Get name, imageUrl, etc. from creators table (normalized)
         name: row.creator?.name ?? 'Unknown',
         imageUrl: row.creator?.imageUrl ?? null,
         description: row.creator?.description ?? null,
         externalUrl: row.creator?.externalUrl ?? null,
-        // Polling metadata
         totalItems: row.subscription.totalItems,
         lastPublishedAt: row.subscription.lastPublishedAt,
         lastPolledAt: row.subscription.lastPolledAt,
         pollIntervalSeconds: row.subscription.pollIntervalSeconds,
-        // Status
         status: row.subscription.status,
         disconnectedAt: row.subscription.disconnectedAt,
         disconnectedReason: row.subscription.disconnectedReason,
-        // Timestamps
         createdAt: row.subscription.createdAt,
         updatedAt: row.subscription.updatedAt,
       }));
@@ -225,21 +151,7 @@ export const subscriptionsRouter = router({
         hasMore,
       };
     }),
-
-  /**
-   * Add a subscription to a YouTube channel or Spotify show
-   *
-   * Requirements:
-   * 1. User must have an active connection to the provider
-   * 2. Creates/finds creator in normalized creators table
-   * 3. Creates new subscription or reactivates existing one (upsert behavior)
-   *
-   * The initial fetch of content is handled asynchronously (zine-teq.18).
-   *
-   * @throws PRECONDITION_FAILED if user is not connected to the provider
-   */
   add: protectedProcedure.input(AddSubscriptionInputSchema).mutation(async ({ ctx, input }) => {
-    // 1. Verify user has active connection to this provider
     const connection = await ctx.db.query.providerConnections.findFirst({
       where: and(
         eq(providerConnections.userId, ctx.userId),
@@ -254,8 +166,6 @@ export const subscriptionsRouter = router({
         message: `Not connected to ${input.provider}. Please connect your ${input.provider} account first.`,
       });
     }
-
-    // 2. Fetch channel/show metadata to enrich creator data
     let creatorName = input.name || input.providerChannelId;
     let creatorImageUrl = input.imageUrl;
     let creatorDescription: string | undefined;
@@ -284,8 +194,6 @@ export const subscriptionsRouter = router({
         logger.warn(`Failed to fetch YouTube channel details for ${input.providerChannelId}`);
       }
     }
-
-    // 3. Find or create creator in normalized creators table
     const creator = await findOrCreateCreator(
       { db: ctx.db },
       {
@@ -298,8 +206,6 @@ export const subscriptionsRouter = router({
         externalUrl: creatorExternalUrl,
       }
     );
-
-    // 4. Create subscription (upsert: reactivate if previously unsubscribed)
     const now = Date.now();
     const subscriptionId = ulid();
 
@@ -324,8 +230,6 @@ export const subscriptionsRouter = router({
           updatedAt: now,
         },
       });
-
-    // 5. Get the subscription ID (might be existing one if upsert)
     const sub = await ctx.db.query.subscriptions.findFirst({
       where: and(
         eq(subscriptions.userId, ctx.userId),
@@ -334,24 +238,17 @@ export const subscriptionsRouter = router({
       ),
       columns: { id: true },
     });
-
-    // 6. Trigger initial fetch (await to ensure it completes before response)
-    // Note: triggerInitialFetch catches its own errors internally and won't fail subscription creation
-    try {
-      await triggerInitialFetch(
-        ctx.userId,
-        sub!.id,
-        connection as ProviderConnection,
-        input.provider,
-        input.providerChannelId,
-        ctx.db,
-        ctx.env as InitialFetchEnv,
-        input.imageUrl ?? undefined
-      );
-    } catch (error) {
-      // Extra safety: log but don't fail subscription creation
-      logger.child('subscriptions').error('Initial fetch failed', { error });
-    }
+    // triggerInitialFetch already translates provider/network failures into a result object.
+    await triggerInitialFetch(
+      ctx.userId,
+      sub!.id,
+      connection as ProviderConnection,
+      input.provider,
+      input.providerChannelId,
+      ctx.db,
+      ctx.env as InitialFetchEnv,
+      input.imageUrl ?? undefined
+    );
 
     return {
       subscriptionId: sub!.id,
@@ -359,22 +256,9 @@ export const subscriptionsRouter = router({
       imageUrl: creator.imageUrl ?? null,
     };
   }),
-
-  /**
-   * Remove (unsubscribe from) a subscription
-   *
-   * Behavior:
-   * 1. Soft delete subscription (status → UNSUBSCRIBED)
-   * 2. Delete user_items in INBOX state (user hasn't committed to these)
-   * 3. Hard delete subscription_items tracking records
-   * 4. Preserve provider_items_seen (prevents re-ingestion on re-subscribe)
-   *
-   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
-   */
   remove: protectedProcedure
     .input(RemoveSubscriptionInputSchema)
     .mutation(async ({ ctx, input }) => {
-      // 1. Verify ownership
       const sub = await ctx.db.query.subscriptions.findFirst({
         where: and(
           eq(subscriptions.id, input.subscriptionId),
@@ -388,8 +272,6 @@ export const subscriptionsRouter = router({
           message: 'Subscription not found',
         });
       }
-
-      // 2. Soft delete subscription (preserves metadata for potential re-subscribe)
       await ctx.db
         .update(subscriptions)
         .set({
@@ -397,15 +279,11 @@ export const subscriptionsRouter = router({
           updatedAt: Date.now(),
         })
         .where(eq(subscriptions.id, input.subscriptionId));
-
-      // 3. Get item IDs from subscription_items for cleanup
       const subItems = await ctx.db.query.subscriptionItems.findMany({
         where: eq(subscriptionItems.subscriptionId, input.subscriptionId),
         columns: { itemId: true },
       });
       const itemIds = subItems.map((si) => si.itemId);
-
-      // 4. Delete INBOX items only (user hasn't committed to these)
       // BOOKMARKED/ARCHIVED items are preserved as user has explicitly saved them
       if (itemIds.length > 0) {
         await ctx.db
@@ -418,8 +296,6 @@ export const subscriptionsRouter = router({
             )
           );
       }
-
-      // 5. Hard delete subscription_items tracking records
       // These have no value after unsubscribe
       await ctx.db
         .delete(subscriptionItems)
@@ -430,15 +306,6 @@ export const subscriptionsRouter = router({
 
       return { success: true as const };
     }),
-
-  /**
-   * Pause a subscription (stops polling)
-   *
-   * Changes subscription status from ACTIVE to PAUSED.
-   * Only active subscriptions can be paused.
-   *
-   * @throws NOT_FOUND if subscription doesn't exist, doesn't belong to user, or is not active
-   */
   pause: protectedProcedure.input(PauseResumeInputSchema).mutation(async ({ ctx, input }) => {
     const result = await ctx.db
       .update(subscriptions)
@@ -464,19 +331,7 @@ export const subscriptionsRouter = router({
 
     return { success: true as const };
   }),
-
-  /**
-   * Resume a paused subscription
-   *
-   * Changes subscription status from PAUSED to ACTIVE.
-   * Validates that the provider connection is still active before resuming.
-   *
-   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
-   * @throws BAD_REQUEST if subscription is not in PAUSED status
-   * @throws PRECONDITION_FAILED if provider connection is not active
-   */
   resume: protectedProcedure.input(PauseResumeInputSchema).mutation(async ({ ctx, input }) => {
-    // 1. Verify ownership and get subscription details
     const sub = await ctx.db.query.subscriptions.findFirst({
       where: and(eq(subscriptions.id, input.subscriptionId), eq(subscriptions.userId, ctx.userId)),
     });
@@ -487,16 +342,12 @@ export const subscriptionsRouter = router({
         message: 'Subscription not found',
       });
     }
-
-    // 2. Validate subscription is paused
     if (sub.status !== 'PAUSED') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: `Cannot resume subscription with status ${sub.status}`,
       });
     }
-
-    // 3. Check if connection is active
     const connection = await ctx.db.query.providerConnections.findFirst({
       where: and(
         eq(providerConnections.userId, ctx.userId),
@@ -511,8 +362,6 @@ export const subscriptionsRouter = router({
         message: 'Provider connection is not active. Please reconnect.',
       });
     }
-
-    // 4. Resume subscription
     await ctx.db
       .update(subscriptions)
       .set({
@@ -523,24 +372,7 @@ export const subscriptionsRouter = router({
 
     return { success: true as const };
   }),
-
-  /**
-   * Manually trigger a sync for a subscription (rate limited)
-   *
-   * Rate limit: 1 sync per 5 minutes per subscription.
-   * Only active subscriptions can be synced.
-   * Validates that the provider connection is active.
-   *
-   * Note: The actual polling logic will be implemented in zine-teq.19.
-   * For now, this validates permissions and returns a placeholder result.
-   *
-   * @throws NOT_FOUND if subscription doesn't exist or doesn't belong to user
-   * @throws BAD_REQUEST if subscription is not active
-   * @throws PRECONDITION_FAILED if provider connection is not active
-   * @throws TOO_MANY_REQUESTS if rate limit is exceeded
-   */
   syncNow: protectedProcedure.input(SyncNowInputSchema).mutation(async ({ ctx, input }) => {
-    // 1. Verify ownership and get subscription details
     const sub = await ctx.db.query.subscriptions.findFirst({
       where: and(eq(subscriptions.id, input.subscriptionId), eq(subscriptions.userId, ctx.userId)),
     });
@@ -551,16 +383,12 @@ export const subscriptionsRouter = router({
         message: 'Subscription not found',
       });
     }
-
-    // 2. Validate subscription is active
     if (sub.status !== 'ACTIVE') {
       throw new TRPCError({
         code: 'BAD_REQUEST',
         message: 'Cannot sync non-active subscription',
       });
     }
-
-    // 3. Check rate limit (1 per 5 minutes per subscription)
     const rateLimitKey = `manual-sync:${input.subscriptionId}`;
     const lastSync = await ctx.env.OAUTH_STATE_KV.get(rateLimitKey);
     if (lastSync && Date.now() - parseInt(lastSync, 10) < 5 * 60 * 1000) {
@@ -569,8 +397,6 @@ export const subscriptionsRouter = router({
         message: 'Please wait 5 minutes between manual syncs',
       });
     }
-
-    // 4. Check if connection is active
     const connection = await ctx.db.query.providerConnections.findFirst({
       where: and(
         eq(providerConnections.userId, ctx.userId),
@@ -585,11 +411,7 @@ export const subscriptionsRouter = router({
         message: 'Provider connection is not active',
       });
     }
-
-    // 5. Update rate limit (store current timestamp with 5 min TTL)
     await ctx.env.OAUTH_STATE_KV.put(rateLimitKey, Date.now().toString(), { expirationTtl: 300 });
-
-    // 6. Call appropriate polling function based on provider
     let result: { newItems: number };
 
     try {
@@ -644,29 +466,6 @@ export const subscriptionsRouter = router({
 
     return { success: true as const, itemsFound: result.newItems };
   }),
-
-  /**
-   * Initiate an async sync job for all active subscriptions.
-   *
-   * Instead of blocking
-   * while all subscriptions are polled, it:
-   * 1. Creates a sync job with a unique ID
-   * 2. Enqueues messages for each subscription to the SYNC_QUEUE
-   * 3. Returns immediately with the job ID
-   *
-   * The client should then poll syncStatus to track progress.
-   *
-   * Key features:
-   * - Job deduplication: Returns existing job if sync already in progress
-   * - Rate limiting: Enforces 2-minute cooldown between syncs
-   * - Error isolation: Each subscription processed independently
-   * - App restart safe: Job progress persists in KV
-   *
-   * @throws TOO_MANY_REQUESTS if user rate limit exceeded
-   * @returns Job ID and total subscriptions to sync
-   *
-   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
-   */
   syncAllAsync: protectedProcedure.mutation(async ({ ctx }) => {
     try {
       const result = await initiateSyncJob(ctx.userId, ctx.db, ctx.env as Bindings, {
@@ -702,21 +501,6 @@ export const subscriptionsRouter = router({
       throw error;
     }
   }),
-
-  /**
-   * Get the status of a sync job.
-   *
-   * Returns progress information including:
-   * - Total subscriptions to sync
-   * - Completed count
-   * - Success/failure counts
-   * - New items found
-   * - Any errors
-   *
-   * Poll this endpoint every 2 seconds while sync is in progress.
-   *
-   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
-   */
   syncStatus: protectedProcedure
     .input(z.object({ jobId: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -728,51 +512,13 @@ export const subscriptionsRouter = router({
 
       return status;
     }),
-
-  /**
-   * Check if the user has an active sync job.
-   *
-   * Call this on app startup/resume to check if a sync is in progress.
-   * If so, the client should resume polling syncStatus.
-   *
-   * @returns Whether sync is in progress and the job ID if so
-   *
-   * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
-   */
   activeSyncJob: protectedProcedure.query(async ({ ctx }) => {
     return getActiveSyncJob(ctx.userId, ctx.env.OAUTH_STATE_KV);
   }),
-
-  /**
-   * DLQ (Dead Letter Queue) monitoring endpoints.
-   *
-   * These endpoints provide visibility into sync messages that failed
-   * after exhausting all retries. Useful for:
-   * - Debugging persistent sync failures
-   * - Understanding error patterns
-   * - Manual investigation and resolution
-   *
-   * Note: These endpoints are available to all authenticated users,
-   * but only show aggregate DLQ data (not user-specific).
-   *
-   * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
-   */
   dlq: router({
-    /**
-     * Get DLQ summary for monitoring dashboard.
-     *
-     * Returns count of DLQ entries and recent failures.
-     */
     summary: protectedProcedure.query(async ({ ctx }) => {
       return getDLQSummary(ctx.env.OAUTH_STATE_KV);
     }),
-
-    /**
-     * List DLQ entries with optional limit.
-     *
-     * Returns detailed information about failed sync messages
-     * for investigation and potential replay.
-     */
     list: protectedProcedure
       .input(
         z.object({
@@ -782,13 +528,6 @@ export const subscriptionsRouter = router({
       .query(async ({ ctx, input }) => {
         return getDLQEntries(ctx.env.OAUTH_STATE_KV, input.limit);
       }),
-
-    /**
-     * Delete a DLQ entry after investigation/resolution.
-     *
-     * Use this to clean up entries that have been manually resolved
-     * or are no longer relevant.
-     */
     delete: protectedProcedure
       .input(
         z.object({
@@ -806,34 +545,14 @@ export const subscriptionsRouter = router({
         return { success: true };
       }),
   }),
-
-  /**
-   * Discovery endpoints for browsing available channels/shows to subscribe to
-   *
-   * Use cases:
-   * 1. available: Show channels/podcasts the user follows on provider but hasn't subscribed to in Zine
-   * 2. search: Search for channels/podcasts by name
-   */
   discover: router({
-    /**
-     * Get user's provider subscriptions not yet in Zine
-     *
-     * Fetches the user's YouTube subscriptions or Spotify saved shows,
-     * then filters out any they've already subscribed to in Zine.
-     *
-     * @returns List of available items with isSubscribed flag (always false for this endpoint)
-     *          and connectionRequired flag if user hasn't connected the provider
-     */
     available: protectedProcedure
       .input(DiscoverAvailableInputSchema)
       .query(async ({ ctx, input }) => {
-        // 1. Get active provider connection
         const connection = await getActiveConnection(ctx.userId, input.provider, ctx.db);
         if (!connection) {
           return { items: [], connectionRequired: true };
         }
-
-        // 2. Fetch user's subscriptions from provider
         let providerSubs: { id: string; name: string; imageUrl?: string }[];
 
         if (input.provider === Provider.YOUTUBE) {
@@ -865,8 +584,6 @@ export const subscriptionsRouter = router({
             imageUrl: getLargestImage(s.images),
           }));
         }
-
-        // 3. Get existing Zine subscriptions for this provider (not unsubscribed)
         const existingIds = await ctx.db.query.subscriptions.findMany({
           where: and(
             eq(subscriptions.userId, ctx.userId),
@@ -877,8 +594,6 @@ export const subscriptionsRouter = router({
         });
 
         const existingSet = new Set(existingIds.map((s) => s.providerChannelId));
-
-        // 4. Filter to unsubscribed items
         const available = providerSubs
           .filter((s) => !existingSet.has(s.id))
           .map((s) => ({
@@ -888,23 +603,11 @@ export const subscriptionsRouter = router({
 
         return { items: available, connectionRequired: false };
       }),
-
-    /**
-     * Search for channels/shows on provider
-     *
-     * WARNING: YouTube search costs 100 quota units per call! Use sparingly.
-     *
-     * @returns List of matching channels/shows with isSubscribed flag indicating
-     *          if the user has already subscribed in Zine
-     */
     search: protectedProcedure.input(SearchInputSchema).query(async ({ ctx, input }) => {
-      // 1. Get active provider connection
       const connection = await getActiveConnection(ctx.userId, input.provider, ctx.db);
       if (!connection) {
         return { items: [], connectionRequired: true };
       }
-
-      // 2. Search provider for matching channels/shows
       let results: { id: string; name: string; description?: string; imageUrl?: string }[];
 
       if (input.provider === Provider.YOUTUBE) {
@@ -939,8 +642,6 @@ export const subscriptionsRouter = router({
           imageUrl: getLargestImage(s.images),
         }));
       }
-
-      // 3. Check which are already subscribed in Zine
       const existingIds = await ctx.db.query.subscriptions.findMany({
         where: and(
           eq(subscriptions.userId, ctx.userId),
@@ -950,8 +651,6 @@ export const subscriptionsRouter = router({
         columns: { providerChannelId: true },
       });
       const existingSet = new Set(existingIds.map((s) => s.providerChannelId));
-
-      // 4. Return results with isSubscribed flag
       return {
         items: results.map((r) => ({
           ...r,

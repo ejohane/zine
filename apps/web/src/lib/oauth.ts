@@ -1,42 +1,48 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import { Provider } from '@zine/shared';
+import { Provider, type OAuthProvider } from '@zine/shared/types';
 import superjson from 'superjson';
 
 import type { AppRouter } from '@zine/worker/trpc/router';
 
 import { API_URL, SPOTIFY_CLIENT_ID, YOUTUBE_CLIENT_ID } from './env';
 
-export type OAuthProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+export type { OAuthProvider } from '@zine/shared/types';
 
 type TokenGetter = () => Promise<string | null>;
 type RedirectHandler = (url: string) => void;
 
-const OAUTH_CONFIG: Record<OAuthProvider, { clientId: string; authUrl: string; scopes: string[] }> =
+const OAUTH_CONFIG = {
+  YOUTUBE: {
+    clientId: YOUTUBE_CLIENT_ID,
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    scopes: [
+      'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  },
+  GMAIL: {
+    clientId: YOUTUBE_CLIENT_ID,
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    scopes: [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+  },
+  SPOTIFY: {
+    clientId: SPOTIFY_CLIENT_ID,
+    authUrl: 'https://accounts.spotify.com/authorize',
+    scopes: ['user-library-read'],
+  },
+} as const satisfies Record<
+  OAuthProvider,
   {
-    YOUTUBE: {
-      clientId: YOUTUBE_CLIENT_ID,
-      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      scopes: [
-        'https://www.googleapis.com/auth/youtube.readonly',
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ],
-    },
-    GMAIL: {
-      clientId: YOUTUBE_CLIENT_ID,
-      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      scopes: [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/userinfo.email',
-        'https://www.googleapis.com/auth/userinfo.profile',
-      ],
-    },
-    SPOTIFY: {
-      clientId: SPOTIFY_CLIENT_ID,
-      authUrl: 'https://accounts.spotify.com/authorize',
-      scopes: ['user-library-read'],
-    },
-  };
+    clientId: string;
+    authUrl: string;
+    scopes: readonly string[];
+  }
+>;
 
 function toProviderEnum(provider: OAuthProvider): Provider {
   switch (provider) {

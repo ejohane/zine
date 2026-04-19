@@ -7,6 +7,7 @@
 
 import { memo } from 'react';
 import { View, Pressable, Image, StyleSheet } from 'react-native';
+import type { ProviderValue } from '@zine/shared/types';
 
 import { Button, Text } from '@/components/primitives';
 import type { Colors } from '@/constants/theme';
@@ -17,7 +18,7 @@ import { CheckboxIcon } from '@/components/icons';
 // Types
 // ============================================================================
 
-export type Provider = 'YOUTUBE' | 'SPOTIFY';
+export type Provider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY'>;
 
 /**
  * Unified channel data shape that works for both onboarding and discovery.

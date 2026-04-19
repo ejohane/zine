@@ -1,37 +1,12 @@
-/**
- * Route Parameter Validation
- *
- * Provides utilities for validating dynamic route parameters.
- * Ensures type safety at runtime, not just compile time.
- *
- * Uses type guards from @zine/shared for consistent validation.
- *
- * @see zine-b4h.27 - Add input validation for route params
- */
+import type { OAuthProvider, Provider } from '@zine/shared/types';
 
-import type { Provider } from '@zine/shared';
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/**
- * Valid lowercase provider values for route parameters.
- * Routes use lowercase (youtube/spotify/gmail), backend uses uppercase.
- */
+// Routes use lowercase provider slugs; the backend uses uppercase enum values.
 export const VALID_PROVIDER_ROUTES = ['youtube', 'spotify', 'gmail'] as const;
 export type ProviderRoute = (typeof VALID_PROVIDER_ROUTES)[number];
 
-/**
- * Provider routes supported by channel discovery flows.
- * Gmail uses newsletter detection instead of creator discovery.
- */
+// Gmail uses newsletter detection instead of creator discovery.
 export const VALID_DISCOVER_PROVIDER_ROUTES = ['youtube', 'spotify'] as const;
 export type DiscoverProviderRoute = (typeof VALID_DISCOVER_PROVIDER_ROUTES)[number];
-
-// ============================================================================
-// Validation Result Types
-// ============================================================================
 
 export type ValidationSuccess<T> = {
   success: true;
@@ -45,39 +20,12 @@ export type ValidationError = {
 
 export type ValidationResult<T> = ValidationSuccess<T> | ValidationError;
 
-// ============================================================================
-// ID Validation
-// ============================================================================
-
-/**
- * Maximum length for item IDs.
- * Prevents potential abuse and ensures reasonable storage.
- */
 const MAX_ID_LENGTH = 100;
 
-/**
- * Type guard to check if an ID is valid (non-empty string within length limit).
- *
- * @example
- * if (!isValidId(id)) {
- *   return <NotFoundScreen />;
- * }
- */
 export function isValidId(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH;
 }
 
-/**
- * Validates an item ID parameter.
- * Returns a discriminated union for easy pattern matching.
- *
- * @example
- * const result = validateItemId(id);
- * if (!result.success) {
- *   return <InvalidParamScreen message={result.message} />;
- * }
- * // result.data is now typed and validated
- */
 export function validateItemId(value: unknown): ValidationResult<string> {
   if (typeof value !== 'string') {
     return { success: false, message: 'Item ID is required' };
@@ -94,33 +42,10 @@ export function validateItemId(value: unknown): ValidationResult<string> {
   return { success: true, data: value };
 }
 
-// ============================================================================
-// Provider Validation
-// ============================================================================
-
-/**
- * Type guard to check if a lowercase string is a valid provider route.
- *
- * @example
- * if (!isValidProviderRoute(provider)) {
- *   router.replace('/onboarding');
- *   return null;
- * }
- */
 export function isValidProviderRoute(value: unknown): value is ProviderRoute {
   return normalizeProviderRoute(value) !== undefined;
 }
 
-/**
- * Normalizes a provider string to lowercase route format.
- * Returns undefined if invalid.
- *
- * @example
- * const provider = normalizeProviderRoute(params.provider);
- * if (!provider) {
- *   return <InvalidParamScreen param="provider" />;
- * }
- */
 export function normalizeProviderRoute(value: unknown): ProviderRoute | undefined {
   if (typeof value !== 'string') return undefined;
 
@@ -132,27 +57,10 @@ export function normalizeProviderRoute(value: unknown): ProviderRoute | undefine
   return undefined;
 }
 
-/**
- * Converts a route provider (lowercase) to backend Provider enum (uppercase).
- *
- * @example
- * const backendProvider = toBackendProvider('youtube'); // 'YOUTUBE'
- */
 export function toBackendProvider(routeProvider: ProviderRoute): Provider {
   return routeProvider.toUpperCase() as Provider;
 }
 
-/**
- * Validates a provider route parameter.
- * Returns the normalized lowercase provider or an error.
- *
- * @example
- * const result = validateProviderRoute(params.provider);
- * if (!result.success) {
- *   return <InvalidParamScreen message={result.message} />;
- * }
- * // result.data is 'youtube' | 'spotify'
- */
 export function validateProviderRoute(value: unknown): ValidationResult<ProviderRoute> {
   if (typeof value !== 'string') {
     return { success: false, message: 'Provider is required' };
@@ -169,20 +77,7 @@ export function validateProviderRoute(value: unknown): ValidationResult<Provider
   return { success: true, data: normalized };
 }
 
-/**
- * Validates and converts a provider route parameter to backend format.
- * Returns the uppercase Provider enum value or an error.
- *
- * @example
- * const result = validateAndConvertProvider(params.provider);
- * if (!result.success) {
- *   return <InvalidParamScreen message={result.message} />;
- * }
- * // result.data is 'YOUTUBE' | 'SPOTIFY'
- */
-export function validateAndConvertProvider(
-  value: unknown
-): ValidationResult<'YOUTUBE' | 'SPOTIFY' | 'GMAIL'> {
+export function validateAndConvertProvider(value: unknown): ValidationResult<OAuthProvider> {
   const routeResult = validateProviderRoute(value);
   if (!routeResult.success) {
     return routeResult;
@@ -190,17 +85,14 @@ export function validateAndConvertProvider(
 
   return {
     success: true,
-    data: toBackendProvider(routeResult.data) as 'YOUTUBE' | 'SPOTIFY' | 'GMAIL',
+    data: toBackendProvider(routeResult.data) as OAuthProvider,
   };
 }
 
-/**
- * Validates and converts a provider route parameter for discovery screens.
- * Discovery only supports providers with creator/channel browsing (YouTube/Spotify).
- */
+// Discovery only supports providers with creator/channel browsing.
 export function validateAndConvertDiscoverProvider(
   value: unknown
-): ValidationResult<'YOUTUBE' | 'SPOTIFY'> {
+): ValidationResult<Extract<OAuthProvider, 'YOUTUBE' | 'SPOTIFY'>> {
   const routeResult = validateProviderRoute(value);
   if (!routeResult.success) {
     return routeResult;
@@ -213,5 +105,8 @@ export function validateAndConvertDiscoverProvider(
     };
   }
 
-  return { success: true, data: routeResult.data.toUpperCase() as 'YOUTUBE' | 'SPOTIFY' };
+  return {
+    success: true,
+    data: routeResult.data.toUpperCase() as Extract<OAuthProvider, 'YOUTUBE' | 'SPOTIFY'>,
+  };
 }

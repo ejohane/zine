@@ -3,11 +3,16 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { WeeklyRecapCard } from './weekly-recap-card';
 
+type RenderedNode = {
+  type: unknown;
+  children: ReadonlyArray<unknown>;
+};
+
 jest.mock('react-native', () => ({
   __esModule: true,
   Platform: {
     OS: 'ios',
-    select: jest.fn((options: Record<string, unknown>) => options.ios ?? options.default),
+    select: jest.fn(<T,>(options: { ios?: T; default?: T }) => options.ios ?? options.default),
   },
   Pressable: ({
     children,
@@ -22,7 +27,7 @@ jest.mock('react-native', () => ({
   View: ({ children }: { children?: React.ReactNode }) =>
     React.createElement('div', null, children),
   StyleSheet: {
-    create: (styles: Record<string, unknown>) => styles,
+    create: <T extends object>(styles: T) => styles,
   },
 }));
 
@@ -73,8 +78,9 @@ describe('WeeklyRecapCard', () => {
       renderer = TestRenderer.create(<WeeklyRecapCard recap={recap} />);
     });
     const output = renderer.root
-      .findAll((node: any) => node.type === 'span')
-      .flatMap((node: any) => node.children)
+      .findAll((node: RenderedNode) => node.type === 'span')
+      .flatMap((node: RenderedNode) => node.children)
+      .map(String)
       .join(' ');
 
     expect(output).toContain('Weekly recap');
@@ -89,8 +95,9 @@ describe('WeeklyRecapCard', () => {
       renderer = TestRenderer.create(<WeeklyRecapCard isLoading />);
     });
     const output = renderer.root
-      .findAll((node: any) => node.type === 'span')
-      .flatMap((node: any) => node.children)
+      .findAll((node: RenderedNode) => node.type === 'span')
+      .flatMap((node: RenderedNode) => node.children)
+      .map(String)
       .join(' ');
 
     expect(output).toContain('Loading your weekly recap');
