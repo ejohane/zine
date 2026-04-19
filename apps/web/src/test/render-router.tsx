@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
+import type { RenderResult } from '@testing-library/react';
 import { render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -11,7 +12,7 @@ interface RenderRouteOptions {
 export function renderRoute(
   element: ReactElement,
   { route = '/', path = '/', redirects = [] }: RenderRouteOptions = {}
-) {
+): RenderResult {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <Routes>
