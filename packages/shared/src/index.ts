@@ -1,15 +1,34 @@
-/**
- * @zine/shared - Shared code across Zine apps
- */
+// JSON-safe types and guards
+export { isJsonObject, isJsonValue } from './json';
+export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from './json';
 
 // Domain types and enums
-export { ContentType, Provider, UserItemState } from './types/domain';
+export {
+  ContentType,
+  Provider,
+  UserItemState,
+  SubscriptionStatus,
+  ProviderConnectionStatus,
+} from './types/domain';
 
 // Domain interfaces
-export type { Creator, CreatorWithSubscription } from './types/domain';
+export type {
+  ContentTypeValue,
+  ProviderValue,
+  UserItemStateValue,
+  SubscriptionStatusValue,
+  ProviderConnectionStatusValue,
+  OAuthProvider,
+  Creator,
+  CreatorWithSubscription,
+} from './types/domain';
 
 // Constants
 export { ZINE_VERSION, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from './constants';
+
+// UI formatting helpers
+export { formatDurationTimestamp, isValidUrl, mapContentType, mapProvider } from './format';
+export type { UIContentType, UIProvider } from './format';
 
 // Schemas (Zod validation for tRPC input)
 export { ContentTypeSchema, ProviderSchema, SubscriptionStatusSchema } from './schemas';
@@ -43,3 +62,14 @@ export type {
   TelemetryError,
   TelemetryEnvelope,
 } from './telemetry';
+
+// Query persistence helpers
+export {
+  QUERY_PERSISTENCE_STORAGE_PREFIX,
+  QUERY_PERSISTENCE_MAX_AGE_MS,
+  buildQueryPersistenceBuster,
+  buildQueryPersistenceKey,
+  getQueryPathFromKey,
+  isAllowlistedQueryKey,
+  shouldPersistQuery,
+} from './query-persistence';

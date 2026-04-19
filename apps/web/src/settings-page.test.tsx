@@ -12,6 +12,16 @@ import { hookSpies, resetTrpcMocks, setAuthAvailability, setSessionState } from 
 describe('SettingsPage', () => {
   beforeEach(() => {
     resetTrpcMocks();
+    vi.mocked(window.matchMedia).mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
     hookSpies.connectionsListUseQuery.mockImplementation(() => ({
       data: {
         YOUTUBE: { provider: 'YOUTUBE', status: 'ACTIVE', connectedAt: Date.now() },

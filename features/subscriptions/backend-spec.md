@@ -486,52 +486,46 @@ async function fetchYouTubeChannelVideos(youtube, channelId, since?: Date) {
 
 ## 3. Polling Architecture
 
-### 3.1 Design: Cron Triggers with Smart Batching
+### 3.1 Design: Provider-Specific Cron Triggers
 
 ```toml
 # wrangler.toml
 [triggers]
-crons = ["*/15 * * * *"]  # Every 15 minutes
+crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
+# :00 YouTube, :15 Gmail newsletters, :30 Spotify, :45 RSS
 ```
 
 ### 3.2 Batch Processing Logic
 
 ```typescript
-export async function pollSubscriptions(env: Env) {
-  const now = Date.now();
-  const batchSize = 50;
+export async function pollProviderSubscriptions(provider: 'YOUTUBE' | 'SPOTIFY', env: Env) {
+  const lockKey = provider === 'YOUTUBE' ? 'cron:poll-youtube:lock' : 'cron:poll-spotify:lock';
 
-  const dueSubscriptions = await db.query.subscriptions.findMany({
-    where: and(
-      eq(subscriptions.status, 'ACTIVE'),
-      or(
-        isNull(subscriptions.lastPolledAt),
-        lt(subscriptions.lastPolledAt, sql`${now} - (${subscriptions.pollIntervalSeconds} * 1000)`)
-      )
-    ),
-    orderBy: [asc(subscriptions.lastPolledAt)],
-    limit: batchSize,
-  });
+  const lockAcquired = await tryAcquireLock(env.KV, lockKey, 900);
+  if (!lockAcquired) {
+    return { skipped: true, reason: 'lock_held' };
+  }
 
-  const byProvider = groupBy(dueSubscriptions, 'provider');
-  await Promise.all([
-    processYouTubeBatch(byProvider.YOUTUBE || [], env),
-    processSpotifyBatch(byProvider.SPOTIFY || [], env),
-  ]);
-}
+  try {
+    const dueSubscriptions = await db.query.subscriptions.findMany({
+      where: and(
+        eq(subscriptions.status, 'ACTIVE'),
+        eq(subscriptions.provider, provider),
+        or(
+          isNull(subscriptions.lastPolledAt),
+          lt(
+            subscriptions.lastPolledAt,
+            sql`${Date.now()} - (${subscriptions.pollIntervalSeconds} * 1000)`
+          )
+        )
+      ),
+      orderBy: [asc(subscriptions.lastPolledAt)],
+      limit: 50,
+    });
 
-async function processYouTubeBatch(subscriptions: Subscription[], env: Env) {
-  const byUser = groupBy(subscriptions, 'userId');
-
-  for (const [userId, userSubs] of Object.entries(byUser)) {
-    // CHECK RATE LIMIT BEFORE PROCESSING
-    const rateCheck = await isRateLimited('YOUTUBE', userId, env.KV);
-    if (rateCheck.limited) {
-      console.log(`Skipping user ${userId}: rate limited for ${rateCheck.retryInMs}ms`);
-      continue;
-    }
-
-    // ... rest of processing
+    await processProviderBatch(dueSubscriptions, provider, env);
+  } finally {
+    await releaseLock(env.KV, lockKey);
   }
 }
 ```
@@ -540,28 +534,12 @@ async function processYouTubeBatch(subscriptions: Subscription[], env: Env) {
 
 ### 3.2.1 Cron Job Collision Prevention
 
-Use distributed locks via KV to prevent overlapping executions:
+Use provider-specific distributed locks via KV to prevent overlapping executions while isolating provider failures:
 
 ```typescript
-const POLL_LOCK_KEY = 'cron:poll-subscriptions:lock';
+const YOUTUBE_POLL_LOCK_KEY = 'cron:poll-youtube:lock';
+const SPOTIFY_POLL_LOCK_KEY = 'cron:poll-spotify:lock';
 const POLL_LOCK_TTL = 900; // 15 minutes
-
-export async function pollSubscriptions(env: Env) {
-  const existingLock = await env.KV.get(POLL_LOCK_KEY);
-  if (existingLock) {
-    const elapsedMs = Date.now() - parseInt(existingLock, 10);
-    if (elapsedMs < POLL_LOCK_TTL * 1000) {
-      return { skipped: true, reason: 'lock_held' };
-    }
-  }
-
-  await env.KV.put(POLL_LOCK_KEY, Date.now().toString(), { expirationTtl: POLL_LOCK_TTL });
-  try {
-    // ... polling logic ...
-  } finally {
-    await env.KV.delete(POLL_LOCK_KEY);
-  }
-}
 ```
 
 ### 3.3 Adaptive Polling Intervals

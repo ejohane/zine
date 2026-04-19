@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import type { OAuthProvider } from '@zine/shared/types';
 
 import { ErrorState, LoadingState } from '@/components/list-states';
 import { Button, Surface } from '@/components/primitives';
@@ -31,7 +32,7 @@ import {
 import { trpc } from '@/lib/trpc';
 import type { NewslettersListOutput } from '@/lib/trpc-types';
 
-type Provider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+type Provider = OAuthProvider;
 type NewsletterFeed = NewslettersListOutput['items'][number];
 type ProviderSubscription = ReturnType<typeof useSubscriptions>['subscriptions'][number];
 type UnifiedSubscription = {

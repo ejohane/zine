@@ -6,6 +6,10 @@
  */
 
 import { StyleSheet } from 'react-native';
+import type {
+  ContentTypeValue as SharedContentTypeValue,
+  ProviderValue as SharedProviderValue,
+} from '@zine/shared/types';
 
 import { ContentColors, ProviderColors, Typography, Spacing, Radius } from '@/constants/theme';
 import { Badge } from '@/components/primitives';
@@ -14,8 +18,8 @@ import { Badge } from '@/components/primitives';
 // Types
 // =============================================================================
 
-export type ProviderType = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'SUBSTACK' | 'X' | 'TWITTER' | 'WEB';
-export type ContentTypeValue = 'VIDEO' | 'PODCAST' | 'ARTICLE' | 'POST';
+export type ProviderType = Exclude<SharedProviderValue, 'RSS'> | 'TWITTER';
+export type ContentTypeValue = SharedContentTypeValue;
 
 // =============================================================================
 // SourceBadge - Shows content provider (YouTube, Spotify, etc.)

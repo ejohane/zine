@@ -1,6 +1,8 @@
 import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ClerkProvider, useAuth, useClerk } from '@clerk/clerk-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 import { httpBatchLink } from '@trpc/client';
 import { createTRPCReact, type CreateTRPCReact } from '@trpc/react-query';
 import superjson from 'superjson';
@@ -8,6 +10,12 @@ import superjson from 'superjson';
 import type { AppRouter } from '@zine/worker/trpc/router';
 
 import { API_URL, CLERK_PUBLISHABLE_KEY } from './env';
+import {
+  buildWebQueryPersistenceBuster,
+  buildWebQueryPersistenceKey,
+  PERSISTENCE_MAX_AGE_MS,
+  shouldPersistQuery,
+} from './query-persistence';
 
 export const trpc: CreateTRPCReact<AppRouter, unknown> = createTRPCReact<AppRouter>();
 
@@ -62,11 +70,13 @@ function BaseTrpcProvider({
   getToken,
   authAvailability,
   session,
+  persistenceScope,
 }: {
   children: ReactNode;
   getToken?: () => Promise<string | null>;
   authAvailability: AuthAvailabilityValue;
   session: AppSessionValue;
+  persistenceScope: string | null | undefined;
 }) {
   const [queryClient] = useState(
     () =>
@@ -79,6 +89,21 @@ function BaseTrpcProvider({
         },
       })
   );
+  const persistenceBuster = useMemo(() => buildWebQueryPersistenceBuster(), []);
+  const persistenceKey = useMemo(
+    () => buildWebQueryPersistenceKey(persistenceScope),
+    [persistenceScope]
+  );
+  const persister = useMemo(() => {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return null;
+    }
+
+    return createSyncStoragePersister({
+      storage: window.localStorage,
+      key: persistenceKey,
+    });
+  }, [persistenceKey]);
 
   const [trpcClient] = useState(() =>
     trpc.createClient({
@@ -101,7 +126,24 @@ function BaseTrpcProvider({
     <AuthAvailabilityContext.Provider value={authAvailability}>
       <AppSessionContext.Provider value={session}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          {persister ? (
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                persister,
+                maxAge: PERSISTENCE_MAX_AGE_MS,
+                buster: persistenceBuster,
+                dehydrateOptions: {
+                  shouldDehydrateQuery: ({ queryKey, state }) =>
+                    shouldPersistQuery({ queryKey, status: state.status }),
+                },
+              }}
+            >
+              {children}
+            </PersistQueryClientProvider>
+          ) : (
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          )}
         </trpc.Provider>
       </AppSessionContext.Provider>
     </AuthAvailabilityContext.Provider>
@@ -127,7 +169,11 @@ function FallbackProviders({ children }: { children: ReactNode }) {
   );
 
   return (
-    <BaseTrpcProvider authAvailability={authAvailability} session={session}>
+    <BaseTrpcProvider
+      authAvailability={authAvailability}
+      session={session}
+      persistenceScope={AUTH_MODE === 'development-bypass' ? 'dev-user-001' : null}
+    >
       {children}
     </BaseTrpcProvider>
   );
@@ -162,9 +208,11 @@ function ClerkSessionProviders({ children }: { children: ReactNode }) {
 
   return (
     <BaseTrpcProvider
+      key={auth.userId ?? 'anon'}
       authAvailability={authAvailability}
       getToken={session.getToken}
       session={session}
+      persistenceScope={auth.userId}
     >
       {children}
     </BaseTrpcProvider>
@@ -195,15 +243,4 @@ export function RootProviders({ children }: { children: ReactNode }) {
   }
 
   return <FallbackProviders>{children}</FallbackProviders>;
-}
-
-export function useRecapTimezone() {
-  return useMemo(() => {
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      return typeof timezone === 'string' && timezone.length > 0 ? timezone : undefined;
-    } catch {
-      return undefined;
-    }
-  }, []);
 }

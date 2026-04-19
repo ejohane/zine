@@ -2,6 +2,8 @@ import type { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { Surface } from '@/components/primitives/surface';
+
 import { styles } from '../../item-detail-styles';
 import type { ItemDetailColors, ItemDetailCreator, ItemDetailItem } from '../types';
 import { ItemDetailActions } from './ItemDetailActions';
@@ -97,7 +99,19 @@ export function ItemDetailContent({
 
       {item.summary && (
         <DescriptionContainer style={styles.descriptionContainer}>
-          <ItemDetailDescription summary={item.summary} label={descriptionLabel} colors={colors} />
+          <Surface
+            tone="subtle"
+            radius="lg"
+            padding="lg"
+            colors={colors}
+            style={styles.descriptionSurface}
+          >
+            <ItemDetailDescription
+              summary={item.summary}
+              label={descriptionLabel}
+              colors={colors}
+            />
+          </Surface>
         </DescriptionContainer>
       )}
     </>

@@ -5,6 +5,7 @@
  * Used by subscriptions/settings screens to display provider connection status.
  */
 
+import type { OAuthProvider, ProviderConnectionStatusValue } from '@zine/shared/types';
 import { trpc } from '../lib/trpc';
 import type {
   ConnectionsListOutput,
@@ -17,8 +18,8 @@ import type {
 // Types
 // ============================================================================
 
-export type ConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'REVOKED';
-export type ConnectionProvider = 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+export type ConnectionStatus = ProviderConnectionStatusValue;
+export type ConnectionProvider = OAuthProvider;
 
 export interface Connection {
   id: string;
@@ -27,10 +28,6 @@ export interface Connection {
   providerUserId: string | null;
   createdAt: string;
   lastSyncAt: string | null;
-}
-
-export interface DisconnectConnectionInput {
-  provider: ConnectionProvider;
 }
 
 type ProviderConnectionData = NonNullable<ConnectionsListOutput[ConnectionProvider]>;
@@ -82,17 +79,6 @@ export function useConnections() {
     staleTime: 5 * 60 * 1000,
     gcTime: 24 * 60 * 60 * 1000,
     select: transformConnectionsResponse,
-  });
-}
-
-export function useConnection(provider: ConnectionProvider) {
-  return trpc.subscriptions.connections.list.useQuery(undefined, {
-    staleTime: 5 * 60 * 1000,
-    gcTime: 24 * 60 * 60 * 1000,
-    select: (response) => {
-      const providerData = response[provider];
-      return providerData ? transformConnection(provider, providerData) : undefined;
-    },
   });
 }
 

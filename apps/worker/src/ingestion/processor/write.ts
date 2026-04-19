@@ -3,15 +3,12 @@ import { UserItemState } from '@zine/shared';
 
 import type { Database } from '../../db';
 import { items, providerItemsSeen, subscriptionItems, userItems } from '../../db/schema';
+import { unixToIso } from '../../lib/timestamps';
 import type { PreparedItem, WriteContext } from './types';
 
 // ============================================================================
 // Write Helpers
 // ============================================================================
-
-function toISO8601(timestamp: number): string {
-  return new Date(timestamp).toISOString();
-}
 
 /**
  * Build the ingestion statements for a prepared item.
@@ -22,7 +19,7 @@ export function buildIngestionStatements(prepared: PreparedItem, context: WriteC
 
   if (!prepared.canonicalItemExists) {
     const publishedAtISO = prepared.newItem.publishedAt
-      ? toISO8601(prepared.newItem.publishedAt)
+      ? unixToIso(prepared.newItem.publishedAt)
       : null;
 
     statements.push(

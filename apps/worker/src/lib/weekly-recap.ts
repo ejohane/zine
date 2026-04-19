@@ -220,7 +220,59 @@ export type WeeklyRecapTeaserResponse = {
   estimatedMinutesDeltaPct: number | null;
 };
 
-type QueryRow = Record<string, unknown>;
+type D1RowValue = string | number | null;
+
+type RawTransitionEventRow = {
+  event_id: D1RowValue;
+  user_item_id: D1RowValue;
+  item_id: D1RowValue;
+  event_type: D1RowValue;
+  occurred_at: D1RowValue;
+  bookmarked_at: D1RowValue;
+  ingested_at: D1RowValue;
+  title: D1RowValue;
+  thumbnail_url: D1RowValue;
+  content_type: D1RowValue;
+  provider: D1RowValue;
+  duration: D1RowValue;
+  reading_time_minutes: D1RowValue;
+  word_count: D1RowValue;
+  creator_id: D1RowValue;
+  creator_name: D1RowValue;
+};
+
+type RawLegacyCompletedRow = {
+  user_item_id: D1RowValue;
+  item_id: D1RowValue;
+  finished_at: D1RowValue;
+  bookmarked_at: D1RowValue;
+  ingested_at: D1RowValue;
+  title: D1RowValue;
+  thumbnail_url: D1RowValue;
+  content_type: D1RowValue;
+  provider: D1RowValue;
+  duration: D1RowValue;
+  reading_time_minutes: D1RowValue;
+  word_count: D1RowValue;
+  creator_id: D1RowValue;
+  creator_name: D1RowValue;
+};
+
+type RawStartedSnapshotRow = {
+  user_item_id: D1RowValue;
+  item_id: D1RowValue;
+  title: D1RowValue;
+  thumbnail_url: D1RowValue;
+  content_type: D1RowValue;
+  provider: D1RowValue;
+  creator_id: D1RowValue;
+  creator_name: D1RowValue;
+  last_opened_at: D1RowValue;
+  progress_position: D1RowValue;
+  progress_duration: D1RowValue;
+  progress_updated_at: D1RowValue;
+  last_touched_at: D1RowValue;
+};
 
 function isValidTimezone(timezone: string | undefined): timezone is string {
   if (!timezone) {
@@ -418,15 +470,15 @@ export function getWeeklyRecapWindow(
   };
 }
 
-function toStringValue(value: unknown): string {
+function toStringValue(value: D1RowValue): string {
   return typeof value === 'string' ? value : '';
 }
 
-function toNullableString(value: unknown): string | null {
+function toNullableString(value: D1RowValue): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function toNullableNumber(value: unknown): number | null {
+function toNullableNumber(value: D1RowValue): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
@@ -439,7 +491,7 @@ function toNullableNumber(value: unknown): number | null {
   return null;
 }
 
-function toTransitionEventRow(row: QueryRow): TransitionEventRow {
+function toTransitionEventRow(row: RawTransitionEventRow): TransitionEventRow {
   return {
     event_id: toStringValue(row.event_id),
     user_item_id: toStringValue(row.user_item_id),
@@ -460,7 +512,7 @@ function toTransitionEventRow(row: QueryRow): TransitionEventRow {
   };
 }
 
-function toLegacyCompletedRow(row: QueryRow): LegacyCompletedRow {
+function toLegacyCompletedRow(row: RawLegacyCompletedRow): LegacyCompletedRow {
   return {
     user_item_id: toStringValue(row.user_item_id),
     item_id: toStringValue(row.item_id),
@@ -479,7 +531,7 @@ function toLegacyCompletedRow(row: QueryRow): LegacyCompletedRow {
   };
 }
 
-function toStartedSnapshotRow(row: QueryRow): StartedSnapshotRow {
+function toStartedSnapshotRow(row: RawStartedSnapshotRow): StartedSnapshotRow {
   return {
     user_item_id: toStringValue(row.user_item_id),
     item_id: toStringValue(row.item_id),
@@ -513,7 +565,7 @@ async function queryCompletionTransitionRows(
   comparisonStartAtMs: number,
   endAtMs: number
 ): Promise<TransitionEventRow[]> {
-  const rows = await queryAll<QueryRow>(
+  const rows = await queryAll<RawTransitionEventRow>(
     d1,
     `SELECT
       e.id AS event_id,
@@ -554,7 +606,7 @@ async function queryLegacyCompletedRows(
   comparisonStartAt: string,
   endAt: string
 ): Promise<LegacyCompletedRow[]> {
-  const rows = await queryAll<QueryRow>(
+  const rows = await queryAll<RawLegacyCompletedRow>(
     d1,
     `SELECT
       ui.id AS user_item_id,
@@ -593,7 +645,7 @@ async function queryStartedSnapshotRows(
   startAt: string,
   endAt: string
 ): Promise<StartedSnapshotRow[]> {
-  const rows = await queryAll<QueryRow>(
+  const rows = await queryAll<RawStartedSnapshotRow>(
     d1,
     `SELECT
       ui.id AS user_item_id,

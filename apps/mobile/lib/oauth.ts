@@ -1,24 +1,10 @@
-/**
- * OAuth configuration and PKCE utilities for mobile OAuth flows.
- *
- * This module provides:
- * - OAuth configuration constants for YouTube and Spotify
- * - PKCE (Proof Key for Code Exchange) generation utilities
- * - Redirect URI helpers for dev/prod environments
- *
- * Security requirements:
- * - Verifier MUST be 43-128 characters (we generate 43 from 32 random bytes)
- * - Challenge is SHA-256 hash of verifier, base64url encoded
- * - Uses expo-crypto for cryptographically secure random bytes
- */
-
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
-import { Provider } from '@zine/shared';
+import { Provider, type OAuthProvider } from '@zine/shared/types';
 import type { AppRouter } from '../../worker/src/trpc/router';
 import { API_URL } from './trpc';
 import { oauthLogger } from './logger';
@@ -28,40 +14,16 @@ import {
   telemetryFetch,
 } from './trpc-transport';
 
-// CRITICAL: Call at module level to handle auth session completion
-// This is required for expo-web-browser to properly complete the OAuth flow
+// Needed so expo-web-browser can resume completed auth sessions.
 WebBrowser.maybeCompleteAuthSession();
-
-// ============================================================================
-// Vanilla tRPC Client for Imperative Calls
-// ============================================================================
-
-/**
- * Token getter function type for auth header injection.
- * Set by the auth provider when the user is authenticated.
- */
 type TokenGetter = () => Promise<string | null>;
 
 let _getToken: TokenGetter | null = null;
 
-/**
- * Set the token getter function for tRPC authentication.
- * This should be called by the auth provider when the user logs in.
- *
- * @param getter - Function that returns the current auth token
- */
 export function setTokenGetter(getter: TokenGetter): void {
   _getToken = getter;
 }
 
-/**
- * Vanilla tRPC client for use outside of React components.
- *
- * This client is used for imperative OAuth operations like `connectProvider`
- * which need to make tRPC calls outside of the React render cycle.
- *
- * Note: The auth token getter must be set via `setTokenGetter` before making calls.
- */
 function createVanillaClient(seed?: { traceId?: string }) {
   return createTRPCClient<AppRouter>({
     links: [
@@ -83,17 +45,7 @@ function createVanillaClient(seed?: { traceId?: string }) {
   });
 }
 
-// ============================================================================
-// OAuth Configuration
-// ============================================================================
-
-/**
- * OAuth configuration for supported providers.
- * Client IDs are loaded from environment variables.
- *
- * Note: Google OAuth currently uses one shared client ID across YouTube and Gmail
- * so mobile, iOS URL schemes, and worker token exchange stay aligned.
- */
+// Google flows share one client ID so iOS redirect schemes and token exchange stay aligned.
 const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID ?? '';
 
 export const OAUTH_CONFIG = {
@@ -120,14 +72,20 @@ export const OAUTH_CONFIG = {
     authUrl: 'https://accounts.spotify.com/authorize',
     scopes: ['user-library-read'],
   },
-} as const;
+} as const satisfies Record<
+  OAuthProvider,
+  {
+    clientId: string;
+    authUrl: string;
+    scopes: readonly string[];
+  }
+>;
 
-/**
- * Supported OAuth provider types.
- */
-export type OAuthProvider = keyof typeof OAUTH_CONFIG;
+export type { OAuthProvider } from '@zine/shared/types';
 
-function isGoogleProvider(provider: OAuthProvider): provider is 'YOUTUBE' | 'GMAIL' {
+function isGoogleProvider(
+  provider: OAuthProvider
+): provider is Extract<OAuthProvider, 'YOUTUBE' | 'GMAIL'> {
   return provider === 'YOUTUBE' || provider === 'GMAIL';
 }
 
@@ -142,36 +100,13 @@ function toProviderEnum(provider: OAuthProvider): Provider {
   }
 }
 
-// ============================================================================
-// Redirect URI Configuration
-// ============================================================================
-
-/**
- * Custom scheme redirect URI for OAuth callbacks.
- * Used for Spotify in production builds.
- */
 export const REDIRECT_URI = 'zine://oauth/callback';
 
-/**
- * Returns the appropriate redirect URI based on provider.
- *
- * For Google/YouTube OAuth on iOS, we MUST use the reversed client ID scheme
- * that Google provides. This is required for both development and production.
- * Format: com.googleusercontent.apps.{CLIENT_ID_PREFIX}:/oauth2redirect
- *
- * For Spotify, we use our custom scheme: zine://oauth/callback
- *
- * @param provider - The OAuth provider ('YOUTUBE' or 'SPOTIFY')
- * @returns The redirect URI to use for OAuth flows
- */
+// Google OAuth on iOS requires the reversed client ID scheme.
 export function getRedirectUri(provider?: OAuthProvider): string {
-  // For Google providers, always use the reversed client ID scheme
-  // This is required by Google for iOS apps (both dev and production)
   if (provider === 'YOUTUBE' || provider === 'GMAIL') {
     const clientId = OAUTH_CONFIG[provider].clientId;
     if (clientId) {
-      // Extract the part before .apps.googleusercontent.com and reverse it
-      // e.g., "123456789-abcdef.apps.googleusercontent.com" -> "com.googleusercontent.apps.123456789-abcdef"
       const match = clientId.match(/^(.+)\.apps\.googleusercontent\.com$/);
       if (match) {
         const reversedClientId = `com.googleusercontent.apps.${match[1]}`;
@@ -180,7 +115,6 @@ export function getRedirectUri(provider?: OAuthProvider): string {
     }
   }
 
-  // For Spotify and fallback, use our custom scheme
   if (__DEV__) {
     const uri = AuthSession.makeRedirectUri({ scheme: 'zine', path: 'oauth/callback' });
     oauthLogger.debug('Using development redirect URI', { uri, provider });
@@ -189,105 +123,26 @@ export function getRedirectUri(provider?: OAuthProvider): string {
   return REDIRECT_URI;
 }
 
-// ============================================================================
-// PKCE Utilities
-// ============================================================================
-
-/**
- * Convert a Uint8Array to a base64url-encoded string.
- *
- * Base64url encoding is base64 with URL-safe characters:
- * - '+' replaced with '-'
- * - '/' replaced with '_'
- * - Padding '=' removed
- *
- * This encoding is required by PKCE (RFC 7636) for the code verifier
- * and code challenge.
- *
- * @param buffer - Raw bytes to encode
- * @returns Base64url-encoded string
- *
- * @example
- * ```typescript
- * const bytes = new Uint8Array([72, 101, 108, 108, 111]);
- * const encoded = base64URLEncode(bytes);
- * // Result: "SGVsbG8" (no padding, URL-safe characters)
- * ```
- */
 export function base64URLEncode(buffer: Uint8Array): string {
-  // Convert bytes to base64 using btoa
-  // btoa expects a string where each char represents a byte value (0-255)
   const base64 = btoa(String.fromCharCode(...buffer));
-
-  // Convert to base64url:
-  // - Replace '+' with '-' (URL-safe)
-  // - Replace '/' with '_' (URL-safe)
-  // - Remove '=' padding (not needed for PKCE)
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-/**
- * Generate PKCE code verifier and challenge.
- *
- * MUST be generated on client - this is the core security guarantee of PKCE.
- * The verifier is a cryptographically random string, and the challenge is
- * the SHA-256 hash of the verifier, both base64url-encoded.
- *
- * Security requirements (RFC 7636):
- * - Verifier must be 43-128 characters (we use 43 from 32 random bytes)
- * - Challenge must be SHA-256 hash of verifier, base64url-encoded
- * - Both must use base64url encoding (not standard base64)
- *
- * @returns Promise resolving to object containing verifier and challenge strings
- *
- * @example
- * ```typescript
- * const { verifier, challenge } = await generatePKCE();
- * // verifier: 43-character cryptographically random string
- * // challenge: SHA-256 hash of verifier, base64url encoded
- *
- * // Store verifier securely for token exchange
- * await SecureStore.setItemAsync('code_verifier', verifier);
- *
- * // Send challenge with authorization request
- * authUrl.searchParams.set('code_challenge', challenge);
- * authUrl.searchParams.set('code_challenge_method', 'S256');
- * ```
- */
 export async function generatePKCE(): Promise<{ verifier: string; challenge: string }> {
-  // Generate 32 random bytes using cryptographically secure random number generator
-  // 32 bytes -> 43 characters when base64url encoded (without padding)
-  // This meets the RFC 7636 requirement of 43-128 characters
   const randomBytes = await Crypto.getRandomBytesAsync(32);
   const verifier = base64URLEncode(randomBytes);
 
-  // Create SHA-256 hash of the verifier string
-  // The verifier must be encoded as UTF-8 bytes before hashing
   const verifierBytes = new TextEncoder().encode(verifier);
   const digestBuffer = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, verifierBytes);
 
-  // Convert ArrayBuffer to Uint8Array and base64url encode
   const challenge = base64URLEncode(new Uint8Array(digestBuffer));
 
   return { verifier, challenge };
 }
-
-// ============================================================================
-// SecureStore Key Helpers
-// ============================================================================
-
-/**
- * Generate SecureStore key for code verifier.
- * Format: "{provider}_code_verifier" (lowercase provider)
- */
 function getVerifierKey(provider: OAuthProvider): string {
   return `${provider.toLowerCase()}_code_verifier`;
 }
 
-/**
- * Generate SecureStore key for OAuth state.
- * Format: "{provider}_oauth_state" (lowercase provider)
- */
 function getStateKey(provider: OAuthProvider): string {
   return `${provider.toLowerCase()}_oauth_state`;
 }
@@ -303,46 +158,10 @@ async function clearOAuthSessionState(provider: OAuthProvider): Promise<void> {
     SecureStore.deleteItemAsync(getTraceKey(provider)),
   ]);
 }
-
-// ============================================================================
-// Connect Provider Flow
-// ============================================================================
-
-/**
- * Complete OAuth flow for connecting a provider.
- *
- * This function orchestrates the entire OAuth PKCE flow:
- * 1. Generate PKCE verifier and challenge (client-side security)
- * 2. Store verifier in SecureStore for later token exchange
- * 3. Generate state with provider prefix for CSRF protection
- * 4. Register state with server via tRPC
- * 5. Build provider-specific authorization URL
- * 6. Open browser for user authorization
- * 7. Handle redirect and exchange code for tokens
- * 8. Clean up SecureStore
- *
- * State Format: "PROVIDER:uuid"
- * - Provider prefix allows callback handler to know which SecureStore keys to use
- * - UUID portion provides CSRF protection
- *
- * @param provider - The OAuth provider to connect ('YOUTUBE' or 'SPOTIFY')
- * @throws Error if OAuth flow is cancelled, fails, or state mismatch occurs
- *
- * @example
- * ```typescript
- * try {
- *   await connectProvider('YOUTUBE');
- *   // Success - connection is now stored on server
- * } catch (error) {
- *   console.error('OAuth failed:', error.message);
- * }
- * ```
- */
 export async function connectProvider(provider: OAuthProvider): Promise<void> {
   oauthLogger.info('Starting connection flow', { provider });
   const config = OAUTH_CONFIG[provider];
 
-  // Validate client ID is configured
   if (!config.clientId) {
     const error = isGoogleProvider(provider)
       ? 'Google client ID not configured. Set EXPO_PUBLIC_YOUTUBE_CLIENT_ID.'
@@ -354,24 +173,14 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   const actionTrace = createMobileActionTraceContext();
   const client = createVanillaClient({ traceId: actionTrace.traceId });
 
-  // STEP 1: Generate PKCE (CLIENT-SIDE - security requirement)
-  // The verifier is a cryptographically random string, the challenge is its SHA-256 hash
   oauthLogger.debug('Generating PKCE challenge');
   const { verifier, challenge } = await generatePKCE();
-
-  // Store verifier securely - needed for token exchange after redirect
   await SecureStore.setItemAsync(getVerifierKey(provider), verifier);
 
-  // STEP 2: Generate state (CLIENT-SIDE) - encode provider for callback identification
-  // The state parameter serves dual purposes:
-  // 1. CSRF protection (validated by server)
-  // 2. Provider identification (needed by cold-start callback handler)
-  // Format: "PROVIDER:uuid" - allows parseOAuthCallback to know which SecureStore keys to use
+  // Encode the provider into state so cold-start callbacks can find the right keys.
   const state = `${provider}:${Crypto.randomUUID()}`;
   await SecureStore.setItemAsync(getTraceKey(provider), actionTrace.traceId);
 
-  // STEP 3: Register state with server (CSRF protection only)
-  // The server stores state → userId mapping with TTL for validation on callback
   oauthLogger.debug('Registering state with server');
   try {
     await client.subscriptions.connections.registerState.mutate({
@@ -385,10 +194,8 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw error;
   }
 
-  // Store state for validation after redirect
   await SecureStore.setItemAsync(getStateKey(provider), state);
 
-  // STEP 4: Build auth URL (CLIENT-SIDE)
   const redirectUri = getRedirectUri(provider);
   oauthLogger.debug('Using redirect URI', { redirectUri, provider });
   const authUrl = new URL(config.authUrl);
@@ -400,31 +207,24 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
   authUrl.searchParams.set('code_challenge', challenge);
   authUrl.searchParams.set('code_challenge_method', 'S256');
 
-  // Google-specific: request offline access for refresh token
-  // Without these params, Google may not issue a refresh token
   if (provider === 'YOUTUBE' || provider === 'GMAIL') {
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
   }
 
-  // STEP 5: Open browser for user authorization
-  // openAuthSessionAsync handles the browser session and waits for redirect
   oauthLogger.debug('Opening browser for authorization');
   const result = await WebBrowser.openAuthSessionAsync(authUrl.toString(), redirectUri);
   oauthLogger.debug('Browser result', { type: result.type });
 
   if (result.type !== 'success') {
-    // Clean up stored values on cancellation/failure
     await clearOAuthSessionState(provider);
     throw new Error('OAuth flow cancelled or failed');
   }
 
-  // STEP 6: Handle redirect and extract params
   const redirectUrl = new URL(result.url);
   const code = redirectUrl.searchParams.get('code');
   const returnedState = redirectUrl.searchParams.get('state');
 
-  // Check for error from provider
   const errorParam = redirectUrl.searchParams.get('error');
   if (errorParam) {
     const errorDescription = redirectUrl.searchParams.get('error_description');
@@ -437,7 +237,6 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw new Error('OAuth failed: No state returned');
   }
 
-  // Validate state matches (client-side check - server also validates)
   const storedState = await SecureStore.getItemAsync(getStateKey(provider));
   if (returnedState !== storedState) {
     await clearOAuthSessionState(provider);
@@ -449,16 +248,12 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw new Error('OAuth failed: No authorization code returned');
   }
 
-  // Retrieve stored verifier
   const storedVerifier = await SecureStore.getItemAsync(getVerifierKey(provider));
   if (!storedVerifier) {
     await clearOAuthSessionState(provider);
     throw new Error('PKCE verifier not found - OAuth flow corrupted');
   }
 
-  // STEP 7: Send code + verifier to server for token exchange
-  // Server will exchange the code using the verifier and store encrypted tokens
-  // NOTE: redirectUri must be sent to server because it must match the one used in auth request
   oauthLogger.debug('Exchanging code for tokens');
   try {
     await client.subscriptions.connections.callback.mutate({
@@ -475,60 +270,20 @@ export async function connectProvider(provider: OAuthProvider): Promise<void> {
     throw error;
   }
 
-  // STEP 8: Cleanup secure storage
   await clearOAuthSessionState(provider);
 }
-
-// ============================================================================
-// OAuth Flow Completion (Cold Start Handler)
-// ============================================================================
-
-/**
- * Result of completing the OAuth flow.
- */
 export interface OAuthFlowResult {
   success: boolean;
-  provider?: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL';
+  provider?: OAuthProvider;
   error?: string;
 }
 
-/**
- * Complete the OAuth flow by exchanging the authorization code for tokens.
- *
- * This function is called after the OAuth provider redirects back to the app
- * with an authorization code. It validates the state, retrieves the PKCE
- * verifier, and sends both to the server for token exchange.
- *
- * Flow:
- * 1. Validate state matches stored state in SecureStore
- * 2. Retrieve PKCE verifier from SecureStore
- * 3. Call tRPC connections.callback mutation for token exchange
- * 4. Cleanup SecureStore (delete verifier and state)
- * 5. Return success/error result
- *
- * @param code - Authorization code from OAuth provider
- * @param state - Full state string (format: "PROVIDER:uuid")
- * @param provider - Provider extracted from state (for consistency check)
- * @returns Result indicating success or failure
- *
- * @example
- * ```typescript
- * // Called from OAuthCallbackHandler after redirect
- * const result = await completeOAuthFlow(code, state, 'YOUTUBE');
- * if (result.success) {
- *   router.replace('/subscriptions/discover/youtube');
- * } else {
- *   router.replace('/subscriptions/connect/youtube');
- * }
- * ```
- */
 export async function completeOAuthFlow(
   code: string,
   state: string,
-  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'
+  provider: OAuthProvider
 ): Promise<OAuthFlowResult> {
   try {
-    // 1. Validate state matches stored state
     const storedState = await SecureStore.getItemAsync(getStateKey(provider));
     if (storedState !== state) {
       await clearOAuthSessionState(provider);
@@ -538,7 +293,6 @@ export async function completeOAuthFlow(
       };
     }
 
-    // 2. Retrieve PKCE verifier
     const verifier = await SecureStore.getItemAsync(getVerifierKey(provider));
     if (!verifier) {
       await clearOAuthSessionState(provider);
@@ -551,17 +305,13 @@ export async function completeOAuthFlow(
     const traceId = await SecureStore.getItemAsync(getTraceKey(provider));
     const client = createVanillaClient({ traceId: traceId ?? undefined });
 
-    // 3. Exchange code for tokens via tRPC
-    // The server validates the state, exchanges the code using PKCE,
-    // and stores encrypted tokens in the database
     await client.subscriptions.connections.callback.mutate({
       provider: toProviderEnum(provider),
       code,
-      state, // Full state string (PROVIDER:uuid format)
+      state,
       codeVerifier: verifier,
     });
 
-    // 4. Clean up SecureStore
     await clearOAuthSessionState(provider);
 
     return {
@@ -569,8 +319,14 @@ export async function completeOAuthFlow(
       provider,
     };
   } catch (error) {
-    // Clean up SecureStore even on error to prevent stale state
-    await clearOAuthSessionState(provider).catch(() => {});
+    try {
+      await clearOAuthSessionState(provider);
+    } catch (cleanupError) {
+      oauthLogger.warn('Failed to clear OAuth session state after OAuth completion error', {
+        provider,
+        error: cleanupError,
+      });
+    }
 
     const message =
       error instanceof Error ? error.message : 'Unknown error during OAuth completion';

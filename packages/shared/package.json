@@ -22,6 +22,10 @@
       "types": "./src/constants/index.ts",
       "import": "./src/constants/index.ts"
     },
+    "./format": {
+      "types": "./src/format.ts",
+      "import": "./src/format.ts"
+    },
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"

@@ -9,7 +9,7 @@
  */
 
 import { trpc } from '../lib/trpc';
-import { ContentType, Provider, UserItemState } from '@zine/shared';
+import { ContentType, Provider, UserItemState, isValidUrl as isValidSharedUrl } from '@zine/shared';
 import * as Crypto from 'expo-crypto';
 
 // ============================================================================
@@ -44,7 +44,7 @@ export interface LinkPreview {
 /**
  * Result from bookmarks.save
  */
-export interface SaveResult {
+interface SaveResult {
   itemId: string;
   userItemId: string;
   status: 'created' | 'already_bookmarked' | 'rebookmarked';
@@ -53,7 +53,7 @@ export interface SaveResult {
 /**
  * Input for saving a bookmark
  */
-export interface SaveBookmarkInput {
+interface SaveBookmarkInput {
   url: string;
   provider: Provider;
   contentType: ContentType;
@@ -126,13 +126,7 @@ const HOME_SECTION_LIMIT = 5;
  * ```
  */
 export function isValidUrl(urlString: string): boolean {
-  if (!urlString || urlString.trim().length === 0) return false;
-  try {
-    const url = new URL(urlString.trim());
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  } catch {
-    return false;
-  }
+  return isValidSharedUrl(urlString);
 }
 
 /**

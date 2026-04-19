@@ -2553,13 +2553,14 @@ export type OfflineActionType =
  * Error classification for retry logic.
  * Determines how the queue should handle different failure types.
  */
-export type ErrorClassification =
-  | 'NETWORK' // Temporary network failure - should retry
-  | 'AUTH' // 401 Unauthorized - refresh auth and retry once
-  | 'CONFLICT' // 409 Conflict - subscription already exists
-  | 'CLIENT' // 4xx errors (except 401, 409) - permanent failure, don't retry
-  | 'SERVER' // 5xx errors - should retry with backoff
-  | 'UNKNOWN'; // Unknown error - treat as retryable
+export type ErrorType =
+  | 'network' // Temporary network failure - should retry
+  | 'timeout' // Request timed out - should retry
+  | 'auth' // 401 Unauthorized - refresh auth and retry once
+  | 'conflict' // 409 Conflict - subscription already exists
+  | 'validation' // 4xx errors (except 401, 409) - permanent failure, don't retry
+  | 'server' // 5xx errors - should retry with backoff
+  | 'unknown'; // Unknown error - treat as retryable
 
 export interface OfflineAction {
   id: string;
@@ -2569,7 +2570,7 @@ export interface OfflineAction {
   retryCount: number;
   authRetryCount: number; // Separate counter for auth retries
   lastError?: string;
-  lastErrorType?: ErrorClassification;
+  lastErrorType?: ErrorType;
 }
 
 /**
@@ -2578,10 +2579,10 @@ export interface OfflineAction {
  * @param error - The error thrown during action execution
  * @returns Error classification for retry logic
  */
-function classifyError(error: unknown): ErrorClassification {
+function classifyError(error: unknown): ErrorType {
   // Network errors (fetch failures, timeouts, etc.)
   if (error instanceof TypeError && error.message.includes('fetch')) {
-    return 'NETWORK';
+    return 'network';
   }
 
   if (error instanceof Error) {
@@ -2590,11 +2591,14 @@ function classifyError(error: unknown): ErrorClassification {
     // Network-related error messages
     if (
       message.includes('network') ||
-      message.includes('timeout') ||
       message.includes('aborted') ||
       message.includes('connection')
     ) {
-      return 'NETWORK';
+      return 'network';
+    }
+
+    if (message.includes('timeout')) {
+      return 'timeout';
     }
   }
 
@@ -2611,26 +2615,26 @@ function classifyError(error: unknown): ErrorClassification {
 
     // 401 Unauthorized - auth token expired or invalid
     if (httpStatus === 401 || code === 'UNAUTHORIZED') {
-      return 'AUTH';
+      return 'auth';
     }
 
     // 409 Conflict - resource already exists (e.g., subscription already added)
     if (httpStatus === 409 || code === 'CONFLICT') {
-      return 'CONFLICT';
+      return 'conflict';
     }
 
     // 4xx Client errors (except 401, 409) - permanent failures
     if (typeof httpStatus === 'number' && httpStatus >= 400 && httpStatus < 500) {
-      return 'CLIENT';
+      return 'validation';
     }
 
     // 5xx Server errors - temporary failures, should retry
     if (typeof httpStatus === 'number' && httpStatus >= 500) {
-      return 'SERVER';
+      return 'server';
     }
   }
 
-  return 'UNKNOWN';
+  return 'unknown';
 }
 
 /**
@@ -2640,24 +2644,25 @@ function classifyError(error: unknown): ErrorClassification {
  * @param action - The action being processed (for retry count checks)
  * @returns Whether the action should be retried
  */
-function isRetryableError(errorType: ErrorClassification, action: OfflineAction): boolean {
+function isRetryableError(errorType: ErrorType, action: OfflineAction): boolean {
   switch (errorType) {
-    case 'NETWORK':
-    case 'SERVER':
-    case 'UNKNOWN':
+    case 'network':
+    case 'timeout':
+    case 'server':
+    case 'unknown':
       // Retry if under the retry limit
       return action.retryCount < MAX_RETRIES;
 
-    case 'AUTH':
+    case 'auth':
       // Auth errors get one retry after token refresh
       return action.authRetryCount < AUTH_RETRY_LIMIT;
 
-    case 'CONFLICT':
+    case 'conflict':
       // Conflict means the action already succeeded (e.g., already subscribed)
       // Don't retry - mark as resolved
       return false;
 
-    case 'CLIENT':
+    case 'validation':
       // Client errors (4xx except 401, 409) are permanent - don't retry
       return false;
 
@@ -3731,7 +3736,7 @@ try {
       case 'NOT_FOUND':
         // Subscription not found
         break;
-      case 'CONFLICT':
+      case 'conflict':
         // Already subscribed
         break;
       default:

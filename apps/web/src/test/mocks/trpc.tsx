@@ -1,8 +1,7 @@
 import type { PropsWithChildren } from 'react';
-import type { ContentType } from '@zine/shared';
+import type { ContentType } from '@zine/shared/types';
+import type { AuthMode } from '../../lib/trpc';
 import { vi } from 'vitest';
-
-type AuthMode = 'clerk' | 'development-bypass' | 'disabled';
 
 type QueryResult<T> = {
   data?: T;
@@ -10,8 +9,8 @@ type QueryResult<T> = {
   error: Error | null;
 };
 
-type MutationOptions<TData = unknown> = {
-  onSuccess?: (data: TData) => void;
+type MutationOptions<TData = unknown, TInput = unknown> = {
+  onSuccess?: (data: TData, input: TInput) => void;
   onError?: (error: Error) => void;
   onSettled?: () => void;
 };
@@ -29,6 +28,11 @@ type ItemsGetInput = {
 
 type CreatorGetInput = {
   creatorId: string;
+};
+
+type ItemTag = {
+  id: string;
+  name: string;
 };
 
 type BookmarkPreviewInput = {
@@ -78,6 +82,7 @@ export const invalidateSpies = {
   itemsGetInvalidate: vi.fn(async () => undefined),
   itemsLibraryInvalidate: vi.fn(async () => undefined),
   itemsHomeInvalidate: vi.fn(async () => undefined),
+  itemsListTagsInvalidate: vi.fn(async () => undefined),
   subscriptionsConnectionsInvalidate: vi.fn(async () => undefined),
   subscriptionsListInvalidate: vi.fn(async () => undefined),
   subscriptionsDiscoverInvalidate: vi.fn(async () => undefined),
@@ -90,6 +95,8 @@ export const invalidateSpies = {
 export const mutationSpies = {
   toggleFinished: vi.fn(async (_input: unknown) => undefined),
   unbookmark: vi.fn(async (_input: unknown) => undefined),
+  setTags: vi.fn(async (_input: unknown) => undefined),
+  markOpened: vi.fn(async (_input: unknown) => undefined),
   bookmarkSave: vi.fn(async (_input: unknown) => undefined),
   subscriptionAdd: vi.fn(async (_input: unknown) => ({ success: true })),
   newslettersSyncNow: vi.fn(async (_input: unknown) => ({ success: true })),
@@ -107,6 +114,9 @@ export const hookSpies = {
   creatorsGetUseQuery: vi.fn<(input: CreatorGetInput, options?: unknown) => QueryResult<unknown>>(
     (_input) => createQueryResult({})
   ),
+  itemsListTagsUseQuery: vi.fn<() => QueryResult<{ tags: ItemTag[] }>>(() =>
+    createQueryResult({ tags: [] })
+  ),
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
   >((_input) => createQueryResult({})),
@@ -118,6 +128,12 @@ export const hookSpies = {
   ),
   unbookmarkUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.unbookmark, options)
+  ),
+  setTagsUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.setTags, options)
+  ),
+  markOpenedUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.markOpened, options)
   ),
   connectionsListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
     createQueryResult({
@@ -209,12 +225,12 @@ function createQueryResult<T>(data?: T, overrides: Partial<QueryResult<T>> = {})
 
 function createMutationResult<TInput, TData>(
   spy: MutationSpy<TInput, TData>,
-  options?: MutationOptions<TData>
+  options?: MutationOptions<TData, TInput>
 ) {
   const run = async (input: TInput) => {
     try {
       const result = await spy(input);
-      options?.onSuccess?.(result);
+      options?.onSuccess?.(result, input);
       options?.onSettled?.();
       return result;
     } catch (error) {
@@ -230,6 +246,7 @@ function createMutationResult<TInput, TData>(
       void run(input);
     },
     mutateAsync: run,
+    reset: vi.fn(),
   };
 }
 
@@ -247,16 +264,14 @@ export function resetTrpcMocks() {
     spy.mockResolvedValue(undefined);
   });
 
-  mutationSpies.toggleFinished.mockReset();
-  mutationSpies.unbookmark.mockReset();
-  mutationSpies.bookmarkSave.mockReset();
-  mutationSpies.subscriptionAdd.mockReset();
-  mutationSpies.newslettersSyncNow.mockReset();
-  mutationSpies.newslettersUpdateStatus.mockReset();
-  mutationSpies.rssAdd.mockReset();
+  Object.values(mutationSpies).forEach((spy) => {
+    spy.mockReset();
+  });
 
   mutationSpies.toggleFinished.mockResolvedValue(undefined);
   mutationSpies.unbookmark.mockResolvedValue(undefined);
+  mutationSpies.setTags.mockResolvedValue(undefined);
+  mutationSpies.markOpened.mockResolvedValue(undefined);
   mutationSpies.bookmarkSave.mockResolvedValue(undefined);
   mutationSpies.subscriptionAdd.mockResolvedValue({ success: true });
   mutationSpies.newslettersSyncNow.mockResolvedValue({ success: true });
@@ -271,6 +286,9 @@ export function resetTrpcMocks() {
 
   hookSpies.creatorsGetUseQuery.mockReset();
   hookSpies.creatorsGetUseQuery.mockImplementation((_input) => createQueryResult());
+
+  hookSpies.itemsListTagsUseQuery.mockReset();
+  hookSpies.itemsListTagsUseQuery.mockImplementation(() => createQueryResult({ tags: [] }));
 
   hookSpies.bookmarksPreviewUseQuery.mockReset();
   hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
@@ -288,6 +306,16 @@ export function resetTrpcMocks() {
   hookSpies.unbookmarkUseMutation.mockReset();
   hookSpies.unbookmarkUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.unbookmark, options)
+  );
+
+  hookSpies.setTagsUseMutation.mockReset();
+  hookSpies.setTagsUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.setTags, options)
+  );
+
+  hookSpies.markOpenedUseMutation.mockReset();
+  hookSpies.markOpenedUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.markOpened, options)
   );
 
   hookSpies.connectionsListUseQuery.mockReset();
@@ -398,6 +426,7 @@ export const trpc = {
       get: { invalidate: invalidateSpies.itemsGetInvalidate },
       library: { invalidate: invalidateSpies.itemsLibraryInvalidate },
       home: { invalidate: invalidateSpies.itemsHomeInvalidate },
+      listTags: { invalidate: invalidateSpies.itemsListTagsInvalidate },
     },
     subscriptions: {
       connections: {
@@ -425,11 +454,20 @@ export const trpc = {
       useQuery: (input: ItemsGetInput, options?: unknown) =>
         hookSpies.itemsGetUseQuery(input, options),
     },
+    listTags: {
+      useQuery: () => hookSpies.itemsListTagsUseQuery(),
+    },
     toggleFinished: {
       useMutation: (options?: MutationOptions) => hookSpies.toggleFinishedUseMutation(options),
     },
     unbookmark: {
       useMutation: (options?: MutationOptions) => hookSpies.unbookmarkUseMutation(options),
+    },
+    setTags: {
+      useMutation: (options?: MutationOptions) => hookSpies.setTagsUseMutation(options),
+    },
+    markOpened: {
+      useMutation: (options?: MutationOptions) => hookSpies.markOpenedUseMutation(options),
     },
   },
   creators: {

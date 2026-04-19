@@ -14,8 +14,10 @@ import {
 import { Link, NavLink } from 'react-router-dom';
 
 import { AppWordmark } from './app-wordmark';
-import { Badge, LinkButton, Surface, cn } from './components';
+import { Badge, Button, LinkButton, Surface, cn } from './components';
+import { MobileTabBar } from './components/mobile-tab-bar';
 import { sourceConfigs, supportedSources, type SupportedSource } from './lib/onboarding';
+import { usePwaState } from './lib/pwa';
 import { trpc, useAppSession, useAuthAvailability } from './lib/trpc';
 
 function getConnectionStatus(
@@ -143,9 +145,53 @@ function SourcesSection() {
   );
 }
 
+function InstallAppSection({
+  installAvailability,
+  promptInstall,
+}: {
+  installAvailability: ReturnType<typeof usePwaState>['installAvailability'];
+  promptInstall: ReturnType<typeof usePwaState>['promptInstall'];
+}) {
+  if (installAvailability === 'unsupported') {
+    return null;
+  }
+
+  return (
+    <div className="settings-page__section settings-pwa-card">
+      <p className="eyebrow">
+        {installAvailability === 'installed' ? 'Installed' : 'Install the app'}
+      </p>
+      <h3>
+        {installAvailability === 'installed'
+          ? 'Zine is already on this device.'
+          : 'Keep Zine one tap away.'}
+      </h3>
+      <p>
+        {installAvailability === 'prompt'
+          ? 'Install Zine for a fullscreen shell, cached relaunches, and mobile-safe layout handling.'
+          : installAvailability === 'ios'
+            ? 'On iPhone, open this page in Safari, then use Share -> Add to Home Screen to install Zine.'
+            : 'This browser is already running the installed version of Zine.'}
+      </p>
+      {installAvailability === 'prompt' ? (
+        <Button
+          type="button"
+          tone="ghost"
+          onClick={() => {
+            void promptInstall();
+          }}
+        >
+          Install app
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { mode } = useAuthAvailability();
   const { signOut } = useAppSession();
+  const { installAvailability, promptInstall } = usePwaState();
 
   return (
     <main className="new-page-screen">
@@ -236,11 +282,17 @@ export function SettingsPage() {
 
               <div className="settings-page__content">
                 <SourcesSection />
+                <InstallAppSection
+                  installAvailability={installAvailability}
+                  promptInstall={promptInstall}
+                />
               </div>
             </div>
           </section>
         </div>
       </div>
+
+      <MobileTabBar />
     </main>
   );
 }

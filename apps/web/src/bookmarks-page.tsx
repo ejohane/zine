@@ -1,12 +1,14 @@
 import {
+  Bookmark,
   BookmarkCheck,
-  Check,
+  CircleCheck,
+  CirclePlus,
   ChevronLeft,
   ChevronRight,
   Ellipsis,
   Plus,
   Settings,
-  Share2,
+  Share,
 } from 'lucide-react';
 import { FaSpotify } from 'react-icons/fa';
 import { FaXTwitter } from 'react-icons/fa6';
@@ -22,11 +24,13 @@ import {
 } from 'react';
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import { Colors, getButtonMetrics } from '@zine/design-system';
+import { Colors, ContentColors, ProviderColors, getButtonMetrics } from '@zine/design-system';
 import { ContentType, Provider } from '@zine/shared';
 
-import { Badge, Button, EmptyState, cn } from './components';
+import { Button, EmptyState, cn } from './components';
+import { BookmarkTagsDialog } from './components/bookmark-tags-dialog';
 import { ManualBookmarkDialog } from './components/manual-bookmark-dialog';
+import { MobileTabBar } from './components/mobile-tab-bar';
 import { FilterChip } from './components/ui/filter-chip';
 import { AppWordmark } from './app-wordmark';
 import {
@@ -38,6 +42,7 @@ import {
 } from './lib/format';
 import type { LibraryItem, RouterOutputs } from './lib/router-types';
 import { trpc } from './lib/trpc';
+import { useMediaQuery } from './lib/use-media-query';
 
 const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
   { label: 'All' },
@@ -72,6 +77,56 @@ const bookmarkActionButtonStyle: BookmarkActionButtonStyle = {
   '--bookmark-action-active-bg': Colors.dark.cardHover,
   '--bookmark-action-active-border': Colors.dark.borderDefault,
 };
+const mobileBookmarkActionButtonStyle = {
+  minHeight: 44,
+  width: 44,
+  borderRadius: 999,
+} as const;
+
+function getBookmarkProviderBadgeColor(provider: Provider | string) {
+  switch (provider) {
+    case Provider.SPOTIFY:
+      return ProviderColors.spotify;
+    case Provider.YOUTUBE:
+      return ProviderColors.youtube;
+    case Provider.GMAIL:
+      return ProviderColors.gmail;
+    case Provider.SUBSTACK:
+      return ProviderColors.substack;
+    case Provider.X:
+      return ProviderColors.x;
+    default:
+      return ProviderColors.web;
+  }
+}
+
+function getBookmarkContentBadgeColor(contentType: ContentType) {
+  switch (contentType) {
+    case ContentType.PODCAST:
+      return ContentColors.podcast;
+    case ContentType.VIDEO:
+      return ContentColors.video;
+    case ContentType.POST:
+      return ContentColors.post;
+    case ContentType.ARTICLE:
+    default:
+      return ContentColors.article;
+  }
+}
+
+function BookmarkDetailBadge({
+  label,
+  backgroundColor,
+}: {
+  label: string;
+  backgroundColor: string;
+}) {
+  return (
+    <span className="new-page-bookmark-view__badge" style={{ backgroundColor }}>
+      {label}
+    </span>
+  );
+}
 
 function getLibrarySummary(item: LibraryItem) {
   return (
@@ -326,7 +381,15 @@ function useBookmarkDetailParallax(scrollKey: string | null) {
     const article = articleRef.current;
     const hero = heroRef.current;
 
-    if (!article || !hero) {
+    if (!article) {
+      return;
+    }
+
+    if (!hero) {
+      article.scrollTo({ top: 0, behavior: 'auto' });
+      article.style.setProperty('--bookmark-hero-translate-y', '0px');
+      article.style.setProperty('--bookmark-hero-opacity', '1');
+      article.style.setProperty('--bookmark-hero-scale', '1');
       return;
     }
 
@@ -493,6 +556,8 @@ export function BookmarksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
   const [manualBookmarkNotice, setManualBookmarkNotice] = useState<string | null>(null);
+  const [bookmarkTagsOpen, setBookmarkTagsOpen] = useState(false);
+  const isPhoneLayout = useMediaQuery('(max-width: 700px)');
   const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
   const bookmarkSearch = searchParams.toString();
   const bookmarkSearchString = bookmarkSearch ? `?${bookmarkSearch}` : '';
@@ -562,7 +627,30 @@ export function BookmarksPage() {
       ? displayBookmark.canonicalUrl
       : null;
   const selectedBookmarkIsFinished = Boolean(displayBookmark?.isFinished);
+  const isPhonePostView = isPhoneLayout && displayBookmark?.contentType === ContentType.POST;
+  const isPhoneDetailView = isPhoneLayout && Boolean(selectedBookmarkId);
+  const bookmarkPlainSummary = displayBookmark ? formatPlainText(displayBookmark.summary) : null;
+  const bookmarkPostHandle =
+    displayBookmark?.provider === Provider.X
+      ? (selectedBookmarkCreatorQuery.data?.handle ?? extractXHandle(displayBookmark.canonicalUrl))
+      : null;
+  const bookmarkPostTimestamp =
+    displayBookmark?.publishedAt ?? displayBookmark?.bookmarkedAt ?? displayBookmark?.ingestedAt;
+  const bookmarkHeroImageUrl = displayBookmark
+    ? isPhoneLayout
+      ? displayBookmark.thumbnailUrl
+      : (displayBookmark.thumbnailUrl ?? displayBookmark.creatorImageUrl)
+    : null;
+  const showBookmarkHero = !displayBookmark
+    ? false
+    : !isPhoneLayout || Boolean(displayBookmark.thumbnailUrl);
+  const showHeroBadges = isPhoneLayout && showBookmarkHero && !isPhonePostView;
+  const showHeaderBadges =
+    Boolean(displayBookmark) && (!isPhoneLayout || !showBookmarkHero || isPhonePostView);
   const bookmarkFabConfig = displayBookmark ? getBookmarkFabConfig(displayBookmark.provider) : null;
+  const detailActionButtonStyle = isPhoneLayout
+    ? mobileBookmarkActionButtonStyle
+    : bookmarkActionButtonStyle;
   const { articleRef: bookmarkDetailRef, heroRef: bookmarkHeroRef } = useBookmarkDetailParallax(
     displayBookmark?.id ?? null
   );
@@ -576,12 +664,17 @@ export function BookmarksPage() {
   const showBookmarkDetailSkeleton =
     showInitialBookmarksLoadingState ||
     Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
+  const showBookmarkListPane = !isPhoneLayout || !selectedBookmarkId;
+  const showBookmarkDetailPane = !isPhoneLayout || Boolean(selectedBookmarkId);
+  const showMobileTabBar = isPhoneLayout && !selectedBookmarkId;
   const refreshNotice = bookmarksQuery.error
     ? (bookmarksQuery.error.message ?? 'Could not refresh bookmarks.')
     : bookmarksAreRefreshing
       ? 'Refreshing bookmarks...'
       : null;
   const headerNotice = manualBookmarkNotice ?? refreshNotice;
+  const showMobileHeader = Boolean(headerNotice);
+  const showInsetHeader = !isPhoneLayout || showMobileHeader;
 
   const invalidateSelectedBookmark = () => {
     if (!selectedBookmarkId) {
@@ -601,6 +694,18 @@ export function BookmarksPage() {
   const unbookmarkMutation = trpc.items.unbookmark.useMutation({
     onSuccess: invalidateSelectedBookmark,
   });
+  const markOpenedMutation = trpc.items.markOpened.useMutation({
+    onSuccess: () => {
+      if (!selectedBookmarkId) {
+        return;
+      }
+
+      void Promise.all([
+        utils.items.get.invalidate({ id: selectedBookmarkId }),
+        utils.items.home.invalidate(),
+      ]);
+    },
+  });
 
   useEffect(() => {
     if (!manualBookmarkNotice) {
@@ -613,6 +718,27 @@ export function BookmarksPage() {
 
     return () => window.clearTimeout(timeout);
   }, [manualBookmarkNotice]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const className = 'mobile-bookmarks-scroll-lock';
+
+    if (isPhoneLayout) {
+      document.documentElement.classList.add(className);
+      document.body.classList.add(className);
+    } else {
+      document.documentElement.classList.remove(className);
+      document.body.classList.remove(className);
+    }
+
+    return () => {
+      document.documentElement.classList.remove(className);
+      document.body.classList.remove(className);
+    };
+  }, [isPhoneLayout]);
 
   const handleManualBookmarkSaved = useCallback(
     (result: { userItemId: string; status: 'created' | 'already_bookmarked' | 'rebookmarked' }) => {
@@ -632,428 +758,584 @@ export function BookmarksPage() {
 
   if (bookmarksQuery.error && !hasBookmarkData) {
     return (
-      <main className="new-page-screen">
+      <main className={cn('new-page-screen', isPhoneLayout && 'new-page-screen--phone')}>
         <EmptyState
           title="Could not load bookmarks"
           message={bookmarksQuery.error.message ?? 'Please refresh and try again.'}
         />
+        {showMobileTabBar ? <MobileTabBar /> : null}
       </main>
     );
   }
 
   return (
-    <main className="new-page-screen">
-      <div className="new-page-sidebar">
-        <div className="new-page-sidebar__rail">
-          <div className="new-page-sidebar__rail-top">
-            <div className="new-page-sidebar__rail-header">
-              <Link
-                to={buildBookmarksLocation(null, bookmarkSearchString)}
-                className="new-page-sidebar__brand"
-                aria-label="Go to bookmarks"
-              >
-                <div className="new-page-sidebar__brand-icon">
-                  <AppWordmark compact />
-                </div>
-              </Link>
+    <main className={cn('new-page-screen', isPhoneLayout && 'new-page-screen--phone')}>
+      {!isPhoneLayout ? (
+        <div className="new-page-sidebar">
+          <div className="new-page-sidebar__rail">
+            <div className="new-page-sidebar__rail-top">
+              <div className="new-page-sidebar__rail-header">
+                <Link
+                  to={buildBookmarksLocation(null, bookmarkSearchString)}
+                  className="new-page-sidebar__brand"
+                  aria-label="Go to bookmarks"
+                >
+                  <div className="new-page-sidebar__brand-icon">
+                    <AppWordmark compact />
+                  </div>
+                </Link>
+              </div>
+
+              <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
+                <NavLink
+                  to={buildBookmarksLocation(null, bookmarkSearchString)}
+                  end
+                  className={({ isActive }) =>
+                    cn(
+                      'new-page-sidebar__rail-btn',
+                      isActive && 'new-page-sidebar__rail-btn--active'
+                    )
+                  }
+                  aria-label="Bookmarks"
+                  title="Bookmarks"
+                >
+                  <BookmarkCheck size={18} strokeWidth={2.15} />
+                  <span>Bookmarks</span>
+                </NavLink>
+              </nav>
             </div>
 
-            <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
+            <div className="new-page-sidebar__rail-footer">
               <NavLink
-                to={buildBookmarksLocation(null, bookmarkSearchString)}
-                end
+                to="/settings"
                 className={({ isActive }) =>
                   cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
                 }
-                aria-label="Bookmarks"
-                title="Bookmarks"
+                aria-label="Settings"
+                title="Settings"
               >
-                <BookmarkCheck size={18} strokeWidth={2.15} />
-                <span>Bookmarks</span>
+                <Settings size={18} strokeWidth={2.15} />
+                <span>Settings</span>
               </NavLink>
-            </nav>
-          </div>
-
-          <div className="new-page-sidebar__rail-footer">
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-              }
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings size={18} strokeWidth={2.15} />
-              <span>Settings</span>
-            </NavLink>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
+
+      {showMobileTabBar ? <MobileTabBar /> : null}
 
       <div className="new-page-inset">
-        <header className="new-page-inset__header">
-          <nav className="new-page-breadcrumb" aria-label="Current page location">
-            <span>Library</span>
-            <ChevronRight size={14} strokeWidth={2.2} />
-            {displayBookmark ? (
-              <>
-                <Link
-                  to={buildBookmarksLocation(null, bookmarkSearchString)}
-                  className="new-page-breadcrumb__link"
-                >
-                  Bookmarks
-                </Link>
+        {showInsetHeader ? (
+          <header className="new-page-inset__header">
+            {!isPhoneLayout ? (
+              <nav className="new-page-breadcrumb" aria-label="Current page location">
+                <span>Library</span>
                 <ChevronRight size={14} strokeWidth={2.2} />
-                <strong className="new-page-breadcrumb__title">{displayBookmark.title}</strong>
-              </>
-            ) : (
-              <strong>Bookmarks</strong>
-            )}
-          </nav>
-
-          <div className="new-page-inset__header-actions">
-            {headerNotice ? (
-              <span className="new-page-inset__header-note">{headerNotice}</span>
+                {displayBookmark ? (
+                  <>
+                    <Link
+                      to={buildBookmarksLocation(null, bookmarkSearchString)}
+                      className="new-page-breadcrumb__link"
+                    >
+                      Bookmarks
+                    </Link>
+                    <ChevronRight size={14} strokeWidth={2.2} />
+                    <strong className="new-page-breadcrumb__title">{displayBookmark.title}</strong>
+                  </>
+                ) : (
+                  <strong>Bookmarks</strong>
+                )}
+              </nav>
             ) : null}
 
-            <Button
-              type="button"
-              size="icon"
-              variant="secondary"
-              aria-label="Add bookmark"
-              style={{
-                backgroundColor: Colors.dark.overlayForeground,
-                color: Colors.dark.accentForeground,
-              }}
-              onClick={() => setManualBookmarkOpen(true)}
-            >
-              <Plus size={16} strokeWidth={2.2} />
-            </Button>
-          </div>
-        </header>
-
-        <div className="new-page-inset__body">
-          <aside className="new-page-column-card">
-            <div className="new-page-column-card__header">
-              <h2 className="new-page-column-card__title">Bookmarks</h2>
-              <div className="new-page-column-card__chips">
-                {CONTENT_FILTERS.map((filter) => (
-                  <FilterChip
-                    key={filter.label}
-                    label={filter.label}
-                    size="small"
-                    selected={bookmarkFilter === filter.value}
-                    tone={filter.value ?? 'default'}
-                    onClick={() => {
-                      const nextSearchParams = new URLSearchParams(searchParams);
-                      const nextFilter = serializeBookmarkFilter(filter.value);
-
-                      if (nextFilter) {
-                        nextSearchParams.set(CONTENT_FILTER_SEARCH_PARAM, nextFilter);
-                      } else {
-                        nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
-                      }
-
-                      setSearchParams(nextSearchParams);
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div
-              className="new-page-column-card__list"
-              aria-busy={showInitialBookmarksLoadingState}
-            >
-              {showInitialBookmarksLoadingState ? (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  style={{
-                    position: 'absolute',
-                    width: '1px',
-                    height: '1px',
-                    padding: 0,
-                    margin: '-1px',
-                    overflow: 'hidden',
-                    clip: 'rect(0, 0, 0, 0)',
-                    whiteSpace: 'nowrap',
-                    border: 0,
-                  }}
-                >
-                  Loading bookmarks
-                </div>
+            <div className="new-page-inset__header-actions">
+              {headerNotice ? (
+                <span className="new-page-inset__header-note">{headerNotice}</span>
               ) : null}
 
-              {showInitialBookmarksLoadingState ? (
-                Array.from({ length: BOOKMARK_LOADING_ROW_COUNT }, (_, index) => (
-                  <BookmarkRowSkeleton key={index} />
-                ))
-              ) : libraryIsEmpty ? (
-                <p className="new-page-column-card__empty">
-                  {bookmarks.length === 0
-                    ? 'Add a bookmark to start building your library.'
-                    : bookmarkFilterLabel
-                      ? `No ${bookmarkFilterLabel.toLowerCase()} bookmarks match this filter.`
-                      : 'No bookmarks match this filter.'}
-                </p>
-              ) : (
-                filteredBookmarks.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    aria-pressed={selectedBookmark?.id === item.id}
-                    className={cn(
-                      'bookmark-row',
-                      selectedBookmark?.id === item.id && 'bookmark-row--selected'
-                    )}
-                    onClick={() => navigate(buildBookmarksLocation(item.id, bookmarkSearchString))}
-                  >
-                    {item.thumbnailUrl ? (
-                      <img
-                        className="bookmark-row__cover"
-                        src={item.thumbnailUrl}
-                        alt=""
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="bookmark-row__cover bookmark-row__cover--empty" />
-                    )}
-                    <div className="bookmark-row__info">
-                      <span className="bookmark-row__title">{item.title}</span>
-                      <div className="bookmark-row__author">
-                        {item.creatorImageUrl ? (
-                          <img className="bookmark-row__avatar" src={item.creatorImageUrl} alt="" />
-                        ) : (
-                          <div className="bookmark-row__avatar bookmark-row__avatar--fallback">
-                            {(item.creator || item.publisher || 'U')[0]}
-                          </div>
-                        )}
-                        <span className="bookmark-row__name">
-                          {item.creator || item.publisher || 'Unknown'}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </aside>
-
-          <div className="new-page-inset__content">
-            <section
-              className="new-page-column-card new-page-bookmark-pane"
-              aria-busy={showBookmarkDetailSkeleton}
-            >
-              {showBookmarkDetailSkeleton ? (
-                <BookmarkDetailSkeleton />
-              ) : displayBookmark ? (
-                <article
-                  ref={bookmarkDetailRef}
-                  className="new-page-bookmark-view new-page-bookmark-view--pane"
+              {!isPhoneLayout ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="secondary"
+                  aria-label="Add bookmark"
+                  style={{
+                    backgroundColor: Colors.dark.overlayForeground,
+                    color: Colors.dark.accentForeground,
+                  }}
+                  onClick={() => setManualBookmarkOpen(true)}
                 >
-                  <button
-                    type="button"
-                    className="new-page-bookmark-view__back"
-                    onClick={() => navigate(buildBookmarksLocation(null, bookmarkSearchString))}
-                    aria-label="Back to bookmarks list"
-                    title="Back"
+                  <Plus size={16} strokeWidth={2.2} />
+                </Button>
+              ) : null}
+            </div>
+          </header>
+        ) : null}
+
+        <div className="new-page-inset__body">
+          {showBookmarkListPane ? (
+            <aside className="new-page-column-card">
+              <div className="new-page-column-card__header">
+                <h2 className="new-page-column-card__title">Bookmarks</h2>
+                <div className="new-page-column-card__chips">
+                  {CONTENT_FILTERS.map((filter) => (
+                    <FilterChip
+                      key={filter.label}
+                      label={filter.label}
+                      size="small"
+                      selected={bookmarkFilter === filter.value}
+                      tone={filter.value ?? 'default'}
+                      onClick={() => {
+                        const nextSearchParams = new URLSearchParams(searchParams);
+                        const nextFilter = serializeBookmarkFilter(filter.value);
+
+                        if (nextFilter) {
+                          nextSearchParams.set(CONTENT_FILTER_SEARCH_PARAM, nextFilter);
+                        } else {
+                          nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+                        }
+
+                        setSearchParams(nextSearchParams);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className="new-page-column-card__list"
+                aria-busy={showInitialBookmarksLoadingState}
+              >
+                {showInitialBookmarksLoadingState ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
+                    style={{
+                      position: 'absolute',
+                      width: '1px',
+                      height: '1px',
+                      padding: 0,
+                      margin: '-1px',
+                      overflow: 'hidden',
+                      clip: 'rect(0, 0, 0, 0)',
+                      whiteSpace: 'nowrap',
+                      border: 0,
+                    }}
                   >
-                    <ChevronLeft size={20} strokeWidth={2.4} />
-                  </button>
-
-                  <div ref={bookmarkHeroRef} className="new-page-bookmark-view__hero">
-                    {displayBookmark.thumbnailUrl || displayBookmark.creatorImageUrl ? (
-                      <img
-                        src={displayBookmark.thumbnailUrl ?? displayBookmark.creatorImageUrl ?? ''}
-                        alt=""
-                      />
-                    ) : (
-                      <div className="new-page-bookmark-view__hero-placeholder" />
-                    )}
+                    Loading bookmarks
                   </div>
+                ) : null}
 
-                  <div className="new-page-bookmark-view__body">
-                    <div className="new-page-bookmark-view__header">
-                      <div className="new-page-bookmark-view__badges">
-                        <Badge>{mapProvider(displayBookmark.provider)}</Badge>
-                        <Badge>{mapContentType(displayBookmark.contentType)}</Badge>
-                      </div>
-
-                      <h2 className="new-page-bookmark-view__title">{displayBookmark.title}</h2>
-                    </div>
-                    <div className="new-page-bookmark-view__creator-block">
-                      <div className="new-page-bookmark-view__creator">
-                        {displayBookmark.creatorImageUrl ? (
-                          <img
-                            className="new-page-bookmark-view__creator-avatar"
-                            src={displayBookmark.creatorImageUrl}
-                            alt=""
-                          />
-                        ) : (
-                          <div className="new-page-bookmark-view__creator-avatar new-page-bookmark-view__creator-avatar--fallback">
-                            {getLibraryCreatorLabel(displayBookmark).slice(0, 1).toUpperCase()}
-                          </div>
-                        )}
-
-                        <div className="new-page-bookmark-view__creator-copy">
-                          <strong>{getLibraryCreatorLabel(displayBookmark)}</strong>
+                {showInitialBookmarksLoadingState ? (
+                  Array.from({ length: BOOKMARK_LOADING_ROW_COUNT }, (_, index) => (
+                    <BookmarkRowSkeleton key={index} />
+                  ))
+                ) : libraryIsEmpty ? (
+                  <p className="new-page-column-card__empty">
+                    {bookmarks.length === 0
+                      ? 'Add a bookmark to start building your library.'
+                      : bookmarkFilterLabel
+                        ? `No ${bookmarkFilterLabel.toLowerCase()} bookmarks match this filter.`
+                        : 'No bookmarks match this filter.'}
+                  </p>
+                ) : (
+                  filteredBookmarks.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={selectedBookmark?.id === item.id}
+                      className={cn(
+                        'bookmark-row',
+                        selectedBookmark?.id === item.id && 'bookmark-row--selected'
+                      )}
+                      onClick={() =>
+                        navigate(buildBookmarksLocation(item.id, bookmarkSearchString))
+                      }
+                    >
+                      {item.thumbnailUrl ? (
+                        <img
+                          className="bookmark-row__cover"
+                          src={item.thumbnailUrl}
+                          alt=""
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="bookmark-row__cover bookmark-row__cover--empty" />
+                      )}
+                      <div className="bookmark-row__info">
+                        <span className="bookmark-row__title">{item.title}</span>
+                        <div className="bookmark-row__author">
+                          {item.creatorImageUrl ? (
+                            <img
+                              className="bookmark-row__avatar"
+                              src={item.creatorImageUrl}
+                              alt=""
+                            />
+                          ) : (
+                            <div className="bookmark-row__avatar bookmark-row__avatar--fallback">
+                              {(item.creator || item.publisher || 'U')[0]}
+                            </div>
+                          )}
+                          <span className="bookmark-row__name">
+                            {item.creator || item.publisher || 'Unknown'}
+                          </span>
                         </div>
                       </div>
-                    </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </aside>
+          ) : null}
 
-                    {selectedBookmarkMeta.length > 0 ? (
-                      <div className="new-page-bookmark-view__meta" aria-label="Bookmark metadata">
-                        {selectedBookmarkMeta.map((bit, index) => (
-                          <span key={`${bit}-${index}`}>{bit}</span>
-                        ))}
+          {showBookmarkDetailPane ? (
+            <div className="new-page-inset__content">
+              <section
+                className="new-page-column-card new-page-bookmark-pane"
+                aria-busy={showBookmarkDetailSkeleton}
+              >
+                {showBookmarkDetailSkeleton ? (
+                  <BookmarkDetailSkeleton />
+                ) : displayBookmark ? (
+                  <article
+                    ref={bookmarkDetailRef}
+                    className={cn(
+                      'new-page-bookmark-view new-page-bookmark-view--pane',
+                      isPhoneLayout && 'new-page-bookmark-view--phone',
+                      isPhoneDetailView && 'new-page-bookmark-view--phone-detail',
+                      !showBookmarkHero && 'new-page-bookmark-view--no-hero',
+                      displayBookmark.contentType === ContentType.POST &&
+                        'new-page-bookmark-view--post'
+                    )}
+                  >
+                    {isPhoneLayout ? (
+                      <button
+                        type="button"
+                        className="new-page-bookmark-view__back"
+                        onClick={() => navigate(buildBookmarksLocation(null, bookmarkSearchString))}
+                        aria-label="Back to bookmarks list"
+                        title="Back"
+                      >
+                        <ChevronLeft size={20} strokeWidth={2.4} />
+                      </button>
+                    ) : null}
+
+                    {showBookmarkHero ? (
+                      <div
+                        ref={bookmarkHeroRef}
+                        className={cn(
+                          'new-page-bookmark-view__hero',
+                          displayBookmark.contentType === ContentType.VIDEO
+                            ? 'new-page-bookmark-view__hero--video'
+                            : 'new-page-bookmark-view__hero--square'
+                        )}
+                      >
+                        {bookmarkHeroImageUrl ? (
+                          <img src={bookmarkHeroImageUrl} alt="" />
+                        ) : (
+                          <div className="new-page-bookmark-view__hero-placeholder" />
+                        )}
+
+                        {showHeroBadges ? (
+                          <div className="new-page-bookmark-view__hero-badges">
+                            <BookmarkDetailBadge
+                              label={mapProvider(displayBookmark.provider)}
+                              backgroundColor={getBookmarkProviderBadgeColor(
+                                displayBookmark.provider
+                              )}
+                            />
+                            <BookmarkDetailBadge
+                              label={mapContentType(displayBookmark.contentType)}
+                              backgroundColor={getBookmarkContentBadgeColor(
+                                displayBookmark.contentType
+                              )}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 
-                    <div className="new-page-bookmark-view__actions">
-                      <div className="new-page-bookmark-view__actions-left">
-                        <Button
-                          tone="ghost"
-                          size="icon"
-                          className="new-page-bookmark-view__icon-action"
-                          style={bookmarkActionButtonStyle}
-                          aria-label={`Remove bookmark for ${displayBookmark.title}`}
-                          title="Remove bookmark"
-                          disabled={!selectedBookmarkId || unbookmarkMutation.isPending}
-                          onClick={() => {
-                            if (!selectedBookmarkId) {
-                              return;
-                            }
+                    <div className="new-page-bookmark-view__body">
+                      <div className="new-page-bookmark-view__header">
+                        {showHeaderBadges ? (
+                          <div className="new-page-bookmark-view__badges">
+                            <BookmarkDetailBadge
+                              label={mapProvider(displayBookmark.provider)}
+                              backgroundColor={getBookmarkProviderBadgeColor(
+                                displayBookmark.provider
+                              )}
+                            />
+                            <BookmarkDetailBadge
+                              label={mapContentType(displayBookmark.contentType)}
+                              backgroundColor={getBookmarkContentBadgeColor(
+                                displayBookmark.contentType
+                              )}
+                            />
+                          </div>
+                        ) : null}
 
-                            unbookmarkMutation.mutate({ id: selectedBookmarkId });
-                          }}
-                        >
-                          <BookmarkCheck size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
-                        </Button>
+                        {!isPhonePostView ? (
+                          <h2 className="new-page-bookmark-view__title">{displayBookmark.title}</h2>
+                        ) : null}
+                      </div>
+                      <div className="new-page-bookmark-view__creator-block">
+                        <div className="new-page-bookmark-view__creator">
+                          {displayBookmark.creatorImageUrl ? (
+                            <img
+                              className="new-page-bookmark-view__creator-avatar"
+                              src={displayBookmark.creatorImageUrl}
+                              alt=""
+                            />
+                          ) : (
+                            <div className="new-page-bookmark-view__creator-avatar new-page-bookmark-view__creator-avatar--fallback">
+                              {getLibraryCreatorLabel(displayBookmark).slice(0, 1).toUpperCase()}
+                            </div>
+                          )}
 
-                        <Button
-                          tone="ghost"
-                          size="icon"
-                          className="new-page-bookmark-view__icon-action"
-                          style={bookmarkActionButtonStyle}
-                          aria-label={
-                            selectedBookmarkIsFinished
-                              ? `Mark ${displayBookmark.title} as unfinished`
-                              : `Mark ${displayBookmark.title} as finished`
-                          }
-                          title={selectedBookmarkIsFinished ? 'Mark unfinished' : 'Mark finished'}
-                          disabled={!selectedBookmarkId || toggleFinishedMutation.isPending}
-                          onClick={() => {
-                            if (!selectedBookmarkId) {
-                              return;
-                            }
+                          <div className="new-page-bookmark-view__creator-copy">
+                            <strong>{getLibraryCreatorLabel(displayBookmark)}</strong>
+                          </div>
 
-                            toggleFinishedMutation.mutate({ id: selectedBookmarkId });
-                          }}
-                        >
-                          <Check size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
-                        </Button>
-
-                        <Button
-                          tone="ghost"
-                          size="icon"
-                          className="new-page-bookmark-view__icon-action"
-                          style={bookmarkActionButtonStyle}
-                          aria-label={`Share ${displayBookmark.title}`}
-                          title="Share"
-                          disabled={!selectedBookmarkSourceUrl}
-                          onClick={async () => {
-                            if (!selectedBookmarkSourceUrl) {
-                              return;
-                            }
-
-                            if (
-                              typeof navigator !== 'undefined' &&
-                              typeof navigator.share === 'function'
-                            ) {
-                              try {
-                                await navigator.share({
-                                  title: displayBookmark.title,
-                                  url: selectedBookmarkSourceUrl,
-                                });
-                                return;
-                              } catch {
-                                // Fall through to clipboard copy when share is unavailable or cancelled.
-                              }
-                            }
-
-                            if (
-                              typeof navigator !== 'undefined' &&
-                              navigator.clipboard?.writeText
-                            ) {
-                              await navigator.clipboard.writeText(selectedBookmarkSourceUrl);
-                            }
-                          }}
-                        >
-                          <Share2 size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
-                        </Button>
-
-                        <Button
-                          tone="ghost"
-                          size="icon"
-                          className="new-page-bookmark-view__icon-action"
-                          style={bookmarkActionButtonStyle}
-                          aria-label={`More actions for ${displayBookmark.title}`}
-                          title="More actions"
-                        >
-                          <Ellipsis size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
-                        </Button>
+                          <ChevronRight
+                            className="new-page-bookmark-view__creator-chevron"
+                            size={14}
+                            strokeWidth={2.2}
+                            aria-hidden="true"
+                          />
+                        </div>
                       </div>
 
-                      {selectedBookmarkSourceUrl && bookmarkFabConfig ? (
-                        <a
-                          className={cn(
-                            'new-page-bookmark-view__fab',
-                            bookmarkFabConfig.toneClassName
-                          )}
-                          href={selectedBookmarkSourceUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label={bookmarkFabConfig.label}
-                          title={bookmarkFabConfig.label}
+                      {selectedBookmarkMeta.length > 0 ? (
+                        <div
+                          className="new-page-bookmark-view__meta"
+                          aria-label="Bookmark metadata"
                         >
-                          {bookmarkFabConfig.icon}
-                        </a>
+                          {selectedBookmarkMeta.map((bit, index) => (
+                            <span key={`${bit}-${index}`}>{bit}</span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="new-page-bookmark-view__actions">
+                        <div className="new-page-bookmark-view__actions-left">
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={`Remove bookmark for ${displayBookmark.title}`}
+                            title="Remove bookmark"
+                            disabled={!selectedBookmarkId || unbookmarkMutation.isPending}
+                            onClick={() => {
+                              if (!selectedBookmarkId) {
+                                return;
+                              }
+
+                              unbookmarkMutation.mutate({ id: selectedBookmarkId });
+                            }}
+                          >
+                            <Bookmark
+                              className="new-page-bookmark-view__bookmark-icon"
+                              size={BOOKMARK_ACTION_ICON_SIZE}
+                              strokeWidth={1.85}
+                              fill="currentColor"
+                            />
+                          </Button>
+
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={
+                              selectedBookmarkIsFinished
+                                ? `Mark ${displayBookmark.title} as unfinished`
+                                : `Mark ${displayBookmark.title} as finished`
+                            }
+                            title={selectedBookmarkIsFinished ? 'Mark unfinished' : 'Mark finished'}
+                            disabled={!selectedBookmarkId || toggleFinishedMutation.isPending}
+                            onClick={() => {
+                              if (!selectedBookmarkId) {
+                                return;
+                              }
+
+                              toggleFinishedMutation.mutate({ id: selectedBookmarkId });
+                            }}
+                          >
+                            <CircleCheck size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                          </Button>
+
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={`Manage tags for ${displayBookmark.title}`}
+                            title="Manage tags"
+                            disabled={!selectedBookmarkId}
+                            onClick={() => setBookmarkTagsOpen(true)}
+                          >
+                            <CirclePlus size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                          </Button>
+
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={`Share ${displayBookmark.title}`}
+                            title="Share"
+                            disabled={!selectedBookmarkSourceUrl}
+                            onClick={async () => {
+                              if (!selectedBookmarkSourceUrl) {
+                                return;
+                              }
+
+                              if (
+                                typeof navigator !== 'undefined' &&
+                                typeof navigator.share === 'function'
+                              ) {
+                                try {
+                                  await navigator.share({
+                                    title: displayBookmark.title,
+                                    url: selectedBookmarkSourceUrl,
+                                  });
+                                  return;
+                                } catch {
+                                  // Fall through to clipboard copy when share is unavailable or cancelled.
+                                }
+                              }
+
+                              if (
+                                typeof navigator !== 'undefined' &&
+                                navigator.clipboard?.writeText
+                              ) {
+                                await navigator.clipboard.writeText(selectedBookmarkSourceUrl);
+                              }
+                            }}
+                          >
+                            <Share size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                          </Button>
+
+                          <Button
+                            tone="ghost"
+                            size="icon"
+                            className="new-page-bookmark-view__icon-action"
+                            style={detailActionButtonStyle}
+                            aria-label={`More actions for ${displayBookmark.title}`}
+                            title="More actions"
+                          >
+                            <Ellipsis size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
+                          </Button>
+                        </div>
+
+                        {selectedBookmarkSourceUrl && bookmarkFabConfig ? (
+                          <a
+                            className={cn(
+                              'new-page-bookmark-view__fab',
+                              bookmarkFabConfig.toneClassName
+                            )}
+                            href={selectedBookmarkSourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label={bookmarkFabConfig.label}
+                            title={bookmarkFabConfig.label}
+                            onClick={() => {
+                              if (!selectedBookmarkId) {
+                                return;
+                              }
+
+                              markOpenedMutation.mutate({ id: selectedBookmarkId });
+                            }}
+                          >
+                            {bookmarkFabConfig.icon}
+                          </a>
+                        ) : null}
+                      </div>
+
+                      {isPhonePostView ? (
+                        <section
+                          className="new-page-bookmark-view__post"
+                          aria-label="X post content"
+                        >
+                          <div className="new-page-bookmark-view__post-row">
+                            {displayBookmark.creatorImageUrl ? (
+                              <img
+                                className="new-page-bookmark-view__post-avatar"
+                                src={displayBookmark.creatorImageUrl}
+                                alt=""
+                              />
+                            ) : (
+                              <div className="new-page-bookmark-view__post-avatar new-page-bookmark-view__post-avatar--fallback">
+                                {getLibraryCreatorLabel(displayBookmark).slice(0, 1).toUpperCase()}
+                              </div>
+                            )}
+
+                            <div className="new-page-bookmark-view__post-copy">
+                              <div className="new-page-bookmark-view__post-author-row">
+                                <strong className="new-page-bookmark-view__post-author">
+                                  {getLibraryCreatorLabel(displayBookmark)}
+                                </strong>
+                                {bookmarkPostHandle ? (
+                                  <span className="new-page-bookmark-view__post-handle">
+                                    @{bookmarkPostHandle}
+                                  </span>
+                                ) : null}
+                                {bookmarkPostTimestamp ? (
+                                  <span className="new-page-bookmark-view__post-time">
+                                    · {formatBookmarkRelativeTime(bookmarkPostTimestamp)}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <p className="new-page-bookmark-view__post-text">
+                                {displayBookmark.title}
+                              </p>
+
+                              {bookmarkPlainSummary &&
+                              bookmarkPlainSummary !== displayBookmark.title ? (
+                                <p className="new-page-bookmark-view__post-text new-page-bookmark-view__post-text--secondary">
+                                  {bookmarkPlainSummary}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </section>
+                      ) : (
+                        <section className="new-page-bookmark-view__section">
+                          <p className="eyebrow new-page-bookmark-view__section-label">
+                            {getBookmarkAboutLabel(displayBookmark.contentType)}
+                          </p>
+                          <p className="new-page-bookmark-view__summary">
+                            {getLibrarySummary(displayBookmark)}
+                          </p>
+                        </section>
+                      )}
+
+                      {selectedBookmarkDetailQuery.isLoading ? (
+                        <p className="new-page-bookmark-view__loading-copy">
+                          Refreshing bookmark detail.
+                        </p>
                       ) : null}
                     </div>
-
-                    <section className="new-page-bookmark-view__section">
-                      <p className="eyebrow">
-                        {getBookmarkAboutLabel(displayBookmark.contentType)}
+                  </article>
+                ) : (
+                  <div className="new-page-bookmark-pane__empty">
+                    <div>
+                      <p className="eyebrow">{libraryIsEmpty ? 'Your library' : 'Bookmark view'}</p>
+                      <h2>{libraryIsEmpty ? 'Add your first bookmark' : 'Select a bookmark'}</h2>
+                      <p>
+                        {libraryIsEmpty
+                          ? 'Use the add button in the header to save a link manually and start this shelf.'
+                          : 'Pick something from the list and its detail view will open here.'}
                       </p>
-                      <p className="new-page-bookmark-view__summary">
-                        {getLibrarySummary(displayBookmark)}
-                      </p>
-                    </section>
-
-                    {selectedBookmarkDetailQuery.isLoading ? (
-                      <p className="new-page-bookmark-view__loading-copy">
-                        Refreshing bookmark detail.
-                      </p>
-                    ) : null}
+                    </div>
                   </div>
-                </article>
-              ) : (
-                <div className="new-page-bookmark-pane__empty">
-                  <div>
-                    <p className="eyebrow">{libraryIsEmpty ? 'Your library' : 'Bookmark view'}</p>
-                    <h2>{libraryIsEmpty ? 'Add your first bookmark' : 'Select a bookmark'}</h2>
-                    <p>
-                      {libraryIsEmpty
-                        ? 'Use the add button in the header to save a link manually and start this shelf.'
-                        : 'Pick something from the list and its detail view will open here.'}
-                    </p>
-                  </div>
-                </div>
-              )}
-            </section>
-          </div>
+                )}
+              </section>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1062,6 +1344,13 @@ export function BookmarksPage() {
         onOpenChange={setManualBookmarkOpen}
         onSaved={handleManualBookmarkSaved}
       />
+      {displayBookmark ? (
+        <BookmarkTagsDialog
+          bookmark={displayBookmark}
+          open={bookmarkTagsOpen}
+          onOpenChange={setBookmarkTagsOpen}
+        />
+      ) : null}
     </main>
   );
 }

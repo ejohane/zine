@@ -15,10 +15,10 @@
  * - Subscriber pattern for UI updates (SyncStatusIndicator)
  *
  * Error Handling Strategy:
- * - NETWORK/SERVER/UNKNOWN: Retry with MAX_RETRIES (3)
- * - AUTH (401): Refresh token, retry once
- * - CONFLICT (409): Treat as success (already done)
- * - CLIENT (4xx): Don't retry, permanent failure
+ * - network/timeout/server/unknown: Retry with MAX_RETRIES (3)
+ * - auth (401): Refresh token, retry once
+ * - conflict (409): Treat as success (already done)
+ * - validation (4xx): Don't retry, permanent failure
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,7 +26,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { createTraceId } from '@zine/shared';
 import { ulid } from 'ulid';
 import { offlineLogger } from './logger';
-import { classifyErrorLegacy, type ErrorClassification } from './error-utils';
+import { classifyError, type ErrorType } from './error-utils';
 import { CLERK_PUBLISHABLE_KEY, tokenCache } from './auth';
 import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
 
@@ -75,7 +75,7 @@ export type OfflineAction = (SubscribeOfflineAction | UnsubscribeOfflineAction) 
   /** Last error message for debugging */
   lastError?: string;
   /** Last error classification for UI display */
-  lastErrorType?: ErrorClassification;
+  lastErrorType?: ErrorType;
 };
 
 /**
@@ -103,24 +103,25 @@ interface ActionProcessingResult {
  * @param action - The action being processed (for retry count checks)
  * @returns Whether the action should be retried
  */
-function isRetryableError(errorType: ErrorClassification, action: OfflineAction): boolean {
+function isRetryableError(errorType: ErrorType, action: OfflineAction): boolean {
   switch (errorType) {
-    case 'NETWORK':
-    case 'SERVER':
-    case 'UNKNOWN':
+    case 'network':
+    case 'timeout':
+    case 'server':
+    case 'unknown':
       // Retry if under the general retry limit
       return action.retryCount < MAX_RETRIES;
 
-    case 'AUTH':
+    case 'auth':
       // Auth errors get one retry after token refresh
       return action.authRetryCount < AUTH_RETRY_LIMIT;
 
-    case 'CONFLICT':
+    case 'conflict':
       // Conflict means the action's intent was already fulfilled
       // (e.g., user is already subscribed) - don't retry
       return false;
 
-    case 'CLIENT':
+    case 'validation':
       // Client errors (4xx except 401, 409) are permanent - don't retry
       return false;
 
@@ -315,11 +316,11 @@ class OfflineActionQueue {
     action: OfflineAction,
     error: unknown
   ): Promise<ActionProcessingResult> {
-    const errorType = classifyErrorLegacy(error);
+    const errorType = classifyError(error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    // CONFLICT: The action's intent is already fulfilled
-    if (errorType === 'CONFLICT') {
+    // conflict: The action's intent is already fulfilled
+    if (errorType === 'conflict') {
       offlineLogger.info('Action resolved as conflict - already done', {
         actionId: action.id,
         type: action.type,
@@ -327,13 +328,13 @@ class OfflineActionQueue {
       return { shouldRemove: true, succeeded: true };
     }
 
-    // AUTH: Try to refresh token and retry
-    if (errorType === 'AUTH') {
+    // auth: Try to refresh token and retry
+    if (errorType === 'auth') {
       return this.handleAuthError(action, errorMessage);
     }
 
-    // CLIENT: Permanent failure (4xx except 401, 409)
-    if (errorType === 'CLIENT') {
+    // validation: Permanent failure (4xx except 401, 409)
+    if (errorType === 'validation') {
       offlineLogger.error('Action failed permanently', {
         actionId: action.id,
         type: action.type,
@@ -342,7 +343,7 @@ class OfflineActionQueue {
       return { shouldRemove: true, succeeded: false };
     }
 
-    // NETWORK, SERVER, UNKNOWN: Retry with backoff
+    // network, timeout, server, unknown: Retry with backoff
     return this.handleRetryableError(action, errorType, errorMessage);
   }
 
@@ -359,7 +360,7 @@ class OfflineActionQueue {
         await this.executeAction(action);
         return { shouldRemove: true, succeeded: true };
       } catch (retryError) {
-        const retryErrorType = classifyErrorLegacy(retryError);
+        const retryErrorType = classifyError(retryError);
         const updatedAction: OfflineAction = {
           ...action,
           authRetryCount: action.authRetryCount + 1,
@@ -387,11 +388,11 @@ class OfflineActionQueue {
   }
 
   /**
-   * Handle retryable errors (NETWORK, SERVER, UNKNOWN) with retry counting.
+   * Handle retryable errors (network, timeout, server, unknown) with retry counting.
    */
   private handleRetryableError(
     action: OfflineAction,
-    errorType: ErrorClassification,
+    errorType: ErrorType,
     errorMessage: string
   ): ActionProcessingResult {
     const updatedAction: OfflineAction = {
