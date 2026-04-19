@@ -43,3 +43,14 @@ export type {
   TelemetryError,
   TelemetryEnvelope,
 } from './telemetry';
+
+// Query persistence helpers
+export {
+  QUERY_PERSISTENCE_STORAGE_PREFIX,
+  QUERY_PERSISTENCE_MAX_AGE_MS,
+  buildQueryPersistenceBuster,
+  buildQueryPersistenceKey,
+  getQueryPathFromKey,
+  isAllowlistedQueryKey,
+  shouldPersistQuery,
+} from './query-persistence';

@@ -40,7 +40,19 @@ const podcastItem = createLibraryItem({
   canonicalUrl: 'https://open.spotify.com/episode/example',
 });
 
-const libraryItems = [articleItem, videoItem, podcastItem];
+const postItem = createLibraryItem({
+  id: 'post-1',
+  title: 'Notes on interface pace',
+  summary:
+    'Ship the smallest interaction that still feels inevitable, then tighten it until it disappears.',
+  creator: 'Erik J',
+  creatorId: 'creator-3',
+  contentType: ContentType.POST,
+  provider: Provider.X,
+  canonicalUrl: 'https://x.com/erik/status/1234567890',
+});
+
+const libraryItems = [articleItem, videoItem, podcastItem, postItem];
 
 function LocationProbe() {
   const location = useLocation();
@@ -49,8 +61,31 @@ function LocationProbe() {
     <>
       <output data-testid="location-pathname">{location.pathname}</output>
       <output data-testid="location-search">{location.search}</output>
+      <output data-testid="location-path">{location.pathname}</output>
     </>
   );
+}
+
+function setViewportWidth(width: number) {
+  vi.mocked(window.matchMedia).mockImplementation((query: string) => {
+    const maxWidthMatch = query.match(/max-width:\s*(\d+(?:\.\d+)?)px/i);
+    const minWidthMatch = query.match(/min-width:\s*(\d+(?:\.\d+)?)px/i);
+    const maxWidth = maxWidthMatch ? Number(maxWidthMatch[1]) : null;
+    const minWidth = minWidthMatch ? Number(minWidthMatch[1]) : null;
+    const matches =
+      (maxWidth === null || width <= maxWidth) && (minWidth === null || width >= minWidth);
+
+    return {
+      matches,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    };
+  });
 }
 
 function installDefaultBookmarkMocks() {
@@ -85,7 +120,13 @@ function installDefaultBookmarkMocks() {
             handle: 'taste-and-pacing',
             description: 'Hosted by Alice Example and Bob Example',
           })
-        : createCreator(),
+        : input.creatorId === 'creator-3'
+          ? createCreator({
+              id: 'creator-3',
+              handle: 'erik',
+              description: 'Writes about product and interface rhythm',
+            })
+          : createCreator(),
     isLoading: false,
     error: null,
   }));
@@ -95,6 +136,7 @@ describe('BookmarksPage', () => {
   beforeEach(() => {
     resetTrpcMocks();
     installDefaultBookmarkMocks();
+    setViewportWidth(1280);
     Object.defineProperty(window.navigator, 'share', {
       configurable: true,
       value: undefined,
@@ -312,6 +354,106 @@ describe('BookmarksPage', () => {
     expect(invalidateSpies.itemsGetInvalidate).toHaveBeenCalledWith({ id: videoItem.id });
     expect(invalidateSpies.itemsLibraryInvalidate).toHaveBeenCalled();
     expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
+  });
+
+  test('uses a drill-in flow on phone widths', async () => {
+    const user = userEvent.setup();
+
+    setViewportWidth(390);
+
+    renderRoute(
+      <>
+        <BookmarksPage />
+        <LocationProbe />
+      </>,
+      {
+        route: '/bookmarks',
+        path: '/bookmarks/:bookmarkId?',
+      }
+    );
+
+    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(screen.queryByText('Select a bookmark')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Current page location')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add bookmark' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Back to bookmarks list' })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Design systems at scale/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks/video-1');
+    });
+
+    expect(screen.getByRole('heading', { name: videoItem.title })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Back to bookmarks list' })).toBeVisible();
+    expect(screen.queryByText(articleItem.title)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back to bookmarks list' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks');
+    });
+
+    expect(screen.getByText(articleItem.title)).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Back to bookmarks list' })
+    ).not.toBeInTheDocument();
+  });
+
+  test('shows a mobile tab bar on phone widths and hides the sidebar', () => {
+    setViewportWidth(390);
+
+    const view = renderRoute(<BookmarksPage />, {
+      route: '/bookmarks',
+      path: '/bookmarks/:bookmarkId?',
+    });
+
+    const tabBar = screen.getByRole('navigation', { name: 'Tab bar' });
+    expect(tabBar).toBeInTheDocument();
+
+    expect(screen.getByRole('link', { name: 'Bookmarks' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
+
+    const bookmarksTab = screen.getByRole('link', { name: 'Bookmarks' });
+    expect(bookmarksTab).toHaveAttribute('aria-current', 'page');
+    expect(document.documentElement).toHaveClass('mobile-bookmarks-scroll-lock');
+    expect(document.body).toHaveClass('mobile-bookmarks-scroll-lock');
+
+    view.unmount();
+
+    expect(document.documentElement).not.toHaveClass('mobile-bookmarks-scroll-lock');
+    expect(document.body).not.toHaveClass('mobile-bookmarks-scroll-lock');
+  });
+
+  test('hides the mobile tab bar on desktop widths', () => {
+    setViewportWidth(1280);
+
+    renderRoute(<BookmarksPage />, {
+      route: '/bookmarks',
+      path: '/bookmarks/:bookmarkId?',
+    });
+
+    expect(screen.getByLabelText('Current page location')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add bookmark' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Tab bar' })).not.toBeInTheDocument();
+    expect(document.documentElement).not.toHaveClass('mobile-bookmarks-scroll-lock');
+    expect(document.body).not.toHaveClass('mobile-bookmarks-scroll-lock');
+  });
+
+  test('renders mobile post detail using the tweet-style layout on phone widths', () => {
+    setViewportWidth(390);
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${postItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(screen.getByLabelText('X post content')).toBeVisible();
+    expect(screen.getByText(postItem.title)).toBeVisible();
+    expect(screen.queryByRole('heading', { name: postItem.title })).not.toBeInTheDocument();
+    expect(screen.queryByText('About this post')).not.toBeInTheDocument();
   });
 
   test('prefers the share API and falls back to the clipboard', async () => {
