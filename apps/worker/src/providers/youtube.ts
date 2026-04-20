@@ -22,10 +22,6 @@ const youtubeLogger = logger.child('provider:youtube');
 // The OAuth2Client type comes from google.auth.OAuth2 instance
 type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * YouTube client wrapper containing the API client and OAuth2 client
  */
@@ -57,9 +53,7 @@ interface YouTubeEnv {
   SPOTIFY_CLIENT_SECRET: string;
 }
 
-// ============================================================================
 // Client Factory
-// ============================================================================
 
 /**
  * Create a YouTube API client with the provided OAuth tokens
@@ -136,9 +130,7 @@ export async function getYouTubeClientForConnection(
   return createYouTubeClient(accessToken, refreshToken, env);
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get the uploads playlist ID for a YouTube channel (deterministic, no API call)

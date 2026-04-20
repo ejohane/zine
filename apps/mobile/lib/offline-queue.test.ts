@@ -14,9 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Provider } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock AsyncStorage
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -46,9 +44,7 @@ jest.mock('ulid', () => ({
 // Ensure Clerk publishable key is set before module import
 process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'test-clerk-key';
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 const QUEUE_KEY = 'zine:offline_action_queue';
 
@@ -127,9 +123,7 @@ function createTestAction(overrides: Partial<OfflineAction> = {}): OfflineAction
   } as OfflineAction;
 }
 
-// ============================================================================
 // Error Classification Tests (classifyError)
-// ============================================================================
 
 describe('Error Classification', () => {
   // We need to test classifyError indirectly since it's not exported
@@ -141,9 +135,7 @@ describe('Error Classification', () => {
   });
 });
 
-// ============================================================================
 // Queue Operations Tests
-// ============================================================================
 
 describe('OfflineActionQueue', () => {
   beforeEach(async () => {
@@ -398,9 +390,7 @@ describe('OfflineActionQueue', () => {
   });
 });
 
-// ============================================================================
 // Queue Processing Tests
-// ============================================================================
 
 describe('Queue Processing', () => {
   let mockTrpcClient: {
@@ -811,9 +801,7 @@ describe('Queue Processing', () => {
   });
 });
 
-// ============================================================================
 // Integration Tests: Error Classification Paths
-// ============================================================================
 
 describe('Error Classification Integration', () => {
   let mockTrpcClient: {
@@ -1004,9 +992,7 @@ describe('Error Classification Integration', () => {
   });
 });
 
-// ============================================================================
 // NetInfo Integration Tests
-// ============================================================================
 
 describe('NetInfo Integration', () => {
   it('auto-processing is configured via addEventListener', () => {

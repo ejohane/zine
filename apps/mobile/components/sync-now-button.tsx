@@ -21,10 +21,6 @@ import { IconSizes, Radius, Spacing, Typography } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useSyncNow, type SyncResult } from '@/hooks/use-sync-now';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface SyncNowButtonProps {
   /** The subscription ID to sync */
   subscriptionId: string;
@@ -41,9 +37,7 @@ interface SyncNowButtonProps {
   };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Format seconds into human-readable countdown string.
@@ -58,10 +52,6 @@ function formatCountdown(seconds: number): string {
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export function SyncNowButton({
   subscriptionId,
@@ -112,9 +102,7 @@ export function SyncNowButton({
 
   const isDisabled = isLoading || countdown > 0;
 
-  // -------------------------------------------------------------------------
   // Compact Variant
-  // -------------------------------------------------------------------------
   if (compact) {
     return (
       <Button
@@ -149,9 +137,7 @@ export function SyncNowButton({
     );
   }
 
-  // -------------------------------------------------------------------------
   // Full Variant (default)
-  // -------------------------------------------------------------------------
   return (
     <View style={styles.fullContainer}>
       <Button
@@ -198,10 +184,6 @@ export function SyncNowButton({
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   // Compact variant styles

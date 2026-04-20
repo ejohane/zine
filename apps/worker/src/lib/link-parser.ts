@@ -7,10 +7,6 @@
 
 import { ContentType, Provider } from '@zine/shared';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Result of parsing a URL
  */
@@ -25,9 +21,7 @@ export interface ParsedLink {
   canonicalUrl: string;
 }
 
-// ============================================================================
 // Tracking Parameter Cleanup
-// ============================================================================
 
 /**
  * Parameters to strip from URLs for cleaner canonical URLs
@@ -66,9 +60,7 @@ function stripTrackingParams(url: URL): string {
   return result;
 }
 
-// ============================================================================
 // Provider Patterns
-// ============================================================================
 
 /**
  * YouTube video ID pattern: 11 alphanumeric characters (including - and _)
@@ -85,9 +77,7 @@ const SPOTIFY_EPISODE_ID_PATTERN = /^[\dA-Za-z]{22}$/;
  */
 const TWITTER_STATUS_ID_PATTERN = /^\d+$/;
 
-// ============================================================================
 // Provider Parsers
-// ============================================================================
 
 /**
  * Parse YouTube URLs
@@ -276,9 +266,7 @@ function parseGeneric(url: URL): ParsedLink {
   };
 }
 
-// ============================================================================
 // Public API
-// ============================================================================
 
 /**
  * Check if a string is a valid URL

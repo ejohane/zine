@@ -6,9 +6,7 @@
  * @see /features/subscriptions/backend-spec.md - Section 6.4: Connection Health & Recovery
  */
 
-// ============================================================================
 // Error Classification
-// ============================================================================
 
 /**
  * Check if error indicates token expiration (401 Unauthorized)

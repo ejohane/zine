@@ -12,26 +12,20 @@
  * proper security handling throughout the OAuth process.
  */
 
-// ============================================================================
 // Global Polyfills (must be before any imports)
-// ============================================================================
 
 // Polyfill TextEncoder for jsdom environment
 import { TextEncoder, TextDecoder } from 'util';
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as typeof global.TextDecoder;
 
-// ============================================================================
 // Environment Variables (must be set before module imports)
-// ============================================================================
 
 // Set environment variables BEFORE any module imports that depend on them
 process.env.EXPO_PUBLIC_YOUTUBE_CLIENT_ID = 'test-client.apps.googleusercontent.com';
 process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID = 'test-spotify-client';
 
-// ============================================================================
 // Mock Setup (must be before module imports)
-// ============================================================================
 
 // Mock expo-crypto
 jest.mock('expo-crypto', () => ({
@@ -87,9 +81,7 @@ jest.mock('superjson', () => ({
   default: {},
 }));
 
-// ============================================================================
 // Module Imports (after mocks and env setup)
-// ============================================================================
 
 import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
@@ -107,9 +99,7 @@ import {
   REDIRECT_URI,
 } from './oauth';
 
-// ============================================================================
 // Test Helpers
-// ============================================================================
 
 /**
  * Creates a Uint8Array from known bytes for deterministic testing
@@ -130,9 +120,7 @@ function createMockRandomBytes(): Uint8Array {
   return bytes;
 }
 
-// ============================================================================
 // base64URLEncode Tests
-// ============================================================================
 
 describe('base64URLEncode', () => {
   it('correctly encodes a known Uint8Array', () => {
@@ -190,9 +178,7 @@ describe('base64URLEncode', () => {
   });
 });
 
-// ============================================================================
 // generatePKCE Tests
-// ============================================================================
 
 describe('generatePKCE', () => {
   beforeEach(() => {
@@ -292,9 +278,7 @@ describe('generatePKCE', () => {
   });
 });
 
-// ============================================================================
 // getRedirectUri Tests
-// ============================================================================
 
 describe('getRedirectUri', () => {
   beforeEach(() => {
@@ -350,9 +334,7 @@ describe('getRedirectUri', () => {
   });
 });
 
-// ============================================================================
 // connectProvider Tests
-// ============================================================================
 
 describe('connectProvider', () => {
   beforeEach(() => {
@@ -590,9 +572,7 @@ describe('connectProvider', () => {
   });
 });
 
-// ============================================================================
 // completeOAuthFlow Tests
-// ============================================================================
 
 describe('completeOAuthFlow', () => {
   beforeEach(() => {
@@ -732,9 +712,7 @@ describe('completeOAuthFlow', () => {
   });
 });
 
-// ============================================================================
 // Module Constants Tests
-// ============================================================================
 
 describe('OAUTH_CONFIG', () => {
   it('has YouTube configuration', () => {
@@ -765,9 +743,7 @@ describe('REDIRECT_URI', () => {
   });
 });
 
-// ============================================================================
 // setTokenGetter Tests
-// ============================================================================
 
 describe('setTokenGetter', () => {
   it('accepts a token getter function', () => {

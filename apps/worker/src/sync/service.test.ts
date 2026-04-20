@@ -52,9 +52,7 @@ vi.mock('../polling/spotify-poller', () => ({
   })),
 }));
 
-// ============================================================================
 // Mock KV Namespace
-// ============================================================================
 
 function createMockKV() {
   const store = new Map<string, string>();
@@ -77,9 +75,7 @@ function createMockKV() {
   };
 }
 
-// ============================================================================
 // Mock Queue
-// ============================================================================
 
 function createMockQueue() {
   const messages: Array<{ body: unknown }> = [];
@@ -97,9 +93,7 @@ function createMockQueue() {
   };
 }
 
-// ============================================================================
 // Mock Database
-// ============================================================================
 
 function createMockDb(overrides?: {
   subscriptions?: Array<{
@@ -133,9 +127,7 @@ function createMockDb(overrides?: {
   };
 }
 
-// ============================================================================
 // Mock Environment
-// ============================================================================
 
 function createMockEnv(
   kv?: ReturnType<typeof createMockKV>,
@@ -147,9 +139,7 @@ function createMockEnv(
   };
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 const TEST_USER_ID = 'user_test_123';
@@ -158,9 +148,7 @@ const TEST_JOB_ID = '01HQXYZ123456789ABCDEFGHIJ';
 // Store original Date.now for restoration
 const originalDateNow = Date.now;
 
-// ============================================================================
 // RateLimitError Tests
-// ============================================================================
 
 describe('RateLimitError', () => {
   it('should have correct name property', () => {
@@ -182,9 +170,7 @@ describe('RateLimitError', () => {
   });
 });
 
-// ============================================================================
 // getJobStatus Tests
-// ============================================================================
 
 describe('getJobStatus', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -252,9 +238,7 @@ describe('getJobStatus', () => {
   });
 });
 
-// ============================================================================
 // getSyncStatus Tests
-// ============================================================================
 
 describe('getSyncStatus', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -356,9 +340,7 @@ describe('getSyncStatus', () => {
   });
 });
 
-// ============================================================================
 // getActiveSyncJob Tests
-// ============================================================================
 
 describe('getActiveSyncJob', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -477,9 +459,7 @@ describe('getActiveSyncJob', () => {
   });
 });
 
-// ============================================================================
 // updateJobProgress Tests
-// ============================================================================
 
 describe('updateJobProgress', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -797,9 +777,7 @@ describe('updateJobProgress', () => {
   });
 });
 
-// ============================================================================
 // initiateSyncJob Tests
-// ============================================================================
 
 describe('initiateSyncJob', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -1304,9 +1282,7 @@ describe('initiateSyncJob', () => {
   });
 });
 
-// ============================================================================
 // KV Key Helper Tests
-// ============================================================================
 
 describe('KV Key Helpers', () => {
   describe('getActiveJobKey', () => {
@@ -1322,9 +1298,7 @@ describe('KV Key Helpers', () => {
   });
 });
 
-// ============================================================================
 // TTL Constants Tests
-// ============================================================================
 
 describe('TTL Constants', () => {
   it('should have job status TTL of 10 minutes', () => {

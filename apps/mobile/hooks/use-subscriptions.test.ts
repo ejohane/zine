@@ -14,9 +14,7 @@
 import { renderHook, act } from '@testing-library/react-hooks';
 import { Provider } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock tRPC
 const mockListUseQuery = jest.fn();
@@ -97,9 +95,7 @@ jest.mock('./use-network-status', () => ({
   }),
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import {
   useSubscriptions,
@@ -140,9 +136,7 @@ beforeEach(() => {
   });
 });
 
-// ============================================================================
 // Query Behavior Tests
-// ============================================================================
 
 describe('useSubscriptions', () => {
   describe('query behavior', () => {
@@ -446,9 +440,7 @@ describe('useSubscriptions', () => {
   });
 });
 
-// ============================================================================
 // Helper Function Tests
-// ============================================================================
 
 describe('createTempSubscription', () => {
   // The helper is internal, but we test it through the subscribe optimistic update
@@ -505,9 +497,7 @@ describe('createTempSubscription', () => {
   });
 });
 
-// ============================================================================
 // useInfiniteSubscriptions Tests
-// ============================================================================
 
 describe('useInfiniteSubscriptions', () => {
   it('returns hook result with expected shape', () => {

@@ -52,10 +52,6 @@ import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 import type { Bindings } from '../../types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Response shape for checkSubscription
  */
@@ -114,9 +110,7 @@ export interface FetchLatestContentResponse {
   connectUrl?: string;
 }
 
-// ============================================================================
 // Cache Configuration
-// ============================================================================
 
 const LATEST_CONTENT_CACHE_CONFIG = {
   /** TTL for cached latest content (10 minutes in seconds) */
@@ -140,9 +134,7 @@ const THUMBNAIL_ENRICHMENT_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const THUMBNAIL_ENRICHMENT_CONCURRENCY = 3;
 const THUMBNAIL_ENRICHMENT_MAX_URLS = 8;
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 const GetInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
@@ -188,9 +180,7 @@ const SubscribeInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
 });
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const creatorsRouter = router({
   /**
@@ -1189,9 +1179,7 @@ export const creatorsRouter = router({
 
 export type CreatorsRouter = typeof creatorsRouter;
 
-// ============================================================================
 // Helper Types
-// ============================================================================
 
 /**
  * Cached latest content structure
@@ -1207,9 +1195,7 @@ interface CachedLatestContent {
  */
 type ProviderFetchEnv = Bindings;
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get the OAuth connect URL for a provider

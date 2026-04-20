@@ -13,9 +13,7 @@
  * consistent handling across the codebase.
  */
 
-// ============================================================================
 // Conversion Functions
-// ============================================================================
 
 /**
  * Convert Unix milliseconds to ISO 8601 string.
@@ -30,9 +28,7 @@ export function unixToIso(unix: number): string {
   return new Date(unix).toISOString();
 }
 
-// ============================================================================
 // Provider-Specific Parsers
-// ============================================================================
 
 /**
  * Parse Spotify's variable date format into Unix milliseconds.

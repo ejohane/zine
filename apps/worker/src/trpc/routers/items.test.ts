@@ -20,9 +20,7 @@ import { ContentType, Provider, UserItemState } from '@zine/shared';
 import type { ItemView } from './items';
 import { normalizeNullString } from './items';
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 
@@ -97,9 +95,7 @@ function matchesLibrarySearch(item: ItemView, query: string): boolean {
   return matchesSearch(item.title, query) || matchesSearch(item.creator, query);
 }
 
-// ============================================================================
 // Mock Router Implementation for Testing
-// ============================================================================
 
 /**
  * Create a mock router caller that simulates the items router behavior
@@ -306,14 +302,10 @@ function createMockItemsCaller(options: {
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Items Router', () => {
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     async function expectUnauthorized(action: () => Promise<unknown>) {
@@ -365,9 +357,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.inbox Tests
-  // ==========================================================================
 
   describe('items.inbox', () => {
     it('should return empty array when no items in inbox', async () => {
@@ -486,9 +476,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.library Tests
-  // ==========================================================================
 
   describe('items.library', () => {
     it('should return empty array when no bookmarked items', async () => {
@@ -606,9 +594,7 @@ describe('Items Router', () => {
       });
     });
 
-    // ========================================================================
     // isFinished Filter Tests
-    // ========================================================================
 
     describe('isFinished filter', () => {
       it('should exclude finished items by default (no filter provided)', async () => {
@@ -936,9 +922,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.home Tests
-  // ==========================================================================
 
   describe('items.home', () => {
     it('should return expected home sections structure', async () => {
@@ -1014,9 +998,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.get Tests
-  // ==========================================================================
 
   describe('items.get', () => {
     it('should return item when found', async () => {
@@ -1052,9 +1034,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.bookmark Tests
-  // ==========================================================================
 
   describe('items.bookmark', () => {
     it('should return success when bookmarking existing item', async () => {
@@ -1084,9 +1064,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.archive Tests
-  // ==========================================================================
 
   describe('items.archive', () => {
     it('should return success when archiving existing item', async () => {
@@ -1116,9 +1094,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.unbookmark Tests
-  // ==========================================================================
 
   describe('items.unbookmark', () => {
     it('should return success when unbookmarking a bookmarked item', async () => {
@@ -1162,9 +1138,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.markOpened Tests
-  // ==========================================================================
 
   describe('items.markOpened', () => {
     it('should return updated true for bookmarked items', async () => {
@@ -1235,9 +1209,7 @@ describe('Items Router', () => {
     });
   });
 
-  // ==========================================================================
   // items.updateProgress Tests
-  // ==========================================================================
 
   describe('items.updateProgress', () => {
     it('should return success when updating progress', async () => {
@@ -1276,9 +1248,7 @@ describe('Items Router', () => {
   });
 });
 
-// ============================================================================
 // ItemView Type Tests
-// ============================================================================
 
 describe('ItemView Type', () => {
   it('should have correct shape for ItemView', () => {
@@ -1353,9 +1323,7 @@ describe('ItemView Type', () => {
   });
 });
 
-// ============================================================================
 // normalizeNullString Helper Tests
-// ============================================================================
 
 describe('normalizeNullString', () => {
   it('should return null for the literal string "null"', () => {

@@ -54,14 +54,10 @@ import {
   type PollingError,
 } from '../utils/error-utils';
 
-// ============================================================================
 // Logger
-// ============================================================================
 const ytLogger = pollLogger.child('youtube');
 
-// ============================================================================
 // Date Parsing Utilities
-// ============================================================================
 
 /**
  * Parse a YouTube date string into a Unix timestamp.
@@ -88,9 +84,7 @@ export function parseYouTubeDate(dateString: string | undefined | null): number 
   return parsed;
 }
 
-// ============================================================================
 // Provider Configuration
-// ============================================================================
 
 /**
  * YouTube provider batch configuration.
@@ -107,9 +101,7 @@ export const youtubeProviderConfig: ProviderBatchConfig<YouTubeClient> = {
   pollBatch: pollYouTubeSubscriptionsBatched,
 };
 
-// ============================================================================
 // Main Polling Function
-// ============================================================================
 
 /**
  * Poll a single YouTube subscription for new videos.
@@ -222,9 +214,7 @@ export async function pollSingleYouTubeSubscription(
   return { newItems: newItemsCount };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Enriched video type with duration from videos.list API
@@ -450,9 +440,7 @@ async function updateSubscriptionPolled(subscriptionId: string, db: DrizzleDB): 
     .where(eq(subscriptions.id, subscriptionId));
 }
 
-// ============================================================================
 // Batched Polling (Parallel + Cross-Subscription Batching)
-// ============================================================================
 
 /**
  * Cloudflare Workers limit for concurrent outbound connections.

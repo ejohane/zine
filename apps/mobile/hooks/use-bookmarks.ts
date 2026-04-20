@@ -12,10 +12,6 @@ import { trpc } from '../lib/trpc';
 import { ContentType, Provider, UserItemState, isValidUrl as isValidSharedUrl } from '@zine/shared';
 import * as Crypto from 'expo-crypto';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Preview data returned from bookmarks.preview
  */
@@ -75,10 +71,6 @@ interface SaveBookmarkInput {
   rawMetadata?: string;
 }
 
-// ============================================================================
-// Optimistic Update Types
-// ============================================================================
-
 type TrpcUtils = ReturnType<typeof trpc.useUtils>;
 
 /** Library query data type */
@@ -106,9 +98,7 @@ type OptimisticSaveContext = {
 
 const HOME_SECTION_LIMIT = 5;
 
-// ============================================================================
 // Validation
-// ============================================================================
 
 /**
  * Validates whether a string is a valid HTTP/HTTPS URL.
@@ -165,9 +155,7 @@ function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
   };
 }
 
-// ============================================================================
 // Hooks
-// ============================================================================
 
 /**
  * Hook for fetching link preview metadata.

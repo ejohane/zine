@@ -20,10 +20,6 @@ import type {
 import { ContentColors, ProviderColors } from '@/constants/theme';
 import { HeadphonesIcon, VideoIcon, ArticleIcon, PostIcon } from '@/components/icons';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * API content types (uppercase, from backend)
  */
@@ -36,9 +32,7 @@ export type { UIContentType, UIProvider };
  */
 export type Provider = SharedProviderValue;
 
-// ============================================================================
 // Type Mapping
-// ============================================================================
 
 /**
  * Normalize content type to lowercase for consistent comparison
@@ -83,9 +77,7 @@ export function mapProvider(apiProvider: Provider): UIProvider {
   return mapSharedProvider(apiProvider) as UIProvider;
 }
 
-// ============================================================================
 // Icon Helpers
-// ============================================================================
 
 /**
  * Get the appropriate icon component for a content type
@@ -119,9 +111,7 @@ export function getContentIcon(
   }
 }
 
-// ============================================================================
 // Color Helpers
-// ============================================================================
 
 /**
  * Get the theme color for a content type
@@ -182,9 +172,7 @@ export function getProviderColor(provider: Provider | UIProvider): string {
   }
 }
 
-// ============================================================================
 // Label Helpers
-// ============================================================================
 
 /**
  * Get human-readable label for content type
@@ -247,9 +235,7 @@ export function getProviderLabel(provider: Provider | UIProvider): string {
   }
 }
 
-// ============================================================================
 // Aspect Ratio Helpers
-// ============================================================================
 
 /**
  * Get the appropriate aspect ratio for cover images based on content type
@@ -316,9 +302,7 @@ export function isPodcastContent(type: ContentType | UIContentType): boolean {
   return normalizeContentType(type) === 'podcast';
 }
 
-// ============================================================================
 // Image URL Helpers
-// ============================================================================
 
 /**
  * Upgrade YouTube channel avatar URL to high resolution.

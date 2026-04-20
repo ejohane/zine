@@ -22,10 +22,6 @@ import { logger } from './logger';
 
 const ogLogger = logger.child('opengraph');
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Extracted Open Graph metadata from a URL
  */
@@ -58,16 +54,10 @@ export interface ScrapeOptions {
   userAgent?: string;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
 const DEFAULT_USER_AGENT = 'ZineBot/1.0 (+https://zine.app/bot; compatible; link-preview)';
 
-// ============================================================================
 // Implementation
-// ============================================================================
 
 /**
  * Create an empty OpenGraphData object with all null values

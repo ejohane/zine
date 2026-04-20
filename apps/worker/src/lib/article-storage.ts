@@ -26,9 +26,7 @@ import { logger } from './logger';
 
 const storageLogger = logger.child('article-storage');
 
-// ============================================================================
 // Key Generation
-// ============================================================================
 
 /**
  * Generate the R2 key for an article.
@@ -37,9 +35,7 @@ function getArticleKey(itemId: string): string {
   return `articles/${itemId}.html`;
 }
 
-// ============================================================================
 // Storage Operations
-// ============================================================================
 
 /**
  * Store article content in R2.

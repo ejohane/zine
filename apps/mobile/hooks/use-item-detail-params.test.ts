@@ -6,9 +6,7 @@ import { renderHook } from '@testing-library/react-hooks';
 
 import { useItemDetailParams } from '@/app/item/detail/hooks/useItemDetailParams';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockUseLocalSearchParams = jest.fn();
 
@@ -16,9 +14,7 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('useItemDetailParams', () => {
   beforeEach(() => {

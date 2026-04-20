@@ -41,16 +41,10 @@ import { usePreview, useSaveBookmark, isValidUrl } from '@/hooks/use-bookmarks';
 import { LinkPreviewCard } from '@/components/link-preview-card';
 import { showSuccess, showError as showErrorToast } from '@/lib/toast-utils';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Debounce delay for URL input before fetching preview */
 const DEBOUNCE_DELAY = 500;
 
-// ============================================================================
 // Icons
-// ============================================================================
 
 function CloseIcon({ size = 24, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -120,9 +114,7 @@ function LinkIcon({ size = 48, color = '#94A3B8' }: { size?: number; color?: str
   );
 }
 
-// ============================================================================
 // Empty State Component
-// ============================================================================
 
 function EmptyState({ colors, compact = false }: { colors: ThemeColors; compact?: boolean }) {
   return (
@@ -141,9 +133,7 @@ function EmptyState({ colors, compact = false }: { colors: ThemeColors; compact?
   );
 }
 
-// ============================================================================
 // Loading State Component
-// ============================================================================
 
 function LoadingState({ colors }: { colors: ThemeColors }) {
   return (
@@ -154,9 +144,7 @@ function LoadingState({ colors }: { colors: ThemeColors }) {
   );
 }
 
-// ============================================================================
 // Error State Component
-// ============================================================================
 
 function ErrorState({
   colors,
@@ -183,10 +171,6 @@ function ErrorState({
     </Animated.View>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function AddLinkScreen() {
   const router = useRouter();
@@ -525,10 +509,6 @@ export default function AddLinkScreen() {
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

@@ -14,9 +14,7 @@ import {
   type RateLimitState,
 } from './rate-limiter';
 
-// ============================================================================
 // Mock KV Namespace
-// ============================================================================
 
 function createMockKV() {
   const store = new Map<string, string>();
@@ -34,15 +32,11 @@ function createMockKV() {
   } as unknown as KVNamespace & { _store: Map<string, string> };
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
-// ============================================================================
 // RateLimitError Tests
-// ============================================================================
 
 describe('RateLimitError', () => {
   it('should have correct properties', () => {
@@ -66,9 +60,7 @@ describe('RateLimitError', () => {
   });
 });
 
-// ============================================================================
 // isRateLimited Tests
-// ============================================================================
 
 describe('isRateLimited', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -178,9 +170,7 @@ describe('isRateLimited', () => {
   });
 });
 
-// ============================================================================
 // clearRateLimitState Tests
-// ============================================================================
 
 describe('clearRateLimitState', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -202,9 +192,7 @@ describe('clearRateLimitState', () => {
   });
 });
 
-// ============================================================================
 // RateLimitedFetcher Tests
-// ============================================================================
 
 describe('RateLimitedFetcher', () => {
   let mockKV: ReturnType<typeof createMockKV>;

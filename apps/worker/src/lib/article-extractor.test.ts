@@ -20,9 +20,7 @@ vi.mock('./logger', () => ({
   },
 }));
 
-// ============================================================================
 // Test HTML Templates
-// ============================================================================
 
 /**
  * Generate valid article HTML that passes Readability's isProbablyReaderable check
@@ -99,9 +97,7 @@ function createNonArticleHtml(options: { ogImage?: string; authorImageUrl?: stri
   `;
 }
 
-// ============================================================================
 // Mock Fetch Setup
-// ============================================================================
 
 const originalFetch = globalThis.fetch;
 
@@ -120,9 +116,7 @@ function mockFetchError(error: Error): void {
   globalThis.fetch = vi.fn().mockRejectedValue(error);
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('article-extractor', () => {
   afterEach(() => {

@@ -9,9 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { scrapeOpenGraph, type OpenGraphData } from './opengraph';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 
-// ============================================================================
 // Test HTML Templates
-// ============================================================================
 
 /**
  * Escape HTML attribute value
@@ -80,9 +78,7 @@ function createHtmlWithMeta(
   `;
 }
 
-// ============================================================================
 // Mock Fetch Setup
-// ============================================================================
 
 const originalFetch = globalThis.fetch;
 
@@ -101,9 +97,7 @@ function mockFetchError(error: Error): void {
   globalThis.fetch = vi.fn().mockRejectedValue(error);
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('scrapeOpenGraph', () => {
   beforeEach(() => {

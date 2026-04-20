@@ -212,9 +212,7 @@ export function generateKey(): string {
   return bytesToHex(keyBytes);
 }
 
-// ============================================================================
 // Versioned Encryption Support
-// ============================================================================
 // These functions support encryption key rotation with zero downtime.
 //
 // Ciphertext formats:
@@ -226,7 +224,6 @@ export function generateKey(): string {
 // 2. Run migration job to re-encrypt all tokens with new key
 // 3. Verify migration complete
 // 4. Remove old key after grace period
-// ============================================================================
 
 /**
  * Get encryption keys from environment variables

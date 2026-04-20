@@ -7,9 +7,7 @@ import { ingestionLogger } from '../../lib/logger';
 import { serializeError } from '../../utils/error-utils';
 import { classifyError } from './errors';
 
-// ============================================================================
 // Dead-letter Queue
-// ============================================================================
 
 /**
  * Store a failed item in the dead-letter queue.

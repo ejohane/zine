@@ -24,9 +24,7 @@ import {
   type YouTubeSkipMetrics,
 } from './types';
 
-// ============================================================================
 // Tests for parseYouTubeDate
-// ============================================================================
 
 describe('parseYouTubeDate', () => {
   describe('valid dates', () => {
@@ -109,9 +107,7 @@ describe('parseYouTubeDate', () => {
   });
 });
 
-// ============================================================================
 // Mock Dependencies for filterNewVideos tests
-// ============================================================================
 
 // Mock the logger
 vi.mock('../lib/logger', () => ({
@@ -154,9 +150,7 @@ vi.mock('../ingestion/transformers', () => ({
   transformYouTubeVideo: vi.fn(),
 }));
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 interface MockEnrichedVideo {
   id: string;
@@ -185,9 +179,7 @@ function createMockVideo(overrides: Partial<MockEnrichedVideo> = {}): MockEnrich
   };
 }
 
-// ============================================================================
 // Integration Tests for Date Filtering Logic
-// ============================================================================
 
 describe('YouTube date filtering integration', () => {
   const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
@@ -348,9 +340,7 @@ describe('YouTube date filtering integration', () => {
   });
 });
 
-// ============================================================================
 // Tests for YouTubeSkipMetrics
-// ============================================================================
 
 describe('YouTubeSkipMetrics', () => {
   describe('createEmptyYouTubeSkipMetrics', () => {

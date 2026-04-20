@@ -35,9 +35,7 @@ import {
   type Provider as ChannelProvider,
 } from '@/components/subscriptions';
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get provider display name
@@ -52,10 +50,6 @@ function getProviderDisplayName(provider: ChannelProvider): string {
       return 'Provider';
   }
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function SelectChannelsScreen() {
   const colorScheme = useColorScheme();
@@ -220,10 +214,6 @@ export default function SelectChannelsScreen() {
     </>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

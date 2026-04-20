@@ -21,9 +21,7 @@ import {
   canonicalItemSchema,
 } from './validation';
 
-// ============================================================================
 // Test Data Factory
-// ============================================================================
 
 /**
  * Creates a valid canonical item for testing.
@@ -44,9 +42,7 @@ function createValidItem(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// ============================================================================
 // ValidationError Class Tests
-// ============================================================================
 
 describe('ValidationError', () => {
   it('should create error with correct properties', () => {
@@ -89,9 +85,7 @@ describe('isValidationError', () => {
   });
 });
 
-// ============================================================================
 // Valid Item Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Valid Items', () => {
   it('should pass validation for a valid YouTube item', () => {
@@ -141,9 +135,7 @@ describe('validateCanonicalItem - Valid Items', () => {
   });
 });
 
-// ============================================================================
 // Required Field Validation Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Required Fields', () => {
   it('should reject missing id', () => {
@@ -204,9 +196,7 @@ describe('validateCanonicalItem - Required Fields', () => {
   });
 });
 
-// ============================================================================
 // URL Validation Tests
-// ============================================================================
 
 describe('validateCanonicalItem - URL Validation', () => {
   it('should reject invalid canonicalUrl format', () => {
@@ -254,9 +244,7 @@ describe('validateCanonicalItem - URL Validation', () => {
   });
 });
 
-// ============================================================================
 // Duration Validation Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Duration Validation', () => {
   it('should accept valid duration within range', () => {
@@ -314,9 +302,7 @@ describe('validateCanonicalItem - Duration Validation', () => {
   });
 });
 
-// ============================================================================
 // Timestamp Validation Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Timestamp Validation', () => {
   it('should accept valid timestamp in recent past', () => {
@@ -368,9 +354,7 @@ describe('validateCanonicalItem - Timestamp Validation', () => {
   });
 });
 
-// ============================================================================
 // Provider/ContentType Validation Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Enum Validation', () => {
   it('should reject invalid provider', () => {
@@ -406,9 +390,7 @@ describe('validateCanonicalItem - Enum Validation', () => {
   });
 });
 
-// ============================================================================
 // Error Context Tests
-// ============================================================================
 
 describe('validateCanonicalItem - Error Context', () => {
   it('should include providerId in error context when available', () => {
@@ -463,9 +445,7 @@ describe('validateCanonicalItem - Error Context', () => {
   });
 });
 
-// ============================================================================
 // Schema Direct Tests
-// ============================================================================
 
 describe('canonicalItemSchema', () => {
   it('should be a Zod schema', () => {

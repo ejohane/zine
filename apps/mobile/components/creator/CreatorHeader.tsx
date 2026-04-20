@@ -20,10 +20,6 @@ import { type Creator, useCreatorSubscription } from '@/hooks/use-creator';
 import { useRssFeedDiscovery, type DiscoveredRssCandidate } from '@/hooks/use-rss-feed-discovery';
 import { analytics } from '@/lib/analytics';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface CreatorHeaderProps {
   /** Creator data to display */
   creator: Creator;
@@ -40,16 +36,10 @@ export interface CreatorHeaderProps {
   };
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const OAUTH_SUBSCRIBABLE_PROVIDERS = new Set(['YOUTUBE', 'SPOTIFY', 'GMAIL']);
 const RSS_DISCOVERY_PROVIDERS = new Set(['RSS', 'WEB', 'SUBSTACK']);
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Formats the handle for display (ensures @ prefix)
@@ -123,10 +113,6 @@ function getManageRoute(provider: string): Href | null {
   }
   return null;
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 /**
  * CreatorHeader displays the creator's profile information with subscribe functionality.
@@ -476,10 +462,6 @@ export function CreatorHeader({
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

@@ -5,9 +5,7 @@
 import { renderHook, act } from '@testing-library/react-hooks';
 import type { AppStateStatus } from 'react-native';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 const mockPrefetchHome = jest.fn(() => Promise.resolve());
 const mockPrefetchInbox = jest.fn(() => Promise.resolve());
@@ -71,9 +69,7 @@ jest.mock('@/providers/auth-resume-gate', () => ({
   }),
 }));
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 import {
   getTabPrefetchTargets,

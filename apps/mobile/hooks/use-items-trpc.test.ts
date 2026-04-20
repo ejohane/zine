@@ -8,9 +8,7 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockInboxUseQuery = jest.fn();
 const mockInboxUseInfiniteQuery = jest.fn();
@@ -50,9 +48,7 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import {
   useInboxItems,
@@ -397,9 +393,7 @@ beforeEach(() => {
   mockUseUtils.mockReturnValue(createToggleUtils().utils);
 });
 
-// ============================================================================
 // List Query Placeholder Data
-// ============================================================================
 
 describe('useItems list queries', () => {
   it('uses placeholderData for inbox items', () => {
@@ -644,9 +638,7 @@ describe('useBookmarkItem', () => {
   });
 });
 
-// ============================================================================
 // useToggleFinished Optimistic Behavior
-// ============================================================================
 
 describe('useToggleFinished', () => {
   type ToggleHandlers = {

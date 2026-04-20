@@ -5,9 +5,7 @@
  * Consistent values across hooks ensure predictable caching behavior.
  */
 
-// ============================================================================
 // Time Constants (in milliseconds)
-// ============================================================================
 
 /**
  * 5 minutes in milliseconds.
@@ -27,9 +25,7 @@ export const FIVE_MINUTES_MS = 5 * 60 * 1000;
  */
 export const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-// ============================================================================
 // React Query Defaults
-// ============================================================================
 
 /**
  * Default query options for most data queries.

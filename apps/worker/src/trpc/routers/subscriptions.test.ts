@@ -16,9 +16,7 @@ import { TRPCError } from '@trpc/server';
 import type { createMockKV } from '../test-utils';
 import { createMockEnv, TEST_USER_ID, mockDbResults } from '../test-utils';
 
-// ============================================================================
 // Mock Dependencies
-// ============================================================================
 
 // Mock initial fetch trigger
 const mockTriggerInitialFetch = vi.fn();
@@ -57,9 +55,7 @@ const mockDbQuerySubscriptionItems = {
   findMany: vi.fn(),
 };
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 function createMockContext(userId: string | null = TEST_USER_ID) {
   const mockEnv = createMockEnv();
@@ -326,9 +322,7 @@ function createMockSubscriptionsCaller(ctx: ReturnType<typeof createMockContext>
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Subscriptions Router', () => {
   const MOCK_NOW = 1705320000000;
@@ -350,9 +344,7 @@ describe('Subscriptions Router', () => {
     vi.useRealTimers();
   });
 
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     it('should reject unauthenticated requests to list', async () => {
@@ -408,9 +400,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.list Tests
-  // ==========================================================================
 
   describe('subscriptions.list', () => {
     it('should return empty list when no subscriptions', async () => {
@@ -504,9 +494,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.add Tests
-  // ==========================================================================
 
   describe('subscriptions.add', () => {
     it('should require active connection', async () => {
@@ -620,9 +608,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.remove Tests
-  // ==========================================================================
 
   describe('subscriptions.remove', () => {
     it('should throw NOT_FOUND when subscription does not exist', async () => {
@@ -686,9 +672,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.pause Tests
-  // ==========================================================================
 
   describe('subscriptions.pause', () => {
     it('should pause an active subscription', async () => {
@@ -762,9 +746,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.resume Tests
-  // ==========================================================================
 
   describe('subscriptions.resume', () => {
     it('should resume a paused subscription', async () => {
@@ -828,9 +810,7 @@ describe('Subscriptions Router', () => {
     });
   });
 
-  // ==========================================================================
   // subscriptions.syncNow Tests
-  // ==========================================================================
 
   describe('subscriptions.syncNow', () => {
     it('should sync an active subscription', async () => {
@@ -929,9 +909,7 @@ describe('Subscriptions Router', () => {
   });
 });
 
-// ============================================================================
 // Channel ID Validation Tests
-// ============================================================================
 
 describe('Channel ID Format Validation', () => {
   it('should validate YouTube channel ID format (UC + 22 chars)', () => {

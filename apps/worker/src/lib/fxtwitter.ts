@@ -27,10 +27,6 @@
 
 import { logger } from './logger';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Poll choice in a Twitter poll
  */
@@ -223,25 +219,17 @@ export interface ParsedTwitterUrl {
   tweetId: string;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** FxTwitter API base URL */
 export const FXTWITTER_API_BASE = 'https://api.fxtwitter.com';
 
 /** Request timeout in milliseconds (10s for Worker environment reliability) */
 const FETCH_TIMEOUT_MS = 10000;
 
-// ============================================================================
 // Logger
-// ============================================================================
 
 const fxTwitterLogger = logger.child('fxtwitter');
 
-// ============================================================================
 // Internal Helpers
-// ============================================================================
 
 /**
  * Make a fetch request with timeout using AbortController
@@ -267,9 +255,7 @@ async function fetchWithTimeout(
   }
 }
 
-// ============================================================================
 // URL Parsing
-// ============================================================================
 
 /**
  * Parse a Twitter/X URL to extract username and tweet ID
@@ -316,9 +302,7 @@ export function parseTwitterUrl(url: string): ParsedTwitterUrl | null {
   }
 }
 
-// ============================================================================
 // API Functions
-// ============================================================================
 
 /**
  * Fetch tweet data from FxTwitter API

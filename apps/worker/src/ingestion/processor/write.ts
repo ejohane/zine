@@ -7,14 +7,15 @@ import { items, providerItemsSeen, subscriptionItems, userItems } from '../../db
 import { unixToIso } from '../../lib/timestamps';
 import type { PreparedItem, WriteContext } from './types';
 
-// ============================================================================
 // Write Helpers
-// ============================================================================
 
 /**
  * Build the ingestion statements for a prepared item.
  */
-export function buildIngestionStatements(prepared: PreparedItem, context: WriteContext): BatchItem<'sqlite'>[] {
+export function buildIngestionStatements(
+  prepared: PreparedItem,
+  context: WriteContext
+): BatchItem<'sqlite'>[] {
   const { db, userId, subscriptionId, provider, nowISO, now } = context;
   const statements: BatchItem<'sqlite'>[] = [];
 
@@ -94,6 +95,9 @@ export function buildIngestionStatements(prepared: PreparedItem, context: WriteC
 /**
  * Execute a batch of statements.
  */
-export async function executeBatchStatements(statements: BatchItem<'sqlite'>[], db: Database): Promise<void> {
+export async function executeBatchStatements(
+  statements: BatchItem<'sqlite'>[],
+  db: Database
+): Promise<void> {
   await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }

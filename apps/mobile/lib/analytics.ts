@@ -26,10 +26,6 @@
 
 import { logger } from './logger';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 const analyticsLogger = logger.child('Analytics');
 
 /**
@@ -108,9 +104,7 @@ export interface AnalyticsEvents {
   };
 }
 
-// ============================================================================
 // Environment Detection
-// ============================================================================
 
 /**
  * Check if we're in a development-like environment.
@@ -123,9 +117,7 @@ function isDev(): boolean {
   return process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 }
 
-// ============================================================================
 // Formatters
-// ============================================================================
 
 /**
  * Format properties for console output.
@@ -135,9 +127,7 @@ function formatProperties(properties: Record<string, unknown>): string {
   return parts.join(', ');
 }
 
-// ============================================================================
 // Analytics Class
-// ============================================================================
 
 class Analytics {
   private enabled: boolean = true;
@@ -201,9 +191,7 @@ class Analytics {
   }
 }
 
-// ============================================================================
 // Singleton Export
-// ============================================================================
 
 /**
  * Default analytics instance

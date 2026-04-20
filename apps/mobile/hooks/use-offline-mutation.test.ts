@@ -17,9 +17,7 @@ import { offlineQueue } from '../lib/offline-queue';
 // Import the mocked module for type safety
 import { useNetworkStatus } from './use-network-status';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock the network status hook
 jest.mock('./use-network-status', () => ({
@@ -52,9 +50,7 @@ jest.mock('../lib/logger', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 // Helper to create default mutation options
 function createMutationOptions<TPayload extends Record<string, unknown>>(
@@ -94,9 +90,7 @@ function setAndroidInitialState() {
   });
 }
 
-// ============================================================================
 // Online Behavior Tests
-// ============================================================================
 
 describe('useOfflineMutation', () => {
   beforeEach(() => {
@@ -225,9 +219,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // Offline Behavior Tests
-  // ============================================================================
 
   describe('Offline behavior', () => {
     beforeEach(() => {
@@ -378,9 +370,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // Sync on Reconnect Tests
-  // ============================================================================
 
   describe('Sync on reconnect', () => {
     it('processes queued mutations via offlineQueue when coming online', async () => {
@@ -457,9 +447,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // Error Handling Tests
-  // ============================================================================
 
   describe('Error handling', () => {
     describe('Online mutation errors', () => {
@@ -621,9 +609,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // Action Type Tests
-  // ============================================================================
 
   describe('Action types', () => {
     beforeEach(() => {
@@ -667,9 +653,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // Callback Behavior Tests
-  // ============================================================================
 
   describe('Callback behavior', () => {
     it('all callbacks are optional', async () => {
@@ -751,9 +735,7 @@ describe('useOfflineMutation', () => {
     });
   });
 
-  // ============================================================================
   // State Consistency Tests
-  // ============================================================================
 
   describe('State consistency', () => {
     it('resets state correctly between mutations', async () => {

@@ -10,9 +10,7 @@
 import { z } from 'zod';
 import { ReleaseContextSchema, TraceContextSchema } from '@zine/shared';
 
-// ============================================================================
 // Queue Message Types
-// ============================================================================
 
 export interface SyncJobTelemetry {
   traceId: string;
@@ -67,9 +65,7 @@ export const SyncQueueMessageSchema = z.object({
   meta: SyncJobTelemetrySchema.optional(),
 });
 
-// ============================================================================
 // Job Status Types
-// ============================================================================
 
 /**
  * Status of a sync job.
@@ -146,9 +142,7 @@ export function parseSyncJobStatus(value: string | null | undefined): SyncJobSta
   return parseStoredJson(value, SyncJobStatusSchema);
 }
 
-// ============================================================================
 // API Response Types
-// ============================================================================
 
 /**
  * Response from syncAllAsync - initiating an async sync job
@@ -208,9 +202,7 @@ export interface ActiveSyncJobResponse {
   telemetry?: SyncJobTelemetry;
 }
 
-// ============================================================================
 // KV Keys
-// ============================================================================
 
 /**
  * Get the KV key for a user's active sync job.
@@ -239,9 +231,7 @@ export const JOB_STATUS_TTL_SECONDS = 600;
  */
 export const ACTIVE_JOB_TTL_SECONDS = 300;
 
-// ============================================================================
 // DLQ Types
-// ============================================================================
 
 /**
  * Dead Letter Queue entry metadata.

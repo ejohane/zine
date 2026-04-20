@@ -52,15 +52,9 @@ import {
   type PollingError,
 } from '../utils/error-utils';
 
-// ============================================================================
 // Logger
-// ============================================================================
 
 const spotifyLogger = pollLogger.child('spotify');
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Default concurrency for parallel episode fetching */
 const DEFAULT_EPISODE_FETCH_CONCURRENCY = 5;
@@ -92,9 +86,7 @@ function getPositiveIntEnv(value: string | undefined, fallback: number): number 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-// ============================================================================
 // Provider Configuration
-// ============================================================================
 
 /**
  * Spotify provider batch configuration.
@@ -111,9 +103,7 @@ export const spotifyProviderConfig: ProviderBatchConfig<SpotifyApi> = {
   pollBatch: pollSpotifySubscriptionsBatched,
 };
 
-// ============================================================================
 // Batch Polling Function
-// ============================================================================
 
 /**
  * Poll multiple Spotify subscriptions using batch API and delta detection.
@@ -556,9 +546,7 @@ async function markSubscriptionsAsDisconnected(
     .where(inArray(subscriptions.id, ids));
 }
 
-// ============================================================================
 // Main Polling Function
-// ============================================================================
 
 /**
  * Poll a single Spotify subscription for new episodes.
@@ -661,9 +649,7 @@ export async function pollSingleSpotifySubscription(
   return { newItems: newItemsCount };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Filter out unplayable episodes before processing.

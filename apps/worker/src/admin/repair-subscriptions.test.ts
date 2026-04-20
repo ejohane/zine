@@ -16,9 +16,7 @@ import {
 } from './repair-subscriptions';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 
-// ============================================================================
 // Mock Date.now for consistent testing
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 const originalDateNow = Date.now;
@@ -31,9 +29,7 @@ afterEach(() => {
   Date.now = originalDateNow;
 });
 
-// ============================================================================
 // Mock Database
-// ============================================================================
 
 interface MockSubscriptionRow {
   id: string;
@@ -78,9 +74,7 @@ function createDrizzleMock(mockDb: MockDb) {
   };
 }
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -153,9 +147,7 @@ function createNoWatermarkSubscription(
   };
 }
 
-// ============================================================================
 // findCorruptedSubscriptions Tests
-// ============================================================================
 
 describe('findCorruptedSubscriptions', () => {
   describe('detection logic', () => {
@@ -316,9 +308,7 @@ describe('findCorruptedSubscriptions', () => {
   });
 });
 
-// ============================================================================
 // generateRepairReport Tests
-// ============================================================================
 
 describe('generateRepairReport', () => {
   it('should generate report with corrupted subscriptions', () => {
@@ -375,9 +365,7 @@ describe('generateRepairReport', () => {
   });
 });
 
-// ============================================================================
 // repairCorruptedSubscriptions Tests
-// ============================================================================
 
 describe('repairCorruptedSubscriptions', () => {
   describe('dry run mode', () => {
@@ -568,9 +556,7 @@ describe('repairCorruptedSubscriptions', () => {
   });
 });
 
-// ============================================================================
 // verifyRepairs Tests
-// ============================================================================
 
 describe('verifyRepairs', () => {
   it('should return success when no corrupted subscriptions remain', async () => {
@@ -601,9 +587,7 @@ describe('verifyRepairs', () => {
   });
 });
 
-// ============================================================================
 // Integration Scenarios
-// ============================================================================
 
 describe('Integration Scenarios', () => {
   it('should handle full repair workflow: find → repair → verify', async () => {

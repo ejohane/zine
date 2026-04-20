@@ -30,10 +30,6 @@ import { logger } from './logger';
 
 const faviconLogger = logger.child('favicon');
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Configuration options for favicon fetching
  */
@@ -56,10 +52,6 @@ interface FaviconCandidate {
   priority: number;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const DEFAULT_TIMEOUT = 5000; // 5 seconds
 const DEFAULT_USER_AGENT = 'ZineBot/1.0 (+https://zine.app/bot; compatible; link-preview)';
 
@@ -75,9 +67,7 @@ const REL_PRIORITY: Record<string, number> = {
   'shortcut icon': 4,
 };
 
-// ============================================================================
 // Implementation
-// ============================================================================
 
 /**
  * Resolve a potentially relative URL to an absolute URL

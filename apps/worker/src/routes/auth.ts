@@ -19,10 +19,6 @@ import { webhookLogger } from '../lib/logger';
 
 const auth = new Hono<Env>();
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Clerk user data from webhook events
  */
@@ -54,9 +50,7 @@ interface ClerkWebhookEvent {
  */
 const IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-// ============================================================================
 // Webhook Route (unauthenticated - uses Svix verification)
-// ============================================================================
 
 /**
  * POST /api/auth/webhook
@@ -197,9 +191,7 @@ auth.post('/webhook', async (c) => {
   }
 });
 
-// ============================================================================
 // Event Handlers
-// ============================================================================
 
 /**
  * Handle user.created event
@@ -259,9 +251,7 @@ async function handleUserDeleted(
   webhookLogger.info('User data deleted from D1', { userId: user.id, requestId });
 }
 
-// ============================================================================
 // Authenticated Routes
-// ============================================================================
 
 /**
  * GET /api/auth/me

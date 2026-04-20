@@ -24,10 +24,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { authLogger } from '@/lib/logger';
 
-// ============================================================================
-// Component
-// ============================================================================
-
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp();
   const { startSSOFlow } = useSSO();
@@ -43,9 +39,7 @@ export default function SignUpScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ---------------------------------------------------------------------------
   // Email/Password Sign Up
-  // ---------------------------------------------------------------------------
 
   const handleSignUp = useCallback(async () => {
     if (!isLoaded || !signUp) return;
@@ -71,9 +65,7 @@ export default function SignUpScreen() {
     }
   }, [isLoaded, signUp, email, password]);
 
-  // ---------------------------------------------------------------------------
   // Email Verification
-  // ---------------------------------------------------------------------------
 
   const handleVerification = useCallback(async () => {
     if (!isLoaded || !signUp) return;
@@ -102,9 +94,7 @@ export default function SignUpScreen() {
     }
   }, [isLoaded, signUp, verificationCode, setActive, router]);
 
-  // ---------------------------------------------------------------------------
   // OAuth Sign Up
-  // ---------------------------------------------------------------------------
 
   const handleOAuthSignUp = useCallback(
     async (strategy: 'oauth_google' | 'oauth_apple') => {
@@ -133,9 +123,7 @@ export default function SignUpScreen() {
     [startSSOFlow, router]
   );
 
-  // ---------------------------------------------------------------------------
   // Render
-  // ---------------------------------------------------------------------------
 
   const styles = createStyles(colors);
 
@@ -311,10 +299,6 @@ export default function SignUpScreen() {
     </SafeAreaView>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 function createStyles(colors: typeof Colors.light) {
   return StyleSheet.create({

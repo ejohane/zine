@@ -11,9 +11,7 @@ import type { Database } from '../db';
 import type { subscriptions, creators } from '../db/schema';
 import type { Bindings } from '../types';
 
-// ============================================================================
 // Database Types
-// ============================================================================
 
 /**
  * Database type with full schema inference
@@ -41,9 +39,7 @@ export interface SubscriptionWithCreator extends Subscription {
   creatorImageUrl: string | null;
 }
 
-// ============================================================================
 // Polling Result Types
-// ============================================================================
 
 /**
  * Result of polling a single subscription
@@ -65,9 +61,7 @@ export interface BatchResult {
   skipped?: number;
 }
 
-// ============================================================================
 // Batch Polling Types
-// ============================================================================
 
 /**
  * YouTube skip reason metrics.
@@ -151,9 +145,7 @@ export interface BatchPollingResult {
   youtubeSkipMetrics?: YouTubeSkipMetrics;
 }
 
-// ============================================================================
 // Provider Interface
-// ============================================================================
 
 /**
  * Provider batch configuration for the generic batch processor.
@@ -221,10 +213,6 @@ export interface ProviderConnectionRow {
   connectedAt: number;
   lastRefreshedAt: number | null;
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Maximum videos/episodes to fetch per subscription poll */
 export const MAX_ITEMS_PER_POLL = 10;

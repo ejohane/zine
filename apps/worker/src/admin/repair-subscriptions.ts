@@ -27,10 +27,6 @@ import type { Database } from '../db';
 import { subscriptions, subscriptionItems, items } from '../db/schema';
 import { logger } from '../lib/logger';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * A subscription with corruption detection data
  */
@@ -95,19 +91,13 @@ export interface RepairOperationResult {
   errors: { subscriptionId: string; error: string }[];
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Gap threshold for considering a subscription corrupted (1 day in ms) */
 const CORRUPTION_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
 /** Create a logger for repair operations */
 const repairLogger = logger.child('admin:repair');
 
-// ============================================================================
 // Core Functions
-// ============================================================================
 
 /**
  * Find all corrupted Spotify subscriptions

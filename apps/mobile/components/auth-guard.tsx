@@ -13,10 +13,6 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useAuthAvailability } from '@/providers/auth-provider';
 
-// ============================================================================
-// Component
-// ============================================================================
-
 interface AuthGuardProps {
   children: ReactNode;
   /** Optional override for deterministic tests/stories */
@@ -79,10 +75,6 @@ function ClerkAuthGuard({ children, authStateOverride, signedOutFallback }: Auth
   // User is authenticated, render children
   return <>{children}</>;
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

@@ -6,9 +6,7 @@ import { renderHook } from '@testing-library/react-hooks';
 
 import { useItemDetailData } from '@/app/item/detail/hooks/useItemDetailData';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockUseItem = jest.fn();
 const mockUseCreator = jest.fn();
@@ -22,9 +20,7 @@ jest.mock('@/hooks/use-creator', () => ({
   useCreator: (creatorId: string) => mockUseCreator(creatorId),
 }));
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('useItemDetailData', () => {
   beforeEach(() => {

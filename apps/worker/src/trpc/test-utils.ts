@@ -11,9 +11,7 @@
 import { vi } from 'vitest';
 import type { Bindings } from '../types';
 
-// ============================================================================
 // Mock KV Namespace
-// ============================================================================
 
 /**
  * Create a mock KV namespace for testing OAuth state and rate limiting
@@ -39,9 +37,7 @@ export function createMockKV() {
   };
 }
 
-// ============================================================================
 // Mock Environment
-// ============================================================================
 
 /**
  * Create a mock environment with all required bindings
@@ -66,9 +62,7 @@ export function createMockEnv(overrides: Partial<Bindings> = {}): Bindings {
   } as Bindings;
 }
 
-// ============================================================================
 // Mock YouTube API
-// ============================================================================
 
 /**
  * YouTube API mock helpers
@@ -218,9 +212,7 @@ interface YouTubeSubscriptionMock {
   };
 }
 
-// ============================================================================
 // Mock Spotify API
-// ============================================================================
 
 /**
  * Spotify API mock helpers
@@ -316,9 +308,7 @@ interface SpotifySavedShowMock {
   show: SpotifyShowMock;
 }
 
-// ============================================================================
 // Mock Database Helpers
-// ============================================================================
 
 /**
  * Create mock database query results
@@ -472,18 +462,14 @@ interface MockItem {
   updatedAt: string;
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 export const TEST_USER_ID = 'user_test_123';
 export const TEST_STATE = 'a'.repeat(32); // Min length state
 export const TEST_CODE = 'test_authorization_code';
 export const TEST_CODE_VERIFIER = 'a'.repeat(43); // Min length verifier
 
-// ============================================================================
 // OAuth State Helpers
-// ============================================================================
 
 /**
  * Register a mock OAuth state in KV

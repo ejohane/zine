@@ -2,10 +2,6 @@ import { StyleSheet } from 'react-native';
 
 import { Typography, Spacing, Radius } from '@/constants/theme';
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 export const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -217,9 +213,7 @@ export const styles = StyleSheet.create({
   },
 });
 
-// ============================================================================
 // X Post Styles
-// ============================================================================
 
 export const xPostStyles = StyleSheet.create({
   // Tweet content section - Twitter-like layout

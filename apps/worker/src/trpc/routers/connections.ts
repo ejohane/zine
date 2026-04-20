@@ -32,9 +32,7 @@ import {
 } from '../../newsletters/gmail';
 import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 /**
  * Input schema for registering OAuth state
@@ -48,9 +46,7 @@ const RegisterStateInputSchema = z.object({
     .max(128, 'State must be at most 128 characters'),
 });
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const connectionsRouter = router({
   /**
@@ -489,9 +485,7 @@ export const connectionsRouter = router({
     }),
 });
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Attempt to revoke an OAuth token with the provider

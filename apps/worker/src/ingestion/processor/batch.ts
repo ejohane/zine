@@ -10,9 +10,7 @@ import { prepareBatch } from './prepare';
 import type { BatchIngestResult, ConsolidatedBatchIngestResult, PreparedItem } from './types';
 import { buildIngestionStatements, executeBatchStatements } from './write';
 
-// ============================================================================
 // Batch Ingestion
-// ============================================================================
 
 /**
  * Default chunk size for consolidated batch inserts.
@@ -104,9 +102,7 @@ export async function ingestBatch<T>(
   return result;
 }
 
-// ============================================================================
 // Consolidated Batch Ingestion
-// ============================================================================
 
 /**
  * Split an array into chunks of the specified size.

@@ -50,9 +50,7 @@ import {
 } from './content-utils';
 import { ContentType, Provider } from '@zine/shared';
 
-// ============================================================================
 // Type Mapping Tests
-// ============================================================================
 
 describe('mapContentType', () => {
   it('maps VIDEO to video', () => {
@@ -94,9 +92,7 @@ describe('mapProvider', () => {
   });
 });
 
-// ============================================================================
 // Color Helper Tests
-// ============================================================================
 
 describe('getContentColor', () => {
   it('returns correct color for video', () => {
@@ -146,9 +142,7 @@ describe('getProviderColor', () => {
   });
 });
 
-// ============================================================================
 // Label Helper Tests
-// ============================================================================
 
 describe('getContentTypeLabel', () => {
   it('returns "Video" for video', () => {
@@ -198,9 +192,7 @@ describe('getProviderLabel', () => {
   });
 });
 
-// ============================================================================
 // Aspect Ratio Helper Tests
-// ============================================================================
 
 describe('getContentAspectRatio', () => {
   it('returns 16/10 for podcast (consistent aspect ratio)', () => {
@@ -278,9 +270,7 @@ describe('isPodcastContent', () => {
   });
 });
 
-// ============================================================================
 // Image URL Helper Tests
-// ============================================================================
 
 describe('upgradeYouTubeImageUrl', () => {
   it('upgrades yt3.ggpht.com URLs from s88 to s800', () => {
@@ -326,9 +316,7 @@ describe('upgradeYouTubeImageUrl', () => {
   });
 });
 
-// ============================================================================
 // Spotify Image URL Upgrade Tests
-// ============================================================================
 
 describe('upgradeSpotifyImageUrl', () => {
   // Album art tests (ab67616d prefix)

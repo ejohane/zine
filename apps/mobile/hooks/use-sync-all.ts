@@ -25,10 +25,6 @@ import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib
 import { useAuthResumeGate } from '@/providers/auth-resume-gate';
 import type { SyncStatusOutput } from '@/lib/trpc-types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 const DEFAULT_COOLDOWN_SECONDS = 120; // 2 minutes (matches backend)
 const STATUS_POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
 
@@ -69,9 +65,7 @@ export interface UseSyncAllReturn {
   lastResult: SyncAllResult | null;
 }
 
-// ============================================================================
 // Hook Implementation
-// ============================================================================
 
 export function useSyncAll(): UseSyncAllReturn {
   const utils = trpc.useUtils();

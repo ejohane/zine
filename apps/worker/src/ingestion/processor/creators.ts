@@ -12,9 +12,7 @@ import {
   type CreatorParams,
 } from '../../db/helpers/creators';
 
-// ============================================================================
 // Creator Extraction Helpers
-// ============================================================================
 
 /**
  * Providers that have native creator IDs from their APIs.

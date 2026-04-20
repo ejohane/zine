@@ -24,10 +24,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { authLogger } from '@/lib/logger';
 
-// ============================================================================
-// Component
-// ============================================================================
-
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const { startSSOFlow } = useSSO();
@@ -41,9 +37,7 @@ export default function SignInScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ---------------------------------------------------------------------------
   // Email/Password Sign In
-  // ---------------------------------------------------------------------------
 
   const handleSignIn = useCallback(async () => {
     if (!isLoaded || !signIn) return;
@@ -74,9 +68,7 @@ export default function SignInScreen() {
     }
   }, [isLoaded, signIn, email, password, setActive, router]);
 
-  // ---------------------------------------------------------------------------
   // OAuth Sign In
-  // ---------------------------------------------------------------------------
 
   const handleOAuthSignIn = useCallback(
     async (strategy: 'oauth_google' | 'oauth_apple') => {
@@ -105,9 +97,7 @@ export default function SignInScreen() {
     [startSSOFlow, router]
   );
 
-  // ---------------------------------------------------------------------------
   // Render
-  // ---------------------------------------------------------------------------
 
   const styles = createStyles(colors);
 
@@ -220,10 +210,6 @@ export default function SignInScreen() {
     </SafeAreaView>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 function createStyles(colors: typeof Colors.light) {
   return StyleSheet.create({

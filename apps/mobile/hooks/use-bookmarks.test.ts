@@ -10,9 +10,7 @@
 import { renderHook, act } from '@testing-library/react-hooks';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock tRPC
 const mockPreviewUseQuery = jest.fn();
@@ -109,9 +107,7 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import { isValidUrl, usePreview, useSaveBookmark, type LinkPreview } from './use-bookmarks';
 
@@ -179,9 +175,7 @@ beforeEach(() => {
   });
 });
 
-// ============================================================================
 // isValidUrl Tests
-// ============================================================================
 
 describe('isValidUrl', () => {
   describe('valid URLs', () => {
@@ -255,9 +249,7 @@ describe('isValidUrl', () => {
   });
 });
 
-// ============================================================================
 // usePreview Tests
-// ============================================================================
 
 describe('usePreview', () => {
   describe('URL validation', () => {
@@ -419,9 +411,7 @@ describe('usePreview', () => {
   });
 });
 
-// ============================================================================
 // useSaveBookmark Tests
-// ============================================================================
 
 describe('useSaveBookmark', () => {
   describe('saveFromPreview', () => {

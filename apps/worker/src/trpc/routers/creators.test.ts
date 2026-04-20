@@ -22,9 +22,7 @@ import type {
   FetchLatestContentResponse,
 } from './creators';
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 const TEST_CREATOR_ID = 'creator_test_abc';
@@ -119,9 +117,7 @@ function createMockProviderConnection(
   };
 }
 
-// ============================================================================
 // Mock Router Implementation for Testing
-// ============================================================================
 
 /**
  * Mock content item for testing fetchLatestContent
@@ -431,9 +427,7 @@ function createMockCreatorsCaller(options: {
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Creators Router', () => {
   beforeEach(() => {
@@ -444,9 +438,7 @@ describe('Creators Router', () => {
     vi.resetAllMocks();
   });
 
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     it('should reject unauthenticated requests to get', async () => {
@@ -512,9 +504,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // creators.get Tests
-  // ==========================================================================
 
   describe('creators.get', () => {
     it('should return creator when found', async () => {
@@ -625,9 +615,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // creators.listBookmarks Tests
-  // ==========================================================================
 
   describe('creators.listBookmarks', () => {
     it('should return empty list when creator exists but has no bookmarks', async () => {
@@ -728,9 +716,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // creators.fetchLatestContent Tests
-  // ==========================================================================
 
   describe('creators.fetchLatestContent', () => {
     it('should throw NOT_FOUND when creator does not exist', async () => {
@@ -1204,9 +1190,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // creators.checkSubscription Tests
-  // ==========================================================================
 
   describe('creators.checkSubscription', () => {
     it('should throw NOT_FOUND when creator does not exist', async () => {
@@ -1560,9 +1544,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // creators.subscribe Tests
-  // ==========================================================================
 
   describe('creators.subscribe', () => {
     it('should throw NOT_FOUND when creator does not exist', async () => {
@@ -1944,9 +1926,7 @@ describe('Creators Router', () => {
     });
   });
 
-  // ==========================================================================
   // Router Structure Tests
-  // ==========================================================================
 
   describe('Router Structure', () => {
     it('should have all expected endpoints', () => {
@@ -1963,9 +1943,7 @@ describe('Creators Router', () => {
   });
 });
 
-// ============================================================================
 // Creator Response Type Tests
-// ============================================================================
 
 describe('Creator Response Shape', () => {
   it('should match the expected Creator interface', () => {

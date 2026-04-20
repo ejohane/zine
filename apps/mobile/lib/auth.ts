@@ -9,9 +9,7 @@ import { Platform } from 'react-native';
 import type { TokenCache } from '@clerk/clerk-expo';
 import { authLogger } from './logger';
 
-// ============================================================================
 // Token Cache Implementation
-// ============================================================================
 
 /**
  * Creates a token cache that uses expo-secure-store on native platforms
@@ -62,9 +60,7 @@ function createTokenCache(): TokenCache {
 export const tokenCache: TokenCache | undefined =
   Platform.OS !== 'web' ? createTokenCache() : undefined;
 
-// ============================================================================
 // Auth Constants
-// ============================================================================
 
 /**
  * Clerk publishable key from environment variables.

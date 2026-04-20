@@ -63,9 +63,7 @@ function retryMessage(message: Message<SyncQueueMessage>, reason: string, error?
   message.retry();
 }
 
-// ============================================================================
 // Queue Handler
-// ============================================================================
 
 /**
  * Process a batch of sync queue messages.

@@ -15,10 +15,6 @@
  * - Nested cause chain
  */
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * A serialized representation of an error that preserves full context.
  */
@@ -73,9 +69,7 @@ export interface PollingError {
   context?: Record<string, unknown>;
 }
 
-// ============================================================================
 // Serialization
-// ============================================================================
 
 /**
  * Serialize an error to a structured object preserving full context.
@@ -170,9 +164,7 @@ export function serializeError(error: unknown): SerializedError {
   };
 }
 
-// ============================================================================
 // Classification
-// ============================================================================
 
 /**
  * Classify an error into a category for monitoring and aggregation.
@@ -272,9 +264,7 @@ export function classifyError(error: unknown): ErrorClassification {
   return 'unknown';
 }
 
-// ============================================================================
 // Polling Error Factory
-// ============================================================================
 
 /**
  * Create a structured polling error with full context.

@@ -7,9 +7,7 @@
 import { renderHook, act } from '@testing-library/react-hooks';
 import { Provider } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockCancel = jest.fn();
 const mockGetData = jest.fn();
@@ -91,9 +89,7 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import { useDisconnectConnection, type Connection } from './use-connections';
 import type { SubscriptionsResponse, Subscription } from './use-subscriptions-query';
@@ -191,9 +187,7 @@ beforeEach(() => {
   mockNewslettersStatsGetData.mockReturnValue(createNewsletterStats());
 });
 
-// ============================================================================
 // useDisconnectConnection Tests
-// ============================================================================
 
 describe('useDisconnectConnection', () => {
   it('marks the provider as disconnected optimistically', async () => {

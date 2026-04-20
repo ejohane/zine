@@ -12,9 +12,7 @@ import {
   formatDateTime,
 } from './format';
 
-// ============================================================================
 // formatDuration Tests
-// ============================================================================
 
 describe('formatDuration', () => {
   describe('valid inputs', () => {
@@ -58,9 +56,7 @@ describe('formatDuration', () => {
   });
 });
 
-// ============================================================================
 // formatDurationTimestamp Tests
-// ============================================================================
 
 describe('formatDurationTimestamp', () => {
   describe('valid inputs', () => {
@@ -104,9 +100,7 @@ describe('formatDurationTimestamp', () => {
   });
 });
 
-// ============================================================================
 // formatRelativeTime Tests
-// ============================================================================
 
 describe('formatRelativeTime', () => {
   // Helper to create a date relative to now
@@ -179,9 +173,7 @@ describe('formatRelativeTime', () => {
   });
 });
 
-// ============================================================================
 // formatDate Tests
-// ============================================================================
 
 describe('formatDate', () => {
   describe('valid inputs', () => {
@@ -211,9 +203,7 @@ describe('formatDate', () => {
   });
 });
 
-// ============================================================================
 // formatDateTime Tests
-// ============================================================================
 
 describe('formatDateTime', () => {
   describe('valid inputs', () => {

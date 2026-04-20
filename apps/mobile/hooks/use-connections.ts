@@ -14,10 +14,6 @@ import type {
   SubscriptionsListOutput,
 } from '../lib/trpc-types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type ConnectionStatus = ProviderConnectionStatusValue;
 export type ConnectionProvider = OAuthProvider;
 
@@ -32,9 +28,7 @@ export interface Connection {
 
 type ProviderConnectionData = NonNullable<ConnectionsListOutput[ConnectionProvider]>;
 
-// ============================================================================
 // Helpers
-// ============================================================================
 
 function isConnectionProvider(value: string): value is ConnectionProvider {
   return value === 'YOUTUBE' || value === 'SPOTIFY' || value === 'GMAIL';
@@ -70,9 +64,7 @@ function transformConnectionsResponse(response: ConnectionsListOutput): Connecti
   return connections;
 }
 
-// ============================================================================
 // Hooks
-// ============================================================================
 
 export function useConnections() {
   return trpc.subscriptions.connections.list.useQuery(undefined, {

@@ -29,9 +29,7 @@ import { validateAndConvertDiscoverProvider } from '@/lib/route-validation';
 import { ErrorState } from '@/components/list-states';
 import { ChannelSelectionList, type Channel, type Provider } from '@/components/subscriptions';
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get provider display name
@@ -46,10 +44,6 @@ function getProviderDisplayName(provider: Provider): string {
       return 'Provider';
   }
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function ProviderDiscoverScreen() {
   const colorScheme = useColorScheme();
@@ -205,10 +199,6 @@ export default function ProviderDiscoverScreen() {
     </>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

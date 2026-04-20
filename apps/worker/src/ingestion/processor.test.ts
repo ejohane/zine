@@ -14,9 +14,7 @@ import { classifyError, ValidationError } from './processor';
 import { TransformError } from './transformers';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 
-// ============================================================================
 // Mock Date.now for consistent testing
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 const originalDateNow = Date.now;
@@ -29,9 +27,7 @@ afterEach(() => {
   Date.now = originalDateNow;
 });
 
-// ============================================================================
 // classifyError Tests
-// ============================================================================
 
 describe('classifyError', () => {
   describe('transform errors', () => {
@@ -145,9 +141,7 @@ describe('classifyError', () => {
   });
 });
 
-// ============================================================================
 // Error Type Classification Edge Cases
-// ============================================================================
 
 describe('classifyError - Edge Cases', () => {
   it('should be case-insensitive for error name matching', () => {
@@ -179,9 +173,7 @@ describe('classifyError - Edge Cases', () => {
   });
 });
 
-// ============================================================================
 // Consolidated Batch Ingestion Tests
-// ============================================================================
 
 import { DEFAULT_BATCH_CHUNK_SIZE, ingestBatchConsolidated } from './processor';
 import { ContentType, Provider } from '@zine/shared';

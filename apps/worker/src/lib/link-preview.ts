@@ -36,10 +36,6 @@ import { fetchFavicon } from './favicon';
 import { logger } from './logger';
 import { parseISO8601Duration } from './duration';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Result of fetching link preview metadata
  */
@@ -95,15 +91,11 @@ export interface PreviewContext {
   };
 }
 
-// ============================================================================
 // Logger
-// ============================================================================
 
 const previewLogger = logger.child('link-preview');
 
-// ============================================================================
 // Provider API Fetchers
-// ============================================================================
 
 /**
  * YouTube Data API video response shape (partial, just what we need)
@@ -371,9 +363,7 @@ function transformSpotifyEpisode(
   };
 }
 
-// ============================================================================
 // oEmbed Fetchers
-// ============================================================================
 
 /**
  * Fetch YouTube metadata via oEmbed
@@ -645,9 +635,7 @@ async function fetchXProviderPreview(parsedLink: ParsedLink): Promise<LinkPrevie
   return null;
 }
 
-// ============================================================================
 // Open Graph Scraper
-// ============================================================================
 
 /**
  * Fetch metadata via Open Graph scraping
@@ -675,9 +663,7 @@ async function fetchViaOpenGraph(parsedLink: ParsedLink): Promise<LinkPreviewRes
   };
 }
 
-// ============================================================================
 // Fallback Result
-// ============================================================================
 
 /**
  * Create a minimal fallback result when all other methods fail
@@ -708,9 +694,7 @@ function createFallbackResult(parsedLink: ParsedLink): LinkPreviewResult {
   };
 }
 
-// ============================================================================
 // Main Orchestrator
-// ============================================================================
 
 /**
  * Fetch link preview metadata using a priority-based fallback system.

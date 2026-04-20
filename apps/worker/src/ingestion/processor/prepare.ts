@@ -11,9 +11,7 @@ import { backfillCreatorIdIfMissing, getOrCreateCreator } from './creators';
 import { storeToDLQ } from './dlq';
 import type { IngestContext, PreparedItem, PreparedResult } from './types';
 
-// ============================================================================
 // Preparation Helpers
-// ============================================================================
 
 interface PrepareItemParams<T> {
   context: IngestContext;

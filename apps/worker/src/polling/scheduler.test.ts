@@ -13,9 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getUserProcessingConcurrency } from './scheduler';
 
-// ============================================================================
 // Mock Dependencies
-// ============================================================================
 
 // Mock distributed locks
 const mockTryAcquireLock = vi.fn();
@@ -116,9 +114,7 @@ vi.mock('drizzle-orm/d1', () => ({
   })),
 }));
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 function createMockEnv() {
   const store = new Map<string, string>();
@@ -203,9 +199,7 @@ interface MockConnection {
   status: string;
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('getUserProcessingConcurrency', () => {
   it('returns default when value is missing or invalid', () => {
@@ -449,9 +443,7 @@ describe('Polling Scheduler', () => {
   });
 });
 
-// ============================================================================
 // Helper Function Tests
-// ============================================================================
 
 describe('isAuthError', () => {
   // Test the isAuthError helper function logic

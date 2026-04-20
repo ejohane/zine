@@ -6,9 +6,7 @@ import type { IngestResult } from './types';
 import { prepareItem } from './prepare';
 import { buildIngestionStatements, executeBatchStatements } from './write';
 
-// ============================================================================
 // Main Ingestion Function
-// ============================================================================
 
 /**
  * Ingest a single item from a provider into the user's inbox.

@@ -15,9 +15,7 @@ import { TRPCError } from '@trpc/server';
 import { Provider } from '@zine/shared';
 import type { SourceView } from './sources';
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 
@@ -38,9 +36,7 @@ function createMockSourceView(overrides: Partial<SourceView> = {}): SourceView {
   return { ...defaults, ...overrides };
 }
 
-// ============================================================================
 // Mock Router Implementation for Testing
-// ============================================================================
 
 /**
  * Create a mock router caller that simulates the sources router behavior
@@ -171,14 +167,10 @@ function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
   }
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Sources Router', () => {
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     it('should reject unauthenticated requests to list', async () => {
@@ -219,9 +211,7 @@ describe('Sources Router', () => {
     });
   });
 
-  // ==========================================================================
   // sources.list Tests
-  // ==========================================================================
 
   describe('sources.list', () => {
     it('should return empty array when no sources', async () => {
@@ -293,9 +283,7 @@ describe('Sources Router', () => {
     });
   });
 
-  // ==========================================================================
   // sources.add Tests
-  // ==========================================================================
 
   describe('sources.add', () => {
     it('should create a YouTube source', async () => {
@@ -408,9 +396,7 @@ describe('Sources Router', () => {
     });
   });
 
-  // ==========================================================================
   // sources.remove Tests
-  // ==========================================================================
 
   describe('sources.remove', () => {
     it('should return success when removing existing source', async () => {
@@ -450,9 +436,7 @@ describe('Sources Router', () => {
   });
 });
 
-// ============================================================================
 // SourceView Type Tests
-// ============================================================================
 
 describe('SourceView Type', () => {
   it('should have correct shape for SourceView', () => {
@@ -494,9 +478,7 @@ describe('SourceView Type', () => {
   });
 });
 
-// ============================================================================
 // Provider ID Extraction Tests
-// ============================================================================
 
 describe('Provider ID Extraction', () => {
   it('should extract YouTube channel from @ URL', () => {
@@ -525,9 +507,7 @@ describe('Provider ID Extraction', () => {
   });
 });
 
-// ============================================================================
 // Name Derivation Tests
-// ============================================================================
 
 describe('Name Derivation', () => {
   it('should derive name from YouTube @ URL', () => {

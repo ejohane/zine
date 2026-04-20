@@ -21,10 +21,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { trpc } from '../lib/trpc';
 import type { SyncSubscriptionOutput } from '../lib/trpc-types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Result of a sync attempt, used for UI feedback.
  */
@@ -51,16 +47,8 @@ export interface UseSyncNowReturn {
   lastResult: SyncResult | null;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Default cooldown duration in seconds (5 minutes) */
 const DEFAULT_COOLDOWN_SECONDS = 300;
-
-// ============================================================================
-// Hook
-// ============================================================================
 
 /**
  * Hook for triggering manual sync of a subscription.

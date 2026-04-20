@@ -9,9 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchYouTubeOEmbed, fetchSpotifyOEmbed, fetchTwitterOEmbed } from './oembed';
 import type { OEmbedResult } from './oembed';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock logger to prevent console output during tests
 vi.mock('./logger', () => ({
@@ -29,9 +27,7 @@ vi.mock('./logger', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const YOUTUBE_OEMBED_RESPONSE = {
   title: 'Rick Astley - Never Gonna Give You Up (Official Music Video)',
@@ -77,9 +73,7 @@ const TWITTER_OEMBED_RESPONSE = {
   version: '1.0',
 };
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -90,9 +84,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ============================================================================
 // YouTube oEmbed Tests
-// ============================================================================
 
 describe('fetchYouTubeOEmbed', () => {
   it('should fetch and return YouTube video metadata', async () => {
@@ -190,9 +182,7 @@ describe('fetchYouTubeOEmbed', () => {
   });
 });
 
-// ============================================================================
 // Spotify oEmbed Tests
-// ============================================================================
 
 describe('fetchSpotifyOEmbed', () => {
   it('should fetch and return Spotify content metadata', async () => {
@@ -303,9 +293,7 @@ describe('fetchSpotifyOEmbed', () => {
   });
 });
 
-// ============================================================================
 // Twitter oEmbed Tests
-// ============================================================================
 
 describe('fetchTwitterOEmbed', () => {
   it('should fetch and return Twitter tweet metadata', async () => {
@@ -470,9 +458,7 @@ describe('fetchTwitterOEmbed', () => {
   });
 });
 
-// ============================================================================
 // Common Behavior Tests
-// ============================================================================
 
 describe('common oEmbed behavior', () => {
   it('should use AbortController for timeout', async () => {
@@ -514,9 +500,7 @@ describe('common oEmbed behavior', () => {
   });
 });
 
-// ============================================================================
 // Edge Cases
-// ============================================================================
 
 describe('edge cases', () => {
   it('should handle empty response gracefully', async () => {

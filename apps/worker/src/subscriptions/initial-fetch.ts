@@ -40,10 +40,6 @@ import { parseSpotifyDate } from '../lib/timestamps';
 
 const fetchLogger = logger.child('initial-fetch');
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Result of initial fetch operation
  */
@@ -101,9 +97,7 @@ interface YouTubePlaylistItem {
   };
 }
 
-// ============================================================================
 // Main Function
-// ============================================================================
 
 /**
  * Trigger initial content fetch for a newly created subscription
@@ -202,9 +196,7 @@ export async function triggerInitialFetch(
   }
 }
 
-// ============================================================================
 // YouTube Initial Fetch
-// ============================================================================
 
 /**
  * Fetch the latest YouTube video for initial subscription
@@ -372,9 +364,7 @@ function convertToYouTubePlaylistItem(
   };
 }
 
-// ============================================================================
 // Spotify Initial Fetch
-// ============================================================================
 
 /**
  * Fetch the latest Spotify episode for initial subscription

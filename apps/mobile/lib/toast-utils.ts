@@ -27,10 +27,6 @@
 import type { ToastManager } from 'heroui-native';
 import { logger } from './logger';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Default duration for success toasts (in milliseconds) */
 const SUCCESS_DURATION = 3000;
 
@@ -40,9 +36,7 @@ const ERROR_DURATION = 4000;
 /** Default duration for warning toasts (in milliseconds) */
 const WARNING_DURATION = 4000;
 
-// ============================================================================
 // Success Toasts
-// ============================================================================
 
 /**
  * Show a success toast notification.
@@ -66,9 +60,7 @@ export function showSuccess(toast: ToastManager, message: string, description?: 
   });
 }
 
-// ============================================================================
 // Warning Toasts
-// ============================================================================
 
 /**
  * Show a warning toast notification.
@@ -93,9 +85,7 @@ export function showWarning(toast: ToastManager, message: string, description?: 
   });
 }
 
-// ============================================================================
 // Error Toasts
-// ============================================================================
 
 /**
  * Show an error toast notification.

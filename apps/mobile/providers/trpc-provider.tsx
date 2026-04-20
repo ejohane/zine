@@ -8,7 +8,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QueryClient, useIsRestoring, type QueryKey, type QueryStatus } from '@tanstack/react-query';
+import {
+  QueryClient,
+  useIsRestoring,
+  type QueryKey,
+  type QueryStatus,
+} from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { getQueryKey } from '@trpc/react-query';
@@ -29,10 +34,6 @@ import {
 } from '@/lib/query-persistence';
 import { useAuthAvailability } from '@/providers/auth-provider';
 import { AuthResumeGateContext } from '@/providers/auth-resume-gate';
-
-// ============================================================================
-// Provider Component
-// ============================================================================
 
 interface TRPCProviderProps {
   children: ReactNode;
@@ -154,9 +155,6 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     [isWithinResumeRefreshGraceWindow]
   );
 
-  // ---------------------------------------------------------------------------
-  // Initialize OAuth Token Getter
-  // ---------------------------------------------------------------------------
   // The vanilla tRPC client in oauth.ts needs access to auth tokens for
   // imperative OAuth operations like connectProvider(). This hooks it up.
   useEffect(() => {
@@ -196,12 +194,8 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     return () => subscription.remove();
   }, [startResumeTokenRefresh]);
 
-  // ---------------------------------------------------------------------------
-  // QueryClient Configuration
-  // ---------------------------------------------------------------------------
   // Create clients in useState to avoid SSR/hydration issues and ensure
   // stable references across re-renders.
-
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -210,10 +204,6 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         },
       })
   );
-
-  // ---------------------------------------------------------------------------
-  // Persistence Configuration
-  // ---------------------------------------------------------------------------
 
   const persistenceBuster = useMemo(() => buildQueryPersistenceBuster(), []);
   const persistenceKey = useMemo(
@@ -276,10 +266,6 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     }
   }, [persister, queryClient]);
 
-  // ---------------------------------------------------------------------------
-  // Offline Queue Cache Invalidation
-  // ---------------------------------------------------------------------------
-
   useEffect(() => {
     setQueueProcessedCallback(() => {
       void Promise.all([
@@ -295,10 +281,6 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
       ]);
     });
   }, [queryClient]);
-
-  // ---------------------------------------------------------------------------
-  // tRPC Client Configuration
-  // ---------------------------------------------------------------------------
 
   const [trpcClient] = useState(() => {
     const url = `${API_URL}/trpc`;
@@ -377,11 +359,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Provider Tree
-  // ---------------------------------------------------------------------------
   // Note: QueryClientProvider must be inside trpc.Provider for proper integration
-
   const shouldBlockHydration = hasPersistedClient === true;
 
   return (

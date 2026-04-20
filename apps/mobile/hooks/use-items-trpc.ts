@@ -2,21 +2,12 @@
  * tRPC-based data hooks for Items
  *
  * Provides React Query hooks for fetching and mutating items data via tRPC.
- * This replaces the Replicache-based hooks in use-items.ts.
  */
 
 import { keepPreviousData } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-// ============================================================================
-// Optimistic Update Types
-// ============================================================================
 
 /** Type alias for tRPC utils */
 type TrpcUtils = ReturnType<typeof trpc.useUtils>;
@@ -83,10 +74,6 @@ type LibraryItemsOptions = {
   search?: string;
   limit?: number;
 };
-
-// ============================================================================
-// Optimistic Update Factory
-// ============================================================================
 
 /**
  * Factory function to create optimistic mutation config
@@ -292,10 +279,6 @@ function buildLibraryItemsInput(options?: LibraryItemsOptions) {
   return input;
 }
 
-// ============================================================================
-// Query Hooks
-// ============================================================================
-
 /**
  * Hook for fetching inbox items (INBOX state)
  *
@@ -435,10 +418,6 @@ export function useItem(id: string) {
 export function useUserTags() {
   return trpc.items.listTags.useQuery();
 }
-
-// ============================================================================
-// Mutation Hooks
-// ============================================================================
 
 /**
  * Hook for bookmarking an item with optimistic updates
@@ -869,9 +848,5 @@ export function useSetItemTags() {
     },
   });
 }
-
-// ============================================================================
-// Re-exports for convenience
-// ============================================================================
 
 export { ContentType, Provider, UserItemState };

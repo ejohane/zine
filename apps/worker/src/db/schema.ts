@@ -1,9 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
-// ============================================================================
 // Users
-// ============================================================================
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.
 export const users = sqliteTable('users', {
@@ -13,9 +11,7 @@ export const users = sqliteTable('users', {
   updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
 });
 
-// ============================================================================
 // Items (Canonical Content)
-// ============================================================================
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.
 export const items = sqliteTable(
@@ -60,9 +56,7 @@ export const items = sqliteTable(
   ]
 );
 
-// ============================================================================
 // User Items (User's relationship to content)
-// ============================================================================
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.
 export const userItems = sqliteTable(
@@ -113,9 +107,7 @@ export const userItems = sqliteTable(
   ]
 );
 
-// ============================================================================
 // User Item Consumption Events
-// ============================================================================
 // Immutable interaction history used for recap and trend calculations.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const userItemConsumptionEvents = sqliteTable(
@@ -151,9 +143,7 @@ export const userItemConsumptionEvents = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Tags (User-defined collections)
-// ============================================================================
 // Stores optional user-defined tags for organizing bookmarked items.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const tags = sqliteTable(
@@ -176,9 +166,7 @@ export const tags = sqliteTable(
   ]
 );
 
-// ============================================================================
 // User Item Tags (Tag assignments)
-// ============================================================================
 // Join table between user_items and tags for many-to-many assignment.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const userItemTags = sqliteTable(
@@ -202,9 +190,7 @@ export const userItemTags = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Sources (User subscriptions)
-// ============================================================================
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.
 export const sources = sqliteTable(
@@ -235,9 +221,7 @@ export const sources = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Provider Connections (OAuth tokens per provider)
-// ============================================================================
 // Stores encrypted OAuth credentials for connected providers (YouTube, Spotify, Gmail)
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const providerConnections = sqliteTable(
@@ -268,9 +252,7 @@ export const providerConnections = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Gmail Mailboxes
-// ============================================================================
 // One connected Gmail mailbox per user/provider connection.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const gmailMailboxes = sqliteTable(
@@ -299,9 +281,7 @@ export const gmailMailboxes = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Newsletter Feeds
-// ============================================================================
 // Canonical newsletter identities detected from Gmail metadata.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const newsletterFeeds = sqliteTable(
@@ -338,9 +318,7 @@ export const newsletterFeeds = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Newsletter Feed Messages
-// ============================================================================
 // Maps Gmail messages to detected newsletter feeds and ingested items.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const newsletterFeedMessages = sqliteTable(
@@ -370,9 +348,7 @@ export const newsletterFeedMessages = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Newsletter Unsubscribe Events
-// ============================================================================
 // Audit trail for unsubscribe attempts from newsletter feeds.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const newsletterUnsubscribeEvents = sqliteTable(
@@ -398,9 +374,7 @@ export const newsletterUnsubscribeEvents = sqliteTable(
   ]
 );
 
-// ============================================================================
 // RSS Feeds
-// ============================================================================
 // User-managed RSS/Atom feed subscriptions with polling metadata.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const rssFeeds = sqliteTable(
@@ -436,9 +410,7 @@ export const rssFeeds = sqliteTable(
   ]
 );
 
-// ============================================================================
 // RSS Feed Items
-// ============================================================================
 // Tracks mapping between an RSS feed and canonical items.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const rssFeedItems = sqliteTable(
@@ -463,9 +435,7 @@ export const rssFeedItems = sqliteTable(
   ]
 );
 
-// ============================================================================
 // RSS Discovery Cache
-// ============================================================================
 // Caches feed autodiscovery results by site origin to avoid repeated rescans.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const rssDiscoveryCache = sqliteTable(
@@ -490,9 +460,7 @@ export const rssDiscoveryCache = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Subscriptions (User subscriptions to specific channels/shows)
-// ============================================================================
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const subscriptions = sqliteTable(
   'subscriptions',
@@ -537,9 +505,7 @@ export const subscriptions = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Subscription Items (Track which items came from which subscription)
-// ============================================================================
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const subscriptionItems = sqliteTable(
   'subscription_items',
@@ -565,9 +531,7 @@ export const subscriptionItems = sqliteTable(
   ]
 );
 
-// ============================================================================
 // User Notifications (System alerts and connection health)
-// ============================================================================
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const userNotifications = sqliteTable(
   'user_notifications',
@@ -593,9 +557,7 @@ export const userNotifications = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Dead Letter Queue (Failed Ingestion Tracking)
-// ============================================================================
 // Stores items that failed during ingestion for later retry or manual review.
 // This prevents permanent data loss when ingestion fails due to transient errors.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
@@ -628,9 +590,7 @@ export const deadLetterQueue = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Creators (Canonical Creator Entities)
-// ============================================================================
 // Stores creator entities across providers (YouTube channels, Spotify shows, X users, etc.)
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
 export const creators = sqliteTable(
@@ -656,9 +616,7 @@ export const creators = sqliteTable(
   ]
 );
 
-// ============================================================================
 // Provider Items Seen (Ingestion Idempotency)
-// ============================================================================
 // This table is CRITICAL for preventing duplicate inbox items during ingestion.
 // See: docs/zine-ingestion-pipeline.md
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.

@@ -20,9 +20,7 @@ import { logger } from '../../lib/logger';
 
 const adminLogger = logger.child('admin');
 
-// ============================================================================
 // Input Schemas
-// ============================================================================
 
 /**
  * Input for finding corrupted subscriptions
@@ -52,9 +50,7 @@ const VerifyInputSchema = z.object({
   provider: ProviderSchema.optional(),
 });
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const adminRouter = router({
   /**

@@ -16,9 +16,7 @@
 
 import type { ItemCardData } from '../components/item-card';
 
-// ============================================================================
 // Test Data
-// ============================================================================
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -36,9 +34,7 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-// ============================================================================
 // Type Definitions (mirrored from component for testing)
-// ============================================================================
 
 interface SwipeableInboxItemProps {
   item: ItemCardData;
@@ -47,9 +43,7 @@ interface SwipeableInboxItemProps {
   index?: number;
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('SwipeableInboxItem', () => {
   describe('component configuration', () => {

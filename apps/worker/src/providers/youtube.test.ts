@@ -32,9 +32,7 @@ import {
 } from './youtube';
 import { mockLogger } from '../test/mock-logger';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock googleapis
 const mockChannelsList = vi.fn();
@@ -72,9 +70,7 @@ vi.mock('../lib/crypto', () => ({
   decrypt: vi.fn((value: string) => Promise.resolve(value.replace('encrypted:', ''))),
 }));
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 function createMockYouTubeClient(): YouTubeClient {
   return {
@@ -216,9 +212,7 @@ function createYouTubeApiError(status: number, message: string) {
   return error;
 }
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 beforeEach(() => {
   // Reset all mocks before each test to clear any queued mockResolvedValueOnce calls
@@ -242,9 +236,7 @@ beforeEach(() => {
   );
 });
 
-// ============================================================================
 // createYouTubeClient Tests
-// ============================================================================
 
 describe('createYouTubeClient', () => {
   it('should create client with OAuth2 credentials', () => {
@@ -292,9 +284,7 @@ describe('createYouTubeClient', () => {
   });
 });
 
-// ============================================================================
 // getYouTubeClientForConnection Tests
-// ============================================================================
 
 describe('getYouTubeClientForConnection', () => {
   // Note: This function combines token refresh with client creation.
@@ -335,9 +325,7 @@ describe('getYouTubeClientForConnection', () => {
   });
 });
 
-// ============================================================================
 // getChannelDetails Tests
-// ============================================================================
 
 describe('getChannelDetails', () => {
   it('should fetch channel details successfully', async () => {
@@ -387,9 +375,7 @@ describe('getChannelDetails', () => {
   });
 });
 
-// ============================================================================
 // getUploadsPlaylistId Tests (New deterministic function - no API call)
-// ============================================================================
 
 describe('getUploadsPlaylistId', () => {
   it('should convert UC prefix to UU prefix', () => {
@@ -419,9 +405,7 @@ describe('getUploadsPlaylistId', () => {
   });
 });
 
-// ============================================================================
 // fetchRecentVideos Tests
-// ============================================================================
 
 describe('fetchRecentVideos', () => {
   it('should fetch recent videos from uploads playlist', async () => {
@@ -494,9 +478,7 @@ describe('fetchRecentVideos', () => {
   });
 });
 
-// ============================================================================
 // fetchVideoDetails Tests
-// ============================================================================
 
 describe('fetchVideoDetails', () => {
   it('should fetch video details with duration and description', async () => {
@@ -624,9 +606,7 @@ describe('fetchVideoDetails', () => {
   });
 });
 
-// ============================================================================
 // fetchVideoDetailsBatched Tests
-// ============================================================================
 
 describe('fetchVideoDetailsBatched', () => {
   beforeEach(() => {
@@ -935,9 +915,7 @@ describe('fetchVideoDetailsBatched', () => {
   });
 });
 
-// ============================================================================
 // getUserSubscriptions Tests
-// ============================================================================
 
 describe('getUserSubscriptions', () => {
   it('should fetch user subscriptions', async () => {
@@ -999,9 +977,7 @@ describe('getUserSubscriptions', () => {
   });
 });
 
-// ============================================================================
 // getAllUserSubscriptions Tests
-// ============================================================================
 
 /**
  * Helper function to create multiple mock subscriptions
@@ -1197,9 +1173,7 @@ describe('getAllUserSubscriptions', () => {
   });
 });
 
-// ============================================================================
 // searchChannels Tests
-// ============================================================================
 
 describe('searchChannels', () => {
   it('should search for channels', async () => {
@@ -1264,9 +1238,7 @@ describe('searchChannels', () => {
   });
 });
 
-// ============================================================================
 // extractVideoInfo Tests
-// ============================================================================
 
 describe('extractVideoInfo', () => {
   it('should extract all video info from playlist item', () => {
@@ -1392,9 +1364,7 @@ describe('extractVideoInfo', () => {
   });
 });
 
-// ============================================================================
 // Error Handling Tests
-// ============================================================================
 
 describe('error handling', () => {
   describe('401 Unauthorized errors', () => {
@@ -1526,9 +1496,7 @@ describe('error handling', () => {
   });
 });
 
-// ============================================================================
 // Integration Scenarios
-// ============================================================================
 
 describe('integration scenarios', () => {
   it('should handle full channel subscription flow', async () => {

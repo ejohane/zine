@@ -10,9 +10,7 @@ import { UserItemState } from '@/hooks/use-items-trpc';
 
 import type { ItemDetailItem } from '@/app/item/detail/types';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockBookmarkMutation = { mutate: jest.fn(), isPending: false };
 const mockArchiveMutation = { mutate: jest.fn(), isPending: false };
@@ -84,9 +82,7 @@ jest.mock('@/hooks/use-items-trpc', () => ({
   useMarkItemOpened: () => mockMarkOpenedMutation,
 }));
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 const baseItem = {
   id: 'item-1',

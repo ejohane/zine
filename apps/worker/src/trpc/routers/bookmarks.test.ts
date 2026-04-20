@@ -14,9 +14,7 @@ import { TRPCError } from '@trpc/server';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 import type { BookmarkSaveStatus } from './bookmarks';
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 
@@ -92,9 +90,7 @@ function createMockSaveInput(
   };
 }
 
-// ============================================================================
 // Mock Router Implementation for Testing
-// ============================================================================
 
 /**
  * Simulated item and userItem storage
@@ -251,9 +247,7 @@ function createMockBookmarksCaller(options: {
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Bookmarks Router', () => {
   beforeEach(() => {
@@ -264,9 +258,7 @@ describe('Bookmarks Router', () => {
     vi.resetAllMocks();
   });
 
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     it('should reject unauthenticated requests to preview', async () => {
@@ -292,9 +284,7 @@ describe('Bookmarks Router', () => {
     });
   });
 
-  // ==========================================================================
   // bookmarks.preview Tests
-  // ==========================================================================
 
   describe('bookmarks.preview', () => {
     it('should return preview for valid YouTube URL', async () => {
@@ -377,9 +367,7 @@ describe('Bookmarks Router', () => {
     });
   });
 
-  // ==========================================================================
   // bookmarks.save Tests
-  // ==========================================================================
 
   describe('bookmarks.save', () => {
     it('should create new item and user_item for first-time bookmark', async () => {
@@ -734,9 +722,7 @@ describe('Bookmarks Router', () => {
   });
 });
 
-// ============================================================================
 // Type Tests
-// ============================================================================
 
 describe('BookmarkSaveStatus Type', () => {
   it('should have correct literal types', () => {

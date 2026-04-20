@@ -55,10 +55,6 @@ import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /** Direction from which item should enter (for rollback animation) */
 export type EnterDirection = 'left' | 'right' | 'fade' | null;
 
@@ -77,10 +73,6 @@ export interface SwipeableInboxItemProps {
 
 /** Direction of exit animation */
 export type ExitDirection = 'left' | 'right' | null;
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Width of action panel in pixels - ~100px for finger-friendly tap target */
 const ACTION_WIDTH = 100;
@@ -107,10 +99,6 @@ const SWIPE_FRICTION = 2;
 
 /** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
 const EXIT_ANIMATION_DURATION = 250;
-
-// ============================================================================
-// Action Panel Components
-// ============================================================================
 
 interface ActionPanelProps {
   progress: SharedValue<number>;
@@ -178,10 +166,6 @@ function RightActionPanel({ progress }: ActionPanelProps) {
   );
 }
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
 /** Context menu action names (match title for handler dispatch) */
 const CONTEXT_MENU_ACTION = {
   SAVE_TO_LIBRARY: 'Save to Library',
@@ -206,14 +190,10 @@ export function SwipeableInboxItem({
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
 
-  // Track when a swipe action is being performed to prevent navigation
-  // This prevents the ItemCard's onPress from firing when completing a swipe gesture
+  // Prevents ItemCard's onPress from firing when completing a swipe gesture
   const isSwipeActionPending = useRef(false);
 
-  /**
-   * Execute the actual action callback after exit animation starts
-   * Called via runOnJS from animation worklet
-   */
+  /** Called via runOnJS from animation worklet */
   const executeAction = useCallback(
     (direction: 'left' | 'right') => {
       if (direction === 'left') {
@@ -225,92 +205,51 @@ export function SwipeableInboxItem({
     [item.id, onArchive, onBookmark]
   );
 
-  /**
-   * Handle bookmark action (from context menu or swipe)
-   * Triggers haptic feedback and exit animation, then calls callback
-   */
   const handleBookmarkAction = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setExitDirection('right');
     onBookmark(item.id);
   }, [item.id, onBookmark]);
 
-  /**
-   * Handle archive action (from context menu or swipe)
-   * Triggers haptic feedback and exit animation, then calls callback
-   */
   const handleArchiveAction = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExitDirection('left');
     onArchive(item.id);
   }, [item.id, onArchive]);
 
-  /**
-   * Render left actions (Save) - appears when swiping right
-   */
   const renderLeftActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
     return <LeftActionPanel progress={progress} />;
   };
 
-  /**
-   * Render right actions (Archive) - appears when swiping left
-   */
   const renderRightActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
     return <RightActionPanel progress={progress} />;
   };
 
-  /**
-   * Handle swipeable will open (swipe gesture is about to complete)
-   * Sets flag to prevent ItemCard navigation from firing
-   */
   const handleSwipeableWillOpen = useCallback(() => {
     isSwipeActionPending.current = true;
   }, []);
 
-  /**
-   * Handle swipeable open (full swipe completed)
-   * Triggers haptic feedback, exit animation, then executes the action callback
-   */
   const handleSwipeableOpen = useCallback(
     (direction: 'left' | 'right') => {
-      // Trigger haptic feedback on action completion
-      // Save (swipe right) = Medium haptic (prominent, positive action)
-      // Archive (swipe left) = Light haptic (subtle, neutral action)
       if (direction === 'right') {
-        // Save action - more satisfying feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       } else {
-        // Archive action - subtle feedback
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
 
-      // Set exit direction to trigger exit animation.
-      // Each action exits in the same direction as its swipe.
       setExitDirection(direction);
-
-      // Execute the action callback
       executeAction(direction);
     },
     [executeAction]
   );
 
-  /**
-   * Handle item press - only navigate if not in the middle of a swipe action
-   * Prevents navigation when completing a swipe gesture
-   */
   const handleItemPress = useCallback(() => {
     if (isSwipeActionPending.current) {
-      // Swipe action is pending, don't navigate
       return;
     }
-    // Navigate to item detail page
     router.push(`/item/${item.id}` as never);
   }, [router, item.id]);
 
-  /**
-   * Handle context menu action selection
-   * Dispatches to the appropriate handler based on action name
-   */
   const handleContextMenuPress = useCallback(
     (e: { nativeEvent: { name: string } }) => {
       const { name } = e.nativeEvent;
@@ -323,10 +262,6 @@ export function SwipeableInboxItem({
     [handleBookmarkAction, handleArchiveAction]
   );
 
-  /**
-   * Handle VoiceOver accessibility action
-   * Provides non-gesture access to bookmark/archive for users who can't swipe
-   */
   const handleAccessibilityAction = useCallback(
     (event: AccessibilityActionEvent) => {
       switch (event.nativeEvent.actionName) {
@@ -341,8 +276,6 @@ export function SwipeableInboxItem({
     [handleBookmarkAction, handleArchiveAction]
   );
 
-  // Determine exit animation based on direction
-  // Archive exits left (SlideOutLeft), Bookmark exits right (SlideOutRight)
   const exitAnimation =
     exitDirection === 'left'
       ? SlideOutLeft.duration(EXIT_ANIMATION_DURATION)
@@ -350,7 +283,6 @@ export function SwipeableInboxItem({
         ? SlideOutRight.duration(EXIT_ANIMATION_DURATION)
         : undefined;
 
-  // Context menu actions - native iOS menu with system icons
   const contextMenuActions = [
     {
       title: CONTEXT_MENU_ACTION.SAVE_TO_LIBRARY,
@@ -362,14 +294,11 @@ export function SwipeableInboxItem({
     },
   ];
 
-  // Accessibility actions for VoiceOver users
   const accessibilityActions = [
     { name: ACCESSIBILITY_ACTION.BOOKMARK, label: 'Save to Library' },
     { name: ACCESSIBILITY_ACTION.ARCHIVE, label: 'Archive' },
   ];
 
-  // Don't render if item is exiting (animation will handle unmount)
-  // The exiting prop triggers Reanimated's exit animation before removal
   return (
     <Animated.View
       exiting={exitAnimation}
@@ -388,14 +317,9 @@ export function SwipeableInboxItem({
       >
         <ReanimatedSwipeable
           ref={swipeableRef}
-          // Friction controls drag resistance (1-3 range, 2 is balanced)
-          // @see zine-2qn for tuning rationale
           friction={SWIPE_FRICTION}
           leftThreshold={SWIPE_THRESHOLD}
           rightThreshold={SWIPE_THRESHOLD}
-          // Overshoot disabled to prevent bouncing past action panel
-          // Creates crisp, predictable stopping at threshold
-          // Spring snap-back handles release animation (~150-300ms)
           overshootLeft={false}
           overshootRight={false}
           renderLeftActions={renderLeftActions}
@@ -409,10 +333,6 @@ export function SwipeableInboxItem({
     </Animated.View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   actionPanel: {

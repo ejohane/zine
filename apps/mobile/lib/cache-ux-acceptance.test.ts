@@ -15,9 +15,7 @@ import {
 } from '@/lib/query-persistence';
 import { getTabPrefetchTargets } from '@/hooks/use-prefetch';
 
-// ============================================================================
 // Acceptance Criteria Tests
-// ============================================================================
 
 describe('Cache UX Acceptance Criteria (gh-64)', () => {
   describe('Persistence + hydration', () => {
@@ -87,9 +85,7 @@ describe('Cache UX Acceptance Criteria (gh-64)', () => {
   });
 });
 
-// ============================================================================
 // Manual Testing Checklist
-// ============================================================================
 
 describe('Manual Testing Checklist', () => {
   it('documents cache hydration steps', () => {
@@ -148,9 +144,7 @@ describe('Manual Testing Checklist', () => {
   });
 });
 
-// ============================================================================
 // Final Acceptance Summary
-// ============================================================================
 
 describe('Final Acceptance Summary', () => {
   it('covers gh-64 cache UX acceptance criteria', () => {

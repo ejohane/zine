@@ -19,9 +19,7 @@
 import { renderHook, act } from '@testing-library/react-hooks';
 import type { AppStateStatus } from 'react-native';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock sync async mutation
 const mockMutate = jest.fn();
@@ -98,9 +96,7 @@ jest.mock('@/providers/auth-resume-gate', () => ({
   }),
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import { useSyncAll } from './use-sync-all';
 
@@ -118,9 +114,7 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('useSyncAll (async pattern)', () => {
   describe('initial state', () => {

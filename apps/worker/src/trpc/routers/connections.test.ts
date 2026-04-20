@@ -23,9 +23,7 @@ import {
   mockDbResults,
 } from '../test-utils';
 
-// ============================================================================
 // Mock Dependencies
-// ============================================================================
 
 // Mock OAuth state functions
 const mockRegisterOAuthState = vi.fn();
@@ -62,9 +60,7 @@ const mockDbDelete = vi.fn();
 const mockDbQueryFindFirst = vi.fn();
 const mockDbQueryFindMany = vi.fn();
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 function createMockContext(userId: string | null = TEST_USER_ID) {
   const mockEnv = createMockEnv();
@@ -222,9 +218,7 @@ function createMockConnectionsCaller(ctx: ReturnType<typeof createMockContext>) 
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Connections Router', () => {
   const MOCK_NOW = 1705320000000;
@@ -251,9 +245,7 @@ describe('Connections Router', () => {
     vi.useRealTimers();
   });
 
-  // ==========================================================================
   // Authentication Tests
-  // ==========================================================================
 
   describe('Authentication', () => {
     it('should reject unauthenticated requests to registerState', async () => {
@@ -315,9 +307,7 @@ describe('Connections Router', () => {
     });
   });
 
-  // ==========================================================================
   // State Registration Tests
-  // ==========================================================================
 
   describe('connections.registerState', () => {
     it('should register OAuth state successfully for YouTube', async () => {
@@ -393,9 +383,7 @@ describe('Connections Router', () => {
     });
   });
 
-  // ==========================================================================
   // OAuth Callback Tests
-  // ==========================================================================
 
   describe('connections.callback', () => {
     it('should complete OAuth flow successfully for YouTube', async () => {
@@ -566,9 +554,7 @@ describe('Connections Router', () => {
     });
   });
 
-  // ==========================================================================
   // Connection List Tests
-  // ==========================================================================
 
   describe('connections.list', () => {
     it('should return null for both providers when no connections', async () => {
@@ -646,9 +632,7 @@ describe('Connections Router', () => {
     });
   });
 
-  // ==========================================================================
   // Disconnect Tests
-  // ==========================================================================
 
   describe('connections.disconnect', () => {
     it('should disconnect YouTube successfully', async () => {
@@ -715,9 +699,7 @@ describe('Connections Router', () => {
     });
   });
 
-  // ==========================================================================
   // Connection Update on Reconnect Tests
-  // ==========================================================================
 
   describe('Connection update on reconnect', () => {
     it('should update existing connection when reconnecting', async () => {

@@ -2,7 +2,18 @@
 import { z } from 'zod';
 import { ulid } from 'ulid';
 import { TRPCError } from '@trpc/server';
-import { eq, and, desc, or, lt, isNotNull, sql, inArray, type SQL, type SQLWrapper } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  desc,
+  or,
+  lt,
+  isNotNull,
+  sql,
+  inArray,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
@@ -25,10 +36,6 @@ import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '..
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
 import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export type ItemTag = {
   id: string;
@@ -104,9 +111,7 @@ type HomeItemView = Pick<
   | 'lastOpenedAt'
 >;
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Normalize a string value that might contain the literal string "null" to actual null.
@@ -373,9 +378,7 @@ async function insertConsumptionEvent(
   });
 }
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 const FilterSchema = z
   .object({
@@ -392,9 +395,7 @@ const PaginationSchema = z.object({
   limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const itemsRouter = router({
   /**

@@ -24,9 +24,7 @@ import {
   type SpotifyShow,
 } from './spotify';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock token-refresh module
 vi.mock('../lib/token-refresh', () => ({
@@ -58,9 +56,7 @@ vi.mock('@spotify/web-api-ts-sdk', () => ({
   },
 }));
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
@@ -123,9 +119,7 @@ function createMockSDKEpisode(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -137,9 +131,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// ============================================================================
 // createSpotifyClient Tests
-// ============================================================================
 
 describe('createSpotifyClient', () => {
   it('should create a client with valid credentials', () => {
@@ -179,9 +171,7 @@ describe('createSpotifyClient', () => {
   });
 });
 
-// ============================================================================
 // getSpotifyClientForConnection Tests
-// ============================================================================
 
 describe('getSpotifyClientForConnection', () => {
   it('should get valid access token and create client', async () => {
@@ -196,9 +186,7 @@ describe('getSpotifyClientForConnection', () => {
   });
 });
 
-// ============================================================================
 // getUserSavedShows Tests
-// ============================================================================
 
 describe('getUserSavedShows', () => {
   it('should fetch saved shows with default parameters', async () => {
@@ -266,9 +254,7 @@ describe('getUserSavedShows', () => {
   });
 });
 
-// ============================================================================
 // getAllUserSavedShows Tests
-// ============================================================================
 
 describe('getAllUserSavedShows', () => {
   it('should fetch all shows with pagination', async () => {
@@ -327,9 +313,7 @@ describe('getAllUserSavedShows', () => {
   });
 });
 
-// ============================================================================
 // getShowEpisodes Tests
-// ============================================================================
 
 describe('getShowEpisodes', () => {
   it('should fetch episodes for a show with default parameters', async () => {
@@ -405,9 +389,7 @@ describe('getShowEpisodes', () => {
   });
 });
 
-// ============================================================================
 // getLatestEpisode Tests
-// ============================================================================
 
 describe('getLatestEpisode', () => {
   it('should return the latest episode', async () => {
@@ -433,9 +415,7 @@ describe('getLatestEpisode', () => {
   });
 });
 
-// ============================================================================
 // getEpisode Tests
-// ============================================================================
 
 describe('getEpisode', () => {
   const mockFetch = vi.fn();
@@ -578,9 +558,7 @@ describe('getEpisode', () => {
   });
 });
 
-// ============================================================================
 // getShow Tests
-// ============================================================================
 
 describe('getShow', () => {
   it('should fetch show details by ID', async () => {
@@ -621,9 +599,7 @@ describe('getShow', () => {
   });
 });
 
-// ============================================================================
 // getMultipleShows Tests
-// ============================================================================
 
 describe('getMultipleShows', () => {
   it('should return empty array for empty input', async () => {
@@ -773,9 +749,7 @@ describe('getMultipleShows', () => {
   });
 });
 
-// ============================================================================
 // searchShows Tests
-// ============================================================================
 
 describe('searchShows', () => {
   it('should search for shows with default limit', async () => {
@@ -840,9 +814,7 @@ describe('searchShows', () => {
   });
 });
 
-// ============================================================================
 // checkSavedShows Tests
-// ============================================================================
 
 describe('checkSavedShows', () => {
   it('should check if shows are saved', async () => {
@@ -865,9 +837,7 @@ describe('checkSavedShows', () => {
   });
 });
 
-// ============================================================================
 // Error Handling Tests
-// ============================================================================
 
 describe('error handling', () => {
   describe('401 Unauthorized', () => {
@@ -1000,9 +970,7 @@ describe('error handling', () => {
   });
 });
 
-// ============================================================================
 // Edge Cases
-// ============================================================================
 
 describe('edge cases', () => {
   it('should handle shows with no images', async () => {
@@ -1089,9 +1057,7 @@ describe('edge cases', () => {
   });
 });
 
-// ============================================================================
 // Show Metadata Cache Tests
-// ============================================================================
 
 import {
   getMultipleShowsWithCache,

@@ -30,10 +30,6 @@ import { buildSubscriptionsSummary } from '@/lib/subscription-sources';
 import { trpc } from '@/lib/trpc';
 import { useAuthAvailability } from '@/providers/auth-provider';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface SettingsRowProps {
   title: string;
   subtitle?: string;
@@ -45,10 +41,6 @@ interface SettingsRowProps {
   showAlertDot?: boolean;
   alertDotTestID?: string;
 }
-
-// ============================================================================
-// Components
-// ============================================================================
 
 /**
  * Reusable settings row component
@@ -104,10 +96,6 @@ function SettingsRow({
 
   return content;
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function SettingsScreen() {
   const { isEnabled } = useAuthAvailability();
@@ -295,10 +283,6 @@ function SettingsScreenContent({
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

@@ -33,9 +33,7 @@ import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
 import { Platform } from 'react-native';
 
-// ============================================================================
 // Test Data Factory
-// ============================================================================
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -53,9 +51,7 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-// ============================================================================
 // Platform Constants
-// ============================================================================
 
 /** Platforms supported by this feature */
 const SUPPORTED_PLATFORMS = ['ios', 'android'] as const;
@@ -103,9 +99,7 @@ const SWIPE_CONFIG = {
   actionWidth: 100,
 } as const;
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('SwipeableInboxItem Cross-Platform Tests', () => {
   describe('Platform Support', () => {

@@ -34,10 +34,6 @@ import { serializeError } from '../utils/error-utils';
 import { youtubeProviderConfig } from './youtube-poller';
 import { spotifyProviderConfig } from './spotify-poller';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Distributed lock key for YouTube polling cron */
 const YOUTUBE_POLL_LOCK_KEY = 'cron:poll-youtube:lock';
 
@@ -55,10 +51,6 @@ const DEFAULT_USER_CONCURRENCY = 10;
 
 /** Scheduler-specific logger */
 const schedulerLogger = pollLogger.child('scheduler');
-
-// ============================================================================
-// Types
-// ============================================================================
 
 /**
  * Result of a polling run
@@ -93,9 +85,7 @@ interface UserBatchResult {
   error?: string;
 }
 
-// ============================================================================
 // Provider Polling Entrypoint
-// ============================================================================
 
 /**
  * Poll due subscriptions for a specific provider.
@@ -186,9 +176,7 @@ export async function pollProviderSubscriptions(
   }
 }
 
-// ============================================================================
 // Generic Provider Batch Processing
-// ============================================================================
 
 /**
  * Process subscriptions sequentially using pollSingle.
@@ -507,9 +495,7 @@ function aggregateUserResults(userResults: UserBatchResult[]): BatchResult {
   };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Parse USER_PROCESSING_CONCURRENCY env value into a safe positive integer.

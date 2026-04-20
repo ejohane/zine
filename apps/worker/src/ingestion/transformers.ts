@@ -12,9 +12,7 @@ import { ContentType, Provider } from '@zine/shared';
 import { ulid } from 'ulid';
 import { parseSpotifyDate } from '../lib/timestamps';
 
-// ============================================================================
 // HTML Entity Decoding
-// ============================================================================
 
 /**
  * Common HTML entity mappings for decoding API responses.
@@ -68,10 +66,6 @@ function normalizeSummaryText(summary?: string): string | undefined {
   return stripped.length > 0 ? stripped : undefined;
 }
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Represents a new item to be inserted into the items table.
  * Uses Unix milliseconds for timestamps (matches new tables convention).
@@ -104,9 +98,7 @@ export class TransformError extends Error {
   }
 }
 
-// ============================================================================
 // YouTube Transformer
-// ============================================================================
 
 /**
  * YouTube Playlist Item structure from the YouTube Data API v3.
@@ -181,9 +173,7 @@ export function transformYouTubeVideo(
   };
 }
 
-// ============================================================================
 // Spotify Transformer
-// ============================================================================
 
 /**
  * Spotify Episode structure from the Spotify Web API.
@@ -250,9 +240,7 @@ export function transformSpotifyEpisode(
   };
 }
 
-// ============================================================================
 // RSS Transformer
-// ============================================================================
 
 export interface RssEntryForTransform {
   providerId: string;

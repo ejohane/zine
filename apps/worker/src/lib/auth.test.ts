@@ -20,9 +20,7 @@ import {
 import type { Bindings } from '../types';
 import { Provider } from '@zine/shared';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock jose module
 vi.mock('jose', async () => {
@@ -38,9 +36,7 @@ vi.mock('jose', async () => {
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const MOCK_JWKS_URL = 'https://clerk.example.com/.well-known/jwks.json';
 const MOCK_TOKEN = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test.signature';
@@ -53,9 +49,7 @@ const mockEnv: Bindings = {
   OAUTH_REDIRECT_URI: 'zine://oauth/callback',
 } as Bindings;
 
-// ============================================================================
 // verifyClerkToken Tests
-// ============================================================================
 
 describe('verifyClerkToken', () => {
   beforeEach(() => {
@@ -191,9 +185,7 @@ describe('verifyClerkToken', () => {
   });
 });
 
-// ============================================================================
 // clearJWKSCache Tests
-// ============================================================================
 
 describe('clearJWKSCache', () => {
   beforeEach(() => {
@@ -254,9 +246,7 @@ describe('clearJWKSCache', () => {
   });
 });
 
-// ============================================================================
 // exchangeCodeForTokens Tests
-// ============================================================================
 
 describe('exchangeCodeForTokens', () => {
   beforeEach(() => {
@@ -463,9 +453,7 @@ describe('exchangeCodeForTokens', () => {
   });
 });
 
-// ============================================================================
 // getProviderUserInfo Tests
-// ============================================================================
 
 describe('getProviderUserInfo', () => {
   beforeEach(() => {

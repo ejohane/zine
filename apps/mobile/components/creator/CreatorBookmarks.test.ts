@@ -9,9 +9,7 @@
  * - Infinite scroll pagination
  */
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockUseCreatorBookmarks = jest.fn();
 const mockMapContentType = jest.fn((type: string) => type.toLowerCase());
@@ -80,9 +78,7 @@ jest.mock('@/constants/theme', () => ({
   },
 }));
 
-// ============================================================================
 // Mock Data Factories
-// ============================================================================
 
 interface MockBookmark {
   id: string;
@@ -117,9 +113,7 @@ function createMockBookmark(overrides: Partial<MockBookmark> = {}): MockBookmark
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('CreatorBookmarks', () => {
   beforeEach(() => {

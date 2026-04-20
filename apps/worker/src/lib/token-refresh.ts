@@ -19,10 +19,6 @@ import { decrypt, encrypt } from './crypto';
 import { tryAcquireLock, releaseLock } from './locks';
 import { providerConnections } from '../db/schema';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Buffer time before expiry to trigger refresh (5 minutes in ms) */
 const REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
@@ -32,9 +28,7 @@ const REFRESH_LOCK_TTL = 60;
 /** Default time to wait before checking for updated token when another worker holds the lock */
 const DEFAULT_LOCK_WAIT_MS = 2000;
 
-// ============================================================================
 // Error Types
-// ============================================================================
 
 /**
  * Error codes for token refresh operations
@@ -61,10 +55,6 @@ export class TokenRefreshError extends Error {
     this.details = details;
   }
 }
-
-// ============================================================================
-// Types
-// ============================================================================
 
 /**
  * Provider connection data from database
@@ -109,9 +99,7 @@ interface RefreshedTokens {
   refreshToken?: string; // May be rotated by provider
 }
 
-// ============================================================================
 // Main API
-// ============================================================================
 
 /**
  * Get a valid access token for a provider connection
@@ -150,9 +138,7 @@ export async function getValidAccessToken(
   return refreshWithLock(connection, env);
 }
 
-// ============================================================================
 // Internal Functions
-// ============================================================================
 
 /**
  * Refresh token with distributed locking to prevent concurrent refreshes

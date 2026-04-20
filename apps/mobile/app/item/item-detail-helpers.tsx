@@ -2,9 +2,7 @@ import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Text } from 'react-native';
 
-// ============================================================================
 // FAB Configuration by Provider
-// ============================================================================
 
 type FabConfig = {
   backgroundColor: string;
@@ -43,9 +41,7 @@ export function getFabConfig(provider: string): FabConfig {
   }
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Extract @handle from X/Twitter URL
