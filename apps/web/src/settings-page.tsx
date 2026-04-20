@@ -1,19 +1,146 @@
-import { BookmarkCheck, ChevronRight, LogOut, Newspaper, Settings } from 'lucide-react';
+import {
+  BookmarkCheck,
+  ChevronRight,
+  LogOut,
+  Mail,
+  Newspaper,
+  Podcast,
+  Rss,
+  Settings,
+  Sparkles,
+  Video,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link, NavLink } from 'react-router-dom';
 
 import { AppWordmark } from './app-wordmark';
-import { Button, cn } from './components';
+import { Badge, Button, LinkButton, Surface, cn } from './components';
 import { MobileTabBar } from './components/mobile-tab-bar';
+import { sourceConfigs, supportedSources, type SupportedSource } from './lib/onboarding';
 import { usePwaState } from './lib/pwa';
-import { useAppSession, useAuthAvailability } from './lib/trpc';
+import { trpc, useAppSession, useAuthAvailability } from './lib/trpc';
 
-function SubscriptionsSection() {
+function getConnectionStatus(
+  connections:
+    | {
+        YOUTUBE: { status: string } | null;
+        SPOTIFY: { status: string } | null;
+        GMAIL: { status: string } | null;
+      }
+    | undefined,
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'
+) {
+  return connections?.[provider]?.status ?? null;
+}
+
+function getSourceSummary(
+  source: SupportedSource,
+  counts: Record<SupportedSource, number>,
+  connections:
+    | {
+        YOUTUBE: { status: string } | null;
+        SPOTIFY: { status: string } | null;
+        GMAIL: { status: string } | null;
+      }
+    | undefined
+) {
+  if (source === 'RSS') {
+    return counts.RSS > 0
+      ? `${counts.RSS} active RSS feed${counts.RSS === 1 ? '' : 's'}`
+      : 'No RSS feeds added yet';
+  }
+
+  const status = getConnectionStatus(connections, source);
+  if (status === 'ACTIVE') {
+    return counts[source] > 0
+      ? `${counts[source]} active ${source === 'GMAIL' ? 'newsletter' : 'source'}${
+          counts[source] === 1 ? '' : 's'
+        }`
+      : 'Connected and ready for import';
+  }
+
+  return 'Not connected yet';
+}
+
+function getSourceBadge(
+  source: SupportedSource,
+  counts: Record<SupportedSource, number>,
+  connections:
+    | {
+        YOUTUBE: { status: string } | null;
+        SPOTIFY: { status: string } | null;
+        GMAIL: { status: string } | null;
+      }
+    | undefined
+) {
+  if (source === 'RSS') {
+    return counts.RSS > 0 ? 'active' : 'manual';
+  }
+
+  return getConnectionStatus(connections, source) === 'ACTIVE' ? 'connected' : 'setup';
+}
+
+const sourceIcons: Record<SupportedSource, LucideIcon> = {
+  SPOTIFY: Podcast,
+  YOUTUBE: Video,
+  GMAIL: Mail,
+  RSS: Rss,
+};
+
+function SourcesSection() {
+  const connectionsQuery = trpc.subscriptions.connections.list.useQuery();
+  const subscriptionsQuery = trpc.subscriptions.list.useQuery({ limit: 100 });
+  const newslettersStatsQuery = trpc.subscriptions.newsletters.stats.useQuery();
+  const rssStatsQuery = trpc.subscriptions.rss.stats.useQuery();
+
+  const subscriptions = subscriptionsQuery.data?.items ?? [];
+  const counts: Record<SupportedSource, number> = {
+    YOUTUBE: subscriptions.filter((subscription) => subscription.provider === 'YOUTUBE').length,
+    SPOTIFY: subscriptions.filter((subscription) => subscription.provider === 'SPOTIFY').length,
+    GMAIL: newslettersStatsQuery.data?.active ?? 0,
+    RSS: rssStatsQuery.data?.active ?? 0,
+  };
+
   return (
     <div className="settings-page__section">
-      <h2 className="settings-page__section-title">Subscriptions</h2>
-      <p className="settings-page__section-copy">
-        Manage your subscriptions here. Subscription controls are coming soon.
-      </p>
+      <div className="group-panel__header">
+        <div>
+          <h2 className="settings-page__section-title">Sources</h2>
+          <p className="settings-page__section-copy">
+            Launch the guided setup whenever you want to connect or expand your source mix.
+          </p>
+        </div>
+        <LinkButton to="/welcome?origin=settings" aria-label="Launch guided setup">
+          <Sparkles size={16} aria-hidden="true" />
+          Launch guided setup
+        </LinkButton>
+      </div>
+
+      <div className="source-grid">
+        {supportedSources.map((source) => {
+          const Icon = sourceIcons[source];
+          return (
+            <div key={source} className="source-card">
+              <Surface className="source-card__surface">
+                <div className="source-card__header">
+                  <div className="source-card__icon" aria-hidden="true">
+                    <Icon size={20} />
+                  </div>
+                  <div className="source-card__heading">
+                    <p className="eyebrow">{sourceConfigs[source].eyebrow}</p>
+                    <h2>{sourceConfigs[source].title}</h2>
+                  </div>
+                </div>
+                <p>{getSourceSummary(source, counts, connectionsQuery.data)}</p>
+                <div className="source-card__footer">
+                  <Badge>{getSourceBadge(source, counts, connectionsQuery.data)}</Badge>
+                  <span>{sourceConfigs[source].summary}</span>
+                </div>
+              </Surface>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -154,7 +281,7 @@ export function SettingsPage() {
               </nav>
 
               <div className="settings-page__content">
-                <SubscriptionsSection />
+                <SourcesSection />
                 <InstallAppSection
                   installAvailability={installAvailability}
                   promptInstall={promptInstall}

@@ -17,6 +17,9 @@ vi.mock('./oauth-callback-page', () => ({
 vi.mock('./settings-page', () => ({
   SettingsPage: () => <div>Settings page</div>,
 }));
+vi.mock('./welcome-page', () => ({
+  WelcomePage: () => <div>Welcome page</div>,
+}));
 
 vi.mock('./protected-route', () => ({
   ProtectedRoute: ({ children }: PropsWithChildren) => <>{children}</>,
@@ -79,5 +82,10 @@ describe('App routes', () => {
 
     renderAppAt('/settings');
     expect(await screen.findByText('Settings page')).toBeVisible();
+
+    cleanup();
+
+    renderAppAt('/welcome');
+    expect(await screen.findByText('Welcome page')).toBeVisible();
   });
 });

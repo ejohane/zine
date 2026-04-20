@@ -34,7 +34,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   }
 
   if (authMode === 'development-bypass') {
-    return <Navigate to="/bookmarks" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   return (
@@ -49,7 +49,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               path="/sign-in"
               routing="path"
               signUpUrl="/sign-up"
-              fallbackRedirectUrl="/bookmarks"
+              fallbackRedirectUrl="/welcome"
             />
           ) : (
             <SignUp
@@ -57,7 +57,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               path="/sign-up"
               routing="path"
               signInUrl="/sign-in"
-              fallbackRedirectUrl="/bookmarks"
+              fallbackRedirectUrl="/welcome"
             />
           )}
         </div>

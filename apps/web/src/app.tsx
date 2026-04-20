@@ -7,6 +7,7 @@ import { PwaProvider } from './lib/pwa';
 import { ProtectedRoute } from './protected-route';
 import { PwaSupport } from './pwa-support';
 import { SettingsPage } from './settings-page';
+import { WelcomePage } from './welcome-page';
 
 function LegacyItemRedirect() {
   const { bookmarkId } = useParams<{ bookmarkId: string }>();
@@ -54,6 +55,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/welcome"
+            element={
+              <ProtectedRoute>
+                <WelcomePage />
               </ProtectedRoute>
             }
           />

@@ -25,16 +25,16 @@ describe('AuthPage', () => {
     ).toBeVisible();
   });
 
-  test('redirects development bypass users to bookmarks', async () => {
+  test('redirects development bypass users to welcome', async () => {
     setAuthAvailability({ isEnabled: true, mode: 'development-bypass' });
 
     renderRoute(<AuthPage mode="sign-in" />, {
       route: '/sign-in',
       path: '/sign-in',
-      redirects: [{ path: '/bookmarks', element: <div>Bookmarks destination</div> }],
+      redirects: [{ path: '/welcome', element: <div>Welcome destination</div> }],
     });
 
-    expect(await screen.findByText('Bookmarks destination')).toBeVisible();
+    expect(await screen.findByText('Welcome destination')).toBeVisible();
   });
 
   test('renders the sign-in clerk widget with the expected routes', () => {
@@ -43,7 +43,7 @@ describe('AuthPage', () => {
     renderRoute(<AuthPage mode="sign-in" />);
 
     expect(screen.getByTestId('clerk-sign-in')).toHaveTextContent(
-      'SignIn /sign-in path /bookmarks /sign-up'
+      'SignIn /sign-in path /welcome /sign-up'
     );
   });
 
@@ -53,7 +53,7 @@ describe('AuthPage', () => {
     renderRoute(<AuthPage mode="sign-up" />);
 
     expect(screen.getByTestId('clerk-sign-up')).toHaveTextContent(
-      'SignUp /sign-up path /bookmarks /sign-in'
+      'SignUp /sign-up path /welcome /sign-in'
     );
   });
 });

@@ -9,8 +9,10 @@ type QueryResult<T> = {
   error: Error | null;
 };
 
-type MutationOptions = {
-  onSuccess?: (data: unknown, input: unknown) => void;
+type MutationOptions<TData = unknown, TInput = unknown> = {
+  onSuccess?: (data: TData, input: TInput) => void;
+  onError?: (error: Error) => void;
+  onSettled?: () => void;
 };
 
 type ItemsLibraryInput = {
@@ -37,7 +39,25 @@ type BookmarkPreviewInput = {
   url: string;
 };
 
-type MutationSpy = ReturnType<typeof vi.fn<(input: unknown) => void>>;
+type DiscoverAvailableInput = {
+  provider: string;
+};
+
+type NewslettersListInput = {
+  status?: string;
+  search?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+type RssDiscoverInput = {
+  url: string;
+  refresh?: boolean;
+};
+
+type MutationSpy<TInput = unknown, TOutput = unknown> = ReturnType<
+  typeof vi.fn<(input: TInput) => Promise<TOutput>>
+>;
 
 type SessionState = {
   isLoaded: boolean;
@@ -63,14 +83,25 @@ export const invalidateSpies = {
   itemsLibraryInvalidate: vi.fn(async () => undefined),
   itemsHomeInvalidate: vi.fn(async () => undefined),
   itemsListTagsInvalidate: vi.fn(async () => undefined),
+  subscriptionsConnectionsInvalidate: vi.fn(async () => undefined),
+  subscriptionsListInvalidate: vi.fn(async () => undefined),
+  subscriptionsDiscoverInvalidate: vi.fn(async () => undefined),
+  newslettersListInvalidate: vi.fn(async () => undefined),
+  newslettersStatsInvalidate: vi.fn(async () => undefined),
+  rssListInvalidate: vi.fn(async () => undefined),
+  rssStatsInvalidate: vi.fn(async () => undefined),
 };
 
 export const mutationSpies = {
-  toggleFinished: vi.fn<(input: unknown) => void>(),
-  unbookmark: vi.fn<(input: unknown) => void>(),
-  setTags: vi.fn<(input: unknown) => void>(),
-  markOpened: vi.fn<(input: unknown) => void>(),
-  bookmarkSave: vi.fn<(input: unknown) => void>(),
+  toggleFinished: vi.fn(async (_input: unknown) => undefined),
+  unbookmark: vi.fn(async (_input: unknown) => undefined),
+  setTags: vi.fn(async (_input: unknown) => undefined),
+  markOpened: vi.fn(async (_input: unknown) => undefined),
+  bookmarkSave: vi.fn(async (_input: unknown) => undefined),
+  subscriptionAdd: vi.fn(async (_input: unknown) => ({ success: true })),
+  newslettersSyncNow: vi.fn(async (_input: unknown) => ({ success: true })),
+  newslettersUpdateStatus: vi.fn(async (_input: unknown) => ({ success: true })),
+  rssAdd: vi.fn(async (_input: unknown) => ({ success: true })),
 };
 
 export const hookSpies = {
@@ -84,7 +115,7 @@ export const hookSpies = {
     (_input) => createQueryResult({})
   ),
   itemsListTagsUseQuery: vi.fn<() => QueryResult<{ tags: ItemTag[] }>>(() =>
-    createQueryResult({ data: { tags: [] } })
+    createQueryResult({ tags: [] })
   ),
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
@@ -104,29 +135,117 @@ export const hookSpies = {
   markOpenedUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.markOpened, options)
   ),
+  connectionsListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+    createQueryResult({
+      YOUTUBE: null,
+      SPOTIFY: null,
+      GMAIL: null,
+    })
+  ),
+  subscriptionsListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+    createQueryResult({ items: [], nextCursor: null, hasMore: false })
+  ),
+  discoverAvailableUseQuery: vi.fn<
+    (input: DiscoverAvailableInput, options?: unknown) => QueryResult<unknown>
+  >((_input) =>
+    createQueryResult({
+      items: [],
+      connectionRequired: false,
+    })
+  ),
+  subscriptionAddUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.subscriptionAdd, options)
+  ),
+  newslettersStatsUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+    createQueryResult({
+      total: 0,
+      active: 0,
+      hidden: 0,
+      unsubscribed: 0,
+      lastSyncAt: null,
+      lastSyncStatus: 'IDLE',
+      lastSyncError: null,
+    })
+  ),
+  newslettersListUseQuery: vi.fn<
+    (input?: NewslettersListInput, options?: unknown) => QueryResult<unknown>
+  >((_input) =>
+    createQueryResult({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    })
+  ),
+  newslettersSyncNowUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.newslettersSyncNow, options)
+  ),
+  newslettersUpdateStatusUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.newslettersUpdateStatus, options)
+  ),
+  rssStatsUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+    createQueryResult({
+      total: 0,
+      active: 0,
+      paused: 0,
+      unsubscribed: 0,
+      error: 0,
+      lastSuccessAt: null,
+    })
+  ),
+  rssListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+    createQueryResult({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    })
+  ),
+  rssDiscoverUseQuery: vi.fn<(input: RssDiscoverInput, options?: unknown) => QueryResult<unknown>>(
+    (_input) =>
+      createQueryResult({
+        sourceUrl: '',
+        sourceOrigin: '',
+        checkedAt: '',
+        cached: false,
+        candidates: [],
+      })
+  ),
+  rssAddUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.rssAdd, options)
+  ),
 };
 
-function createQueryResult<T>(overrides: Partial<QueryResult<T>> = {}): QueryResult<T> {
+function createQueryResult<T>(data?: T, overrides: Partial<QueryResult<T>> = {}): QueryResult<T> {
   return {
-    data: undefined,
+    data,
     isLoading: false,
     error: null,
     ...overrides,
   };
 }
 
-function createMutationResult(spy: MutationSpy, options?: MutationOptions) {
+function createMutationResult<TInput, TData>(
+  spy: MutationSpy<TInput, TData>,
+  options?: MutationOptions<TData, TInput>
+) {
+  const run = async (input: TInput) => {
+    try {
+      const result = await spy(input);
+      options?.onSuccess?.(result, input);
+      options?.onSettled?.();
+      return result;
+    } catch (error) {
+      options?.onError?.(error instanceof Error ? error : new Error(String(error)));
+      options?.onSettled?.();
+      throw error;
+    }
+  };
+
   return {
     isPending: false,
-    mutate: (input: unknown) => {
-      spy(input);
-      options?.onSuccess?.(undefined, input);
+    mutate: (input: TInput) => {
+      void run(input);
     },
-    mutateAsync: async (input: unknown) => {
-      spy(input);
-      options?.onSuccess?.(undefined, input);
-      return undefined;
-    },
+    mutateAsync: run,
     reset: vi.fn(),
   };
 }
@@ -149,6 +268,16 @@ export function resetTrpcMocks() {
     spy.mockReset();
   });
 
+  mutationSpies.toggleFinished.mockResolvedValue(undefined);
+  mutationSpies.unbookmark.mockResolvedValue(undefined);
+  mutationSpies.setTags.mockResolvedValue(undefined);
+  mutationSpies.markOpened.mockResolvedValue(undefined);
+  mutationSpies.bookmarkSave.mockResolvedValue(undefined);
+  mutationSpies.subscriptionAdd.mockResolvedValue({ success: true });
+  mutationSpies.newslettersSyncNow.mockResolvedValue({ success: true });
+  mutationSpies.newslettersUpdateStatus.mockResolvedValue({ success: true });
+  mutationSpies.rssAdd.mockResolvedValue({ success: true });
+
   hookSpies.itemsLibraryUseQuery.mockReset();
   hookSpies.itemsLibraryUseQuery.mockImplementation((_input) => createQueryResult());
 
@@ -159,9 +288,7 @@ export function resetTrpcMocks() {
   hookSpies.creatorsGetUseQuery.mockImplementation((_input) => createQueryResult());
 
   hookSpies.itemsListTagsUseQuery.mockReset();
-  hookSpies.itemsListTagsUseQuery.mockImplementation(() =>
-    createQueryResult({ data: { tags: [] } })
-  );
+  hookSpies.itemsListTagsUseQuery.mockImplementation(() => createQueryResult({ tags: [] }));
 
   hookSpies.bookmarksPreviewUseQuery.mockReset();
   hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
@@ -190,6 +317,99 @@ export function resetTrpcMocks() {
   hookSpies.markOpenedUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.markOpened, options)
   );
+
+  hookSpies.connectionsListUseQuery.mockReset();
+  hookSpies.connectionsListUseQuery.mockImplementation(() =>
+    createQueryResult({
+      YOUTUBE: null,
+      SPOTIFY: null,
+      GMAIL: null,
+    })
+  );
+
+  hookSpies.subscriptionsListUseQuery.mockReset();
+  hookSpies.subscriptionsListUseQuery.mockImplementation(() =>
+    createQueryResult({ items: [], nextCursor: null, hasMore: false })
+  );
+
+  hookSpies.discoverAvailableUseQuery.mockReset();
+  hookSpies.discoverAvailableUseQuery.mockImplementation((_input) =>
+    createQueryResult({ items: [], connectionRequired: false })
+  );
+
+  hookSpies.subscriptionAddUseMutation.mockReset();
+  hookSpies.subscriptionAddUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.subscriptionAdd, options)
+  );
+
+  hookSpies.newslettersStatsUseQuery.mockReset();
+  hookSpies.newslettersStatsUseQuery.mockImplementation(() =>
+    createQueryResult({
+      total: 0,
+      active: 0,
+      hidden: 0,
+      unsubscribed: 0,
+      lastSyncAt: null,
+      lastSyncStatus: 'IDLE',
+      lastSyncError: null,
+    })
+  );
+
+  hookSpies.newslettersListUseQuery.mockReset();
+  hookSpies.newslettersListUseQuery.mockImplementation((_input) =>
+    createQueryResult({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    })
+  );
+
+  hookSpies.newslettersSyncNowUseMutation.mockReset();
+  hookSpies.newslettersSyncNowUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.newslettersSyncNow, options)
+  );
+
+  hookSpies.newslettersUpdateStatusUseMutation.mockReset();
+  hookSpies.newslettersUpdateStatusUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.newslettersUpdateStatus, options)
+  );
+
+  hookSpies.rssStatsUseQuery.mockReset();
+  hookSpies.rssStatsUseQuery.mockImplementation(() =>
+    createQueryResult({
+      total: 0,
+      active: 0,
+      paused: 0,
+      unsubscribed: 0,
+      error: 0,
+      lastSuccessAt: null,
+    })
+  );
+
+  hookSpies.rssListUseQuery.mockReset();
+  hookSpies.rssListUseQuery.mockImplementation(() =>
+    createQueryResult({
+      items: [],
+      nextCursor: null,
+      hasMore: false,
+    })
+  );
+
+  hookSpies.rssDiscoverUseQuery.mockReset();
+  hookSpies.rssDiscoverUseQuery.mockImplementation((_input) =>
+    createQueryResult({
+      sourceUrl: '',
+      sourceOrigin: '',
+      checkedAt: '',
+      cached: false,
+      candidates: [],
+    })
+  );
+
+  hookSpies.rssAddUseMutation.mockReset();
+  hookSpies.rssAddUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.rssAdd, options)
+  );
 }
 
 export function setAuthAvailability(nextState: Partial<typeof authAvailability>) {
@@ -207,6 +427,23 @@ export const trpc = {
       library: { invalidate: invalidateSpies.itemsLibraryInvalidate },
       home: { invalidate: invalidateSpies.itemsHomeInvalidate },
       listTags: { invalidate: invalidateSpies.itemsListTagsInvalidate },
+    },
+    subscriptions: {
+      connections: {
+        list: { invalidate: invalidateSpies.subscriptionsConnectionsInvalidate },
+      },
+      list: { invalidate: invalidateSpies.subscriptionsListInvalidate },
+      discover: {
+        available: { invalidate: invalidateSpies.subscriptionsDiscoverInvalidate },
+      },
+      newsletters: {
+        list: { invalidate: invalidateSpies.newslettersListInvalidate },
+        stats: { invalidate: invalidateSpies.newslettersStatsInvalidate },
+      },
+      rss: {
+        list: { invalidate: invalidateSpies.rssListInvalidate },
+        stats: { invalidate: invalidateSpies.rssStatsInvalidate },
+      },
     },
   }),
   items: {
@@ -248,6 +485,57 @@ export const trpc = {
       useMutation: (options?: MutationOptions) => hookSpies.bookmarksSaveUseMutation(options),
     },
   },
+  subscriptions: {
+    connections: {
+      list: {
+        useQuery: () => hookSpies.connectionsListUseQuery(),
+      },
+    },
+    list: {
+      useQuery: () => hookSpies.subscriptionsListUseQuery(),
+    },
+    add: {
+      useMutation: (options?: MutationOptions) => hookSpies.subscriptionAddUseMutation(options),
+    },
+    discover: {
+      available: {
+        useQuery: (input: DiscoverAvailableInput, options?: unknown) =>
+          hookSpies.discoverAvailableUseQuery(input, options),
+      },
+    },
+    newsletters: {
+      stats: {
+        useQuery: () => hookSpies.newslettersStatsUseQuery(),
+      },
+      list: {
+        useQuery: (input?: NewslettersListInput, options?: unknown) =>
+          hookSpies.newslettersListUseQuery(input, options),
+      },
+      syncNow: {
+        useMutation: (options?: MutationOptions) =>
+          hookSpies.newslettersSyncNowUseMutation(options),
+      },
+      updateStatus: {
+        useMutation: (options?: MutationOptions) =>
+          hookSpies.newslettersUpdateStatusUseMutation(options),
+      },
+    },
+    rss: {
+      stats: {
+        useQuery: () => hookSpies.rssStatsUseQuery(),
+      },
+      list: {
+        useQuery: () => hookSpies.rssListUseQuery(),
+      },
+      discover: {
+        useQuery: (input: RssDiscoverInput, options?: unknown) =>
+          hookSpies.rssDiscoverUseQuery(input, options),
+      },
+      add: {
+        useMutation: (options?: MutationOptions) => hookSpies.rssAddUseMutation(options),
+      },
+    },
+  },
 };
 
 export function useAuthAvailability() {
@@ -260,4 +548,8 @@ export function useAppSession() {
 
 export function RootProviders({ children }: PropsWithChildren) {
   return <>{children}</>;
+}
+
+export function useRecapTimezone() {
+  return undefined;
 }
