@@ -23,6 +23,7 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { trpc } from '../lib/trpc';
 import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib/trpc-transport';
 import { useAuthResumeGate } from '@/providers/auth-resume-gate';
+import type { SyncStatusOutput } from '@/lib/trpc-types';
 
 // ============================================================================
 // Types
@@ -30,21 +31,6 @@ import { useAuthResumeGate } from '@/providers/auth-resume-gate';
 
 const DEFAULT_COOLDOWN_SECONDS = 120; // 2 minutes (matches backend)
 const STATUS_POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
-
-/**
- * Response from syncStatus tRPC query
- */
-interface SyncStatusResponse {
-  jobId: string;
-  status: 'pending' | 'processing' | 'completed' | 'not_found';
-  total: number;
-  completed: number;
-  succeeded: number;
-  failed: number;
-  itemsFound: number;
-  progress: number;
-  errors: Array<{ subscriptionId: string; error: string }>;
-}
 
 export interface SyncProgress {
   /** Total subscriptions to sync */
@@ -109,7 +95,7 @@ export function useSyncAll(): UseSyncAllReturn {
    * Handle sync status update
    */
   const handleStatusUpdate = useCallback(
-    (status: SyncStatusResponse) => {
+    (status: SyncStatusOutput) => {
       if (status.status === 'not_found') {
         // Job expired or not found - clean up
         stopStatusPolling();

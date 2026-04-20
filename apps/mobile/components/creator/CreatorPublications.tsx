@@ -13,8 +13,7 @@ import { Text } from '@/components/primitives';
 import { Radius, Typography, Spacing, type ThemeColors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useCreatorPublications } from '@/hooks/use-creator';
-import { mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import type { ContentType, Provider } from '@/lib/content-utils';
+import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 
 export interface CreatorPublicationsProps {
   /** The creator ID to fetch publications for */

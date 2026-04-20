@@ -14,7 +14,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { Provider } from '@zine/shared';
+import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
 import { subscriptions, creators } from '../db/schema';
@@ -43,7 +43,6 @@ import type {
 } from './types';
 import {
   MAX_ITEMS_PER_POLL,
-  SHORTS_DURATION_THRESHOLD,
   createEmptyYouTubeSkipMetrics,
   aggregateYouTubeSkipMetrics,
   getTotalSkipCount,
@@ -287,7 +286,7 @@ function filterOutShorts(
     if (v.durationSeconds === undefined) {
       return true; // Graceful degradation - don't lose content
     }
-    if (v.durationSeconds <= SHORTS_DURATION_THRESHOLD) {
+    if (v.durationSeconds <= YOUTUBE_SHORTS_MAX_DURATION_SECONDS) {
       skipMetrics.shortsFiltered++;
       return false;
     }

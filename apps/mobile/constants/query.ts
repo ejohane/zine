@@ -27,18 +27,6 @@ export const FIVE_MINUTES_MS = 5 * 60 * 1000;
  */
 export const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-/**
- * 30 seconds in milliseconds.
- * Used for sync debouncing to prevent rapid re-syncs.
- */
-export const THIRTY_SECONDS_MS = 30 * 1000;
-
-/**
- * 1 second in milliseconds.
- * Used for UI countdowns and short delays.
- */
-export const ONE_SECOND_MS = 1000;
-
 // ============================================================================
 // React Query Defaults
 // ============================================================================
@@ -55,24 +43,3 @@ export const DEFAULT_QUERY_OPTIONS = {
   gcTime: TWENTY_FOUR_HOURS_MS,
   retry: 2,
 } as const;
-
-// ============================================================================
-// Sync & Retry Constants
-// ============================================================================
-
-/**
- * Default cooldown between manual sync attempts (in seconds).
- * Prevents users from hammering the sync button.
- */
-export const DEFAULT_SYNC_COOLDOWN_SECONDS = 300; // 5 minutes
-
-/**
- * Maximum retry attempts for offline actions before giving up.
- */
-export const MAX_OFFLINE_RETRIES = 3;
-
-/**
- * Maximum auth refresh retries before requiring re-login.
- * Only one retry after token refresh to avoid infinite loops.
- */
-export const MAX_AUTH_RETRIES = 1;

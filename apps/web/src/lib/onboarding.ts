@@ -1,17 +1,7 @@
-import type { OAuthProvider } from './oauth';
+import type { OAuthProvider, SubscriptionSource } from '@zine/shared/types';
 
-export type SupportedSource = OAuthProvider | 'RSS';
+export type { SubscriptionSource };
 export type WizardStep = 'SPOTIFY' | 'YOUTUBE' | 'GMAIL' | 'RSS' | 'DONE';
-
-export const wizardSteps: WizardStep[] = ['SPOTIFY', 'YOUTUBE', 'GMAIL', 'RSS', 'DONE'];
-
-export const wizardStepLabels: Record<WizardStep, string> = {
-  SPOTIFY: 'Spotify',
-  YOUTUBE: 'YouTube',
-  GMAIL: 'Newsletters',
-  RSS: 'RSS',
-  DONE: 'Done',
-};
 
 export type OnboardingOAuthContext = {
   origin: 'welcome' | 'settings';
@@ -21,7 +11,7 @@ export type OnboardingOAuthContext = {
 export const ONBOARDING_OAUTH_CONTEXT_KEY = 'zine:web:onboarding-oauth-context';
 
 export type SourceConfig = {
-  id: SupportedSource;
+  id: SubscriptionSource;
   title: string;
   eyebrow: string;
   summary: string;
@@ -29,7 +19,7 @@ export type SourceConfig = {
   itemNounPlural: string;
 };
 
-export const sourceConfigs: Record<SupportedSource, SourceConfig> = {
+export const sourceConfigs: Record<SubscriptionSource, SourceConfig> = {
   SPOTIFY: {
     id: 'SPOTIFY',
     title: 'Spotify',
@@ -64,7 +54,7 @@ export const sourceConfigs: Record<SupportedSource, SourceConfig> = {
   },
 };
 
-export const supportedSources = Object.keys(sourceConfigs) as SupportedSource[];
+export const supportedSources = Object.keys(sourceConfigs) as SubscriptionSource[];
 
 export function setOnboardingOAuthContext(context: OnboardingOAuthContext) {
   sessionStorage.setItem(ONBOARDING_OAUTH_CONTEXT_KEY, JSON.stringify(context));
@@ -99,20 +89,4 @@ export function clearOnboardingOAuthContext() {
 
 export function providerToWizardStep(provider: OAuthProvider): Exclude<WizardStep, 'DONE'> {
   return provider;
-}
-
-export function nextWizardStep(current: WizardStep): WizardStep {
-  const index = wizardSteps.indexOf(current);
-  if (index < 0 || index === wizardSteps.length - 1) {
-    return current;
-  }
-  return wizardSteps[index + 1]!;
-}
-
-export function previousWizardStep(current: WizardStep): WizardStep | null {
-  const index = wizardSteps.indexOf(current);
-  if (index <= 0) {
-    return null;
-  }
-  return wizardSteps[index - 1] ?? null;
 }

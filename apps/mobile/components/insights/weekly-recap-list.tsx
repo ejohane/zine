@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { ItemCard } from '@/components/item-card';
 import { Surface, Text } from '@/components/primitives';
 import { Radius, Spacing } from '@/constants/theme';
-import { mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatDateTime } from '@/lib/format';
 import {

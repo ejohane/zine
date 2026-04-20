@@ -19,6 +19,7 @@ export type {
   SubscriptionStatusValue,
   ProviderConnectionStatusValue,
   OAuthProvider,
+  SubscriptionSource,
   Creator,
   CreatorWithSubscription,
 } from './types/domain';

@@ -16,7 +16,7 @@ import { Link, NavLink } from 'react-router-dom';
 import { AppWordmark } from './app-wordmark';
 import { Badge, Button, LinkButton, Surface, cn } from './components';
 import { MobileTabBar } from './components/mobile-tab-bar';
-import { sourceConfigs, supportedSources, type SupportedSource } from './lib/onboarding';
+import { sourceConfigs, supportedSources, type SubscriptionSource } from './lib/onboarding';
 import { usePwaState } from './lib/pwa';
 import { trpc, useAppSession, useAuthAvailability } from './lib/trpc';
 
@@ -34,8 +34,8 @@ function getConnectionStatus(
 }
 
 function getSourceSummary(
-  source: SupportedSource,
-  counts: Record<SupportedSource, number>,
+  source: SubscriptionSource,
+  counts: Record<SubscriptionSource, number>,
   connections:
     | {
         YOUTUBE: { status: string } | null;
@@ -63,8 +63,8 @@ function getSourceSummary(
 }
 
 function getSourceBadge(
-  source: SupportedSource,
-  counts: Record<SupportedSource, number>,
+  source: SubscriptionSource,
+  counts: Record<SubscriptionSource, number>,
   connections:
     | {
         YOUTUBE: { status: string } | null;
@@ -80,7 +80,7 @@ function getSourceBadge(
   return getConnectionStatus(connections, source) === 'ACTIVE' ? 'connected' : 'setup';
 }
 
-const sourceIcons: Record<SupportedSource, LucideIcon> = {
+const sourceIcons: Record<SubscriptionSource, LucideIcon> = {
   SPOTIFY: Podcast,
   YOUTUBE: Video,
   GMAIL: Mail,
@@ -94,7 +94,7 @@ function SourcesSection() {
   const rssStatsQuery = trpc.subscriptions.rss.stats.useQuery();
 
   const subscriptions = subscriptionsQuery.data?.items ?? [];
-  const counts: Record<SupportedSource, number> = {
+  const counts: Record<SubscriptionSource, number> = {
     YOUTUBE: subscriptions.filter((subscription) => subscription.provider === 'YOUTUBE').length,
     SPOTIFY: subscriptions.filter((subscription) => subscription.provider === 'SPOTIFY').length,
     GMAIL: newslettersStatsQuery.data?.active ?? 0,

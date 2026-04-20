@@ -10,7 +10,6 @@
 import type { Database } from '../db';
 import type { subscriptions, creators } from '../db/schema';
 import type { Bindings } from '../types';
-import { YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 
 // ============================================================================
 // Database Types
@@ -229,6 +228,3 @@ export interface ProviderConnectionRow {
 
 /** Maximum videos/episodes to fetch per subscription poll */
 export const MAX_ITEMS_PER_POLL = 10;
-
-/** YouTube Shorts duration threshold - re-exported from shared for convenience */
-export const SHORTS_DURATION_THRESHOLD = YOUTUBE_SHORTS_MAX_DURATION_SECONDS;
