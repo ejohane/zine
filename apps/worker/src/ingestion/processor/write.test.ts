@@ -143,7 +143,7 @@ describe('executeBatchStatements', () => {
   it('passes statements to db.batch', async () => {
     const mockBatch = async (_statements: unknown[]) => undefined;
     const db = { batch: mockBatch } as never;
-    const statements = [{ a: 1 }, { b: 2 }];
+    const statements = [{ a: 1 }, { b: 2 }] as never[];
 
     await expect(executeBatchStatements(statements, db)).resolves.toBeUndefined();
   });

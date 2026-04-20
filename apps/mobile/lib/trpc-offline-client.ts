@@ -14,7 +14,7 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import * as SecureStore from 'expo-secure-store';
-import type { AppRouter } from '../../worker/src/trpc/router';
+import type { AppRouter } from '@zine/worker/trpc/router';
 import { API_URL } from './trpc';
 import { trpcLogger } from './logger';
 import { buildMobileTelemetryHeaders, telemetryFetch } from './trpc-transport';

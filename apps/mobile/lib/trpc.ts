@@ -10,7 +10,7 @@
 
 import { Platform } from 'react-native';
 import { createTRPCReact } from '@trpc/react-query';
-import type { AppRouter } from '../../worker/src/trpc/router';
+import type { AppRouter } from '@zine/worker/trpc/router';
 
 /**
  * Type-safe tRPC React hooks client.

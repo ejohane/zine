@@ -121,8 +121,11 @@ async function getUserAccessTokens(
         // The preview will fall back to oEmbed/OG scraping
       }
     }
-  } catch {
-    // If database query fails, continue without tokens
+  } catch (error) {
+    bookmarksLogger.warn('Failed to fetch user provider connections for token retrieval', {
+      userId,
+      error,
+    });
   }
 
   return tokens;

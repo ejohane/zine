@@ -40,7 +40,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePreview, useSaveBookmark, isValidUrl } from '@/hooks/use-bookmarks';
 import { LinkPreviewCard } from '@/components/link-preview-card';
 import { showSuccess, showError as showErrorToast } from '@/lib/toast-utils';
-import { logger } from '@/lib/logger';
 
 // ============================================================================
 // Constants
@@ -297,18 +296,9 @@ export default function AddLinkScreen() {
   // Handle paste from clipboard
   // Note: On iOS, the paste button triggers the system paste permission dialog
   // which handles clipboard access. We use a simple approach that works cross-platform.
-  const handlePaste = useCallback(async () => {
-    try {
-      // On mobile, we rely on the user using the native paste functionality
-      // via long-press on the input field. The paste button provides haptic feedback
-      // and focuses the input to encourage this behavior.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      inputRef.current?.focus();
-      // Note: Direct clipboard access requires expo-clipboard which isn't installed.
-      // Users can long-press the input field to paste from the system clipboard.
-    } catch (error) {
-      logger.error('Failed to handle paste action', { error });
-    }
+  const handlePaste = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    inputRef.current?.focus();
   }, []);
 
   // Handle save

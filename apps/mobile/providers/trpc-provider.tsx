@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QueryClient, useIsRestoring, type QueryStatus } from '@tanstack/react-query';
+import { QueryClient, useIsRestoring, type QueryKey, type QueryStatus } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { getQueryKey } from '@trpc/react-query';
@@ -234,7 +234,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
           queryKey,
           state,
         }: {
-          queryKey: unknown;
+          queryKey: QueryKey;
           state: { status: QueryStatus };
         }) => shouldPersistQuery({ queryKey, status: state.status }),
       },
@@ -458,7 +458,7 @@ function UnauthenticatedTRPCProvider({ children }: TRPCProviderProps) {
                 queryKey,
                 state,
               }: {
-                queryKey: unknown;
+                queryKey: QueryKey;
                 state: { status: QueryStatus };
               }) => shouldPersistQuery({ queryKey, status: state.status }),
             },

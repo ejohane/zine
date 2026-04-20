@@ -870,43 +870,6 @@ export function useSetItemTags() {
   });
 }
 
-/**
- * Hook for updating playback/reading progress
- *
- * Updates the progress position for video/podcast/article consumption.
- *
- * No optimistic update is performed since progress updates are typically
- * fire-and-forget operations that don't need immediate UI feedback.
- *
- * @returns tRPC mutation with mutate/mutateAsync functions
- *
- * @example
- * function VideoPlayer({ item }) {
- *   const updateProgress = useUpdateProgress();
- *
- *   const handleProgress = (position: number, duration: number) => {
- *     updateProgress.mutate({
- *       id: item.id,
- *       position,
- *       duration,
- *     });
- *   };
- *
- *   return <Player onProgress={handleProgress} />;
- * }
- */
-export function useUpdateProgress() {
-  const utils = trpc.useUtils();
-
-  return trpc.items.updateProgress.useMutation({
-    onSettled: (_data, _err, { id }) => {
-      utils.items.home.invalidate();
-      utils.items.get.invalidate({ id });
-      invalidateRecapQueries(utils);
-    },
-  });
-}
-
 // ============================================================================
 // Re-exports for convenience
 // ============================================================================

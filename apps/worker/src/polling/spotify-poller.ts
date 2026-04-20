@@ -48,7 +48,7 @@ import { MAX_ITEMS_PER_POLL } from './types';
 import {
   serializeError,
   createPollingError,
-  formatPollingErrorLegacy,
+  toPollingErrorEntry,
   type PollingError,
 } from '../utils/error-utils';
 
@@ -213,7 +213,7 @@ export async function pollSpotifySubscriptionsBatched(
       newItems: 0,
       processed: 0,
       errors: subs.map((sub) =>
-        formatPollingErrorLegacy(
+        toPollingErrorEntry(
           createPollingError(sub.id, error, {
             operation: 'getMultipleShowsWithCache',
             userId,
@@ -514,7 +514,7 @@ export async function pollSpotifySubscriptionsBatched(
     processed: subsNeedingUpdate.length,
     skipped: subsUnchanged.length,
     disconnected: subsMissing.length,
-    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(toPollingErrorEntry) : undefined,
     cacheHits,
     cacheMisses,
   };

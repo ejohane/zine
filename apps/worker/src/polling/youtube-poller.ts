@@ -50,14 +50,13 @@ import {
 import {
   serializeError,
   createPollingError,
-  formatPollingErrorLegacy,
+  toPollingErrorEntry,
   type PollingError,
 } from '../utils/error-utils';
 
 // ============================================================================
 // Logger
 // ============================================================================
-
 const ytLogger = pollLogger.child('youtube');
 
 // ============================================================================
@@ -629,7 +628,7 @@ export async function pollYouTubeSubscriptionsBatched(
     newItems: totalNewItems,
     processed: playlistResults.length,
     skipped: totalSkipped,
-    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(toPollingErrorEntry) : undefined,
     youtubeSkipMetrics: aggregatedSkipMetrics,
   };
 }

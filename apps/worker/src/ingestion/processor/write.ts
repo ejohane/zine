@@ -1,5 +1,6 @@
 import { ulid } from 'ulid';
 import { UserItemState } from '@zine/shared';
+import type { BatchItem } from 'drizzle-orm/batch';
 
 import type { Database } from '../../db';
 import { items, providerItemsSeen, subscriptionItems, userItems } from '../../db/schema';
@@ -13,9 +14,9 @@ import type { PreparedItem, WriteContext } from './types';
 /**
  * Build the ingestion statements for a prepared item.
  */
-export function buildIngestionStatements(prepared: PreparedItem, context: WriteContext): unknown[] {
+export function buildIngestionStatements(prepared: PreparedItem, context: WriteContext): BatchItem<'sqlite'>[] {
   const { db, userId, subscriptionId, provider, nowISO, now } = context;
-  const statements: unknown[] = [];
+  const statements: BatchItem<'sqlite'>[] = [];
 
   if (!prepared.canonicalItemExists) {
     const publishedAtISO = prepared.newItem.publishedAt
@@ -93,6 +94,6 @@ export function buildIngestionStatements(prepared: PreparedItem, context: WriteC
 /**
  * Execute a batch of statements.
  */
-export async function executeBatchStatements(statements: unknown[], db: Database): Promise<void> {
-  await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
+export async function executeBatchStatements(statements: BatchItem<'sqlite'>[], db: Database): Promise<void> {
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }

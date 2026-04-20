@@ -309,16 +309,16 @@ export function createPollingError(
 }
 
 /**
- * Format a PollingError for legacy string-based error arrays.
+ * Convert a structured PollingError to the batch error entry format used by
+ * BatchPollingResult and SyncJobStatus.
  *
- * This provides backwards compatibility with existing code that expects
- * { subscriptionId: string, error: string } format while preserving
- * richer context in the error message.
+ * Serializes the rich error context into a single string so it can be stored
+ * in the flat { subscriptionId, error } array required by batch result types.
  *
  * @param pollingError - The structured polling error
- * @returns A legacy format error object
+ * @returns Batch error entry with subscriptionId and serialized error string
  */
-export function formatPollingErrorLegacy(pollingError: PollingError): {
+export function toPollingErrorEntry(pollingError: PollingError): {
   subscriptionId: string;
   error: string;
 } {

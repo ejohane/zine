@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { ulid } from 'ulid';
 import { TRPCError } from '@trpc/server';
-import { eq, and, desc, or, lt, isNotNull, sql, inArray, type SQL } from 'drizzle-orm';
+import { eq, and, desc, or, lt, isNotNull, sql, inArray, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
@@ -262,11 +262,11 @@ function stripVowels(value: string): string {
   return value.replace(/[aeiou]/g, '');
 }
 
-function toCompactSql(value: unknown): SQL {
+function toCompactSql(value: SQLWrapper): SQL {
   return sql`replace(replace(replace(replace(replace(replace(lower(coalesce(${value}, '')), ' ', ''), '-', ''), '_', ''), '.', ''), '/', ''), '&', '')`;
 }
 
-function toConsonantSql(value: unknown): SQL {
+function toConsonantSql(value: SQLWrapper): SQL {
   const compact = toCompactSql(value);
   return sql`replace(replace(replace(replace(replace(${compact}, 'a', ''), 'e', ''), 'i', ''), 'o', ''), 'u', '')`;
 }
