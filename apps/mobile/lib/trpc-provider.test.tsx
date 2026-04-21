@@ -128,9 +128,7 @@ jest.mock('@/providers/auth-provider', () => ({
   useAuthAvailability: () => mockUseAuthAvailability(),
 }));
 
-// ==========================================================================
 // Tests
-// ==========================================================================
 
 afterEach(() => {
   jest.restoreAllMocks();

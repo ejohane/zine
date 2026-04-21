@@ -37,12 +37,17 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
-import { useInfiniteLibraryItems, mapContentType, mapProvider } from '@/hooks/use-items-trpc';
+import { useInfiniteLibraryItems } from '@/hooks/use-items-trpc';
+import {
+  mapContentType,
+  mapProvider,
+  type UIContentType,
+  type UIProvider,
+} from '@/lib/content-utils';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
-import type { UIContentType, UIProvider } from '@/lib/content-utils';
 
 function SearchIcon({ size = 20, color = '#94A3B8' }: { size?: number; color?: string }) {
   return (

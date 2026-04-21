@@ -12,9 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { tryAcquireLock, releaseLock, withLock } from './locks';
 
-// ============================================================================
 // Mock KV Namespace
-// ============================================================================
 
 function createMockKV() {
   const store = new Map<string, string>();
@@ -33,15 +31,11 @@ function createMockKV() {
   } as unknown as KVNamespace & { _store: Map<string, string>; _clear: () => void };
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
-// ============================================================================
 // tryAcquireLock Tests
-// ============================================================================
 
 describe('tryAcquireLock', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -130,9 +124,7 @@ describe('tryAcquireLock', () => {
   });
 });
 
-// ============================================================================
 // releaseLock Tests
-// ============================================================================
 
 describe('releaseLock', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -179,9 +171,7 @@ describe('releaseLock', () => {
   });
 });
 
-// ============================================================================
 // withLock Tests
-// ============================================================================
 
 describe('withLock', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -316,9 +306,7 @@ describe('withLock', () => {
   });
 });
 
-// ============================================================================
 // Concurrent Lock Attempts Tests
-// ============================================================================
 
 describe('concurrent lock attempts', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -396,9 +384,7 @@ describe('concurrent lock attempts', () => {
   });
 });
 
-// ============================================================================
 // Lock Acquisition After Expiry Tests
-// ============================================================================
 
 describe('lock acquisition after expiry (simulated)', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -435,9 +421,7 @@ describe('lock acquisition after expiry (simulated)', () => {
   });
 });
 
-// ============================================================================
 // Edge Cases Tests
-// ============================================================================
 
 describe('edge cases', () => {
   let mockKV: ReturnType<typeof createMockKV>;
@@ -529,9 +513,7 @@ describe('edge cases', () => {
   });
 });
 
-// ============================================================================
 // Integration-style Tests
-// ============================================================================
 
 describe('integration scenarios', () => {
   let mockKV: ReturnType<typeof createMockKV>;

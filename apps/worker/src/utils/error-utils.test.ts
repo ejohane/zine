@@ -3,7 +3,7 @@ import {
   serializeError,
   classifyError,
   createPollingError,
-  formatPollingErrorLegacy,
+  toPollingErrorEntry,
 } from './error-utils';
 
 describe('serializeError', () => {
@@ -357,13 +357,13 @@ describe('createPollingError', () => {
   });
 });
 
-describe('formatPollingErrorLegacy', () => {
-  it('formats error for legacy systems', () => {
+describe('toPollingErrorEntry', () => {
+  it('serializes error for batch result entries', () => {
     const error = new Error('API timeout');
     const pollingError = createPollingError('sub-123', error, {
       showId: 'show-456',
     });
-    const result = formatPollingErrorLegacy(pollingError);
+    const result = toPollingErrorEntry(pollingError);
 
     expect(result.subscriptionId).toBe('sub-123');
     expect(result.error).toContain('[timeout]');
@@ -376,7 +376,7 @@ describe('formatPollingErrorLegacy', () => {
   it('works without context', () => {
     const error = new Error('Simple error');
     const pollingError = createPollingError('sub-123', error);
-    const result = formatPollingErrorLegacy(pollingError);
+    const result = toPollingErrorEntry(pollingError);
 
     expect(result.subscriptionId).toBe('sub-123');
     expect(result.error).toContain('Simple error');

@@ -22,6 +22,7 @@ export type {
   SubscriptionStatusValue,
   ProviderConnectionStatusValue,
   OAuthProvider,
+  SubscriptionSource,
   Item,
   UserItem,
   Source,

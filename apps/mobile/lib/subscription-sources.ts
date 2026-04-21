@@ -1,9 +1,9 @@
 import type { Href } from 'expo-router';
-import type { ProviderValue } from '@zine/shared/types';
+import type { SubscriptionSource } from '@zine/shared/types';
 
 import type { ConnectionStatus } from '@/lib/connection-status';
 
-export type SubscriptionSource = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'RSS'>;
+export type { SubscriptionSource };
 export type IntegrationState = 'connected' | 'needsAttention' | 'notConnected' | 'manual';
 
 type SourceConfig = {

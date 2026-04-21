@@ -14,14 +14,12 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import * as SecureStore from 'expo-secure-store';
-import type { AppRouter } from '../../worker/src/trpc/router';
+import type { AppRouter } from '@zine/worker/trpc/router';
 import { API_URL } from './trpc';
 import { trpcLogger } from './logger';
 import { buildMobileTelemetryHeaders, telemetryFetch } from './trpc-transport';
 
-// ============================================================================
 // Callback Registration for Cache Invalidation
-// ============================================================================
 
 /**
  * Callback to be invoked when the offline queue successfully processes actions.
@@ -50,9 +48,7 @@ export function notifyQueueProcessed(): void {
   queueProcessedCallback?.();
 }
 
-// ============================================================================
 // Auth Headers for Non-React Context
-// ============================================================================
 
 /**
  * Clerk session token key used by expo-secure-store.
@@ -81,9 +77,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   return {};
 }
 
-// ============================================================================
 // Singleton tRPC Client
-// ============================================================================
 
 /**
  * Singleton instance of the offline tRPC client.

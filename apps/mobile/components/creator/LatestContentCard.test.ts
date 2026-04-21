@@ -12,9 +12,7 @@
 
 import { type LatestContentItem } from './LatestContentCard';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockOpenURL = jest.fn();
 const mockUseColorScheme = jest.fn<string | undefined, []>(() => 'light');
@@ -81,9 +79,7 @@ jest.mock('@/constants/theme', () => ({
   },
 }));
 
-// ============================================================================
 // Mock Data Factories
-// ============================================================================
 
 function createMockItem(overrides: Partial<LatestContentItem> = {}): LatestContentItem {
   return {
@@ -98,9 +94,7 @@ function createMockItem(overrides: Partial<LatestContentItem> = {}): LatestConte
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('LatestContentCard', () => {
   beforeEach(() => {

@@ -14,10 +14,6 @@ import { Radius, Spacing, Typography } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { Text } from '@/components/primitives/text';
 
-// =============================================================================
-// Types
-// =============================================================================
-
 type FilterChipIconProps = {
   size?: number;
   color?: string;
@@ -51,10 +47,6 @@ export interface FilterChipProps {
   /** Size variant */
   size?: 'small' | 'medium';
 }
-
-// =============================================================================
-// Component
-// =============================================================================
 
 /**
  * FilterChip displays a selectable chip with optional icon and count.
@@ -152,10 +144,6 @@ export function FilterChip({
     </Pressable>
   );
 }
-
-// =============================================================================
-// Styles
-// =============================================================================
 
 const styles = StyleSheet.create({
   chip: {

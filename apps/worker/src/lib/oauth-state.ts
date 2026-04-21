@@ -91,29 +91,3 @@ export async function validateOAuthState(
   // Delete after successful validation (one-time use)
   await kv.delete(key);
 }
-
-/**
- * Clean up an OAuth state (e.g., if the OAuth flow is cancelled)
- *
- * @param state - The state to remove
- * @param userId - The user's ID (must match stored value for deletion)
- * @param kv - Cloudflare KV namespace
- * @returns true if state was deleted, false if not found or didn't match
- */
-export async function cleanupOAuthState(
-  state: string,
-  userId: string,
-  kv: KVNamespace
-): Promise<boolean> {
-  const key = `${OAUTH_STATE_PREFIX}${state}`;
-
-  const storedUserId = await kv.get(key);
-
-  // Only delete if the state exists and belongs to this user
-  if (storedUserId === userId) {
-    await kv.delete(key);
-    return true;
-  }
-
-  return false;
-}

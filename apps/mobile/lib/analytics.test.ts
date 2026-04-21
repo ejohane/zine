@@ -6,9 +6,7 @@
 
 import { analytics, type AnalyticsEvents } from './analytics';
 
-// ============================================================================
 // Setup
-// ============================================================================
 
 // Mock console methods
 const mockConsoleLog = jest.spyOn(console, 'log').mockImplementation();
@@ -23,9 +21,7 @@ afterAll(() => {
   mockConsoleLog.mockRestore();
 });
 
-// ============================================================================
 // analytics.track Tests
-// ============================================================================
 
 describe('analytics.track', () => {
   describe('creator_view_opened', () => {
@@ -174,9 +170,7 @@ describe('analytics.track', () => {
   });
 });
 
-// ============================================================================
 // analytics.setEnabled Tests
-// ============================================================================
 
 describe('analytics.setEnabled', () => {
   it('disables tracking when set to false', () => {
@@ -207,9 +201,7 @@ describe('analytics.setEnabled', () => {
   });
 });
 
-// ============================================================================
 // analytics.identify Tests
-// ============================================================================
 
 describe('analytics.identify', () => {
   it('logs user identification', () => {
@@ -232,9 +224,7 @@ describe('analytics.identify', () => {
   });
 });
 
-// ============================================================================
 // analytics.reset Tests
-// ============================================================================
 
 describe('analytics.reset', () => {
   it('logs reset', () => {

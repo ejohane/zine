@@ -17,10 +17,6 @@ import { formatRelativeTime, formatDuration } from '@/lib/format';
 import { logger } from '@/lib/logger';
 import { trpc } from '@/lib/trpc';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface LatestContentItem {
   /** Provider-specific ID */
   providerId: string;
@@ -50,10 +46,6 @@ export interface LatestContentCardProps {
   /** The provider for analytics tracking */
   provider: string;
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 /**
  * LatestContentCard displays a single content item in a horizontal carousel.
@@ -191,10 +183,6 @@ export function LatestContentCard({ item, creatorId, provider }: LatestContentCa
     </Pressable>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const THUMBNAIL_SIZE = 64;
 

@@ -22,10 +22,6 @@
 
 import { logger } from './logger';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Standardized oEmbed result from any provider
  */
@@ -103,10 +99,6 @@ interface TwitterOEmbedResponse {
   cache_age: string;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Request timeout in milliseconds */
 const FETCH_TIMEOUT_MS = 5000;
 
@@ -117,15 +109,11 @@ const OEMBED_ENDPOINTS = {
   TWITTER: 'https://publish.twitter.com/oembed',
 } as const;
 
-// ============================================================================
 // Logger
-// ============================================================================
 
 const oembedLogger = logger.child('oembed');
 
-// ============================================================================
 // Internal Helpers
-// ============================================================================
 
 /**
  * Make a fetch request with timeout using AbortController
@@ -162,9 +150,7 @@ function buildOEmbedUrl(endpoint: string, contentUrl: string, format?: string): 
   return url.toString();
 }
 
-// ============================================================================
 // YouTube oEmbed
-// ============================================================================
 
 /**
  * Fetch oEmbed metadata for a YouTube video
@@ -221,9 +207,7 @@ export async function fetchYouTubeOEmbed(videoUrl: string): Promise<OEmbedResult
   }
 }
 
-// ============================================================================
 // Spotify oEmbed
-// ============================================================================
 
 /**
  * Fetch oEmbed metadata for a Spotify episode, track, or other content
@@ -303,9 +287,7 @@ function extractSpotifyAuthor(title: string, html?: string): string {
   return 'Spotify';
 }
 
-// ============================================================================
 // Twitter oEmbed
-// ============================================================================
 
 /**
  * Fetch oEmbed metadata for a Twitter/X tweet

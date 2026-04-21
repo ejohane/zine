@@ -2,9 +2,7 @@ import { Platform, DynamicColorIOS } from 'react-native';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { AuthGuard } from '@/components/auth-guard';
 
-// =============================================================================
 // Tab Layout - iOS 26 Native Tabs with Liquid Glass
-// =============================================================================
 
 export default function TabLayout() {
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';

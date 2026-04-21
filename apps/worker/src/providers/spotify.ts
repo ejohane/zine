@@ -28,10 +28,6 @@ import {
   type TokenRefreshEnv,
 } from '../lib/token-refresh';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Cached show metadata stored in KV.
  * Contains show metadata that rarely changes, with totalEpisodes for delta detection.
@@ -105,9 +101,7 @@ export interface SpotifyEpisode {
  */
 type SpotifyEnv = TokenRefreshEnv;
 
-// ============================================================================
 // Client Factory
-// ============================================================================
 
 /**
  * Create a Spotify API client with a user's access token.
@@ -174,9 +168,7 @@ export async function getSpotifyClientForConnection(
   return createSpotifyClient(accessToken, env);
 }
 
-// ============================================================================
 // API Helpers
-// ============================================================================
 
 /**
  * Get user's saved shows (podcasts).
@@ -429,9 +421,7 @@ export async function getMultipleShows(
   return allShows;
 }
 
-// ============================================================================
 // Cache Functions
-// ============================================================================
 
 /**
  * Environment interface for cache operations.
@@ -646,9 +636,7 @@ export async function checkSavedShows(client: SpotifyApi, showIds: string[]): Pr
   return client.currentUser.shows.hasSavedShow(showIds);
 }
 
-// ============================================================================
 // Transform Helpers
-// ============================================================================
 
 /**
  * Select the largest image from an array of images based on dimensions.

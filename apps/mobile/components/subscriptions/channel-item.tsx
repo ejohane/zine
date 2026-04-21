@@ -14,10 +14,6 @@ import type { Colors } from '@/constants/theme';
 import { IconSizes, ProviderColors, Radius, Spacing, Typography } from '@/constants/theme';
 import { CheckboxIcon } from '@/components/icons';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type Provider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY'>;
 
 /**
@@ -61,9 +57,7 @@ export interface ChannelItemProps {
   mode: 'multi' | 'single';
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Format subscriber count to human-readable string
@@ -91,10 +85,6 @@ function getProviderColor(provider: Provider): string {
 function getProviderDescription(provider: Provider): string {
   return provider === 'YOUTUBE' ? 'YouTube Channel' : 'Spotify Podcast';
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 function ChannelItemComponent({
   channel,
@@ -214,10 +204,6 @@ function ChannelItemComponent({
 }
 
 export const ChannelItem = memo(ChannelItemComponent);
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   card: {

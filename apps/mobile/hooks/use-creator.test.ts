@@ -11,9 +11,7 @@
 
 import { renderHook, act } from '@testing-library/react-hooks';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 // Mock tRPC query and mutation hooks
 const mockCreatorUseQuery = jest.fn();
@@ -84,9 +82,7 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import {
   useCreator,
@@ -196,9 +192,7 @@ beforeEach(() => {
   mockGetData.mockReturnValue(null);
 });
 
-// ============================================================================
 // useCreator Tests
-// ============================================================================
 
 describe('useCreator', () => {
   describe('query configuration', () => {
@@ -299,9 +293,7 @@ describe('useCreator', () => {
   });
 });
 
-// ============================================================================
 // useCreatorBookmarks Tests
-// ============================================================================
 
 describe('useCreatorBookmarks', () => {
   describe('query configuration', () => {
@@ -453,9 +445,7 @@ describe('useCreatorBookmarks', () => {
   });
 });
 
-// ============================================================================
 // useCreatorPublications Tests
-// ============================================================================
 
 describe('useCreatorPublications', () => {
   describe('query configuration', () => {
@@ -562,9 +552,7 @@ describe('useCreatorPublications', () => {
   });
 });
 
-// ============================================================================
 // useCreatorLatestContent Tests
-// ============================================================================
 
 describe('useCreatorLatestContent', () => {
   describe('query configuration', () => {
@@ -704,9 +692,7 @@ describe('useCreatorLatestContent', () => {
   });
 });
 
-// ============================================================================
 // useCreatorSubscription Tests
-// ============================================================================
 
 describe('useCreatorSubscription', () => {
   describe('query configuration', () => {

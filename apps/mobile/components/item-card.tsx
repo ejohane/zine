@@ -34,10 +34,6 @@ const STACK_CARD_HEIGHT =
   Spacing.xs +
   Typography.bodySmall.lineHeight;
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type ItemCardShape = 'row' | 'stack' | 'cover';
 export type ItemCardRowStyle = 'compact' | 'featured';
 
@@ -102,10 +98,6 @@ function areItemCardPropsEqual(previous: ItemCardProps, next: ItemCardProps): bo
     areItemCardItemsEqual(previous.item, next.item)
   );
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 function ItemCardComponent({
   item,
@@ -386,10 +378,6 @@ function ItemCardComponent({
 }
 
 export const ItemCard = memo(ItemCardComponent, areItemCardPropsEqual);
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   rowCompactCard: {

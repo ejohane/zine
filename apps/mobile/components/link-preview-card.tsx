@@ -41,10 +41,6 @@ import {
 import { CheckIcon } from '@/components/icons';
 import type { LinkPreview } from '@/hooks/use-bookmarks';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface LinkPreviewCardProps {
   /** Preview data from the bookmarks.preview endpoint */
   preview?: LinkPreview | null;
@@ -54,9 +50,7 @@ export interface LinkPreviewCardProps {
   style?: ViewStyle;
 }
 
-// ============================================================================
 // Text Parsing Helpers
-// ============================================================================
 
 type TextPart = { type: 'text'; content: string } | { type: 'link'; content: string; url: string };
 
@@ -144,9 +138,7 @@ function LinkedText({
   );
 }
 
-// ============================================================================
 // Skeleton Component
-// ============================================================================
 
 function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
   const { colors } = useAppTheme();
@@ -187,10 +179,6 @@ function LinkPreviewCardSkeleton({ style }: { style?: ViewStyle }) {
     </Animated.View>
   );
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardProps) {
   const { colors, motion } = useAppTheme();
@@ -314,10 +302,6 @@ export function LinkPreviewCard({ preview, isLoading, style }: LinkPreviewCardPr
     </Animated.View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

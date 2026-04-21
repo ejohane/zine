@@ -1,4 +1,4 @@
-import { Link, NavLink } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import type { ComponentPropsWithoutRef, CSSProperties, ReactNode } from 'react';
 
 import {
@@ -35,26 +35,6 @@ export function Button({
   return (
     <PrimitiveButton className={className} tone={buttonTone} variant={resolvedVariant} {...props}>
       {children}
-    </PrimitiveButton>
-  );
-}
-
-export function AnchorButton({
-  tone = 'default',
-  variant,
-  children,
-  className,
-  ...props
-}: ComponentPropsWithoutRef<'a'> & {
-  tone?: ButtonTone | 'ghost';
-  variant?: ButtonVariant | 'default';
-}) {
-  const resolvedVariant = variant ?? (tone === 'ghost' ? 'ghost' : undefined);
-  const buttonTone = tone === 'danger' ? 'danger' : 'default';
-
-  return (
-    <PrimitiveButton asChild className={className} tone={buttonTone} variant={resolvedVariant}>
-      <a {...props}>{children}</a>
     </PrimitiveButton>
   );
 }
@@ -191,75 +171,5 @@ export function EmptyState({
       <p>{message}</p>
       {action}
     </Surface>
-  );
-}
-
-export function QueryBoundary({
-  isLoading,
-  error,
-  isEmpty,
-  empty,
-  children,
-}: {
-  isLoading: boolean;
-  error?: { message?: string } | null;
-  isEmpty?: boolean;
-  empty?: ReactNode;
-  children: ReactNode;
-}) {
-  if (isLoading) {
-    return (
-      <Surface className="empty-state">
-        <p className="eyebrow">Loading</p>
-        <h2>Pulling in your latest state.</h2>
-      </Surface>
-    );
-  }
-
-  if (error) {
-    return (
-      <Surface className="empty-state">
-        <p className="eyebrow">Something broke</p>
-        <h2>Could not load this section.</h2>
-        <p>{error.message ?? 'Please refresh and try again.'}</p>
-      </Surface>
-    );
-  }
-
-  if (isEmpty) {
-    return <>{empty}</>;
-  }
-
-  return <>{children}</>;
-}
-
-export function SidebarLink({ to, label, short }: { to: string; label: string; short: string }) {
-  return (
-    <NavLink
-      to={to}
-      end={to === '/'}
-      className={({ isActive }) => cn('sidebar-link', isActive && 'sidebar-link--active')}
-    >
-      <span className="sidebar-link__short">{short}</span>
-      <span>{label}</span>
-    </NavLink>
-  );
-}
-
-export function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="field">
-      <span className="field__label">{label}</span>
-      {hint ? <span className="field__hint">{hint}</span> : null}
-      {children}
-    </label>
   );
 }

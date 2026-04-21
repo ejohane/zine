@@ -23,9 +23,7 @@
 import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
 
-// ============================================================================
 // Test Data Factory
-// ============================================================================
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -43,9 +41,7 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-// ============================================================================
 // Performance Constants (mirrored from components for validation)
-// ============================================================================
 
 /** 60 FPS target means 16.67ms per frame budget */
 const TARGET_FPS = 60;
@@ -63,9 +59,7 @@ const ACTION_WIDTH = 100;
 const LAYOUT_SPRING_DAMPING = 15;
 const LAYOUT_SPRING_STIFFNESS = 100;
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('SwipeableInboxItem Performance Configuration', () => {
   describe('frame budget requirements', () => {

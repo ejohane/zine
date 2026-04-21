@@ -22,9 +22,7 @@ import {
   type Subscription,
 } from './adaptive';
 
-// ============================================================================
 // Constants Tests
-// ============================================================================
 
 describe('Polling interval constants', () => {
   it('should have correct values for each tier', () => {
@@ -43,9 +41,7 @@ describe('Polling interval constants', () => {
   });
 });
 
-// ============================================================================
 // calculateOptimalInterval Tests
-// ============================================================================
 
 describe('calculateOptimalInterval', () => {
   describe('Very active tier (7+ items/week)', () => {
@@ -295,9 +291,7 @@ describe('calculateOptimalInterval', () => {
   });
 });
 
-// ============================================================================
 // shouldAdjustInterval Tests
-// ============================================================================
 
 describe('shouldAdjustInterval', () => {
   const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z

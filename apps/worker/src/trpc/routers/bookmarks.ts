@@ -31,10 +31,6 @@ import type { Bindings } from '../../types';
 
 const bookmarksLogger = logger.child('bookmarks');
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Status returned after saving a bookmark
  */
@@ -49,9 +45,7 @@ export interface BookmarkSaveResult {
   status: BookmarkSaveStatus;
 }
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 const PreviewInputSchema = z.object({
   url: z.string().url('Invalid URL format'),
@@ -79,9 +73,7 @@ const SaveInputSchema = z.object({
   rawMetadata: z.string().optional(), // JSON string of provider API response
 });
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get user's OAuth access tokens for enhanced metadata fetching
@@ -121,16 +113,17 @@ async function getUserAccessTokens(
         // The preview will fall back to oEmbed/OG scraping
       }
     }
-  } catch {
-    // If database query fails, continue without tokens
+  } catch (error) {
+    bookmarksLogger.warn('Failed to fetch user provider connections for token retrieval', {
+      userId,
+      error,
+    });
   }
 
   return tokens;
 }
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const bookmarksRouter = router({
   /**

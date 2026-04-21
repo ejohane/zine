@@ -9,10 +9,6 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { tokenCache, CLERK_PUBLISHABLE_KEY, validateClerkConfig } from '@/lib/auth';
 import { authLogger } from '@/lib/logger';
 
-// ============================================================================
-// Provider Component
-// ============================================================================
-
 interface AuthProviderProps {
   children: ReactNode;
 }

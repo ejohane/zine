@@ -25,18 +25,14 @@ import {
   reEncryptWithCurrentVersion,
 } from './crypto';
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 // Valid 256-bit key (64 hex chars)
 const VALID_KEY = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2';
 // Different valid key for wrong key tests
 const WRONG_KEY = 'f1e2d3c4b5a6978869504132a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0';
 
-// ============================================================================
 // bytesToHex / hexToBytes Tests
-// ============================================================================
 
 describe('bytesToHex', () => {
   it('should convert empty array to empty string', () => {
@@ -98,9 +94,7 @@ describe('hexToBytes and bytesToHex round-trip', () => {
   });
 });
 
-// ============================================================================
 // generateKey Tests
-// ============================================================================
 
 describe('generateKey', () => {
   it('should generate a 64-character hex string', () => {
@@ -126,9 +120,7 @@ describe('generateKey', () => {
   });
 });
 
-// ============================================================================
 // encrypt Tests
-// ============================================================================
 
 describe('encrypt', () => {
   it('should return ciphertext in format "iv:ciphertext"', async () => {
@@ -189,9 +181,7 @@ describe('encrypt', () => {
   });
 });
 
-// ============================================================================
 // decrypt Tests
-// ============================================================================
 
 describe('decrypt', () => {
   it('should decrypt what was encrypted', async () => {
@@ -272,9 +262,7 @@ describe('decrypt', () => {
   });
 });
 
-// ============================================================================
 // Round-trip Tests
-// ============================================================================
 
 describe('encrypt/decrypt round-trip', () => {
   const testCases = [
@@ -298,9 +286,7 @@ describe('encrypt/decrypt round-trip', () => {
   });
 });
 
-// ============================================================================
 // CryptoError Tests
-// ============================================================================
 
 describe('CryptoError', () => {
   it('should have correct name and code', () => {
@@ -316,9 +302,7 @@ describe('CryptoError', () => {
   });
 });
 
-// ============================================================================
 // Versioned Encryption Tests
-// ============================================================================
 
 // Second key for rotation tests
 const KEY_V2 = 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3';

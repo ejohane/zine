@@ -19,9 +19,7 @@ import {
   persistConnectionExpired,
 } from './token-refresh';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock the crypto module
 vi.mock('./crypto', () => ({
@@ -80,9 +78,7 @@ vi.mock('../db/schema', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 const FIVE_MINUTES_MS = 5 * 60 * 1000;
@@ -142,9 +138,7 @@ function mockImmediateSetTimeout() {
   }) as unknown as typeof setTimeout);
 }
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 const originalDateNow = Date.now;
 
@@ -164,9 +158,7 @@ afterEach(() => {
   Date.now = originalDateNow;
 });
 
-// ============================================================================
 // getValidAccessToken - Token Still Valid
-// ============================================================================
 
 describe('getValidAccessToken - token still valid', () => {
   it('should return decrypted token when not expired (outside buffer)', async () => {
@@ -231,9 +223,7 @@ describe('getValidAccessToken - token still valid', () => {
   });
 });
 
-// ============================================================================
 // getValidAccessToken - Token Needs Refresh
-// ============================================================================
 
 describe('getValidAccessToken - token needs refresh', () => {
   it('should acquire lock when token expired', async () => {
@@ -308,9 +298,7 @@ describe('getValidAccessToken - token needs refresh', () => {
   });
 });
 
-// ============================================================================
 // Distributed Locking Behavior
-// ============================================================================
 
 describe('distributed locking behavior', () => {
   it('should acquire lock before refresh', async () => {
@@ -462,9 +450,7 @@ describe('distributed locking behavior', () => {
   });
 });
 
-// ============================================================================
 // Provider-Specific Refresh
-// ============================================================================
 
 describe('provider-specific refresh', () => {
   it('should use correct token URL for YOUTUBE', async () => {
@@ -577,9 +563,7 @@ describe('provider-specific refresh', () => {
   });
 });
 
-// ============================================================================
 // Token Persistence
-// ============================================================================
 
 describe('token persistence', () => {
   it('should encrypt new access token before storage', async () => {
@@ -685,9 +669,7 @@ describe('token persistence', () => {
   });
 });
 
-// ============================================================================
 // Error Handling
-// ============================================================================
 
 describe('error handling', () => {
   it('should throw DECRYPTION_FAILED when refresh token cannot be decrypted', async () => {
@@ -759,9 +741,7 @@ describe('error handling', () => {
   });
 });
 
-// ============================================================================
 // TokenRefreshError Tests
-// ============================================================================
 
 describe('TokenRefreshError', () => {
   it('should have correct name and code', () => {
@@ -799,9 +779,7 @@ describe('TokenRefreshError', () => {
   });
 });
 
-// ============================================================================
 // Integration Tests
-// ============================================================================
 
 describe('integration scenarios', () => {
   it('should handle full refresh flow for YouTube', async () => {
@@ -944,9 +922,7 @@ describe('integration scenarios', () => {
   });
 });
 
-// ============================================================================
 // isPermanentRefreshError Unit Tests
-// ============================================================================
 
 describe('isPermanentRefreshError', () => {
   it('should return true for invalid_grant error with 400 status', () => {
@@ -1016,9 +992,7 @@ describe('isPermanentRefreshError', () => {
   });
 });
 
-// ============================================================================
 // persistConnectionExpired Unit Tests
-// ============================================================================
 
 describe('persistConnectionExpired', () => {
   it('should update connection status to EXPIRED', async () => {
@@ -1049,9 +1023,7 @@ describe('persistConnectionExpired', () => {
   });
 });
 
-// ============================================================================
 // Integration Tests for Expired Token Flow
-// ============================================================================
 
 describe('expired token flow integration', () => {
   it('should mark connection EXPIRED and throw REFRESH_FAILED_PERMANENT for invalid_grant', async () => {

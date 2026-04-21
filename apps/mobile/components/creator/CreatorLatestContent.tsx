@@ -23,10 +23,6 @@ import { trpc } from '@/lib/trpc';
 
 import { LatestContentCard, type LatestContentItem } from './LatestContentCard';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export interface CreatorLatestContentProps {
   /** The creator ID to fetch content for */
   creatorId: string;
@@ -42,10 +38,6 @@ export interface CreatorLatestContentProps {
     error?: Error | null;
   };
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Providers that support fetching latest content */
 const SUPPORTED_PROVIDERS = ['YOUTUBE', 'SPOTIFY', 'RSS', 'WEB', 'SUBSTACK'];
@@ -105,10 +97,6 @@ function getManageRoute(provider: string): Href | null {
 
   return null;
 }
-
-// ============================================================================
-// Helper Components
-// ============================================================================
 
 function Skeleton({ colors }: { colors: ThemeColors }) {
   return (
@@ -171,10 +159,6 @@ function ReconnectPrompt({ provider, onPress, colors }: ReconnectPromptProps) {
   );
 }
 
-// ============================================================================
-// Component
-// ============================================================================
-
 /**
  * CreatorLatestContent displays the latest content from a creator.
  *
@@ -205,12 +189,10 @@ export function CreatorLatestContent({
   const requestedThumbnailUrlsRef = useRef(new Set<string>());
   const isProcessingQueueRef = useRef(false);
 
-  // Check if provider is supported
   const isSupported = SUPPORTED_PROVIDERS.includes(provider);
   const shouldEnrichThumbnails = THUMBNAIL_ENRICHMENT_PROVIDERS.includes(provider);
 
-  // Always call hook to avoid conditional hook error
-  // The hook will only fetch when enabled
+  // Hook must always be called; it won't fetch when isSupported is false
   const latestContentState = useCreatorLatestContent(creatorId);
   const content = stateOverride?.content ?? latestContentState.content;
   const reason = stateOverride?.reason ?? latestContentState.reason;
@@ -220,7 +202,6 @@ export function CreatorLatestContent({
   const resolveLatestContentThumbnailsMutation =
     trpc.creators.resolveLatestContentThumbnails.useMutation();
 
-  // Track content loaded once
   const hasTrackedContentLoaded = useRef(false);
   useEffect(() => {
     if (!isLoading && !error && content.length > 0 && !hasTrackedContentLoaded.current) {
@@ -234,7 +215,6 @@ export function CreatorLatestContent({
     }
   }, [isLoading, error, content.length, creatorId, provider, cacheStatus]);
 
-  // Track connect prompt shown once
   const hasTrackedConnectPrompt = useRef(false);
   useEffect(() => {
     if (
@@ -392,7 +372,6 @@ export function CreatorLatestContent({
     return null;
   }
 
-  // Loading state
   if (isLoading) {
     return (
       <View style={styles.container}>
@@ -404,7 +383,6 @@ export function CreatorLatestContent({
     );
   }
 
-  // Not connected to provider
   if (reason === 'NOT_CONNECTED') {
     return (
       <View style={styles.container}>
@@ -421,7 +399,6 @@ export function CreatorLatestContent({
     );
   }
 
-  // Token expired
   if (reason === 'TOKEN_EXPIRED') {
     return (
       <View style={styles.container}>
@@ -433,7 +410,6 @@ export function CreatorLatestContent({
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={styles.container}>
@@ -447,7 +423,6 @@ export function CreatorLatestContent({
     );
   }
 
-  // Empty state
   if (content.length === 0) {
     return (
       <View style={styles.container}>
@@ -461,7 +436,6 @@ export function CreatorLatestContent({
     );
   }
 
-  // Transform API content to LatestContentItem format
   const items: LatestContentItem[] = content.map((item: CreatorContentItem) => ({
     providerId: item.id,
     title: item.title,
@@ -474,7 +448,6 @@ export function CreatorLatestContent({
     isBookmarked: item.isBookmarked ?? false,
   }));
 
-  // Success state with items
   return (
     <View style={styles.container}>
       <Text style={styles.title} tone="primary">
@@ -499,10 +472,6 @@ export function CreatorLatestContent({
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

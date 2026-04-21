@@ -1,5 +1,5 @@
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
-import type { AppRouter } from '../../worker/src/trpc/router';
+import type { AppRouter } from '@zine/worker/trpc/router';
 
 export type RouterInputs = inferRouterInputs<AppRouter>;
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
@@ -27,3 +27,5 @@ export type RssListOutput = RouterOutputs['subscriptions']['rss']['list'];
 export type RssStatsOutput = RouterOutputs['subscriptions']['rss']['stats'];
 export type RssDiscoverInput = RouterInputs['subscriptions']['rss']['discover'];
 export type RssDiscoverOutput = RouterOutputs['subscriptions']['rss']['discover'];
+
+export type SyncStatusOutput = RouterOutputs['subscriptions']['syncStatus'];

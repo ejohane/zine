@@ -32,10 +32,6 @@ export type { Subscription, SubscriptionsResponse, SubscriptionProvider };
 export type SubscribePayload = AddSubscriptionInput;
 export type UnsubscribePayload = RemoveSubscriptionInput;
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Return type for the useSubscriptions hook.
  */
@@ -66,10 +62,6 @@ export interface UseSubscriptionsReturn {
   /** Whether an unsubscribe action was queued for offline execution */
   unsubscribeQueued: boolean;
 }
-
-// ============================================================================
-// Hook
-// ============================================================================
 
 /**
  * Full subscriptions hook with offline mutation support.
@@ -151,10 +143,6 @@ export interface UseSubscriptionsReturn {
 export function useSubscriptions(): UseSubscriptionsReturn {
   const utils = trpc.useUtils();
 
-  // ============================================================================
-  // Query
-  // ============================================================================
-
   const subscriptionsQuery = trpc.subscriptions.list.useQuery(
     { limit: 50 }, // Use default limit from API contract
     {
@@ -166,10 +154,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     }
   );
 
-  // ============================================================================
-  // Subscribe Mutation
-  // ============================================================================
-
   const {
     mutate: subscribe,
     isPending: isSubscribing,
@@ -177,12 +161,10 @@ export function useSubscriptions(): UseSubscriptionsReturn {
   } = useOfflineMutation<AddSubscriptionInput>({
     actionType: 'SUBSCRIBE',
 
-    // Execute the actual mutation when online
     mutationFn: async (payload) => {
       await utils.client.subscriptions.add.mutate(payload);
     },
 
-    // Apply optimistic update to cache immediately
     onOptimisticUpdate: (payload) => {
       utils.subscriptions.list.setData(
         { limit: 50 },
@@ -203,7 +185,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
       );
     },
 
-    // Rollback optimistic update on failure
     onRollback: (payload) => {
       utils.subscriptions.list.setData(
         { limit: 50 },
@@ -223,7 +204,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
       );
     },
 
-    // Invalidate cache to get fresh data from server
     onSuccess: () => {
       utils.subscriptions.list.invalidate();
       // Also invalidate items queries - new subscription triggers ingestion of latest episode
@@ -232,10 +212,6 @@ export function useSubscriptions(): UseSubscriptionsReturn {
     },
   });
 
-  // ============================================================================
-  // Unsubscribe Mutation
-  // ============================================================================
-
   const {
     mutate: unsubscribe,
     isPending: isUnsubscribing,
@@ -243,12 +219,10 @@ export function useSubscriptions(): UseSubscriptionsReturn {
   } = useOfflineMutation<RemoveSubscriptionInput>({
     actionType: 'UNSUBSCRIBE',
 
-    // Execute the actual mutation when online
     mutationFn: async (payload) => {
       await utils.client.subscriptions.remove.mutate(payload);
     },
 
-    // Apply optimistic update to cache immediately
     onOptimisticUpdate: (payload) => {
       utils.subscriptions.list.setData(
         { limit: 50 },
@@ -267,18 +241,12 @@ export function useSubscriptions(): UseSubscriptionsReturn {
       );
     },
 
-    // Rollback by invalidating cache (let it refetch the actual state)
     onRollback: () => {
       utils.subscriptions.list.invalidate();
     },
   });
 
-  // ============================================================================
-  // Return
-  // ============================================================================
-
   return {
-    // Query
     subscriptions: subscriptionsQuery.data
       ? mapSubscriptionsResponse(subscriptionsQuery.data).items
       : [],
@@ -290,21 +258,17 @@ export function useSubscriptions(): UseSubscriptionsReturn {
       await subscriptionsQuery.refetch();
     },
 
-    // Subscribe mutation
     subscribe,
     isSubscribing,
     subscribeQueued,
 
-    // Unsubscribe mutation
     unsubscribe,
     isUnsubscribing,
     unsubscribeQueued,
   };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Create a temporary subscription object for optimistic updates.
@@ -337,9 +301,7 @@ function createTempSubscriptionRow(
   };
 }
 
-// ============================================================================
 // Additional Exports
-// ============================================================================
 
 /**
  * Hook for infinite scroll/pagination of subscriptions.

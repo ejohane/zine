@@ -8,9 +8,7 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 const mockInboxUseQuery = jest.fn();
 const mockInboxUseInfiniteQuery = jest.fn();
@@ -50,9 +48,7 @@ jest.mock('../lib/trpc', () => ({
   },
 }));
 
-// ============================================================================
 // Test Setup
-// ============================================================================
 
 import {
   useInboxItems,
@@ -63,7 +59,6 @@ import {
   useBookmarkItem,
   useArchiveItem,
   useToggleFinished,
-  formatDuration,
 } from './use-items-trpc';
 
 function createMockItem(overrides: Record<string, unknown> = {}) {
@@ -339,27 +334,6 @@ function createToggleUtils(initial?: {
   };
 }
 
-describe('formatDuration', () => {
-  it('formats minute and hour durations', () => {
-    expect(formatDuration(45)).toBe('0:45');
-    expect(formatDuration(125)).toBe('2:05');
-    expect(formatDuration(3661)).toBe('1:01:01');
-  });
-
-  it('floors fractional seconds to avoid decimal output', () => {
-    expect(formatDuration(125.9)).toBe('2:05');
-    expect(formatDuration(59.999)).toBe('0:59');
-  });
-
-  it('returns undefined for invalid durations', () => {
-    expect(formatDuration(undefined)).toBeUndefined();
-    expect(formatDuration(null)).toBeUndefined();
-    expect(formatDuration(Number.NaN)).toBeUndefined();
-    expect(formatDuration(Number.POSITIVE_INFINITY)).toBeUndefined();
-    expect(formatDuration(-1)).toBeUndefined();
-  });
-});
-
 beforeEach(() => {
   jest.clearAllMocks();
 
@@ -419,9 +393,7 @@ beforeEach(() => {
   mockUseUtils.mockReturnValue(createToggleUtils().utils);
 });
 
-// ============================================================================
 // List Query Placeholder Data
-// ============================================================================
 
 describe('useItems list queries', () => {
   it('uses placeholderData for inbox items', () => {
@@ -666,9 +638,7 @@ describe('useBookmarkItem', () => {
   });
 });
 
-// ============================================================================
 // useToggleFinished Optimistic Behavior
-// ============================================================================
 
 describe('useToggleFinished', () => {
   type ToggleHandlers = {

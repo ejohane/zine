@@ -12,10 +12,6 @@ import { router, protectedProcedure } from '../trpc';
 import { Provider, ProviderSchema } from '@zine/shared';
 import { sources } from '../../db/schema';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Source response type for API
  */
@@ -29,9 +25,7 @@ export type SourceView = {
   updatedAt: string;
 };
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 // Input schema for adding a source
 const AddSourceInputSchema = z.object({
@@ -45,9 +39,7 @@ const RemoveSourceInputSchema = z.object({
   id: z.string().min(1),
 });
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Derive a name from the feedUrl if not provided
@@ -149,9 +141,7 @@ function toSourceView(row: typeof sources.$inferSelect): SourceView {
   };
 }
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const sourcesRouter = router({
   /**

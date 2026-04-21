@@ -8,9 +8,9 @@ import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { mapContentType, mapProvider, useLibraryItems } from '@/hooks/use-items-trpc';
+import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import { useLibraryItems } from '@/hooks/use-items-trpc';
 import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
-import type { ContentType, Provider } from '@/lib/content-utils';
 
 export default function SearchTabScreen() {
   const navigation = useNavigation();

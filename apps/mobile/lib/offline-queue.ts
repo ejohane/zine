@@ -30,17 +30,9 @@ import { classifyError, type ErrorType } from './error-utils';
 import { CLERK_PUBLISHABLE_KEY, tokenCache } from './auth';
 import type { AddSubscriptionInput, RemoveSubscriptionInput } from './trpc-types';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const QUEUE_KEY = 'zine:offline_action_queue';
 const MAX_RETRIES = 3;
 const AUTH_RETRY_LIMIT = 1; // Only retry auth errors once after token refresh
-
-// ============================================================================
-// Types
-// ============================================================================
 
 /**
  * Types of offline actions that can be queued.
@@ -130,9 +122,7 @@ function isRetryableError(errorType: ErrorType, action: OfflineAction): boolean 
   }
 }
 
-// ============================================================================
 // Offline Action Queue
-// ============================================================================
 
 /**
  * Singleton queue for managing offline subscription mutations.
@@ -440,9 +430,7 @@ class OfflineActionQueue {
     this.notifyListeners();
   }
 
-  // ==========================================================================
   // Private Methods
-  // ==========================================================================
 
   /**
    * Persist the queue to AsyncStorage.
@@ -535,9 +523,7 @@ class OfflineActionQueue {
   }
 }
 
-// ============================================================================
 // Singleton Export
-// ============================================================================
 
 /**
  * Singleton instance of the offline action queue.
@@ -554,9 +540,7 @@ class OfflineActionQueue {
  */
 export const offlineQueue = new OfflineActionQueue();
 
-// ============================================================================
 // NetInfo Integration
-// ============================================================================
 
 /**
  * Auto-process queue when app comes online.

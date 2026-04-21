@@ -48,19 +48,13 @@ import { MAX_ITEMS_PER_POLL } from './types';
 import {
   serializeError,
   createPollingError,
-  formatPollingErrorLegacy,
+  toPollingErrorEntry,
   type PollingError,
 } from '../utils/error-utils';
 
-// ============================================================================
 // Logger
-// ============================================================================
 
 const spotifyLogger = pollLogger.child('spotify');
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Default concurrency for parallel episode fetching */
 const DEFAULT_EPISODE_FETCH_CONCURRENCY = 5;
@@ -92,9 +86,7 @@ function getPositiveIntEnv(value: string | undefined, fallback: number): number 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-// ============================================================================
 // Provider Configuration
-// ============================================================================
 
 /**
  * Spotify provider batch configuration.
@@ -111,9 +103,7 @@ export const spotifyProviderConfig: ProviderBatchConfig<SpotifyApi> = {
   pollBatch: pollSpotifySubscriptionsBatched,
 };
 
-// ============================================================================
 // Batch Polling Function
-// ============================================================================
 
 /**
  * Poll multiple Spotify subscriptions using batch API and delta detection.
@@ -213,7 +203,7 @@ export async function pollSpotifySubscriptionsBatched(
       newItems: 0,
       processed: 0,
       errors: subs.map((sub) =>
-        formatPollingErrorLegacy(
+        toPollingErrorEntry(
           createPollingError(sub.id, error, {
             operation: 'getMultipleShowsWithCache',
             userId,
@@ -514,7 +504,7 @@ export async function pollSpotifySubscriptionsBatched(
     processed: subsNeedingUpdate.length,
     skipped: subsUnchanged.length,
     disconnected: subsMissing.length,
-    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(toPollingErrorEntry) : undefined,
     cacheHits,
     cacheMisses,
   };
@@ -556,9 +546,7 @@ async function markSubscriptionsAsDisconnected(
     .where(inArray(subscriptions.id, ids));
 }
 
-// ============================================================================
 // Main Polling Function
-// ============================================================================
 
 /**
  * Poll a single Spotify subscription for new episodes.
@@ -661,9 +649,7 @@ export async function pollSingleSpotifySubscription(
   return { newItems: newItemsCount };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Filter out unplayable episodes before processing.

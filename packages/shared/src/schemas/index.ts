@@ -11,9 +11,7 @@
 import { z } from 'zod';
 import { ContentType, Provider, SubscriptionStatus } from '../types/domain';
 
-// ============================================================================
 // Enum Schemas (used for tRPC input validation)
-// ============================================================================
 
 /** Schema for content types (VIDEO, AUDIO, etc.) */
 export const ContentTypeSchema = z

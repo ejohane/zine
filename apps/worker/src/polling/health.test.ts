@@ -10,9 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { isTokenExpiredError, isRefreshTokenInvalid, isAccessRevokedError } from './health';
 
-// ============================================================================
 // isTokenExpiredError Tests
-// ============================================================================
 
 describe('isTokenExpiredError', () => {
   describe('should return true for token expiration errors', () => {
@@ -60,9 +58,7 @@ describe('isTokenExpiredError', () => {
   });
 });
 
-// ============================================================================
 // isRefreshTokenInvalid Tests
-// ============================================================================
 
 describe('isRefreshTokenInvalid', () => {
   describe('should return true for permanent refresh failures', () => {
@@ -110,9 +106,7 @@ describe('isRefreshTokenInvalid', () => {
   });
 });
 
-// ============================================================================
 // isAccessRevokedError Tests
-// ============================================================================
 
 describe('isAccessRevokedError', () => {
   describe('should return true for access revocation errors', () => {
@@ -160,9 +154,7 @@ describe('isAccessRevokedError', () => {
   });
 });
 
-// ============================================================================
 // Combined Error Classification Tests
-// ============================================================================
 
 describe('Error classification priority', () => {
   it('classifies 401 as token expired, not revoked', () => {
@@ -193,9 +185,7 @@ describe('Error classification priority', () => {
   });
 });
 
-// ============================================================================
 // Edge Cases
-// ============================================================================
 
 describe('Edge cases', () => {
   it('handles empty error message', () => {

@@ -16,9 +16,7 @@ import {
 } from './route-validation';
 
 describe('route-validation', () => {
-  // ===========================================================================
   // ID Validation Tests
-  // ===========================================================================
 
   describe('isValidId', () => {
     it('returns true for valid non-empty strings', () => {
@@ -78,9 +76,7 @@ describe('route-validation', () => {
     });
   });
 
-  // ===========================================================================
   // Provider Validation Tests
-  // ===========================================================================
 
   describe('isValidProviderRoute', () => {
     it('returns true for valid lowercase providers', () => {

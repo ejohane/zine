@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { Provider, UserItemState } from '@zine/shared';
+import type { BatchItem } from 'drizzle-orm/batch';
 
 import { createDb, type Database } from '../db';
 import { items, providerItemsSeen, rssFeedItems, rssFeeds, userItems } from '../db/schema';
@@ -267,7 +268,7 @@ async function ingestEntry(params: {
     return false;
   }
 
-  const statements: unknown[] = [];
+  const statements: BatchItem<'sqlite'>[] = [];
 
   if (!prepared.item.canonicalItemExists) {
     const publishedAtISO = prepared.item.newItem.publishedAt
@@ -358,7 +359,7 @@ async function ingestEntry(params: {
       .onConflictDoNothing()
   );
 
-  await db.batch(statements as unknown as Parameters<typeof db.batch>[0]);
+  await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
   return true;
 }
 

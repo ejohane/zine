@@ -16,9 +16,7 @@ import type { SyncQueueMessage, SyncJobStatus } from './types';
 import { getActiveJobKey, getDLQEntryKey, getDLQIndexKey, getJobStatusKey } from './types';
 import { expectLoggerErrorCalls, mockLogger } from '../test/mock-logger';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock ulid
 let mockUlidCounter = 0;
@@ -26,9 +24,7 @@ vi.mock('ulid', () => ({
   ulid: () => `01HQXYZ${String(++mockUlidCounter).padStart(17, '0')}`,
 }));
 
-// ============================================================================
 // Mock KV Namespace
-// ============================================================================
 
 type KVStore = Map<string, { value: string; expiration?: number }>;
 
@@ -58,9 +54,7 @@ function createMockKV(initialData?: Record<string, string>): KVNamespace & { sto
   } as unknown as KVNamespace & { store: KVStore };
 }
 
-// ============================================================================
 // Mock Message Batch
-// ============================================================================
 
 function createMockMessage(
   body: SyncQueueMessage,
@@ -111,9 +105,7 @@ function expectHandleSyncDLQErrorLogs(
   expectLoggerErrorCalls(expectedCalls);
 }
 
-// ============================================================================
 // Mock Environment
-// ============================================================================
 
 function createMockEnv(kv: KVNamespace) {
   return {
@@ -123,9 +115,7 @@ function createMockEnv(kv: KVNamespace) {
   };
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 const TEST_JOB_ID = '01HQXYZ123456789ABCDEFGHIJ';
@@ -157,9 +147,7 @@ function createDLQEntry(
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('handleSyncDLQ', () => {
   beforeEach(() => {

@@ -18,9 +18,7 @@ import { ItemDetailFloatingBack } from './detail/components/ItemDetailFloatingBa
 import { extractXHandle } from './item-detail-helpers';
 import { styles, xPostStyles } from './item-detail-styles';
 
-// ============================================================================
 // Linked Text Component (URL Detection)
-// ============================================================================
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
 
@@ -68,9 +66,7 @@ export function LinkedText({
   );
 }
 
-// ============================================================================
 // X Post Body Component
-// ============================================================================
 
 /**
  * X Post Bookmark View

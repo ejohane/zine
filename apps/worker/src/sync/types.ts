@@ -10,9 +10,7 @@
 import { z } from 'zod';
 import { ReleaseContextSchema, TraceContextSchema } from '@zine/shared';
 
-// ============================================================================
 // Queue Message Types
-// ============================================================================
 
 export interface SyncJobTelemetry {
   traceId: string;
@@ -67,9 +65,7 @@ export const SyncQueueMessageSchema = z.object({
   meta: SyncJobTelemetrySchema.optional(),
 });
 
-// ============================================================================
 // Job Status Types
-// ============================================================================
 
 /**
  * Status of a sync job.
@@ -125,13 +121,16 @@ export const SyncJobStatusSchema = z.object({
   telemetry: SyncJobTelemetrySchema.optional(),
 });
 
-function parseStoredJson(value: string | null | undefined, schema: z.ZodTypeAny): unknown | null {
+function parseStoredJson<T>(
+  value: string | null | undefined,
+  schema: z.ZodType<T, z.ZodTypeDef, unknown>
+): T | null {
   if (!value) {
     return null;
   }
 
   try {
-    const parsed = JSON.parse(value) as unknown;
+    const parsed: unknown = JSON.parse(value);
     const result = schema.safeParse(parsed);
     return result.success ? result.data : null;
   } catch {
@@ -140,12 +139,10 @@ function parseStoredJson(value: string | null | undefined, schema: z.ZodTypeAny)
 }
 
 export function parseSyncJobStatus(value: string | null | undefined): SyncJobStatus | null {
-  return parseStoredJson(value, SyncJobStatusSchema) as SyncJobStatus | null;
+  return parseStoredJson(value, SyncJobStatusSchema);
 }
 
-// ============================================================================
 // API Response Types
-// ============================================================================
 
 /**
  * Response from syncAllAsync - initiating an async sync job
@@ -205,9 +202,7 @@ export interface ActiveSyncJobResponse {
   telemetry?: SyncJobTelemetry;
 }
 
-// ============================================================================
 // KV Keys
-// ============================================================================
 
 /**
  * Get the KV key for a user's active sync job.
@@ -236,9 +231,7 @@ export const JOB_STATUS_TTL_SECONDS = 600;
  */
 export const ACTIVE_JOB_TTL_SECONDS = 300;
 
-// ============================================================================
 // DLQ Types
-// ============================================================================
 
 /**
  * Dead Letter Queue entry metadata.
@@ -270,7 +263,7 @@ export const DLQEntrySchema = z.object({
 });
 
 export function parseDLQEntry(value: string | null | undefined): DLQEntry | null {
-  return parseStoredJson(value, DLQEntrySchema) as DLQEntry | null;
+  return parseStoredJson(value, DLQEntrySchema);
 }
 
 /**

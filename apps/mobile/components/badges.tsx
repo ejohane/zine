@@ -14,16 +14,10 @@ import type {
 import { ContentColors, ProviderColors, Typography, Spacing, Radius } from '@/constants/theme';
 import { Badge } from '@/components/primitives';
 
-// =============================================================================
-// Types
-// =============================================================================
-
 export type ProviderType = Exclude<SharedProviderValue, 'RSS'> | 'TWITTER';
 export type ContentTypeValue = SharedContentTypeValue;
 
-// =============================================================================
 // SourceBadge - Shows content provider (YouTube, Spotify, etc.)
-// =============================================================================
 
 export interface SourceBadgeProps {
   provider: ProviderType | string;
@@ -66,9 +60,7 @@ export function SourceBadge({ provider }: SourceBadgeProps) {
   );
 }
 
-// =============================================================================
 // TypeBadge - Shows content type (Video, Podcast, etc.)
-// =============================================================================
 
 export interface TypeBadgeProps {
   contentType: ContentTypeValue | string;
@@ -107,10 +99,6 @@ export function TypeBadge({ contentType }: TypeBadgeProps) {
     />
   );
 }
-
-// =============================================================================
-// Styles
-// =============================================================================
 
 const styles = StyleSheet.create({
   badge: {

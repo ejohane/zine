@@ -14,7 +14,7 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { Provider } from '@zine/shared';
+import { Provider, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
 import type { Database } from '../db';
 import type { youtube_v3 } from 'googleapis';
 import { subscriptions, creators } from '../db/schema';
@@ -43,7 +43,6 @@ import type {
 } from './types';
 import {
   MAX_ITEMS_PER_POLL,
-  SHORTS_DURATION_THRESHOLD,
   createEmptyYouTubeSkipMetrics,
   aggregateYouTubeSkipMetrics,
   getTotalSkipCount,
@@ -51,19 +50,14 @@ import {
 import {
   serializeError,
   createPollingError,
-  formatPollingErrorLegacy,
+  toPollingErrorEntry,
   type PollingError,
 } from '../utils/error-utils';
 
-// ============================================================================
 // Logger
-// ============================================================================
-
 const ytLogger = pollLogger.child('youtube');
 
-// ============================================================================
 // Date Parsing Utilities
-// ============================================================================
 
 /**
  * Parse a YouTube date string into a Unix timestamp.
@@ -90,9 +84,7 @@ export function parseYouTubeDate(dateString: string | undefined | null): number 
   return parsed;
 }
 
-// ============================================================================
 // Provider Configuration
-// ============================================================================
 
 /**
  * YouTube provider batch configuration.
@@ -109,9 +101,7 @@ export const youtubeProviderConfig: ProviderBatchConfig<YouTubeClient> = {
   pollBatch: pollYouTubeSubscriptionsBatched,
 };
 
-// ============================================================================
 // Main Polling Function
-// ============================================================================
 
 /**
  * Poll a single YouTube subscription for new videos.
@@ -224,9 +214,7 @@ export async function pollSingleYouTubeSubscription(
   return { newItems: newItemsCount };
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Enriched video type with duration from videos.list API
@@ -287,7 +275,7 @@ function filterOutShorts(
     if (v.durationSeconds === undefined) {
       return true; // Graceful degradation - don't lose content
     }
-    if (v.durationSeconds <= SHORTS_DURATION_THRESHOLD) {
+    if (v.durationSeconds <= YOUTUBE_SHORTS_MAX_DURATION_SECONDS) {
       skipMetrics.shortsFiltered++;
       return false;
     }
@@ -452,9 +440,7 @@ async function updateSubscriptionPolled(subscriptionId: string, db: DrizzleDB): 
     .where(eq(subscriptions.id, subscriptionId));
 }
 
-// ============================================================================
 // Batched Polling (Parallel + Cross-Subscription Batching)
-// ============================================================================
 
 /**
  * Cloudflare Workers limit for concurrent outbound connections.
@@ -630,7 +616,7 @@ export async function pollYouTubeSubscriptionsBatched(
     newItems: totalNewItems,
     processed: playlistResults.length,
     skipped: totalSkipped,
-    errors: pollingErrors.length > 0 ? pollingErrors.map(formatPollingErrorLegacy) : undefined,
+    errors: pollingErrors.length > 0 ? pollingErrors.map(toPollingErrorEntry) : undefined,
     youtubeSkipMetrics: aggregatedSkipMetrics,
   };
 }

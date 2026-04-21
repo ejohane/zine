@@ -13,12 +13,7 @@ import { Text } from '@/components/primitives';
 import { Radius, Typography, Spacing, type ThemeColors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useCreatorBookmarks } from '@/hooks/use-creator';
-import { mapContentType, mapProvider } from '@/hooks/use-items-trpc';
-import type { ContentType, Provider } from '@/lib/content-utils';
-
-// ============================================================================
-// Types
-// ============================================================================
+import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 
 export interface CreatorBookmarksProps {
   /** The creator ID to fetch bookmarks for */
@@ -35,9 +30,7 @@ export interface CreatorBookmarksProps {
   };
 }
 
-// ============================================================================
 // Skeleton Component
-// ============================================================================
 
 function BookmarksSkeleton({ colors }: { colors: ThemeColors }) {
   return (
@@ -48,10 +41,6 @@ function BookmarksSkeleton({ colors }: { colors: ThemeColors }) {
     </View>
   );
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 /**
  * CreatorBookmarks displays a paginated list of the user's bookmarks
@@ -168,10 +157,6 @@ export function CreatorBookmarks({ creatorId, stateOverride }: CreatorBookmarksP
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

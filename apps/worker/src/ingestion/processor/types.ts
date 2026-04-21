@@ -3,10 +3,6 @@ import type { Provider } from '@zine/shared';
 import type { Database } from '../../db';
 import type { NewItem } from '../transformers';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Result of an ingestion attempt.
  */

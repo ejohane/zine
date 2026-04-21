@@ -26,10 +26,6 @@ const adaptiveLogger = pollLogger.child('adaptive');
  */
 type DrizzleDB = Database;
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Activity metrics used to calculate optimal polling interval
  */
@@ -52,10 +48,6 @@ export interface Subscription {
   pollIntervalSeconds: number;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Polling interval for very active channels (7+ items/week): 1 hour */
 export const INTERVAL_VERY_ACTIVE = 3600;
 
@@ -74,9 +66,7 @@ export const MIN_CHANGE_THRESHOLD = 0.5;
 /** How often to check for interval adjustments (every ~24 polls) */
 export const ADJUSTMENT_POLL_FREQUENCY = 24;
 
-// ============================================================================
 // Core Functions
-// ============================================================================
 
 /**
  * Calculate the optimal polling interval based on activity metrics

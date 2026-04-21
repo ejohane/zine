@@ -29,9 +29,7 @@
 import type { ItemCardData } from '../components/item-card';
 import type { ContentType, Provider } from '../lib/content-utils';
 
-// ============================================================================
 // Test Data Factory
-// ============================================================================
 
 function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   return {
@@ -49,9 +47,7 @@ function createMockItem(overrides: Partial<ItemCardData> = {}): ItemCardData {
   };
 }
 
-// ============================================================================
 // Acceptance Criteria Configuration Constants
-// ============================================================================
 
 /** Design system constants for validation */
 const DESIGN_CONSTANTS = {
@@ -102,9 +98,7 @@ const THEME_COLORS = {
   },
 };
 
-// ============================================================================
 // Acceptance Criteria Tests
-// ============================================================================
 
 describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
   describe('1. Inbox uses flat list design matching library page', () => {
@@ -685,9 +679,7 @@ describe('Inbox Swipeable Redesign - GitHub #41 Acceptance Criteria', () => {
   });
 });
 
-// ============================================================================
 // Manual Testing Checklist
-// ============================================================================
 
 describe('Manual Testing Checklist', () => {
   describe('Happy Path Testing', () => {
@@ -753,9 +745,7 @@ describe('Manual Testing Checklist', () => {
   });
 });
 
-// ============================================================================
 // Final Acceptance Summary
-// ============================================================================
 
 describe('Final Acceptance Summary', () => {
   it('all 14 criteria are covered by tests', () => {

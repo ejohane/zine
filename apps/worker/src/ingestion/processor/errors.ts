@@ -1,9 +1,7 @@
 import { TransformError } from '../transformers';
 import { isValidationError } from '../validation';
 
-// ============================================================================
 // Error Classification
-// ============================================================================
 
 /**
  * Error types for dead-letter queue classification.

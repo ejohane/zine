@@ -11,9 +11,7 @@
 import { z } from 'zod';
 import { ContentType, Provider } from '@zine/shared';
 
-// ============================================================================
 // Custom Validation Error
-// ============================================================================
 
 /**
  * Custom error for validation failures.
@@ -30,10 +28,6 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /**
  * Maximum duration in seconds (24 hours).
@@ -53,9 +47,7 @@ const MAX_TIMESTAMP_MS = 4102444800000;
  */
 const MIN_TIMESTAMP_MS = 946684800000;
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 /**
  * Custom URL validator that only accepts http/https URLs.
@@ -127,9 +119,7 @@ export const canonicalItemSchema = z.object({
  */
 export type ValidatedCanonicalItem = z.infer<typeof canonicalItemSchema>;
 
-// ============================================================================
 // Validation Functions
-// ============================================================================
 
 /**
  * Validate a transformed item before database insertion.

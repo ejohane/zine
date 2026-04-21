@@ -151,24 +151,20 @@ export function useOfflineMutation<TPayload extends object>({
   const [isPending, setIsPending] = useState(false);
   const [isQueued, setIsQueued] = useState(false);
 
-  // Device is online if connected AND internet is reachable
-  // Note: isInternetReachable can be null on Android initially, treat as online
+  // isInternetReachable can be null on Android initially; treat null as online
   const isOnline = isConnected && isInternetReachable !== false;
 
   const mutate = useCallback(
     async (payload: TPayload) => {
       const actionTrace = createMobileActionTraceContext();
 
-      // Reset state for new mutation
       setIsPending(true);
       setIsQueued(false);
 
-      // Apply optimistic update immediately (before network check)
-      // This ensures instant UI feedback regardless of online/offline status
+      // Apply optimistic update before the network check for instant UI feedback
       onOptimisticUpdate?.(payload);
 
       if (!isOnline) {
-        // Offline path: Queue the action for later processing
         try {
           await offlineQueue.enqueue({
             type: actionType,
@@ -176,10 +172,9 @@ export function useOfflineMutation<TPayload extends object>({
             traceId: actionTrace.traceId,
           });
           setIsQueued(true);
-          // Note: No rollback here - optimistic update stays until queue processes
-          // The queue will notify React Query to invalidate when it eventually succeeds
+          // No rollback: optimistic update stays until the queue processes and invalidates
         } catch (error) {
-          // Queuing failed (e.g., AsyncStorage error) - this is rare
+          // Queuing failed (e.g., AsyncStorage error)
           offlineLogger.error('Failed to queue action', { error, actionType });
           onRollback?.(payload);
         } finally {
@@ -188,12 +183,10 @@ export function useOfflineMutation<TPayload extends object>({
         return;
       }
 
-      // Online path: Execute mutation directly
       try {
         await runWithMobileActionTrace(actionTrace, () => mutationFn(payload));
         onSuccess?.(payload);
       } catch (error) {
-        // Mutation failed - roll back optimistic update
         onRollback?.(payload);
         onError?.(error as Error, payload);
       } finally {

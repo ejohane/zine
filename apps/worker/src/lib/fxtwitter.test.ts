@@ -31,9 +31,7 @@ describe('fxtwitter', () => {
     vi.restoreAllMocks();
   });
 
-  // ==========================================================================
   // parseTwitterUrl
-  // ==========================================================================
   describe('parseTwitterUrl', () => {
     it('parses valid x.com URL', () => {
       const result = parseTwitterUrl('https://x.com/user/status/12345');
@@ -98,9 +96,7 @@ describe('fxtwitter', () => {
     });
   });
 
-  // ==========================================================================
   // fetchFxTwitter
-  // ==========================================================================
   describe('fetchFxTwitter', () => {
     const mockTweetResponse: FxTwitterResponse = {
       code: 200,
@@ -219,9 +215,7 @@ describe('fxtwitter', () => {
     });
   });
 
-  // ==========================================================================
   // fetchFxTwitterByUrl
-  // ==========================================================================
   describe('fetchFxTwitterByUrl', () => {
     const mockTweetResponse: FxTwitterResponse = {
       code: 200,

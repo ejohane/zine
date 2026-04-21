@@ -18,9 +18,7 @@ import {
   type DbContext,
 } from './creators';
 
-// ============================================================================
 // Mock Date.now for consistent testing
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 const originalDateNow = Date.now;
@@ -33,9 +31,7 @@ afterEach(() => {
   Date.now = originalDateNow;
 });
 
-// ============================================================================
 // normalizeCreatorName Tests
-// ============================================================================
 
 describe('normalizeCreatorName', () => {
   it('should convert to lowercase', () => {
@@ -64,9 +60,7 @@ describe('normalizeCreatorName', () => {
   });
 });
 
-// ============================================================================
 // generateSyntheticCreatorId Tests
-// ============================================================================
 
 describe('generateSyntheticCreatorId', () => {
   it('should produce consistent hashes for same input', () => {
@@ -121,9 +115,7 @@ describe('generateSyntheticCreatorId', () => {
   });
 });
 
-// ============================================================================
 // extractCreatorFromMetadata Tests
-// ============================================================================
 
 describe('extractCreatorFromMetadata', () => {
   describe('YouTube metadata', () => {
@@ -382,9 +374,7 @@ describe('extractCreatorFromMetadata', () => {
   });
 });
 
-// ============================================================================
 // findOrCreateCreator Tests
-// ============================================================================
 
 describe('findOrCreateCreator', () => {
   // Create mock database context

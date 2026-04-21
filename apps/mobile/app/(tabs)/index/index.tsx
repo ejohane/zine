@@ -30,17 +30,17 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { getFeaturedGridItemWidth, getVisibleFeaturedGridItems } from '@/lib/home-layout';
+import { useInfiniteInboxItems, useHomeData, useLibraryItems } from '@/hooks/use-items-trpc';
 import {
-  useInfiniteInboxItems,
-  useHomeData,
-  useLibraryItems,
   mapContentType,
   mapProvider,
-} from '@/hooks/use-items-trpc';
+  type ContentType,
+  type Provider,
+  type UIContentType,
+} from '@/lib/content-utils';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
-import type { ContentType, Provider, UIContentType } from '@/lib/content-utils';
 
 function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; color?: string }) {
   return (

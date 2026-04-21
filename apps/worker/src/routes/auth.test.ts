@@ -47,9 +47,7 @@ vi.mock('../db', () => ({
 // Import after mocking
 import authRoutes from './auth';
 
-// ============================================================================
 // Test Helpers
-// ============================================================================
 
 interface JsonResponse {
   code?: string;
@@ -123,9 +121,7 @@ function createWebhookHeaders(svixId = 'msg_test123') {
   };
 }
 
-// ============================================================================
 // Webhook Tests
-// ============================================================================
 
 describe('POST /api/auth/webhook', () => {
   let app: ReturnType<typeof createTestApp>;
@@ -293,9 +289,7 @@ describe('POST /api/auth/webhook', () => {
   });
 });
 
-// ============================================================================
 // Authenticated Routes Tests
-// ============================================================================
 
 describe('GET /api/auth/me', () => {
   let mockEnv: Env['Bindings'];

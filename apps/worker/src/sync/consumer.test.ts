@@ -14,9 +14,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleSyncQueue } from './consumer';
 import type { SyncQueueMessage } from './types';
 
-// ============================================================================
 // Mocks
-// ============================================================================
 
 // Mock drizzle
 vi.mock('drizzle-orm/d1', () => ({
@@ -102,9 +100,7 @@ vi.mock('../lib/logger', () => ({
   },
 }));
 
-// ============================================================================
 // Mock Database
-// ============================================================================
 
 let mockDb: {
   query: {
@@ -147,9 +143,7 @@ function createMockDb(overrides?: {
   };
 }
 
-// ============================================================================
 // Mock Environment
-// ============================================================================
 
 function createMockEnv() {
   return {
@@ -161,9 +155,7 @@ function createMockEnv() {
   };
 }
 
-// ============================================================================
 // Mock Message Batch
-// ============================================================================
 
 function createMockMessage(body: SyncQueueMessage): Message<SyncQueueMessage> {
   return {
@@ -185,17 +177,13 @@ function createMockBatch(messages: Message<SyncQueueMessage>[]): MessageBatch<Sy
   };
 }
 
-// ============================================================================
 // Test Constants
-// ============================================================================
 
 const TEST_USER_ID = 'user_test_123';
 const TEST_JOB_ID = '01HQXYZ123456789ABCDEFGHIJ';
 const MOCK_NOW = 1705320000000;
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('handleSyncQueue', () => {
   beforeEach(() => {

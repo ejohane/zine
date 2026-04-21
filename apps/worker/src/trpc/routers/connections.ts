@@ -32,9 +32,7 @@ import {
 } from '../../newsletters/gmail';
 import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refresh';
 
-// ============================================================================
 // Zod Schemas
-// ============================================================================
 
 /**
  * Input schema for registering OAuth state
@@ -48,9 +46,7 @@ const RegisterStateInputSchema = z.object({
     .max(128, 'State must be at most 128 characters'),
 });
 
-// ============================================================================
 // Router
-// ============================================================================
 
 export const connectionsRouter = router({
   /**
@@ -118,213 +114,203 @@ export const connectionsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      try {
-        // Validate that required services are available
-        if (!ctx.env.OAUTH_STATE_KV) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'OAuth state storage not configured',
-          });
-        }
+      // Validate that required services are available
+      if (!ctx.env.OAUTH_STATE_KV) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'OAuth state storage not configured',
+        });
+      }
 
-        if (!ctx.env.ENCRYPTION_KEY) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Token encryption not configured',
-          });
-        }
+      if (!ctx.env.ENCRYPTION_KEY) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Token encryption not configured',
+        });
+      }
 
-        // 1. Validate state (CSRF protection)
-        // This also deletes the state after validation (one-time use)
-        authLogger.debug('Step 1: Validating OAuth state');
-        await validateOAuthState(input.state, ctx.userId, ctx.env.OAUTH_STATE_KV);
+      // 1. Validate state (CSRF protection)
+      // This also deletes the state after validation (one-time use)
+      authLogger.debug('Step 1: Validating OAuth state');
+      await validateOAuthState(input.state, ctx.userId, ctx.env.OAUTH_STATE_KV);
 
-        // 2. Exchange authorization code + PKCE verifier for tokens
-        authLogger.debug('Step 2: Exchanging code for tokens');
-        const tokens = await exchangeCodeForTokens(
-          input.provider,
-          input.code,
-          input.codeVerifier,
-          ctx.env,
-          input.redirectUri
-        );
+      // 2. Exchange authorization code + PKCE verifier for tokens
+      authLogger.debug('Step 2: Exchanging code for tokens');
+      const tokens = await exchangeCodeForTokens(
+        input.provider,
+        input.code,
+        input.codeVerifier,
+        ctx.env,
+        input.redirectUri
+      );
 
-        // 3. Get provider user info (for provider_user_id)
-        authLogger.debug('Step 3: Getting provider user info');
-        const providerUser = await getProviderUserInfo(input.provider, tokens.access_token);
+      // 3. Get provider user info (for provider_user_id)
+      authLogger.debug('Step 3: Getting provider user info');
+      const providerUser = await getProviderUserInfo(input.provider, tokens.access_token);
 
-        // 4. Ensure user exists in database (handles post-migration or webhook race condition)
-        // This is idempotent - if user already exists, no change is made
-        authLogger.debug('Step 4: Ensuring user exists');
-        const now = Date.now();
-        const nowIso = new Date(now).toISOString();
-        await ctx.db
-          .insert(users)
-          .values({
-            id: ctx.userId,
-            email: null,
-            createdAt: nowIso,
-            updatedAt: nowIso,
-          })
-          .onConflictDoNothing();
+      // 4. Ensure user exists in database (handles post-migration or webhook race condition)
+      // This is idempotent - if user already exists, no change is made
+      authLogger.debug('Step 4: Ensuring user exists');
+      const now = Date.now();
+      const nowIso = new Date(now).toISOString();
+      await ctx.db
+        .insert(users)
+        .values({
+          id: ctx.userId,
+          email: null,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        })
+        .onConflictDoNothing();
 
-        // 5. Encrypt tokens before storage
-        authLogger.debug('Step 5: Encrypting tokens');
-        const encryptedAccessToken = await encrypt(tokens.access_token, ctx.env.ENCRYPTION_KEY);
-        const encryptedRefreshToken = await encrypt(tokens.refresh_token, ctx.env.ENCRYPTION_KEY);
+      // 5. Encrypt tokens before storage
+      authLogger.debug('Step 5: Encrypting tokens');
+      const encryptedAccessToken = await encrypt(tokens.access_token, ctx.env.ENCRYPTION_KEY);
+      const encryptedRefreshToken = await encrypt(tokens.refresh_token, ctx.env.ENCRYPTION_KEY);
 
-        // 6. Calculate token expiry timestamp
-        const tokenExpiresAt = now + tokens.expires_in * 1000;
+      // 6. Calculate token expiry timestamp
+      const tokenExpiresAt = now + tokens.expires_in * 1000;
 
-        // 7. Upsert connection (update if exists, insert if not)
-        authLogger.debug('Step 7: Upserting provider connection');
-        await ctx.db
-          .insert(providerConnections)
-          .values({
-            id: ulid(),
-            userId: ctx.userId,
-            provider: input.provider,
+      // 7. Upsert connection (update if exists, insert if not)
+      authLogger.debug('Step 7: Upserting provider connection');
+      await ctx.db
+        .insert(providerConnections)
+        .values({
+          id: ulid(),
+          userId: ctx.userId,
+          provider: input.provider,
+          providerUserId: providerUser.id,
+          accessToken: encryptedAccessToken,
+          refreshToken: encryptedRefreshToken,
+          tokenExpiresAt,
+          scopes: tokens.scope ?? null,
+          status: 'ACTIVE',
+          connectedAt: now,
+          lastRefreshedAt: null,
+        })
+        .onConflictDoUpdate({
+          target: [providerConnections.userId, providerConnections.provider],
+          set: {
             providerUserId: providerUser.id,
             accessToken: encryptedAccessToken,
             refreshToken: encryptedRefreshToken,
             tokenExpiresAt,
             scopes: tokens.scope ?? null,
             status: 'ACTIVE',
-            connectedAt: now,
-            lastRefreshedAt: null,
-          })
-          .onConflictDoUpdate({
-            target: [providerConnections.userId, providerConnections.provider],
-            set: {
-              providerUserId: providerUser.id,
-              accessToken: encryptedAccessToken,
-              refreshToken: encryptedRefreshToken,
-              tokenExpiresAt,
-              scopes: tokens.scope ?? null,
-              status: 'ACTIVE',
-              lastRefreshedAt: now,
-            },
-          });
-
-        // 8. Reactivate DISCONNECTED subscriptions for this provider
-        // When a user reconnects their account, their previously disconnected subscriptions
-        // should become active again so they can be synced
-        authLogger.debug('Step 8: Reactivating disconnected subscriptions');
-        await ctx.db
-          .update(subscriptions)
-          .set({
-            status: 'ACTIVE',
-            updatedAt: now,
-          })
-          .where(
-            and(
-              eq(subscriptions.userId, ctx.userId),
-              eq(subscriptions.provider, input.provider),
-              eq(subscriptions.status, 'DISCONNECTED')
-            )
-          );
-
-        authLogger.info('Provider reconnected, reactivated disconnected subscriptions', {
-          provider: input.provider,
-          userId: ctx.userId,
+            lastRefreshedAt: now,
+          },
         });
 
-        // 9. Gmail-specific mailbox setup + initial newsletter sync
-        if (input.provider === 'GMAIL') {
-          const gmailConnection = await ctx.db.query.providerConnections.findFirst({
-            where: and(
-              eq(providerConnections.userId, ctx.userId),
-              eq(providerConnections.provider, 'GMAIL'),
-              eq(providerConnections.status, 'ACTIVE')
-            ),
-          });
+      // 8. Reactivate DISCONNECTED subscriptions for this provider
+      // When a user reconnects their account, their previously disconnected subscriptions
+      // should become active again so they can be synced
+      authLogger.debug('Step 8: Reactivating disconnected subscriptions');
+      await ctx.db
+        .update(subscriptions)
+        .set({
+          status: 'ACTIVE',
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(subscriptions.userId, ctx.userId),
+            eq(subscriptions.provider, input.provider),
+            eq(subscriptions.status, 'DISCONNECTED')
+          )
+        );
 
-          if (gmailConnection) {
+      authLogger.info('Provider reconnected, reactivated disconnected subscriptions', {
+        provider: input.provider,
+        userId: ctx.userId,
+      });
+
+      // 9. Gmail-specific mailbox setup + initial newsletter sync
+      if (input.provider === 'GMAIL') {
+        const gmailConnection = await ctx.db.query.providerConnections.findFirst({
+          where: and(
+            eq(providerConnections.userId, ctx.userId),
+            eq(providerConnections.provider, 'GMAIL'),
+            eq(providerConnections.status, 'ACTIVE')
+          ),
+        });
+
+        if (gmailConnection) {
+          try {
+            await ensureGmailMailboxForConnection({
+              db: ctx.db,
+              userId: ctx.userId,
+              connection: gmailConnection as ProviderConnection,
+              env: ctx.env as TokenRefreshEnv,
+            });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const lower = errorMessage.toLowerCase();
+
+            authLogger.error('Gmail mailbox setup failed after OAuth callback', {
+              userId: ctx.userId,
+              error: errorMessage,
+            });
+
             try {
-              await ensureGmailMailboxForConnection({
-                db: ctx.db,
+              await ctx.db
+                .delete(gmailMailboxes)
+                .where(eq(gmailMailboxes.providerConnectionId, gmailConnection.id));
+              await ctx.db
+                .delete(providerConnections)
+                .where(eq(providerConnections.id, gmailConnection.id));
+            } catch (rollbackError) {
+              authLogger.error('Failed to rollback Gmail connection after setup failure', {
                 userId: ctx.userId,
-                connection: gmailConnection as ProviderConnection,
-                env: ctx.env as TokenRefreshEnv,
+                providerConnectionId: gmailConnection.id,
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
               });
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const lower = errorMessage.toLowerCase();
+            }
 
-              authLogger.error('Gmail mailbox setup failed after OAuth callback', {
-                userId: ctx.userId,
-                error: errorMessage,
-              });
-
-              try {
-                await ctx.db
-                  .delete(gmailMailboxes)
-                  .where(eq(gmailMailboxes.providerConnectionId, gmailConnection.id));
-                await ctx.db
-                  .delete(providerConnections)
-                  .where(eq(providerConnections.id, gmailConnection.id));
-              } catch (rollbackError) {
-                authLogger.error('Failed to rollback Gmail connection after setup failure', {
-                  userId: ctx.userId,
-                  providerConnectionId: gmailConnection.id,
-                  error:
-                    rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-                });
-              }
-
-              if (
-                lower.includes('insufficient authentication scopes') ||
-                lower.includes('insufficient permission') ||
-                lower.includes('insufficientpermissions') ||
-                lower.includes('access_token_scope_insufficient')
-              ) {
-                throw new TRPCError({
-                  code: 'PRECONDITION_FAILED',
-                  message:
-                    'Gmail permissions are missing required scopes. Reconnect Gmail and approve read-only Gmail access.',
-                });
-              }
-
-              if (
-                lower.includes('accessnotconfigured') ||
-                lower.includes('gmail api has not been used in project')
-              ) {
-                throw new TRPCError({
-                  code: 'PRECONDITION_FAILED',
-                  message:
-                    'Gmail API is not enabled for this Google Cloud project. Enable Gmail API in Google Cloud Console, wait a few minutes, then try connecting again.',
-                });
-              }
-
+            if (
+              lower.includes('insufficient authentication scopes') ||
+              lower.includes('insufficient permission') ||
+              lower.includes('insufficientpermissions') ||
+              lower.includes('access_token_scope_insufficient')
+            ) {
               throw new TRPCError({
-                code: 'BAD_REQUEST',
-                message: 'Unable to verify Gmail mailbox access. Please try connecting again.',
+                code: 'PRECONDITION_FAILED',
+                message:
+                  'Gmail permissions are missing required scopes. Reconnect Gmail and approve read-only Gmail access.',
               });
             }
 
-            try {
-              await syncGmailNewslettersForUser(ctx.userId, ctx.db, ctx.env as TokenRefreshEnv, {
-                forceFull: true,
-              });
-            } catch (error) {
-              authLogger.warn('Initial Gmail newsletter sync failed after OAuth callback', {
-                userId: ctx.userId,
-                error: error instanceof Error ? error.message : String(error),
+            if (
+              lower.includes('accessnotconfigured') ||
+              lower.includes('gmail api has not been used in project')
+            ) {
+              throw new TRPCError({
+                code: 'PRECONDITION_FAILED',
+                message:
+                  'Gmail API is not enabled for this Google Cloud project. Enable Gmail API in Google Cloud Console, wait a few minutes, then try connecting again.',
               });
             }
+
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Unable to verify Gmail mailbox access. Please try connecting again.',
+            });
+          }
+
+          try {
+            await syncGmailNewslettersForUser(ctx.userId, ctx.db, ctx.env as TokenRefreshEnv, {
+              forceFull: true,
+            });
+          } catch (error) {
+            authLogger.warn('Initial Gmail newsletter sync failed after OAuth callback', {
+              userId: ctx.userId,
+              error: error instanceof Error ? error.message : String(error),
+            });
           }
         }
-
-        return { success: true };
-      } catch (error) {
-        // Log the actual error for debugging
-        authLogger.error('OAuth callback failed', {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          provider: input.provider,
-        });
-        throw error;
       }
+
+      return { success: true };
     }),
 
   /**
@@ -499,9 +485,7 @@ export const connectionsRouter = router({
     }),
 });
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Attempt to revoke an OAuth token with the provider

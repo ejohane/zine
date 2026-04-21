@@ -38,10 +38,6 @@ import {
 import type { ProviderConnection } from '../lib/token-refresh';
 import type { Subscription as PollingSubscription } from '../polling/types';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Rate limit cooldown in milliseconds (2 minutes) */
 const RATE_LIMIT_COOLDOWN_MS = 2 * 60 * 1000;
 
@@ -72,9 +68,7 @@ function createSyncTelemetry(
   };
 }
 
-// ============================================================================
 // Job Management
-// ============================================================================
 
 /**
  * Initiate an async sync job for all active subscriptions.
@@ -461,9 +455,7 @@ export async function updateJobProgress(
   });
 }
 
-// ============================================================================
 // Synchronous Fallback (Local Development)
-// ============================================================================
 
 /**
  * Process subscriptions synchronously when queue is not available.
@@ -662,9 +654,7 @@ async function processSyncFallback(
   });
 }
 
-// ============================================================================
 // Error Types
-// ============================================================================
 
 /**
  * Error thrown when rate limit is exceeded.
@@ -676,9 +666,7 @@ export class RateLimitError extends Error {
   }
 }
 
-// ============================================================================
 // Type Augmentation
-// ============================================================================
 
 /**
  * Extended Bindings type with queue binding.

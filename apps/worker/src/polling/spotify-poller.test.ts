@@ -16,9 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 
-// ============================================================================
 // Mock Dependencies
-// ============================================================================
 
 // Mock Spotify provider
 const mockGetShowEpisodes = vi.fn();
@@ -84,9 +82,7 @@ const mockDbUpdate = vi.fn(() => ({
   })),
 }));
 
-// ============================================================================
 // Test Fixtures
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
@@ -268,9 +264,7 @@ function expectCriticalBatchSizeErrorLog(params: {
   ]);
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('Spotify Poller - Watermark Integrity', () => {
   const originalDateNow = Date.now;
@@ -293,9 +287,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
     Date.now = originalDateNow;
   });
 
-  // ==========================================================================
   // pollSingleSpotifySubscription Tests
-  // ==========================================================================
 
   describe('pollSingleSpotifySubscription', () => {
     it('should NOT update lastPublishedAt when ingestion fails for all episodes', async () => {
@@ -499,9 +491,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
     });
   });
 
-  // ==========================================================================
   // pollSpotifySubscriptionsBatched Tests
-  // ==========================================================================
 
   describe('pollSpotifySubscriptionsBatched', () => {
     it('should NOT update lastPublishedAt or totalItems when ingestion fails', async () => {
@@ -639,9 +629,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
     });
   });
 
-  // ==========================================================================
   // Edge Cases
-  // ==========================================================================
 
   describe('Edge Cases', () => {
     it('should handle empty episode list gracefully', async () => {
@@ -729,9 +717,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
   });
 });
 
-// ============================================================================
 // Unplayable Episodes Filtering Tests (zine-ej7)
-// ============================================================================
 
 describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
   const originalDateNow = Date.now;
@@ -1077,9 +1063,7 @@ describe('Spotify Poller - Unplayable Episode Filtering (zine-ej7)', () => {
   });
 });
 
-// ============================================================================
 // Regression Tests for Bug zine-ej0
-// ============================================================================
 
 describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
   const originalDateNow = Date.now;
@@ -1193,9 +1177,7 @@ describe('Regression: zine-ej0 - lastPublishedAt Corruption Bug', () => {
   });
 });
 
-// ============================================================================
 // Parallel Episode Fetching Tests (zine-p5h)
-// ============================================================================
 
 describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
   const originalDateNow = Date.now;
@@ -1659,9 +1641,7 @@ describe('Spotify Poller - Parallel Episode Fetching (zine-p5h)', () => {
   });
 });
 
-// ============================================================================
 // Deleted/Unavailable Show Handling Tests (zine-ew6)
-// ============================================================================
 
 describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => {
   const originalDateNow = Date.now;
@@ -1903,9 +1883,7 @@ describe('Spotify Poller - Deleted/Unavailable Show Handling (zine-ew6)', () => 
   });
 });
 
-// ============================================================================
 // Batch Size Guard Tests (zine-3ys)
-// ============================================================================
 
 describe('Spotify Poller - Batch Size Guard (zine-3ys)', () => {
   const originalDateNow = Date.now;

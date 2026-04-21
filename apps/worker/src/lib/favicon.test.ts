@@ -9,9 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fetchFavicon } from './favicon';
 import { expectLoggerErrorCalls } from '../test/mock-logger';
 
-// ============================================================================
 // Test HTML Templates
-// ============================================================================
 
 /**
  * Generate HTML with favicon link tags
@@ -53,9 +51,7 @@ function createHtmlWithoutFavicons(): string {
   `;
 }
 
-// ============================================================================
 // Mock Fetch Setup
-// ============================================================================
 
 const originalFetch = globalThis.fetch;
 
@@ -100,9 +96,7 @@ function mockFetchError(error: Error): void {
   globalThis.fetch = vi.fn().mockRejectedValue(error);
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('fetchFavicon', () => {
   beforeEach(() => {

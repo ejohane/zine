@@ -19,11 +19,11 @@ export type {
   SubscriptionStatusValue,
   ProviderConnectionStatusValue,
   OAuthProvider,
+  SubscriptionSource,
   Creator,
   CreatorWithSubscription,
 } from './types/domain';
 
-// Constants
 export { ZINE_VERSION, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from './constants';
 
 // UI formatting helpers

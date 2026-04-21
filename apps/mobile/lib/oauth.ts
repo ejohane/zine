@@ -5,7 +5,7 @@ import * as AuthSession from 'expo-auth-session';
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
 import { Provider, type OAuthProvider } from '@zine/shared/types';
-import type { AppRouter } from '../../worker/src/trpc/router';
+import type { AppRouter } from '@zine/worker/trpc/router';
 import { API_URL } from './trpc';
 import { oauthLogger } from './logger';
 import {

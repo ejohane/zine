@@ -27,10 +27,6 @@
 import type { ToastManager } from 'heroui-native';
 import { logger } from './logger';
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** Default duration for success toasts (in milliseconds) */
 const SUCCESS_DURATION = 3000;
 
@@ -40,9 +36,7 @@ const ERROR_DURATION = 4000;
 /** Default duration for warning toasts (in milliseconds) */
 const WARNING_DURATION = 4000;
 
-// ============================================================================
 // Success Toasts
-// ============================================================================
 
 /**
  * Show a success toast notification.
@@ -66,9 +60,7 @@ export function showSuccess(toast: ToastManager, message: string, description?: 
   });
 }
 
-// ============================================================================
 // Warning Toasts
-// ============================================================================
 
 /**
  * Show a warning toast notification.
@@ -93,9 +85,7 @@ export function showWarning(toast: ToastManager, message: string, description?: 
   });
 }
 
-// ============================================================================
 // Error Toasts
-// ============================================================================
 
 /**
  * Show an error toast notification.
@@ -132,46 +122,4 @@ export function showError(
     variant: 'danger',
     duration: ERROR_DURATION,
   });
-}
-
-// ============================================================================
-// Mutation Helpers
-// ============================================================================
-
-/**
- * Handle a mutation with automatic toast feedback.
- *
- * Shows success toast on completion, error toast on failure.
- *
- * @param toast - The toast manager from useToast()
- * @param mutation - The async mutation to execute
- * @param options - Configuration for success and error messages
- *
- * @example
- * ```tsx
- * await withToast(toast, () => toggleFinished(item.id), {
- *   successMessage: item.isFinished ? 'Marked as unfinished' : 'Marked as finished',
- *   errorMessage: 'Failed to update item',
- *   context: 'toggleFinished',
- * });
- * ```
- */
-export async function withToast<T>(
-  toast: ToastManager,
-  mutation: () => Promise<T>,
-  options: {
-    successMessage: string;
-    successDescription?: string;
-    errorMessage: string;
-    context?: string;
-  }
-): Promise<T | undefined> {
-  try {
-    const result = await mutation();
-    showSuccess(toast, options.successMessage, options.successDescription);
-    return result;
-  } catch (error) {
-    showError(toast, error, options.errorMessage, options.context);
-    return undefined;
-  }
 }

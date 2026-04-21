@@ -17,10 +17,6 @@ import type { ProviderValue, SubscriptionStatusValue } from '@zine/shared/types'
 import { trpc } from '../lib/trpc';
 import type { SubscriptionsListOutput, SubscriptionListItemOutput } from '../lib/trpc-types';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 /**
  * Subscription status values
  */
@@ -86,10 +82,6 @@ export function mapSubscriptionsResponse(response: SubscriptionsListOutput): Sub
     hasMore: response.hasMore,
   };
 }
-
-// ============================================================================
-// Hook
-// ============================================================================
 
 /**
  * Simple query hook for fetching subscriptions.

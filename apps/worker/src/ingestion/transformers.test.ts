@@ -17,9 +17,7 @@ import {
   TransformError,
 } from './transformers';
 
-// ============================================================================
 // Test Helpers
-// ============================================================================
 
 /**
  * Creates a valid YouTube playlist item for testing
@@ -65,9 +63,7 @@ function createSpotifyEpisode(overrides: Record<string, unknown> = {}) {
   };
 }
 
-// ============================================================================
 // Mock Date.now for consistent testing
-// ============================================================================
 
 const MOCK_NOW = 1705320000000; // 2024-01-15T12:00:00.000Z
 
@@ -79,9 +75,7 @@ beforeEach(() => {
   Date.now = vi.fn(() => MOCK_NOW);
 });
 
-// ============================================================================
 // transformRssEntry Tests
-// ============================================================================
 
 describe('transformRssEntry', () => {
   it('strips HTML and decodes entities in RSS summaries', () => {
@@ -123,9 +117,7 @@ afterEach(() => {
   Date.now = originalDateNow;
 });
 
-// ============================================================================
 // transformYouTubeVideo Tests
-// ============================================================================
 
 describe('transformYouTubeVideo', () => {
   describe('with valid data', () => {
@@ -285,9 +277,7 @@ describe('transformYouTubeVideo', () => {
   });
 });
 
-// ============================================================================
 // transformSpotifyEpisode Tests
-// ============================================================================
 
 describe('transformSpotifyEpisode', () => {
   const DEFAULT_SHOW_NAME = 'Test Podcast Show';
@@ -455,9 +445,7 @@ describe('transformSpotifyEpisode', () => {
   });
 });
 
-// ============================================================================
 // TransformError Tests
-// ============================================================================
 
 describe('TransformError', () => {
   it('should have correct name', () => {

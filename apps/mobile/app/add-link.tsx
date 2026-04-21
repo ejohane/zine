@@ -40,18 +40,11 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePreview, useSaveBookmark, isValidUrl } from '@/hooks/use-bookmarks';
 import { LinkPreviewCard } from '@/components/link-preview-card';
 import { showSuccess, showError as showErrorToast } from '@/lib/toast-utils';
-import { logger } from '@/lib/logger';
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Debounce delay for URL input before fetching preview */
 const DEBOUNCE_DELAY = 500;
 
-// ============================================================================
 // Icons
-// ============================================================================
 
 function CloseIcon({ size = 24, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -121,9 +114,7 @@ function LinkIcon({ size = 48, color = '#94A3B8' }: { size?: number; color?: str
   );
 }
 
-// ============================================================================
 // Empty State Component
-// ============================================================================
 
 function EmptyState({ colors, compact = false }: { colors: ThemeColors; compact?: boolean }) {
   return (
@@ -142,9 +133,7 @@ function EmptyState({ colors, compact = false }: { colors: ThemeColors; compact?
   );
 }
 
-// ============================================================================
 // Loading State Component
-// ============================================================================
 
 function LoadingState({ colors }: { colors: ThemeColors }) {
   return (
@@ -155,9 +144,7 @@ function LoadingState({ colors }: { colors: ThemeColors }) {
   );
 }
 
-// ============================================================================
 // Error State Component
-// ============================================================================
 
 function ErrorState({
   colors,
@@ -184,10 +171,6 @@ function ErrorState({
     </Animated.View>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function AddLinkScreen() {
   const router = useRouter();
@@ -297,18 +280,9 @@ export default function AddLinkScreen() {
   // Handle paste from clipboard
   // Note: On iOS, the paste button triggers the system paste permission dialog
   // which handles clipboard access. We use a simple approach that works cross-platform.
-  const handlePaste = useCallback(async () => {
-    try {
-      // On mobile, we rely on the user using the native paste functionality
-      // via long-press on the input field. The paste button provides haptic feedback
-      // and focuses the input to encourage this behavior.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      inputRef.current?.focus();
-      // Note: Direct clipboard access requires expo-clipboard which isn't installed.
-      // Users can long-press the input field to paste from the system clipboard.
-    } catch (error) {
-      logger.error('Failed to handle paste action', { error });
-    }
+  const handlePaste = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    inputRef.current?.focus();
   }, []);
 
   // Handle save
@@ -535,10 +509,6 @@ export default function AddLinkScreen() {
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

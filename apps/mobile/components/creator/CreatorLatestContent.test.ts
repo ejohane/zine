@@ -15,9 +15,7 @@ import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { CreatorLatestContent } from './CreatorLatestContent';
 
-// ============================================================================
 // Module-level Mocks
-// ============================================================================
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 type TestNode = Renderer['root'];
@@ -183,9 +181,7 @@ jest.mock('@/constants/theme', () => ({
   },
 }));
 
-// ============================================================================
 // Mock Data Factories
-// ============================================================================
 
 interface MockContentItem {
   providerId: string;
@@ -208,9 +204,7 @@ function createMockContentItem(overrides: Partial<MockContentItem> = {}): MockCo
   };
 }
 
-// ============================================================================
 // Tests
-// ============================================================================
 
 describe('CreatorLatestContent', () => {
   beforeEach(() => {

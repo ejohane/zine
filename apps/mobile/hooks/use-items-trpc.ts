@@ -2,32 +2,12 @@
  * tRPC-based data hooks for Items
  *
  * Provides React Query hooks for fetching and mutating items data via tRPC.
- * This replaces the Replicache-based hooks in use-items.ts.
  */
 
 import { keepPreviousData } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
-import {
-  ContentType,
-  Provider,
-  UserItemState,
-  formatDurationTimestamp,
-  mapContentType as mapSharedContentType,
-  mapProvider as mapSharedProvider,
-  type UIContentType,
-  type UIProvider,
-} from '@zine/shared';
-
-// ============================================================================
-// Types
-// ============================================================================
-
-export type { UIContentType, UIProvider };
-
-// ============================================================================
-// Optimistic Update Types
-// ============================================================================
+import { ContentType, Provider, UserItemState } from '@zine/shared';
 
 /** Type alias for tRPC utils */
 type TrpcUtils = ReturnType<typeof trpc.useUtils>;
@@ -94,10 +74,6 @@ type LibraryItemsOptions = {
   search?: string;
   limit?: number;
 };
-
-// ============================================================================
-// Optimistic Update Factory
-// ============================================================================
 
 /**
  * Factory function to create optimistic mutation config
@@ -260,54 +236,6 @@ function createOptimisticConfig<TInput extends { id: string }>(
   };
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Map ContentType enum to UI-friendly lowercase string
- *
- * @param contentType - The ContentType enum value
- * @returns Lowercase string for UI display
- *
- * @example
- * mapContentType(ContentType.VIDEO) // => 'video'
- * mapContentType(ContentType.PODCAST) // => 'podcast'
- */
-export function mapContentType(contentType: ContentType): UIContentType {
-  return mapSharedContentType(contentType);
-}
-
-/**
- * Map Provider enum to UI-friendly lowercase string
- *
- * @param provider - The Provider enum value
- * @returns Lowercase string for UI display
- *
- * @example
- * mapProvider(Provider.YOUTUBE) // => 'youtube'
- * mapProvider(Provider.SPOTIFY) // => 'spotify'
- */
-export function mapProvider(provider: Provider): UIProvider {
-  return mapSharedProvider(provider);
-}
-
-/**
- * Format duration in seconds to human-readable string
- *
- * @param seconds - Duration in seconds (optional)
- * @returns Formatted duration string (H:MM:SS or M:SS) or undefined
- *
- * @example
- * formatDuration(3661) // => '1:01:01'
- * formatDuration(125) // => '2:05'
- * formatDuration(45) // => '0:45'
- * formatDuration(undefined) // => undefined
- */
-export function formatDuration(seconds?: number | null): string | undefined {
-  return formatDurationTimestamp(seconds);
-}
-
 function buildInboxItemsInput(options?: InboxItemsOptions) {
   const filter = options?.filter
     ? {
@@ -350,10 +278,6 @@ function buildLibraryItemsInput(options?: LibraryItemsOptions) {
 
   return input;
 }
-
-// ============================================================================
-// Query Hooks
-// ============================================================================
 
 /**
  * Hook for fetching inbox items (INBOX state)
@@ -494,10 +418,6 @@ export function useItem(id: string) {
 export function useUserTags() {
   return trpc.items.listTags.useQuery();
 }
-
-// ============================================================================
-// Mutation Hooks
-// ============================================================================
 
 /**
  * Hook for bookmarking an item with optimistic updates
@@ -928,46 +848,5 @@ export function useSetItemTags() {
     },
   });
 }
-
-/**
- * Hook for updating playback/reading progress
- *
- * Updates the progress position for video/podcast/article consumption.
- *
- * No optimistic update is performed since progress updates are typically
- * fire-and-forget operations that don't need immediate UI feedback.
- *
- * @returns tRPC mutation with mutate/mutateAsync functions
- *
- * @example
- * function VideoPlayer({ item }) {
- *   const updateProgress = useUpdateProgress();
- *
- *   const handleProgress = (position: number, duration: number) => {
- *     updateProgress.mutate({
- *       id: item.id,
- *       position,
- *       duration,
- *     });
- *   };
- *
- *   return <Player onProgress={handleProgress} />;
- * }
- */
-export function useUpdateProgress() {
-  const utils = trpc.useUtils();
-
-  return trpc.items.updateProgress.useMutation({
-    onSettled: (_data, _err, { id }) => {
-      utils.items.home.invalidate();
-      utils.items.get.invalidate({ id });
-      invalidateRecapQueries(utils);
-    },
-  });
-}
-
-// ============================================================================
-// Re-exports for convenience
-// ============================================================================
 
 export { ContentType, Provider, UserItemState };

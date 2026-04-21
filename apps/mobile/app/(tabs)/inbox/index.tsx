@@ -11,13 +11,8 @@ import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
-import {
-  useInfiniteInboxItems,
-  useArchiveItem,
-  useBookmarkItem,
-  mapContentType,
-  mapProvider,
-} from '@/hooks/use-items-trpc';
+import { useInfiniteInboxItems, useArchiveItem, useBookmarkItem } from '@/hooks/use-items-trpc';
+import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import {
   addPendingDismissedId,
@@ -31,7 +26,6 @@ import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
-import type { ContentType, Provider } from '@/lib/content-utils';
 
 const REENTRY_CLEANUP_DELAY = 500;
 const INBOX_PAGE_SIZE = 20;

@@ -24,10 +24,6 @@ import { SearchIcon } from '@/components/icons';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
 import { ChannelItem, type Channel, type Provider } from './channel-item';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type { Channel, Provider } from './channel-item';
 
 export interface ChannelSelectionListProps {
@@ -72,9 +68,7 @@ export interface ChannelSelectionListProps {
   ListFooterComponent?: React.ReactElement | null;
 }
 
-// ============================================================================
 // Helper Functions
-// ============================================================================
 
 /**
  * Get provider color for styling
@@ -82,10 +76,6 @@ export interface ChannelSelectionListProps {
 function getProviderColor(provider: Provider): string {
   return provider === 'YOUTUBE' ? ProviderColors.youtube : ProviderColors.spotify;
 }
-
-// ============================================================================
-// Component
-// ============================================================================
 
 export function ChannelSelectionList({
   provider,
@@ -268,9 +258,7 @@ export function ChannelSelectionList({
   );
 }
 
-// ============================================================================
 // Bottom Action Bar Component
-// ============================================================================
 
 export interface ChannelSelectionActionBarProps {
   /** Number of selected channels */
@@ -333,10 +321,6 @@ export function ChannelSelectionActionBar({
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

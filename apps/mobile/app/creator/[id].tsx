@@ -65,9 +65,7 @@ function getSourceUrlForDiscovery(
   return null;
 }
 
-// ============================================================================
 // Floating Header Button
-// ============================================================================
 
 function HeaderIconButton({
   icon,
@@ -89,10 +87,6 @@ function HeaderIconButton({
     </Pressable>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function CreatorScreen() {
   const { id, source } = useLocalSearchParams<{ id: string; source?: CreatorViewSource }>();
@@ -274,10 +268,6 @@ export default function CreatorScreen() {
     </View>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

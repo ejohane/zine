@@ -26,9 +26,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 
-// ============================================================================
 // Icons
-// ============================================================================
 
 function YouTubeIcon({ size = 32 }: { size?: number }) {
   return (
@@ -68,9 +66,7 @@ function ChevronRightIcon({ color }: { color: string }) {
   );
 }
 
-// ============================================================================
 // Provider Card Component
-// ============================================================================
 
 interface ProviderCardProps {
   icon: React.ReactNode;
@@ -127,9 +123,7 @@ function ProviderCard({
   );
 }
 
-// ============================================================================
 // Coming Soon Card Component
-// ============================================================================
 
 interface ComingSoonCardProps {
   colors: ThemeColors;
@@ -147,10 +141,6 @@ function ComingSoonCard({ colors }: ComingSoonCardProps) {
     </View>
   );
 }
-
-// ============================================================================
-// Main Component
-// ============================================================================
 
 export default function OnboardingConnectScreen() {
   const colorScheme = useColorScheme();
@@ -259,10 +249,6 @@ export default function OnboardingConnectScreen() {
     </SafeAreaView>
   );
 }
-
-// ============================================================================
-// Styles
-// ============================================================================
 
 const styles = StyleSheet.create({
   container: {

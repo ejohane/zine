@@ -19,10 +19,6 @@
  * See: features/subscriptions/backend-spec.md Section 3.6
  */
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 /** YouTube's daily quota limit (default allocation) */
 const DAILY_QUOTA = 10_000;
 
@@ -40,10 +36,6 @@ const QUOTA_TTL_SECONDS = 2 * 24 * 3600;
 
 // Import logger
 import { quotaLogger } from '../lib/logger';
-
-// ============================================================================
-// Types
-// ============================================================================
 
 /**
  * Quota state persisted to KV storage
@@ -99,9 +91,7 @@ export const YOUTUBE_QUOTA_COSTS = {
   VIDEOS_LIST: 1,
 } as const;
 
-// ============================================================================
 // Custom Error
-// ============================================================================
 
 /**
  * Error thrown when YouTube API quota is exhausted
@@ -123,9 +113,7 @@ export class QuotaExhaustedError extends Error {
   }
 }
 
-// ============================================================================
 // Utility Functions
-// ============================================================================
 
 /**
  * Get the current date string in Pacific Time (YYYY-MM-DD format)
@@ -176,9 +164,7 @@ function stateToStatus(state: QuotaState): QuotaStatus {
   };
 }
 
-// ============================================================================
 // Core Functions
-// ============================================================================
 
 /**
  * Track quota usage after making a YouTube API call
@@ -379,9 +365,7 @@ export async function assertQuotaAvailable(estimatedUnits: number, kv: KVNamespa
   }
 }
 
-// ============================================================================
 // Integration Helpers
-// ============================================================================
 
 /**
  * Wrapper for YouTube API calls with automatic quota tracking

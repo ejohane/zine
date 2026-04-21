@@ -23,9 +23,7 @@ const mockAuthLogger = authLogger as jest.Mocked<typeof authLogger>;
 // Store original env value
 const originalClerkKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-// ============================================================================
 // tokenCache Tests (Native Platform - Default)
-// ============================================================================
 
 describe('tokenCache on native platforms (iOS/Android)', () => {
   // Import the module once - jest.setup.js already mocks Platform.OS as 'ios'
@@ -164,9 +162,7 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
   });
 });
 
-// ============================================================================
 // tokenCache Web Platform Tests
-// ============================================================================
 
 describe('tokenCache on web platform', () => {
   it('tokenCache is undefined on web platform', () => {
@@ -219,9 +215,7 @@ describe('tokenCache on web platform', () => {
   });
 });
 
-// ============================================================================
 // validateClerkConfig Tests
-// ============================================================================
 
 describe('validateClerkConfig', () => {
   const originalConsoleWarn = console.warn;
@@ -319,9 +313,7 @@ describe('validateClerkConfig', () => {
   });
 });
 
-// ============================================================================
 // CLERK_PUBLISHABLE_KEY Export Tests
-// ============================================================================
 
 describe('CLERK_PUBLISHABLE_KEY', () => {
   afterEach(() => {
