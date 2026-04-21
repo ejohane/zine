@@ -1254,6 +1254,10 @@ img {
   color: #ffffff;
 }
 
+.new-page-bookmark-view__bookmark-icon--finished {
+  color: var(--success);
+}
+
 .new-page-bookmark-view__icon-action:hover:not(:disabled),
 .new-page-bookmark-view__icon-action:focus-visible:not(:disabled) {
   --bookmark-action-bg: var(--bookmark-action-hover-bg);
