@@ -2968,7 +2968,9 @@ input:focus {
 }
 
 .onboarding-dialog__content--compact {
-  width: min(29rem, calc(100vw - 2rem));
+  width: min(27rem, calc(100vw - 2rem));
+  border-radius: 1.25rem;
+  overflow: hidden;
 }
 
 .onboarding-dialog {
@@ -2979,8 +2981,9 @@ input:focus {
 }
 
 .onboarding-dialog--compact {
+  position: relative;
   grid-template-rows: auto minmax(0, 1fr);
-  min-height: min(44rem, calc(100vh - 2rem));
+  min-height: 0;
   max-height: min(44rem, calc(100vh - 2rem));
 }
 
@@ -2991,11 +2994,6 @@ input:focus {
   gap: 1rem;
   padding: 1.5rem 1.5rem 1rem;
   border-bottom: 1px solid var(--border);
-}
-
-.onboarding-dialog__header-copy {
-  display: grid;
-  gap: 0.55rem;
 }
 
 .onboarding-dialog__title {
@@ -3013,19 +3011,53 @@ input:focus {
 }
 
 .onboarding-dialog__close {
-  flex-shrink: 0;
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+  z-index: 1;
+}
+
+.onboarding-dialog__close:hover {
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.onboarding-dialog__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .onboarding-dialog--compact .onboarding-dialog__header {
-  padding: 1.25rem 1.25rem 0.9rem;
+  display: grid;
+  gap: 0.45rem;
+  padding: 1.75rem 1.5rem 0.5rem;
+  border-bottom: none;
 }
 
 .onboarding-dialog--compact .onboarding-dialog__title {
-  font-size: clamp(1.45rem, 4vw, 1.95rem);
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .onboarding-dialog--compact .onboarding-dialog__description {
   max-width: none;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--text-dim);
 }
 
 .onboarding-stepper {
@@ -3101,32 +3133,18 @@ input:focus {
   padding: 1.25rem 1.5rem 1.5rem;
 }
 
-.onboarding-dialog__body--compact {
+.onboarding-dialog__body--intro {
+  padding: 0.75rem 1rem 1.25rem;
+}
+
+.onboarding-dialog__body--step {
   padding: 1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .onboarding-dialog__workspace {
   min-width: 0;
-}
-
-.onboarding-dialog__panel {
-  height: 100%;
-}
-
-.wizard-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-}
-
-.wizard-intro {
-  padding: 0.85rem;
-}
-
-.wizard-intro__content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
 }
 
 .wizard-intro__list {
@@ -3134,7 +3152,7 @@ input:focus {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.65rem;
+  gap: 0.35rem;
 }
 
 .wizard-intro__item {
@@ -3143,25 +3161,29 @@ input:focus {
 
 .wizard-intro__button {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 0.85rem;
   width: 100%;
-  padding: 0.85rem 0.95rem;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  background: var(--surface-subtle);
+  padding: 0.75rem 0.75rem 0.75rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  background: transparent;
   color: inherit;
   text-align: left;
+  cursor: pointer;
   transition:
-    border-color 180ms ease,
-    background 180ms ease,
-    transform 180ms ease;
+    border-color 160ms ease,
+    background 160ms ease;
 }
 
 .wizard-intro__button:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-raised);
-  transform: translateY(-1px);
+  background: var(--surface-subtle);
+  border-color: var(--border);
+}
+
+.wizard-intro__button:hover .wizard-intro__chevron {
+  color: var(--text);
+  transform: translateX(2px);
 }
 
 .wizard-intro__button:focus-visible {
@@ -3175,71 +3197,104 @@ input:focus {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  flex-shrink: 0;
-}
-
-.wizard-intro__icon--brand {
+  border-radius: 0.65rem;
   color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .wizard-intro__copy {
   display: grid;
-  gap: 0.2rem;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .wizard-intro__copy h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.97rem;
+  font-weight: 600;
   color: var(--text);
+  letter-spacing: -0.005em;
 }
 
 .wizard-intro__copy p {
   margin: 0;
   color: var(--text-dim);
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.35;
+}
+
+.wizard-intro__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--success, #22c55e) 16%, transparent);
+  color: var(--success, #22c55e);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.wizard-intro__chevron {
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition:
+    color 160ms ease,
+    transform 160ms ease;
 }
 
 .wizard-step {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   height: 100%;
 }
 
 .wizard-step__header {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: 0.75rem;
 }
 
 .wizard-step__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.85rem;
-  background: var(--surface-subtle);
-  color: var(--text);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  color: #fff;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.wizard-step__icon > * {
+  transform: scale(0.85);
+}
+
+.wizard-step__heading {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 .wizard-step__title {
   margin: 0;
-  font-size: 1.35rem;
+  font-size: 1.05rem;
   font-weight: 650;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .wizard-step__summary {
-  margin: 0.15rem 0 0;
+  margin: 0;
   color: var(--text-dim);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .wizard-step__body {
@@ -3366,8 +3421,7 @@ input:focus {
   justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
   margin-top: auto;
 }
 
@@ -3386,33 +3440,62 @@ input:focus {
 .wizard-connect {
   display: flex;
   flex-direction: column;
+  gap: 1.25rem;
+  flex: 1;
+  min-height: 0;
+  padding-top: 0.5rem;
+}
+
+.wizard-connect__hero {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
-  padding: 2rem 1rem;
+  gap: 0.75rem;
+  padding: 1.75rem 1rem 1.25rem;
   text-align: center;
   flex: 1;
 }
 
-.wizard-connect__icon {
+.wizard-connect__brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 3.5rem;
   height: 3.5rem;
   border-radius: 1rem;
-  background: var(--surface-subtle);
+  color: #fff;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 10px 32px -18px rgba(0, 0, 0, 0.65);
+}
+
+.wizard-connect__brand > * {
+  transform: scale(1.4);
+  transform-origin: center;
+}
+
+.wizard-connect__title {
+  margin: 0.25rem 0 0;
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--text);
 }
 
-.wizard-connect__copy {
-  max-width: 28rem;
+.wizard-connect__description {
+  margin: 0;
+  max-width: 22rem;
   color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.55;
 }
 
 .wizard-connect__error {
+  margin: 0;
+  text-align: center;
   color: var(--danger, #ef4444);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .wizard-rss__form {
@@ -3743,29 +3826,25 @@ input:focus {
   }
 
   .onboarding-dialog__body,
-  .onboarding-dialog__body--compact {
+  .onboarding-dialog__body--intro,
+  .onboarding-dialog__body--step {
     padding: 0.75rem;
   }
 
-  .wizard-intro {
-    padding: 0.5rem;
-  }
-
   .wizard-intro__button {
-    padding: 1rem;
+    padding: 0.85rem 0.85rem 0.85rem 0.75rem;
     gap: 1rem;
     border-radius: 0.85rem;
   }
 
-  .wizard-intro__icon,
-  .wizard-intro__icon--brand {
-    width: 2.75rem;
-    height: 2.75rem;
-    border-radius: 0.85rem;
+  .wizard-intro__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
   }
 
   .wizard-intro__copy h3 {
-    font-size: 1.05rem;
+    font-size: 1.02rem;
   }
 
   .wizard-intro__copy p {

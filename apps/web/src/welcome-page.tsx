@@ -1,4 +1,4 @@
-import { Loader2, Mail, Podcast, Rss, Video, X, type LucideIcon } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Mail, Rss, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FaSpotify } from 'react-icons/fa';
 import { IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Provider } from '@zine/shared';
 
-import { Button, EmptyState, Surface, cn } from './components';
+import { Button, EmptyState, cn } from './components';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog';
 import {
   clearOnboardingOAuthContext,
@@ -20,13 +20,6 @@ import { connectProvider } from './lib/oauth';
 import { trpc, useAppSession } from './lib/trpc';
 
 type IntegrationStep = Exclude<WizardStep, 'DONE'>;
-
-const STEP_ICONS: Record<IntegrationStep, LucideIcon> = {
-  SPOTIFY: Podcast,
-  YOUTUBE: Video,
-  GMAIL: Mail,
-  RSS: Rss,
-};
 
 const INTRO_STEPS: IntegrationStep[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL', 'RSS'];
 
@@ -241,22 +234,29 @@ type ConnectGateProps = {
 };
 
 function ConnectGate({ provider, title, description, onConnect, onBack, error }: ConnectGateProps) {
-  const Icon = STEP_ICONS[provider];
+  const brand = INTRO_BRAND[provider];
+  const config = sourceConfigs[provider];
   return (
     <div className="wizard-connect">
-      <div className="wizard-connect__icon" aria-hidden="true">
-        <Icon size={28} />
-      </div>
-      <div className="wizard-connect__copy">
-        <h3>{title}</h3>
-        <p>{description}</p>
+      <div className="wizard-connect__hero">
+        <span
+          className="wizard-connect__brand"
+          aria-hidden="true"
+          style={{ backgroundColor: brand.bg }}
+        >
+          {brand.icon}
+        </span>
+        <h2 className="wizard-connect__title">{config.title}</h2>
+        <p className="wizard-connect__description">
+          {title}. {description}
+        </p>
       </div>
       {error ? <p className="wizard-connect__error">{error}</p> : null}
       <div className="wizard-footer">
         <Button tone="ghost" onClick={onBack}>
-          Back to integrations
+          Back
         </Button>
-        <Button onClick={onConnect}>Connect {sourceConfigs[provider].title}</Button>
+        <Button onClick={onConnect}>Connect {config.title}</Button>
       </div>
     </div>
   );
@@ -496,95 +496,93 @@ export function WelcomePage() {
         aria-labelledby="welcome-dialog-title"
       >
         <div className="onboarding-dialog onboarding-dialog--compact">
+          <button
+            type="button"
+            className="onboarding-dialog__close"
+            aria-label="Close guided setup"
+            onClick={handleClose}
+          >
+            <X size={16} strokeWidth={2.2} />
+          </button>
+
           <header className="onboarding-dialog__header">
-            <div className="onboarding-dialog__header-copy">
-              <p className="eyebrow">Guided setup</p>
-              <DialogTitle id="welcome-dialog-title" className="onboarding-dialog__title">
-                {dialogTitle}
-              </DialogTitle>
-              <DialogDescription
-                id="welcome-dialog-description"
-                className="onboarding-dialog__description"
-              >
-                {dialogDescription}
-              </DialogDescription>
-            </div>
-            <button
-              type="button"
-              className="button button--ghost onboarding-dialog__close"
-              aria-label="Close guided setup"
-              onClick={handleClose}
+            <DialogTitle id="welcome-dialog-title" className="onboarding-dialog__title">
+              {dialogTitle}
+            </DialogTitle>
+            <DialogDescription
+              id="welcome-dialog-description"
+              className="onboarding-dialog__description"
             >
-              <X size={16} strokeWidth={2.2} />
-            </button>
+              {dialogDescription}
+            </DialogDescription>
           </header>
 
-          <div className="onboarding-dialog__body onboarding-dialog__body--compact">
-            <Surface
-              className={cn(
-                'onboarding-dialog__panel',
-                !activeStep ? 'wizard-intro' : 'wizard-panel'
-              )}
-            >
-              {!activeStep ? <IntroStep onSelect={handleSelectStep} /> : null}
+          <div
+            className={cn(
+              'onboarding-dialog__body',
+              !activeStep ? 'onboarding-dialog__body--intro' : 'onboarding-dialog__body--step'
+            )}
+          >
+            {!activeStep ? (
+              <IntroStep onSelect={handleSelectStep} connections={connections} />
+            ) : null}
 
-              {activeStep === 'SPOTIFY' ? (
-                <SpotifyStep
-                  connections={connections}
-                  available={spotifyAvailable.data?.items ?? []}
-                  isLoading={spotifyAvailable.isLoading}
-                  isImporting={isImporting}
-                  onConnect={() => void handleConnect('SPOTIFY')}
-                  onBack={handleBackToIntegrations}
-                  onImport={importSpotify}
-                  error={stepError.SPOTIFY ?? null}
-                />
-              ) : null}
+            {activeStep === 'SPOTIFY' ? (
+              <SpotifyStep
+                connections={connections}
+                available={spotifyAvailable.data?.items ?? []}
+                isLoading={spotifyAvailable.isLoading}
+                isImporting={isImporting}
+                onConnect={() => void handleConnect('SPOTIFY')}
+                onBack={handleBackToIntegrations}
+                onImport={importSpotify}
+                error={stepError.SPOTIFY ?? null}
+              />
+            ) : null}
 
-              {activeStep === 'YOUTUBE' ? (
-                <YoutubeStep
-                  connections={connections}
-                  available={youtubeAvailable.data?.items ?? []}
-                  isLoading={youtubeAvailable.isLoading}
-                  isImporting={isImporting}
-                  onConnect={() => void handleConnect('YOUTUBE')}
-                  onBack={handleBackToIntegrations}
-                  onImport={importYoutube}
-                  error={stepError.YOUTUBE ?? null}
-                />
-              ) : null}
+            {activeStep === 'YOUTUBE' ? (
+              <YoutubeStep
+                connections={connections}
+                available={youtubeAvailable.data?.items ?? []}
+                isLoading={youtubeAvailable.isLoading}
+                isImporting={isImporting}
+                onConnect={() => void handleConnect('YOUTUBE')}
+                onBack={handleBackToIntegrations}
+                onImport={importYoutube}
+                error={stepError.YOUTUBE ?? null}
+              />
+            ) : null}
 
-              {activeStep === 'GMAIL' ? (
-                <GmailStep
-                  connections={connections}
-                  newsletters={newslettersListQuery.data?.items ?? []}
-                  isLoading={newslettersListQuery.isLoading}
-                  isSyncing={syncNewsletters.isPending}
-                  isImporting={isImporting}
-                  onConnect={() => void handleConnect('GMAIL')}
-                  onScan={() => void handleScanNewsletters()}
-                  onBack={handleBackToIntegrations}
-                  onImport={importNewsletters}
-                  error={stepError.GMAIL ?? null}
-                />
-              ) : null}
+            {activeStep === 'GMAIL' ? (
+              <GmailStep
+                connections={connections}
+                newsletters={newslettersListQuery.data?.items ?? []}
+                isLoading={newslettersListQuery.isLoading}
+                isSyncing={syncNewsletters.isPending}
+                isImporting={isImporting}
+                onConnect={() => void handleConnect('GMAIL')}
+                onScan={() => void handleScanNewsletters()}
+                onBack={handleBackToIntegrations}
+                onImport={importNewsletters}
+                error={stepError.GMAIL ?? null}
+              />
+            ) : null}
 
-              {activeStep === 'RSS' ? (
-                <RssStep
-                  url={rssUrl}
-                  onUrlChange={setRssUrl}
-                  onDiscover={() => {
-                    if (rssUrl.trim()) setRssDiscoveryUrl(rssUrl.trim());
-                  }}
-                  candidates={rssCandidates}
-                  isDiscovering={rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
-                  isImporting={isImporting}
-                  onBack={handleBackToIntegrations}
-                  onImport={importRss}
-                  error={stepError.RSS ?? null}
-                />
-              ) : null}
-            </Surface>
+            {activeStep === 'RSS' ? (
+              <RssStep
+                url={rssUrl}
+                onUrlChange={setRssUrl}
+                onDiscover={() => {
+                  if (rssUrl.trim()) setRssDiscoveryUrl(rssUrl.trim());
+                }}
+                candidates={rssCandidates}
+                isDiscovering={rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
+                isImporting={isImporting}
+                onBack={handleBackToIntegrations}
+                onImport={importRss}
+                error={stepError.RSS ?? null}
+              />
+            ) : null}
           </div>
         </div>
       </DialogContent>
@@ -592,38 +590,58 @@ export function WelcomePage() {
   );
 }
 
-function IntroStep({ onSelect }: { onSelect: (step: IntegrationStep) => void }) {
+function IntroStep({
+  onSelect,
+  connections,
+}: {
+  onSelect: (step: IntegrationStep) => void;
+  connections: ConnectionsData;
+}) {
   return (
-    <div className="wizard-intro__content">
-      <ul className="wizard-intro__list" aria-label="Available integrations">
-        {INTRO_STEPS.map((step) => {
-          const config = sourceConfigs[step];
-          const brand = INTRO_BRAND[step];
-          return (
-            <li key={step} className="wizard-intro__item">
-              <button
-                type="button"
-                className="wizard-intro__button"
-                onClick={() => onSelect(step)}
-                aria-label={`Open ${config.title} integration`}
+    <ul className="wizard-intro__list" aria-label="Available integrations">
+      {INTRO_STEPS.map((step) => {
+        const config = sourceConfigs[step];
+        const brand = INTRO_BRAND[step];
+        const connected =
+          step !== 'RSS'
+            ? isConnected(connections, step as 'YOUTUBE' | 'SPOTIFY' | 'GMAIL')
+            : false;
+        return (
+          <li key={step} className="wizard-intro__item">
+            <button
+              type="button"
+              className="wizard-intro__button"
+              onClick={() => onSelect(step)}
+              aria-label={`Open ${config.title} integration`}
+            >
+              <span
+                className="wizard-intro__icon"
+                aria-hidden="true"
+                style={{ backgroundColor: brand.bg }}
               >
-                <span
-                  className="wizard-intro__icon wizard-intro__icon--brand"
-                  aria-hidden="true"
-                  style={{ backgroundColor: brand.bg }}
-                >
-                  {brand.icon}
+                {brand.icon}
+              </span>
+              <div className="wizard-intro__copy">
+                <h3>{config.title}</h3>
+                <p>{INTRO_STEP_SUMMARIES[step]}</p>
+              </div>
+              {connected ? (
+                <span className="wizard-intro__status" aria-label="Connected">
+                  <Check size={12} strokeWidth={2.5} />
+                  Connected
                 </span>
-                <div className="wizard-intro__copy">
-                  <h3>{config.title}</h3>
-                  <p>{INTRO_STEP_SUMMARIES[step]}</p>
-                </div>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+              ) : null}
+              <ChevronRight
+                size={16}
+                strokeWidth={2}
+                className="wizard-intro__chevron"
+                aria-hidden="true"
+              />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -653,16 +671,14 @@ function SpotifyStep({
 
   if (!connected) {
     return (
-      <StepShell title={config.title} summary={config.summary} stepIcon="SPOTIFY">
-        <ConnectGate
-          provider="SPOTIFY"
-          title="Connect Spotify"
-          description="Log in with Spotify to see the podcasts you follow."
-          onConnect={onConnect}
-          onBack={onBack}
-          error={error}
-        />
-      </StepShell>
+      <ConnectGate
+        provider="SPOTIFY"
+        title="Log in with Spotify"
+        description="See the podcasts you follow and pick which ones to bring into Zine."
+        onConnect={onConnect}
+        onBack={onBack}
+        error={error}
+      />
     );
   }
 
@@ -700,16 +716,14 @@ function YoutubeStep({
 
   if (!connected) {
     return (
-      <StepShell title={config.title} summary={config.summary} stepIcon="YOUTUBE">
-        <ConnectGate
-          provider="YOUTUBE"
-          title="Connect YouTube"
-          description="Log in with Google to see the channels you subscribe to."
-          onConnect={onConnect}
-          onBack={onBack}
-          error={error}
-        />
-      </StepShell>
+      <ConnectGate
+        provider="YOUTUBE"
+        title="Log in with Google"
+        description="See the channels you subscribe to and pick which ones to bring into Zine."
+        onConnect={onConnect}
+        onBack={onBack}
+        error={error}
+      />
     );
   }
 
@@ -771,47 +785,43 @@ function GmailStep({
 
   if (!connected) {
     return (
-      <StepShell title={config.title} summary={config.summary} stepIcon="GMAIL">
-        <ConnectGate
-          provider="GMAIL"
-          title="Connect Gmail"
-          description="Log in with Google so Zine can scan for newsletters in your inbox."
-          onConnect={onConnect}
-          onBack={onBack}
-          error={error}
-        />
-      </StepShell>
+      <ConnectGate
+        provider="GMAIL"
+        title="Log in with Google"
+        description="Zine will scan your inbox for newsletter senders you can keep or skip."
+        onConnect={onConnect}
+        onBack={onBack}
+        error={error}
+      />
     );
   }
 
   if (newsletters.length === 0) {
     return (
-      <StepShell
-        title={config.title}
-        summary="Scan your inbox to find newsletter senders."
-        stepIcon="GMAIL"
-      >
-        {error ? <p className="wizard-connect__error">{error}</p> : null}
-        <div className="wizard-connect">
-          <div className="wizard-connect__icon" aria-hidden="true">
-            <Mail size={28} />
-          </div>
-          <div className="wizard-connect__copy">
-            <h3>Scan for newsletters</h3>
-            <p>
-              Gmail is connected. Run a quick scan to pull in newsletter senders you can pick from.
-            </p>
-          </div>
-          <div className="wizard-footer">
-            <Button tone="ghost" onClick={onBack}>
-              Back to integrations
-            </Button>
-            <Button onClick={onScan} disabled={isSyncing || isLoading}>
-              {isSyncing ? 'Scanning…' : 'Scan newsletters'}
-            </Button>
-          </div>
+      <div className="wizard-connect">
+        <div className="wizard-connect__hero">
+          <span
+            className="wizard-connect__brand"
+            aria-hidden="true"
+            style={{ backgroundColor: INTRO_BRAND.GMAIL.bg }}
+          >
+            <Mail size={22} color="#fff" />
+          </span>
+          <h2 className="wizard-connect__title">Scan for newsletters</h2>
+          <p className="wizard-connect__description">
+            Gmail is connected. Run a quick scan to pull in newsletter senders you can pick from.
+          </p>
         </div>
-      </StepShell>
+        {error ? <p className="wizard-connect__error">{error}</p> : null}
+        <div className="wizard-footer">
+          <Button tone="ghost" onClick={onBack}>
+            Back
+          </Button>
+          <Button onClick={onScan} disabled={isSyncing || isLoading}>
+            {isSyncing ? 'Scanning…' : 'Scan newsletters'}
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -918,14 +928,18 @@ type StepShellProps = {
 };
 
 function StepShell({ title, summary, stepIcon, children }: StepShellProps) {
-  const Icon = STEP_ICONS[stepIcon];
+  const brand = INTRO_BRAND[stepIcon];
   return (
     <div className="wizard-step">
       <header className="wizard-step__header">
-        <span className="wizard-step__icon" aria-hidden="true">
-          <Icon size={20} />
+        <span
+          className="wizard-step__icon"
+          aria-hidden="true"
+          style={{ backgroundColor: brand.bg }}
+        >
+          {brand.icon}
         </span>
-        <div>
+        <div className="wizard-step__heading">
           <h2 className="wizard-step__title">{title}</h2>
           <p className="wizard-step__summary">{summary}</p>
         </div>
