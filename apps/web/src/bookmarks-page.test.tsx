@@ -367,6 +367,51 @@ describe('BookmarksPage', () => {
     expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
   });
 
+  test('uses the mobile-complete green fill for finished bookmark icons in detail view', () => {
+    const finishedVideoItem = createLibraryItem({
+      ...videoItem,
+      isFinished: true,
+    });
+
+    hookSpies.itemsLibraryUseQuery.mockImplementation((input) => ({
+      data: {
+        items: input.filter.contentType
+          ? [
+              finishedVideoItem,
+              ...libraryItems.filter((item) => item.id !== finishedVideoItem.id),
+            ].filter((item) => item.contentType === input.filter.contentType)
+          : [finishedVideoItem, ...libraryItems.filter((item) => item.id !== finishedVideoItem.id)],
+      },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.itemsGetUseQuery.mockImplementation((input) => {
+      if (!input.id) {
+        return { data: undefined, isLoading: false, error: null };
+      }
+
+      if (input.id === finishedVideoItem.id) {
+        return { data: finishedVideoItem, isLoading: false, error: null };
+      }
+
+      const item = libraryItems.find((candidate) => candidate.id === input.id);
+      return item
+        ? { data: item, isLoading: false, error: null }
+        : { data: undefined, isLoading: false, error: new Error('Missing bookmark') };
+    });
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${finishedVideoItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(
+      screen
+        .getByRole('button', { name: `Remove bookmark for ${finishedVideoItem.title}` })
+        .querySelector('.new-page-bookmark-view__bookmark-icon')
+    ).toHaveClass('new-page-bookmark-view__bookmark-icon--finished');
+  });
+
   test('opens tag management from the action row and saves normalized tags', async () => {
     const user = userEvent.setup();
     const taggedVideoItem = createLibraryItem({

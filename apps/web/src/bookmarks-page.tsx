@@ -1128,7 +1128,11 @@ export function BookmarksPage() {
                             }}
                           >
                             <Bookmark
-                              className="new-page-bookmark-view__bookmark-icon"
+                              className={cn(
+                                'new-page-bookmark-view__bookmark-icon',
+                                selectedBookmarkIsFinished &&
+                                  'new-page-bookmark-view__bookmark-icon--finished'
+                              )}
                               size={BOOKMARK_ACTION_ICON_SIZE}
                               strokeWidth={1.85}
                               fill="currentColor"
