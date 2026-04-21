@@ -1003,6 +1003,7 @@ img {
   --bookmark-hero-translate-y: 0px;
   --bookmark-hero-scale: 1;
   --bookmark-hero-opacity: 1;
+  --bookmark-hero-height: clamp(8rem, 33vh, 20rem);
   --bookmark-header-overlap: clamp(2.75rem, 7vw, 4.5rem);
   position: relative;
   width: 100%;
@@ -1027,9 +1028,7 @@ img {
 
 .new-page-bookmark-view__hero {
   position: relative;
-  height: 40%;
-  min-height: 10rem;
-  max-height: 50%;
+  height: var(--bookmark-hero-height);
   flex-shrink: 0;
   background: #0d0d0d;
   overflow: hidden;
@@ -3922,20 +3921,8 @@ input:focus {
     display: inline;
   }
 
-  .new-page-bookmark-view__hero,
-  .new-page-bookmark-view__hero--video,
-  .new-page-bookmark-view__hero--square {
-    height: auto;
-    min-height: 0;
-    max-height: none;
-  }
-
-  .new-page-bookmark-view__hero--video {
-    aspect-ratio: 16 / 9;
-  }
-
-  .new-page-bookmark-view__hero--square {
-    aspect-ratio: 1;
+  .new-page-bookmark-view {
+    --bookmark-hero-height: clamp(8rem, 33svh, 16rem);
   }
 
   .new-page-bookmark-view__hero::after {

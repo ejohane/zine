@@ -534,6 +534,32 @@ describe('BookmarksPage', () => {
     expect(screen.getByRole('button', { name: 'Back to bookmarks list' })).toBeVisible();
   });
 
+  test('uses the same bookmark hero treatment for non-video content on phone widths', () => {
+    setViewportWidth(390);
+
+    const { container } = renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${articleItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    const hero = container.querySelector('.new-page-bookmark-view__hero');
+    expect(hero).toBeTruthy();
+    expect(hero?.className).toBe('new-page-bookmark-view__hero');
+  });
+
+  test('uses the same bookmark hero treatment for non-video content on desktop widths', () => {
+    setViewportWidth(1280);
+
+    const { container } = renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${articleItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    const hero = container.querySelector('.new-page-bookmark-view__hero');
+    expect(hero).toBeTruthy();
+    expect(hero?.className).toBe('new-page-bookmark-view__hero');
+  });
+
   test('hides the mobile tab bar on desktop widths', () => {
     setViewportWidth(1280);
 

@@ -1022,15 +1022,7 @@ export function BookmarksPage() {
                     ) : null}
 
                     {showBookmarkHero ? (
-                      <div
-                        ref={bookmarkHeroRef}
-                        className={cn(
-                          'new-page-bookmark-view__hero',
-                          displayBookmark.contentType === ContentType.VIDEO
-                            ? 'new-page-bookmark-view__hero--video'
-                            : 'new-page-bookmark-view__hero--square'
-                        )}
-                      >
+                      <div ref={bookmarkHeroRef} className="new-page-bookmark-view__hero">
                         {bookmarkHeroImageUrl ? (
                           <img src={bookmarkHeroImageUrl} alt="" />
                         ) : (
