@@ -16,6 +16,13 @@ import {
   sourceConfigs,
   type WizardStep,
 } from './lib/onboarding';
+import {
+  connectMockProvider,
+  createMockOnboardingState,
+  discoverMockFeeds,
+  resolveMockOnboardingScenario,
+  scanMockNewsletters,
+} from './lib/onboarding-mocks';
 import { connectProvider } from './lib/oauth';
 import { trpc, useAppSession } from './lib/trpc';
 
@@ -266,6 +273,11 @@ export function WelcomePage() {
   const { getToken } = useAppSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const mockScenario = resolveMockOnboardingScenario(searchParams);
+  const mockScenarioState = useMemo(
+    () => (mockScenario ? createMockOnboardingState(mockScenario) : null),
+    [mockScenario]
+  );
 
   const origin = searchParams.get('origin') === 'settings' ? 'settings' : 'welcome';
   const closePath = origin === 'settings' ? '/settings' : '/bookmarks';
@@ -275,21 +287,32 @@ export function WelcomePage() {
   const [rssUrl, setRssUrl] = useState('');
   const [rssDiscoveryUrl, setRssDiscoveryUrl] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [mockState, setMockState] = useState(mockScenarioState);
   const processedOauthContextRef = useRef<string | null>(null);
 
-  const connectionsQuery = trpc.subscriptions.connections.list.useQuery();
-  const connections = connectionsQuery.data;
+  const connectionsQuery = trpc.subscriptions.connections.list.useQuery(undefined, {
+    enabled: !mockState,
+  });
 
-  const spotifyAvailable = trpc.subscriptions.discover.available.useQuery({
-    provider: Provider.SPOTIFY,
-  });
-  const youtubeAvailable = trpc.subscriptions.discover.available.useQuery({
-    provider: Provider.YOUTUBE,
-  });
-  const newslettersListQuery = trpc.subscriptions.newsletters.list.useQuery({ limit: 100 });
+  const spotifyAvailable = trpc.subscriptions.discover.available.useQuery(
+    {
+      provider: Provider.SPOTIFY,
+    },
+    { enabled: !mockState }
+  );
+  const youtubeAvailable = trpc.subscriptions.discover.available.useQuery(
+    {
+      provider: Provider.YOUTUBE,
+    },
+    { enabled: !mockState }
+  );
+  const newslettersListQuery = trpc.subscriptions.newsletters.list.useQuery(
+    { limit: 100 },
+    { enabled: !mockState }
+  );
   const rssDiscoverQuery = trpc.subscriptions.rss.discover.useQuery(
     { url: rssDiscoveryUrl ?? 'https://example.com' },
-    { enabled: Boolean(rssDiscoveryUrl) }
+    { enabled: Boolean(rssDiscoveryUrl) && !mockState }
   );
 
   const addSubscription = trpc.subscriptions.add.useMutation();
@@ -312,9 +335,29 @@ export function WelcomePage() {
     setRssDiscoveryUrl(null);
   }, []);
 
+  useEffect(() => {
+    setMockState(mockScenarioState);
+    setActiveStep(mockScenarioState?.activeStep ?? null);
+    setStepError({});
+    setRssUrl('');
+    setRssDiscoveryUrl(null);
+    setIsImporting(false);
+    processedOauthContextRef.current = null;
+  }, [mockScenarioState]);
+
+  const connections = mockState?.connections ?? connectionsQuery.data;
+  const spotifyItems = mockState?.available.SPOTIFY ?? spotifyAvailable.data?.items ?? [];
+  const youtubeItems = mockState?.available.YOUTUBE ?? youtubeAvailable.data?.items ?? [];
+  const newsletters = mockState?.newsletters ?? newslettersListQuery.data?.items ?? [];
+
   const handleConnect = useCallback(
     async (provider: 'SPOTIFY' | 'YOUTUBE' | 'GMAIL') => {
       setStepError((current) => ({ ...current, [provider]: undefined }));
+      if (mockState) {
+        setMockState((current) => (current ? connectMockProvider(current, provider) : current));
+        return;
+      }
+
       setOnboardingOAuthContext({ origin, provider });
       try {
         await connectProvider(provider, getToken);
@@ -326,11 +369,13 @@ export function WelcomePage() {
         }));
       }
     },
-    [getToken, origin]
+    [getToken, mockState, origin]
   );
 
   // Resume on the provider step after returning from OAuth.
   useEffect(() => {
+    if (mockState) return;
+
     const context = getOnboardingOAuthContext();
     if (!context) return;
     const key = `${context.origin}:${context.provider}`;
@@ -340,10 +385,28 @@ export function WelcomePage() {
     processedOauthContextRef.current = key;
     clearOnboardingOAuthContext();
     setActiveStep(providerToWizardStep(context.provider));
-  }, [connections]);
+  }, [connections, mockState]);
 
   const importSpotify = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                available: {
+                  ...current.available,
+                  SPOTIFY: current.available.SPOTIFY.filter(
+                    (item) => !selected.some((selectedItem) => selectedItem.id === item.id)
+                  ),
+                },
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -363,11 +426,29 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addSubscription, handleBackToIntegrations]
+    [addSubscription, handleBackToIntegrations, mockState]
   );
 
   const importYoutube = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                available: {
+                  ...current.available,
+                  YOUTUBE: current.available.YOUTUBE.filter(
+                    (item) => !selected.some((selectedItem) => selectedItem.id === item.id)
+                  ),
+                },
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -387,11 +468,27 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addSubscription, handleBackToIntegrations]
+    [addSubscription, handleBackToIntegrations, mockState]
   );
 
   const importNewsletters = useCallback(
     async (selected: PickerItem[], deselected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                newsletters: current.newsletters.map((newsletter) => ({
+                  ...newsletter,
+                  status: selected.some((item) => item.id === newsletter.id) ? 'ACTIVE' : 'HIDDEN',
+                })),
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -410,11 +507,26 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [handleBackToIntegrations, updateNewsletterStatus]
+    [handleBackToIntegrations, mockState, updateNewsletterStatus]
   );
 
   const importRss = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                rssCandidates: current.rssCandidates.filter(
+                  (candidate) => !selected.some((item) => item.id === candidate.feedUrl)
+                ),
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -430,11 +542,16 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addRss, handleBackToIntegrations]
+    [addRss, handleBackToIntegrations, mockState]
   );
 
   const handleScanNewsletters = useCallback(async () => {
     setStepError((current) => ({ ...current, GMAIL: undefined }));
+    if (mockState) {
+      setMockState((current) => (current ? scanMockNewsletters(current) : current));
+      return;
+    }
+
     try {
       await syncNewsletters.mutateAsync(undefined);
     } catch (error) {
@@ -443,16 +560,24 @@ export function WelcomePage() {
         GMAIL: error instanceof Error ? error.message : 'Could not scan newsletters.',
       }));
     }
-  }, [syncNewsletters]);
+  }, [mockState, syncNewsletters]);
 
   const rssCandidates = useMemo<PickerItem[]>(() => {
+    if (mockState) {
+      return mockState.rssCandidates.map((candidate) => ({
+        id: candidate.feedUrl,
+        label: candidate.title,
+        description: candidate.description,
+      }));
+    }
+
     const candidates = rssDiscoverQuery.data?.candidates ?? [];
     return candidates.map((candidate) => ({
       id: candidate.feedUrl,
       label: candidate.title ?? candidate.feedUrl,
       description: candidate.feedUrl,
     }));
-  }, [rssDiscoverQuery.data?.candidates]);
+  }, [mockState, rssDiscoverQuery.data?.candidates]);
 
   const dialogTitle = useMemo(() => {
     if (!activeStep) {
@@ -472,21 +597,23 @@ export function WelcomePage() {
   }, [activeStep]);
 
   const dialogDescription = useMemo(() => {
+    const mockLabel = mockState ? ` Mock mode: ${mockState.scenario.replace(/-/g, ' ')}.` : '';
+
     if (!activeStep) {
-      return 'Pick an integration to connect or review. Connected providers jump straight to the subscriptions list.';
+      return `Pick an integration to connect or review. Connected providers jump straight to the subscriptions list.${mockLabel}`;
     }
 
     switch (activeStep) {
       case 'SPOTIFY':
-        return 'Connect Spotify and pick which podcasts to bring into Zine.';
+        return `Connect Spotify and pick which podcasts to bring into Zine.${mockLabel}`;
       case 'YOUTUBE':
-        return 'Connect YouTube and pick which channels to bring into Zine.';
+        return `Connect YouTube and pick which channels to bring into Zine.${mockLabel}`;
       case 'GMAIL':
-        return 'Connect Gmail and pick which newsletters to keep active in Zine.';
+        return `Connect Gmail and pick which newsletters to keep active in Zine.${mockLabel}`;
       case 'RSS':
-        return 'Paste a URL and pick which feeds to follow.';
+        return `Paste a URL and pick which feeds to follow.${mockLabel}`;
     }
-  }, [activeStep]);
+  }, [activeStep, mockState]);
 
   return (
     <Dialog open onOpenChange={(open) => (!open ? handleClose() : undefined)}>
@@ -530,8 +657,8 @@ export function WelcomePage() {
             {activeStep === 'SPOTIFY' ? (
               <SpotifyStep
                 connections={connections}
-                available={spotifyAvailable.data?.items ?? []}
-                isLoading={spotifyAvailable.isLoading}
+                available={spotifyItems}
+                isLoading={!mockState && spotifyAvailable.isLoading}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('SPOTIFY')}
                 onBack={handleBackToIntegrations}
@@ -543,8 +670,8 @@ export function WelcomePage() {
             {activeStep === 'YOUTUBE' ? (
               <YoutubeStep
                 connections={connections}
-                available={youtubeAvailable.data?.items ?? []}
-                isLoading={youtubeAvailable.isLoading}
+                available={youtubeItems}
+                isLoading={!mockState && youtubeAvailable.isLoading}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('YOUTUBE')}
                 onBack={handleBackToIntegrations}
@@ -556,9 +683,9 @@ export function WelcomePage() {
             {activeStep === 'GMAIL' ? (
               <GmailStep
                 connections={connections}
-                newsletters={newslettersListQuery.data?.items ?? []}
-                isLoading={newslettersListQuery.isLoading}
-                isSyncing={syncNewsletters.isPending}
+                newsletters={newsletters}
+                isLoading={!mockState && newslettersListQuery.isLoading}
+                isSyncing={!mockState && syncNewsletters.isPending}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('GMAIL')}
                 onScan={() => void handleScanNewsletters()}
@@ -573,10 +700,17 @@ export function WelcomePage() {
                 url={rssUrl}
                 onUrlChange={setRssUrl}
                 onDiscover={() => {
-                  if (rssUrl.trim()) setRssDiscoveryUrl(rssUrl.trim());
+                  if (!rssUrl.trim()) return;
+                  if (mockState) {
+                    setMockState((current) =>
+                      current ? discoverMockFeeds(current, rssUrl.trim()) : current
+                    );
+                    return;
+                  }
+                  setRssDiscoveryUrl(rssUrl.trim());
                 }}
                 candidates={rssCandidates}
-                isDiscovering={rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
+                isDiscovering={!mockState && rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
                 isImporting={isImporting}
                 onBack={handleBackToIntegrations}
                 onImport={importRss}
