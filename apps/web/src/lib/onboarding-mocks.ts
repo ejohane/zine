@@ -260,6 +260,31 @@ export function createMockOnboardingState(scenario: MockOnboardingScenario): Moc
   return JSON.parse(JSON.stringify(MOCK_SCENARIO_STATE[scenario])) as MockOnboardingState;
 }
 
+export function disconnectMockProvider(
+  state: MockOnboardingState,
+  provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'
+): MockOnboardingState {
+  const connections = { ...state.connections, [provider]: null };
+
+  if (provider === 'YOUTUBE') {
+    return {
+      ...state,
+      connections,
+      available: { ...state.available, YOUTUBE: [] },
+    };
+  }
+
+  if (provider === 'SPOTIFY') {
+    return {
+      ...state,
+      connections,
+      available: { ...state.available, SPOTIFY: [] },
+    };
+  }
+
+  return { ...state, connections, newsletters: [] };
+}
+
 export function connectMockProvider(
   state: MockOnboardingState,
   provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'

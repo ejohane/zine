@@ -20,6 +20,7 @@ import {
   connectMockProvider,
   createMockOnboardingState,
   discoverMockFeeds,
+  disconnectMockProvider,
   resolveMockOnboardingScenario,
   scanMockNewsletters,
 } from './lib/onboarding-mocks';
@@ -86,6 +87,9 @@ type SubscriptionPickerProps = {
   onBack: () => void;
   backLabel?: string;
   isImporting: boolean;
+  headerSlot?: ReactNode;
+  renderItemMedia?: (item: PickerItem, selected: boolean) => ReactNode;
+  itemDescriptionFallback?: (item: PickerItem) => string | undefined;
 };
 
 function SubscriptionPicker({
@@ -100,6 +104,9 @@ function SubscriptionPicker({
   onBack,
   backLabel = 'Back to integrations',
   isImporting,
+  headerSlot,
+  renderItemMedia,
+  itemDescriptionFallback,
 }: SubscriptionPickerProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -152,6 +159,7 @@ function SubscriptionPicker({
 
   return (
     <div className="wizard-picker" data-testid={testId}>
+      {headerSlot}
       <div className="wizard-picker__controls">
         <label className="wizard-picker__search">
           <span className="visually-hidden">{searchLabel}</span>
@@ -194,18 +202,32 @@ function SubscriptionPicker({
           <ul className="wizard-picker__items">
             {filtered.map((item) => {
               const inputId = `picker-${testId}-${item.id}`;
+              const isSelected = selected.has(item.id);
+              const fallbackDescription = itemDescriptionFallback
+                ? itemDescriptionFallback(item)
+                : undefined;
+              const description = item.description ?? fallbackDescription;
+              const rich = Boolean(renderItemMedia);
               return (
-                <li key={item.id} className="wizard-picker__item">
+                <li
+                  key={item.id}
+                  className={cn('wizard-picker__item', rich && 'wizard-picker__item--rich')}
+                >
                   <input
                     id={inputId}
                     type="checkbox"
                     aria-label={item.label}
-                    checked={selected.has(item.id)}
+                    checked={isSelected}
                     onChange={() => toggleItem(item.id)}
                   />
+                  {renderItemMedia ? (
+                    <span className="wizard-picker__media" aria-hidden="true">
+                      {renderItemMedia(item, isSelected)}
+                    </span>
+                  ) : null}
                   <label htmlFor={inputId}>
                     <strong>{item.label}</strong>
-                    {item.description ? <span>{item.description}</span> : null}
+                    {description ? <span>{description}</span> : null}
                   </label>
                 </li>
               );
@@ -319,6 +341,11 @@ export function WelcomePage() {
   const syncNewsletters = trpc.subscriptions.newsletters.syncNow.useMutation();
   const updateNewsletterStatus = trpc.subscriptions.newsletters.updateStatus.useMutation();
   const addRss = trpc.subscriptions.rss.add.useMutation();
+  const disconnectProviderMutation = trpc.subscriptions.connections.disconnect.useMutation();
+
+  const [disconnectingProvider, setDisconnectingProvider] = useState<
+    'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | null
+  >(null);
 
   const handleClose = useCallback(() => {
     navigate(closePath, { replace: true });
@@ -328,6 +355,32 @@ export function WelcomePage() {
     setStepError((current) => ({ ...current, [step]: undefined }));
     setActiveStep(step);
   }, []);
+
+  const handleDisconnect = useCallback(
+    async (provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL') => {
+      setStepError((current) => ({ ...current, [provider]: undefined }));
+      setDisconnectingProvider(provider);
+      try {
+        if (mockState) {
+          setMockState((current) =>
+            current ? disconnectMockProvider(current, provider) : current
+          );
+        } else {
+          await disconnectProviderMutation.mutateAsync({ provider: Provider[provider] });
+          await connectionsQuery.refetch();
+        }
+      } catch (error) {
+        setStepError((current) => ({
+          ...current,
+          [provider]:
+            error instanceof Error ? error.message : 'Could not disconnect this provider.',
+        }));
+      } finally {
+        setDisconnectingProvider(null);
+      }
+    },
+    [connectionsQuery, disconnectProviderMutation, mockState]
+  );
 
   const handleBackToIntegrations = useCallback(() => {
     setActiveStep(null);
@@ -676,6 +729,8 @@ export function WelcomePage() {
                 onConnect={() => void handleConnect('YOUTUBE')}
                 onBack={handleBackToIntegrations}
                 onImport={importYoutube}
+                onDisconnect={() => void handleDisconnect('YOUTUBE')}
+                isDisconnecting={disconnectingProvider === 'YOUTUBE'}
                 error={stepError.YOUTUBE ?? null}
               />
             ) : null}
@@ -843,8 +898,13 @@ function YoutubeStep({
   onConnect,
   onBack,
   onImport,
+  onDisconnect,
+  isDisconnecting,
   error,
-}: ProviderStepProps) {
+}: ProviderStepProps & {
+  onDisconnect: () => void;
+  isDisconnecting: boolean;
+}) {
   const connected = isConnected(connections, 'YOUTUBE');
   const config = sourceConfigs.YOUTUBE;
 
@@ -861,10 +921,12 @@ function YoutubeStep({
     );
   }
 
+  const brand = INTRO_BRAND.YOUTUBE;
+
   return (
     <StepShell
       title={config.title}
-      summary="Pick the YouTube channels to import."
+      summary="Pick the channels you want in your Zine feed."
       stepIcon="YOUTUBE"
     >
       {error ? <p className="wizard-connect__error">{error}</p> : null}
@@ -879,8 +941,88 @@ function YoutubeStep({
         onImport={onImport}
         onBack={onBack}
         isImporting={isImporting}
+        itemDescriptionFallback={() => 'YouTube channel'}
+        renderItemMedia={(item) => (
+          <span
+            className="wizard-picker__avatar"
+            style={{ backgroundColor: brand.bg }}
+            aria-hidden="true"
+          >
+            {item.label.trim().charAt(0).toUpperCase() || 'Y'}
+          </span>
+        )}
+        headerSlot={
+          <ProviderAccountBar
+            provider="YOUTUBE"
+            accountLabel="Connected to YouTube"
+            onDisconnect={onDisconnect}
+            isDisconnecting={isDisconnecting}
+          />
+        }
       />
     </StepShell>
+  );
+}
+
+type ProviderAccountBarProps = {
+  provider: IntegrationStep;
+  accountLabel: string;
+  onDisconnect: () => void;
+  isDisconnecting: boolean;
+};
+
+function ProviderAccountBar({
+  provider,
+  accountLabel,
+  onDisconnect,
+  isDisconnecting,
+}: ProviderAccountBarProps) {
+  const [confirming, setConfirming] = useState(false);
+  const brand = INTRO_BRAND[provider];
+
+  return (
+    <div className="wizard-account-bar" role="group" aria-label={`${provider} account`}>
+      <span
+        className="wizard-account-bar__icon"
+        style={{ backgroundColor: brand.bg }}
+        aria-hidden="true"
+      >
+        {brand.icon}
+      </span>
+      <div className="wizard-account-bar__copy">
+        <span className="wizard-account-bar__status">
+          <Check size={12} strokeWidth={2.5} aria-hidden="true" />
+          {accountLabel}
+        </span>
+        <span className="wizard-account-bar__hint">Disconnecting stops future imports.</span>
+      </div>
+      {confirming ? (
+        <div className="wizard-account-bar__actions">
+          <Button tone="ghost" onClick={() => setConfirming(false)} disabled={isDisconnecting}>
+            Cancel
+          </Button>
+          <Button
+            tone="danger"
+            onClick={() => {
+              onDisconnect();
+              setConfirming(false);
+            }}
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? 'Disconnecting…' : 'Confirm disconnect'}
+          </Button>
+        </div>
+      ) : (
+        <Button
+          tone="ghost"
+          className="wizard-account-bar__disconnect"
+          onClick={() => setConfirming(true)}
+          disabled={isDisconnecting}
+        >
+          Disconnect
+        </Button>
+      )}
+    </div>
   );
 }
 

@@ -186,6 +186,26 @@ describe('WelcomePage — integration launcher', () => {
     expect(screen.queryByRole('button', { name: 'Connect YouTube' })).toBeNull();
   });
 
+  test('YouTube step exposes an account bar and disconnect confirm flow', async () => {
+    const user = userEvent.setup();
+
+    mockConnected({ YOUTUBE: true });
+    mockDiscoverItems({ YOUTUBE: [{ id: 'channel-1', name: 'Wendover Productions' }] });
+
+    renderRoute(<WelcomePage />, { route: '/welcome', path: '/welcome' });
+
+    await openIntegration(user, 'YouTube');
+
+    expect(screen.getByText('Connected to YouTube')).toBeVisible();
+    const disconnectButton = screen.getByRole('button', { name: 'Disconnect' });
+    await user.click(disconnectButton);
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Confirm disconnect' }));
+
+    expect(mutationSpies.connectionsDisconnect).toHaveBeenCalledWith({ provider: 'YOUTUBE' });
+  });
+
   test('dev mock mode can simulate the YouTube connect-to-picker transition without OAuth', async () => {
     const user = userEvent.setup();
 

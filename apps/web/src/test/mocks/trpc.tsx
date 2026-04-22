@@ -102,6 +102,7 @@ export const mutationSpies = {
   newslettersSyncNow: vi.fn(async (_input: unknown) => ({ success: true })),
   newslettersUpdateStatus: vi.fn(async (_input: unknown) => ({ success: true })),
   rssAdd: vi.fn(async (_input: unknown) => ({ success: true })),
+  connectionsDisconnect: vi.fn(async (_input: unknown) => ({ success: true })),
 };
 
 export const hookSpies = {
@@ -212,6 +213,9 @@ export const hookSpies = {
   rssAddUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.rssAdd, options)
   ),
+  connectionsDisconnectUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.connectionsDisconnect, options)
+  ),
 };
 
 function createQueryResult<T>(data?: T, overrides: Partial<QueryResult<T>> = {}): QueryResult<T> {
@@ -277,6 +281,7 @@ export function resetTrpcMocks() {
   mutationSpies.newslettersSyncNow.mockResolvedValue({ success: true });
   mutationSpies.newslettersUpdateStatus.mockResolvedValue({ success: true });
   mutationSpies.rssAdd.mockResolvedValue({ success: true });
+  mutationSpies.connectionsDisconnect.mockResolvedValue({ success: true });
 
   hookSpies.itemsLibraryUseQuery.mockReset();
   hookSpies.itemsLibraryUseQuery.mockImplementation((_input) => createQueryResult());
@@ -410,6 +415,11 @@ export function resetTrpcMocks() {
   hookSpies.rssAddUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.rssAdd, options)
   );
+
+  hookSpies.connectionsDisconnectUseMutation.mockReset();
+  hookSpies.connectionsDisconnectUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.connectionsDisconnect, options)
+  );
 }
 
 export function setAuthAvailability(nextState: Partial<typeof authAvailability>) {
@@ -489,6 +499,10 @@ export const trpc = {
     connections: {
       list: {
         useQuery: () => hookSpies.connectionsListUseQuery(),
+      },
+      disconnect: {
+        useMutation: (options?: MutationOptions) =>
+          hookSpies.connectionsDisconnectUseMutation(options),
       },
     },
     list: {
