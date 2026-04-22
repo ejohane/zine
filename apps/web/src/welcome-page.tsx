@@ -158,7 +158,10 @@ function SubscriptionPicker({
       : `Import ${selectedItems.length} ${selectedItems.length === 1 ? itemNounSingular : itemNounPlural}`;
 
   return (
-    <div className="wizard-picker" data-testid={testId}>
+    <div
+      className={cn('wizard-picker', renderItemMedia && 'wizard-picker--rich')}
+      data-testid={testId}
+    >
       {headerSlot}
       <div className="wizard-picker__controls">
         <label className="wizard-picker__search">
@@ -208,26 +211,52 @@ function SubscriptionPicker({
                 : undefined;
               const description = item.description ?? fallbackDescription;
               const rich = Boolean(renderItemMedia);
+
+              if (!rich) {
+                return (
+                  <li key={item.id} className="wizard-picker__item">
+                    <input
+                      id={inputId}
+                      type="checkbox"
+                      aria-label={item.label}
+                      checked={isSelected}
+                      onChange={() => toggleItem(item.id)}
+                    />
+                    <label htmlFor={inputId}>
+                      <strong>{item.label}</strong>
+                      {description ? <span>{description}</span> : null}
+                    </label>
+                  </li>
+                );
+              }
+
               return (
                 <li
                   key={item.id}
-                  className={cn('wizard-picker__item', rich && 'wizard-picker__item--rich')}
+                  className={cn('picker-row', isSelected && 'picker-row--selected')}
                 >
                   <input
                     id={inputId}
                     type="checkbox"
                     aria-label={item.label}
+                    className="picker-row__input"
                     checked={isSelected}
                     onChange={() => toggleItem(item.id)}
                   />
-                  {renderItemMedia ? (
-                    <span className="wizard-picker__media" aria-hidden="true">
-                      {renderItemMedia(item, isSelected)}
+                  <label htmlFor={inputId} className="picker-row__label">
+                    <span className="picker-row__media" aria-hidden="true">
+                      {renderItemMedia?.(item, isSelected)}
                     </span>
-                  ) : null}
-                  <label htmlFor={inputId}>
-                    <strong>{item.label}</strong>
-                    {description ? <span>{description}</span> : null}
+                    <span className="picker-row__text">
+                      <strong>{item.label}</strong>
+                      {description ? <span>{description}</span> : null}
+                    </span>
+                    <span
+                      className={cn('picker-row__check', isSelected && 'picker-row__check--on')}
+                      aria-hidden="true"
+                    >
+                      {isSelected ? <Check size={13} strokeWidth={3} /> : null}
+                    </span>
                   </label>
                 </li>
               );
@@ -924,11 +953,7 @@ function YoutubeStep({
   const brand = INTRO_BRAND.YOUTUBE;
 
   return (
-    <StepShell
-      title={config.title}
-      summary="Pick the channels you want in your Zine feed."
-      stepIcon="YOUTUBE"
-    >
+    <div className="wizard-provider-step">
       {error ? <p className="wizard-connect__error">{error}</p> : null}
       <SubscriptionPicker
         testId="youtube-picker"
@@ -944,7 +969,7 @@ function YoutubeStep({
         itemDescriptionFallback={() => 'YouTube channel'}
         renderItemMedia={(item) => (
           <span
-            className="wizard-picker__avatar"
+            className="picker-row__avatar"
             style={{ backgroundColor: brand.bg }}
             aria-hidden="true"
           >
@@ -960,7 +985,7 @@ function YoutubeStep({
           />
         }
       />
-    </StepShell>
+    </div>
   );
 }
 
@@ -981,28 +1006,31 @@ function ProviderAccountBar({
   const brand = INTRO_BRAND[provider];
 
   return (
-    <div className="wizard-account-bar" role="group" aria-label={`${provider} account`}>
+    <div className="wizard-account-chip" role="group" aria-label={`${provider} account`}>
       <span
-        className="wizard-account-bar__icon"
+        className="wizard-account-chip__icon"
         style={{ backgroundColor: brand.bg }}
         aria-hidden="true"
       >
         {brand.icon}
       </span>
-      <div className="wizard-account-bar__copy">
-        <span className="wizard-account-bar__status">
-          <Check size={12} strokeWidth={2.5} aria-hidden="true" />
-          {accountLabel}
-        </span>
-        <span className="wizard-account-bar__hint">Disconnecting stops future imports.</span>
-      </div>
+      <span className="wizard-account-chip__label">
+        <span className="wizard-account-chip__status" aria-hidden="true" />
+        {accountLabel}
+      </span>
       {confirming ? (
-        <div className="wizard-account-bar__actions">
-          <Button tone="ghost" onClick={() => setConfirming(false)} disabled={isDisconnecting}>
+        <span className="wizard-account-chip__actions">
+          <button
+            type="button"
+            className="wizard-account-chip__link"
+            onClick={() => setConfirming(false)}
+            disabled={isDisconnecting}
+          >
             Cancel
-          </Button>
-          <Button
-            tone="danger"
+          </button>
+          <button
+            type="button"
+            className="wizard-account-chip__link wizard-account-chip__link--danger"
             onClick={() => {
               onDisconnect();
               setConfirming(false);
@@ -1010,17 +1038,17 @@ function ProviderAccountBar({
             disabled={isDisconnecting}
           >
             {isDisconnecting ? 'Disconnecting…' : 'Confirm disconnect'}
-          </Button>
-        </div>
+          </button>
+        </span>
       ) : (
-        <Button
-          tone="ghost"
-          className="wizard-account-bar__disconnect"
+        <button
+          type="button"
+          className="wizard-account-chip__link"
           onClick={() => setConfirming(true)}
           disabled={isDisconnecting}
         >
           Disconnect
-        </Button>
+        </button>
       )}
     </div>
   );

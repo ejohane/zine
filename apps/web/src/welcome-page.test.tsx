@@ -181,7 +181,7 @@ describe('WelcomePage — integration launcher', () => {
 
     await openIntegration(user, 'YouTube');
 
-    expect(screen.getByRole('heading', { name: 'YouTube', level: 2 })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Import from YouTube' })).toBeVisible();
     expect(screen.getByRole('checkbox', { name: 'Wendover Productions' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Connect YouTube' })).toBeNull();
   });

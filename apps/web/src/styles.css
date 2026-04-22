@@ -3508,75 +3508,174 @@ input:focus {
   gap: 0.5rem;
 }
 
-.wizard-account-bar {
+.wizard-provider-step {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.85rem;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border);
-  border-radius: 0.85rem;
-  background: var(--surface-subtle, var(--surface));
+  flex: 1;
+  min-height: 0;
 }
 
-.wizard-account-bar__icon {
+.wizard-account-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.55rem 0.35rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  width: fit-content;
+  max-width: 100%;
+}
+
+.wizard-account-chip__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.6rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 50%;
   color: #fff;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.wizard-account-bar__copy {
-  display: grid;
-  gap: 0.1rem;
-  flex: 1;
-  min-width: 0;
+.wizard-account-chip__icon > * {
+  transform: scale(0.82);
 }
 
-.wizard-account-bar__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--success, #22c55e);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.wizard-account-bar__hint {
-  color: var(--text-dim);
-  font-size: 0.76rem;
-  line-height: 1.35;
-}
-
-.wizard-account-bar__actions {
+.wizard-account-chip__label {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wizard-account-chip__status {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--success, #22c55e);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--success, #22c55e) 25%, transparent);
   flex-shrink: 0;
 }
 
-.wizard-account-bar__disconnect {
-  flex-shrink: 0;
+.wizard-account-chip__link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0.15rem 0.5rem;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
 }
 
-.wizard-picker__item--rich {
-  padding: 0.7rem 0.85rem;
+.wizard-account-chip__link:hover {
+  background: var(--surface-subtle);
+  color: var(--text);
+}
+
+.wizard-account-chip__link:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.wizard-account-chip__link--danger {
+  color: var(--danger, #ef4444);
+}
+
+.wizard-account-chip__link--danger:hover {
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
+  color: var(--danger, #ef4444);
+}
+
+.wizard-account-chip__actions {
+  display: inline-flex;
+  gap: 0.15rem;
+  margin-left: auto;
+}
+
+.wizard-picker--rich .wizard-picker__list {
+  border: none;
+  background: transparent;
+  overflow: visible;
+}
+
+.wizard-picker--rich .wizard-picker__items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.15rem;
+  max-height: 22rem;
+}
+
+.picker-row {
+  position: relative;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--surface);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.picker-row:hover {
+  border-color: color-mix(in srgb, var(--text) 20%, var(--border));
+  background: var(--surface-subtle, var(--surface));
+}
+
+.picker-row--selected {
+  border-color: color-mix(in srgb, var(--accent, #3b82f6) 55%, transparent);
+  background: color-mix(in srgb, var(--accent, #3b82f6) 10%, var(--surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #3b82f6) 40%, transparent);
+}
+
+.picker-row__input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+}
+
+.picker-row__input:focus-visible + .picker-row__label {
+  outline: 2px solid var(--accent, #3b82f6);
+  outline-offset: 2px;
+}
+
+.picker-row__label {
+  display: flex;
+  align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  cursor: pointer;
+  border-radius: inherit;
 }
 
-.wizard-picker__media {
+.picker-row__media {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.wizard-picker__avatar {
+.picker-row__avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3584,30 +3683,63 @@ input:focus {
   height: 2.25rem;
   border-radius: 50%;
   color: #fff;
-  font-weight: 650;
+  font-weight: 700;
   font-size: 0.95rem;
   letter-spacing: 0.01em;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
-.wizard-picker__item--rich > label {
+.picker-row__text {
   display: grid;
   gap: 0.1rem;
   flex: 1;
   min-width: 0;
 }
 
-.wizard-picker__item--rich > label strong {
-  font-size: 0.95rem;
+.picker-row__text strong {
+  font-size: 0.93rem;
   font-weight: 600;
   color: var(--text);
   letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.wizard-picker__item--rich > label span {
+.picker-row__text span {
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-row__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: transparent;
+  flex-shrink: 0;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.picker-row:hover .picker-row__check {
+  border-color: color-mix(in srgb, var(--text) 35%, var(--border));
+}
+
+.picker-row__check--on {
+  background: var(--accent, #3b82f6);
+  border-color: var(--accent, #3b82f6);
+  color: #fff;
 }
 
 .wizard-done {
