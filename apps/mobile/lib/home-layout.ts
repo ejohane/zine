@@ -1,4 +1,4 @@
-const MAX_FEATURED_GRID_ITEMS = 6;
+const MAX_FEATURED_GRID_ITEMS = 20;
 const FEATURED_GRID_COLUMNS = 2;
 
 interface FeaturedGridItem {
@@ -6,10 +6,7 @@ interface FeaturedGridItem {
 }
 
 export function getValidFeaturedGridItems<T>(items: readonly T[]): T[] {
-  const cappedItems = items.slice(0, MAX_FEATURED_GRID_ITEMS);
-  const evenCount = cappedItems.length - (cappedItems.length % 2);
-
-  return cappedItems.slice(0, evenCount);
+  return items.slice(0, MAX_FEATURED_GRID_ITEMS);
 }
 
 export function getFeaturedGridItemWidth(containerWidth: number, gap: number): number {

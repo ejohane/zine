@@ -8,6 +8,15 @@ import { keepPreviousData } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
+import {
+  buildHomeItemsInput,
+  getAllHomeQueryInputs,
+  type HomeItemsOptions,
+  type HomeQueryInput,
+  HOME_JUMP_BACK_IN_LIMIT,
+  HOME_SECTION_LIMIT,
+  matchesHomeQueryContentType,
+} from '@/lib/home-query';
 
 /** Type alias for tRPC utils */
 type TrpcUtils = ReturnType<typeof trpc.useUtils>;
@@ -16,6 +25,10 @@ type TrpcUtils = ReturnType<typeof trpc.useUtils>;
 type ListQueryData = ReturnType<TrpcUtils['items']['inbox']['getData']>;
 type InfiniteListQueryData = ReturnType<TrpcUtils['items']['inbox']['getInfiniteData']>;
 type HomeQueryData = ReturnType<TrpcUtils['items']['home']['getData']>;
+type HomeQuerySnapshot = {
+  input: HomeQueryInput | undefined;
+  data: HomeQueryData;
+};
 
 /** Single item query data type */
 type ItemQueryData = ReturnType<TrpcUtils['items']['get']['getData']>;
@@ -29,12 +42,9 @@ type OptimisticContext = {
   previousLibrary?: ListQueryData;
   previousInfiniteInbox?: InfiniteListQueryData;
   previousInfiniteLibrary?: InfiniteListQueryData;
-  previousHome?: HomeQueryData;
+  previousHomes?: HomeQuerySnapshot[];
   previousItem?: ItemQueryData;
 };
-
-const HOME_SECTION_LIMIT = 5;
-const HOME_JUMP_BACK_IN_LIMIT = 10;
 
 function removeItemFromHomeData(
   old: NonNullable<HomeQueryData>,
@@ -55,6 +65,42 @@ function removeItemFromHomeData(
 function invalidateRecapQueries(utils: TrpcUtils) {
   utils.insights.weeklyRecap.invalidate();
   utils.insights.weeklyRecapTeaser.invalidate();
+}
+
+function cancelHomeQueries(utils: TrpcUtils, inputs = getAllHomeQueryInputs()): Promise<void>[] {
+  return inputs.map((input) => utils.items.home.cancel(input));
+}
+
+function getHomeQuerySnapshots(
+  utils: TrpcUtils,
+  inputs = getAllHomeQueryInputs()
+): HomeQuerySnapshot[] {
+  return inputs.map((input) => ({
+    input,
+    data: utils.items.home.getData(input),
+  }));
+}
+
+function restoreHomeQuerySnapshots(utils: TrpcUtils, snapshots: HomeQuerySnapshot[]) {
+  for (const { input, data } of snapshots) {
+    utils.items.home.setData(input, data);
+  }
+}
+
+function updateHomeQueries(
+  utils: TrpcUtils,
+  updater: (
+    home: NonNullable<HomeQueryData>,
+    input: HomeQueryInput | undefined
+  ) => NonNullable<HomeQueryData>,
+  inputs = getAllHomeQueryInputs()
+) {
+  for (const input of inputs) {
+    utils.items.home.setData(input, (old) => {
+      if (!old) return old;
+      return updater(old, input);
+    });
+  }
 }
 
 type InboxItemsOptions = {
@@ -109,7 +155,11 @@ function createOptimisticConfig<TInput extends { id: string }>(
     /** Transform library items (return filtered/mapped items) */
     updateLibrary?: (items: ListItem[], input: TInput) => ListItem[];
     /** Transform home query data */
-    updateHome?: (home: NonNullable<HomeQueryData>, input: TInput) => NonNullable<HomeQueryData>;
+    updateHome?: (
+      home: NonNullable<HomeQueryData>,
+      input: TInput,
+      homeInput: HomeQueryInput | undefined
+    ) => NonNullable<HomeQueryData>;
     /** Transform single item cache */
     updateSingleItem?: (
       item: NonNullable<ItemQueryData>,
@@ -156,7 +206,7 @@ function createOptimisticConfig<TInput extends { id: string }>(
     onMutate: async (input: TInput): Promise<OptimisticContext> => {
       // Apply optimistic state immediately so swipe/tap actions do not wait on query cancellation.
       // Cancellation still runs in the background to reduce stale overwrite races.
-      const cancellations: Promise<void>[] = [utils.items.home.cancel()];
+      const cancellations: Promise<void>[] = [...cancelHomeQueries(utils)];
       if (options.updateInbox) cancellations.push(utils.items.inbox.cancel());
       if (options.updateLibrary) cancellations.push(utils.items.library.cancel());
       if (options.updateSingleItem) cancellations.push(utils.items.get.cancel({ id: input.id }));
@@ -190,11 +240,8 @@ function createOptimisticConfig<TInput extends { id: string }>(
       }
 
       if (options.updateHome) {
-        context.previousHome = utils.items.home.getData();
-        utils.items.home.setData(undefined, (old) => {
-          if (!old) return old;
-          return options.updateHome!(old, input);
-        });
+        context.previousHomes = getHomeQuerySnapshots(utils);
+        updateHomeQueries(utils, (old, homeInput) => options.updateHome!(old, input, homeInput));
       }
 
       if (options.updateSingleItem) {
@@ -221,8 +268,8 @@ function createOptimisticConfig<TInput extends { id: string }>(
       if (context?.previousInfiniteLibrary) {
         utils.items.library.setInfiniteData(undefined, context.previousInfiniteLibrary);
       }
-      if (context?.previousHome) {
-        utils.items.home.setData(undefined, context.previousHome);
+      if (context?.previousHomes) {
+        restoreHomeQuerySnapshots(utils, context.previousHomes);
       }
       if (context?.previousItem) {
         utils.items.get.setData({ id: vars.id }, context.previousItem);
@@ -386,8 +433,8 @@ export function useInfiniteLibraryItems(options?: LibraryItemsOptions) {
  *   );
  * }
  */
-export function useHomeData() {
-  return trpc.items.home.useQuery(undefined, {
+export function useHomeData(options?: HomeItemsOptions) {
+  return trpc.items.home.useQuery(buildHomeItemsInput(options), {
     placeholderData: keepPreviousData,
   });
 }
@@ -704,10 +751,12 @@ export function useToggleFinished() {
       return updatedItem as NonNullable<ItemQueryData>;
     });
 
-    utils.items.home.setData(undefined, (old) => {
-      if (!old) return old;
-
+    updateHomeQueries(utils, (old, homeInput) => {
       if (nowFinished || updatedItem.state !== UserItemState.BOOKMARKED) {
+        return removeItemFromHomeData(old, id);
+      }
+
+      if (!matchesHomeQueryContentType(homeInput, updatedItem.contentType)) {
         return removeItemFromHomeData(old, id);
       }
 
@@ -777,7 +826,7 @@ export function useToggleFinished() {
       void Promise.all([
         utils.items.library.cancel(),
         utils.items.inbox.cancel(),
-        utils.items.home.cancel(),
+        ...cancelHomeQueries(utils),
         utils.items.get.cancel({ id }),
       ]).catch(() => {
         utils.items.library.invalidate();

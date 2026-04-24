@@ -15,6 +15,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import type { ContentType as ApiContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, HeadphonesIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
@@ -179,13 +180,20 @@ export default function HomeScreen() {
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
   const [showCollapsedTitle, setShowCollapsedTitle] = useState(false);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
+  const apiContentTypeFilter = useMemo(
+    () => (contentTypeFilter ? (contentTypeFilter.toUpperCase() as ApiContentType) : undefined),
+    [contentTypeFilter]
+  );
 
   useTabPrefetch('home');
 
   const { data: inboxPages, isLoading: isInboxLoading } = useInfiniteInboxItems({
+    ...(apiContentTypeFilter ? { filter: { contentType: apiContentTypeFilter } } : {}),
     limit: INBOX_PAGE_SIZE,
   });
-  const { data: homeData, isLoading: isHomeLoading } = useHomeData();
+  const { data: homeData, isLoading: isHomeLoading } = useHomeData(
+    apiContentTypeFilter ? { filter: { contentType: apiContentTypeFilter } } : undefined
+  );
   const { data: libraryData } = useLibraryItems();
   const { data: connections } = useConnections();
   const { data: subscriptionsData } = useSubscriptions();
@@ -209,7 +217,7 @@ export default function HomeScreen() {
   }, [homeData?.jumpBackIn]);
 
   const recentlyBookmarked = useMemo((): ItemCardData[] => {
-    return (homeData?.recentBookmarks ?? []).slice(0, 6).map((item) => ({
+    return (homeData?.recentBookmarks ?? []).map((item) => ({
       id: item.id,
       title: item.title,
       creator: item.publisher ?? item.creator,
@@ -225,7 +233,7 @@ export default function HomeScreen() {
   const inboxItems = useMemo((): ItemCardData[] => {
     const allInboxItems = inboxPages?.pages.flatMap((page) => page.items) ?? [];
 
-    return allInboxItems.slice(0, 4).map((item) => ({
+    return allInboxItems.map((item) => ({
       id: item.id,
       title: item.title,
       creator: item.creator,
@@ -370,7 +378,7 @@ export default function HomeScreen() {
         type: 'cover-rail',
         title: 'Podcasts',
         count: podcasts.length,
-        items: podcasts.slice(0, 5),
+        items: podcasts,
       });
     }
 

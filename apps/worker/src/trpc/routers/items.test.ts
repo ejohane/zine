@@ -175,27 +175,33 @@ function createMockItemsCaller(options: {
       };
     },
 
-    home: async () => {
+    home: async (input?: { filter?: { contentType?: string } }) => {
       if (!userId) {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
-      const bookmarked = libraryItems.filter((item) => item.state === UserItemState.BOOKMARKED);
+      const bookmarked = libraryItems
+        .filter(
+          (item) =>
+            item.state === UserItemState.BOOKMARKED &&
+            (!input?.filter?.contentType || item.contentType === input.filter.contentType)
+        )
+        .sort((a, b) => (b.bookmarkedAt ?? '').localeCompare(a.bookmarkedAt ?? ''));
       const jumpBackIn = bookmarked
         .filter((item) => item.lastOpenedAt !== null)
         .sort((a, b) => (b.lastOpenedAt ?? '').localeCompare(a.lastOpenedAt ?? ''))
-        .slice(0, 10);
+        .slice(0, 20);
 
       return {
-        recentBookmarks: bookmarked.slice(0, 5),
+        recentBookmarks: bookmarked.slice(0, 20),
         jumpBackIn,
         byContentType: {
-          videos: bookmarked.filter((item) => item.contentType === ContentType.VIDEO).slice(0, 5),
+          videos: bookmarked.filter((item) => item.contentType === ContentType.VIDEO).slice(0, 20),
           podcasts: bookmarked
             .filter((item) => item.contentType === ContentType.PODCAST)
-            .slice(0, 5),
+            .slice(0, 20),
           articles: bookmarked
             .filter((item) => item.contentType === ContentType.ARTICLE)
-            .slice(0, 5),
+            .slice(0, 20),
         },
       };
     },
@@ -995,6 +1001,66 @@ describe('Items Router', () => {
       expect(result.byContentType.videos).toHaveLength(1);
       expect(result.byContentType.podcasts).toHaveLength(1);
       expect(result.byContentType.articles).toHaveLength(1);
+    });
+
+    it('should return up to 20 items per home section', async () => {
+      const libraryItems = Array.from({ length: 24 }, (_, index) =>
+        createMockItemView({
+          id: `ui-article-${index + 1}`,
+          itemId: `item-article-${index + 1}`,
+          state: UserItemState.BOOKMARKED,
+          contentType: ContentType.ARTICLE,
+          bookmarkedAt: new Date(Date.UTC(2026, 0, 24 - index)).toISOString(),
+        })
+      );
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        libraryItems,
+      });
+      const result = await caller.home();
+
+      expect(result.recentBookmarks).toHaveLength(20);
+      expect(result.byContentType.articles).toHaveLength(20);
+    });
+
+    it('should refill filtered home sections with up to 20 matching items', async () => {
+      const libraryItems = [
+        ...Array.from({ length: 12 }, (_, index) =>
+          createMockItemView({
+            id: `ui-video-${index + 1}`,
+            itemId: `item-video-${index + 1}`,
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.VIDEO,
+            bookmarkedAt: new Date(Date.UTC(2026, 0, 30 - index * 2)).toISOString(),
+          })
+        ),
+        ...Array.from({ length: 12 }, (_, index) =>
+          createMockItemView({
+            id: `ui-article-${index + 1}`,
+            itemId: `item-article-${index + 1}`,
+            state: UserItemState.BOOKMARKED,
+            contentType: ContentType.ARTICLE,
+            bookmarkedAt: new Date(Date.UTC(2026, 0, 29 - index * 2)).toISOString(),
+          })
+        ),
+      ];
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        libraryItems,
+      });
+      const result = await caller.home({
+        filter: { contentType: ContentType.ARTICLE },
+      });
+
+      expect(result.recentBookmarks).toHaveLength(12);
+      expect(result.recentBookmarks.every((item) => item.contentType === ContentType.ARTICLE)).toBe(
+        true
+      );
+      expect(result.byContentType.articles).toHaveLength(12);
+      expect(result.byContentType.videos).toEqual([]);
+      expect(result.byContentType.podcasts).toEqual([]);
     });
   });
 

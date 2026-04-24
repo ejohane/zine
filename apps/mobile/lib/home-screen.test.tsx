@@ -10,6 +10,24 @@ const mockScrollTo = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockConnections: Array<{ provider: string; status: string }> = [];
 let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
+const mockUseInfiniteInboxItems = jest.fn((_options?: unknown) => ({
+  data: {
+    pages: [{ items: [], nextCursor: null }],
+  },
+  isLoading: false,
+}));
+const mockUseHomeData = jest.fn((_options?: unknown) => ({
+  data: {
+    jumpBackIn: [],
+    recentBookmarks: [],
+    byContentType: {
+      podcasts: [],
+      videos: [],
+      articles: [],
+    },
+  },
+  isLoading: false,
+}));
 
 const mockNavigation: {
   addListener: typeof mockAddListener;
@@ -257,24 +275,8 @@ jest.mock('@/lib/home-layout', () => ({
 
 jest.mock('@/hooks/use-items-trpc', () => ({
   useInboxItems: () => ({ data: { items: [] }, isLoading: false }),
-  useInfiniteInboxItems: () => ({
-    data: {
-      pages: [{ items: [], nextCursor: null }],
-    },
-    isLoading: false,
-  }),
-  useHomeData: () => ({
-    data: {
-      jumpBackIn: [],
-      recentBookmarks: [],
-      byContentType: {
-        podcasts: [],
-        videos: [],
-        articles: [],
-      },
-    },
-    isLoading: false,
-  }),
+  useInfiniteInboxItems: (options?: unknown) => mockUseInfiniteInboxItems(options),
+  useHomeData: (options?: unknown) => mockUseHomeData(options),
   useLibraryItems: () => ({ data: { items: [] } }),
   mapContentType: (value: string) => value.toLowerCase(),
   mapProvider: (value: string) => value,
@@ -287,6 +289,8 @@ describe('HomeScreen', () => {
     mockConnections = [];
     mockSubscriptionsData = { items: [] };
     mockIsFocused.mockReturnValue(true);
+    mockUseInfiniteInboxItems.mockClear();
+    mockUseHomeData.mockClear();
     mockAddListener.mockImplementation((event: 'tabPress', listener: () => void) => {
       if (event === 'tabPress') {
         tabPressListener = listener;
@@ -410,5 +414,24 @@ describe('HomeScreen', () => {
 
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
     expect(mockScrollTo).not.toHaveBeenCalled();
+  });
+
+  it('requests filtered home and inbox data after selecting a content type', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    expect(mockUseHomeData).toHaveBeenLastCalledWith({
+      filter: { contentType: 'ARTICLE' },
+    });
+    expect(mockUseInfiniteInboxItems).toHaveBeenLastCalledWith({
+      filter: { contentType: 'ARTICLE' },
+      limit: 20,
+    });
   });
 });
