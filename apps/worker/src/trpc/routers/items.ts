@@ -395,6 +395,16 @@ const PaginationSchema = z.object({
   limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 
+const HomeInputSchema = z
+  .object({
+    filter: z
+      .object({
+        contentType: ContentTypeSchema.nullish(),
+      })
+      .optional(),
+  })
+  .optional();
+
 // Router
 
 export const itemsRouter = router({
@@ -580,9 +590,10 @@ export const itemsRouter = router({
    * Get curated home sections.
    * Returns recent bookmarks, recently opened bookmarks ("Jump Back In"), and items by content type.
    */
-  home: protectedProcedure.query(async ({ ctx }) => {
-    const SECTION_LIMIT = 5;
-    const RECENTLY_OPENED_LIMIT = 10;
+  home: protectedProcedure.input(HomeInputSchema).query(async ({ input, ctx }) => {
+    const SECTION_LIMIT = 20;
+    const RECENTLY_OPENED_LIMIT = 20;
+    const contentTypeFilter = input?.filter?.contentType;
 
     // Base query for bookmarked items
     const baseConditions = [
@@ -590,6 +601,9 @@ export const itemsRouter = router({
       eq(userItems.state, UserItemState.BOOKMARKED),
       eq(userItems.isFinished, false),
     ];
+    const filteredConditions = contentTypeFilter
+      ? [...baseConditions, eq(items.contentType, contentTypeFilter)]
+      : baseConditions;
 
     // Fetch recent bookmarks
     const recentBookmarksQuery = ctx.db
@@ -597,7 +611,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...baseConditions))
+      .where(and(...filteredConditions))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 
@@ -607,7 +621,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...baseConditions, isNotNull(userItems.lastOpenedAt)))
+      .where(and(...filteredConditions, isNotNull(userItems.lastOpenedAt)))
       .orderBy(desc(userItems.lastOpenedAt))
       .limit(RECENTLY_OPENED_LIMIT);
 
@@ -617,7 +631,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...baseConditions, eq(items.contentType, ContentType.VIDEO)))
+      .where(and(...filteredConditions, eq(items.contentType, ContentType.VIDEO)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 
@@ -627,7 +641,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...baseConditions, eq(items.contentType, ContentType.PODCAST)))
+      .where(and(...filteredConditions, eq(items.contentType, ContentType.PODCAST)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 
@@ -637,7 +651,7 @@ export const itemsRouter = router({
       .from(userItems)
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
-      .where(and(...baseConditions, eq(items.contentType, ContentType.ARTICLE)))
+      .where(and(...filteredConditions, eq(items.contentType, ContentType.ARTICLE)))
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 

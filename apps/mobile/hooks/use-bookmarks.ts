@@ -11,6 +11,12 @@
 import { trpc } from '../lib/trpc';
 import { ContentType, Provider, UserItemState, isValidUrl as isValidSharedUrl } from '@zine/shared';
 import * as Crypto from 'expo-crypto';
+import {
+  getHomeQueryInputsForContentType,
+  type HomeQueryInput,
+  HOME_SECTION_LIMIT,
+  matchesHomeQueryContentType,
+} from '@/lib/home-query';
 
 /**
  * Preview data returned from bookmarks.preview
@@ -92,11 +98,12 @@ type InboxItem = NonNullable<InboxData>['items'][number];
 type OptimisticSaveContext = {
   previousLibrary?: LibraryData;
   previousContentTypeLibrary?: LibraryData;
-  previousHome?: HomeData;
+  previousHomes?: Array<{
+    input: HomeQueryInput | undefined;
+    data: HomeData;
+  }>;
   previousInbox?: InboxData;
 };
-
-const HOME_SECTION_LIMIT = 5;
 
 // Validation
 
@@ -284,11 +291,12 @@ export function useSaveBookmark() {
   const mutation = trpc.bookmarks.save.useMutation({
     onMutate: async (input: SaveBookmarkInput): Promise<OptimisticSaveContext> => {
       const optimisticItem = createOptimisticItem(input);
+      const homeInputs = getHomeQueryInputsForContentType(input.contentType);
 
       const cancellations: Promise<void>[] = [
         utils.items.library.cancel(),
-        utils.items.home.cancel(),
         utils.items.inbox.cancel(),
+        ...homeInputs.map((homeInput) => utils.items.home.cancel(homeInput)),
       ];
       if (input.contentType) {
         cancellations.push(
@@ -301,7 +309,10 @@ export function useSaveBookmark() {
       const previousContentTypeLibrary = input.contentType
         ? utils.items.library.getData({ filter: { contentType: input.contentType } })
         : undefined;
-      const previousHome = utils.items.home.getData();
+      const previousHomes = homeInputs.map((homeInput) => ({
+        input: homeInput,
+        data: utils.items.home.getData(homeInput),
+      }));
       const previousInbox = utils.items.inbox.getData();
 
       utils.items.library.setData(undefined, (old) => {
@@ -328,35 +339,43 @@ export function useSaveBookmark() {
         });
       }
 
-      utils.items.home.setData(undefined, (old) => {
-        if (!old) return old;
+      for (const homeInput of homeInputs) {
+        utils.items.home.setData(homeInput, (old) => {
+          if (
+            !old ||
+            !input.contentType ||
+            !matchesHomeQueryContentType(homeInput, input.contentType)
+          ) {
+            return old;
+          }
 
-        const recentBookmarks = [optimisticItem, ...old.recentBookmarks].slice(
-          0,
-          HOME_SECTION_LIMIT
-        );
-        const byContentType = {
-          ...old.byContentType,
-          videos:
-            input.contentType === ContentType.VIDEO
-              ? [optimisticItem, ...old.byContentType.videos].slice(0, HOME_SECTION_LIMIT)
-              : old.byContentType.videos,
-          podcasts:
-            input.contentType === ContentType.PODCAST
-              ? [optimisticItem, ...old.byContentType.podcasts].slice(0, HOME_SECTION_LIMIT)
-              : old.byContentType.podcasts,
-          articles:
-            input.contentType === ContentType.ARTICLE
-              ? [optimisticItem, ...old.byContentType.articles].slice(0, HOME_SECTION_LIMIT)
-              : old.byContentType.articles,
-        };
+          const recentBookmarks = [optimisticItem, ...old.recentBookmarks].slice(
+            0,
+            HOME_SECTION_LIMIT
+          );
+          const byContentType = {
+            ...old.byContentType,
+            videos:
+              input.contentType === ContentType.VIDEO
+                ? [optimisticItem, ...old.byContentType.videos].slice(0, HOME_SECTION_LIMIT)
+                : old.byContentType.videos,
+            podcasts:
+              input.contentType === ContentType.PODCAST
+                ? [optimisticItem, ...old.byContentType.podcasts].slice(0, HOME_SECTION_LIMIT)
+                : old.byContentType.podcasts,
+            articles:
+              input.contentType === ContentType.ARTICLE
+                ? [optimisticItem, ...old.byContentType.articles].slice(0, HOME_SECTION_LIMIT)
+                : old.byContentType.articles,
+          };
 
-        return {
-          ...old,
-          recentBookmarks,
-          byContentType,
-        };
-      });
+          return {
+            ...old,
+            recentBookmarks,
+            byContentType,
+          };
+        });
+      }
 
       const shouldRemoveInboxItem = (item: InboxItem) =>
         item.itemId === input.providerId || item.id === input.providerId;
@@ -374,7 +393,7 @@ export function useSaveBookmark() {
       return {
         previousLibrary,
         previousContentTypeLibrary,
-        previousHome,
+        previousHomes,
         previousInbox,
       };
     },
@@ -388,7 +407,9 @@ export function useSaveBookmark() {
           context.previousContentTypeLibrary
         );
       }
-      utils.items.home.setData(undefined, context.previousHome);
+      context.previousHomes?.forEach(({ input: homeInput, data }) => {
+        utils.items.home.setData(homeInput, data);
+      });
       utils.items.inbox.setData(undefined, context.previousInbox);
     },
     onSuccess: () => {

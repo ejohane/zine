@@ -147,12 +147,29 @@ function serializeLibraryInput(
   });
 }
 
+function serializeHomeInput(
+  input?:
+    | {
+        filter?: {
+          contentType?: ContentType;
+        };
+      }
+    | undefined
+): string {
+  if (!input?.filter?.contentType) return 'default';
+
+  return JSON.stringify({
+    contentType: input.filter.contentType,
+  });
+}
+
 function createToggleUtils(initial?: {
   defaultLibrary?: MockListData;
   unfinishedLibrary?: MockListData;
   finishedLibrary?: MockListData;
   inbox?: MockListData;
   home?: MockHomeData;
+  filteredHome?: Partial<Record<ContentType, MockHomeData>>;
   itemsById?: Record<string, ReturnType<typeof createMockItem> | undefined>;
 }) {
   const libraryDataByKey = new Map<string, MockListData | undefined>();
@@ -196,9 +213,14 @@ function createToggleUtils(initial?: {
   const itemsById = new Map<string, ReturnType<typeof createMockItem> | undefined>(
     Object.entries(initial?.itemsById ?? {})
   );
-  const homeRef: { current: MockHomeData | undefined } = {
-    current: initial?.home,
-  };
+  const homeDataByKey = new Map<string, MockHomeData | undefined>();
+  homeDataByKey.set('default', initial?.home);
+  for (const [contentType, data] of Object.entries(initial?.filteredHome ?? {})) {
+    homeDataByKey.set(
+      serializeHomeInput({ filter: { contentType: contentType as ContentType } }),
+      data
+    );
+  }
 
   const mockLibraryCancel = jest.fn().mockResolvedValue(undefined);
   const mockInboxCancel = jest.fn().mockResolvedValue(undefined);
@@ -276,14 +298,17 @@ function createToggleUtils(initial?: {
       home: {
         cancel: mockHomeCancel,
         invalidate: mockHomeInvalidate,
-        getData: jest.fn(() => homeRef.current),
-        setData: jest.fn((_: undefined, updater: unknown) => {
-          const previous = homeRef.current;
+        getData: jest.fn((input?: Parameters<typeof serializeHomeInput>[0]) =>
+          homeDataByKey.get(serializeHomeInput(input))
+        ),
+        setData: jest.fn((input: Parameters<typeof serializeHomeInput>[0], updater: unknown) => {
+          const key = serializeHomeInput(input);
+          const previous = homeDataByKey.get(key);
           const next =
             typeof updater === 'function'
               ? (updater as (value: MockHomeData | undefined) => MockHomeData | undefined)(previous)
               : (updater as MockHomeData | undefined);
-          homeRef.current = next;
+          homeDataByKey.set(key, next);
           return next;
         }),
       },
@@ -321,7 +346,8 @@ function createToggleUtils(initial?: {
     readLibrary: (input?: Parameters<typeof serializeLibraryInput>[0]) =>
       libraryDataByKey.get(serializeLibraryInput(input)),
     readInbox: () => inboxRef.current,
-    readHome: () => homeRef.current,
+    readHome: (input?: Parameters<typeof serializeHomeInput>[0]) =>
+      homeDataByKey.get(serializeHomeInput(input)),
     readItem: (id: string) => itemsById.get(id),
     spies: {
       mockLibraryInvalidate,
@@ -431,6 +457,15 @@ describe('useItems list queries', () => {
 
     expect(mockHomeUseQuery).toHaveBeenCalledWith(
       undefined,
+      expect.objectContaining({ placeholderData: expect.any(Function) })
+    );
+  });
+
+  it('passes content type filters through to home data queries', () => {
+    renderHook(() => useHomeData({ filter: { contentType: ContentType.ARTICLE } }));
+
+    expect(mockHomeUseQuery).toHaveBeenCalledWith(
+      { filter: { contentType: ContentType.ARTICLE } },
       expect.objectContaining({ placeholderData: expect.any(Function) })
     );
   });
@@ -569,6 +604,9 @@ describe('useArchiveItem', () => {
         nextCursor: null,
       },
       home: createMockHomeData([item]),
+      filteredHome: {
+        [ContentType.ARTICLE]: createMockHomeData([item]),
+      },
       itemsById: {
         [item.id]: item,
       },
@@ -583,6 +621,9 @@ describe('useArchiveItem', () => {
     });
 
     expect(harness.readHome()?.recentBookmarks).toHaveLength(0);
+    expect(
+      harness.readHome({ filter: { contentType: ContentType.ARTICLE } })?.recentBookmarks
+    ).toHaveLength(0);
     expect(harness.readHome()?.byContentType.articles).toHaveLength(0);
   });
 });
@@ -826,6 +867,9 @@ describe('useToggleFinished', () => {
         nextCursor: null,
       },
       home: createMockHomeData([item]),
+      filteredHome: {
+        [ContentType.ARTICLE]: createMockHomeData([item]),
+      },
       itemsById: {
         [item.id]: item,
       },
@@ -841,6 +885,9 @@ describe('useToggleFinished', () => {
 
     expect(harness.readHome()?.recentBookmarks).toHaveLength(0);
     expect(harness.readHome()?.jumpBackIn).toHaveLength(0);
+    expect(
+      harness.readHome({ filter: { contentType: ContentType.ARTICLE } })?.recentBookmarks
+    ).toHaveLength(0);
     expect(harness.readHome()?.byContentType.articles).toHaveLength(0);
   });
 });

@@ -9,23 +9,25 @@ describe('getValidFeaturedGridItems', () => {
     expect(getValidFeaturedGridItems([])).toEqual([]);
   });
 
-  it('returns an empty array when there is only one item', () => {
-    expect(getValidFeaturedGridItems([1])).toEqual([]);
+  it('keeps a single item when there is only one item', () => {
+    expect(getValidFeaturedGridItems([1])).toEqual([1]);
   });
 
-  it('keeps even counts up to six', () => {
+  it('keeps counts up to twenty', () => {
     expect(getValidFeaturedGridItems([1, 2])).toEqual([1, 2]);
     expect(getValidFeaturedGridItems([1, 2, 3, 4])).toEqual([1, 2, 3, 4]);
     expect(getValidFeaturedGridItems([1, 2, 3, 4, 5, 6])).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
-  it('rounds odd counts down to the nearest even count', () => {
-    expect(getValidFeaturedGridItems([1, 2, 3])).toEqual([1, 2]);
-    expect(getValidFeaturedGridItems([1, 2, 3, 4, 5])).toEqual([1, 2, 3, 4]);
+  it('preserves odd counts', () => {
+    expect(getValidFeaturedGridItems([1, 2, 3])).toEqual([1, 2, 3]);
+    expect(getValidFeaturedGridItems([1, 2, 3, 4, 5])).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it('caps results at six items', () => {
-    expect(getValidFeaturedGridItems([1, 2, 3, 4, 5, 6, 7, 8])).toEqual([1, 2, 3, 4, 5, 6]);
+  it('caps results at twenty items', () => {
+    expect(getValidFeaturedGridItems(Array.from({ length: 22 }, (_, index) => index + 1))).toEqual(
+      Array.from({ length: 20 }, (_, index) => index + 1)
+    );
   });
 });
 
@@ -48,7 +50,7 @@ describe('getVisibleFeaturedGridItems', () => {
     ]);
   });
 
-  it('preserves the even-count cap after filtering', () => {
+  it('preserves later filtered matches up to the larger cap', () => {
     expect(getVisibleFeaturedGridItems(items, 'article')).toEqual([
       { id: 'article-1', contentType: 'article' },
       { id: 'article-2', contentType: 'article' },
