@@ -10,9 +10,32 @@ const mockScrollTo = jest.fn();
 const mockRemoveListener = jest.fn();
 let mockConnections: Array<{ provider: string; status: string }> = [];
 let mockSubscriptionsData: { items: Array<{ provider: string; status: string }> } = { items: [] };
+type MockFeedItem = {
+  id: string;
+  title: string;
+  creator: string;
+  publisher?: string;
+  creatorImageUrl: string | null;
+  thumbnailUrl: string | null;
+  contentType?: string;
+  provider: string;
+  duration: number | null;
+  readingTimeMinutes: number | null;
+};
+
+type MockHomeData = {
+  jumpBackIn: MockFeedItem[];
+  recentBookmarks: MockFeedItem[];
+  byContentType: {
+    podcasts: MockFeedItem[];
+    videos: MockFeedItem[];
+    articles: MockFeedItem[];
+  };
+};
+
 const mockUseInfiniteInboxItems = jest.fn((_options?: unknown) => ({
   data: {
-    pages: [{ items: [], nextCursor: null }],
+    pages: [{ items: [] as MockFeedItem[], nextCursor: null }],
   },
   isLoading: false,
 }));
@@ -25,7 +48,7 @@ const mockUseHomeData = jest.fn((_options?: unknown) => ({
       videos: [],
       articles: [],
     },
-  },
+  } as MockHomeData,
   isLoading: false,
 }));
 
@@ -179,7 +202,7 @@ jest.mock('react-native', () => ({
 
       return React.createElement(
         'flat-list',
-        props,
+        { data, renderItem, ...props },
         renderListBoundary(ListHeaderComponent),
         renderedItems,
         renderListBoundary(ListFooterComponent)
@@ -269,8 +292,8 @@ jest.mock('@/hooks/use-subscriptions-query', () => ({
 }));
 
 jest.mock('@/lib/home-layout', () => ({
+  ...jest.requireActual('@/lib/home-layout'),
   getFeaturedGridItemWidth: () => 160,
-  getVisibleFeaturedGridItems: (items: unknown[]) => items,
 }));
 
 jest.mock('@/hooks/use-items-trpc', () => ({
@@ -433,5 +456,90 @@ describe('HomeScreen', () => {
       filter: { contentType: 'ARTICLE' },
       limit: 20,
     });
+  });
+
+  it('restores the home section visual caps without changing the expanded fetch size', () => {
+    mockUseHomeData.mockReturnValue({
+      data: {
+        jumpBackIn: Array.from({ length: 8 }, (_, index) => ({
+          id: `jump-${index + 1}`,
+          title: `Jump ${index + 1}`,
+          creator: 'Creator',
+          publisher: 'Publisher',
+          creatorImageUrl: null,
+          thumbnailUrl: null,
+          contentType: 'ARTICLE',
+          provider: 'RSS',
+          duration: null,
+          readingTimeMinutes: null,
+        })),
+        recentBookmarks: Array.from({ length: 8 }, (_, index) => ({
+          id: `bookmark-${index + 1}`,
+          title: `Bookmark ${index + 1}`,
+          creator: 'Creator',
+          publisher: 'Publisher',
+          creatorImageUrl: null,
+          thumbnailUrl: null,
+          contentType: 'ARTICLE',
+          provider: 'RSS',
+          duration: null,
+          readingTimeMinutes: null,
+        })),
+        byContentType: {
+          podcasts: Array.from({ length: 6 }, (_, index) => ({
+            id: `podcast-${index + 1}`,
+            title: `Podcast ${index + 1}`,
+            creator: 'Creator',
+            publisher: 'Publisher',
+            creatorImageUrl: null,
+            thumbnailUrl: null,
+            provider: 'SPOTIFY',
+            duration: null,
+            readingTimeMinutes: null,
+          })),
+          videos: [],
+          articles: [],
+        },
+      },
+      isLoading: false,
+    });
+    mockUseInfiniteInboxItems.mockReturnValue({
+      data: {
+        pages: [
+          {
+            items: Array.from({ length: 8 }, (_, index) => ({
+              id: `inbox-${index + 1}`,
+              title: `Inbox ${index + 1}`,
+              creator: 'Creator',
+              creatorImageUrl: null,
+              thumbnailUrl: null,
+              contentType: 'ARTICLE',
+              provider: 'RSS',
+              duration: null,
+              readingTimeMinutes: null,
+            })),
+            nextCursor: null,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const sections = findHomeList(renderer!).props.data as Array<{
+      key: string;
+      items: unknown[];
+    }>;
+
+    expect(sections.find((section) => section.key === 'jump-back-in')?.items).toHaveLength(6);
+    expect(sections.find((section) => section.key === 'recently-bookmarked')?.items).toHaveLength(
+      6
+    );
+    expect(sections.find((section) => section.key === 'inbox')?.items).toHaveLength(4);
+    expect(sections.find((section) => section.key === 'podcasts')?.items).toHaveLength(5);
   });
 });
