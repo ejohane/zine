@@ -52,6 +52,9 @@ function ChevronRightIcon({ size = 16, color = '#94A3B8' }: { size?: number; col
 }
 
 const INBOX_PAGE_SIZE = 20;
+const HOME_RECENT_BOOKMARKS_VISIBLE_LIMIT = 6;
+const HOME_INBOX_VISIBLE_LIMIT = 4;
+const HOME_PODCASTS_VISIBLE_LIMIT = 5;
 const HOME_TOP_THRESHOLD = 4;
 const HOME_COLLAPSED_TITLE_THRESHOLD = 44;
 
@@ -319,21 +322,23 @@ export default function HomeScreen() {
     [contentTypeFilter, jumpBackInItems]
   );
 
-  const filteredRecentlyBookmarked = useMemo(
-    () =>
+  const filteredRecentlyBookmarked = useMemo(() => {
+    const visibleItems =
       contentTypeFilter === null
         ? recentlyBookmarked
-        : recentlyBookmarked.filter((item) => item.contentType === contentTypeFilter),
-    [contentTypeFilter, recentlyBookmarked]
-  );
+        : recentlyBookmarked.filter((item) => item.contentType === contentTypeFilter);
 
-  const filteredInboxItems = useMemo(
-    () =>
+    return visibleItems.slice(0, HOME_RECENT_BOOKMARKS_VISIBLE_LIMIT);
+  }, [contentTypeFilter, recentlyBookmarked]);
+
+  const filteredInboxItems = useMemo(() => {
+    const visibleItems =
       contentTypeFilter === null
         ? inboxItems
-        : inboxItems.filter((item) => item.contentType === contentTypeFilter),
-    [contentTypeFilter, inboxItems]
-  );
+        : inboxItems.filter((item) => item.contentType === contentTypeFilter);
+
+    return visibleItems.slice(0, HOME_INBOX_VISIBLE_LIMIT);
+  }, [contentTypeFilter, inboxItems]);
 
   const showPodcastsSection = contentTypeFilter === null || contentTypeFilter === 'podcast';
   const showVideosSection = contentTypeFilter === null || contentTypeFilter === 'video';
@@ -378,7 +383,7 @@ export default function HomeScreen() {
         type: 'cover-rail',
         title: 'Podcasts',
         count: podcasts.length,
-        items: podcasts,
+        items: podcasts.slice(0, HOME_PODCASTS_VISIBLE_LIMIT),
       });
     }
 

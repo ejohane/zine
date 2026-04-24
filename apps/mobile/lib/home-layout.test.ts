@@ -13,7 +13,7 @@ describe('getValidFeaturedGridItems', () => {
     expect(getValidFeaturedGridItems([1])).toEqual([1]);
   });
 
-  it('keeps counts up to twenty', () => {
+  it('keeps counts up to six', () => {
     expect(getValidFeaturedGridItems([1, 2])).toEqual([1, 2]);
     expect(getValidFeaturedGridItems([1, 2, 3, 4])).toEqual([1, 2, 3, 4]);
     expect(getValidFeaturedGridItems([1, 2, 3, 4, 5, 6])).toEqual([1, 2, 3, 4, 5, 6]);
@@ -24,9 +24,9 @@ describe('getValidFeaturedGridItems', () => {
     expect(getValidFeaturedGridItems([1, 2, 3, 4, 5])).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it('caps results at twenty items', () => {
-    expect(getValidFeaturedGridItems(Array.from({ length: 22 }, (_, index) => index + 1))).toEqual(
-      Array.from({ length: 20 }, (_, index) => index + 1)
+  it('caps results at six items', () => {
+    expect(getValidFeaturedGridItems(Array.from({ length: 8 }, (_, index) => index + 1))).toEqual(
+      Array.from({ length: 6 }, (_, index) => index + 1)
     );
   });
 });
@@ -50,7 +50,7 @@ describe('getVisibleFeaturedGridItems', () => {
     ]);
   });
 
-  it('preserves later filtered matches up to the larger cap', () => {
+  it('preserves later filtered matches up to the visual cap', () => {
     expect(getVisibleFeaturedGridItems(items, 'article')).toEqual([
       { id: 'article-1', contentType: 'article' },
       { id: 'article-2', contentType: 'article' },

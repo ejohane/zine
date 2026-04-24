@@ -1,4 +1,4 @@
-const MAX_FEATURED_GRID_ITEMS = 20;
+const MAX_FEATURED_GRID_ITEMS = 6;
 const FEATURED_GRID_COLUMNS = 2;
 
 interface FeaturedGridItem {
