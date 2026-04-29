@@ -9,12 +9,23 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
-import { useLibraryItems } from '@/hooks/use-items-trpc';
+import { useSearchResults, type CreatorSearchResult } from '@/hooks/use-search';
 import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
+import { CreatorResultRow } from './creator-result-row';
+
+type SearchRow =
+  | {
+      type: 'creator';
+      creator: CreatorSearchResult;
+    }
+  | {
+      type: 'item';
+      item: ItemCardData;
+    };
 
 export default function SearchTabScreen() {
   const navigation = useNavigation();
-  const listScrollRef = useRef<FlatList<ItemCardData>>(null);
+  const listScrollRef = useRef<FlatList<SearchRow>>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -28,27 +39,37 @@ export default function SearchTabScreen() {
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
-  const { data, isLoading, error } = useLibraryItems({
-    search: debouncedSearchQuery || undefined,
-  });
+  const { data, isLoading, error } = useSearchResults(debouncedSearchQuery);
 
-  const libraryItems: ItemCardData[] = useMemo(
+  const searchRows: SearchRow[] = useMemo(
     () =>
-      (data?.items ?? []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        creator: item.creator,
-        creatorImageUrl: item.creatorImageUrl ?? null,
-        thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as ContentType,
-        provider: mapProvider(item.provider) as Provider,
-        duration: item.duration ?? null,
-        readingTimeMinutes: item.readingTimeMinutes ?? null,
-        bookmarkedAt: item.bookmarkedAt ?? null,
-        publishedAt: item.publishedAt ?? null,
-        isFinished: item.isFinished,
-      })),
-    [data?.items]
+      (data?.results ?? []).map((result) => {
+        if (result.type === 'creator') {
+          return {
+            type: 'creator',
+            creator: result,
+          };
+        }
+
+        return {
+          type: 'item',
+          item: {
+            id: result.id,
+            title: result.title,
+            creator: result.creator,
+            creatorImageUrl: result.creatorImageUrl ?? null,
+            thumbnailUrl: result.thumbnailUrl ?? null,
+            contentType: mapContentType(result.contentType) as ContentType,
+            provider: mapProvider(result.provider) as Provider,
+            duration: result.duration ?? null,
+            readingTimeMinutes: result.readingTimeMinutes ?? null,
+            bookmarkedAt: result.bookmarkedAt ?? null,
+            publishedAt: result.publishedAt ?? null,
+            isFinished: result.isFinished,
+          },
+        };
+      }),
+    [data?.results]
   );
 
   useEffect(() => {
@@ -61,14 +82,15 @@ export default function SearchTabScreen() {
     });
   }, [navigation]);
 
-  const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
-      <ItemCard item={item} shape="row" index={index} />
-    ),
-    []
-  );
+  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<SearchRow>) => {
+    if (item.type === 'creator') {
+      return <CreatorResultRow creator={item.creator} />;
+    }
 
-  const isShowingState = isLoading || Boolean(error) || libraryItems.length === 0;
+    return <ItemCard item={item.item} shape="row" index={index} />;
+  }, []);
+
+  const isShowingState = isLoading || Boolean(error) || searchRows.length === 0;
   const listEmptyComponent = isLoading ? (
     <LoadingState />
   ) : error ? (
@@ -104,8 +126,10 @@ export default function SearchTabScreen() {
 
       <FlatList
         ref={listScrollRef}
-        data={isShowingState ? [] : libraryItems}
-        keyExtractor={(item) => item.id}
+        data={isShowingState ? [] : searchRows}
+        keyExtractor={(item) =>
+          item.type === 'creator' ? `creator:${item.creator.creatorId}` : `item:${item.item.id}`
+        }
         renderItem={renderItem}
         style={styles.listContainer}
         contentContainerStyle={[styles.listContent, isShowingState && styles.emptyListContent]}
