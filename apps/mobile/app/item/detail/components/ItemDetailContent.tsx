@@ -34,7 +34,6 @@ type ItemDetailContentProps = {
   useAnimatedActions: boolean;
   onContentLayout?: (contentTopY: number) => void;
   onTitleLayout?: (titleOffsetY: number) => void;
-  onActionRowLayout?: (actionRowStartY: number) => void;
 };
 
 export function ItemDetailContent({
@@ -59,7 +58,6 @@ export function ItemDetailContent({
   useAnimatedDescription,
   onContentLayout,
   onTitleLayout,
-  onActionRowLayout,
 }: ItemDetailContentProps) {
   const DescriptionContainer = useAnimatedDescription ? Animated.View : View;
 
@@ -94,7 +92,6 @@ export function ItemDetailContent({
         onShare={onShare}
         onOpenLink={onOpenLink}
         useAnimatedContainer={useAnimatedActions}
-        onLayout={onActionRowLayout}
       />
 
       {item.summary && (

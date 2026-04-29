@@ -18,10 +18,6 @@ type ItemDetailLayoutBaseProps = {
   onScroll: ScrollViewProps['onScroll'];
   screenTitle: string;
   showCollapsedTitle: boolean;
-  showStickyActions?: boolean;
-  stickyActions?: ReactNode;
-  stickyActionsTop?: number;
-  stickyBackdropHeight?: number;
 };
 
 export function ItemDetailParallaxLayout({
@@ -32,10 +28,6 @@ export function ItemDetailParallaxLayout({
   onScroll,
   screenTitle,
   showCollapsedTitle,
-  showStickyActions,
-  stickyActions,
-  stickyActionsTop,
-  stickyBackdropHeight,
   headerImage,
   headerAspectRatio,
 }: ItemDetailLayoutBaseProps & {
@@ -62,10 +54,6 @@ export function ItemDetailParallaxLayout({
         onBack={onBack}
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
-        showStickyActions={showStickyActions}
-        stickyActions={stickyActions}
-        stickyActionsTop={stickyActionsTop}
-        stickyBackdropHeight={stickyBackdropHeight}
       />
     </View>
   );
@@ -79,10 +67,6 @@ export function ItemDetailScrollLayout({
   onScroll,
   screenTitle,
   showCollapsedTitle,
-  showStickyActions,
-  stickyActions,
-  stickyActionsTop,
-  stickyBackdropHeight,
 }: ItemDetailLayoutBaseProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -104,10 +88,6 @@ export function ItemDetailScrollLayout({
         onBack={onBack}
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
-        showStickyActions={showStickyActions}
-        stickyActions={stickyActions}
-        stickyActionsTop={stickyActionsTop}
-        stickyBackdropHeight={stickyBackdropHeight}
       />
     </View>
   );

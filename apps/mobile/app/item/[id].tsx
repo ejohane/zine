@@ -15,22 +15,20 @@
 
 import { Image } from 'expo-image';
 import { useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { upgradeSpotifyImageUrl, upgradeYouTubeImageUrl } from '@/lib/content-utils';
 import {
   COLLAPSED_TITLE_THRESHOLD,
   getCollapsedHeaderTitleThreshold,
-  getStickyActionRowThreshold,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
 
 import { XPostBookmarkView } from './item-detail-components';
 import { styles } from './item-detail-styles';
-import { ItemDetailActions } from './detail/components/ItemDetailActions';
 import { ItemDetailContent } from './detail/components/ItemDetailContent';
 import {
   ItemDetailParallaxLayout,
@@ -54,8 +52,6 @@ export default function ItemDetailScreen() {
   const insets = useSafeAreaInsets();
   const [contentTopY, setContentTopY] = useState<number | null>(null);
   const [titleOffsetY, setTitleOffsetY] = useState<number | null>(null);
-  const [actionRowStartY, setActionRowStartY] = useState<number | null>(null);
-  const [showStickyActions, setShowStickyActions] = useState(false);
 
   const { id, isValid, message } = useItemDetailParams();
   const { item, isLoading, error, refetch, creatorData } = useItemDetailData({ id, isValid });
@@ -85,32 +81,14 @@ export default function ItemDetailScreen() {
 
     return getCollapsedHeaderTitleThreshold(contentTopY + titleOffsetY);
   }, [contentTopY, titleOffsetY]);
-  const stickyActionsTop = insets.top + 56 + Spacing.sm;
-  const stickyBackdropHeight = stickyActionsTop + 56 + Spacing.sm;
-  const stickyActionRowThreshold = useMemo(() => {
-    if (actionRowStartY === null) {
-      return Number.POSITIVE_INFINITY;
-    }
-
-    return getStickyActionRowThreshold(actionRowStartY, stickyActionsTop);
-  }, [actionRowStartY, stickyActionsTop]);
-  const {
-    handleScroll: handleTitleScroll,
-    showCollapsedTitle,
-    scrollOffsetYRef,
-  } = useCollapsedHeaderTitle({
+  const { handleScroll: handleTitleScroll, showCollapsedTitle } = useCollapsedHeaderTitle({
     threshold: collapsedTitleThreshold,
   });
   const handleScroll = useCallback(
     (event: Parameters<typeof handleTitleScroll>[0]) => {
       handleTitleScroll(event);
-
-      const shouldShowStickyActions = event.nativeEvent.contentOffset.y > stickyActionRowThreshold;
-      setShowStickyActions((current) =>
-        current === shouldShowStickyActions ? current : shouldShowStickyActions
-      );
     },
-    [handleTitleScroll, stickyActionRowThreshold]
+    [handleTitleScroll]
   );
   const handleContentLayout = useCallback((nextContentTopY: number) => {
     setContentTopY((current) => (current === nextContentTopY ? current : nextContentTopY));
@@ -118,18 +96,6 @@ export default function ItemDetailScreen() {
   const handleTitleLayout = useCallback((nextTitleOffsetY: number) => {
     setTitleOffsetY((current) => (current === nextTitleOffsetY ? current : nextTitleOffsetY));
   }, []);
-  const handleActionRowLayout = useCallback((nextActionRowStartY: number) => {
-    setActionRowStartY((current) =>
-      current === nextActionRowStartY ? current : nextActionRowStartY
-    );
-  }, []);
-
-  useEffect(() => {
-    const shouldShowStickyActions = scrollOffsetYRef.current > stickyActionRowThreshold;
-    setShowStickyActions((current) =>
-      current === shouldShowStickyActions ? current : shouldShowStickyActions
-    );
-  }, [scrollOffsetYRef, stickyActionRowThreshold]);
 
   if (!isValid) {
     return (
@@ -150,26 +116,6 @@ export default function ItemDetailScreen() {
   if (!item) {
     return <ItemDetailNotFoundState colors={colors} />;
   }
-
-  const stickyActionBar = (
-    <ItemDetailActions
-      item={item}
-      colors={colors}
-      bookmarkActionIcon={viewState.bookmarkActionIcon}
-      bookmarkActionColor={viewState.bookmarkActionColor}
-      isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
-      secondaryActionIcon={viewState.secondaryActionIcon}
-      secondaryActionColor={viewState.secondaryActionColor}
-      isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
-      onBookmarkToggle={handleToggleBookmark}
-      onSecondaryAction={handleSecondaryAction}
-      onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
-      onShare={handleShare}
-      onOpenLink={handleOpenLink}
-      useAnimatedContainer={false}
-      style={styles.stickyActionRow}
-    />
-  );
 
   if (viewState.isXPost) {
     return (
@@ -194,13 +140,9 @@ export default function ItemDetailScreen() {
         isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
         creatorData={creatorData}
         showCollapsedTitle={showCollapsedTitle}
-        showStickyActions={showStickyActions}
-        stickyActionsTop={stickyActionsTop}
-        stickyBackdropHeight={stickyBackdropHeight}
         onScroll={handleScroll}
         onContentLayout={handleContentLayout}
         onTitleLayout={handleTitleLayout}
-        onActionRowLayout={handleActionRowLayout}
       />
     );
   }
@@ -217,10 +159,6 @@ export default function ItemDetailScreen() {
         onScroll={handleScroll}
         screenTitle={item.title}
         showCollapsedTitle={showCollapsedTitle}
-        showStickyActions={showStickyActions}
-        stickyActions={stickyActionBar}
-        stickyActionsTop={stickyActionsTop}
-        stickyBackdropHeight={stickyBackdropHeight}
         headerImage={
           <Image
             source={{ uri: item.thumbnailUrl! }}
@@ -255,7 +193,6 @@ export default function ItemDetailScreen() {
           useAnimatedDescription
           onContentLayout={handleContentLayout}
           onTitleLayout={handleTitleLayout}
-          onActionRowLayout={handleActionRowLayout}
         />
       </ItemDetailParallaxLayout>
     );
@@ -269,10 +206,6 @@ export default function ItemDetailScreen() {
       onScroll={handleScroll}
       screenTitle={item.title}
       showCollapsedTitle={showCollapsedTitle}
-      showStickyActions={showStickyActions}
-      stickyActions={stickyActionBar}
-      stickyActionsTop={stickyActionsTop}
-      stickyBackdropHeight={stickyBackdropHeight}
     >
       <ItemDetailContent
         item={item}
@@ -298,7 +231,6 @@ export default function ItemDetailScreen() {
         useAnimatedDescription={false}
         onContentLayout={handleContentLayout}
         onTitleLayout={handleTitleLayout}
-        onActionRowLayout={handleActionRowLayout}
       />
     </ItemDetailScrollLayout>
   );

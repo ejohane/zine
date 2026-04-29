@@ -98,13 +98,9 @@ export function XPostBookmarkView({
   isSecondaryActionDisabled,
   creatorData,
   showCollapsedTitle,
-  showStickyActions,
-  stickyActionsTop,
-  stickyBackdropHeight,
   onScroll,
   onContentLayout,
   onTitleLayout,
-  onActionRowLayout,
 }: {
   item: {
     id: string;
@@ -136,13 +132,9 @@ export function XPostBookmarkView({
   isSecondaryActionDisabled: boolean;
   creatorData?: { handle?: string | null } | null;
   showCollapsedTitle: boolean;
-  showStickyActions: boolean;
-  stickyActionsTop: number;
-  stickyBackdropHeight: number;
   onScroll: ScrollViewProps['onScroll'];
   onContentLayout: (contentTopY: number) => void;
   onTitleLayout: (titleOffsetY: number) => void;
-  onActionRowLayout: (actionRowStartY: number) => void;
 }) {
   // Extract @handle from URL as fallback if creatorData.handle not available
   const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
@@ -237,7 +229,6 @@ export function XPostBookmarkView({
         onShare={onShare}
         onOpenLink={onOpenLink}
         useAnimatedContainer
-        onLayout={onActionRowLayout}
       />
 
       {/* Tweet Content Section - Twitter-like layout */}
@@ -344,28 +335,6 @@ export function XPostBookmarkView({
           onBack={onBack}
           screenTitle={item.title}
           showCollapsedTitle={showCollapsedTitle}
-          showStickyActions={showStickyActions}
-          stickyActionsTop={stickyActionsTop}
-          stickyBackdropHeight={stickyBackdropHeight}
-          stickyActions={
-            <ItemDetailActions
-              item={item}
-              colors={colors}
-              bookmarkActionIcon={bookmarkActionIcon}
-              bookmarkActionColor={bookmarkActionColor}
-              isBookmarkActionDisabled={isBookmarkActionDisabled}
-              secondaryActionIcon={secondaryActionIcon}
-              secondaryActionColor={secondaryActionColor}
-              isSecondaryActionDisabled={isSecondaryActionDisabled}
-              onBookmarkToggle={onBookmarkToggle}
-              onSecondaryAction={onSecondaryAction}
-              onManageTags={onManageTags}
-              onShare={onShare}
-              onOpenLink={onOpenLink}
-              useAnimatedContainer={false}
-              style={styles.stickyActionRow}
-            />
-          }
         />
       </View>
     );
@@ -394,28 +363,6 @@ export function XPostBookmarkView({
         onBack={onBack}
         screenTitle={item.title}
         showCollapsedTitle={showCollapsedTitle}
-        showStickyActions={showStickyActions}
-        stickyActionsTop={stickyActionsTop}
-        stickyBackdropHeight={stickyBackdropHeight}
-        stickyActions={
-          <ItemDetailActions
-            item={item}
-            colors={colors}
-            bookmarkActionIcon={bookmarkActionIcon}
-            bookmarkActionColor={bookmarkActionColor}
-            isBookmarkActionDisabled={isBookmarkActionDisabled}
-            secondaryActionIcon={secondaryActionIcon}
-            secondaryActionColor={secondaryActionColor}
-            isSecondaryActionDisabled={isSecondaryActionDisabled}
-            onBookmarkToggle={onBookmarkToggle}
-            onSecondaryAction={onSecondaryAction}
-            onManageTags={onManageTags}
-            onShare={onShare}
-            onOpenLink={onOpenLink}
-            useAnimatedContainer={false}
-            style={styles.stickyActionRow}
-          />
-        }
       />
     </View>
   );

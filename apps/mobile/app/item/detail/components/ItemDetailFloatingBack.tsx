@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { View, Text } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import type { EdgeInsets } from 'react-native-safe-area-context';
@@ -13,10 +12,6 @@ type ItemDetailFloatingBackProps = {
   onBack: () => void;
   screenTitle: string;
   showCollapsedTitle: boolean;
-  showStickyActions?: boolean;
-  stickyActions?: ReactNode;
-  stickyActionsTop?: number;
-  stickyBackdropHeight?: number;
 };
 
 export function ItemDetailFloatingBack({
@@ -25,16 +20,8 @@ export function ItemDetailFloatingBack({
   onBack,
   screenTitle,
   showCollapsedTitle,
-  showStickyActions = false,
-  stickyActions,
-  stickyActionsTop = 0,
-  stickyBackdropHeight = 0,
 }: ItemDetailFloatingBackProps) {
-  const backdropHeight = showStickyActions
-    ? stickyBackdropHeight
-    : showCollapsedTitle
-      ? insets.top + 56
-      : 0;
+  const backdropHeight = showCollapsedTitle ? insets.top + 56 : 0;
 
   return (
     <View style={styles.floatingOverlay} pointerEvents="box-none">
@@ -63,16 +50,6 @@ export function ItemDetailFloatingBack({
           <Text style={[styles.floatingTitle, { color: colors.text }]} numberOfLines={1}>
             {screenTitle}
           </Text>
-        </Animated.View>
-      ) : null}
-
-      {showStickyActions && stickyActions ? (
-        <Animated.View
-          entering={FadeIn.duration(160)}
-          exiting={FadeOut.duration(160)}
-          style={[styles.stickyActionRowContainer, { top: stickyActionsTop }]}
-        >
-          {stickyActions}
         </Animated.View>
       ) : null}
 
