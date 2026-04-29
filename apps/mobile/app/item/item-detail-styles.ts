@@ -69,12 +69,6 @@ export const styles = StyleSheet.create({
   floatingTitle: {
     ...Typography.titleMedium,
   },
-  stickyActionRowContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    zIndex: 101,
-  },
   headerIconButton: {
     width: 40,
     height: 40,
@@ -176,9 +170,6 @@ export const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     paddingLeft: Spacing.xl,
     paddingRight: Spacing.xl + Spacing.sm,
-  },
-  stickyActionRow: {
-    marginBottom: 0,
   },
   actionRowLeft: {
     flexDirection: 'row',

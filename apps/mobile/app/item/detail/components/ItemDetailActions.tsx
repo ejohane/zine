@@ -29,7 +29,6 @@ type ItemDetailActionsProps = {
   onShare: () => void;
   onOpenLink: () => void;
   useAnimatedContainer: boolean;
-  onLayout?: (actionRowStartY: number) => void;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -48,7 +47,6 @@ export function ItemDetailActions({
   onShare,
   onOpenLink,
   useAnimatedContainer,
-  onLayout,
   style,
 }: ItemDetailActionsProps) {
   const fabConfig = getFabConfig(item.provider);
@@ -56,10 +54,7 @@ export function ItemDetailActions({
   const Container = useAnimatedContainer ? Animated.View : View;
 
   return (
-    <Container
-      style={[styles.actionRow, style]}
-      onLayout={({ nativeEvent }) => onLayout?.(nativeEvent.layout.y)}
-    >
+    <Container style={[styles.actionRow, style]}>
       <View style={styles.actionRowLeft}>
         <IconActionButton
           icon={bookmarkActionIcon}

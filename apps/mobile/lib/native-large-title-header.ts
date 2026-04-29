@@ -17,14 +17,6 @@ export function getCollapsedHeaderTitleThreshold(
   return Math.max(collapsedTitleThreshold, titleStartY - collapsedTitleThreshold);
 }
 
-export function getStickyActionRowThreshold(actionRowStartY: number, stickyTopY: number) {
-  if (!Number.isFinite(actionRowStartY) || !Number.isFinite(stickyTopY)) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return Math.max(0, actionRowStartY - stickyTopY);
-}
-
 export const lightweightHeaderStackScreenOptions: NativeStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
   headerShadowVisible: false,
