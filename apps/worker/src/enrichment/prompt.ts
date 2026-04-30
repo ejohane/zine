@@ -1,0 +1,119 @@
+import type {
+  EnrichmentModelOutput,
+  EnrichmentPromptInput,
+  EnrichmentSourceCreator,
+  EnrichmentSourceItem,
+} from './types';
+
+const ARTICLE_EXCERPT_LIMIT = 5000;
+const METADATA_LIMIT = 2500;
+const EMBEDDING_TEXT_LIMIT = 6000;
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function truncate(value: string | null | undefined, max: number): string | null {
+  if (!value) return null;
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) return null;
+  return normalized.length > max ? `${normalized.slice(0, max)}...` : normalized;
+}
+
+function parseMetadataExcerpt(rawMetadata: string | null): string | null {
+  if (!rawMetadata) return null;
+
+  try {
+    const parsed = JSON.parse(rawMetadata);
+    return truncate(JSON.stringify(parsed), METADATA_LIMIT);
+  } catch {
+    return truncate(rawMetadata, METADATA_LIMIT);
+  }
+}
+
+function formatCreator(creator: EnrichmentSourceCreator | null): string {
+  if (!creator) return 'Unknown';
+  return (
+    [creator.name, creator.handle, creator.description].filter(Boolean).join(' | ') || 'Unknown'
+  );
+}
+
+export function buildArticleExcerpt(content: string | null): string | null {
+  return truncate(stripHtml(content ?? ''), ARTICLE_EXCERPT_LIMIT);
+}
+
+export function buildPromptInput(params: {
+  item: EnrichmentSourceItem;
+  creator: EnrichmentSourceCreator | null;
+  articleContent: string | null;
+}): EnrichmentPromptInput {
+  return {
+    item: params.item,
+    creator: params.creator,
+    articleExcerpt: buildArticleExcerpt(params.articleContent),
+  };
+}
+
+export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
+  const metadataExcerpt = parseMetadataExcerpt(input.item.rawMetadata);
+
+  const userContent = {
+    task: 'Enrich this saved bookmark for a personal knowledge/recommendation app.',
+    constraints: [
+      'Return only JSON matching the requested schema.',
+      'Prefer stable categories and short lowercase tag names.',
+      'Do not invent facts not supported by the input.',
+      'Use confidence below 0.6 when the input is thin or ambiguous.',
+    ],
+    item: {
+      title: input.item.title,
+      url: input.item.canonicalUrl,
+      provider: input.item.provider,
+      contentType: input.item.contentType,
+      publisher: input.item.publisher,
+      creator: formatCreator(input.creator),
+      existingSummary: input.item.summary,
+      metadataExcerpt,
+      articleExcerpt: input.articleExcerpt,
+    },
+  };
+
+  return [
+    {
+      role: 'system',
+      content:
+        'You produce concise, valid JSON metadata for bookmarks. Keep tags useful for later recommendations.',
+    },
+    {
+      role: 'user',
+      content: JSON.stringify(userContent),
+    },
+  ];
+}
+
+export function buildEmbeddingText(params: {
+  item: EnrichmentSourceItem;
+  creator: EnrichmentSourceCreator | null;
+  output: EnrichmentModelOutput;
+  articleExcerpt: string | null;
+}): string {
+  const lines = [
+    `Title: ${params.item.title}`,
+    `Creator: ${formatCreator(params.creator)}`,
+    `Publisher: ${params.item.publisher ?? ''}`,
+    `Provider: ${params.item.provider}`,
+    `Content type: ${params.item.contentType}`,
+    `Summary: ${params.output.summary.short} ${params.output.summary.detail}`,
+    `Primary category: ${params.output.classification.primaryCategory}`,
+    `Topics: ${params.output.topics.map((topic) => topic.name).join(', ')}`,
+    `Entities: ${params.output.entities.map((entity) => entity.name).join(', ')}`,
+    params.articleExcerpt ? `Excerpt: ${params.articleExcerpt}` : '',
+  ];
+
+  return truncate(lines.filter(Boolean).join('\n'), EMBEDDING_TEXT_LIMIT) ?? '';
+}

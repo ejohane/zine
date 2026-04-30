@@ -21,6 +21,7 @@ import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refre
 import { extractArticle } from '../../lib/article-extractor';
 import { storeArticleContent } from '../../lib/article-storage';
 import { logger } from '../../lib/logger';
+import { enqueueBookmarkEnrichment } from '../../enrichment/service';
 import {
   findOrCreateCreator,
   extractCreatorFromMetadata,
@@ -329,6 +330,12 @@ export const bookmarksRouter = router({
         })
         .where(eq(userItems.id, existingUserItem.id));
 
+      await enqueueBookmarkEnrichment(ctx, {
+        itemId,
+        userItemId: existingUserItem.id,
+        trigger: 'manual_save',
+      });
+
       return {
         itemId,
         userItemId: existingUserItem.id,
@@ -364,6 +371,12 @@ export const bookmarksRouter = router({
       finishedAt: null,
       createdAt: now,
       updatedAt: now,
+    });
+
+    await enqueueBookmarkEnrichment(ctx, {
+      itemId,
+      userItemId,
+      trigger: 'manual_save',
     });
 
     return {

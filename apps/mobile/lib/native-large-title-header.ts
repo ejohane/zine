@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
+import type { ExtendedStackNavigationOptions } from 'expo-router/build/layouts/StackClient';
 import type { NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 
 import { Colors } from '@/constants/theme';
@@ -17,7 +17,7 @@ export function getCollapsedHeaderTitleThreshold(
   return Math.max(collapsedTitleThreshold, titleStartY - collapsedTitleThreshold);
 }
 
-export const lightweightHeaderStackScreenOptions: NativeStackNavigationOptions = {
+export const lightweightHeaderStackScreenOptions: ExtendedStackNavigationOptions = {
   headerBackButtonDisplayMode: 'minimal',
   headerShadowVisible: false,
   contentStyle: {
@@ -40,12 +40,12 @@ export function createLightweightHeaderScreenOptions({
   headerStyle,
   headerTitleStyle,
   ...options
-}: NativeStackNavigationOptions & {
+}: ExtendedStackNavigationOptions & {
   backgroundColor: string;
   tintColor: string;
   screenTitle: string;
   showScreenTitle?: boolean;
-}): NativeStackNavigationOptions {
+}): ExtendedStackNavigationOptions {
   return {
     headerLargeTitle: false,
     headerTransparent: false,

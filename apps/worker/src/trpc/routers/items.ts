@@ -29,14 +29,18 @@ import {
   userItems,
   items,
   creators,
+  itemEnrichments,
   tags,
   userItemTags,
+  userItemEnrichments,
   userItemConsumptionEvents,
 } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
 import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
+import { enqueueBookmarkEnrichment } from '../../enrichment/service';
+import { ENRICHMENT_SCHEMA_VERSION, type SuggestedTag } from '../../enrichment/types';
 
 export type ItemTag = {
   id: string;
@@ -168,6 +172,17 @@ function parseRawMetadata(rawMetadata: string | null): JsonObject {
   }
 
   return {};
+}
+
+function parseJsonArray<T>(value: string | null): T[] {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 function getStringMetadataField(metadata: JsonObject, key: string): string | null {
@@ -762,6 +777,81 @@ export const itemsRouter = router({
     }),
 
   /**
+   * Get AI enrichment and advisory tag suggestions for a user item.
+   */
+  getEnrichment: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const owned = await ctx.db
+        .select({ userItemId: userItems.id, itemId: userItems.itemId })
+        .from(userItems)
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (owned.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      const [canonicalRows, userRows] = await Promise.all([
+        ctx.db
+          .select()
+          .from(itemEnrichments)
+          .where(
+            and(
+              eq(itemEnrichments.itemId, owned[0].itemId),
+              eq(itemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
+            )
+          )
+          .orderBy(desc(itemEnrichments.updatedAt))
+          .limit(1),
+        ctx.db
+          .select()
+          .from(userItemEnrichments)
+          .where(
+            and(
+              eq(userItemEnrichments.userItemId, input.id),
+              eq(userItemEnrichments.userId, ctx.userId),
+              eq(userItemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
+            )
+          )
+          .orderBy(desc(userItemEnrichments.updatedAt))
+          .limit(1),
+      ]);
+
+      const canonical = canonicalRows[0] ?? null;
+      const userEnrichment = userRows[0] ?? null;
+
+      return {
+        item: {
+          status: canonical?.status ?? 'MISSING',
+          summaryShort: canonical?.summaryShort ?? null,
+          summaryDetail: canonical?.summaryDetail ?? null,
+          primaryCategory: canonical?.primaryCategory ?? null,
+          secondaryCategories: parseJsonArray<string>(canonical?.secondaryCategoriesJson ?? null),
+          topics: parseJsonArray<{ name: string; confidence: number }>(
+            canonical?.topicsJson ?? null
+          ),
+          entities: parseJsonArray<{ name: string; type: string; confidence: number }>(
+            canonical?.entitiesJson ?? null
+          ),
+          intent: canonical?.intent ?? null,
+          difficulty: canonical?.difficulty ?? null,
+          evergreenScore: canonical?.evergreenScore ?? null,
+          timeSensitivity: canonical?.timeSensitivity ?? null,
+        },
+        userItem: {
+          status: userEnrichment?.status ?? 'MISSING',
+          suggestedTags: parseJsonArray<SuggestedTag>(userEnrichment?.suggestedTagsJson ?? null),
+          inferredSaveIntent: userEnrichment?.inferredSaveIntent ?? null,
+          reasonToRevisit: userEnrichment?.reasonToRevisit ?? null,
+        },
+      };
+    }),
+
+  /**
    * List all tags for the current user.
    * Used by the bookmark detail tagging flow.
    */
@@ -954,7 +1044,7 @@ export const itemsRouter = router({
 
       // Verify the item exists and belongs to the user
       const existing = await ctx.db
-        .select({ id: userItems.id })
+        .select({ id: userItems.id, itemId: userItems.itemId, state: userItems.state })
         .from(userItems)
         .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
         .limit(1);
@@ -975,6 +1065,14 @@ export const itemsRouter = router({
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));
+
+      if (existing[0].state === UserItemState.INBOX) {
+        await enqueueBookmarkEnrichment(ctx, {
+          itemId: existing[0].itemId,
+          userItemId: existing[0].id,
+          trigger: 'inbox_bookmark',
+        });
+      }
 
       return { success: true as const };
     }),

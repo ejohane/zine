@@ -28,6 +28,13 @@ id = "959e6f30a4c84298a96f8060fd9b4cef"
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-dev"
 
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "ITEM_VECTORS"
+index_name = "zine-item-vectors-dev"
+
 # D1 Database binding (development)
 [[d1_databases]]
 binding = "DB"
@@ -48,6 +55,10 @@ crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
 queue = "zine-sync-queue-dev"
 binding = "SYNC_QUEUE"
 
+[[queues.producers]]
+queue = "zine-enrichment-queue-dev"
+binding = "ENRICHMENT_QUEUE"
+
 [[queues.consumers]]
 queue = "zine-sync-queue-dev"
 max_batch_size = 10
@@ -63,6 +74,18 @@ queue = "zine-sync-dlq-dev"
 max_batch_size = 10
 max_batch_timeout = 30
 
+[[queues.consumers]]
+queue = "zine-enrichment-queue-dev"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-enrichment-dlq-dev"
+
+[[queues.consumers]]
+queue = "zine-enrichment-dlq-dev"
+max_batch_size = 5
+max_batch_timeout = 30
+
 # Observability settings
 [observability]
 [observability.logs]
@@ -74,6 +97,9 @@ invocation_logs = true
 [vars]
 ENVIRONMENT = "development"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
+ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
+EMBEDDING_DIMENSIONS = "1024"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -95,6 +121,11 @@ id = "9c5919333b6442a88f2762f797b05139"
 [[env.staging.r2_buckets]]
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-staging"
+[env.staging.ai]
+binding = "AI"
+[[env.staging.vectorize]]
+binding = "ITEM_VECTORS"
+index_name = "zine-item-vectors-staging"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "zine-db-staging"
@@ -103,12 +134,18 @@ migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
+ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
+EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
 [[env.staging.queues.producers]]
 queue = "zine-sync-queue-staging"
 binding = "SYNC_QUEUE"
+[[env.staging.queues.producers]]
+queue = "zine-enrichment-queue-staging"
+binding = "ENRICHMENT_QUEUE"
 [[env.staging.queues.consumers]]
 queue = "zine-sync-queue-staging"
 max_batch_size = 10
@@ -120,6 +157,16 @@ dead_letter_queue = "zine-sync-dlq-staging"
 [[env.staging.queues.consumers]]
 queue = "zine-sync-dlq-staging"
 max_batch_size = 10
+max_batch_timeout = 30
+[[env.staging.queues.consumers]]
+queue = "zine-enrichment-queue-staging"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-enrichment-dlq-staging"
+[[env.staging.queues.consumers]]
+queue = "zine-enrichment-dlq-staging"
+max_batch_size = 5
 max_batch_timeout = 30
 [env.staging.observability]
 [env.staging.observability.logs]
@@ -149,6 +196,11 @@ id = "727509fe6a7640bca2c49eedefc2a52b"
 [[env.production.r2_buckets]]
 binding = "ARTICLE_CONTENT"
 bucket_name = "zine-article-content-prod"
+[env.production.ai]
+binding = "AI"
+[[env.production.vectorize]]
+binding = "ITEM_VECTORS"
+index_name = "zine-item-vectors-prod"
 [[env.production.d1_databases]]
 binding = "DB"
 database_name = "zine-db-production"
@@ -157,12 +209,18 @@ migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
+ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
+EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
 [[env.production.queues.producers]]
 queue = "zine-sync-queue-prod"
 binding = "SYNC_QUEUE"
+[[env.production.queues.producers]]
+queue = "zine-enrichment-queue-prod"
+binding = "ENRICHMENT_QUEUE"
 [[env.production.queues.consumers]]
 queue = "zine-sync-queue-prod"
 max_batch_size = 10
@@ -174,6 +232,16 @@ dead_letter_queue = "zine-sync-dlq-prod"
 [[env.production.queues.consumers]]
 queue = "zine-sync-dlq-prod"
 max_batch_size = 10
+max_batch_timeout = 30
+[[env.production.queues.consumers]]
+queue = "zine-enrichment-queue-prod"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-enrichment-dlq-prod"
+[[env.production.queues.consumers]]
+queue = "zine-enrichment-dlq-prod"
+max_batch_size = 5
 max_batch_timeout = 30
 [env.production.observability]
 [env.production.observability.logs]

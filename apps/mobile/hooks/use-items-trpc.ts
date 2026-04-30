@@ -460,6 +460,13 @@ export function useItem(id: string) {
   return trpc.items.get.useQuery({ id }, { enabled: !!id });
 }
 
+/**
+ * Hook for fetching AI enrichment and advisory tag suggestions for an item.
+ */
+export function useItemEnrichment(id: string) {
+  return trpc.items.getEnrichment.useQuery({ id }, { enabled: !!id });
+}
+
 export function useOtherUnfinishedBookmarksByCreator(id: string) {
   return trpc.items.otherUnfinishedBookmarksByCreator.useQuery(
     { id },

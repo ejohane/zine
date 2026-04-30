@@ -190,6 +190,111 @@ export const userItemTags = sqliteTable(
   ]
 );
 
+// Item Enrichments
+// Canonical AI-generated enrichment for a content item and content hash.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const itemEnrichments = sqliteTable(
+  'item_enrichments',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    schemaVersion: integer('schema_version').notNull(),
+    contentHash: text('content_hash').notNull(),
+    status: text('status').notNull(),
+    modelProvider: text('model_provider'),
+    modelName: text('model_name'),
+    summaryShort: text('summary_short'),
+    summaryDetail: text('summary_detail'),
+    primaryCategory: text('primary_category'),
+    secondaryCategoriesJson: text('secondary_categories_json'),
+    topicsJson: text('topics_json'),
+    entitiesJson: text('entities_json'),
+    intent: text('intent'),
+    difficulty: text('difficulty'),
+    evergreenScore: real('evergreen_score'),
+    timeSensitivity: text('time_sensitivity'),
+    confidenceJson: text('confidence_json'),
+    errorMessage: text('error_message'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    enrichedAt: integer('enriched_at'),
+  },
+  (table) => [
+    uniqueIndex('item_enrichments_item_schema_hash_idx').on(
+      table.itemId,
+      table.schemaVersion,
+      table.contentHash
+    ),
+    index('item_enrichments_item_idx').on(table.itemId, table.updatedAt),
+    index('item_enrichments_status_idx').on(table.status, table.updatedAt),
+  ]
+);
+
+// User Item Enrichments
+// Per-user AI suggestions for a bookmarked item. Suggestions are advisory only.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userItemEnrichments = sqliteTable(
+  'user_item_enrichments',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    schemaVersion: integer('schema_version').notNull(),
+    suggestedTagsJson: text('suggested_tags_json'),
+    inferredSaveIntent: text('inferred_save_intent'),
+    reasonToRevisit: text('reason_to_revisit'),
+    status: text('status').notNull(),
+    errorMessage: text('error_message'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    enrichedAt: integer('enriched_at'),
+  },
+  (table) => [
+    uniqueIndex('user_item_enrichments_user_item_schema_idx').on(
+      table.userItemId,
+      table.schemaVersion
+    ),
+    index('user_item_enrichments_user_idx').on(table.userId, table.updatedAt),
+    index('user_item_enrichments_item_idx').on(table.itemId, table.updatedAt),
+    index('user_item_enrichments_status_idx').on(table.status, table.updatedAt),
+  ]
+);
+
+// Item Embedding References
+// D1 reference records for vectors stored in Cloudflare Vectorize.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const itemEmbeddingRefs = sqliteTable(
+  'item_embedding_refs',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    userId: text('user_id').references(() => users.id),
+    vectorId: text('vector_id').notNull(),
+    namespace: text('namespace').notNull(),
+    embeddingModel: text('embedding_model').notNull(),
+    embeddingDimensions: integer('embedding_dimensions').notNull(),
+    contentHash: text('content_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('item_embedding_refs_vector_id_idx').on(table.vectorId),
+    index('item_embedding_refs_item_idx').on(table.itemId, table.updatedAt),
+    index('item_embedding_refs_user_idx').on(table.userId, table.updatedAt),
+  ]
+);
+
 // Sources (User subscriptions)
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.

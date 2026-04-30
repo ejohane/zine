@@ -17,6 +17,8 @@ import type { Bindings, Env } from './types';
 import { pollProviderSubscriptions } from './polling/scheduler';
 import { pollGmailNewsletters } from './newsletters/gmail';
 import { pollRssFeeds } from './rss/service';
+import { handleEnrichmentDLQ, handleEnrichmentQueue } from './enrichment/consumer';
+import type { EnrichmentQueueMessage } from './enrichment/types';
 import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
@@ -266,15 +268,17 @@ export default {
   },
 
   /**
-   * Queue handler for async pull-to-refresh sync and DLQ monitoring.
+   * Queue handler for async jobs and DLQ monitoring.
    *
-   * Handles two queues:
+   * Handles four queues:
    * 1. SYNC_QUEUE: Primary sync queue for processing subscriptions
    *    - Non-blocking pull-to-refresh (< 500ms response time)
    *    - Error isolation (one subscription failing doesn't affect others)
    *    - Automatic retries (3 attempts before DLQ)
    *
-   * 2. SYNC_DLQ: Dead Letter Queue for failed messages
+   * 2. SYNC_DLQ: Dead Letter Queue for failed sync messages
+   * 3. ENRICHMENT_QUEUE: Bookmark enrichment and embedding generation
+   * 4. ENRICHMENT_DLQ: Dead Letter Queue for failed enrichment messages
    *    - Captures messages that exhausted all retries
    *    - Logs at ERROR level for Cloudflare dashboard alerts
    *    - Stores entries in KV for investigation and potential replay
@@ -285,16 +289,24 @@ export default {
    * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
    */
   async queue(
-    batch: MessageBatch<SyncQueueMessage>,
+    batch: MessageBatch<SyncQueueMessage | EnrichmentQueueMessage>,
     env: Bindings,
     _ctx: ExecutionContext
   ): Promise<void> {
-    // Route to appropriate handler based on queue name
-    // DLQ queue names end with '-dlq-{env}'
+    if (batch.queue.includes('enrichment-dlq')) {
+      await handleEnrichmentDLQ(batch as MessageBatch<EnrichmentQueueMessage>, env);
+      return;
+    }
+
+    if (batch.queue.includes('enrichment')) {
+      await handleEnrichmentQueue(batch as MessageBatch<EnrichmentQueueMessage>, env);
+      return;
+    }
+
     if (batch.queue.includes('-dlq-')) {
-      await handleSyncDLQ(batch, env);
+      await handleSyncDLQ(batch as MessageBatch<SyncQueueMessage>, env);
     } else {
-      await handleSyncQueue(batch, env);
+      await handleSyncQueue(batch as MessageBatch<SyncQueueMessage>, env);
     }
   },
 };

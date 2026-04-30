@@ -1,0 +1,69 @@
+name = "zine-worker-test"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "WEBHOOK_IDEMPOTENCY"
+id = "test-webhook-idempotency"
+
+[[kv_namespaces]]
+binding = "OAUTH_STATE_KV"
+id = "test-oauth-state"
+
+[[kv_namespaces]]
+binding = "SPOTIFY_CACHE"
+id = "test-spotify-cache"
+
+[[kv_namespaces]]
+binding = "CREATOR_CONTENT_CACHE"
+id = "test-creator-content-cache"
+
+[[r2_buckets]]
+binding = "ARTICLE_CONTENT"
+bucket_name = "zine-article-content-test"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zine-db-test"
+database_id = "test-zine-db"
+migrations_dir = "src/db/migrations"
+
+[[queues.producers]]
+queue = "zine-sync-queue-test"
+binding = "SYNC_QUEUE"
+
+[[queues.producers]]
+queue = "zine-enrichment-queue-test"
+binding = "ENRICHMENT_QUEUE"
+
+[[queues.consumers]]
+queue = "zine-sync-queue-test"
+max_batch_size = 10
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-sync-dlq-test"
+
+[[queues.consumers]]
+queue = "zine-sync-dlq-test"
+max_batch_size = 10
+max_batch_timeout = 30
+
+[[queues.consumers]]
+queue = "zine-enrichment-queue-test"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-enrichment-dlq-test"
+
+[[queues.consumers]]
+queue = "zine-enrichment-dlq-test"
+max_batch_size = 5
+max_batch_timeout = 30
+
+[vars]
+ENVIRONMENT = "test"
+SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
+ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
+EMBEDDING_DIMENSIONS = "1024"
