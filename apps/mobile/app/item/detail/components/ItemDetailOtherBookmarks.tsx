@@ -28,6 +28,7 @@ export function ItemDetailOtherBookmarks({
     return null;
   }
 
+  const canExpand = bookmarks.length > 1;
   const items: ItemCardData[] = bookmarks.map((bookmark) => ({
     id: bookmark.id,
     title: bookmark.title,
@@ -52,24 +53,35 @@ export function ItemDetailOtherBookmarks({
         style={styles.otherBookmarksSurface}
         accessibilityLabel="Other bookmarks from creator"
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Toggle other bookmarks from creator"
-          accessibilityState={{ expanded: isExpanded }}
-          onPress={() => setIsExpanded((current) => !current)}
-          style={({ pressed }) => [styles.otherBookmarksHeader, pressed ? { opacity: 0.72 } : null]}
-        >
-          <Text variant="labelSmall" tone="tertiary" colors={colors}>
-            Your Bookmarks
-          </Text>
-          <Ionicons
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={IconSizes.sm}
-            color={colors.textTertiary}
-          />
-        </Pressable>
+        {canExpand ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Toggle other bookmarks from creator"
+            accessibilityState={{ expanded: isExpanded }}
+            onPress={() => setIsExpanded((current) => !current)}
+            style={({ pressed }) => [
+              styles.otherBookmarksHeader,
+              pressed ? { opacity: 0.72 } : null,
+            ]}
+          >
+            <Text variant="labelSmall" tone="tertiary" colors={colors}>
+              Your Bookmarks
+            </Text>
+            <Ionicons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={IconSizes.sm}
+              color={colors.textTertiary}
+            />
+          </Pressable>
+        ) : (
+          <View style={styles.otherBookmarksHeader}>
+            <Text variant="labelSmall" tone="tertiary" colors={colors}>
+              Your Bookmarks
+            </Text>
+          </View>
+        )}
 
-        {(isExpanded ? items : items.slice(0, 1)).map((item, index) => (
+        {(isExpanded && canExpand ? items : items.slice(0, 1)).map((item, index) => (
           <ItemCard
             key={item.id}
             item={item}
