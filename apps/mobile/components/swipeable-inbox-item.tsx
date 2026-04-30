@@ -5,8 +5,8 @@
  * Uses ReanimatedSwipeable from react-native-gesture-handler for 60 FPS performance.
  *
  * Features:
- * - Swipe right to save (primary color panel)
- * - Swipe left to archive (gray action panel)
+ * - Swipe right to save (full-height iOS-style action panel)
+ * - Swipe left to archive (full-height iOS-style action panel)
  * - Full swipe auto-completes action
  * - Partial swipe + release animates back smoothly
  * - Smooth exit animation when action completes
@@ -34,13 +34,17 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import { View, StyleSheet, Text, type AccessibilityActionEvent } from 'react-native';
+import { View, StyleSheet, type AccessibilityActionEvent } from 'react-native';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
 } from 'react-native-gesture-handler/ReanimatedSwipeable';
 import Animated, {
   useAnimatedStyle,
+  useAnimatedReaction,
+  useSharedValue,
   interpolate,
+  Extrapolation,
+  runOnJS,
   type SharedValue,
   SlideOutLeft,
   SlideOutRight,
@@ -52,8 +56,8 @@ import ContextMenu from '../lib/context-menu';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { ArchiveIcon, BookmarkIcon } from '@/components/icons';
-import { Colors, Spacing, Typography } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Spacing } from '@/constants/theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 
 /** Direction from which item should enter (for rollback animation) */
 export type EnterDirection = 'left' | 'right' | 'fade' | null;
@@ -74,95 +78,194 @@ export interface SwipeableInboxItemProps {
 /** Direction of exit animation */
 export type ExitDirection = 'left' | 'right' | null;
 
-/** Width of action panel in pixels - ~100px for finger-friendly tap target */
-const ACTION_WIDTH = 100;
+/** Final measured width of each action lane. */
+const ACTION_LANE_WIDTH = 220;
+const ACTION_CIRCLE_SIZE = 64;
+const ACTION_ICON_SIZE = 24;
+const STRETCH_START_DISTANCE = 96;
+const COMMIT_DISTANCE = 164;
+const ACTION_STRETCHED_WIDTH = 156;
+const ACTION_MAX_WIDTH = 204;
 
 /**
- * Swipe threshold to trigger action (full swipe distance)
- * 100px chosen because:
- * - Large enough to prevent accidental triggers (~2.5x typical accidental swipe of 40px)
- * - Small enough to be easily reachable (~1/4 of smallest phone width)
- * - Matches action panel width for consistent feel
+ * Swipe threshold to trigger action.
+ * Matched to the point where the capsule finishes stretching and vibrates.
  * @see zine-2qn for threshold tuning rationale
  */
-const SWIPE_THRESHOLD = 100;
+const SWIPE_THRESHOLD = COMMIT_DISTANCE;
 
 /**
  * Friction value for swipe resistance (1-3 range)
- * Value of 2 provides balanced resistance:
- * - 1: Too loose, feels slippery
- * - 2: Balanced, feels responsive but controlled
- * - 3: Too stiff, feels sluggish
+ * Values near 1 track the finger closely, which better matches native iOS rows.
  * @see zine-2qn for friction tuning rationale
  */
-const SWIPE_FRICTION = 2;
+const SWIPE_FRICTION = 1.08;
+
+/** Native-feeling rubber-band resistance once the row moves past the action width. */
+const OVERSHOOT_FRICTION = 8;
 
 /** Exit animation duration in milliseconds (~200-300ms for quick but visible) */
 const EXIT_ANIMATION_DURATION = 250;
 
 interface ActionPanelProps {
   progress: SharedValue<number>;
+  translation: SharedValue<number>;
+  releaseLocked: SharedValue<boolean>;
 }
 
-/**
- * Left action panel (Save) - revealed when swiping right
- * Primary color styling per design spec
- */
-function LeftActionPanel({ progress }: ActionPanelProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+type MorphingActionCapsuleProps = ActionPanelProps & {
+  direction: 'left' | 'right';
+  color: string;
+  children: React.ReactNode;
+};
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const scale = interpolate(progress.value, [0, 1], [0.8, 1]);
-    const opacity = interpolate(progress.value, [0, 0.5, 1], [0, 0.5, 1]);
+function triggerSwipeCommitHaptic() {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
+
+function MorphingActionCapsule({
+  progress,
+  translation,
+  releaseLocked,
+  direction,
+  color,
+  children,
+}: MorphingActionCapsuleProps) {
+  const isLeft = direction === 'left';
+  const frozenWidth = useSharedValue(-1);
+
+  const getDragDistance = () => {
+    'worklet';
+    return isLeft ? Math.max(translation.value, 0) : Math.max(-translation.value, 0);
+  };
+
+  const getCapsuleWidth = (dragDistance: number) => {
+    'worklet';
+    return interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [ACTION_CIRCLE_SIZE, ACTION_CIRCLE_SIZE, ACTION_STRETCHED_WIDTH, ACTION_MAX_WIDTH],
+      Extrapolation.CLAMP
+    );
+  };
+
+  useAnimatedReaction(
+    () => {
+      const dragDistance = isLeft
+        ? Math.max(translation.value, 0)
+        : Math.max(-translation.value, 0);
+      return dragDistance >= COMMIT_DISTANCE;
+    },
+    (isCommitted, wasCommitted) => {
+      if (isCommitted && !wasCommitted) {
+        runOnJS(triggerSwipeCommitHaptic)();
+      }
+    },
+    [isLeft]
+  );
+
+  useAnimatedReaction(
+    () => {
+      return {
+        dragDistance: getDragDistance(),
+        releaseLocked: releaseLocked.value,
+      };
+    },
+    ({ dragDistance, releaseLocked: isReleaseLocked }) => {
+      if (!isReleaseLocked) {
+        frozenWidth.value = -1;
+        return;
+      }
+
+      if (frozenWidth.value < 0) {
+        frozenWidth.value = getCapsuleWidth(dragDistance);
+      }
+    },
+    [isLeft]
+  );
+
+  const capsuleStyle = useAnimatedStyle(() => {
+    const dragDistance = getDragDistance();
+    const width = frozenWidth.value >= 0 ? frozenWidth.value : getCapsuleWidth(dragDistance);
+    const scaleY = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 1.035, 1.035],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(progress.value, [0, 0.18, 0.35], [0, 0.8, 1], Extrapolation.CLAMP);
 
     return {
-      transform: [{ scale }],
+      width,
       opacity,
+      transform: [{ scaleY }],
+    };
+  });
+
+  const iconStyle = useAnimatedStyle(() => {
+    const dragDistance = getDragDistance();
+    const scaleX = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 1.15, 1.28],
+      Extrapolation.CLAMP
+    );
+    const scaleY = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 0.9, 0.84],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      transform: [{ scaleX }, { scaleY }],
     };
   });
 
   return (
-    <View style={[styles.actionPanel, styles.leftActionPanel, { backgroundColor: colors.primary }]}>
-      <Animated.View style={[styles.actionContent, animatedStyle]}>
-        <BookmarkIcon size={24} color={colors.buttonPrimaryText} />
-        <Text style={[styles.actionLabel, { color: colors.buttonPrimaryText }]}>Save</Text>
+    <View style={[styles.actionPanel, isLeft ? styles.leftActionPanel : styles.rightActionPanel]}>
+      <Animated.View style={[styles.actionCapsule, { backgroundColor: color }, capsuleStyle]}>
+        <Animated.View style={iconStyle}>{children}</Animated.View>
       </Animated.View>
     </View>
   );
 }
 
 /**
- * Right action panel (Archive) - revealed when swiping left
- * Gray/neutral styling per design spec (soft delete, not destructive)
+ * Left action panel (Save) - revealed when swiping right
  */
-function RightActionPanel({ progress }: ActionPanelProps) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const scale = interpolate(progress.value, [0, 1], [0.8, 1]);
-    const opacity = interpolate(progress.value, [0, 0.5, 1], [0, 0.5, 1]);
-
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
-  });
+function LeftActionPanel({ progress, translation, releaseLocked }: ActionPanelProps) {
+  const { colors } = useAppTheme();
 
   return (
-    <View
-      style={[
-        styles.actionPanel,
-        styles.rightActionPanel,
-        { backgroundColor: colors.backgroundTertiary },
-      ]}
+    <MorphingActionCapsule
+      progress={progress}
+      translation={translation}
+      releaseLocked={releaseLocked}
+      direction="left"
+      color={colors.statusSuccess}
     >
-      <Animated.View style={[styles.actionContent, animatedStyle]}>
-        <ArchiveIcon size={24} color={colors.textSecondary} />
-        <Text style={[styles.actionLabel, { color: colors.textSecondary }]}>Archive</Text>
-      </Animated.View>
-    </View>
+      <BookmarkIcon size={ACTION_ICON_SIZE} color={colors.overlayForeground} />
+    </MorphingActionCapsule>
+  );
+}
+
+/**
+ * Right action panel (Archive) - revealed when swiping left
+ */
+function RightActionPanel({ progress, translation, releaseLocked }: ActionPanelProps) {
+  const { colors } = useAppTheme();
+
+  return (
+    <MorphingActionCapsule
+      progress={progress}
+      translation={translation}
+      releaseLocked={releaseLocked}
+      direction="right"
+      color={colors.statusError}
+    >
+      <ArchiveIcon size={ACTION_ICON_SIZE} color={colors.overlayForeground} />
+    </MorphingActionCapsule>
   );
 }
 
@@ -186,8 +289,8 @@ export function SwipeableInboxItem({
 }: SwipeableInboxItemProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
   const [exitDirection, setExitDirection] = useState<ExitDirection>(null);
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const releaseLocked = useSharedValue(false);
+  const { colors } = useAppTheme();
   const router = useRouter();
 
   // Prevents ItemCard's onPress from firing when completing a swipe gesture
@@ -217,26 +320,37 @@ export function SwipeableInboxItem({
     onArchive(item.id);
   }, [item.id, onArchive]);
 
-  const renderLeftActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
-    return <LeftActionPanel progress={progress} />;
+  const renderLeftActions = (progress: SharedValue<number>, translation: SharedValue<number>) => {
+    return (
+      <LeftActionPanel
+        progress={progress}
+        translation={translation}
+        releaseLocked={releaseLocked}
+      />
+    );
   };
 
-  const renderRightActions = (progress: SharedValue<number>, _dragX: SharedValue<number>) => {
-    return <RightActionPanel progress={progress} />;
+  const renderRightActions = (progress: SharedValue<number>, translation: SharedValue<number>) => {
+    return (
+      <RightActionPanel
+        progress={progress}
+        translation={translation}
+        releaseLocked={releaseLocked}
+      />
+    );
   };
 
   const handleSwipeableWillOpen = useCallback(() => {
     isSwipeActionPending.current = true;
-  }, []);
+    releaseLocked.value = true;
+  }, [releaseLocked]);
+
+  const handleSwipeableWillClose = useCallback(() => {
+    releaseLocked.value = false;
+  }, [releaseLocked]);
 
   const handleSwipeableOpen = useCallback(
     (direction: 'left' | 'right') => {
-      if (direction === 'right') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } else {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
-
       setExitDirection(direction);
       executeAction(direction);
     },
@@ -320,14 +434,21 @@ export function SwipeableInboxItem({
           friction={SWIPE_FRICTION}
           leftThreshold={SWIPE_THRESHOLD}
           rightThreshold={SWIPE_THRESHOLD}
-          overshootLeft={false}
-          overshootRight={false}
+          overshootLeft={true}
+          overshootRight={true}
+          overshootFriction={OVERSHOOT_FRICTION}
           renderLeftActions={renderLeftActions}
           renderRightActions={renderRightActions}
           onSwipeableWillOpen={handleSwipeableWillOpen}
+          onSwipeableWillClose={handleSwipeableWillClose}
           onSwipeableOpen={handleSwipeableOpen}
+          containerStyle={styles.swipeableContainer}
+          childrenContainerStyle={{ backgroundColor: colors.background }}
         >
-          <ItemCard item={item} shape="row" index={index} onPress={handleItemPress} />
+          <View style={styles.rowContent}>
+            <ItemCard item={item} shape="row" index={index} onPress={handleItemPress} />
+            <View style={[styles.rowSeparator, { backgroundColor: colors.borderDefault }]} />
+          </View>
         </ReanimatedSwipeable>
       </ContextMenu>
     </Animated.View>
@@ -335,27 +456,39 @@ export function SwipeableInboxItem({
 }
 
 const styles = StyleSheet.create({
+  swipeableContainer: {
+    minHeight: 64,
+  },
+  rowContent: {
+    minHeight: 64,
+  },
+  rowSeparator: {
+    position: 'absolute',
+    left: 80,
+    right: 0,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+  },
   actionPanel: {
-    width: ACTION_WIDTH,
+    width: ACTION_LANE_WIDTH,
+    flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    // Ensure minimum touch target (iOS HIG: 44x44)
-    minHeight: 44,
+    overflow: 'visible',
   },
   leftActionPanel: {
-    // Save panel - left side (revealed on right swipe)
+    alignItems: 'flex-start',
+    paddingLeft: Spacing.sm,
   },
   rightActionPanel: {
-    // Archive panel - right side (revealed on left swipe)
+    alignItems: 'flex-end',
+    paddingRight: Spacing.sm,
   },
-  actionContent: {
+  actionCapsule: {
+    height: ACTION_CIRCLE_SIZE,
+    minWidth: ACTION_CIRCLE_SIZE,
+    borderRadius: ACTION_CIRCLE_SIZE / 2,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: Spacing.md,
-    gap: Spacing.xs,
-  },
-  actionLabel: {
-    ...Typography.labelSmall,
   },
 });
 
