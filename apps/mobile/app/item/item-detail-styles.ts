@@ -205,7 +205,12 @@ export const styles = StyleSheet.create({
 
   // Other bookmarks
   otherBookmarksContainer: {
-    paddingTop: Spacing.lg,
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  otherBookmarksSurface: {
+    paddingVertical: Spacing.lg,
+    overflow: 'hidden',
   },
   otherBookmarksHeader: {
     flexDirection: 'row',

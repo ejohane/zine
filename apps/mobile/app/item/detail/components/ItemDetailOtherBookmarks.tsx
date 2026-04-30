@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
+import { Surface } from '@/components/primitives/surface';
 import { Text } from '@/components/primitives/text';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 
@@ -39,24 +40,32 @@ export function ItemDetailOtherBookmarks({
 
   return (
     <View style={styles.otherBookmarksContainer}>
-      <View style={styles.otherBookmarksHeader} accessibilityLabel="Other bookmarks from creator">
-        <Text style={styles.otherBookmarksTitle} tone="primary" colors={colors}>
-          Your Bookmarks
-        </Text>
-        <Text style={styles.otherBookmarksCount} tone="subheader" colors={colors}>
-          {items.length} item{items.length === 1 ? '' : 's'}
-        </Text>
-      </View>
+      <Surface
+        tone="subtle"
+        radius="lg"
+        colors={colors}
+        style={styles.otherBookmarksSurface}
+        accessibilityLabel="Other bookmarks from creator"
+      >
+        <View style={styles.otherBookmarksHeader}>
+          <Text style={styles.otherBookmarksTitle} tone="primary" colors={colors}>
+            Your Bookmarks
+          </Text>
+          <Text style={styles.otherBookmarksCount} tone="subheader" colors={colors}>
+            {items.length} item{items.length === 1 ? '' : 's'}
+          </Text>
+        </View>
 
-      {items.map((item, index) => (
-        <ItemCard
-          key={item.id}
-          item={item}
-          shape="row"
-          index={index}
-          onPress={() => onBookmarkPress(item.id)}
-        />
-      ))}
+        {items.map((item, index) => (
+          <ItemCard
+            key={item.id}
+            item={item}
+            shape="row"
+            index={index}
+            onPress={() => onBookmarkPress(item.id)}
+          />
+        ))}
+      </Surface>
     </View>
   );
 }
