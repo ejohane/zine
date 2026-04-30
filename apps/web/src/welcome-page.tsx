@@ -16,6 +16,14 @@ import {
   sourceConfigs,
   type WizardStep,
 } from './lib/onboarding';
+import {
+  connectMockProvider,
+  createMockOnboardingState,
+  discoverMockFeeds,
+  disconnectMockProvider,
+  resolveMockOnboardingScenario,
+  scanMockNewsletters,
+} from './lib/onboarding-mocks';
 import { connectProvider } from './lib/oauth';
 import { trpc, useAppSession } from './lib/trpc';
 
@@ -79,6 +87,9 @@ type SubscriptionPickerProps = {
   onBack: () => void;
   backLabel?: string;
   isImporting: boolean;
+  headerSlot?: ReactNode;
+  renderItemMedia?: (item: PickerItem, selected: boolean) => ReactNode;
+  itemDescriptionFallback?: (item: PickerItem) => string | undefined;
 };
 
 function SubscriptionPicker({
@@ -93,6 +104,9 @@ function SubscriptionPicker({
   onBack,
   backLabel = 'Back to integrations',
   isImporting,
+  headerSlot,
+  renderItemMedia,
+  itemDescriptionFallback,
 }: SubscriptionPickerProps) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -144,7 +158,11 @@ function SubscriptionPicker({
       : `Import ${selectedItems.length} ${selectedItems.length === 1 ? itemNounSingular : itemNounPlural}`;
 
   return (
-    <div className="wizard-picker" data-testid={testId}>
+    <div
+      className={cn('wizard-picker', renderItemMedia && 'wizard-picker--rich')}
+      data-testid={testId}
+    >
+      {headerSlot}
       <div className="wizard-picker__controls">
         <label className="wizard-picker__search">
           <span className="visually-hidden">{searchLabel}</span>
@@ -187,18 +205,58 @@ function SubscriptionPicker({
           <ul className="wizard-picker__items">
             {filtered.map((item) => {
               const inputId = `picker-${testId}-${item.id}`;
+              const isSelected = selected.has(item.id);
+              const fallbackDescription = itemDescriptionFallback
+                ? itemDescriptionFallback(item)
+                : undefined;
+              const description = item.description ?? fallbackDescription;
+              const rich = Boolean(renderItemMedia);
+
+              if (!rich) {
+                return (
+                  <li key={item.id} className="wizard-picker__item">
+                    <input
+                      id={inputId}
+                      type="checkbox"
+                      aria-label={item.label}
+                      checked={isSelected}
+                      onChange={() => toggleItem(item.id)}
+                    />
+                    <label htmlFor={inputId}>
+                      <strong>{item.label}</strong>
+                      {description ? <span>{description}</span> : null}
+                    </label>
+                  </li>
+                );
+              }
+
               return (
-                <li key={item.id} className="wizard-picker__item">
+                <li
+                  key={item.id}
+                  className={cn('picker-row', isSelected && 'picker-row--selected')}
+                >
                   <input
                     id={inputId}
                     type="checkbox"
                     aria-label={item.label}
-                    checked={selected.has(item.id)}
+                    className="picker-row__input"
+                    checked={isSelected}
                     onChange={() => toggleItem(item.id)}
                   />
-                  <label htmlFor={inputId}>
-                    <strong>{item.label}</strong>
-                    {item.description ? <span>{item.description}</span> : null}
+                  <label htmlFor={inputId} className="picker-row__label">
+                    <span className="picker-row__media" aria-hidden="true">
+                      {renderItemMedia?.(item, isSelected)}
+                    </span>
+                    <span className="picker-row__text">
+                      <strong>{item.label}</strong>
+                      {description ? <span>{description}</span> : null}
+                    </span>
+                    <span
+                      className={cn('picker-row__check', isSelected && 'picker-row__check--on')}
+                      aria-hidden="true"
+                    >
+                      {isSelected ? <Check size={13} strokeWidth={3} /> : null}
+                    </span>
                   </label>
                 </li>
               );
@@ -266,6 +324,11 @@ export function WelcomePage() {
   const { getToken } = useAppSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const mockScenario = resolveMockOnboardingScenario(searchParams);
+  const mockScenarioState = useMemo(
+    () => (mockScenario ? createMockOnboardingState(mockScenario) : null),
+    [mockScenario]
+  );
 
   const origin = searchParams.get('origin') === 'settings' ? 'settings' : 'welcome';
   const closePath = origin === 'settings' ? '/settings' : '/bookmarks';
@@ -275,27 +338,43 @@ export function WelcomePage() {
   const [rssUrl, setRssUrl] = useState('');
   const [rssDiscoveryUrl, setRssDiscoveryUrl] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [mockState, setMockState] = useState(mockScenarioState);
   const processedOauthContextRef = useRef<string | null>(null);
 
-  const connectionsQuery = trpc.subscriptions.connections.list.useQuery();
-  const connections = connectionsQuery.data;
+  const connectionsQuery = trpc.subscriptions.connections.list.useQuery(undefined, {
+    enabled: !mockState,
+  });
 
-  const spotifyAvailable = trpc.subscriptions.discover.available.useQuery({
-    provider: Provider.SPOTIFY,
-  });
-  const youtubeAvailable = trpc.subscriptions.discover.available.useQuery({
-    provider: Provider.YOUTUBE,
-  });
-  const newslettersListQuery = trpc.subscriptions.newsletters.list.useQuery({ limit: 100 });
+  const spotifyAvailable = trpc.subscriptions.discover.available.useQuery(
+    {
+      provider: Provider.SPOTIFY,
+    },
+    { enabled: !mockState }
+  );
+  const youtubeAvailable = trpc.subscriptions.discover.available.useQuery(
+    {
+      provider: Provider.YOUTUBE,
+    },
+    { enabled: !mockState }
+  );
+  const newslettersListQuery = trpc.subscriptions.newsletters.list.useQuery(
+    { limit: 100 },
+    { enabled: !mockState }
+  );
   const rssDiscoverQuery = trpc.subscriptions.rss.discover.useQuery(
     { url: rssDiscoveryUrl ?? 'https://example.com' },
-    { enabled: Boolean(rssDiscoveryUrl) }
+    { enabled: Boolean(rssDiscoveryUrl) && !mockState }
   );
 
   const addSubscription = trpc.subscriptions.add.useMutation();
   const syncNewsletters = trpc.subscriptions.newsletters.syncNow.useMutation();
   const updateNewsletterStatus = trpc.subscriptions.newsletters.updateStatus.useMutation();
   const addRss = trpc.subscriptions.rss.add.useMutation();
+  const disconnectProviderMutation = trpc.subscriptions.connections.disconnect.useMutation();
+
+  const [disconnectingProvider, setDisconnectingProvider] = useState<
+    'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | null
+  >(null);
 
   const handleClose = useCallback(() => {
     navigate(closePath, { replace: true });
@@ -306,15 +385,61 @@ export function WelcomePage() {
     setActiveStep(step);
   }, []);
 
+  const handleDisconnect = useCallback(
+    async (provider: 'YOUTUBE' | 'SPOTIFY' | 'GMAIL') => {
+      setStepError((current) => ({ ...current, [provider]: undefined }));
+      setDisconnectingProvider(provider);
+      try {
+        if (mockState) {
+          setMockState((current) =>
+            current ? disconnectMockProvider(current, provider) : current
+          );
+        } else {
+          await disconnectProviderMutation.mutateAsync({ provider: Provider[provider] });
+          await connectionsQuery.refetch();
+        }
+      } catch (error) {
+        setStepError((current) => ({
+          ...current,
+          [provider]:
+            error instanceof Error ? error.message : 'Could not disconnect this provider.',
+        }));
+      } finally {
+        setDisconnectingProvider(null);
+      }
+    },
+    [connectionsQuery, disconnectProviderMutation, mockState]
+  );
+
   const handleBackToIntegrations = useCallback(() => {
     setActiveStep(null);
     setRssUrl('');
     setRssDiscoveryUrl(null);
   }, []);
 
+  useEffect(() => {
+    setMockState(mockScenarioState);
+    setActiveStep(mockScenarioState?.activeStep ?? null);
+    setStepError({});
+    setRssUrl('');
+    setRssDiscoveryUrl(null);
+    setIsImporting(false);
+    processedOauthContextRef.current = null;
+  }, [mockScenarioState]);
+
+  const connections = mockState?.connections ?? connectionsQuery.data;
+  const spotifyItems = mockState?.available.SPOTIFY ?? spotifyAvailable.data?.items ?? [];
+  const youtubeItems = mockState?.available.YOUTUBE ?? youtubeAvailable.data?.items ?? [];
+  const newsletters = mockState?.newsletters ?? newslettersListQuery.data?.items ?? [];
+
   const handleConnect = useCallback(
     async (provider: 'SPOTIFY' | 'YOUTUBE' | 'GMAIL') => {
       setStepError((current) => ({ ...current, [provider]: undefined }));
+      if (mockState) {
+        setMockState((current) => (current ? connectMockProvider(current, provider) : current));
+        return;
+      }
+
       setOnboardingOAuthContext({ origin, provider });
       try {
         await connectProvider(provider, getToken);
@@ -326,11 +451,13 @@ export function WelcomePage() {
         }));
       }
     },
-    [getToken, origin]
+    [getToken, mockState, origin]
   );
 
   // Resume on the provider step after returning from OAuth.
   useEffect(() => {
+    if (mockState) return;
+
     const context = getOnboardingOAuthContext();
     if (!context) return;
     const key = `${context.origin}:${context.provider}`;
@@ -340,10 +467,28 @@ export function WelcomePage() {
     processedOauthContextRef.current = key;
     clearOnboardingOAuthContext();
     setActiveStep(providerToWizardStep(context.provider));
-  }, [connections]);
+  }, [connections, mockState]);
 
   const importSpotify = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                available: {
+                  ...current.available,
+                  SPOTIFY: current.available.SPOTIFY.filter(
+                    (item) => !selected.some((selectedItem) => selectedItem.id === item.id)
+                  ),
+                },
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -363,11 +508,29 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addSubscription, handleBackToIntegrations]
+    [addSubscription, handleBackToIntegrations, mockState]
   );
 
   const importYoutube = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                available: {
+                  ...current.available,
+                  YOUTUBE: current.available.YOUTUBE.filter(
+                    (item) => !selected.some((selectedItem) => selectedItem.id === item.id)
+                  ),
+                },
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -387,11 +550,27 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addSubscription, handleBackToIntegrations]
+    [addSubscription, handleBackToIntegrations, mockState]
   );
 
   const importNewsletters = useCallback(
     async (selected: PickerItem[], deselected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                newsletters: current.newsletters.map((newsletter) => ({
+                  ...newsletter,
+                  status: selected.some((item) => item.id === newsletter.id) ? 'ACTIVE' : 'HIDDEN',
+                })),
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -410,11 +589,26 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [handleBackToIntegrations, updateNewsletterStatus]
+    [handleBackToIntegrations, mockState, updateNewsletterStatus]
   );
 
   const importRss = useCallback(
     async (selected: PickerItem[]) => {
+      if (mockState) {
+        setMockState((current) =>
+          current
+            ? {
+                ...current,
+                rssCandidates: current.rssCandidates.filter(
+                  (candidate) => !selected.some((item) => item.id === candidate.feedUrl)
+                ),
+              }
+            : current
+        );
+        handleBackToIntegrations();
+        return;
+      }
+
       setIsImporting(true);
       try {
         for (const item of selected) {
@@ -430,11 +624,16 @@ export function WelcomePage() {
         setIsImporting(false);
       }
     },
-    [addRss, handleBackToIntegrations]
+    [addRss, handleBackToIntegrations, mockState]
   );
 
   const handleScanNewsletters = useCallback(async () => {
     setStepError((current) => ({ ...current, GMAIL: undefined }));
+    if (mockState) {
+      setMockState((current) => (current ? scanMockNewsletters(current) : current));
+      return;
+    }
+
     try {
       await syncNewsletters.mutateAsync(undefined);
     } catch (error) {
@@ -443,16 +642,24 @@ export function WelcomePage() {
         GMAIL: error instanceof Error ? error.message : 'Could not scan newsletters.',
       }));
     }
-  }, [syncNewsletters]);
+  }, [mockState, syncNewsletters]);
 
   const rssCandidates = useMemo<PickerItem[]>(() => {
+    if (mockState) {
+      return mockState.rssCandidates.map((candidate) => ({
+        id: candidate.feedUrl,
+        label: candidate.title,
+        description: candidate.description,
+      }));
+    }
+
     const candidates = rssDiscoverQuery.data?.candidates ?? [];
     return candidates.map((candidate) => ({
       id: candidate.feedUrl,
       label: candidate.title ?? candidate.feedUrl,
       description: candidate.feedUrl,
     }));
-  }, [rssDiscoverQuery.data?.candidates]);
+  }, [mockState, rssDiscoverQuery.data?.candidates]);
 
   const dialogTitle = useMemo(() => {
     if (!activeStep) {
@@ -472,21 +679,23 @@ export function WelcomePage() {
   }, [activeStep]);
 
   const dialogDescription = useMemo(() => {
+    const mockLabel = mockState ? ` Mock mode: ${mockState.scenario.replace(/-/g, ' ')}.` : '';
+
     if (!activeStep) {
-      return 'Pick an integration to connect or review. Connected providers jump straight to the subscriptions list.';
+      return `Pick an integration to connect or review. Connected providers jump straight to the subscriptions list.${mockLabel}`;
     }
 
     switch (activeStep) {
       case 'SPOTIFY':
-        return 'Connect Spotify and pick which podcasts to bring into Zine.';
+        return `Connect Spotify and pick which podcasts to bring into Zine.${mockLabel}`;
       case 'YOUTUBE':
-        return 'Connect YouTube and pick which channels to bring into Zine.';
+        return `Connect YouTube and pick which channels to bring into Zine.${mockLabel}`;
       case 'GMAIL':
-        return 'Connect Gmail and pick which newsletters to keep active in Zine.';
+        return `Connect Gmail and pick which newsletters to keep active in Zine.${mockLabel}`;
       case 'RSS':
-        return 'Paste a URL and pick which feeds to follow.';
+        return `Paste a URL and pick which feeds to follow.${mockLabel}`;
     }
-  }, [activeStep]);
+  }, [activeStep, mockState]);
 
   return (
     <Dialog open onOpenChange={(open) => (!open ? handleClose() : undefined)}>
@@ -530,8 +739,8 @@ export function WelcomePage() {
             {activeStep === 'SPOTIFY' ? (
               <SpotifyStep
                 connections={connections}
-                available={spotifyAvailable.data?.items ?? []}
-                isLoading={spotifyAvailable.isLoading}
+                available={spotifyItems}
+                isLoading={!mockState && spotifyAvailable.isLoading}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('SPOTIFY')}
                 onBack={handleBackToIntegrations}
@@ -543,12 +752,14 @@ export function WelcomePage() {
             {activeStep === 'YOUTUBE' ? (
               <YoutubeStep
                 connections={connections}
-                available={youtubeAvailable.data?.items ?? []}
-                isLoading={youtubeAvailable.isLoading}
+                available={youtubeItems}
+                isLoading={!mockState && youtubeAvailable.isLoading}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('YOUTUBE')}
                 onBack={handleBackToIntegrations}
                 onImport={importYoutube}
+                onDisconnect={() => void handleDisconnect('YOUTUBE')}
+                isDisconnecting={disconnectingProvider === 'YOUTUBE'}
                 error={stepError.YOUTUBE ?? null}
               />
             ) : null}
@@ -556,9 +767,9 @@ export function WelcomePage() {
             {activeStep === 'GMAIL' ? (
               <GmailStep
                 connections={connections}
-                newsletters={newslettersListQuery.data?.items ?? []}
-                isLoading={newslettersListQuery.isLoading}
-                isSyncing={syncNewsletters.isPending}
+                newsletters={newsletters}
+                isLoading={!mockState && newslettersListQuery.isLoading}
+                isSyncing={!mockState && syncNewsletters.isPending}
                 isImporting={isImporting}
                 onConnect={() => void handleConnect('GMAIL')}
                 onScan={() => void handleScanNewsletters()}
@@ -573,10 +784,17 @@ export function WelcomePage() {
                 url={rssUrl}
                 onUrlChange={setRssUrl}
                 onDiscover={() => {
-                  if (rssUrl.trim()) setRssDiscoveryUrl(rssUrl.trim());
+                  if (!rssUrl.trim()) return;
+                  if (mockState) {
+                    setMockState((current) =>
+                      current ? discoverMockFeeds(current, rssUrl.trim()) : current
+                    );
+                    return;
+                  }
+                  setRssDiscoveryUrl(rssUrl.trim());
                 }}
                 candidates={rssCandidates}
-                isDiscovering={rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
+                isDiscovering={!mockState && rssDiscoverQuery.isLoading && Boolean(rssDiscoveryUrl)}
                 isImporting={isImporting}
                 onBack={handleBackToIntegrations}
                 onImport={importRss}
@@ -709,8 +927,13 @@ function YoutubeStep({
   onConnect,
   onBack,
   onImport,
+  onDisconnect,
+  isDisconnecting,
   error,
-}: ProviderStepProps) {
+}: ProviderStepProps & {
+  onDisconnect: () => void;
+  isDisconnecting: boolean;
+}) {
   const connected = isConnected(connections, 'YOUTUBE');
   const config = sourceConfigs.YOUTUBE;
 
@@ -727,12 +950,10 @@ function YoutubeStep({
     );
   }
 
+  const brand = INTRO_BRAND.YOUTUBE;
+
   return (
-    <StepShell
-      title={config.title}
-      summary="Pick the YouTube channels to import."
-      stepIcon="YOUTUBE"
-    >
+    <div className="wizard-provider-step">
       {error ? <p className="wizard-connect__error">{error}</p> : null}
       <SubscriptionPicker
         testId="youtube-picker"
@@ -745,8 +966,91 @@ function YoutubeStep({
         onImport={onImport}
         onBack={onBack}
         isImporting={isImporting}
+        itemDescriptionFallback={() => 'YouTube channel'}
+        renderItemMedia={(item) => (
+          <span
+            className="picker-row__avatar"
+            style={{ backgroundColor: brand.bg }}
+            aria-hidden="true"
+          >
+            {item.label.trim().charAt(0).toUpperCase() || 'Y'}
+          </span>
+        )}
+        headerSlot={
+          <ProviderAccountBar
+            provider="YOUTUBE"
+            accountLabel="Connected to YouTube"
+            onDisconnect={onDisconnect}
+            isDisconnecting={isDisconnecting}
+          />
+        }
       />
-    </StepShell>
+    </div>
+  );
+}
+
+type ProviderAccountBarProps = {
+  provider: IntegrationStep;
+  accountLabel: string;
+  onDisconnect: () => void;
+  isDisconnecting: boolean;
+};
+
+function ProviderAccountBar({
+  provider,
+  accountLabel,
+  onDisconnect,
+  isDisconnecting,
+}: ProviderAccountBarProps) {
+  const [confirming, setConfirming] = useState(false);
+  const brand = INTRO_BRAND[provider];
+
+  return (
+    <div className="wizard-account-chip" role="group" aria-label={`${provider} account`}>
+      <span
+        className="wizard-account-chip__icon"
+        style={{ backgroundColor: brand.bg }}
+        aria-hidden="true"
+      >
+        {brand.icon}
+      </span>
+      <span className="wizard-account-chip__label">
+        <span className="wizard-account-chip__status" aria-hidden="true" />
+        {accountLabel}
+      </span>
+      {confirming ? (
+        <span className="wizard-account-chip__actions">
+          <button
+            type="button"
+            className="wizard-account-chip__link"
+            onClick={() => setConfirming(false)}
+            disabled={isDisconnecting}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="wizard-account-chip__link wizard-account-chip__link--danger"
+            onClick={() => {
+              onDisconnect();
+              setConfirming(false);
+            }}
+            disabled={isDisconnecting}
+          >
+            {isDisconnecting ? 'Disconnecting…' : 'Confirm disconnect'}
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="wizard-account-chip__link"
+          onClick={() => setConfirming(true)}
+          disabled={isDisconnecting}
+        >
+          Disconnect
+        </button>
+      )}
+    </div>
   );
 }
 

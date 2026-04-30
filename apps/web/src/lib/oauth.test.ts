@@ -1,5 +1,5 @@
 import { Provider } from '@zine/shared';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const createTRPCClientMock = vi.fn();
 const httpBatchLinkMock = vi.fn((options: unknown) => options);
@@ -55,6 +55,10 @@ describe('oauth helpers', () => {
     sessionStorage.clear();
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   test('connectProvider rejects when the provider client id is missing', async () => {
     const { connectProvider } = await loadOAuthModule({ SPOTIFY_CLIENT_ID: '' });
 
@@ -89,6 +93,30 @@ describe('oauth helpers', () => {
     expect(redirectUrl.searchParams.get('code_challenge_method')).toBe('S256');
     expect(redirectUrl.searchParams.get('access_type')).toBe('offline');
     expect(redirectUrl.searchParams.get('prompt')).toBe('consent');
+  });
+
+  test('connectProvider falls back when secure-context crypto helpers are unavailable', async () => {
+    const originalCrypto = globalThis.crypto;
+
+    vi.stubGlobal('crypto', {
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto),
+    });
+
+    const { connectProvider } = await loadOAuthModule();
+    const redirectMock = vi.fn();
+
+    await connectProvider('YOUTUBE', async () => 'token-123', redirectMock);
+
+    expect(registerStateMutate).toHaveBeenCalledTimes(1);
+
+    const [registration] = registerStateMutate.mock.calls[0]!;
+    expect(registration.state).toMatch(
+      /^YOUTUBE:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+
+    const redirectUrl = new URL(redirectMock.mock.calls[0][0] as string);
+    expect(redirectUrl.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(redirectUrl.searchParams.get('code_challenge')).toMatch(/^[A-Za-z0-9_-]{43}$/);
   });
 
   test('completeOAuthFlow exchanges the callback code and clears stored oauth state', async () => {

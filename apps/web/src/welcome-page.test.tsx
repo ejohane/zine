@@ -181,9 +181,47 @@ describe('WelcomePage — integration launcher', () => {
 
     await openIntegration(user, 'YouTube');
 
-    expect(screen.getByRole('heading', { name: 'YouTube', level: 2 })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Import from YouTube' })).toBeVisible();
     expect(screen.getByRole('checkbox', { name: 'Wendover Productions' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Connect YouTube' })).toBeNull();
+  });
+
+  test('YouTube step exposes an account bar and disconnect confirm flow', async () => {
+    const user = userEvent.setup();
+
+    mockConnected({ YOUTUBE: true });
+    mockDiscoverItems({ YOUTUBE: [{ id: 'channel-1', name: 'Wendover Productions' }] });
+
+    renderRoute(<WelcomePage />, { route: '/welcome', path: '/welcome' });
+
+    await openIntegration(user, 'YouTube');
+
+    expect(screen.getByText('Connected to YouTube')).toBeVisible();
+    const disconnectButton = screen.getByRole('button', { name: 'Disconnect' });
+    await user.click(disconnectButton);
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Confirm disconnect' }));
+
+    expect(mutationSpies.connectionsDisconnect).toHaveBeenCalledWith({ provider: 'YOUTUBE' });
+  });
+
+  test('dev mock mode can simulate the YouTube connect-to-picker transition without OAuth', async () => {
+    const user = userEvent.setup();
+
+    renderRoute(<WelcomePage />, {
+      route: '/welcome?mockOnboarding=youtube-connect',
+      path: '/welcome',
+    });
+
+    expect(screen.getByText(/Mock mode: youtube connect/i)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Connect YouTube' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Connect YouTube' }));
+
+    expect(connectProvider).not.toHaveBeenCalled();
+    expect(screen.getByRole('searchbox', { name: /Search YouTube/i })).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Wendover Productions' })).toBeVisible();
   });
 
   test('Newsletters opens the disconnected connect state when Gmail is not connected', async () => {
@@ -195,6 +233,22 @@ describe('WelcomePage — integration launcher', () => {
 
     expect(screen.getByRole('heading', { name: 'Newsletters', level: 2 })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Connect Newsletters' })).toBeVisible();
+  });
+
+  test('dev mock mode can simulate a Gmail scan and show newsletter choices', async () => {
+    const user = userEvent.setup();
+
+    renderRoute(<WelcomePage />, {
+      route: '/welcome?mockOnboarding=gmail-scan',
+      path: '/welcome',
+    });
+
+    expect(screen.getByRole('button', { name: 'Scan newsletters' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Scan newsletters' }));
+
+    expect(screen.getByRole('checkbox', { name: 'Stratechery' })).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: 'Morning Brew' })).toBeVisible();
   });
 
   test('connected Newsletters starts on the sender list and updates statuses', async () => {
