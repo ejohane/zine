@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, useNavigation } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { FlatList, type ListRenderItemInfo, StyleSheet, View } from 'react-native';
+import type { SearchBarCommands } from 'react-native-screens';
 
 import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
@@ -26,6 +27,8 @@ type SearchRow =
 export default function SearchTabScreen() {
   const navigation = useNavigation();
   const listScrollRef = useRef<FlatList<SearchRow>>(null);
+  const searchBarRef = useRef<SearchBarCommands | null>(null);
+  const focusSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -40,6 +43,17 @@ export default function SearchTabScreen() {
   }, [searchQuery]);
 
   const { data, isLoading, error } = useSearchResults(debouncedSearchQuery);
+
+  const focusSearchBar = useCallback(() => {
+    if (focusSearchTimeoutRef.current) {
+      clearTimeout(focusSearchTimeoutRef.current);
+    }
+
+    focusSearchTimeoutRef.current = setTimeout(() => {
+      searchBarRef.current?.focus();
+      focusSearchTimeoutRef.current = null;
+    }, 100);
+  }, []);
 
   const searchRows: SearchRow[] = useMemo(
     () =>
@@ -75,12 +89,24 @@ export default function SearchTabScreen() {
   useEffect(() => {
     const tabNavigation = navigation.getParent() ?? navigation;
 
-    return tabNavigation.addListener('tabPress', () => {
+    const removeTabPressListener = tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
+      focusSearchBar();
     });
-  }, [navigation]);
+
+    const removeFocusListener = navigation.addListener('focus', focusSearchBar);
+
+    return () => {
+      if (focusSearchTimeoutRef.current) {
+        clearTimeout(focusSearchTimeoutRef.current);
+        focusSearchTimeoutRef.current = null;
+      }
+      removeTabPressListener();
+      removeFocusListener();
+    };
+  }, [focusSearchBar, navigation]);
 
   const renderItem = useCallback(({ item, index }: ListRenderItemInfo<SearchRow>) => {
     if (item.type === 'creator') {
@@ -114,6 +140,8 @@ export default function SearchTabScreen() {
           tintColor: colors.text,
           screenTitle: 'Search',
           headerSearchBarOptions: {
+            ref: searchBarRef,
+            autoFocus: true,
             placement: 'automatic',
             placeholder: 'Search your library',
             hideWhenScrolling: false,
