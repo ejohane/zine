@@ -15,6 +15,8 @@ import { logger } from '@/lib/logger';
 
 import { ItemDetailActions } from './detail/components/ItemDetailActions';
 import { ItemDetailFloatingBack } from './detail/components/ItemDetailFloatingBack';
+import { ItemDetailOtherBookmarks } from './detail/components/ItemDetailOtherBookmarks';
+import type { ItemDetailItem } from './detail/types';
 import { extractXHandle } from './item-detail-helpers';
 import { styles, xPostStyles } from './item-detail-styles';
 
@@ -101,6 +103,8 @@ export function XPostBookmarkView({
   onScroll,
   onContentLayout,
   onTitleLayout,
+  otherUnfinishedBookmarks = [],
+  onOtherBookmarkPress,
 }: {
   item: {
     id: string;
@@ -116,7 +120,7 @@ export function XPostBookmarkView({
     state: UserItemState;
   };
   colors: typeof Colors.dark;
-  insets: { top: number; bottom: number };
+  insets: { top: number; bottom: number; left: number; right: number };
   onBack: () => void;
   onOpenLink: () => void;
   onShare: () => void;
@@ -135,6 +139,8 @@ export function XPostBookmarkView({
   onScroll: ScrollViewProps['onScroll'];
   onContentLayout: (contentTopY: number) => void;
   onTitleLayout: (titleOffsetY: number) => void;
+  otherUnfinishedBookmarks?: ItemDetailItem[];
+  onOtherBookmarkPress?: (id: string) => void;
 }) {
   // Extract @handle from URL as fallback if creatorData.handle not available
   const handle = creatorData?.handle || extractXHandle(item.canonicalUrl);
@@ -303,6 +309,14 @@ export function XPostBookmarkView({
           </View>
         </View>
       </Animated.View>
+
+      {onOtherBookmarkPress && (
+        <ItemDetailOtherBookmarks
+          bookmarks={otherUnfinishedBookmarks}
+          colors={colors}
+          onBookmarkPress={onOtherBookmarkPress}
+        />
+      )}
     </>
   );
 

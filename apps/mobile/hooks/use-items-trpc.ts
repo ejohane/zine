@@ -197,6 +197,7 @@ function createOptimisticConfig<TInput extends { id: string }>(
     utils.items.inbox.invalidate();
     utils.items.library.invalidate();
     utils.items.home.invalidate();
+    utils.items.otherUnfinishedBookmarksByCreator.invalidate();
     if (options.updateSingleItem) {
       utils.items.get.invalidate({ id: input.id });
     }
@@ -457,6 +458,16 @@ export function useHomeData(options?: HomeItemsOptions) {
  */
 export function useItem(id: string) {
   return trpc.items.get.useQuery({ id }, { enabled: !!id });
+}
+
+export function useOtherUnfinishedBookmarksByCreator(id: string) {
+  return trpc.items.otherUnfinishedBookmarksByCreator.useQuery(
+    { id },
+    {
+      enabled: !!id,
+      placeholderData: keepPreviousData,
+    }
+  );
 }
 
 /**
@@ -832,6 +843,7 @@ export function useToggleFinished() {
         utils.items.library.invalidate();
         utils.items.inbox.invalidate();
         utils.items.home.invalidate();
+        utils.items.otherUnfinishedBookmarksByCreator.invalidate();
         utils.items.get.invalidate({ id });
       });
 
@@ -846,6 +858,7 @@ export function useToggleFinished() {
           utils.items.library.invalidate();
           utils.items.inbox.invalidate();
           utils.items.home.invalidate();
+          utils.items.otherUnfinishedBookmarksByCreator.invalidate();
           utils.items.get.invalidate({ id });
         }
       }
@@ -859,6 +872,7 @@ export function useToggleFinished() {
       utils.items.library.invalidate();
       utils.items.inbox.invalidate();
       utils.items.home.invalidate();
+      utils.items.otherUnfinishedBookmarksByCreator.invalidate();
       utils.items.get.invalidate({ id });
       invalidateRecapQueries(utils);
     },

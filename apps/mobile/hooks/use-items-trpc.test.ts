@@ -15,6 +15,7 @@ const mockInboxUseInfiniteQuery = jest.fn();
 const mockLibraryUseQuery = jest.fn();
 const mockLibraryUseInfiniteQuery = jest.fn();
 const mockHomeUseQuery = jest.fn();
+const mockOtherUnfinishedBookmarksByCreatorUseQuery = jest.fn();
 const mockBookmarkUseMutation = jest.fn();
 const mockArchiveUseMutation = jest.fn();
 const mockToggleFinishedUseMutation = jest.fn();
@@ -33,6 +34,9 @@ jest.mock('../lib/trpc', () => ({
       },
       home: {
         useQuery: mockHomeUseQuery,
+      },
+      otherUnfinishedBookmarksByCreator: {
+        useQuery: mockOtherUnfinishedBookmarksByCreatorUseQuery,
       },
       bookmark: {
         useMutation: (...args: unknown[]) => mockBookmarkUseMutation(...args),
@@ -231,6 +235,7 @@ function createToggleUtils(initial?: {
   const mockInboxInvalidate = jest.fn();
   const mockHomeInvalidate = jest.fn();
   const mockGetInvalidate = jest.fn();
+  const mockOtherUnfinishedBookmarksByCreatorInvalidate = jest.fn();
   const mockWeeklyRecapInvalidate = jest.fn();
   const mockWeeklyRecapTeaserInvalidate = jest.fn();
 
@@ -330,6 +335,9 @@ function createToggleUtils(initial?: {
           return next;
         }),
       },
+      otherUnfinishedBookmarksByCreator: {
+        invalidate: mockOtherUnfinishedBookmarksByCreatorInvalidate,
+      },
     },
     insights: {
       weeklyRecap: {
@@ -354,6 +362,7 @@ function createToggleUtils(initial?: {
       mockInboxInvalidate,
       mockHomeInvalidate,
       mockGetInvalidate,
+      mockOtherUnfinishedBookmarksByCreatorInvalidate,
       mockWeeklyRecapInvalidate,
       mockWeeklyRecapTeaserInvalidate,
     },
@@ -391,6 +400,11 @@ beforeEach(() => {
   });
   mockHomeUseQuery.mockReturnValue({
     data: null,
+    isLoading: false,
+    error: null,
+  });
+  mockOtherUnfinishedBookmarksByCreatorUseQuery.mockReturnValue({
+    data: { items: [] },
     isLoading: false,
     error: null,
   });

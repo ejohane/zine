@@ -11,6 +11,7 @@ import { ItemDetailCreatorRow } from './ItemDetailCreatorRow';
 import { ItemDetailDescription } from './ItemDetailDescription';
 import { ItemDetailHeader } from './ItemDetailHeader';
 import { ItemDetailMetaRow } from './ItemDetailMetaRow';
+import { ItemDetailOtherBookmarks } from './ItemDetailOtherBookmarks';
 
 type ItemDetailContentProps = {
   item: ItemDetailItem;
@@ -30,6 +31,8 @@ type ItemDetailContentProps = {
   onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
+  otherUnfinishedBookmarks?: ItemDetailItem[];
+  onOtherBookmarkPress?: (id: string) => void;
   useAnimatedDescription: boolean;
   useAnimatedActions: boolean;
   onContentLayout?: (contentTopY: number) => void;
@@ -54,6 +57,8 @@ export function ItemDetailContent({
   onManageTags,
   onShare,
   onOpenLink,
+  otherUnfinishedBookmarks = [],
+  onOtherBookmarkPress,
   useAnimatedActions,
   useAnimatedDescription,
   onContentLayout,
@@ -110,6 +115,14 @@ export function ItemDetailContent({
             />
           </Surface>
         </DescriptionContainer>
+      )}
+
+      {onOtherBookmarkPress && (
+        <ItemDetailOtherBookmarks
+          bookmarks={otherUnfinishedBookmarks}
+          colors={colors}
+          onBookmarkPress={onOtherBookmarkPress}
+        />
       )}
     </>
   );

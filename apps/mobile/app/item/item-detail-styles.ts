@@ -202,6 +202,25 @@ export const styles = StyleSheet.create({
     ...Typography.bodyMedium,
     lineHeight: 24,
   },
+
+  // Other bookmarks
+  otherBookmarksContainer: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  otherBookmarksSurface: {
+    paddingVertical: Spacing.lg,
+    overflow: 'hidden',
+  },
+  otherBookmarksHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  otherBookmarksHeaderExpanded: {
+    marginBottom: Spacing.md,
+  },
 });
 
 // X Post Styles
