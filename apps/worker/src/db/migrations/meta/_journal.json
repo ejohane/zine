@@ -64,6 +64,13 @@
       "when": 1773705600000,
       "tag": "0008_add_weekly_recap_support",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777507200000,
+      "tag": "0009_add_item_enrichment",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@
  */
 
 import type { Context } from 'hono';
+import type { EnrichmentQueueMessage } from './enrichment/types';
 import type { SyncQueueMessage } from './sync/types';
 
 /**
@@ -21,8 +22,18 @@ export interface Bindings {
   CREATOR_CONTENT_CACHE: KVNamespace;
   /** R2 bucket for article content storage */
   ARTICLE_CONTENT: R2Bucket;
+  /** Workers AI binding for enrichment and embeddings */
+  AI?: Ai;
+  /** Cloudflare Vectorize index for item embeddings */
+  ITEM_VECTORS?: VectorizeIndex;
   /** Current environment (development, staging, production) */
   ENVIRONMENT: string;
+  /** Workers AI model used for bookmark enrichment */
+  ENRICHMENT_MODEL?: string;
+  /** Workers AI model used for item embeddings */
+  EMBEDDING_MODEL?: string;
+  /** Embedding vector dimensions */
+  EMBEDDING_DIMENSIONS?: string;
   /** Clerk publishable key */
   CLERK_PUBLISHABLE_KEY?: string;
   /** Clerk secret key for backend operations */
@@ -63,6 +74,8 @@ export interface Bindings {
   RELEASE_RING?: string;
   /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
   SYNC_QUEUE?: Queue<SyncQueueMessage>;
+  /** Queue for async bookmark enrichment (optional - not available in all envs) */
+  ENRICHMENT_QUEUE?: Queue<EnrichmentQueueMessage>;
 }
 
 /**
