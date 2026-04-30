@@ -57,11 +57,7 @@ export function ItemDetailOtherBookmarks({
           accessibilityLabel="Toggle other bookmarks from creator"
           accessibilityState={{ expanded: isExpanded }}
           onPress={() => setIsExpanded((current) => !current)}
-          style={({ pressed }) => [
-            styles.otherBookmarksHeader,
-            isExpanded ? styles.otherBookmarksHeaderExpanded : null,
-            pressed ? { opacity: 0.72 } : null,
-          ]}
+          style={({ pressed }) => [styles.otherBookmarksHeader, pressed ? { opacity: 0.72 } : null]}
         >
           <Text variant="labelSmall" tone="tertiary" colors={colors}>
             Your Bookmarks
@@ -73,17 +69,15 @@ export function ItemDetailOtherBookmarks({
           />
         </Pressable>
 
-        {isExpanded
-          ? items.map((item, index) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                shape="row"
-                index={index}
-                onPress={() => onBookmarkPress(item.id)}
-              />
-            ))
-          : null}
+        {(isExpanded ? items : items.slice(0, 1)).map((item, index) => (
+          <ItemCard
+            key={item.id}
+            item={item}
+            shape="row"
+            index={index}
+            onPress={() => onBookmarkPress(item.id)}
+          />
+        ))}
       </Surface>
     </View>
   );

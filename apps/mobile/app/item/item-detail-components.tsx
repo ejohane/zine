@@ -28,10 +28,12 @@ export function LinkedText({
   children,
   style,
   linkColor,
+  numberOfLines,
 }: {
   children: string;
   style?: object;
   linkColor: string;
+  numberOfLines?: number;
 }) {
   const parts = children.split(URL_REGEX);
 
@@ -47,7 +49,7 @@ export function LinkedText({
   };
 
   return (
-    <Text style={style}>
+    <Text style={style} numberOfLines={numberOfLines}>
       {parts.map((part, index) => {
         if (URL_REGEX.test(part)) {
           // Reset regex lastIndex since we're reusing it
