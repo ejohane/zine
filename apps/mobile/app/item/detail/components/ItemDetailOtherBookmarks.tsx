@@ -48,10 +48,10 @@ export function ItemDetailOtherBookmarks({
         accessibilityLabel="Other bookmarks from creator"
       >
         <View style={styles.otherBookmarksHeader}>
-          <Text style={styles.otherBookmarksTitle} tone="primary" colors={colors}>
+          <Text variant="labelSmall" tone="tertiary" colors={colors}>
             Your Bookmarks
           </Text>
-          <Text style={styles.otherBookmarksCount} tone="subheader" colors={colors}>
+          <Text variant="labelSmall" tone="tertiary" colors={colors}>
             {items.length} item{items.length === 1 ? '' : 's'}
           </Text>
         </View>

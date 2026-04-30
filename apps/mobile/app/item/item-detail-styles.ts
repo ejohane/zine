@@ -219,13 +219,6 @@ export const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  otherBookmarksTitle: {
-    ...Typography.titleMedium,
-    fontWeight: '600',
-  },
-  otherBookmarksCount: {
-    ...Typography.bodySmall,
-  },
 });
 
 // X Post Styles
