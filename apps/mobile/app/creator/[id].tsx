@@ -14,9 +14,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet, Pressable } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { useEffect, useMemo, useRef } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -31,6 +38,10 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useCreator, useCreatorBookmarks } from '@/hooks/use-creator';
 import { analytics, type CreatorViewSource } from '@/lib/analytics';
 import { upgradeYouTubeImageUrl, upgradeSpotifyImageUrl } from '@/lib/content-utils';
+import {
+  COLLAPSED_TITLE_THRESHOLD,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 
 function isHttpUrl(value: string | null | undefined): boolean {
   if (!value) {
@@ -88,15 +99,79 @@ function HeaderIconButton({
   );
 }
 
+function CreatorFloatingHeader({
+  colors,
+  insetsTop,
+  onBack,
+  screenTitle,
+  showCollapsedTitle,
+}: {
+  colors: typeof Colors.dark;
+  insetsTop: number;
+  onBack: () => void;
+  screenTitle: string;
+  showCollapsedTitle: boolean;
+}) {
+  const backdropHeight = showCollapsedTitle ? insetsTop + 56 : 0;
+
+  return (
+    <View style={styles.floatingOverlay} pointerEvents="box-none">
+      {backdropHeight > 0 ? (
+        <Animated.View
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(160)}
+          style={[
+            styles.floatingHeaderBackdrop,
+            {
+              backgroundColor: colors.background,
+              height: backdropHeight,
+            },
+          ]}
+          pointerEvents="none"
+        />
+      ) : null}
+
+      {showCollapsedTitle ? (
+        <Animated.View
+          entering={FadeIn.duration(160)}
+          exiting={FadeOut.duration(160)}
+          style={[styles.floatingTitleContainer, { top: insetsTop + 14 }]}
+          pointerEvents="none"
+        >
+          <Text style={[styles.floatingTitle, { color: colors.text }]} numberOfLines={1}>
+            {screenTitle}
+          </Text>
+        </Animated.View>
+      ) : null}
+
+      <View style={[styles.floatingHeader, { top: insetsTop + 8 }]} pointerEvents="box-none">
+        <Animated.View>
+          <HeaderIconButton icon="chevron-back" colors={colors} onPress={onBack} />
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
 export default function CreatorScreen() {
   const { id, source } = useLocalSearchParams<{ id: string; source?: CreatorViewSource }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
 
   const { creator, isLoading, error, refetch } = useCreator(id ?? '');
   const { bookmarks } = useCreatorBookmarks(id ?? '');
+  const hasImage = !!creator?.imageUrl;
+  const headerHeightFraction = hasImage ? 0.35 : 0.45;
+  const collapsedTitleThreshold = useMemo(
+    () => Math.max(COLLAPSED_TITLE_THRESHOLD, height * headerHeightFraction - 72),
+    [headerHeightFraction, height]
+  );
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle({
+    threshold: collapsedTitleThreshold,
+  });
 
   // Track view once when creator data is loaded
   const hasTrackedView = useRef(false);
@@ -179,7 +254,6 @@ export default function CreatorScreen() {
   }
 
   // Success state with creator data
-  const hasImage = !!creator.imageUrl;
   const sourceUrlForDiscovery = getSourceUrlForDiscovery(
     creator.externalUrl,
     creator.providerCreatorId,
@@ -206,6 +280,7 @@ export default function CreatorScreen() {
               />
             }
             headerHeightFraction={0.35}
+            onScroll={handleScroll}
           >
             <Animated.View>
               <CreatorHeader creator={creator} sourceUrlForDiscovery={sourceUrlForDiscovery} />
@@ -219,12 +294,13 @@ export default function CreatorScreen() {
           </ParallaxScrollView>
         </Animated.View>
 
-        {/* Floating Back Button */}
-        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-          <Animated.View>
-            <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
-          </Animated.View>
-        </View>
+        <CreatorFloatingHeader
+          colors={colors}
+          insetsTop={insets.top}
+          onBack={() => router.back()}
+          screenTitle={creator.name}
+          showCollapsedTitle={showCollapsedTitle}
+        />
       </View>
     );
   }
@@ -246,6 +322,7 @@ export default function CreatorScreen() {
             </View>
           }
           headerHeightFraction={0.45}
+          onScroll={handleScroll}
         >
           <Animated.View>
             <CreatorHeader creator={creator} sourceUrlForDiscovery={sourceUrlForDiscovery} />
@@ -259,12 +336,13 @@ export default function CreatorScreen() {
         </ParallaxScrollView>
       </Animated.View>
 
-      {/* Floating Back Button */}
-      <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-        <Animated.View>
-          <HeaderIconButton icon="chevron-back" colors={colors} onPress={() => router.back()} />
-        </Animated.View>
-      </View>
+      <CreatorFloatingHeader
+        colors={colors}
+        insetsTop={insets.top}
+        onBack={() => router.back()}
+        screenTitle={creator.name}
+        showCollapsedTitle={showCollapsedTitle}
+      />
     </View>
   );
 }
@@ -340,6 +418,26 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     zIndex: 100,
+  },
+  floatingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+  },
+  floatingHeaderBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  floatingTitleContainer: {
+    position: 'absolute',
+    left: 72,
+    right: 72,
+    alignItems: 'center',
+    zIndex: 101,
+  },
+  floatingTitle: {
+    ...Typography.titleMedium,
   },
   headerIconButton: {
     width: 40,
