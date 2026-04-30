@@ -54,7 +54,8 @@ export default function ItemDetailScreen() {
   const [titleOffsetY, setTitleOffsetY] = useState<number | null>(null);
 
   const { id, isValid, message } = useItemDetailParams();
-  const { item, isLoading, error, refetch, creatorData } = useItemDetailData({ id, isValid });
+  const { item, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
+    useItemDetailData({ id, isValid });
   const {
     handleOpenLink,
     handleShare,
@@ -143,6 +144,8 @@ export default function ItemDetailScreen() {
         onScroll={handleScroll}
         onContentLayout={handleContentLayout}
         onTitleLayout={handleTitleLayout}
+        otherUnfinishedBookmarks={otherUnfinishedBookmarks}
+        onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
       />
     );
   }
@@ -189,6 +192,8 @@ export default function ItemDetailScreen() {
           onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
           onShare={handleShare}
           onOpenLink={handleOpenLink}
+          otherUnfinishedBookmarks={otherUnfinishedBookmarks}
+          onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
           useAnimatedActions
           useAnimatedDescription
           onContentLayout={handleContentLayout}
@@ -227,6 +232,8 @@ export default function ItemDetailScreen() {
         onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
         onShare={handleShare}
         onOpenLink={handleOpenLink}
+        otherUnfinishedBookmarks={otherUnfinishedBookmarks}
+        onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
         useAnimatedActions={false}
         useAnimatedDescription={false}
         onContentLayout={handleContentLayout}

@@ -9,11 +9,14 @@ import { useItemDetailData } from '@/app/item/detail/hooks/useItemDetailData';
 // Module-level Mocks
 
 const mockUseItem = jest.fn();
+const mockUseOtherUnfinishedBookmarksByCreator = jest.fn();
 const mockUseCreator = jest.fn();
 const mockRefetch = jest.fn();
 
 jest.mock('@/hooks/use-items-trpc', () => ({
   useItem: (id: string) => mockUseItem(id),
+  useOtherUnfinishedBookmarksByCreator: (id: string) =>
+    mockUseOtherUnfinishedBookmarksByCreator(id),
 }));
 
 jest.mock('@/hooks/use-creator', () => ({
@@ -37,14 +40,21 @@ describe('useItemDetailData', () => {
       error: null,
       refetch: jest.fn(),
     });
+    mockUseOtherUnfinishedBookmarksByCreator.mockReturnValue({
+      data: { items: [] },
+      isLoading: false,
+      error: null,
+    });
   });
 
   it('uses an empty id when params are invalid', () => {
     const { result } = renderHook(() => useItemDetailData({ id: 'bad-id', isValid: false }));
 
     expect(mockUseItem).toHaveBeenCalledWith('');
+    expect(mockUseOtherUnfinishedBookmarksByCreator).toHaveBeenCalledWith('');
     expect(mockUseCreator).toHaveBeenCalledWith('');
     expect(result.current.item).toBeNull();
+    expect(result.current.otherUnfinishedBookmarks).toEqual([]);
   });
 
   it('requests creator data for the item creator', () => {
@@ -67,6 +77,7 @@ describe('useItemDetailData', () => {
     const { result } = renderHook(() => useItemDetailData({ id: 'item-1', isValid: true }));
 
     expect(mockUseItem).toHaveBeenCalledWith('item-1');
+    expect(mockUseOtherUnfinishedBookmarksByCreator).toHaveBeenCalledWith('item-1');
     expect(mockUseCreator).toHaveBeenCalledWith('creator-1');
     expect(result.current.creatorData).toBe(creator);
     expect(result.current.item).toBe(item);

@@ -6,6 +6,7 @@ import {
   eq,
   and,
   desc,
+  ne,
   or,
   lt,
   isNotNull,
@@ -680,6 +681,60 @@ export const itemsRouter = router({
       },
     };
   }),
+
+  /**
+   * Get other unfinished bookmarked items from the same creator as a detail item.
+   */
+  otherUnfinishedBookmarksByCreator: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        limit: z.number().min(1).max(10).default(5),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const current = await ctx.db
+        .select({
+          creatorId: items.creatorId,
+        })
+        .from(userItems)
+        .innerJoin(items, eq(userItems.itemId, items.id))
+        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
+        .limit(1);
+
+      if (current.length === 0) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+
+      const creatorId = current[0].creatorId;
+      if (!creatorId) {
+        return { items: [] };
+      }
+
+      const results = await ctx.db
+        .select()
+        .from(userItems)
+        .innerJoin(items, eq(userItems.itemId, items.id))
+        .leftJoin(creators, eq(items.creatorId, creators.id))
+        .where(
+          and(
+            eq(userItems.userId, ctx.userId),
+            eq(userItems.state, UserItemState.BOOKMARKED),
+            eq(userItems.isFinished, false),
+            eq(items.creatorId, creatorId),
+            ne(userItems.id, input.id)
+          )
+        )
+        .orderBy(desc(userItems.bookmarkedAt), desc(userItems.ingestedAt), desc(userItems.id))
+        .limit(input.limit);
+
+      const itemViews = await toItemViewsWithTags(ctx, results);
+
+      return { items: itemViews };
+    }),
 
   /**
    * Get a single item by UserItem ID.

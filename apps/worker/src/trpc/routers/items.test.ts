@@ -220,6 +220,35 @@ function createMockItemsCaller(options: {
       return item;
     },
 
+    otherUnfinishedBookmarksByCreator: async (input: { id: string; limit?: number }) => {
+      if (!userId) {
+        throw new TRPCError({ code: 'UNAUTHORIZED' });
+      }
+      const item = allItems.get(input.id);
+      if (!item) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `Item ${input.id} not found`,
+        });
+      }
+      if (!item.creatorId) {
+        return { items: [] };
+      }
+
+      const limit = input.limit ?? 5;
+      return {
+        items: libraryItems
+          .filter(
+            (candidate) =>
+              candidate.id !== item.id &&
+              candidate.creatorId === item.creatorId &&
+              candidate.state === UserItemState.BOOKMARKED &&
+              candidate.isFinished === false
+          )
+          .slice(0, limit),
+      };
+    },
+
     bookmark: async (input: { id: string }) => {
       if (!userId) {
         throw new TRPCError({ code: 'UNAUTHORIZED' });
@@ -340,6 +369,11 @@ describe('Items Router', () => {
     it('should reject unauthenticated requests to get', async () => {
       const caller = createMockItemsCaller({ userId: null });
       await expectUnauthorized(() => caller.get({ id: 'ui-001' }));
+    });
+
+    it('should reject unauthenticated requests to other unfinished bookmarks by creator', async () => {
+      const caller = createMockItemsCaller({ userId: null });
+      await expectUnauthorized(() => caller.otherUnfinishedBookmarksByCreator({ id: 'ui-001' }));
     });
 
     it('should reject unauthenticated requests to bookmark', async () => {
@@ -924,6 +958,76 @@ describe('Items Router', () => {
         expect(result.items[0].isFinished).toBe(true);
         expect(result.items[0].contentType).toBe(ContentType.VIDEO);
         expect(result.items[0].provider).toBe(Provider.YOUTUBE);
+      });
+    });
+  });
+
+  // items.otherUnfinishedBookmarksByCreator Tests
+
+  describe('items.otherUnfinishedBookmarksByCreator', () => {
+    it('returns other unfinished bookmarked items by the same creator', async () => {
+      const current = createMockItemView({
+        id: 'ui-current',
+        creatorId: 'creator-1',
+        creator: 'Creator One',
+        state: UserItemState.BOOKMARKED,
+        isFinished: false,
+      });
+      const sameCreatorUnfinished = createMockItemView({
+        id: 'ui-same-unfinished',
+        creatorId: 'creator-1',
+        creator: 'Creator One',
+        title: 'Next from creator',
+        state: UserItemState.BOOKMARKED,
+        isFinished: false,
+      });
+      const sameCreatorFinished = createMockItemView({
+        id: 'ui-same-finished',
+        creatorId: 'creator-1',
+        creator: 'Creator One',
+        state: UserItemState.BOOKMARKED,
+        isFinished: true,
+      });
+      const otherCreatorUnfinished = createMockItemView({
+        id: 'ui-other-creator',
+        creatorId: 'creator-2',
+        creator: 'Creator Two',
+        state: UserItemState.BOOKMARKED,
+        isFinished: false,
+      });
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: new Map([[current.id, current]]),
+        libraryItems: [current, sameCreatorUnfinished, sameCreatorFinished, otherCreatorUnfinished],
+      });
+
+      const result = await caller.otherUnfinishedBookmarksByCreator({ id: current.id });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        id: 'ui-same-unfinished',
+        title: 'Next from creator',
+        creatorId: 'creator-1',
+        isFinished: false,
+      });
+    });
+
+    it('returns an empty list when the current item has no creator', async () => {
+      const current = createMockItemView({
+        id: 'ui-current',
+        creatorId: null,
+        state: UserItemState.BOOKMARKED,
+      });
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        allItems: new Map([[current.id, current]]),
+        libraryItems: [current],
+      });
+
+      await expect(caller.otherUnfinishedBookmarksByCreator({ id: current.id })).resolves.toEqual({
+        items: [],
       });
     });
   });
