@@ -10,8 +10,9 @@
  */
 
 import { useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useClerk } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 
@@ -119,12 +120,26 @@ function SettingsScreenContent({
   authEnabled: boolean;
   signOut?: () => Promise<void>;
 }) {
+  const navigation = useNavigation();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
   const isStorybookEnabled = process.env.EXPO_PUBLIC_STORYBOOK_ENABLED === 'true';
   const isDeveloperDiagnosticsEnabled = __DEV__ || isStorybookEnabled;
+  const canGoBack = navigation.canGoBack();
+  const headerLeft = canGoBack
+    ? () => (
+        <Pressable
+          accessibilityLabel="Go back"
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={styles.headerBack}
+        >
+          <Ionicons name="chevron-back" size={28} color={colors.text} />
+        </Pressable>
+      )
+    : undefined;
 
   // Data hooks
   const { data: connections } = useConnections();
@@ -193,6 +208,7 @@ function SettingsScreenContent({
           tintColor: colors.text,
           screenTitle: 'Settings',
           showScreenTitle: showCollapsedTitle,
+          headerLeft,
         })}
       />
       <ScrollView
@@ -301,6 +317,9 @@ const styles = StyleSheet.create({
   },
   screenTitle: {
     ...Typography.displayMedium,
+  },
+  headerBack: {
+    marginLeft: -Spacing.xs,
   },
   sectionTitle: {
     fontSize: 12,

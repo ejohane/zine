@@ -4,6 +4,9 @@ import TestRenderer, { act } from 'react-test-renderer';
 import SettingsScreen from '@/app/settings/index';
 
 const mockPush = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn();
+const mockStackScreen = jest.fn();
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 type TestNode = Renderer['root'];
@@ -21,12 +24,23 @@ function getTextContent(node: TestNode): string {
 
 jest.mock('expo-router', () => ({
   Stack: {
-    Screen: (props: Record<string, unknown>) => React.createElement('stack-screen', props),
+    Screen: (props: Record<string, unknown>) => {
+      mockStackScreen(props);
+      return React.createElement('stack-screen', props);
+    },
   },
+  useNavigation: () => ({
+    canGoBack: mockCanGoBack,
+  }),
   useRouter: () => ({
     push: mockPush,
+    back: mockBack,
     replace: jest.fn(),
   }),
+}));
+
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: (props: Record<string, unknown>) => React.createElement('ionicons', props),
 }));
 
 jest.mock('react-native', () => ({
@@ -142,6 +156,7 @@ jest.mock('@/providers/auth-provider', () => ({
 describe('SettingsScreen subscriptions entrypoint', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(false);
   });
 
   it('surfaces a single subscriptions entrypoint instead of provider-specific connection rows', () => {
@@ -193,6 +208,68 @@ describe('SettingsScreen subscriptions entrypoint', () => {
     expect(() =>
       renderer!.root.findByProps({ testID: 'settings-subscriptions-alert-dot' })
     ).not.toThrow();
+    consoleErrorSpy.mockRestore();
+  });
+});
+
+describe('SettingsScreen header', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCanGoBack.mockReturnValue(false);
+  });
+
+  it('adds a header back button when a parent navigator can go back', () => {
+    mockCanGoBack.mockReturnValue(true);
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<SettingsScreen />);
+    });
+
+    expect(renderer!).toBeDefined();
+
+    const stackScreenProps = mockStackScreen.mock.calls.at(-1)?.[0] as {
+      options: {
+        headerLeft?: (props: Record<string, unknown>) => React.ReactElement;
+      };
+    };
+
+    expect(stackScreenProps.options.headerLeft).toBeDefined();
+
+    const headerLeft = stackScreenProps.options.headerLeft!;
+    const backButton = headerLeft({ tintColor: '#111111' }) as React.ReactElement<{
+      onPress: () => void;
+      accessibilityLabel?: string;
+    }>;
+
+    expect(backButton.props.accessibilityLabel).toBe('Go back');
+
+    act(() => {
+      backButton.props.onPress();
+    });
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('leaves the header left slot empty when there is no back target', () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<SettingsScreen />);
+    });
+
+    expect(renderer!).toBeDefined();
+
+    const stackScreenProps = mockStackScreen.mock.calls.at(-1)?.[0] as {
+      options: {
+        headerLeft?: unknown;
+      };
+    };
+
+    expect(stackScreenProps.options.headerLeft).toBeUndefined();
     consoleErrorSpy.mockRestore();
   });
 });
