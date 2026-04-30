@@ -185,6 +185,17 @@ function parseJsonArray<T>(value: string | null): T[] {
   }
 }
 
+function parseJsonObjectValue(value: string | null): JsonObject | null {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value);
+    return isJsonObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function getStringMetadataField(metadata: JsonObject, key: string): string | null {
   const value = metadata[key];
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
@@ -827,6 +838,8 @@ export const itemsRouter = router({
       return {
         item: {
           status: canonical?.status ?? 'MISSING',
+          modelProvider: canonical?.modelProvider ?? null,
+          modelName: canonical?.modelName ?? null,
           summaryShort: canonical?.summaryShort ?? null,
           summaryDetail: canonical?.summaryDetail ?? null,
           primaryCategory: canonical?.primaryCategory ?? null,
@@ -841,12 +854,15 @@ export const itemsRouter = router({
           difficulty: canonical?.difficulty ?? null,
           evergreenScore: canonical?.evergreenScore ?? null,
           timeSensitivity: canonical?.timeSensitivity ?? null,
+          confidence: parseJsonObjectValue(canonical?.confidenceJson ?? null),
+          enrichedAt: canonical?.enrichedAt ?? null,
         },
         userItem: {
           status: userEnrichment?.status ?? 'MISSING',
           suggestedTags: parseJsonArray<SuggestedTag>(userEnrichment?.suggestedTagsJson ?? null),
           inferredSaveIntent: userEnrichment?.inferredSaveIntent ?? null,
           reasonToRevisit: userEnrichment?.reasonToRevisit ?? null,
+          enrichedAt: userEnrichment?.enrichedAt ?? null,
         },
       };
     }),

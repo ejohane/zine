@@ -1335,6 +1335,68 @@ img {
   line-height: 1.72;
 }
 
+.new-page-bookmark-view__enrichment {
+  gap: 1rem;
+}
+
+.new-page-bookmark-view__enrichment-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.new-page-bookmark-view__enrichment-header span {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
+.new-page-bookmark-view__enrichment-grid {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.new-page-bookmark-view__enrichment-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.new-page-bookmark-view__enrichment-field dt {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.new-page-bookmark-view__enrichment-field dd {
+  margin: 0;
+  color: var(--text-subheader);
+  font-size: 0.94rem;
+  line-height: 1.48;
+}
+
+.new-page-bookmark-view__enrichment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.new-page-bookmark-view__enrichment-chips span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-raised);
+  color: var(--text-subheader);
+  font-size: 0.78rem;
+  line-height: 1.15;
+}
+
 .new-page-bookmark-view__post {
   display: grid;
   gap: 0.75rem;
@@ -4159,6 +4221,21 @@ input:focus {
   .new-page-bookmark-view__summary {
     font-size: 0.875rem;
     line-height: 1.43;
+  }
+
+  .new-page-bookmark-view__enrichment-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .new-page-bookmark-view__enrichment-field dd {
+    font-size: 0.85rem;
+    line-height: 1.42;
+  }
+
+  .new-page-bookmark-view__enrichment-chips {
+    gap: 0.35rem;
   }
 
   .new-page-bookmark-view__post {
