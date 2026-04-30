@@ -1,8 +1,11 @@
-import { View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Surface } from '@/components/primitives/surface';
 import { Text } from '@/components/primitives/text';
+import { IconSizes } from '@/constants/theme';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 
 import { styles } from '../../item-detail-styles';
@@ -19,6 +22,8 @@ export function ItemDetailOtherBookmarks({
   colors,
   onBookmarkPress,
 }: ItemDetailOtherBookmarksProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   if (bookmarks.length === 0) {
     return null;
   }
@@ -47,24 +52,38 @@ export function ItemDetailOtherBookmarks({
         style={styles.otherBookmarksSurface}
         accessibilityLabel="Other bookmarks from creator"
       >
-        <View style={styles.otherBookmarksHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Toggle other bookmarks from creator"
+          accessibilityState={{ expanded: isExpanded }}
+          onPress={() => setIsExpanded((current) => !current)}
+          style={({ pressed }) => [
+            styles.otherBookmarksHeader,
+            isExpanded ? styles.otherBookmarksHeaderExpanded : null,
+            pressed ? { opacity: 0.72 } : null,
+          ]}
+        >
           <Text variant="labelSmall" tone="tertiary" colors={colors}>
             Your Bookmarks
           </Text>
-          <Text variant="labelSmall" tone="tertiary" colors={colors}>
-            {items.length} item{items.length === 1 ? '' : 's'}
-          </Text>
-        </View>
-
-        {items.map((item, index) => (
-          <ItemCard
-            key={item.id}
-            item={item}
-            shape="row"
-            index={index}
-            onPress={() => onBookmarkPress(item.id)}
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={IconSizes.sm}
+            color={colors.textTertiary}
           />
-        ))}
+        </Pressable>
+
+        {isExpanded
+          ? items.map((item, index) => (
+              <ItemCard
+                key={item.id}
+                item={item}
+                shape="row"
+                index={index}
+                onPress={() => onBookmarkPress(item.id)}
+              />
+            ))
+          : null}
       </Surface>
     </View>
   );

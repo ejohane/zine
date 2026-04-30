@@ -195,7 +195,7 @@ describe('ItemDetailContent other creator bookmarks', () => {
     ).toThrow();
   });
 
-  it('shows other unfinished bookmarks below the description and navigates to the selected bookmark', () => {
+  it('shows a collapsed other bookmarks card below the description and expands to navigate to a bookmark', () => {
     const renderer = renderContent({
       otherUnfinishedBookmarks: [
         createItem({
@@ -211,8 +211,21 @@ describe('ItemDetailContent other creator bookmarks', () => {
     expect(labels.indexOf('Current bookmark summary')).toBeLessThan(
       labels.indexOf('Your Bookmarks')
     );
-    expect(labels).toContain('1 item');
-    expect(labels).toContain('Next bookmark');
+    expect(labels).not.toContain('1 item');
+    expect(labels).not.toContain('Next bookmark');
+
+    const toggleButton = renderer.root.findByProps({
+      accessibilityLabel: 'Toggle other bookmarks from creator',
+    });
+    expect(toggleButton.props.accessibilityState).toEqual({ expanded: false });
+
+    act(() => {
+      toggleButton.props.onPress();
+    });
+
+    expect(toggleButton.props.accessibilityState).toEqual({ expanded: true });
+    const expandedLabels = renderer.root.findAllByType('span').map(textContent).join(' ');
+    expect(expandedLabels).toContain('Next bookmark');
 
     const bookmarkButton = renderer.root.findByProps({
       accessibilityLabel: 'Open bookmark Next bookmark',
