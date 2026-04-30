@@ -2,16 +2,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Stack, useNavigation } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { FlatList, type ListRenderItemInfo, StyleSheet, View } from 'react-native';
+import { FlatList, Text, type ListRenderItemInfo, StyleSheet, View } from 'react-native';
 import type { SearchBarCommands } from 'react-native-screens';
 
 import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
 import { useSearchResults, type CreatorSearchResult } from '@/hooks/use-search';
-import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
+import {
+  createLightweightHeaderScreenOptions,
+  useCollapsedHeaderTitle,
+} from '@/lib/native-large-title-header';
 import { CreatorResultRow } from './creator-result-row';
 
 type SearchRow =
@@ -31,6 +34,7 @@ export default function SearchTabScreen() {
   const focusSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -116,20 +120,20 @@ export default function SearchTabScreen() {
     return <ItemCard item={item.item} shape="row" index={index} />;
   }, []);
 
+  const hasSearchQuery = debouncedSearchQuery.length > 0;
   const isShowingState = isLoading || Boolean(error) || searchRows.length === 0;
   const listEmptyComponent = isLoading ? (
     <LoadingState />
   ) : error ? (
     <ErrorState message={error.message} />
-  ) : (
-    <EmptyState
-      title={debouncedSearchQuery ? 'No matches found' : 'Search your library'}
-      message={
-        debouncedSearchQuery
-          ? 'Try a different title or creator name.'
-          : 'Type in the search bar to find saved items by title or creator.'
-      }
-    />
+  ) : !hasSearchQuery ? null : (
+    <EmptyState title="No matches found" message="Try a different title or creator name." />
+  );
+
+  const listHeaderComponent = (
+    <View style={styles.listHeader}>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>Search</Text>
+    </View>
   );
 
   return (
@@ -139,6 +143,7 @@ export default function SearchTabScreen() {
           backgroundColor: colors.background,
           tintColor: colors.text,
           screenTitle: 'Search',
+          showScreenTitle: isLoading || Boolean(error) || showCollapsedTitle,
           headerSearchBarOptions: {
             ref: searchBarRef,
             autoFocus: true,
@@ -160,11 +165,14 @@ export default function SearchTabScreen() {
         }
         renderItem={renderItem}
         style={styles.listContainer}
-        contentContainerStyle={[styles.listContent, isShowingState && styles.emptyListContent]}
+        contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={32}
+        ListHeaderComponent={listHeaderComponent}
         ListEmptyComponent={listEmptyComponent}
         ListFooterComponent={!isShowingState ? <View style={styles.bottomSpacer} /> : null}
       />
@@ -179,13 +187,18 @@ const styles = StyleSheet.create({
   listContainer: {
     flex: 1,
   },
+  listHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
+  },
+  headerTitle: {
+    ...Typography.displayMedium,
+  },
   listContent: {
     flexGrow: 1,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing['3xl'],
-  },
-  emptyListContent: {
-    justifyContent: 'center',
   },
   bottomSpacer: {
     height: Spacing.lg,
