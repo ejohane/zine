@@ -65,6 +65,7 @@ export function ItemDetailContent({
   onTitleLayout,
 }: ItemDetailContentProps) {
   const DescriptionContainer = useAnimatedDescription ? Animated.View : View;
+  const shouldExpandDescriptionByDefault = otherUnfinishedBookmarks.length === 0;
 
   return (
     <>
@@ -112,6 +113,7 @@ export function ItemDetailContent({
               summary={item.summary}
               label={descriptionLabel}
               colors={colors}
+              expandedByDefault={shouldExpandDescriptionByDefault}
             />
           </Surface>
         </DescriptionContainer>
