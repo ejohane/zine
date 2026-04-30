@@ -306,7 +306,7 @@ async function getTagsForUserItems(
   return map;
 }
 
-async function toItemViewsWithTags(
+export async function toItemViewsWithTags(
   ctx: { db: Database; userId: string },
   rows: Array<{
     user_items: typeof userItems.$inferSelect;

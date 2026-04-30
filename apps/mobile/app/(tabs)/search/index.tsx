@@ -3,18 +3,32 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, useNavigation } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { FlatList, type ListRenderItemInfo, StyleSheet, View } from 'react-native';
+import type { SearchBarCommands } from 'react-native-screens';
 
 import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
-import { useLibraryItems } from '@/hooks/use-items-trpc';
+import { useSearchResults, type CreatorSearchResult } from '@/hooks/use-search';
 import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
+import { CreatorResultRow } from './creator-result-row';
+
+type SearchRow =
+  | {
+      type: 'creator';
+      creator: CreatorSearchResult;
+    }
+  | {
+      type: 'item';
+      item: ItemCardData;
+    };
 
 export default function SearchTabScreen() {
   const navigation = useNavigation();
-  const listScrollRef = useRef<FlatList<ItemCardData>>(null);
+  const listScrollRef = useRef<FlatList<SearchRow>>(null);
+  const searchBarRef = useRef<SearchBarCommands | null>(null);
+  const focusSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
@@ -28,47 +42,81 @@ export default function SearchTabScreen() {
     return () => clearTimeout(handle);
   }, [searchQuery]);
 
-  const { data, isLoading, error } = useLibraryItems({
-    search: debouncedSearchQuery || undefined,
-  });
+  const { data, isLoading, error } = useSearchResults(debouncedSearchQuery);
 
-  const libraryItems: ItemCardData[] = useMemo(
+  const focusSearchBar = useCallback(() => {
+    if (focusSearchTimeoutRef.current) {
+      clearTimeout(focusSearchTimeoutRef.current);
+    }
+
+    focusSearchTimeoutRef.current = setTimeout(() => {
+      searchBarRef.current?.focus();
+      focusSearchTimeoutRef.current = null;
+    }, 100);
+  }, []);
+
+  const searchRows: SearchRow[] = useMemo(
     () =>
-      (data?.items ?? []).map((item) => ({
-        id: item.id,
-        title: item.title,
-        creator: item.creator,
-        creatorImageUrl: item.creatorImageUrl ?? null,
-        thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as ContentType,
-        provider: mapProvider(item.provider) as Provider,
-        duration: item.duration ?? null,
-        readingTimeMinutes: item.readingTimeMinutes ?? null,
-        bookmarkedAt: item.bookmarkedAt ?? null,
-        publishedAt: item.publishedAt ?? null,
-        isFinished: item.isFinished,
-      })),
-    [data?.items]
+      (data?.results ?? []).map((result) => {
+        if (result.type === 'creator') {
+          return {
+            type: 'creator',
+            creator: result,
+          };
+        }
+
+        return {
+          type: 'item',
+          item: {
+            id: result.id,
+            title: result.title,
+            creator: result.creator,
+            creatorImageUrl: result.creatorImageUrl ?? null,
+            thumbnailUrl: result.thumbnailUrl ?? null,
+            contentType: mapContentType(result.contentType) as ContentType,
+            provider: mapProvider(result.provider) as Provider,
+            duration: result.duration ?? null,
+            readingTimeMinutes: result.readingTimeMinutes ?? null,
+            bookmarkedAt: result.bookmarkedAt ?? null,
+            publishedAt: result.publishedAt ?? null,
+            isFinished: result.isFinished,
+          },
+        };
+      }),
+    [data?.results]
   );
 
   useEffect(() => {
     const tabNavigation = navigation.getParent() ?? navigation;
 
-    return tabNavigation.addListener('tabPress', () => {
+    const removeTabPressListener = tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
 
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
+      focusSearchBar();
     });
-  }, [navigation]);
 
-  const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
-      <ItemCard item={item} shape="row" index={index} />
-    ),
-    []
-  );
+    const removeFocusListener = navigation.addListener('focus', focusSearchBar);
 
-  const isShowingState = isLoading || Boolean(error) || libraryItems.length === 0;
+    return () => {
+      if (focusSearchTimeoutRef.current) {
+        clearTimeout(focusSearchTimeoutRef.current);
+        focusSearchTimeoutRef.current = null;
+      }
+      removeTabPressListener();
+      removeFocusListener();
+    };
+  }, [focusSearchBar, navigation]);
+
+  const renderItem = useCallback(({ item, index }: ListRenderItemInfo<SearchRow>) => {
+    if (item.type === 'creator') {
+      return <CreatorResultRow creator={item.creator} />;
+    }
+
+    return <ItemCard item={item.item} shape="row" index={index} />;
+  }, []);
+
+  const isShowingState = isLoading || Boolean(error) || searchRows.length === 0;
   const listEmptyComponent = isLoading ? (
     <LoadingState />
   ) : error ? (
@@ -92,6 +140,8 @@ export default function SearchTabScreen() {
           tintColor: colors.text,
           screenTitle: 'Search',
           headerSearchBarOptions: {
+            ref: searchBarRef,
+            autoFocus: true,
             placement: 'automatic',
             placeholder: 'Search your library',
             hideWhenScrolling: false,
@@ -104,8 +154,10 @@ export default function SearchTabScreen() {
 
       <FlatList
         ref={listScrollRef}
-        data={isShowingState ? [] : libraryItems}
-        keyExtractor={(item) => item.id}
+        data={isShowingState ? [] : searchRows}
+        keyExtractor={(item) =>
+          item.type === 'creator' ? `creator:${item.creator.creatorId}` : `item:${item.item.id}`
+        }
         renderItem={renderItem}
         style={styles.listContainer}
         contentContainerStyle={[styles.listContent, isShowingState && styles.emptyListContent]}
