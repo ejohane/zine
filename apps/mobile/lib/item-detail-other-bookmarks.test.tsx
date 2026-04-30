@@ -68,7 +68,8 @@ jest.mock('react-native-reanimated', () => ({
 }));
 
 jest.mock('@expo/vector-icons', () => ({
-  Ionicons: () => null,
+  Ionicons: ({ name }: { name: string }) =>
+    React.createElement('span', { accessibilityLabel: `icon-${name}` }, name),
 }));
 
 jest.mock('expo-image', () => ({
@@ -182,6 +183,17 @@ function textContent(node: { children: Array<string | { children: unknown[] }> }
     .join('');
 }
 
+type TestTextNode = {
+  children: Array<string | { children: unknown[] }>;
+  props: { numberOfLines?: number };
+};
+
+function findSpanContaining(renderer: ReturnType<typeof TestRenderer.create>, text: string) {
+  return (renderer.root.findAllByType('span') as TestTextNode[]).find((node) =>
+    textContent(node).includes(text)
+  );
+}
+
 describe('ItemDetailContent other creator bookmarks', () => {
   beforeEach(() => {
     mockPush.mockClear();
@@ -195,7 +207,45 @@ describe('ItemDetailContent other creator bookmarks', () => {
     ).toThrow();
   });
 
-  it('shows a collapsed other bookmarks card below the description and expands to navigate to a bookmark', () => {
+  it('collapses and expands the description preview', () => {
+    const renderer = renderContent({
+      item: createItem({
+        summary:
+          'Current bookmark summary with enough detail to preview four lines before expanding into the complete description. It continues with more context so there is hidden content behind the collapsed state.',
+      }),
+    });
+
+    const toggleButton = renderer.root.findByProps({
+      accessibilityLabel: 'Toggle Description',
+    });
+    expect(toggleButton.props.accessibilityState).toEqual({ expanded: false });
+    expect(renderer.root.findByProps({ accessibilityLabel: 'icon-chevron-down' })).toBeTruthy();
+    expect(findSpanContaining(renderer, 'Current bookmark summary')?.props.numberOfLines).toBe(4);
+
+    act(() => {
+      toggleButton.props.onPress();
+    });
+
+    expect(toggleButton.props.accessibilityState).toEqual({ expanded: true });
+    expect(renderer.root.findByProps({ accessibilityLabel: 'icon-chevron-up' })).toBeTruthy();
+    expect(
+      findSpanContaining(renderer, 'Current bookmark summary')?.props.numberOfLines
+    ).toBeUndefined();
+  });
+
+  it('does not show a description chevron when the summary is too short to expand', () => {
+    const renderer = renderContent({
+      item: createItem({
+        summary: 'Short summary.',
+      }),
+    });
+
+    expect(() => renderer.root.findByProps({ accessibilityLabel: 'Toggle Description' })).toThrow();
+    expect(() => renderer.root.findByProps({ accessibilityLabel: 'icon-chevron-down' })).toThrow();
+    expect(findSpanContaining(renderer, 'Short summary.')?.props.numberOfLines).toBeUndefined();
+  });
+
+  it('does not show an other bookmarks chevron when there is only one preview item', () => {
     const renderer = renderContent({
       otherUnfinishedBookmarks: [
         createItem({
@@ -208,11 +258,37 @@ describe('ItemDetailContent other creator bookmarks', () => {
     });
 
     const labels = renderer.root.findAllByType('span').map(textContent).join(' ');
+    expect(labels).toContain('Next bookmark');
+    expect(() =>
+      renderer.root.findByProps({ accessibilityLabel: 'Toggle other bookmarks from creator' })
+    ).toThrow();
+  });
+
+  it('shows a collapsed other bookmarks card below the description and expands to reveal more bookmarks', () => {
+    const renderer = renderContent({
+      otherUnfinishedBookmarks: [
+        createItem({
+          id: 'ui-next',
+          itemId: 'item-next',
+          title: 'Next bookmark',
+          summary: 'Another thing to read',
+        }),
+        createItem({
+          id: 'ui-second',
+          itemId: 'item-second',
+          title: 'Second bookmark',
+          summary: 'One more thing to read',
+        }),
+      ],
+    });
+
+    const labels = renderer.root.findAllByType('span').map(textContent).join(' ');
     expect(labels.indexOf('Current bookmark summary')).toBeLessThan(
       labels.indexOf('Your Bookmarks')
     );
     expect(labels).not.toContain('1 item');
-    expect(labels).not.toContain('Next bookmark');
+    expect(labels).toContain('Next bookmark');
+    expect(labels).not.toContain('Second bookmark');
 
     const toggleButton = renderer.root.findByProps({
       accessibilityLabel: 'Toggle other bookmarks from creator',
@@ -226,15 +302,16 @@ describe('ItemDetailContent other creator bookmarks', () => {
     expect(toggleButton.props.accessibilityState).toEqual({ expanded: true });
     const expandedLabels = renderer.root.findAllByType('span').map(textContent).join(' ');
     expect(expandedLabels).toContain('Next bookmark');
+    expect(expandedLabels).toContain('Second bookmark');
 
     const bookmarkButton = renderer.root.findByProps({
-      accessibilityLabel: 'Open bookmark Next bookmark',
+      accessibilityLabel: 'Open bookmark Second bookmark',
     });
 
     act(() => {
       bookmarkButton.props.onPress();
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/item/ui-next');
+    expect(mockPush).toHaveBeenCalledWith('/item/ui-second');
   });
 });

@@ -198,6 +198,11 @@ export const styles = StyleSheet.create({
   descriptionSurface: {
     gap: Spacing.md,
   },
+  descriptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   description: {
     ...Typography.bodyMedium,
     lineHeight: 24,
@@ -217,8 +222,6 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-  },
-  otherBookmarksHeaderExpanded: {
     marginBottom: Spacing.md,
   },
 });
