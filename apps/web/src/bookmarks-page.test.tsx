@@ -367,6 +367,69 @@ describe('BookmarksPage', () => {
     expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
   });
 
+  test('renders enrichment data beneath the bookmark detail when extracted data exists', () => {
+    hookSpies.itemsGetEnrichmentUseQuery.mockImplementation((input) => ({
+      data:
+        input.id === videoItem.id
+          ? {
+              item: {
+                status: 'COMPLETE',
+                modelProvider: 'cloudflare',
+                modelName: '@cf/qwen/qwen3-30b-a3b-fp8',
+                summaryShort: 'A compact overview of design system scaling.',
+                summaryDetail:
+                  'Explains how stable primitives, tokens, and review habits keep interfaces coherent.',
+                primaryCategory: 'Design systems',
+                secondaryCategories: ['Frontend architecture', 'Product craft'],
+                topics: [{ name: 'Design tokens', confidence: 0.92 }],
+                entities: [{ name: 'Zine', type: 'product', confidence: 0.81 }],
+                intent: 'Learn how to maintain UI consistency',
+                difficulty: 'intermediate',
+                evergreenScore: 0.88,
+                timeSensitivity: 'low',
+                confidence: {
+                  overall: 0.91,
+                  summary: 0.89,
+                  classification: 0.86,
+                  tags: 0.83,
+                },
+                enrichedAt: 1777587600000,
+              },
+              userItem: {
+                status: 'COMPLETE',
+                suggestedTags: [
+                  {
+                    name: 'Design systems',
+                    normalizedName: 'design systems',
+                    kind: 'topic',
+                    confidence: 0.94,
+                    matchedExistingTagId: null,
+                  },
+                ],
+                inferredSaveIntent: 'Use as a reference for future UI work.',
+                reasonToRevisit: 'Revisit before changing shared primitives.',
+                enrichedAt: 1777587600000,
+              },
+            }
+          : undefined,
+      isLoading: false,
+      error: null,
+    }));
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${videoItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(screen.getByText('Enrichment')).toBeVisible();
+    expect(screen.getByText('A compact overview of design system scaling.')).toBeVisible();
+    expect(screen.getByText('Design tokens 92%')).toBeVisible();
+    expect(screen.getByText('Zine · Product · 81%')).toBeVisible();
+    expect(screen.getByText('Use as a reference for future UI work.')).toBeVisible();
+    expect(screen.getByText('Overall 91%')).toBeVisible();
+    expect(screen.getByText('cloudflare · @cf/qwen/qwen3-30b-a3b-fp8')).toBeVisible();
+  });
+
   test('uses the mobile-complete green fill for finished bookmark icons in detail view', () => {
     const finishedVideoItem = createLibraryItem({
       ...videoItem,

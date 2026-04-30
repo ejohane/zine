@@ -26,6 +26,10 @@ type ItemsGetInput = {
   id: string;
 };
 
+type ItemsGetEnrichmentInput = {
+  id: string;
+};
+
 type CreatorGetInput = {
   creatorId: string;
 };
@@ -111,6 +115,9 @@ export const hookSpies = {
   itemsGetUseQuery: vi.fn<(input: ItemsGetInput, options?: unknown) => QueryResult<unknown>>(
     (_input) => createQueryResult({})
   ),
+  itemsGetEnrichmentUseQuery: vi.fn<
+    (input: ItemsGetEnrichmentInput, options?: unknown) => QueryResult<unknown>
+  >((_input) => createQueryResult()),
   creatorsGetUseQuery: vi.fn<(input: CreatorGetInput, options?: unknown) => QueryResult<unknown>>(
     (_input) => createQueryResult({})
   ),
@@ -284,6 +291,9 @@ export function resetTrpcMocks() {
   hookSpies.itemsGetUseQuery.mockReset();
   hookSpies.itemsGetUseQuery.mockImplementation((_input) => createQueryResult());
 
+  hookSpies.itemsGetEnrichmentUseQuery.mockReset();
+  hookSpies.itemsGetEnrichmentUseQuery.mockImplementation((_input) => createQueryResult());
+
   hookSpies.creatorsGetUseQuery.mockReset();
   hookSpies.creatorsGetUseQuery.mockImplementation((_input) => createQueryResult());
 
@@ -453,6 +463,10 @@ export const trpc = {
     get: {
       useQuery: (input: ItemsGetInput, options?: unknown) =>
         hookSpies.itemsGetUseQuery(input, options),
+    },
+    getEnrichment: {
+      useQuery: (input: ItemsGetEnrichmentInput, options?: unknown) =>
+        hookSpies.itemsGetEnrichmentUseQuery(input, options),
     },
     listTags: {
       useQuery: () => hookSpies.itemsListTagsUseQuery(),
