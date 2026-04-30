@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -13,15 +13,25 @@ type ItemDetailDescriptionProps = {
   summary: string;
   label: string;
   colors: ItemDetailColors;
+  expandedByDefault?: boolean;
 };
 
 const COLLAPSED_DESCRIPTION_LINES = 4;
 const EXPANDABLE_DESCRIPTION_MIN_LENGTH = 160;
 
-export function ItemDetailDescription({ summary, label, colors }: ItemDetailDescriptionProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function ItemDetailDescription({
+  summary,
+  label,
+  colors,
+  expandedByDefault = false,
+}: ItemDetailDescriptionProps) {
+  const [isExpanded, setIsExpanded] = useState(expandedByDefault);
   const canExpand = summary.trim().length > EXPANDABLE_DESCRIPTION_MIN_LENGTH;
   const descriptionLines = canExpand && !isExpanded ? COLLAPSED_DESCRIPTION_LINES : undefined;
+
+  useEffect(() => {
+    setIsExpanded(expandedByDefault);
+  }, [expandedByDefault, summary]);
 
   return (
     <>

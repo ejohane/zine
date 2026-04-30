@@ -207,12 +207,38 @@ describe('ItemDetailContent other creator bookmarks', () => {
     ).toThrow();
   });
 
-  it('collapses and expands the description preview', () => {
+  it('expands the description preview by default when there are no other bookmarks', () => {
     const renderer = renderContent({
       item: createItem({
         summary:
           'Current bookmark summary with enough detail to preview four lines before expanding into the complete description. It continues with more context so there is hidden content behind the collapsed state.',
       }),
+    });
+
+    const toggleButton = renderer.root.findByProps({
+      accessibilityLabel: 'Toggle Description',
+    });
+    expect(toggleButton.props.accessibilityState).toEqual({ expanded: true });
+    expect(renderer.root.findByProps({ accessibilityLabel: 'icon-chevron-up' })).toBeTruthy();
+    expect(
+      findSpanContaining(renderer, 'Current bookmark summary')?.props.numberOfLines
+    ).toBeUndefined();
+  });
+
+  it('collapses and expands the description preview when other bookmarks are present', () => {
+    const renderer = renderContent({
+      item: createItem({
+        summary:
+          'Current bookmark summary with enough detail to preview four lines before expanding into the complete description. It continues with more context so there is hidden content behind the collapsed state.',
+      }),
+      otherUnfinishedBookmarks: [
+        createItem({
+          id: 'ui-next',
+          itemId: 'item-next',
+          title: 'Next bookmark',
+          summary: 'Another thing to read',
+        }),
+      ],
     });
 
     const toggleButton = renderer.root.findByProps({
