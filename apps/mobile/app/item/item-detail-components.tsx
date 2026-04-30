@@ -314,7 +314,6 @@ export function XPostBookmarkView({
         <ItemDetailOtherBookmarks
           bookmarks={otherUnfinishedBookmarks}
           colors={colors}
-          creatorName={item.creator}
           onBookmarkPress={onOtherBookmarkPress}
         />
       )}

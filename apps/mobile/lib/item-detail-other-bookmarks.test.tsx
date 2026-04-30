@@ -86,6 +86,28 @@ jest.mock('@/hooks/use-app-theme', () => ({
 
 jest.mock('@/lib/content-utils', () => ({
   getContentIcon: () => null,
+  mapContentType: (contentType: string) => contentType,
+  mapProvider: (provider: string) => provider,
+}));
+
+jest.mock('@/components/item-card', () => ({
+  ItemCard: ({
+    item,
+    onPress,
+  }: {
+    item: { title: string; creator: string; duration?: number | null };
+    onPress?: () => void;
+  }) =>
+    React.createElement(
+      'button',
+      {
+        accessibilityLabel: `Open bookmark ${item.title}`,
+        onPress,
+      },
+      React.createElement('span', null, item.title),
+      React.createElement('span', null, item.creator),
+      item.duration ? React.createElement('span', null, `${item.duration}`) : null
+    ),
 }));
 
 function createItem(overrides: Partial<ItemDetailItem> = {}): ItemDetailItem {
@@ -187,8 +209,9 @@ describe('ItemDetailContent other creator bookmarks', () => {
 
     const labels = renderer.root.findAllByType('span').map(textContent).join(' ');
     expect(labels.indexOf('Current bookmark summary')).toBeLessThan(
-      labels.indexOf('More from Example Creator')
+      labels.indexOf('Your Bookmarks')
     );
+    expect(labels).toContain('1 item');
     expect(labels).toContain('Next bookmark');
 
     const bookmarkButton = renderer.root.findByProps({

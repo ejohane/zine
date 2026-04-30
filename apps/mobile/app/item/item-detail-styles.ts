@@ -205,30 +205,21 @@ export const styles = StyleSheet.create({
 
   // Other bookmarks
   otherBookmarksContainer: {
-    marginTop: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-  },
-  otherBookmarksSurface: {
-    gap: Spacing.md,
+    paddingTop: Spacing.lg,
   },
   otherBookmarksHeader: {
-    gap: Spacing.xs,
-  },
-  otherBookmarksList: {
-    gap: Spacing.sm,
-  },
-  otherBookmarkRow: {
-    minHeight: 56,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-    borderTopWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
   },
-  otherBookmarkTextGroup: {
-    flex: 1,
-    gap: Spacing.xs,
+  otherBookmarksTitle: {
+    ...Typography.titleMedium,
+    fontWeight: '600',
+  },
+  otherBookmarksCount: {
+    ...Typography.bodySmall,
   },
 });
 

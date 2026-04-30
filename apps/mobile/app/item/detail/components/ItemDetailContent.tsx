@@ -121,7 +121,6 @@ export function ItemDetailContent({
         <ItemDetailOtherBookmarks
           bookmarks={otherUnfinishedBookmarks}
           colors={colors}
-          creatorName={item.creator}
           onBookmarkPress={onOtherBookmarkPress}
         />
       )}
