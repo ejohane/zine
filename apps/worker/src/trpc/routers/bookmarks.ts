@@ -57,7 +57,8 @@ const SaveInputSchema = z.object({
   contentType: ContentTypeSchema,
   providerId: z.string().min(1, 'Provider ID is required'),
   title: z.string().min(1, 'Title is required'),
-  creator: z.string().min(1, 'Creator is required'),
+  // Some providers don't reliably return creator names; allow save without it.
+  creator: z.string().trim().min(1, 'Creator must not be empty').optional(),
   creatorImageUrl: z.string().url().nullable().optional(), // Channel/show/podcast image
   thumbnailUrl: z.string().url().nullable(),
   duration: z.number().int().min(0).nullable(),
