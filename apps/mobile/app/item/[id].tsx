@@ -54,8 +54,17 @@ export default function ItemDetailScreen() {
   const [titleOffsetY, setTitleOffsetY] = useState<number | null>(null);
 
   const { id, isValid, message } = useItemDetailParams();
-  const { item, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
-    useItemDetailData({ id, isValid });
+  const {
+    item,
+    enrichment,
+    enrichmentLoading,
+    enrichmentError,
+    otherUnfinishedBookmarks,
+    isLoading,
+    error,
+    refetch,
+    creatorData,
+  } = useItemDetailData({ id, isValid });
   const {
     handleOpenLink,
     handleShare,
@@ -140,6 +149,9 @@ export default function ItemDetailScreen() {
         secondaryActionColor={viewState.secondaryActionColor}
         isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
         creatorData={creatorData}
+        enrichment={enrichment}
+        enrichmentLoading={enrichmentLoading}
+        enrichmentError={enrichmentError}
         showCollapsedTitle={showCollapsedTitle}
         onScroll={handleScroll}
         onContentLayout={handleContentLayout}
@@ -174,6 +186,9 @@ export default function ItemDetailScreen() {
       >
         <ItemDetailContent
           item={item}
+          enrichment={enrichment}
+          enrichmentLoading={enrichmentLoading}
+          enrichmentError={enrichmentError}
           colors={colors}
           creatorData={creatorData}
           creatorImageUrl={upgradedCreatorImageUrl}
@@ -214,6 +229,9 @@ export default function ItemDetailScreen() {
     >
       <ItemDetailContent
         item={item}
+        enrichment={enrichment}
+        enrichmentLoading={enrichmentLoading}
+        enrichmentError={enrichmentError}
         colors={colors}
         creatorData={creatorData}
         creatorImageUrl={item.creatorImageUrl}

@@ -208,6 +208,35 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
+  // Enrichment
+  enrichmentContainer: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  enrichmentSurface: {
+    gap: Spacing.lg,
+  },
+  enrichmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  enrichmentField: {
+    gap: Spacing.xs,
+  },
+  enrichmentChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  enrichmentChip: {
+    maxWidth: '100%',
+  },
+  enrichmentGrid: {
+    gap: Spacing.md,
+  },
+
   // Other bookmarks
   otherBookmarksContainer: {
     marginTop: Spacing.md,
