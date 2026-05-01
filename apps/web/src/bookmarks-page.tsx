@@ -1208,7 +1208,12 @@ export function BookmarksPage() {
                         selectedBookmark?.id === item.id && 'bookmark-row--selected'
                       )}
                       onClick={() =>
-                        navigate(buildBookmarksLocation(item.id, bookmarkSearchString))
+                        navigate(
+                          buildBookmarksLocation(
+                            selectedBookmark?.id === item.id ? null : item.id,
+                            bookmarkSearchString
+                          )
+                        )
                       }
                     >
                       {item.thumbnailUrl ? (
