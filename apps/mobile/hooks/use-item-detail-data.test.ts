@@ -9,12 +9,14 @@ import { useItemDetailData } from '@/app/item/detail/hooks/useItemDetailData';
 // Module-level Mocks
 
 const mockUseItem = jest.fn();
+const mockUseItemEnrichment = jest.fn();
 const mockUseOtherUnfinishedBookmarksByCreator = jest.fn();
 const mockUseCreator = jest.fn();
 const mockRefetch = jest.fn();
 
 jest.mock('@/hooks/use-items-trpc', () => ({
   useItem: (id: string) => mockUseItem(id),
+  useItemEnrichment: (id: string) => mockUseItemEnrichment(id),
   useOtherUnfinishedBookmarksByCreator: (id: string) =>
     mockUseOtherUnfinishedBookmarksByCreator(id),
 }));
@@ -40,6 +42,11 @@ describe('useItemDetailData', () => {
       error: null,
       refetch: jest.fn(),
     });
+    mockUseItemEnrichment.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    });
     mockUseOtherUnfinishedBookmarksByCreator.mockReturnValue({
       data: { items: [] },
       isLoading: false,
@@ -51,6 +58,7 @@ describe('useItemDetailData', () => {
     const { result } = renderHook(() => useItemDetailData({ id: 'bad-id', isValid: false }));
 
     expect(mockUseItem).toHaveBeenCalledWith('');
+    expect(mockUseItemEnrichment).toHaveBeenCalledWith('');
     expect(mockUseOtherUnfinishedBookmarksByCreator).toHaveBeenCalledWith('');
     expect(mockUseCreator).toHaveBeenCalledWith('');
     expect(result.current.item).toBeNull();
@@ -77,6 +85,7 @@ describe('useItemDetailData', () => {
     const { result } = renderHook(() => useItemDetailData({ id: 'item-1', isValid: true }));
 
     expect(mockUseItem).toHaveBeenCalledWith('item-1');
+    expect(mockUseItemEnrichment).toHaveBeenCalledWith('item-1');
     expect(mockUseOtherUnfinishedBookmarksByCreator).toHaveBeenCalledWith('item-1');
     expect(mockUseCreator).toHaveBeenCalledWith('creator-1');
     expect(result.current.creatorData).toBe(creator);

@@ -5,16 +5,25 @@ import Animated from 'react-native-reanimated';
 import { Surface } from '@/components/primitives/surface';
 
 import { styles } from '../../item-detail-styles';
-import type { ItemDetailColors, ItemDetailCreator, ItemDetailItem } from '../types';
+import type {
+  ItemDetailColors,
+  ItemDetailCreator,
+  ItemDetailEnrichment,
+  ItemDetailItem,
+} from '../types';
 import { ItemDetailActions } from './ItemDetailActions';
 import { ItemDetailCreatorRow } from './ItemDetailCreatorRow';
 import { ItemDetailDescription } from './ItemDetailDescription';
+import { ItemDetailEnrichmentCard } from './ItemDetailEnrichmentCard';
 import { ItemDetailHeader } from './ItemDetailHeader';
 import { ItemDetailMetaRow } from './ItemDetailMetaRow';
 import { ItemDetailOtherBookmarks } from './ItemDetailOtherBookmarks';
 
 type ItemDetailContentProps = {
   item: ItemDetailItem;
+  enrichment?: ItemDetailEnrichment;
+  enrichmentLoading?: boolean;
+  enrichmentError?: unknown;
   colors: ItemDetailColors;
   creatorData?: ItemDetailCreator;
   creatorImageUrl?: string | null;
@@ -41,6 +50,9 @@ type ItemDetailContentProps = {
 
 export function ItemDetailContent({
   item,
+  enrichment,
+  enrichmentLoading,
+  enrichmentError,
   colors,
   creatorData,
   creatorImageUrl,
@@ -118,6 +130,13 @@ export function ItemDetailContent({
           </Surface>
         </DescriptionContainer>
       )}
+
+      <ItemDetailEnrichmentCard
+        enrichment={enrichment}
+        isLoading={enrichmentLoading}
+        error={enrichmentError}
+        colors={colors}
+      />
 
       {onOtherBookmarkPress && (
         <ItemDetailOtherBookmarks

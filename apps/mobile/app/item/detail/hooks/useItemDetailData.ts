@@ -1,5 +1,9 @@
 import { useCreator } from '@/hooks/use-creator';
-import { useItem, useOtherUnfinishedBookmarksByCreator } from '@/hooks/use-items-trpc';
+import {
+  useItem,
+  useItemEnrichment,
+  useOtherUnfinishedBookmarksByCreator,
+} from '@/hooks/use-items-trpc';
 
 type ItemDetailDataInput = {
   id: string;
@@ -8,12 +12,20 @@ type ItemDetailDataInput = {
 
 export function useItemDetailData({ id, isValid }: ItemDetailDataInput) {
   const { data: item, isLoading, error, refetch } = useItem(isValid ? id : '');
+  const {
+    data: enrichment,
+    isLoading: enrichmentLoading,
+    error: enrichmentError,
+  } = useItemEnrichment(isValid ? id : '');
   const { data: otherBookmarksData } = useOtherUnfinishedBookmarksByCreator(isValid ? id : '');
 
   const { creator: creatorData } = useCreator(item?.creatorId ?? '');
 
   return {
     item,
+    enrichment,
+    enrichmentLoading,
+    enrichmentError,
     otherUnfinishedBookmarks: otherBookmarksData?.items ?? [],
     isLoading,
     error,
