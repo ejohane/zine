@@ -26,8 +26,6 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useConnections, type Connection } from '@/hooks/use-connections';
 
-// Icons
-
 function YouTubeIcon({ size = 32 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -65,8 +63,6 @@ function ChevronRightIcon({ color }: { color: string }) {
     </Svg>
   );
 }
-
-// Provider Card Component
 
 interface ProviderCardProps {
   icon: React.ReactNode;
@@ -123,20 +119,18 @@ function ProviderCard({
   );
 }
 
-// Coming Soon Card Component
-
-interface ComingSoonCardProps {
+interface AdditionalSourcesCardProps {
   colors: ThemeColors;
 }
 
-function ComingSoonCard({ colors }: ComingSoonCardProps) {
+function AdditionalSourcesCard({ colors }: AdditionalSourcesCardProps) {
   return (
-    <View style={[styles.comingSoonCard, { backgroundColor: colors.backgroundSecondary }]}>
-      <Text style={[styles.comingSoonTitle, { color: colors.textSubheader }]}>
-        More coming soon...
+    <View style={[styles.additionalSourcesCard, { backgroundColor: colors.backgroundSecondary }]}>
+      <Text style={[styles.additionalSourcesTitle, { color: colors.textSubheader }]}>
+        More sources
       </Text>
-      <Text style={[styles.comingSoonDescription, { color: colors.textTertiary }]}>
-        RSS, Substack, X (Twitter)
+      <Text style={[styles.additionalSourcesDescription, { color: colors.textTertiary }]}>
+        Add RSS and newsletters from Subscriptions after setup.
       </Text>
     </View>
   );
@@ -147,10 +141,8 @@ export default function OnboardingConnectScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
 
-  // Fetch connection status
   const { data: connections } = useConnections();
 
-  // Check if providers are connected
   const youtubeConnection = connections?.find((c: Connection) => c.provider === 'YOUTUBE');
   const spotifyConnection = connections?.find((c: Connection) => c.provider === 'SPOTIFY');
 
@@ -158,7 +150,6 @@ export default function OnboardingConnectScreen() {
   const isSpotifyConnected = spotifyConnection?.status === 'ACTIVE';
   const hasAnyConnection = isYouTubeConnected || isSpotifyConnected;
 
-  // Navigation handlers
   const handleConnectYouTube = useCallback(() => {
     router.push('/subscriptions/youtube');
   }, [router]);
@@ -168,19 +159,16 @@ export default function OnboardingConnectScreen() {
   }, [router]);
 
   const handleSkip = useCallback(() => {
-    // Navigate to main app (tabs)
     router.replace('/index');
   }, [router]);
 
   const handleContinue = useCallback(() => {
-    // Navigate to main app (tabs)
     router.replace('/index');
   }, [router]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>Connect your favorite sources</Text>
           <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
@@ -188,7 +176,6 @@ export default function OnboardingConnectScreen() {
           </Text>
         </View>
 
-        {/* Provider Cards */}
         <View style={styles.providersContainer}>
           <ProviderCard
             icon={<YouTubeIcon />}
@@ -208,10 +195,9 @@ export default function OnboardingConnectScreen() {
             colors={colors}
           />
 
-          <ComingSoonCard colors={colors} />
+          <AdditionalSourcesCard colors={colors} />
         </View>
 
-        {/* Connection status hint */}
         {hasAnyConnection && (
           <View style={styles.statusHint}>
             <Text style={[styles.statusHintText, { color: colors.success }]}>
@@ -221,7 +207,6 @@ export default function OnboardingConnectScreen() {
         )}
       </ScrollView>
 
-      {/* Bottom Actions */}
       <View style={[styles.bottomActions, { borderTopColor: colors.border }]}>
         {hasAnyConnection ? (
           <Pressable
@@ -258,8 +243,6 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     paddingTop: Spacing['3xl'],
   },
-
-  // Header
   header: {
     marginBottom: Spacing['2xl'],
   },
@@ -274,8 +257,6 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     alignSelf: 'center',
   },
-
-  // Provider Cards
   providersContainer: {
     gap: Spacing.md,
   },
@@ -317,8 +298,6 @@ const styles = StyleSheet.create({
   providerCardRight: {
     marginLeft: Spacing.md,
   },
-
-  // Connected badge
   connectedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -331,8 +310,6 @@ const styles = StyleSheet.create({
     ...Typography.labelMedium,
     fontWeight: '600',
   },
-
-  // Connect button
   connectButton: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
@@ -343,22 +320,19 @@ const styles = StyleSheet.create({
     ...Typography.labelMedium,
     fontWeight: '600',
   },
-
-  // Coming soon card
-  comingSoonCard: {
+  additionalSourcesCard: {
     padding: Spacing.lg,
     borderRadius: Radius.lg,
     alignItems: 'center',
   },
-  comingSoonTitle: {
+  additionalSourcesTitle: {
     ...Typography.titleSmall,
     marginBottom: Spacing.xs,
   },
-  comingSoonDescription: {
+  additionalSourcesDescription: {
     ...Typography.bodySmall,
   },
 
-  // Status hint
   statusHint: {
     marginTop: Spacing['2xl'],
     alignItems: 'center',
@@ -367,8 +341,6 @@ const styles = StyleSheet.create({
     ...Typography.bodyMedium,
     fontWeight: '500',
   },
-
-  // Bottom actions
   bottomActions: {
     padding: Spacing.lg,
     paddingBottom: Spacing.lg,

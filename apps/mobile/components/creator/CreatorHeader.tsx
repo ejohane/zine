@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter, type Href } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { isOAuthProvider } from '@zine/shared/types';
 
 import { SourceBadge } from '@/components/badges';
 import { Button, Text } from '@/components/primitives';
@@ -36,7 +37,6 @@ export interface CreatorHeaderProps {
   };
 }
 
-const OAUTH_SUBSCRIBABLE_PROVIDERS = new Set(['YOUTUBE', 'SPOTIFY', 'GMAIL']);
 const RSS_DISCOVERY_PROVIDERS = new Set(['RSS', 'WEB', 'SUBSTACK']);
 
 // Helper Functions
@@ -105,7 +105,7 @@ function getProviderName(provider: string): string {
 }
 
 function getManageRoute(provider: string): Href | null {
-  if (provider === 'YOUTUBE' || provider === 'SPOTIFY' || provider === 'GMAIL') {
+  if (isOAuthProvider(provider)) {
     return `/subscriptions/${provider.toLowerCase()}` as Href;
   }
   if (provider === 'RSS' || provider === 'WEB' || provider === 'SUBSTACK') {
@@ -140,7 +140,7 @@ export function CreatorHeader({
 
   const [pendingFeedUrl, setPendingFeedUrl] = useState<string | null>(null);
 
-  const isOAuthSubscriptionProvider = OAUTH_SUBSCRIBABLE_PROVIDERS.has(creator.provider);
+  const isOAuthSubscriptionProvider = isOAuthProvider(creator.provider);
   const isRssDiscoveryProvider = RSS_DISCOVERY_PROVIDERS.has(creator.provider);
   const discoveryUrl = sourceUrlForDiscovery?.trim() ?? '';
 

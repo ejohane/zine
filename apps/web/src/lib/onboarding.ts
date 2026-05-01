@@ -1,7 +1,12 @@
-import type { OAuthProvider, SubscriptionSource } from '@zine/shared/types';
+import {
+  SUBSCRIPTION_SOURCES,
+  isOAuthProvider,
+  type OAuthProvider,
+  type SubscriptionSource,
+} from '@zine/shared/types';
 
 export type { SubscriptionSource };
-export type WizardStep = 'SPOTIFY' | 'YOUTUBE' | 'GMAIL' | 'RSS' | 'DONE';
+export type WizardStep = SubscriptionSource | 'DONE';
 
 export type OnboardingOAuthContext = {
   origin: 'welcome' | 'settings';
@@ -54,7 +59,7 @@ export const sourceConfigs: Record<SubscriptionSource, SourceConfig> = {
   },
 };
 
-export const supportedSources = Object.keys(sourceConfigs) as SubscriptionSource[];
+export const supportedSources = SUBSCRIPTION_SOURCES;
 
 export function setOnboardingOAuthContext(context: OnboardingOAuthContext) {
   sessionStorage.setItem(ONBOARDING_OAUTH_CONTEXT_KEY, JSON.stringify(context));
@@ -70,9 +75,7 @@ export function getOnboardingOAuthContext(): OnboardingOAuthContext | null {
     const parsed = JSON.parse(stored) as Partial<OnboardingOAuthContext>;
     if (
       (parsed.origin === 'welcome' || parsed.origin === 'settings') &&
-      (parsed.provider === 'YOUTUBE' ||
-        parsed.provider === 'SPOTIFY' ||
-        parsed.provider === 'GMAIL')
+      isOAuthProvider(parsed.provider)
     ) {
       return { origin: parsed.origin, provider: parsed.provider };
     }

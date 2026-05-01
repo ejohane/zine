@@ -1,5 +1,6 @@
 import {
   formatDurationTimestamp,
+  formatEstimatedMinutes,
   isValidUrl as isValidSharedUrl,
   mapContentType as mapSharedContentType,
   mapProvider as mapSharedProvider,
@@ -65,24 +66,7 @@ export function formatRelativeDate(value?: string | number | null) {
   return 'Just now';
 }
 
-export function formatEstimatedMinutes(totalMinutes: number) {
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
-    return '0m';
-  }
-
-  const roundedMinutes = Math.max(0, Math.round(totalMinutes));
-  const hours = Math.floor(roundedMinutes / 60);
-  const minutes = roundedMinutes % 60;
-
-  if (hours > 0 && minutes > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (hours > 0) {
-    return `${hours}h`;
-  }
-
-  return `${minutes}m`;
-}
+export { formatEstimatedMinutes };
 
 export function isValidUrl(urlString: string): boolean {
   return isValidSharedUrl(urlString);

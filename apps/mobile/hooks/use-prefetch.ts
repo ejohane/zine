@@ -8,6 +8,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useIsRestoring } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
 import { useAuthResumeGate } from '@/providers/auth-resume-gate';
+import { logger } from '@/lib/logger';
 
 type ListQueryKey = 'home' | 'inbox' | 'library';
 export type PrefetchTab = 'home' | 'inbox' | 'library';
@@ -23,7 +24,9 @@ export function getTabPrefetchTargets(tab: PrefetchTab): readonly ListQueryKey[]
 }
 
 function prefetchSafely(prefetcher: () => Promise<unknown>) {
-  void prefetcher().catch(() => undefined);
+  void prefetcher().catch((error) => {
+    logger.debug('Background prefetch failed', { error });
+  });
 }
 
 function prefetchListQueries(

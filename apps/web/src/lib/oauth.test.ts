@@ -1,8 +1,11 @@
 import { Provider } from '@zine/shared';
+import type { httpBatchLink } from '@trpc/client';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+type HttpBatchLinkOptions = Parameters<typeof httpBatchLink>[0];
+
 const createTRPCClientMock = vi.fn();
-const httpBatchLinkMock = vi.fn((options: unknown) => options);
+const httpBatchLinkMock = vi.fn((options: HttpBatchLinkOptions) => options);
 const registerStateMutate = vi.fn<(input: { provider: Provider; state: string }) => Promise<void>>(
   async () => undefined
 );

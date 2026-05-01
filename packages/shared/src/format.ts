@@ -32,6 +32,25 @@ export function formatDurationTimestamp(seconds?: number | null): string | undef
   return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+export function formatEstimatedMinutes(totalMinutes: number): string {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+    return '0m';
+  }
+
+  const roundedMinutes = Math.max(0, Math.round(totalMinutes));
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+
+  if (hours > 0 && minutes > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  if (hours > 0) {
+    return `${hours}h`;
+  }
+
+  return `${minutes}m`;
+}
+
 export function isValidUrl(urlString: string): boolean {
   if (!urlString || urlString.trim().length === 0) {
     return false;

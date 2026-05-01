@@ -31,6 +31,7 @@ import { Badge, Text } from '@/components/primitives';
 import { Typography, Spacing, Radius, Shadows } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatDuration } from '@/lib/format';
+import { logger } from '@/lib/logger';
 import {
   getContentIcon,
   getContentColor,
@@ -112,8 +113,8 @@ function LinkedText({
   const parts = parseTextWithLinks(text);
 
   const handleLinkPress = (url: string) => {
-    Linking.openURL(url).catch(() => {
-      // Silently fail if URL can't be opened
+    Linking.openURL(url).catch((error) => {
+      logger.warn('Failed to open preview link', { error, url });
     });
   };
 

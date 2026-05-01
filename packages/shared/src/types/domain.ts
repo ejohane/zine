@@ -43,6 +43,18 @@ export type SubscriptionStatusValue = `${SubscriptionStatus}`;
 export type ProviderConnectionStatusValue = `${ProviderConnectionStatus}`;
 export type OAuthProvider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'>;
 export type SubscriptionSource = OAuthProvider | 'RSS';
+
+export const OAUTH_PROVIDERS = [
+  'YOUTUBE',
+  'SPOTIFY',
+  'GMAIL',
+] as const satisfies readonly OAuthProvider[];
+export const SUBSCRIPTION_SOURCES = [
+  'SPOTIFY',
+  'YOUTUBE',
+  'GMAIL',
+  'RSS',
+] as const satisfies readonly SubscriptionSource[];
 export interface Item {
   id: string;
   contentType: ContentType;
@@ -116,6 +128,14 @@ export function isSubscriptionStatus(value: unknown): value is SubscriptionStatu
 
 export function isProviderConnectionStatus(value: unknown): value is ProviderConnectionStatus {
   return Object.values(ProviderConnectionStatus).includes(value as ProviderConnectionStatus);
+}
+
+export function isOAuthProvider(value: unknown): value is OAuthProvider {
+  return typeof value === 'string' && OAUTH_PROVIDERS.includes(value as OAuthProvider);
+}
+
+export function isSubscriptionSource(value: unknown): value is SubscriptionSource {
+  return typeof value === 'string' && SUBSCRIPTION_SOURCES.includes(value as SubscriptionSource);
 }
 export interface Creator {
   id: string;

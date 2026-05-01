@@ -26,6 +26,10 @@
       "types": "./src/format.ts",
       "import": "./src/format.ts"
     },
+    "./tags": {
+      "types": "./src/tags.ts",
+      "import": "./src/tags.ts"
+    },
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"

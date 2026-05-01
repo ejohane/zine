@@ -1,5 +1,6 @@
 import { ulid } from 'ulid';
 import { and, desc, eq } from 'drizzle-orm';
+import { normalizeTagKey, normalizeTagName } from '@zine/shared/tags';
 
 import { createDb, type Database } from '../db';
 import {
@@ -30,14 +31,6 @@ import {
 const enrichmentLogger = logger.child('enrichment-consumer');
 
 type EnrichmentMessage = Message<EnrichmentQueueMessage>;
-
-function normalizeTagName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
-
-function normalizeTagKey(value: string): string {
-  return normalizeTagName(value).toLowerCase();
-}
 
 function normalizeSuggestedTags(
   modelTags: ModelSuggestedTag[],

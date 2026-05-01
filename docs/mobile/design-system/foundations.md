@@ -1,6 +1,6 @@
 # Mobile Design System Foundations
 
-Last updated: March 7, 2026
+Last updated: April 30, 2026
 
 ## Scope
 
@@ -113,7 +113,6 @@ Use `IconSizes.*` for emoji, initials, and glyph-only text treatments in shared 
 Current motion patterns across components:
 
 - Press feedback opacity changes on `Pressable`.
-- Spring-based press scaling in `home/pressable-scale.tsx` (legacy pattern).
 - 200-300ms transition windows for media and state changes.
 
 Motion token source:
@@ -174,6 +173,5 @@ If a literal or legacy dependency is intentional and temporary, annotate the lin
 ## Known Gaps to Address
 
 1. Introduce lint rules for hardcoded color literals in shared components.
-2. Consolidate legacy template components (`themed-*`, `ui/*`) into either canonical or archived status.
-3. Migrate canonical components from low-level color names to semantic aliases.
-4. Introduce lint rules for ad hoc typography values in shared components.
+2. Migrate canonical components from low-level color names to semantic aliases.
+3. Introduce lint rules for ad hoc typography values in shared components.

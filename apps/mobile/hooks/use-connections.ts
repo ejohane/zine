@@ -5,7 +5,11 @@
  * Used by subscriptions/settings screens to display provider connection status.
  */
 
-import type { OAuthProvider, ProviderConnectionStatusValue } from '@zine/shared/types';
+import {
+  isOAuthProvider,
+  type OAuthProvider,
+  type ProviderConnectionStatusValue,
+} from '@zine/shared/types';
 import { trpc } from '../lib/trpc';
 import type {
   ConnectionsListOutput,
@@ -31,7 +35,7 @@ type ProviderConnectionData = NonNullable<ConnectionsListOutput[ConnectionProvid
 // Helpers
 
 function isConnectionProvider(value: string): value is ConnectionProvider {
-  return value === 'YOUTUBE' || value === 'SPOTIFY' || value === 'GMAIL';
+  return isOAuthProvider(value);
 }
 
 function transformConnection(

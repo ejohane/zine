@@ -1,4 +1,5 @@
 import type { RouterOutputs } from '@/lib/trpc-types';
+import { formatEstimatedMinutes } from '@zine/shared/format';
 
 export type WeeklyRecap = RouterOutputs['insights']['weeklyRecap'];
 export type WeeklyRecapTeaser = RouterOutputs['insights']['weeklyRecapTeaser'];
@@ -30,24 +31,7 @@ function formatLocalDateKey(date: Date): string {
   ].join('-');
 }
 
-export function formatEstimatedMinutes(totalMinutes: number): string {
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
-    return '0m';
-  }
-
-  const roundedMinutes = Math.max(0, Math.round(totalMinutes));
-  const hours = Math.floor(roundedMinutes / 60);
-  const minutes = roundedMinutes % 60;
-
-  if (hours > 0 && minutes > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  if (hours > 0) {
-    return `${hours}h`;
-  }
-
-  return `${minutes}m`;
-}
+export { formatEstimatedMinutes };
 
 export function shouldShowWeeklyRecapEntry(date = new Date()): boolean {
   const day = date.getDay();

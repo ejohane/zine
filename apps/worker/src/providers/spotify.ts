@@ -27,6 +27,9 @@ import {
   type ProviderConnection,
   type TokenRefreshEnv,
 } from '../lib/token-refresh';
+import { logger } from '../lib/logger';
+
+const spotifyLogger = logger.child('spotify');
 
 /**
  * Cached show metadata stored in KV.
@@ -538,8 +541,8 @@ export async function getMultipleShowsWithCache(
         cachePromises.push(
           env.SPOTIFY_CACHE.put(getShowCacheKey(show.id), JSON.stringify(toCacheFormat(show)), {
             expirationTtl: SHOW_CACHE_CONFIG.TTL_SECONDS,
-          }).catch(() => {
-            // Silently ignore cache write failures - not critical
+          }).catch((error) => {
+            spotifyLogger.warn('Failed to write Spotify show cache', { error, showId: show.id });
           })
         );
       }
@@ -576,8 +579,8 @@ export async function updateShowCache(
     await env.SPOTIFY_CACHE.put(getShowCacheKey(showId), JSON.stringify(toCacheFormat(show)), {
       expirationTtl: SHOW_CACHE_CONFIG.TTL_SECONDS,
     });
-  } catch {
-    // Silently ignore cache write failures - not critical
+  } catch (error) {
+    spotifyLogger.warn('Failed to update Spotify show cache', { error, showId });
   }
 }
 
@@ -593,8 +596,8 @@ export async function updateShowCache(
 export async function invalidateShowCache(showId: string, env: CacheEnv): Promise<void> {
   try {
     await env.SPOTIFY_CACHE.delete(getShowCacheKey(showId));
-  } catch {
-    // Silently ignore cache delete failures - not critical
+  } catch (error) {
+    spotifyLogger.warn('Failed to invalidate Spotify show cache', { error, showId });
   }
 }
 

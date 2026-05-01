@@ -1,7 +1,7 @@
 import * as jose from 'jose';
 import type { Bindings } from '../types';
 import { authLogger } from './logger';
-import { Provider } from '@zine/shared';
+import { isOAuthProvider, type Provider } from '@zine/shared';
 
 export interface ClerkJWTPayload extends jose.JWTPayload {
   sub: string;
@@ -174,14 +174,6 @@ const OAUTH_CONFIG = {
     userInfoUrl: 'https://api.spotify.com/v1/me',
   },
 } as const;
-
-type OAuthProvider = Provider.YOUTUBE | Provider.SPOTIFY | Provider.GMAIL;
-
-function isOAuthProvider(provider: Provider): provider is OAuthProvider {
-  return (
-    provider === Provider.YOUTUBE || provider === Provider.SPOTIFY || provider === Provider.GMAIL
-  );
-}
 
 export async function exchangeCodeForTokens(
   provider: Provider,
