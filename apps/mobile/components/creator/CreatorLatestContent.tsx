@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { isOAuthProvider } from '@zine/shared/types';
 
 import { Button, Text } from '@/components/primitives';
 import { Typography, Spacing, Radius, type ThemeColors } from '@/constants/theme';
@@ -87,7 +88,7 @@ function getProviderDisplayName(provider: string): string {
 }
 
 function getManageRoute(provider: string): Href | null {
-  if (provider === 'YOUTUBE' || provider === 'SPOTIFY' || provider === 'GMAIL') {
+  if (isOAuthProvider(provider)) {
     return `/subscriptions/${provider.toLowerCase()}` as Href;
   }
 

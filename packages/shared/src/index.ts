@@ -5,10 +5,19 @@ export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from './json';
 // Domain types and enums
 export {
   ContentType,
+  OAUTH_PROVIDERS,
   Provider,
   UserItemState,
+  SUBSCRIPTION_SOURCES,
   SubscriptionStatus,
   ProviderConnectionStatus,
+  isContentType,
+  isOAuthProvider,
+  isProvider,
+  isProviderConnectionStatus,
+  isSubscriptionSource,
+  isSubscriptionStatus,
+  isUserItemState,
 } from './types/domain';
 
 // Domain interfaces
@@ -20,6 +29,9 @@ export type {
   ProviderConnectionStatusValue,
   OAuthProvider,
   SubscriptionSource,
+  Item,
+  UserItem,
+  Source,
   Creator,
   CreatorWithSubscription,
 } from './types/domain';
@@ -27,8 +39,17 @@ export type {
 export { ZINE_VERSION, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from './constants';
 
 // UI formatting helpers
-export { formatDurationTimestamp, isValidUrl, mapContentType, mapProvider } from './format';
+export {
+  formatDurationTimestamp,
+  formatEstimatedMinutes,
+  isValidUrl,
+  mapContentType,
+  mapProvider,
+} from './format';
 export type { UIContentType, UIProvider } from './format';
+
+// Tag normalization helpers
+export { normalizeTagKey, normalizeTagName, sanitizeTagNames } from './tags';
 
 // Schemas (Zod validation for tRPC input)
 export { ContentTypeSchema, ProviderSchema, SubscriptionStatusSchema } from './schemas';

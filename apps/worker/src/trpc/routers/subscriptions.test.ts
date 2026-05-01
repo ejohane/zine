@@ -14,6 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
 import type { createMockKV } from '../test-utils';
+import type { triggerInitialFetch } from '../../subscriptions/initial-fetch';
 import { createMockEnv, TEST_USER_ID, mockDbResults } from '../test-utils';
 
 // Mock Dependencies
@@ -22,7 +23,8 @@ import { createMockEnv, TEST_USER_ID, mockDbResults } from '../test-utils';
 const mockTriggerInitialFetch = vi.fn();
 
 vi.mock('../../subscriptions/initial-fetch', () => ({
-  triggerInitialFetch: (...args: unknown[]) => mockTriggerInitialFetch(...args),
+  triggerInitialFetch: (...args: Parameters<typeof triggerInitialFetch>) =>
+    mockTriggerInitialFetch(...args),
 }));
 
 // Mock YouTube provider

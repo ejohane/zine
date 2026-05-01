@@ -8,8 +8,10 @@ export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from '../json';
 // Domain types and enums
 export {
   ContentType,
+  OAUTH_PROVIDERS,
   Provider,
   UserItemState,
+  SUBSCRIPTION_SOURCES,
   SubscriptionStatus,
   ProviderConnectionStatus,
 } from './domain';
@@ -33,9 +35,11 @@ export type {
 // Type guards
 export {
   isContentType,
+  isOAuthProvider,
   isProvider,
   isUserItemState,
   isSubscriptionStatus,
+  isSubscriptionSource,
   isProviderConnectionStatus,
 } from './domain';
 

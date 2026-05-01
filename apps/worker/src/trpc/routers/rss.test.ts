@@ -6,6 +6,8 @@
 
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { syncRssFeed, syncRssFeedById } from '../../rss/service';
+import type { discoverFeedsForUrl } from '../../rss/discovery';
 
 import { rssRouter } from './rss';
 
@@ -14,12 +16,13 @@ const mockSyncRssFeedById = vi.fn();
 const mockDiscoverFeedsForUrl = vi.fn();
 
 vi.mock('../../rss/service', () => ({
-  syncRssFeed: (...args: unknown[]) => mockSyncRssFeed(...args),
-  syncRssFeedById: (...args: unknown[]) => mockSyncRssFeedById(...args),
+  syncRssFeed: (...args: Parameters<typeof syncRssFeed>) => mockSyncRssFeed(...args),
+  syncRssFeedById: (...args: Parameters<typeof syncRssFeedById>) => mockSyncRssFeedById(...args),
 }));
 
 vi.mock('../../rss/discovery', () => ({
-  discoverFeedsForUrl: (...args: unknown[]) => mockDiscoverFeedsForUrl(...args),
+  discoverFeedsForUrl: (...args: Parameters<typeof discoverFeedsForUrl>) =>
+    mockDiscoverFeedsForUrl(...args),
 }));
 
 function createMockCtx(userId: string | null = 'user_test_123') {

@@ -26,7 +26,7 @@ import {
   newsletterFeeds,
   newsletterFeedMessages,
 } from '../../db/schema';
-import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS } from '@zine/shared';
+import { UserItemState, YOUTUBE_SHORTS_MAX_DURATION_SECONDS, isOAuthProvider } from '@zine/shared';
 import { decodeCursor, encodeCursor } from '../../lib/pagination';
 import { toItemView, type ItemView } from './items';
 import { getLatestContentItemContentType } from './latest-content-content-type';
@@ -51,6 +51,9 @@ import type { ProviderConnection, TokenRefreshEnv } from '../../lib/token-refres
 import { TokenRefreshError } from '../../lib/token-refresh';
 import type { Database } from '../../db';
 import type { Bindings } from '../../types';
+import { logger } from '../../lib/logger';
+
+const creatorsLogger = logger.child('creators');
 
 /**
  * Response shape for checkSubscription
@@ -254,8 +257,12 @@ export const creatorsRouter = router({
             }
           }
         }
-      } catch {
-        // Silently ignore enrichment errors - return original creator
+      } catch (error) {
+        creatorsLogger.warn('Spotify creator enrichment failed', {
+          error,
+          creatorId: creator.id,
+          providerCreatorId: creator.providerCreatorId,
+        });
       }
     }
 
@@ -306,8 +313,12 @@ export const creatorsRouter = router({
             }
           }
         }
-      } catch {
-        // Silently ignore enrichment errors - return original creator
+      } catch (error) {
+        creatorsLogger.warn('YouTube creator enrichment failed', {
+          error,
+          creatorId: creator.id,
+          providerCreatorId: creator.providerCreatorId,
+        });
       }
     }
 
@@ -653,8 +664,12 @@ export const creatorsRouter = router({
                 await ctx.db.update(creators).set(updates).where(eq(creators.id, creator.id));
               }
             }
-          } catch {
-            // Silently ignore enrichment errors - non-critical
+          } catch (error) {
+            creatorsLogger.warn('Background YouTube creator enrichment failed', {
+              error,
+              creatorId: creator.id,
+              providerCreatorId: creator.providerCreatorId,
+            });
           }
         })();
       }
@@ -690,8 +705,12 @@ export const creatorsRouter = router({
                 await ctx.db.update(creators).set(updates).where(eq(creators.id, creator.id));
               }
             }
-          } catch {
-            // Silently ignore enrichment errors - non-critical
+          } catch (error) {
+            creatorsLogger.warn('Background Spotify creator enrichment failed', {
+              error,
+              creatorId: creator.id,
+              providerCreatorId: creator.providerCreatorId,
+            });
           }
         })();
       }
@@ -964,7 +983,7 @@ export const creatorsRouter = router({
       }
 
       // 2. Only supported providers expose creator-level subscriptions
-      if (!['YOUTUBE', 'SPOTIFY', 'GMAIL'].includes(creator.provider)) {
+      if (!isOAuthProvider(creator.provider)) {
         return {
           isSubscribed: false,
           canSubscribe: false,
@@ -1062,7 +1081,7 @@ export const creatorsRouter = router({
       }
 
       // 2. Only supported providers expose creator-level subscriptions.
-      if (!['YOUTUBE', 'SPOTIFY', 'GMAIL'].includes(creator.provider)) {
+      if (!isOAuthProvider(creator.provider)) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'Subscriptions not supported for this provider',

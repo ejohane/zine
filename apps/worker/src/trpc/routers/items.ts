@@ -25,6 +25,7 @@ import {
   ProviderSchema,
   ContentTypeSchema,
 } from '@zine/shared';
+import { normalizeTagKey, normalizeTagName } from '@zine/shared/tags';
 import {
   userItems,
   items,
@@ -265,14 +266,6 @@ function toItemView(
     finishedAt: userItem.finishedAt,
     tags: itemTags,
   };
-}
-
-function normalizeTagName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
-
-function normalizeTagKey(value: string): string {
-  return normalizeTagName(value).toLowerCase();
 }
 
 function toCompactSearchTerm(value: string): string {

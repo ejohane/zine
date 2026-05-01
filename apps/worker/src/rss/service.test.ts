@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentType, Provider } from '@zine/shared';
+import type { prepareItem } from '../ingestion/processor/prepare';
+import type { getOrCreateCreator } from '../ingestion/processor/creators';
+import type { fetchLinkPreview } from '../lib/link-preview';
 
 import { items } from '../db/schema';
 
@@ -8,15 +11,16 @@ const mockFetchLinkPreview = vi.fn();
 const mockGetOrCreateCreator = vi.fn();
 
 vi.mock('../ingestion/processor/prepare', () => ({
-  prepareItem: (...args: unknown[]) => mockPrepareItem(...args),
+  prepareItem: (...args: Parameters<typeof prepareItem>) => mockPrepareItem(...args),
 }));
 
 vi.mock('../lib/link-preview', () => ({
-  fetchLinkPreview: (...args: unknown[]) => mockFetchLinkPreview(...args),
+  fetchLinkPreview: (...args: Parameters<typeof fetchLinkPreview>) => mockFetchLinkPreview(...args),
 }));
 
 vi.mock('../ingestion/processor/creators', () => ({
-  getOrCreateCreator: (...args: unknown[]) => mockGetOrCreateCreator(...args),
+  getOrCreateCreator: (...args: Parameters<typeof getOrCreateCreator>) =>
+    mockGetOrCreateCreator(...args),
 }));
 
 import { syncRssFeed } from './service';

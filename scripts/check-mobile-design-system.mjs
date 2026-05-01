@@ -38,15 +38,7 @@ function isTrackedComponentFile(relativePath) {
     return false;
   }
 
-  if (
-    relativePath.includes('/home/') ||
-    relativePath.includes('/ui/') ||
-    relativePath.includes('/storybook/')
-  ) {
-    return false;
-  }
-
-  if (baseName.startsWith('themed-')) {
+  if (relativePath.includes('/storybook/')) {
     return false;
   }
 

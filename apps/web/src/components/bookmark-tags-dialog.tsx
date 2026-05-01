@@ -1,36 +1,11 @@
 import { LoaderCircle, Plus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { normalizeTagKey, normalizeTagName, sanitizeTagNames } from '@zine/shared/tags';
 
 import type { LibraryItem } from '../lib/router-types';
 import { trpc } from '../lib/trpc';
 import { Button } from '../components';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
-
-function normalizeTagName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
-
-function normalizeTagKey(value: string): string {
-  return normalizeTagName(value).toLowerCase();
-}
-
-function sanitizeTags(tags: string[]): string[] {
-  const deduped = new Map<string, string>();
-
-  for (const tag of tags) {
-    const normalizedName = normalizeTagName(tag);
-    if (!normalizedName) {
-      continue;
-    }
-
-    const normalizedKey = normalizeTagKey(normalizedName);
-    if (!deduped.has(normalizedKey)) {
-      deduped.set(normalizedKey, normalizedName);
-    }
-  }
-
-  return Array.from(deduped.values()).slice(0, 20);
-}
 
 type BookmarkTagsDialogProps = {
   bookmark: Pick<LibraryItem, 'id' | 'title' | 'tags'>;
@@ -46,7 +21,7 @@ export function BookmarkTagsDialog({ bookmark, open, onOpenChange }: BookmarkTag
 
   const tagsQuery = trpc.items.listTags.useQuery();
   const initialTagNames = useMemo(
-    () => sanitizeTags((bookmark.tags ?? []).map((tag) => tag.name)),
+    () => sanitizeTagNames((bookmark.tags ?? []).map((tag) => tag.name)),
     [bookmark.tags]
   );
 
@@ -114,7 +89,7 @@ export function BookmarkTagsDialog({ bookmark, open, onOpenChange }: BookmarkTag
         ? previous.filter((tag) => normalizeTagKey(tag) !== normalizedKey)
         : [...previous, normalizedName];
 
-      return sanitizeTags(next);
+      return sanitizeTagNames(next);
     });
   };
 
@@ -128,7 +103,7 @@ export function BookmarkTagsDialog({ bookmark, open, onOpenChange }: BookmarkTag
     try {
       await setTagsMutation.mutateAsync({
         id: bookmark.id,
-        tags: sanitizeTags(selectedTags),
+        tags: sanitizeTagNames(selectedTags),
       });
     } catch (error) {
       setSaveErrorMessage(error instanceof Error ? error.message : 'Failed to update tags.');

@@ -107,7 +107,7 @@ function backfillColumn(
   }
 
   const result = db
-    .query<unknown, []>(
+    .query<Record<never, never>, []>(
       `UPDATE ${table}
        SET ${msColumn} = CAST(strftime('%s', ${isoColumn}) AS INTEGER) * 1000
        WHERE ${isoColumn} IS NOT NULL

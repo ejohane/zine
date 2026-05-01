@@ -1,5 +1,5 @@
 import { createTRPCClient, httpBatchLink } from '@trpc/client';
-import { Provider, type OAuthProvider } from '@zine/shared/types';
+import { Provider, isOAuthProvider, type OAuthProvider } from '@zine/shared/types';
 import superjson from 'superjson';
 
 import type { AppRouter } from '@zine/worker/trpc/router';
@@ -101,7 +101,7 @@ function isGoogleProvider(provider: OAuthProvider) {
 function parseProviderFromState(state: string | null): OAuthProvider | null {
   if (!state) return null;
   const provider = state.split(':')[0];
-  return provider === 'YOUTUBE' || provider === 'SPOTIFY' || provider === 'GMAIL' ? provider : null;
+  return isOAuthProvider(provider) ? provider : null;
 }
 
 async function clearOAuthState(provider: OAuthProvider) {

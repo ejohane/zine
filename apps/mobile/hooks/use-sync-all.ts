@@ -24,6 +24,7 @@ import { trpc } from '../lib/trpc';
 import { createMobileActionTraceContext, runWithMobileActionTrace } from '../lib/trpc-transport';
 import { useAuthResumeGate } from '@/providers/auth-resume-gate';
 import type { SyncStatusOutput } from '@/lib/trpc-types';
+import { logger } from '@/lib/logger';
 
 const DEFAULT_COOLDOWN_SECONDS = 120; // 2 minutes (matches backend)
 const STATUS_POLL_INTERVAL_MS = 2000; // Poll every 2 seconds
@@ -167,8 +168,8 @@ export function useSyncAll(): UseSyncAllReturn {
             jobId: activeJobIdRef.current,
           });
           handleStatusUpdate(result);
-        } catch {
-          // Ignore query errors during polling
+        } catch (error) {
+          logger.debug('Sync status polling failed', { error });
         }
       };
 
@@ -214,8 +215,8 @@ export function useSyncAll(): UseSyncAllReturn {
         }
         startStatusPolling(result.jobId);
       }
-    } catch {
-      // Ignore errors during resume check
+    } catch (error) {
+      logger.debug('Active sync resume check failed', { error });
     }
   }, [ensureFreshAuthToken, utils.client.subscriptions.activeSyncJob, startStatusPolling]);
 

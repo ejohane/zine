@@ -1,6 +1,6 @@
 # Mobile Design System Story Map
 
-Last updated: March 7, 2026
+Last updated: April 30, 2026
 
 ## Purpose
 
@@ -23,7 +23,6 @@ Use this top-level structure in Storybook:
 8. `Boundary/*`
 9. `Interactions/*`
 10. `Dev/*`
-11. `Legacy/*` (optional, compatibility only)
 
 ## Foundations Reference Stories
 
@@ -40,13 +39,12 @@ These stories document the system itself, not a single component:
 
 ## Required Story Sets by Status
 
-| Status          | Required Story Set                                                  |
-| --------------- | ------------------------------------------------------------------- |
-| `canonical`     | `Playground`, `All States`, `Stress`, `A11y Notes`                  |
-| `app-container` | `Mocked States`, `Error Paths`, `Interaction Contracts`             |
-| `dormant`       | `Single Reference Story` only when feature is reactivated           |
-| `legacy`        | No new stories. Optional compatibility story under `Legacy/*` only. |
-| `dev-only`      | Minimal smoke stories under `Dev/*`.                                |
+| Status          | Required Story Set                                        |
+| --------------- | --------------------------------------------------------- |
+| `canonical`     | `Playground`, `All States`, `Stress`, `A11y Notes`        |
+| `app-container` | `Mocked States`, `Error Paths`, `Interaction Contracts`   |
+| `dormant`       | `Single Reference Story` only when feature is reactivated |
+| `dev-only`      | Minimal smoke stories under `Dev/*`.                      |
 
 ## P0 Story Backlog (Build First)
 

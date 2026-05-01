@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useToast, Surface } from 'heroui-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { normalizeTagKey, normalizeTagName, sanitizeTagNames } from '@zine/shared/tags';
 import {
   ActivityIndicator,
   Pressable,
@@ -17,30 +18,6 @@ import { Colors, Radius, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { UserItemState, useItem, useSetItemTags, useUserTags } from '@/hooks/use-items-trpc';
 import { showError, showSuccess } from '@/lib/toast-utils';
-
-function normalizeTagName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
-}
-
-function normalizeTagKey(value: string): string {
-  return normalizeTagName(value).toLowerCase();
-}
-
-function sanitizeTags(tags: string[]): string[] {
-  const deduped = new Map<string, string>();
-
-  for (const tag of tags) {
-    const normalizedName = normalizeTagName(tag);
-    if (!normalizedName) continue;
-
-    const normalizedKey = normalizeTagKey(normalizedName);
-    if (!deduped.has(normalizedKey)) {
-      deduped.set(normalizedKey, normalizedName);
-    }
-  }
-
-  return Array.from(deduped.values()).slice(0, 20);
-}
 
 function getReadableTextColor(background: string): string {
   const normalized = background.replace('#', '').trim();
@@ -133,14 +110,14 @@ export default function ItemTagsScreen() {
         return previous.filter((tag) => normalizeTagKey(tag) !== normalizedKey);
       }
 
-      return sanitizeTags([...previous, normalizedName]);
+      return sanitizeTagNames([...previous, normalizedName]);
     });
   };
 
   const handleSave = () => {
     if (!item) return;
 
-    const sanitized = sanitizeTags(selectedTags);
+    const sanitized = sanitizeTagNames(selectedTags);
 
     setTagsMutation.mutate(
       {

@@ -1,19 +1,18 @@
 # Mobile Design System Component Inventory
 
-Last updated: March 7, 2026
+Last updated: April 30, 2026
 
 ## Purpose
 
 This document is the source of truth for the mobile component catalog in `apps/mobile/components`.
 It defines which components are canonical design-system building blocks, which are app containers,
-and which are legacy or dormant.
+and which are dormant.
 
 ## Status Labels
 
 - `canonical`: Reusable UI building block. Preferred for new work.
 - `app-container`: Uses app hooks, routing, analytics, or side effects. Keep behavior here, but prefer extracting a pure view when possible.
 - `dormant`: Not currently mounted in app routes. Keep, but do not expand until feature work resumes.
-- `legacy`: Superseded or template-era component. Do not use for new work.
 - `dev-only`: Storybook scaffolding or inventory support modules.
 
 ## Canonical Components
@@ -61,23 +60,6 @@ and which are legacy or dormant.
 | `apps/mobile/components/offline-banner.tsx`        | `dormant` | `P2`           | Network status banner not currently mounted.                 |
 | `apps/mobile/components/external-link.tsx`         | `dormant` | `P2`           | Utility wrapper not currently referenced by app routes.      |
 
-## Legacy Components
-
-| Path                                              | Status   | Story Priority | Notes                                                      |
-| ------------------------------------------------- | -------- | -------------- | ---------------------------------------------------------- |
-| `apps/mobile/components/home/index.tsx`           | `legacy` | `none`         | Legacy home export barrel not used by current tab home.    |
-| `apps/mobile/components/home/content-card.tsx`    | `legacy` | `none`         | Superseded by `ItemCard` variants in current home screen.  |
-| `apps/mobile/components/home/featured-card.tsx`   | `legacy` | `none`         | Legacy home hero card implementation.                      |
-| `apps/mobile/components/home/channel-card.tsx`    | `legacy` | `none`         | Legacy home channel card implementation.                   |
-| `apps/mobile/components/home/quick-stats.tsx`     | `legacy` | `none`         | Legacy home stats panel implementation.                    |
-| `apps/mobile/components/home/section-header.tsx`  | `legacy` | `none`         | Legacy section header implementation.                      |
-| `apps/mobile/components/home/pressable-scale.tsx` | `legacy` | `none`         | Legacy pressable utility scoped to old home stack.         |
-| `apps/mobile/components/themed-text.tsx`          | `legacy` | `none`         | Expo template-era themed helper, not in active DS path.    |
-| `apps/mobile/components/themed-view.tsx`          | `legacy` | `none`         | Expo template-era themed helper, not in active DS path.    |
-| `apps/mobile/components/ui/collapsible.tsx`       | `legacy` | `none`         | Template-era component dependent on legacy themed helpers. |
-| `apps/mobile/components/ui/icon-symbol.tsx`       | `legacy` | `none`         | Template-era icon abstraction, not in active usage.        |
-| `apps/mobile/components/ui/icon-symbol.ios.tsx`   | `legacy` | `none`         | iOS-specific template icon implementation.                 |
-
 ## Dev-Only and Support Modules
 
 | Path                                                            | Status     | Story Priority | Notes                                             |
@@ -93,12 +75,10 @@ and which are legacy or dormant.
 1. New UI work must start from `canonical` components whenever possible.
 2. Shared visual work should prefer `primitives/text.tsx`, `primitives/surface.tsx`, `primitives/badge.tsx`, `primitives/button.tsx`, and `primitives/icon-button.tsx` before adding duplicated local button/text/container styles.
 3. New screens can use `app-container` components, but shared visuals should move toward a pure presentational layer.
-4. `legacy` components should not receive new features.
-5. `dormant` components can be reactivated only as part of a scoped feature plan.
-6. If a component changes status, update this file in the same PR.
+4. `dormant` components can be reactivated only as part of a scoped feature plan.
+5. If a component changes status, update this file in the same PR.
 
 ## Immediate Follow-Ups
 
-1. Migrate remaining non-legacy theme consumers (`swipeable-inbox-item` and route-level item detail screens) to `useAppTheme()`.
+1. Migrate remaining route-level item detail screens to `useAppTheme()`.
 2. Create view-model splits for selected `app-container` rows before expanding their stories.
-3. Decide whether to archive or delete `legacy` home components after Storybook coverage lands.

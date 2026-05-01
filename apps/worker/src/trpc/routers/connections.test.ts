@@ -12,6 +12,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TRPCError } from '@trpc/server';
+import type { exchangeCodeForTokens, getProviderUserInfo } from '../../lib/auth';
+import type { decrypt, encrypt } from '../../lib/crypto';
+import type { registerOAuthState, validateOAuthState } from '../../lib/oauth-state';
 import {
   createMockEnv,
   TEST_USER_ID,
@@ -30,8 +33,10 @@ const mockRegisterOAuthState = vi.fn();
 const mockValidateOAuthState = vi.fn();
 
 vi.mock('../../lib/oauth-state', () => ({
-  registerOAuthState: (...args: unknown[]) => mockRegisterOAuthState(...args),
-  validateOAuthState: (...args: unknown[]) => mockValidateOAuthState(...args),
+  registerOAuthState: (...args: Parameters<typeof registerOAuthState>) =>
+    mockRegisterOAuthState(...args),
+  validateOAuthState: (...args: Parameters<typeof validateOAuthState>) =>
+    mockValidateOAuthState(...args),
   OAUTH_STATE_TTL_SECONDS: 1800,
 }));
 
@@ -40,8 +45,10 @@ const mockExchangeCodeForTokens = vi.fn();
 const mockGetProviderUserInfo = vi.fn();
 
 vi.mock('../../lib/auth', () => ({
-  exchangeCodeForTokens: (...args: unknown[]) => mockExchangeCodeForTokens(...args),
-  getProviderUserInfo: (...args: unknown[]) => mockGetProviderUserInfo(...args),
+  exchangeCodeForTokens: (...args: Parameters<typeof exchangeCodeForTokens>) =>
+    mockExchangeCodeForTokens(...args),
+  getProviderUserInfo: (...args: Parameters<typeof getProviderUserInfo>) =>
+    mockGetProviderUserInfo(...args),
 }));
 
 // Mock crypto functions
@@ -49,8 +56,8 @@ const mockEncrypt = vi.fn();
 const mockDecrypt = vi.fn();
 
 vi.mock('../../lib/crypto', () => ({
-  encrypt: (...args: unknown[]) => mockEncrypt(...args),
-  decrypt: (...args: unknown[]) => mockDecrypt(...args),
+  encrypt: (...args: Parameters<typeof encrypt>) => mockEncrypt(...args),
+  decrypt: (...args: Parameters<typeof decrypt>) => mockDecrypt(...args),
 }));
 
 // Mock database operations
