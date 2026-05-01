@@ -64,11 +64,44 @@ describe('enrichWithQwen', () => {
 
     expect(result.summary.short).toBe(output.summary.short);
     expect(run).toHaveBeenCalledWith(
-      '@cf/qwen/qwen3-30b-a3b-fp8',
+      '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       expect.objectContaining({
         response_format: expect.objectContaining({ type: 'json_schema' }),
       })
     );
+  });
+
+  it('returns validated structured output from Workers AI JSON Mode object response', async () => {
+    const output = createValidModelOutput();
+    const run = vi.fn().mockResolvedValue({ response: output });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.summary.short).toBe(output.summary.short);
+    expect(run).toHaveBeenCalledWith(
+      '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      expect.objectContaining({
+        response_format: {
+          type: 'json_schema',
+          json_schema: expect.objectContaining({
+            type: 'object',
+            properties: expect.objectContaining({
+              summary: expect.any(Object),
+            }),
+          }),
+        },
+      })
+    );
+  });
+
+  it('does not use the OpenAI named schema wrapper for Workers AI JSON Mode', async () => {
+    const output = createValidModelOutput();
+    const run = vi.fn().mockResolvedValue({ response: output });
+
+    await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(run.mock.calls[0][1].response_format.json_schema).not.toHaveProperty('name');
+    expect(run.mock.calls[0][1].response_format.json_schema).not.toHaveProperty('schema');
   });
 
   it('retries once when model output is invalid and accepts repaired JSON', async () => {
@@ -82,6 +115,28 @@ describe('enrichWithQwen', () => {
 
     expect(result.classification.primaryCategory).toBe('software-engineering');
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts OpenAI-style choices response content', async () => {
+    const output = createValidModelOutput();
+    const run = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(output) } }],
+    });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.summary.detail).toBe(output.summary.detail);
+  });
+
+  it('accepts fenced JSON text', async () => {
+    const output = createValidModelOutput();
+    const run = vi.fn().mockResolvedValue({
+      response: `\`\`\`json\n${JSON.stringify(output)}\n\`\`\``,
+    });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.confidence.overall).toBe(output.confidence.overall);
   });
 
   it('throws validation error when both model attempts are invalid', async () => {

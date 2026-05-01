@@ -30,6 +30,7 @@ import authRoutes from './routes/auth';
 import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
 import { getDependencyHealth, getQueueHealth } from './diagnostics/health';
+import { backfillBookmarkEnrichment } from './admin/enrichment-backfill';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -162,6 +163,48 @@ app.get('/health/queues', async (c) => {
 
 // Mount auth routes first (webhook endpoint handles its own auth via Svix)
 app.route('/api/auth', authRoutes);
+
+app.post('/admin/enrichment/backfill', async (c) => {
+  const configuredSecret = c.env.ENRICHMENT_BACKFILL_SECRET;
+  if (!configuredSecret) {
+    return c.json(
+      {
+        error: 'Enrichment backfill is not configured',
+        code: 'BACKFILL_NOT_CONFIGURED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      503
+    );
+  }
+
+  const authHeader = c.req.header('Authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token || token !== configuredSecret) {
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      401
+    );
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const result = await backfillBookmarkEnrichment(c.env, {
+    dryRun: typeof body.dryRun === 'boolean' ? body.dryRun : true,
+    limit: typeof body.limit === 'number' ? body.limit : undefined,
+    cursor: typeof body.cursor === 'string' && body.cursor.length > 0 ? body.cursor : null,
+  });
+
+  return c.json({
+    ...result,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
 
 // tRPC Routes
 

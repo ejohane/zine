@@ -72,6 +72,8 @@ export interface Bindings {
   RELEASE_DEPLOYED_AT?: string;
   /** Optional rollout ring or percentage */
   RELEASE_RING?: string;
+  /** Secret for privileged enrichment backfill operations */
+  ENRICHMENT_BACKFILL_SECRET?: string;
   /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
   SYNC_QUEUE?: Queue<SyncQueueMessage>;
   /** Queue for async bookmark enrichment (optional - not available in all envs) */

@@ -1,7 +1,7 @@
 import type { ContentType, Provider } from '@zine/shared';
 
 export const ENRICHMENT_SCHEMA_VERSION = 1;
-export const DEFAULT_ENRICHMENT_MODEL = '@cf/qwen/qwen3-30b-a3b-fp8';
+export const DEFAULT_ENRICHMENT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const DEFAULT_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 export const DEFAULT_EMBEDDING_DIMENSIONS = 1024;
 

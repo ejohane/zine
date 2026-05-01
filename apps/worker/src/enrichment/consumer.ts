@@ -479,10 +479,9 @@ export async function handleEnrichmentQueue(
     queue: batch.queue,
   });
 
-  const db = createDb(env.DB);
-  for (const message of batch.messages) {
-    await processMessage(message, db, env);
-  }
+  await Promise.all(
+    batch.messages.map((message) => processMessage(message, createDb(env.DB), env))
+  );
 }
 
 export async function handleEnrichmentDLQ(
