@@ -605,6 +605,37 @@ describe('BookmarksPage', () => {
     ).not.toBeInTheDocument();
   });
 
+  test('toggles the selected bookmark card off from the desktop list', async () => {
+    const user = userEvent.setup();
+
+    const { container } = renderRoute(
+      <>
+        <BookmarksPage />
+        <LocationProbe />
+      </>,
+      {
+        route: `/bookmarks/${videoItem.id}`,
+        path: '/bookmarks/:bookmarkId?',
+      }
+    );
+
+    const selectedBookmarkCard = container.querySelector('.bookmark-row--selected');
+
+    expect(selectedBookmarkCard).toBeDefined();
+    expect(selectedBookmarkCard).toHaveTextContent(videoItem.title);
+    expect(screen.getByRole('heading', { name: videoItem.title })).toBeVisible();
+
+    await user.click(selectedBookmarkCard as HTMLElement);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks');
+    });
+
+    expect(selectedBookmarkCard).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('heading', { name: videoItem.title })).not.toBeInTheDocument();
+    expect(screen.getByText('Select a bookmark')).toBeVisible();
+  });
+
   test('shows a mobile tab bar on phone widths and hides the sidebar', () => {
     setViewportWidth(390);
 
