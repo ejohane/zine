@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import type { OAuthProvider } from '@zine/shared/types';
+import { Provider as ProviderEnum, type OAuthProvider } from '@zine/shared/types';
 
 import { ErrorState, LoadingState } from '@/components/list-states';
 import { Button, Surface } from '@/components/primitives';
@@ -30,11 +30,13 @@ import {
   getSubscriptionSourceConfig,
 } from '@/lib/subscription-sources';
 import { trpc } from '@/lib/trpc';
-import type { NewslettersListOutput } from '@/lib/trpc-types';
+import type { NewslettersListOutput, XBookmarksStatusOutput } from '@/lib/trpc-types';
 
-type Provider = OAuthProvider;
+type SourceProvider = OAuthProvider;
 type NewsletterFeed = NewslettersListOutput['items'][number];
+type XBookmarkStatus = XBookmarksStatusOutput;
 type ProviderSubscription = ReturnType<typeof useSubscriptions>['subscriptions'][number];
+type ListRow = NewsletterFeed | UnifiedSubscription;
 type UnifiedSubscription = {
   id: string;
   title: string;
@@ -53,12 +55,12 @@ export default function ProviderDetailScreen() {
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   const providerValidation = validateAndConvertProvider(params.provider);
-  const provider: Provider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
+  const provider: SourceProvider = providerValidation.success ? providerValidation.data : 'YOUTUBE';
   const sourceConfig = getSubscriptionSourceConfig(provider);
   const connectRoute = `/subscriptions/connect/${provider.toLowerCase()}` as Href;
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [disconnectingProvider, setDisconnectingProvider] = useState<Provider | null>(null);
+  const [disconnectingProvider, setDisconnectingProvider] = useState<SourceProvider | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   const { data: connections, isLoading: connectionsLoading } = useConnections();
@@ -73,12 +75,13 @@ export default function ProviderDetailScreen() {
   const integrationState = getIntegrationState(provider, connection?.status ?? null);
   const isConnected = integrationState === 'connected';
 
-  const discoverProvider = provider === 'SPOTIFY' ? 'SPOTIFY' : 'YOUTUBE';
+  const discoverProvider = provider === 'SPOTIFY' ? ProviderEnum.SPOTIFY : ProviderEnum.YOUTUBE;
 
   const discoverQuery = trpc.subscriptions.discover.available.useQuery(
     { provider: discoverProvider },
     {
-      enabled: providerValidation.success && provider !== 'GMAIL' && isConnected,
+      enabled:
+        providerValidation.success && provider !== 'GMAIL' && provider !== 'X' && isConnected,
       staleTime: 5 * 60 * 1000,
     }
   );
@@ -96,10 +99,37 @@ export default function ProviderDetailScreen() {
       utils.subscriptions.newsletters.list.invalidate();
       utils.subscriptions.newsletters.stats.invalidate();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       Alert.alert('Sync failed', error.message || 'Failed to sync newsletters.');
     },
   });
+
+  const xBookmarksStatusQuery = trpc.subscriptions.xBookmarks.status.useQuery(undefined, {
+    enabled: providerValidation.success && provider === 'X',
+    staleTime: 60 * 1000,
+  });
+
+  const xBookmarksSyncMutation = trpc.subscriptions.xBookmarks.syncNow.useMutation({
+    onSuccess: () => {
+      utils.subscriptions.xBookmarks.status.invalidate();
+      utils.items.library.invalidate();
+      utils.items.home.invalidate();
+    },
+    onError: (error) => {
+      Alert.alert('Sync failed', error.message || 'Failed to sync X bookmarks.');
+    },
+  });
+
+  const updateXBookmarksSettingsMutation = trpc.subscriptions.xBookmarks.updateSettings.useMutation(
+    {
+      onSuccess: () => {
+        utils.subscriptions.xBookmarks.status.invalidate();
+      },
+      onError: (error) => {
+        Alert.alert('Update failed', error.message || 'Failed to update X bookmark settings.');
+      },
+    }
+  );
 
   const updateNewsletterStatusMutation = trpc.subscriptions.newsletters.updateStatus.useMutation({
     onSuccess: () => {
@@ -108,7 +138,7 @@ export default function ProviderDetailScreen() {
       utils.items.inbox.invalidate();
       utils.items.home.invalidate();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       Alert.alert('Update failed', error.message || 'Failed to update newsletter status.');
     },
   });
@@ -118,7 +148,7 @@ export default function ProviderDetailScreen() {
       utils.subscriptions.newsletters.list.invalidate();
       utils.subscriptions.newsletters.stats.invalidate();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       Alert.alert('Unsubscribe failed', error.message || 'Failed to unsubscribe from newsletter.');
     },
   });
@@ -178,9 +208,16 @@ export default function ProviderDetailScreen() {
     () => newslettersQuery.data?.items ?? [],
     [newslettersQuery.data]
   );
+  const listData: ListRow[] =
+    provider === 'GMAIL' ? newsletterFeeds : provider === 'X' ? [] : filteredSubscriptions;
 
+  const xBookmarkStatus = xBookmarksStatusQuery.data;
   const displayedCount =
-    provider === 'GMAIL' ? newsletterFeeds.length : availableSubscriptions.length;
+    provider === 'GMAIL'
+      ? newsletterFeeds.length
+      : provider === 'X'
+        ? (xBookmarkStatus?.importedCount ?? 0)
+        : availableSubscriptions.length;
   const hubSummary = getHubStatusText(provider, integrationState, displayedCount);
   const integrationCopy = getIntegrationCardCopy(provider, integrationState);
   const integrationDetail = buildIntegrationDetail(connection);
@@ -188,7 +225,11 @@ export default function ProviderDetailScreen() {
   const isLoading =
     connectionsLoading ||
     subscriptionsLoading ||
-    (provider === 'GMAIL' ? newslettersQuery.isLoading : discoverQuery.isLoading);
+    (provider === 'GMAIL'
+      ? newslettersQuery.isLoading
+      : provider === 'X'
+        ? xBookmarksStatusQuery.isLoading
+        : discoverQuery.isLoading);
 
   const isProcessingNewsletter =
     updateNewsletterStatusMutation.isPending || unsubscribeNewsletterMutation.isPending;
@@ -229,13 +270,17 @@ export default function ProviderDetailScreen() {
         return;
       }
 
+      if (provider !== 'YOUTUBE' && provider !== 'SPOTIFY') {
+        return;
+      }
+
       setProcessingIds((current) => new Set(current).add(subscription.id));
 
       if (subscription.isSubscribed && subscription.subscriptionId) {
         unsubscribe({ subscriptionId: subscription.subscriptionId });
       } else {
         subscribe({
-          provider,
+          provider: provider === 'SPOTIFY' ? ProviderEnum.SPOTIFY : ProviderEnum.YOUTUBE,
           providerChannelId: subscription.id,
           name: subscription.title,
           imageUrl: subscription.imageUrl ?? undefined,
@@ -301,6 +346,20 @@ export default function ProviderDetailScreen() {
     newslettersSyncMutation.mutate();
   }, [isConnected, newslettersSyncMutation]);
 
+  const handleXBookmarksSync = useCallback(() => {
+    if (!isConnected) {
+      Alert.alert('Integration required', 'Connect X before syncing bookmarks.');
+      return;
+    }
+
+    xBookmarksSyncMutation.mutate({});
+  }, [isConnected, xBookmarksSyncMutation]);
+
+  const handleXDailySyncToggle = useCallback(() => {
+    const nextValue = !(xBookmarksStatusQuery.data?.sync?.dailySyncEnabled ?? false);
+    updateXBookmarksSettingsMutation.mutate({ dailySyncEnabled: nextValue });
+  }, [updateXBookmarksSettingsMutation, xBookmarksStatusQuery.data?.sync?.dailySyncEnabled]);
+
   return (
     <Surface tone="canvas" style={styles.container} collapsable={false}>
       <Stack.Screen
@@ -318,7 +377,7 @@ export default function ProviderDetailScreen() {
       ) : (
         <FlatList
           style={styles.list}
-          data={provider === 'GMAIL' ? newsletterFeeds : filteredSubscriptions}
+          data={listData}
           keyExtractor={(item) => item.id}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -345,9 +404,15 @@ export default function ProviderDetailScreen() {
 
               <View style={styles.section}>
                 <SourceSectionHeader
-                  eyebrow="Subscriptions"
-                  title="Subscriptions"
-                  summary={isConnected ? formatSourceCount(provider, displayedCount) : undefined}
+                  eyebrow={provider === 'X' ? 'Bookmarks' : 'Subscriptions'}
+                  title={provider === 'X' ? 'Bookmark sync' : 'Subscriptions'}
+                  summary={
+                    provider === 'X'
+                      ? getXBookmarksSummary(xBookmarkStatus)
+                      : isConnected
+                        ? formatSourceCount(provider, displayedCount)
+                        : undefined
+                  }
                   trailing={
                     provider === 'GMAIL' && isConnected ? (
                       <Button
@@ -357,10 +422,30 @@ export default function ProviderDetailScreen() {
                         variant="secondary"
                         size="sm"
                       />
+                    ) : provider === 'X' && isConnected ? (
+                      <Button
+                        label="Sync now"
+                        onPress={handleXBookmarksSync}
+                        loading={xBookmarksSyncMutation.isPending}
+                        variant="secondary"
+                        size="sm"
+                      />
                     ) : null
                   }
                 />
-                {isConnected ? (
+                {provider === 'X' && isConnected ? (
+                  <Button
+                    label={
+                      xBookmarkStatus?.sync?.dailySyncEnabled
+                        ? 'Disable daily sync'
+                        : 'Enable daily sync'
+                    }
+                    onPress={handleXDailySyncToggle}
+                    loading={updateXBookmarksSettingsMutation.isPending}
+                    variant="outline"
+                    size="sm"
+                  />
+                ) : isConnected ? (
                   <SourceSearchField
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -379,7 +464,6 @@ export default function ProviderDetailScreen() {
           renderItem={({ item }) =>
             provider === 'GMAIL' ? (
               <SourceSubscriptionRow
-                source={provider}
                 title={(item as NewsletterFeed).displayName}
                 subtitle={(item as NewsletterFeed).fromAddress ?? null}
                 imageUrl={getNewsletterImageUrl(item as NewsletterFeed)}
@@ -399,7 +483,6 @@ export default function ProviderDetailScreen() {
               />
             ) : (
               <SourceSubscriptionRow
-                source={provider}
                 title={(item as UnifiedSubscription).title}
                 imageUrl={(item as UnifiedSubscription).imageUrl}
                 statusLabel={(item as UnifiedSubscription).isSubscribed ? 'Subscribed' : null}
@@ -445,6 +528,26 @@ function buildIntegrationDetail(connection: Connection | undefined): string | nu
   detailParts.push(`Connected ${formatDate(connection.createdAt)}`);
 
   return detailParts.join(' · ');
+}
+
+function getXBookmarksSummary(status: XBookmarkStatus | undefined): string | undefined {
+  if (!status?.connected) {
+    return undefined;
+  }
+
+  const parts = [formatSourceCount('X', status.importedCount), 'Latest 100 bookmarks per sync'];
+
+  if (status.sync?.lastSuccessAt) {
+    parts.push(`Last synced ${formatDate(new Date(status.sync.lastSuccessAt).toISOString())}`);
+  }
+
+  if (status.sync?.rateLimitedUntil && status.sync.rateLimitedUntil > Date.now()) {
+    parts.push(
+      `Rate limited until ${formatDate(new Date(status.sync.rateLimitedUntil).toISOString())}`
+    );
+  }
+
+  return parts.join(' · ');
 }
 
 function formatDate(dateString: string): string {
@@ -533,12 +636,16 @@ function getNewsletterPrimaryActionVariant(
 }
 
 function getEmptyTitle(
-  provider: Provider,
+  provider: SourceProvider,
   state: ReturnType<typeof getIntegrationState>,
   query: string
 ) {
   if (state !== 'connected') {
     return state === 'needsAttention' ? 'Reconnect integration' : 'Connect integration';
+  }
+
+  if (provider === 'X') {
+    return 'No X bookmarks imported yet';
   }
 
   if (query.trim()) {
@@ -549,14 +656,20 @@ function getEmptyTitle(
 }
 
 function getEmptyMessage(
-  provider: Provider,
+  provider: SourceProvider,
   state: ReturnType<typeof getIntegrationState>,
   query: string
 ) {
   const config = getSubscriptionSourceConfig(provider);
 
   if (state !== 'connected') {
-    return `Connect ${config.providerLabel} to import and manage subscriptions from this source.`;
+    return provider === 'X'
+      ? 'Connect X to import bookmarked posts into your library.'
+      : `Connect ${config.providerLabel} to import and manage subscriptions from this source.`;
+  }
+
+  if (provider === 'X') {
+    return 'Use Sync now to import the latest 100 bookmarked posts from X. Manual refresh is capped to once every 24 hours.';
   }
 
   if (query.trim()) {

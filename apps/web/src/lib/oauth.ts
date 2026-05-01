@@ -4,7 +4,7 @@ import superjson from 'superjson';
 
 import type { AppRouter } from '@zine/worker/trpc/router';
 
-import { API_URL, SPOTIFY_CLIENT_ID, YOUTUBE_CLIENT_ID } from './env';
+import { API_URL, SPOTIFY_CLIENT_ID, X_CLIENT_ID, YOUTUBE_CLIENT_ID } from './env';
 
 export type { OAuthProvider } from '@zine/shared/types';
 
@@ -35,6 +35,11 @@ const OAUTH_CONFIG = {
     authUrl: 'https://accounts.spotify.com/authorize',
     scopes: ['user-library-read'],
   },
+  X: {
+    clientId: X_CLIENT_ID,
+    authUrl: 'https://x.com/i/oauth2/authorize',
+    scopes: ['tweet.read', 'users.read', 'bookmark.read', 'offline.access'],
+  },
 } as const satisfies Record<
   OAuthProvider,
   {
@@ -52,6 +57,8 @@ function toProviderEnum(provider: OAuthProvider): Provider {
       return Provider.GMAIL;
     case 'SPOTIFY':
       return Provider.SPOTIFY;
+    case 'X':
+      return Provider.X;
   }
 }
 
@@ -117,7 +124,11 @@ export async function connectProvider(
   const config = OAUTH_CONFIG[provider];
   if (!config.clientId) {
     throw new Error(
-      provider === 'SPOTIFY' ? 'Missing VITE_SPOTIFY_CLIENT_ID.' : 'Missing VITE_YOUTUBE_CLIENT_ID.'
+      provider === 'SPOTIFY'
+        ? 'Missing VITE_SPOTIFY_CLIENT_ID.'
+        : provider === 'X'
+          ? 'Missing VITE_X_CLIENT_ID.'
+          : 'Missing VITE_YOUTUBE_CLIENT_ID.'
     );
   }
 

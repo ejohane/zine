@@ -4,3 +4,4 @@ export const API_URL = import.meta.env.VITE_API_URL?.trim() || fallbackApiUrl;
 export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?.trim() || '';
 export const YOUTUBE_CLIENT_ID = import.meta.env.VITE_YOUTUBE_CLIENT_ID?.trim() || '';
 export const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() || '';
+export const X_CLIENT_ID = import.meta.env.VITE_X_CLIENT_ID?.trim() || '';

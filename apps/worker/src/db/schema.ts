@@ -357,6 +357,64 @@ export const providerConnections = sqliteTable(
   ]
 );
 
+// X Bookmark Syncs
+// One conservative bookmark-import sync state per connected X account.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const xBookmarkSyncs = sqliteTable(
+  'x_bookmark_syncs',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    providerConnectionId: text('provider_connection_id')
+      .notNull()
+      .references(() => providerConnections.id),
+    status: text('status').notNull().default('IDLE'), // IDLE | RUNNING | SUCCESS | ERROR | RATE_LIMITED
+    dailySyncEnabled: integer('daily_sync_enabled', { mode: 'boolean' }).notNull().default(false),
+    lastCursor: text('last_cursor'),
+    lastSyncAt: integer('last_sync_at'),
+    lastSuccessAt: integer('last_success_at'),
+    lastErrorAt: integer('last_error_at'),
+    lastError: text('last_error'),
+    rateLimitedUntil: integer('rate_limited_until'),
+    lastEstimatedBillableReads: integer('last_estimated_billable_reads').notNull().default(0),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('x_bookmark_syncs_user_connection_idx').on(
+      table.userId,
+      table.providerConnectionId
+    ),
+    index('x_bookmark_syncs_daily_idx').on(table.dailySyncEnabled, table.status, table.lastSyncAt),
+  ]
+);
+
+// X Bookmark Items
+// Tracks imported X bookmark posts without using creator/channel subscriptions.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const xBookmarkItems = sqliteTable(
+  'x_bookmark_items',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    tweetId: text('tweet_id').notNull(),
+    firstSeenAt: integer('first_seen_at').notNull(),
+    lastSeenAt: integer('last_seen_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('x_bookmark_items_user_tweet_idx').on(table.userId, table.tweetId),
+    index('x_bookmark_items_user_seen_idx').on(table.userId, table.lastSeenAt),
+    index('x_bookmark_items_item_idx').on(table.itemId),
+  ]
+);
+
 // Gmail Mailboxes
 // One connected Gmail mailbox per user/provider connection.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

@@ -20,6 +20,19 @@ describe('subscription source helpers', () => {
     expect(formatSourceCount('RSS', 2)).toBe('2 feeds');
   });
 
+  it('formats X bookmark counts using bookmark terminology', () => {
+    expect(formatSourceCount('X', 2)).toBe('2 bookmarks');
+  });
+
+  it('returns X integration copy with the conservative sync cap', () => {
+    expect(getIntegrationCardCopy('X', 'notConnected')).toEqual({
+      title: 'Integration not connected',
+      description:
+        'Connect X to import bookmarked posts into your Zine library with a strict daily sync cap.',
+      actionLabel: 'Connect',
+    });
+  });
+
   it('returns reconnect copy for integrations that need attention', () => {
     expect(getIntegrationCardCopy('SPOTIFY', 'needsAttention')).toEqual({
       title: 'Integration needs attention',

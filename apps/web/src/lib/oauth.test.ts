@@ -46,6 +46,7 @@ async function loadOAuthModule(envOverrides: Partial<Record<string, string>> = {
   vi.doMock('./env', () => ({
     API_URL: 'http://localhost:8787',
     SPOTIFY_CLIENT_ID: 'spotify-client',
+    X_CLIENT_ID: 'x-client',
     YOUTUBE_CLIENT_ID: 'google-client',
     ...envOverrides,
   }));

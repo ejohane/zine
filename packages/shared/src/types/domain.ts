@@ -41,18 +41,20 @@ export type ProviderValue = `${Provider}`;
 export type UserItemStateValue = `${UserItemState}`;
 export type SubscriptionStatusValue = `${SubscriptionStatus}`;
 export type ProviderConnectionStatusValue = `${ProviderConnectionStatus}`;
-export type OAuthProvider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY' | 'GMAIL'>;
+export type OAuthProvider = Extract<ProviderValue, 'YOUTUBE' | 'SPOTIFY' | 'GMAIL' | 'X'>;
 export type SubscriptionSource = OAuthProvider | 'RSS';
 
 export const OAUTH_PROVIDERS = [
   'YOUTUBE',
   'SPOTIFY',
   'GMAIL',
+  'X',
 ] as const satisfies readonly OAuthProvider[];
 export const SUBSCRIPTION_SOURCES = [
   'SPOTIFY',
   'YOUTUBE',
   'GMAIL',
+  'X',
   'RSS',
 ] as const satisfies readonly SubscriptionSource[];
 export interface Item {

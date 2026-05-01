@@ -46,7 +46,7 @@ migrations_dir = "src/db/migrations"
 # YouTube polls at :00, Gmail newsletters at :15, Spotify at :30, RSS at :45
 # Each provider has its own distributed lock for failure isolation
 [triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
+crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 
 # Queue for async pull-to-refresh sync
 # Producer: subscriptions.syncAllAsync tRPC procedure
@@ -139,7 +139,7 @@ EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
+crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 [[env.staging.queues.producers]]
 queue = "zine-sync-queue-staging"
 binding = "SYNC_QUEUE"
@@ -214,7 +214,7 @@ EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *"]
+crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 [[env.production.queues.producers]]
 queue = "zine-sync-queue-prod"
 binding = "SYNC_QUEUE"

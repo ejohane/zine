@@ -13,6 +13,8 @@ import {
   getSubscriptionSourceConfig,
 } from '@/lib/subscription-sources';
 
+const SOURCE_BRAND_ICON_COLOR = '#FFFFFF'; // design-system-exception: white brand glyphs
+
 // design-system-exception: brand colors matching FAB config in item-detail-helpers.tsx
 const SOURCE_BRAND: Record<SubscriptionSource, { bg: string; icon: React.ReactNode }> = {
   YOUTUBE: {
@@ -26,6 +28,14 @@ const SOURCE_BRAND: Record<SubscriptionSource, { bg: string; icon: React.ReactNo
   GMAIL: {
     bg: '#1A73E8', // design-system-exception: Gmail brand color
     icon: <Ionicons name="newspaper-outline" size={22} color="#FFFFFF" />, // design-system-exception: white on brand
+  },
+  X: {
+    bg: '#111111', // design-system-exception: X brand color
+    icon: (
+      <Text variant="labelLarge" style={{ color: SOURCE_BRAND_ICON_COLOR }}>
+        X
+      </Text>
+    ), // design-system-exception: white on brand
   },
   RSS: {
     bg: '#F59E0B', // design-system-exception: RSS accent color

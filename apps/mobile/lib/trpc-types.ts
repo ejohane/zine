@@ -28,4 +28,7 @@ export type RssStatsOutput = RouterOutputs['subscriptions']['rss']['stats'];
 export type RssDiscoverInput = RouterInputs['subscriptions']['rss']['discover'];
 export type RssDiscoverOutput = RouterOutputs['subscriptions']['rss']['discover'];
 
+export type XBookmarksStatusOutput = RouterOutputs['subscriptions']['xBookmarks']['status'];
+export type XBookmarksSyncOutput = RouterOutputs['subscriptions']['xBookmarks']['syncNow'];
+
 export type SyncStatusOutput = RouterOutputs['subscriptions']['syncStatus'];
