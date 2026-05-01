@@ -97,7 +97,7 @@ invocation_logs = true
 [vars]
 ENVIRONMENT = "development"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
-ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
@@ -134,7 +134,7 @@ migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
-ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
@@ -209,7 +209,7 @@ migrations_dir = "src/db/migrations"
 [env.production.vars]
 ENVIRONMENT = "production"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
-ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
@@ -253,6 +253,7 @@ invocation_logs = true
 # Required Secrets (set via `wrangler secret put <NAME>`)
 # ============================================================================
 # - CLERK_WEBHOOK_SECRET: Signing secret from Clerk Dashboard > Webhooks
+# - ENRICHMENT_BACKFILL_SECRET: Bearer token for admin enrichment backfill route
 #
 # Required KV Namespace (create via `wrangler kv:namespace create WEBHOOK_IDEMPOTENCY`)
 # - WEBHOOK_IDEMPOTENCY: KV for webhook idempotency tracking
