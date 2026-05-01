@@ -52,6 +52,13 @@ export default function ConnectLayout() {
           presentation: 'card',
         }}
       />
+      <Stack.Screen
+        name="x"
+        options={{
+          title: 'Connect X',
+          presentation: 'card',
+        }}
+      />
     </Stack>
   );
 }

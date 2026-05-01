@@ -86,6 +86,8 @@ export interface TokenRefreshEnv {
   GOOGLE_CLIENT_SECRET?: string;
   SPOTIFY_CLIENT_ID: string;
   SPOTIFY_CLIENT_SECRET: string;
+  X_CLIENT_ID?: string;
+  X_CLIENT_SECRET?: string;
   /** Optional override for the lock handoff wait before re-reading the refreshed token (ms) */
   TOKEN_REFRESH_LOCK_WAIT_MS?: string | number;
 }
@@ -280,6 +282,15 @@ function getProviderConfig(
         tokenUrl: 'https://accounts.spotify.com/api/token',
         clientId: env.SPOTIFY_CLIENT_ID,
         clientSecret: env.SPOTIFY_CLIENT_SECRET,
+      };
+    case 'X':
+      if (!env.X_CLIENT_ID) {
+        throw new TokenRefreshError('INVALID_PROVIDER', 'X OAuth client ID is not configured');
+      }
+      return {
+        tokenUrl: 'https://api.x.com/2/oauth2/token',
+        clientId: env.X_CLIENT_ID,
+        clientSecret: env.X_CLIENT_SECRET,
       };
     default:
       throw new TokenRefreshError('INVALID_PROVIDER', `Unknown provider: ${provider}`);

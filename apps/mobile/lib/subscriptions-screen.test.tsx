@@ -137,6 +137,14 @@ jest.mock('@/lib/trpc', () => ({
           }),
         },
       },
+      xBookmarks: {
+        status: {
+          useQuery: () => ({
+            data: { connected: false, importedCount: 0, sync: null },
+            isLoading: false,
+          }),
+        },
+      },
     },
   },
 }));

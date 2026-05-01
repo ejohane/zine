@@ -1,7 +1,7 @@
 import type { OAuthProvider, Provider } from '@zine/shared/types';
 
 // Routes use lowercase provider slugs; the backend uses uppercase enum values.
-export const VALID_PROVIDER_ROUTES = ['youtube', 'spotify', 'gmail'] as const;
+export const VALID_PROVIDER_ROUTES = ['youtube', 'spotify', 'gmail', 'x'] as const;
 export type ProviderRoute = (typeof VALID_PROVIDER_ROUTES)[number];
 
 // Gmail uses newsletter detection instead of creator discovery.

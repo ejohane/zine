@@ -234,7 +234,8 @@ describe('route-validation', () => {
       expect(VALID_PROVIDER_ROUTES).toContain('youtube');
       expect(VALID_PROVIDER_ROUTES).toContain('spotify');
       expect(VALID_PROVIDER_ROUTES).toContain('gmail');
-      expect(VALID_PROVIDER_ROUTES.length).toBe(3);
+      expect(VALID_PROVIDER_ROUTES).toContain('x');
+      expect(VALID_PROVIDER_ROUTES.length).toBe(4);
     });
 
     it('keeps discovery providers limited to youtube/spotify', () => {

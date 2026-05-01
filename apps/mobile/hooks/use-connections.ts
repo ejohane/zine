@@ -46,7 +46,7 @@ function transformConnection(
     id: `connection-${provider.toLowerCase()}`,
     provider,
     status: data.status as ConnectionStatus,
-    providerUserId: null,
+    providerUserId: data.providerUserId ?? null,
     createdAt: new Date(data.connectedAt).toISOString(),
     lastSyncAt: data.lastRefreshedAt ? new Date(data.lastRefreshedAt).toISOString() : null,
   };
@@ -63,6 +63,9 @@ function transformConnectionsResponse(response: ConnectionsListOutput): Connecti
   }
   if (response.GMAIL) {
     connections.push(transformConnection('GMAIL', response.GMAIL));
+  }
+  if (response.X) {
+    connections.push(transformConnection('X', response.X));
   }
 
   return connections;
@@ -249,6 +252,11 @@ export function useDisconnectConnection(options?: {
       if (isConnectionProvider(input.provider) && input.provider === 'GMAIL') {
         utils.subscriptions.newsletters.list.invalidate();
         utils.subscriptions.newsletters.stats.invalidate();
+      }
+      if (isConnectionProvider(input.provider) && input.provider === 'X') {
+        utils.subscriptions.xBookmarks.status.invalidate();
+        utils.items.library.invalidate();
+        utils.items.home.invalidate();
       }
       options?.onSuccess?.();
     },

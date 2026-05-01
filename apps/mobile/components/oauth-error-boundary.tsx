@@ -18,6 +18,7 @@ interface OAuthErrorFallbackProps {
 function getProviderName(provider: OAuthProvider): string {
   if (provider === 'YOUTUBE') return 'YouTube';
   if (provider === 'SPOTIFY') return 'Spotify';
+  if (provider === 'X') return 'X';
   return 'Gmail';
 }
 

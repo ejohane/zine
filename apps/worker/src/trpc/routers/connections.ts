@@ -21,6 +21,8 @@ import {
   newsletterFeeds,
   newsletterFeedMessages,
   newsletterUnsubscribeEvents,
+  xBookmarkItems,
+  xBookmarkSyncs,
 } from '../../db/schema';
 import type { Bindings } from '../../types';
 import { authLogger } from '../../lib/logger';
@@ -327,6 +329,7 @@ export const connectionsRouter = router({
       where: eq(providerConnections.userId, ctx.userId),
       columns: {
         provider: true,
+        providerUserId: true,
         status: true,
         connectedAt: true,
         lastRefreshedAt: true,
@@ -339,6 +342,7 @@ export const connectionsRouter = router({
       YOUTUBE: connections.find((c) => c.provider === 'YOUTUBE') ?? null,
       SPOTIFY: connections.find((c) => c.provider === 'SPOTIFY') ?? null,
       GMAIL: connections.find((c) => c.provider === 'GMAIL') ?? null,
+      X: connections.find((c) => c.provider === 'X') ?? null,
     };
   }),
 
@@ -462,6 +466,18 @@ export const connectionsRouter = router({
         }
       }
 
+      if (input.provider === 'X') {
+        await ctx.db
+          .delete(xBookmarkSyncs)
+          .where(
+            and(
+              eq(xBookmarkSyncs.userId, ctx.userId),
+              eq(xBookmarkSyncs.providerConnectionId, connection.id)
+            )
+          );
+        await ctx.db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, ctx.userId));
+      }
+
       // 3. Delete connection from database
       await ctx.db.delete(providerConnections).where(eq(providerConnections.id, connection.id));
 
@@ -520,6 +536,25 @@ async function revokeProviderToken(
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`YouTube token revocation failed: ${response.status} ${text}`);
+    }
+  }
+  if (provider === 'X') {
+    const body = new URLSearchParams({
+      token,
+      client_id: env.X_CLIENT_ID ?? '',
+    });
+
+    const response = await fetch('https://api.x.com/2/oauth2/revoke', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`X token revocation failed: ${response.status} ${text}`);
     }
   }
   // Spotify doesn't have a token revocation endpoint

@@ -121,6 +121,14 @@ interface SpotifyUserInfoResponse {
   display_name?: string;
 }
 
+interface XUserInfoResponse {
+  data: {
+    id: string;
+    name: string;
+    username: string;
+  };
+}
+
 function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string';
 }
@@ -160,6 +168,21 @@ function isSpotifyUserInfoResponse(value: unknown): value is SpotifyUserInfoResp
     isOptionalString(candidate.display_name)
   );
 }
+
+function isXUserInfoResponse(value: unknown): value is XUserInfoResponse {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const candidate = value as XUserInfoResponse;
+  return (
+    !!candidate.data &&
+    typeof candidate.data === 'object' &&
+    typeof candidate.data.id === 'string' &&
+    typeof candidate.data.name === 'string' &&
+    typeof candidate.data.username === 'string'
+  );
+}
 const OAUTH_CONFIG = {
   YOUTUBE: {
     tokenUrl: 'https://oauth2.googleapis.com/token',
@@ -172,6 +195,10 @@ const OAUTH_CONFIG = {
   SPOTIFY: {
     tokenUrl: 'https://accounts.spotify.com/api/token',
     userInfoUrl: 'https://api.spotify.com/v1/me',
+  },
+  X: {
+    tokenUrl: 'https://api.x.com/2/oauth2/token',
+    userInfoUrl: 'https://api.x.com/2/users/me',
   },
 } as const;
 
@@ -188,8 +215,16 @@ export async function exchangeCodeForTokens(
   const config = OAUTH_CONFIG[provider];
 
   const isGoogleProvider = provider === 'YOUTUBE' || provider === 'GMAIL';
-  const clientId = isGoogleProvider ? env.GOOGLE_CLIENT_ID : env.SPOTIFY_CLIENT_ID;
-  const clientSecret = isGoogleProvider ? env.GOOGLE_CLIENT_SECRET : env.SPOTIFY_CLIENT_SECRET;
+  const clientId = isGoogleProvider
+    ? env.GOOGLE_CLIENT_ID
+    : provider === 'X'
+      ? env.X_CLIENT_ID
+      : env.SPOTIFY_CLIENT_ID;
+  const clientSecret = isGoogleProvider
+    ? env.GOOGLE_CLIENT_SECRET
+    : provider === 'X'
+      ? env.X_CLIENT_SECRET
+      : env.SPOTIFY_CLIENT_SECRET;
   const redirectUri = overrideRedirectUri || env.OAUTH_REDIRECT_URI || 'zine://oauth/callback';
 
   if (!clientId) {
@@ -275,6 +310,17 @@ export async function getProviderUserInfo(
       id: data.id,
       email: data.email,
       name: data.name,
+    };
+  }
+
+  if (provider === 'X') {
+    if (!isXUserInfoResponse(data)) {
+      throw new Error('Invalid X user info response');
+    }
+
+    return {
+      id: data.data.id,
+      name: `${data.data.name} (@${data.data.username})`,
     };
   }
 

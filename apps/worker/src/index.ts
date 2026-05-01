@@ -19,6 +19,7 @@ import { pollGmailNewsletters } from './newsletters/gmail';
 import { pollRssFeeds } from './rss/service';
 import { handleEnrichmentDLQ, handleEnrichmentQueue } from './enrichment/consumer';
 import type { EnrichmentQueueMessage } from './enrichment/types';
+import { pollXBookmarkSyncs } from './x-bookmarks/service';
 import { handleSyncQueue } from './sync/consumer';
 import { handleSyncDLQ } from './sync/dlq-consumer';
 import type { SyncQueueMessage } from './sync/types';
@@ -281,6 +282,7 @@ export default {
    * - "15 * * * *" → Gmail newsletter polling at quarter past
    * - "30 * * * *" → Spotify polling at 30 minutes past
    * - "45 * * * *" → RSS feed polling at 45 minutes past
+   * - "5 8 * * *"  → opt-in X bookmark sync once daily
    *
    * Each provider has its own distributed lock for failure isolation.
    *
@@ -304,6 +306,11 @@ export default {
 
     if (event.cron === '45 * * * *') {
       ctx.waitUntil(pollRssFeeds(env, ctx));
+      return;
+    }
+
+    if (event.cron === '5 8 * * *') {
+      ctx.waitUntil(pollXBookmarkSyncs(env as Parameters<typeof pollXBookmarkSyncs>[0]));
       return;
     }
 

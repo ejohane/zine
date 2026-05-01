@@ -72,6 +72,11 @@ export const OAUTH_CONFIG = {
     authUrl: 'https://accounts.spotify.com/authorize',
     scopes: ['user-library-read'],
   },
+  X: {
+    clientId: process.env.EXPO_PUBLIC_X_CLIENT_ID ?? '',
+    authUrl: 'https://x.com/i/oauth2/authorize',
+    scopes: ['tweet.read', 'users.read', 'bookmark.read', 'offline.access'],
+  },
 } as const satisfies Record<
   OAuthProvider,
   {
@@ -97,6 +102,8 @@ function toProviderEnum(provider: OAuthProvider): Provider {
       return Provider.GMAIL;
     case 'SPOTIFY':
       return Provider.SPOTIFY;
+    case 'X':
+      return Provider.X;
   }
 }
 

@@ -23,7 +23,7 @@ import {
 } from '@/lib/subscription-sources';
 import { trpc } from '@/lib/trpc';
 
-const SUBSCRIPTION_SOURCES: SubscriptionSource[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL', 'RSS'];
+const SUBSCRIPTION_SOURCES: SubscriptionSource[] = ['YOUTUBE', 'SPOTIFY', 'GMAIL', 'X', 'RSS'];
 
 export default function SubscriptionsScreen() {
   const navigation = useNavigation();
@@ -52,16 +52,21 @@ export default function SubscriptionsScreen() {
   const rssStatsQuery = trpc.subscriptions.rss.stats.useQuery(undefined, {
     staleTime: 60 * 1000,
   });
+  const xBookmarksStatusQuery = trpc.subscriptions.xBookmarks.status.useQuery(undefined, {
+    staleTime: 60 * 1000,
+  });
 
   const isLoading =
     connectionsLoading ||
     subscriptionsLoading ||
     newsletterStatsQuery.isLoading ||
-    rssStatsQuery.isLoading;
+    rssStatsQuery.isLoading ||
+    xBookmarksStatusQuery.isLoading;
 
   const youtubeStatus = getConnectionStatus(connections, 'YOUTUBE');
   const spotifyStatus = getConnectionStatus(connections, 'SPOTIFY');
   const gmailStatus = getConnectionStatus(connections, 'GMAIL');
+  const xStatus = getConnectionStatus(connections, 'X');
 
   const youtubeCount = subscriptions.filter(
     (subscription) => subscription.provider === 'YOUTUBE'
@@ -70,6 +75,7 @@ export default function SubscriptionsScreen() {
     (subscription) => subscription.provider === 'SPOTIFY'
   ).length;
   const gmailCount = newsletterStatsQuery.data?.active ?? 0;
+  const xCount = xBookmarksStatusQuery.data?.importedCount ?? 0;
   const rssCount = rssStatsQuery.data?.active ?? 0;
 
   const sourceRows = useMemo(
@@ -82,7 +88,9 @@ export default function SubscriptionsScreen() {
               ? spotifyCount
               : source === 'GMAIL'
                 ? gmailCount
-                : rssCount;
+                : source === 'X'
+                  ? xCount
+                  : rssCount;
         const status =
           source === 'YOUTUBE'
             ? youtubeStatus
@@ -90,7 +98,9 @@ export default function SubscriptionsScreen() {
               ? spotifyStatus
               : source === 'GMAIL'
                 ? gmailStatus
-                : null;
+                : source === 'X'
+                  ? xStatus
+                  : null;
 
         return {
           source,
@@ -98,7 +108,17 @@ export default function SubscriptionsScreen() {
           summary: getHubStatusText(source, getIntegrationState(source, status), count),
         };
       }),
-    [gmailCount, gmailStatus, rssCount, spotifyCount, spotifyStatus, youtubeCount, youtubeStatus]
+    [
+      gmailCount,
+      gmailStatus,
+      rssCount,
+      spotifyCount,
+      spotifyStatus,
+      xCount,
+      xStatus,
+      youtubeCount,
+      youtubeStatus,
+    ]
   );
 
   return (

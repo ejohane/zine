@@ -71,6 +71,13 @@
       "when": 1777507200000,
       "tag": "0009_add_item_enrichment",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777593600000,
+      "tag": "0010_add_x_bookmark_syncs",
+      "breakpoints": true
     }
   ]
 }

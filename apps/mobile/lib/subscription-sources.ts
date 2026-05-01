@@ -53,6 +53,18 @@ const SOURCE_CONFIG: Record<SubscriptionSource, SourceConfig> = {
     searchPlaceholder: 'Search newsletters',
     route: '/subscriptions/gmail',
   },
+  X: {
+    key: 'X',
+    name: 'X Bookmarks',
+    integrationName: 'X integration',
+    integrationDescription:
+      'Connect X to import bookmarked posts into your Zine library with a strict daily sync cap.',
+    sourceDescription: 'Bookmarked posts from X are imported as saved items in your library.',
+    providerLabel: 'X',
+    subscriptionNoun: 'bookmark',
+    searchPlaceholder: 'Search bookmarks',
+    route: '/subscriptions/x',
+  },
   RSS: {
     key: 'RSS',
     name: 'RSS',

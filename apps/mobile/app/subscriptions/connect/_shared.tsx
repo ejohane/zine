@@ -1,7 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FileText, Headphones, LockKeyhole, Play, ShieldCheck } from 'lucide-react-native';
+import {
+  FileText,
+  Headphones,
+  LockKeyhole,
+  Play,
+  ShieldCheck,
+  Bookmark,
+} from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -22,6 +29,7 @@ const PROVIDER_ICON: Record<ConnectProvider, LucideIcon> = {
   YOUTUBE: Play,
   SPOTIFY: Headphones,
   GMAIL: FileText,
+  X: Bookmark,
 };
 
 type IntegrationConnectScreenProps = {
@@ -63,6 +71,11 @@ export function IntegrationConnectScreen({
         await utils.subscriptions.newsletters.list.invalidate();
         await utils.subscriptions.newsletters.stats.invalidate();
       }
+      if (provider === 'X') {
+        await utils.subscriptions.xBookmarks.status.invalidate();
+        await utils.items.library.invalidate();
+        await utils.items.home.invalidate();
+      }
 
       router.replace(successRoute);
     } catch (err) {
@@ -80,6 +93,10 @@ export function IntegrationConnectScreen({
   const footerCopy = useMemo(() => {
     if (provider === 'GMAIL') {
       return 'Manage this integration and your newsletter subscriptions from the Newsletters source screen.';
+    }
+
+    if (provider === 'X') {
+      return 'Manage this integration and bookmark sync from the X Bookmarks source screen.';
     }
 
     return `Manage this integration and your ${sourceConfig.name.toLowerCase()} subscriptions from the source screen after you connect.`;

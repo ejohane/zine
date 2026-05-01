@@ -14,7 +14,14 @@ import { Webhook } from 'svix';
 import { eq } from 'drizzle-orm';
 import type { Env, Bindings } from '../types';
 import { createDb } from '../db';
-import { users, userItems, sources, providerItemsSeen } from '../db/schema';
+import {
+  users,
+  userItems,
+  sources,
+  providerItemsSeen,
+  xBookmarkItems,
+  xBookmarkSyncs,
+} from '../db/schema';
 import { webhookLogger } from '../lib/logger';
 
 const auth = new Hono<Env>();
@@ -244,6 +251,8 @@ async function handleUserDeleted(
   // 4. Delete user record
 
   await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, user.id));
+  await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, user.id));
+  await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, user.id));
   await db.delete(userItems).where(eq(userItems.userId, user.id));
   await db.delete(sources).where(eq(sources.userId, user.id));
   await db.delete(users).where(eq(users.id, user.id));
@@ -313,6 +322,8 @@ auth.delete('/account', async (c) => {
   // 4. Delete user record
 
   await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
+  await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, userId));
+  await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, userId));
   await db.delete(userItems).where(eq(userItems.userId, userId));
   await db.delete(sources).where(eq(sources.userId, userId));
   await db.delete(users).where(eq(users.id, userId));
