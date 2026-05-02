@@ -198,6 +198,9 @@ export const styles = StyleSheet.create({
   descriptionSurface: {
     gap: Spacing.md,
   },
+  descriptionToggleContent: {
+    gap: Spacing.md,
+  },
   descriptionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

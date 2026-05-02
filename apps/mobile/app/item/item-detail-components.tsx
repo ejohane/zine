@@ -1,7 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Stack } from 'expo-router';
-import { View, Text, ScrollView, Pressable, Linking, type ScrollViewProps } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Linking,
+  type GestureResponderEvent,
+  type ScrollViewProps,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { SourceBadge, TypeBadge } from '@/components/badges';
@@ -38,7 +46,9 @@ export function LinkedText({
 }) {
   const parts = children.split(URL_REGEX);
 
-  const handleLinkPress = async (url: string) => {
+  const handleLinkPress = async (url: string, event?: GestureResponderEvent) => {
+    event?.stopPropagation();
+
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
@@ -59,7 +69,7 @@ export function LinkedText({
             <Text
               key={index}
               style={{ color: linkColor, textDecorationLine: 'underline' }}
-              onPress={() => handleLinkPress(part)}
+              onPress={(event) => handleLinkPress(part, event)}
             >
               {part}
             </Text>

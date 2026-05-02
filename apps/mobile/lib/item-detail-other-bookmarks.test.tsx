@@ -259,6 +259,37 @@ describe('ItemDetailContent other creator bookmarks', () => {
     ).toBeUndefined();
   });
 
+  it('uses the whole expandable description card content as the collapse toggle', () => {
+    const summary =
+      'Current bookmark summary with enough detail to preview four lines before expanding into the complete description. It continues with more context so there is hidden content behind the collapsed state.';
+    const renderer = renderContent({
+      item: createItem({ summary }),
+      otherUnfinishedBookmarks: [
+        createItem({
+          id: 'ui-next',
+          itemId: 'item-next',
+          title: 'Next bookmark',
+          summary: 'Another thing to read',
+        }),
+      ],
+    });
+
+    const toggleButton = renderer.root.findByProps({
+      accessibilityLabel: 'Toggle Description',
+    });
+
+    expect(textContent(toggleButton)).toContain(summary);
+    expect(findSpanContaining(renderer, 'Current bookmark summary')?.props.numberOfLines).toBe(4);
+
+    act(() => {
+      toggleButton.props.onPress();
+    });
+
+    expect(
+      findSpanContaining(renderer, 'Current bookmark summary')?.props.numberOfLines
+    ).toBeUndefined();
+  });
+
   it('does not show a description chevron when the summary is too short to expand', () => {
     const renderer = renderContent({
       item: createItem({
