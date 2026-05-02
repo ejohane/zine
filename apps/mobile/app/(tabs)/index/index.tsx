@@ -18,7 +18,7 @@ import Svg, { Path } from 'react-native-svg';
 import type { ContentType as ApiContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
-import { ArticleIcon, HeadphonesIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
+import { ArticleIcon, PodcastIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import {
   Colors,
@@ -31,7 +31,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { getFeaturedGridItemWidth, getVisibleFeaturedGridItems } from '@/lib/home-layout';
-import { useInfiniteInboxItems, useHomeData, useLibraryItems } from '@/hooks/use-items-trpc';
+import { useInfiniteInboxItems, useHomeData } from '@/hooks/use-items-trpc';
 import {
   mapContentType,
   mapProvider,
@@ -84,7 +84,7 @@ const contentTypeFilters: {
   {
     id: 'podcast',
     label: 'Podcasts',
-    icon: HeadphonesIcon,
+    icon: PodcastIcon,
     dotColor: ContentColors.podcast,
     selectedColor: FilterChipPalette.podcast.accent,
     selectedSurfaceColor: FilterChipPalette.podcast.surface,
@@ -197,7 +197,6 @@ export default function HomeScreen() {
   const { data: homeData, isLoading: isHomeLoading } = useHomeData(
     apiContentTypeFilter ? { filter: { contentType: apiContentTypeFilter } } : undefined
   );
-  const { data: libraryData } = useLibraryItems();
   const { data: connections } = useConnections();
   const { data: subscriptionsData } = useSubscriptions();
   const { hasAttention: hasSettingsAlert } = useMemo(
@@ -290,16 +289,6 @@ export default function HomeScreen() {
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
   }, [homeData?.byContentType.articles]);
-
-  const categoryCounts = useMemo(() => {
-    const items = libraryData?.items ?? [];
-    return {
-      podcast: items.filter((item) => item.contentType === 'PODCAST').length,
-      video: items.filter((item) => item.contentType === 'VIDEO').length,
-      article: items.filter((item) => item.contentType === 'ARTICLE').length,
-      post: items.filter((item) => item.contentType === 'POST').length,
-    };
-  }, [libraryData?.items]);
 
   const handleOpenSettings = useCallback(() => {
     router.push('/settings');
@@ -445,13 +434,12 @@ export default function HomeScreen() {
               dotColor={filter.dotColor}
               selectedColor={filter.selectedColor}
               selectedSurfaceColor={filter.selectedSurfaceColor}
-              count={categoryCounts[filter.id]}
             />
           ))}
         </ScrollView>
       </>
     ),
-    [categoryCounts, colors.text, colors.textSubheader, contentTypeFilter, greeting]
+    [colors.text, colors.textSubheader, contentTypeFilter, greeting]
   );
 
   const renderSection = useCallback(

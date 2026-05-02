@@ -21,7 +21,7 @@ import { FilterChip } from '@/components/filter-chip';
 import {
   ArticleIcon,
   CheckOutlineIcon,
-  HeadphonesIcon,
+  PodcastIcon,
   PostIcon,
   VideoIcon,
 } from '@/components/icons';
@@ -95,7 +95,7 @@ const filterOptions: {
     id: 'podcast',
     label: 'Podcasts',
     color: ContentColors.podcast,
-    icon: HeadphonesIcon,
+    icon: PodcastIcon,
     selectedColor: FilterChipPalette.podcast.accent,
     selectedSurfaceColor: FilterChipPalette.podcast.surface,
     contentType: ApiContentType.PODCAST,
@@ -235,12 +235,6 @@ export default function LibraryScreen() {
     []
   );
 
-  const libraryCountLabel = isLoading
-    ? 'Loading...'
-    : hasNextPage
-      ? `${libraryItems.length}+ saved items`
-      : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
-
   useEffect(() => {
     const tabNavigation = navigation.getParent?.() ?? navigation;
 
@@ -311,9 +305,6 @@ export default function LibraryScreen() {
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Library</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
-              {libraryCountLabel}
-            </Text>
 
             <View style={styles.searchContainer}>
               <View
@@ -390,11 +381,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.displayMedium,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.xs,
-  },
-  headerSubtitle: {
-    ...Typography.bodyMedium,
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
   },

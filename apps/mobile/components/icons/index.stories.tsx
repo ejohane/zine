@@ -14,8 +14,8 @@ import {
   CheckboxIcon,
   ChevronRightIcon,
   FilterIcon,
-  HeadphonesIcon,
   InboxArrowIcon,
+  PodcastIcon,
   PostIcon,
   PlayIcon,
   PlusCircleIcon,
@@ -40,7 +40,7 @@ type IconEntry = {
 
 const iconEntries: IconEntry[] = [
   { label: 'Article', Icon: ArticleIcon },
-  { label: 'Headphones', Icon: HeadphonesIcon },
+  { label: 'Podcast', Icon: PodcastIcon },
   { label: 'Video', Icon: VideoIcon },
   { label: 'Post', Icon: PostIcon },
   { label: 'Checkbox', Icon: CheckboxIcon },
