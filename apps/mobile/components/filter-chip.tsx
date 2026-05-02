@@ -41,15 +41,12 @@ export interface FilterChipProps {
   /** Optional selected surface color for type-associated selection states */
   selectedSurfaceColor?: string;
 
-  /** Optional count badge (e.g., "12") */
-  count?: number;
-
   /** Size variant */
   size?: 'small' | 'medium';
 }
 
 /**
- * FilterChip displays a selectable chip with optional icon and count.
+ * FilterChip displays a selectable chip with an optional icon.
  * Used for filtering content by type (Articles, Podcasts, Videos, etc.).
  *
  * @example
@@ -59,7 +56,7 @@ export interface FilterChipProps {
  *   label="Podcasts"
  *   isSelected={false}
  *   onPress={() => setFilter('podcast')}
- *   icon={HeadphonesIcon}
+ *   icon={PodcastIcon}
  * />
  *
  * // Selected state
@@ -78,7 +75,6 @@ export function FilterChip({
   dotColor,
   selectedColor,
   selectedSurfaceColor,
-  count,
   size = 'medium',
 }: FilterChipProps) {
   const { colors, motion } = useAppTheme();
@@ -92,7 +88,6 @@ export function FilterChip({
   const selectedForegroundColor = hasTintedSelection ? selectedColor : colors.textPrimary;
   const unselectedForegroundColor = colors.textSubheader;
   const iconColor = isSelected ? selectedForegroundColor : unselectedForegroundColor;
-  const displayedCount = count && count > 0 ? (count > 99 ? '99+' : String(count)) : null;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
@@ -129,18 +124,6 @@ export function FilterChip({
       >
         {label}
       </Text>
-      {displayedCount ? (
-        <Text
-          variant="bodySmall"
-          tone={isSelected ? 'primary' : 'subheader'}
-          style={[
-            styles.count,
-            { color: isSelected ? selectedForegroundColor : unselectedForegroundColor },
-          ]}
-        >
-          {displayedCount}
-        </Text>
-      ) : null}
     </Pressable>
   );
 }
@@ -172,9 +155,5 @@ const styles = StyleSheet.create({
   },
   textMedium: {
     ...Typography.labelMedium,
-  },
-  count: {
-    ...Typography.bodySmall,
-    minWidth: 18,
   },
 });

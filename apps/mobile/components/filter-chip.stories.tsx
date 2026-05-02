@@ -5,7 +5,7 @@ import { FilterChipPalette, Spacing } from '@/constants/theme';
 import {
   ArticleIcon,
   CheckOutlineIcon,
-  HeadphonesIcon,
+  PodcastIcon,
   PostIcon,
   VideoIcon,
 } from '@/components/icons';
@@ -18,7 +18,7 @@ const meta = {
   args: {
     label: 'Podcasts',
     isSelected: false,
-    icon: HeadphonesIcon,
+    icon: PodcastIcon,
     onPress: () => {},
   },
   decorators: [createDarkCanvasDecorator()],
@@ -45,10 +45,9 @@ export const Selected: Story = {
   },
 };
 
-export const WithCount: Story = {
+export const Article: Story = {
   args: {
     label: 'Articles',
-    count: 42,
     icon: ArticleIcon,
   },
 };
@@ -56,7 +55,6 @@ export const WithCount: Story = {
 export const SuccessSelection: Story = {
   args: {
     label: 'Completed',
-    count: 18,
     isSelected: true,
     icon: CheckOutlineIcon,
     selectedColor: FilterChipPalette.completed.accent,
@@ -78,7 +76,7 @@ export const TypePalette: Story = {
       <FilterChip
         label="Podcasts"
         isSelected={true}
-        icon={HeadphonesIcon}
+        icon={PodcastIcon}
         selectedColor={FilterChipPalette.podcast.accent}
         selectedSurfaceColor={FilterChipPalette.podcast.surface}
         onPress={() => {}}
@@ -111,15 +109,14 @@ export const SmallVsMedium: Story = {
           label="Podcasts"
           isSelected={false}
           size="small"
-          icon={HeadphonesIcon}
+          icon={PodcastIcon}
           onPress={() => {}}
         />
         <FilterChip
           label="Podcasts"
           isSelected={true}
           size="small"
-          count={12}
-          icon={HeadphonesIcon}
+          icon={PodcastIcon}
           onPress={() => {}}
         />
       </View>
@@ -135,7 +132,6 @@ export const SmallVsMedium: Story = {
           label="Articles"
           isSelected={true}
           size="medium"
-          count={7}
           icon={ArticleIcon}
           onPress={() => {}}
         />

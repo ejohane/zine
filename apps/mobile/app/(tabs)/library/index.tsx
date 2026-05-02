@@ -21,7 +21,7 @@ import { FilterChip } from '@/components/filter-chip';
 import {
   ArticleIcon,
   CheckOutlineIcon,
-  HeadphonesIcon,
+  PodcastIcon,
   PostIcon,
   VideoIcon,
 } from '@/components/icons';
@@ -95,7 +95,7 @@ const filterOptions: {
     id: 'podcast',
     label: 'Podcasts',
     color: ContentColors.podcast,
-    icon: HeadphonesIcon,
+    icon: PodcastIcon,
     selectedColor: FilterChipPalette.podcast.accent,
     selectedSurfaceColor: FilterChipPalette.podcast.surface,
     contentType: ApiContentType.PODCAST,
