@@ -542,10 +542,10 @@ describe('SwipeableInboxItem Cross-Platform Tests', () => {
       expect(gestureConflictResolution).toBe('vertical-scroll-priority');
     });
 
-    it('itemLayoutAnimation provides smooth collapse', () => {
-      // LinearTransition.springify() for list collapse animation
-      const layoutAnimation = 'LinearTransition.springify()';
-      expect(layoutAnimation).toContain('springify');
+    it('does not spring-animate item layout during list updates', () => {
+      // Rows render and reflow without the bouncy list animation.
+      const layoutAnimation = undefined;
+      expect(layoutAnimation).toBeUndefined();
     });
   });
 

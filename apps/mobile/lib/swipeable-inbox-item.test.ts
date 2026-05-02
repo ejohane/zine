@@ -658,21 +658,11 @@ describe('SwipeableInboxItem', () => {
       expect(initialExitDirection).toBeNull();
     });
 
-    it('layout animation uses spring physics for smooth collapse', () => {
-      // Per issue zine-av9: List should collapse smoothly
-      // Uses Layout.springify() with damping and stiffness
-      const layoutConfig = {
-        type: 'spring',
-        damping: 15,
-        stiffness: 100,
-      };
+    it('does not apply a row layout spring on render', () => {
+      // Rows should not bounce when they first render or when siblings reflow.
+      const layoutConfig = undefined;
 
-      // Damping controls oscillation (15 is moderate, no bouncing)
-      expect(layoutConfig.damping).toBeGreaterThan(10);
-      expect(layoutConfig.damping).toBeLessThan(20);
-
-      // Stiffness controls speed (100 is quick response)
-      expect(layoutConfig.stiffness).toBeGreaterThanOrEqual(100);
+      expect(layoutConfig).toBeUndefined();
     });
 
     it('exit animation direction maps correctly for both actions', () => {
@@ -733,20 +723,15 @@ describe('SwipeableInboxItem', () => {
       expect(exitAnimation).toBe('SlideOutRight');
     });
 
-    it('FlatList uses itemLayoutAnimation for smooth list collapse', () => {
-      // Per issue zine-av9: List items should animate when siblings are removed
-      // Animated.FlatList with itemLayoutAnimation prop
+    it('FlatList leaves itemLayoutAnimation unset', () => {
+      // Avoids the bouncy scroll/reflow animation when inbox rows render.
       const flatListConfig = {
         useAnimatedFlatList: true,
-        itemLayoutAnimation: 'LinearTransition.springify()',
-        layoutSpring: {
-          damping: 15,
-          stiffness: 100,
-        },
+        itemLayoutAnimation: undefined,
       };
 
       expect(flatListConfig.useAnimatedFlatList).toBe(true);
-      expect(flatListConfig.itemLayoutAnimation).toContain('springify');
+      expect(flatListConfig.itemLayoutAnimation).toBeUndefined();
     });
 
     it('sequential swipes process independently (no race conditions)', () => {
