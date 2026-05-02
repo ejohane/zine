@@ -94,7 +94,7 @@ export interface EnrichmentSourceCreator {
 export interface EnrichmentPromptInput {
   item: EnrichmentSourceItem;
   creator: EnrichmentSourceCreator | null;
-  articleExcerpt: string | null;
+  articleContent: string | null;
 }
 
 export interface EmbeddingUpsertInput {
