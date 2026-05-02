@@ -30,10 +30,8 @@ describe('isValidUrl', () => {
     });
 
     it('rejects null/undefined', () => {
-      // @ts-expect-error - testing runtime behavior
-      expect(isValidUrl(null)).toBe(false);
-      // @ts-expect-error - testing runtime behavior
-      expect(isValidUrl(undefined)).toBe(false);
+      expect(isValidUrl(null as unknown as string)).toBe(false);
+      expect(isValidUrl(undefined as unknown as string)).toBe(false);
     });
 
     it('rejects plain text', () => {
@@ -405,10 +403,8 @@ describe('parseLink', () => {
     });
 
     it('handles null/undefined gracefully', () => {
-      // @ts-expect-error - testing runtime behavior
-      expect(parseLink(null)).toBe(null);
-      // @ts-expect-error - testing runtime behavior
-      expect(parseLink(undefined)).toBe(null);
+      expect(parseLink(null as unknown as string)).toBe(null);
+      expect(parseLink(undefined as unknown as string)).toBe(null);
     });
   });
 });
