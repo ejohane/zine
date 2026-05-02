@@ -5,7 +5,7 @@ import type {
   EnrichmentSourceItem,
 } from './types';
 
-const ARTICLE_EXCERPT_LIMIT = 5000;
+const EMBEDDING_ARTICLE_EXCERPT_LIMIT = 5000;
 const METADATA_LIMIT = 2500;
 const EMBEDDING_TEXT_LIMIT = 6000;
 
@@ -43,8 +43,12 @@ function formatCreator(creator: EnrichmentSourceCreator | null): string {
   );
 }
 
+export function buildArticleContent(content: string | null): string | null {
+  return stripHtml(content ?? '') || null;
+}
+
 export function buildArticleExcerpt(content: string | null): string | null {
-  return truncate(stripHtml(content ?? ''), ARTICLE_EXCERPT_LIMIT);
+  return truncate(stripHtml(content ?? ''), EMBEDDING_ARTICLE_EXCERPT_LIMIT);
 }
 
 export function buildPromptInput(params: {
@@ -55,7 +59,7 @@ export function buildPromptInput(params: {
   return {
     item: params.item,
     creator: params.creator,
-    articleExcerpt: buildArticleExcerpt(params.articleContent),
+    articleContent: buildArticleContent(params.articleContent),
   };
 }
 
@@ -79,7 +83,7 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
       creator: formatCreator(input.creator),
       existingSummary: input.item.summary,
       metadataExcerpt,
-      articleExcerpt: input.articleExcerpt,
+      articleContent: input.articleContent,
     },
   };
 
