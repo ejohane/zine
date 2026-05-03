@@ -1,12 +1,16 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 import { withBackgrounds } from '@storybook/addon-ondevice-backgrounds';
 import type { Preview } from '@storybook/react-native';
 import { Platform } from 'react-native';
 
+declare global {
+  // Needed by the Storybook on-device actions addon on web.
+  // These globals are installed as no-op objects to satisfy runtime checks.
+  var ProgressTransitionRegister: Record<string, unknown>;
+  var UpdatePropsManager: Record<string, unknown>;
+}
+
 if (Platform.OS === 'web') {
-  // @ts-ignore Needed by the on-device actions addon on web.
   global.ProgressTransitionRegister = {};
-  // @ts-ignore Needed by the on-device actions addon on web.
   global.UpdatePropsManager = {};
 }
 
