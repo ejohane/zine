@@ -8,6 +8,7 @@
  */
 
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { router, protectedProcedure } from '../trpc';
 import { ProviderSchema } from '@zine/shared';
 import {
@@ -16,6 +17,7 @@ import {
   verifyRepairs,
   generateRepairReport,
 } from '../../admin/repair-subscriptions';
+import { backfillPeopleIndex } from '../../people/backfill';
 import { logger } from '../../lib/logger';
 
 const adminLogger = logger.child('admin');
@@ -48,6 +50,13 @@ const RepairInputSchema = z.object({
 const VerifyInputSchema = z.object({
   /** Provider to verify (default: SPOTIFY) */
   provider: ProviderSchema.optional(),
+});
+
+const BackfillPeopleInputSchema = z.object({
+  dryRun: z.boolean().default(true),
+  limit: z.number().int().min(1).max(500).default(100),
+  cursor: z.string().nullable().optional(),
+  userId: z.string().nullable().optional(),
 });
 
 // Router
@@ -168,6 +177,31 @@ export const adminRouter = router({
       });
 
       return result;
+    }),
+
+  backfillPeople: protectedProcedure
+    .input(BackfillPeopleInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId && input.userId !== ctx.userId) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'People backfill can only run for the current user',
+        });
+      }
+
+      adminLogger.info('backfillPeople called', {
+        userId: ctx.userId,
+        dryRun: input.dryRun,
+        limit: input.limit,
+        cursor: input.cursor,
+      });
+
+      return backfillPeopleIndex(ctx.db, {
+        dryRun: input.dryRun,
+        limit: input.limit,
+        cursor: input.cursor ?? null,
+        userId: ctx.userId,
+      });
     }),
 });
 

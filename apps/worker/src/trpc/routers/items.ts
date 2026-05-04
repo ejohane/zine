@@ -35,6 +35,8 @@ import {
   userItemTags,
   userItemEnrichments,
   userItemConsumptionEvents,
+  userPeople,
+  userPersonMentions,
 } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
@@ -42,6 +44,11 @@ import type { Database } from '../../db';
 import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
 import { enqueueBookmarkEnrichment } from '../../enrichment/service';
 import { ENRICHMENT_SCHEMA_VERSION, type SuggestedTag } from '../../enrichment/types';
+import {
+  deactivatePeopleForUserItemBestEffort,
+  normalizePersonName,
+  syncPeopleForUserItemBestEffort,
+} from '../../people/service';
 
 export type ItemTag = {
   id: string;
@@ -827,6 +834,29 @@ export const itemsRouter = router({
 
       const canonical = canonicalRows[0] ?? null;
       const userEnrichment = userRows[0] ?? null;
+      const parsedEntities = parseJsonArray<{ name: string; type: string; confidence: number }>(
+        canonical?.entitiesJson ?? null
+      );
+      const activePersonRows =
+        parsedEntities.length > 0
+          ? await ctx.db
+              .select({
+                personId: userPeople.id,
+                normalizedName: userPeople.normalizedName,
+              })
+              .from(userPersonMentions)
+              .innerJoin(userPeople, eq(userPersonMentions.userPersonId, userPeople.id))
+              .where(
+                and(
+                  eq(userPersonMentions.userItemId, owned[0].userItemId),
+                  eq(userPersonMentions.userId, ctx.userId),
+                  eq(userPersonMentions.isActive, true)
+                )
+              )
+          : [];
+      const personIdByNormalizedName = new Map(
+        activePersonRows.map((row) => [row.normalizedName, row.personId])
+      );
 
       return {
         item: {
@@ -840,9 +870,13 @@ export const itemsRouter = router({
           topics: parseJsonArray<{ name: string; confidence: number }>(
             canonical?.topicsJson ?? null
           ),
-          entities: parseJsonArray<{ name: string; type: string; confidence: number }>(
-            canonical?.entitiesJson ?? null
-          ),
+          entities: parsedEntities.map((entity) => ({
+            ...entity,
+            personId:
+              normalizePersonName(entity.name) && entity.type.trim().toLowerCase() === 'person'
+                ? (personIdByNormalizedName.get(normalizePersonName(entity.name)) ?? null)
+                : null,
+          })),
           intent: canonical?.intent ?? null,
           difficulty: canonical?.difficulty ?? null,
           evergreenScore: canonical?.evergreenScore ?? null,
@@ -1083,6 +1117,12 @@ export const itemsRouter = router({
         });
       }
 
+      await syncPeopleForUserItemBestEffort(ctx.db, {
+        userId: ctx.userId,
+        userItemId: existing[0].id,
+        operation: 'items.bookmark',
+      });
+
       return { success: true as const };
     }),
 
@@ -1117,6 +1157,12 @@ export const itemsRouter = router({
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));
+
+      await deactivatePeopleForUserItemBestEffort(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        operation: 'items.archive',
+      });
 
       return { success: true as const };
     }),
@@ -1162,6 +1208,12 @@ export const itemsRouter = router({
           updatedAt: now,
         })
         .where(eq(userItems.id, input.id));
+
+      await deactivatePeopleForUserItemBestEffort(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        operation: 'items.unbookmark',
+      });
 
       return { success: true as const };
     }),

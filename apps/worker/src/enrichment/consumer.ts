@@ -13,6 +13,7 @@ import {
 } from '../db/schema';
 import { getArticleContent } from '../lib/article-storage';
 import { logger } from '../lib/logger';
+import { syncPeopleForItem } from '../people/service';
 import type { Bindings } from '../types';
 import { upsertItemEmbedding } from './embeddings';
 import { EnrichmentModelValidationError, enrichWithQwen } from './llm';
@@ -403,6 +404,15 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
         reasonToRevisit: existingCanonical.summaryShort,
       });
 
+      try {
+        await syncPeopleForItem(db, { itemId: effectiveBody.itemId });
+      } catch (error) {
+        enrichmentLogger.warn('People indexing failed for existing canonical enrichment', {
+          itemId: effectiveBody.itemId,
+          error,
+        });
+      }
+
       message.ack();
       return;
     }
@@ -420,6 +430,15 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
     const output = await enrichWithQwen(env, promptInput);
 
     await writeCanonicalComplete(db, effectiveBody, output, env);
+
+    try {
+      await syncPeopleForItem(db, { itemId: effectiveBody.itemId });
+    } catch (error) {
+      enrichmentLogger.warn('People indexing failed after enrichment completion', {
+        itemId: effectiveBody.itemId,
+        error,
+      });
+    }
 
     const suggestedTags = normalizeSuggestedTags(output.suggestedTags, existingTags);
     await writeUserComplete(db, effectiveBody, {

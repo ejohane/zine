@@ -244,6 +244,23 @@ jest.mock('@/hooks/use-items-trpc', () => ({
   mapProvider: (value: string) => value,
 }));
 
+jest.mock('@/hooks/use-people', () => ({
+  usePeople: () => ({
+    data: {
+      pages: [
+        {
+          people: [],
+        },
+      ],
+    },
+    isLoading: false,
+    error: null,
+    fetchNextPage: jest.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false,
+  }),
+}));
+
 const LibraryScreen = jest.requireActual('@/app/(tabs)/library').default;
 
 describe('LibraryScreen', () => {

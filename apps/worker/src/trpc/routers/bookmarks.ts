@@ -22,6 +22,7 @@ import { extractArticle } from '../../lib/article-extractor';
 import { storeArticleContent } from '../../lib/article-storage';
 import { logger } from '../../lib/logger';
 import { enqueueBookmarkEnrichment } from '../../enrichment/service';
+import { syncPeopleForUserItemBestEffort } from '../../people/service';
 import {
   findOrCreateCreator,
   extractCreatorFromMetadata,
@@ -336,6 +337,12 @@ export const bookmarksRouter = router({
         trigger: 'manual_save',
       });
 
+      await syncPeopleForUserItemBestEffort(ctx.db, {
+        userId: ctx.userId,
+        userItemId: existingUserItem.id,
+        operation: 'bookmarks.save.rebookmark',
+      });
+
       return {
         itemId,
         userItemId: existingUserItem.id,
@@ -377,6 +384,12 @@ export const bookmarksRouter = router({
       itemId,
       userItemId,
       trigger: 'manual_save',
+    });
+
+    await syncPeopleForUserItemBestEffort(ctx.db, {
+      userId: ctx.userId,
+      userItemId,
+      operation: 'bookmarks.save.create',
     });
 
     return {

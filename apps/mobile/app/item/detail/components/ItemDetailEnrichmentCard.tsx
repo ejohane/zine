@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { useRouter, type Href } from 'expo-router';
 
 import { Badge } from '@/components/primitives/badge';
 import { Surface } from '@/components/primitives/surface';
@@ -128,9 +129,29 @@ function renderTopic(topic: EnrichmentTopic, colors: ItemDetailColors) {
   );
 }
 
-function renderEntity(entity: EnrichmentEntity, colors: ItemDetailColors) {
+function renderEntity(
+  entity: EnrichmentEntity,
+  colors: ItemDetailColors,
+  onPersonPress: (personId: string) => void
+) {
   const confidence = formatPercent(entity.confidence);
-  const label = [entity.name, formatLabel(entity.type), confidence].filter(Boolean).join(' / ');
+  const isResolvedPerson = Boolean(entity.personId);
+  const label = [entity.name, formatLabel(entity.type), isResolvedPerson ? null : confidence]
+    .filter(Boolean)
+    .join(' / ');
+
+  if (entity.personId) {
+    return (
+      <Pressable
+        key={`${entity.name}-${entity.type}`}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${entity.name}`}
+        onPress={() => onPersonPress(entity.personId!)}
+      >
+        <Badge label={label} tone="subtle" colors={colors} style={styles.enrichmentChip} />
+      </Pressable>
+    );
+  }
 
   return (
     <Badge
@@ -149,6 +170,12 @@ export function ItemDetailEnrichmentCard({
   error,
   colors,
 }: ItemDetailEnrichmentCardProps) {
+  const router = useRouter();
+
+  const handlePersonPress = (personId: string) => {
+    router.push(`/person/${personId}?source=item` as Href);
+  };
+
   if (isLoading) {
     return (
       <View style={styles.enrichmentContainer}>
@@ -240,7 +267,7 @@ export function ItemDetailEnrichmentCard({
 
         {item.entities.length > 0 && (
           <ChipGroup label="Entities" colors={colors}>
-            {item.entities.map((entity) => renderEntity(entity, colors))}
+            {item.entities.map((entity) => renderEntity(entity, colors, handlePersonPress))}
           </ChipGroup>
         )}
       </Surface>

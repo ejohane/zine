@@ -7,7 +7,12 @@
 import { describe, expect, it } from 'vitest';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 
-import { buildSearchResponse, type CreatorSearchRow, type SearchItemView } from './search';
+import {
+  buildSearchResponse,
+  type CreatorSearchRow,
+  type PersonSearchRow,
+  type SearchItemView,
+} from './search';
 
 const baseCreator: CreatorSearchRow = {
   id: 'creator_joe',
@@ -49,6 +54,14 @@ const baseItem: SearchItemView = {
   isFinished: false,
   finishedAt: null,
   tags: [],
+};
+
+const basePerson: PersonSearchRow = {
+  id: 'person_joe',
+  displayName: 'Joe Rogan',
+  itemCount: 7,
+  latestSeenAt: 1777593600000,
+  latestItemTitle: null,
 };
 
 describe('buildSearchResponse', () => {
@@ -102,6 +115,24 @@ describe('buildSearchResponse', () => {
       subscriptionId: 'sub_joe',
       libraryItemCount: 3,
       latestPublishedAt: '2026-04-01T00:00:00Z',
+    });
+  });
+
+  it('places person results after creators and before items', () => {
+    const response = buildSearchResponse({
+      query: 'Joe',
+      creatorRows: [baseCreator],
+      personRows: [basePerson],
+      items: [baseItem],
+      nextCursor: null,
+    });
+
+    expect(response.results.map((result) => result.type)).toEqual(['creator', 'person', 'item']);
+    expect(response.sections.people[0]).toMatchObject({
+      type: 'person',
+      personId: 'person_joe',
+      displayName: 'Joe Rogan',
+      itemCount: 7,
     });
   });
 });

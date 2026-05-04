@@ -30,6 +30,7 @@ and which are dormant.
 | `apps/mobile/components/list-states.tsx`                          | `canonical` | `P0`           | Shared loading/error/empty/not-found state components.             |
 | `apps/mobile/components/item-card.tsx`                            | `canonical` | `P0`           | Primary card system organized around row, stack, and cover shapes. |
 | `apps/mobile/components/link-preview-card.tsx`                    | `canonical` | `P0`           | Add-link preview card and skeleton state.                          |
+| `apps/mobile/components/person-result-row.tsx`                    | `canonical` | `P1`           | Reusable person row for library/search people surfaces.            |
 | `apps/mobile/components/ParallaxScrollView.tsx`                   | `canonical` | `P1`           | Reusable parallax layout primitive for detail views.               |
 | `apps/mobile/components/error-boundary.tsx`                       | `canonical` | `P1`           | Base boundary used by specialized boundaries.                      |
 | `apps/mobile/components/subscriptions/channel-item.tsx`           | `canonical` | `P0`           | Reusable channel row in single and multi-select modes.             |

@@ -27,6 +27,7 @@ import {
 } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState, EmptyState } from '@/components/list-states';
+import { PersonResultRow, type PersonResultRowData } from '@/components/person-result-row';
 import {
   Colors,
   Typography,
@@ -38,6 +39,7 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteLibraryItems } from '@/hooks/use-items-trpc';
+import { usePeople } from '@/hooks/use-people';
 import {
   mapContentType,
   mapProvider,
@@ -130,10 +132,16 @@ type LibraryScreenNavigation = {
   isFocused: () => boolean;
 };
 
+type LibraryMode = 'items' | 'people';
+
+type LibraryRow =
+  | { type: 'item'; item: ItemCardData }
+  | { type: 'person'; person: PersonResultRowData };
+
 export default function LibraryScreen() {
   const router = useRouter();
   const navigation = useNavigation() as LibraryScreenNavigation;
-  const listScrollRef = useRef<FlatList<ItemCardData>>(null);
+  const listScrollRef = useRef<FlatList<LibraryRow>>(null);
   const params = useLocalSearchParams<{ contentType?: string }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -164,6 +172,7 @@ export default function LibraryScreen() {
   const [contentTypeFilter, setContentTypeFilter] = useState<ApiContentType | null>(
     () => preselectedContentType ?? null
   );
+  const [libraryMode, setLibraryMode] = useState<LibraryMode>('items');
   const [showCompletedOnly, setShowCompletedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -200,6 +209,18 @@ export default function LibraryScreen() {
       search: debouncedSearchQuery || undefined,
       limit: LIBRARY_PAGE_SIZE,
     });
+  const {
+    data: peopleData,
+    isLoading: peopleLoading,
+    error: peopleError,
+    fetchNextPage: fetchNextPeoplePage,
+    hasNextPage: hasNextPeoplePage,
+    isFetchingNextPage: isFetchingNextPeoplePage,
+  } = usePeople({
+    query: debouncedSearchQuery || undefined,
+    limit: LIBRARY_PAGE_SIZE,
+    sort: 'count',
+  });
 
   const libraryItems: ItemCardData[] = useMemo(
     () =>
@@ -219,27 +240,71 @@ export default function LibraryScreen() {
       })),
     [data?.pages]
   );
+  const people: PersonResultRowData[] = useMemo(
+    () =>
+      (peopleData?.pages.flatMap((page) => page.people) ?? []).map((person) => ({
+        id: person.id,
+        displayName: person.displayName,
+        itemCount: person.itemCount,
+        latestItemTitle: person.latestItemTitle,
+      })),
+    [peopleData?.pages]
+  );
+  const rows: LibraryRow[] = useMemo(
+    () =>
+      libraryMode === 'people'
+        ? people.map((person) => ({ type: 'person' as const, person }))
+        : libraryItems.map((item) => ({ type: 'item' as const, item })),
+    [libraryItems, libraryMode, people]
+  );
 
   const handleEndReached = useCallback(() => {
-    if (!hasNextPage || isFetchingNextPage) {
+    if (libraryMode === 'people') {
+      if (!hasNextPeoplePage || isFetchingNextPeoplePage) {
+        return;
+      }
+
+      void fetchNextPeoplePage();
       return;
     }
 
+    if (!hasNextPage || isFetchingNextPage) {
+      return;
+    }
     void fetchNextPage();
-  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  }, [
+    fetchNextPage,
+    fetchNextPeoplePage,
+    hasNextPage,
+    hasNextPeoplePage,
+    isFetchingNextPage,
+    isFetchingNextPeoplePage,
+    libraryMode,
+  ]);
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
-      <ItemCard item={item} shape="row" index={index} />
-    ),
+    ({ item, index }: ListRenderItemInfo<LibraryRow>) =>
+      item.type === 'person' ? (
+        <PersonResultRow person={item.person} source="library" />
+      ) : (
+        <ItemCard item={item.item} shape="row" index={index} />
+      ),
     []
   );
 
-  const libraryCountLabel = isLoading
+  const isActiveLoading = libraryMode === 'people' ? peopleLoading : isLoading;
+  const activeError = libraryMode === 'people' ? peopleError : error;
+  const isActiveFetchingNextPage =
+    libraryMode === 'people' ? isFetchingNextPeoplePage : isFetchingNextPage;
+  const libraryCountLabel = isActiveLoading
     ? 'Loading...'
-    : hasNextPage
-      ? `${libraryItems.length}+ saved items`
-      : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
+    : libraryMode === 'people'
+      ? hasNextPeoplePage
+        ? `${people.length}+ people`
+        : `${people.length} ${people.length === 1 ? 'person' : 'people'}`
+      : hasNextPage
+        ? `${libraryItems.length}+ saved items`
+        : `${libraryItems.length} saved item${libraryItems.length === 1 ? '' : 's'}`;
 
   useEffect(() => {
     const tabNavigation = navigation.getParent?.() ?? navigation;
@@ -257,19 +322,29 @@ export default function LibraryScreen() {
 
       listScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [contentTypeFilter, navigation, showCompletedOnly]);
+  }, [contentTypeFilter, navigation, scrollOffsetYRef, showCompletedOnly]);
 
-  const listEmptyComponent = isLoading ? (
+  const listEmptyComponent = isActiveLoading ? (
     <LoadingState />
-  ) : error ? (
-    <ErrorState message={error.message} />
+  ) : activeError ? (
+    <ErrorState message={activeError.message} />
   ) : (
     <EmptyState
-      title={searchQuery.trim() ? 'No matches found' : 'No bookmarked items'}
+      title={
+        searchQuery.trim()
+          ? 'No matches found'
+          : libraryMode === 'people'
+            ? 'No people yet'
+            : 'No bookmarked items'
+      }
       message={
         searchQuery.trim()
-          ? 'Try a different title or creator name.'
-          : 'Bookmark content from your inbox to save it here for later.'
+          ? libraryMode === 'people'
+            ? 'Try a different person name.'
+            : 'Try a different title or creator name.'
+          : libraryMode === 'people'
+            ? 'People appear here after your saved items are enriched.'
+            : 'Bookmark content from your inbox to save it here for later.'
       }
     />
   );
@@ -281,7 +356,7 @@ export default function LibraryScreen() {
           backgroundColor: colors.background,
           tintColor: colors.text,
           screenTitle: 'Library',
-          showScreenTitle: isLoading || Boolean(error) || showCollapsedTitle,
+          showScreenTitle: isActiveLoading || Boolean(activeError) || showCollapsedTitle,
           headerRight: () => (
             <Pressable
               onPress={handleAddBookmark}
@@ -297,8 +372,10 @@ export default function LibraryScreen() {
 
       <FlatList
         ref={listScrollRef}
-        data={isLoading || error ? [] : libraryItems}
-        keyExtractor={(item) => item.id}
+        data={isActiveLoading || activeError ? [] : rows}
+        keyExtractor={(item) =>
+          item.type === 'person' ? `person:${item.person.id}` : item.item.id
+        }
         renderItem={renderItem}
         style={styles.listContainer}
         contentContainerStyle={styles.listContent}
@@ -314,6 +391,41 @@ export default function LibraryScreen() {
             <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
               {libraryCountLabel}
             </Text>
+
+            <View
+              style={[
+                styles.modeSwitcher,
+                {
+                  backgroundColor: colors.backgroundSecondary,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {(['items', 'people'] as const).map((mode) => {
+                const isSelected = libraryMode === mode;
+                return (
+                  <Pressable
+                    key={mode}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    onPress={() => setLibraryMode(mode)}
+                    style={[
+                      styles.modeButton,
+                      isSelected && { backgroundColor: colors.surfaceRaised },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modeButtonText,
+                        { color: isSelected ? colors.text : colors.textTertiary },
+                      ]}
+                    >
+                      {mode === 'items' ? 'Items' : 'People'}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
             <View style={styles.searchContainer}>
               <View
@@ -336,42 +448,44 @@ export default function LibraryScreen() {
               </View>
             </View>
 
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterContainer}
-            >
-              <FilterChip
-                label="Completed"
-                isSelected={showCompletedOnly}
-                onPress={() => setShowCompletedOnly((prev) => !prev)}
-                icon={CheckOutlineIcon}
-                selectedColor={FilterChipPalette.completed.accent}
-                selectedSurfaceColor={FilterChipPalette.completed.surface}
-              />
-              {filterOptions.map((option) => (
+            {libraryMode === 'items' ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterContainer}
+              >
                 <FilterChip
-                  key={option.id}
-                  label={option.label}
-                  isSelected={contentTypeFilter === option.contentType}
-                  onPress={() =>
-                    setContentTypeFilter((current) =>
-                      current === option.contentType ? null : option.contentType
-                    )
-                  }
-                  icon={option.icon}
-                  dotColor={option.color}
-                  selectedColor={option.selectedColor}
-                  selectedSurfaceColor={option.selectedSurfaceColor}
+                  label="Completed"
+                  isSelected={showCompletedOnly}
+                  onPress={() => setShowCompletedOnly((prev) => !prev)}
+                  icon={CheckOutlineIcon}
+                  selectedColor={FilterChipPalette.completed.accent}
+                  selectedSurfaceColor={FilterChipPalette.completed.surface}
                 />
-              ))}
-            </ScrollView>
+                {filterOptions.map((option) => (
+                  <FilterChip
+                    key={option.id}
+                    label={option.label}
+                    isSelected={contentTypeFilter === option.contentType}
+                    onPress={() =>
+                      setContentTypeFilter((current) =>
+                        current === option.contentType ? null : option.contentType
+                      )
+                    }
+                    icon={option.icon}
+                    dotColor={option.color}
+                    selectedColor={option.selectedColor}
+                    selectedSurfaceColor={option.selectedSurfaceColor}
+                  />
+                ))}
+              </ScrollView>
+            ) : null}
           </View>
         }
         ListEmptyComponent={listEmptyComponent}
         ListFooterComponent={
           <View style={styles.listFooter}>
-            {!isLoading && !error && isFetchingNextPage ? (
+            {!isActiveLoading && !activeError && isActiveFetchingNextPage ? (
               <ActivityIndicator size="small" color={colors.primary} />
             ) : null}
           </View>
@@ -409,6 +523,25 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: Spacing.md,
     marginBottom: Spacing.md,
+  },
+  modeSwitcher: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.xs,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    gap: Spacing.xs,
+  },
+  modeButton: {
+    flex: 1,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Radius.md,
+  },
+  modeButtonText: {
+    ...Typography.labelMedium,
   },
   searchBar: {
     flexDirection: 'row',
