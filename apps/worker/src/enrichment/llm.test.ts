@@ -21,7 +21,7 @@ function createPromptInput(): EnrichmentPromptInput {
       description: null,
       handle: null,
     },
-    articleExcerpt: 'Workers AI can run models near a Cloudflare Worker.',
+    articleContent: 'Workers AI can run models near a Cloudflare Worker.',
   };
 }
 

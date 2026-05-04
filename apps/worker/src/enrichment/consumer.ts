@@ -17,10 +17,11 @@ import { syncPeopleForItem } from '../people/service';
 import type { Bindings } from '../types';
 import { upsertItemEmbedding } from './embeddings';
 import { EnrichmentModelValidationError, enrichWithQwen } from './llm';
-import { buildEmbeddingText, buildPromptInput } from './prompt';
+import { buildArticleExcerpt, buildEmbeddingText, buildPromptInput } from './prompt';
 import { EnrichmentQueueMessageSchema } from './schema';
 import { computeItemContentHash } from './service';
 import {
+  DEFAULT_ENRICHMENT_MODEL,
   type EnrichmentModelOutput,
   type EnrichmentQueueMessage,
   type EnrichmentSourceCreator,
@@ -223,7 +224,7 @@ async function writeCanonicalComplete(
       contentHash: message.contentHash,
       status: 'COMPLETE',
       modelProvider: 'cloudflare-workers-ai',
-      modelName: env.ENRICHMENT_MODEL || '@cf/qwen/qwen3-30b-a3b-fp8',
+      modelName: env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL,
       summaryShort: output.summary.short,
       summaryDetail: output.summary.detail,
       primaryCategory: output.classification.primaryCategory,
@@ -244,7 +245,7 @@ async function writeCanonicalComplete(
       set: {
         status: 'COMPLETE',
         modelProvider: 'cloudflare-workers-ai',
-        modelName: env.ENRICHMENT_MODEL || '@cf/qwen/qwen3-30b-a3b-fp8',
+        modelName: env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL,
         summaryShort: output.summary.short,
         summaryDetail: output.summary.detail,
         primaryCategory: output.classification.primaryCategory,
@@ -458,7 +459,7 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
         item: source.item,
         creator: source.creator,
         output,
-        articleExcerpt: promptInput.articleExcerpt,
+        articleExcerpt: buildArticleExcerpt(articleContent),
       }),
     });
 

@@ -41,31 +41,45 @@ export function ItemDetailDescription({
           accessibilityLabel={`Toggle ${label}`}
           accessibilityState={{ expanded: isExpanded }}
           onPress={() => setIsExpanded((current) => !current)}
-          style={({ pressed }) => [styles.descriptionHeader, pressed ? { opacity: 0.72 } : null]}
+          style={({ pressed }) => [
+            styles.descriptionToggleContent,
+            pressed ? { opacity: 0.72 } : null,
+          ]}
         >
-          <Text variant="labelSmall" tone="tertiary" colors={colors}>
-            {label}
-          </Text>
-          <Ionicons
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={IconSizes.sm}
-            color={colors.textTertiary}
-          />
+          <View style={styles.descriptionHeader}>
+            <Text variant="labelSmall" tone="tertiary" colors={colors}>
+              {label}
+            </Text>
+            <Ionicons
+              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+              size={IconSizes.sm}
+              color={colors.textTertiary}
+            />
+          </View>
+          <LinkedText
+            style={[styles.description, { color: colors.textSubheader }]}
+            linkColor={colors.primary}
+            numberOfLines={descriptionLines}
+          >
+            {summary}
+          </LinkedText>
         </Pressable>
       ) : (
-        <View style={styles.descriptionHeader}>
-          <Text variant="labelSmall" tone="tertiary" colors={colors}>
-            {label}
-          </Text>
-        </View>
+        <>
+          <View style={styles.descriptionHeader}>
+            <Text variant="labelSmall" tone="tertiary" colors={colors}>
+              {label}
+            </Text>
+          </View>
+          <LinkedText
+            style={[styles.description, { color: colors.textSubheader }]}
+            linkColor={colors.primary}
+            numberOfLines={descriptionLines}
+          >
+            {summary}
+          </LinkedText>
+        </>
       )}
-      <LinkedText
-        style={[styles.description, { color: colors.textSubheader }]}
-        linkColor={colors.primary}
-        numberOfLines={descriptionLines}
-      >
-        {summary}
-      </LinkedText>
     </>
   );
 }

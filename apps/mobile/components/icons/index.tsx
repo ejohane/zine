@@ -7,14 +7,14 @@ import {
   CheckCircle,
   ChevronRight,
   CircleCheck,
-  FileText,
   Filter,
-  Headphones,
   Inbox,
-  MessageSquare,
+  MessageCircle,
+  Newspaper,
   Play,
   Plus,
   PlusCircle,
+  Podcast,
   Rss,
   Search,
   Settings,
@@ -22,7 +22,7 @@ import {
   Sparkles,
   Square,
   SquareCheck,
-  Video,
+  Tv,
 } from 'lucide-react-native';
 
 import { Colors } from '@/constants/theme';
@@ -41,19 +41,21 @@ const DEFAULT_ICON_STROKE = Colors.dark.overlayForeground;
 // Content type icons
 
 export function ArticleIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
-  return <FileText size={size} color={color} fill={color} strokeWidth={0} />;
+  return <Newspaper size={size} color={color} strokeWidth={2} />;
 }
 
-export function HeadphonesIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
-  return <Headphones size={size} color={color} fill={color} strokeWidth={0} />;
+export function PodcastIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
+  return <Podcast size={size} color={color} strokeWidth={2} />;
 }
+
+export const HeadphonesIcon = PodcastIcon;
 
 export function VideoIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
-  return <Video size={size} color={color} fill={color} strokeWidth={0} />;
+  return <Tv size={size} color={color} strokeWidth={2} />;
 }
 
 export function PostIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
-  return <MessageSquare size={size} color={color} fill={color} strokeWidth={0} />;
+  return <MessageCircle size={size} color={color} strokeWidth={2} />;
 }
 
 // Selection icons

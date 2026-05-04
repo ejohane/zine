@@ -1,18 +1,43 @@
 import { Stack, useNavigation } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
+import type { ComponentType } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View, Text, StyleSheet, type ListRenderItemInfo } from 'react-native';
-import Animated, { FadeOut, LinearTransition } from 'react-native-reanimated';
+import {
+  ActivityIndicator,
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
+import Animated from 'react-native-reanimated';
+import { ContentType as ApiContentType } from '@zine/shared';
 
-import { InboxArrowIcon } from '@/components/icons';
+import { FilterChip } from '@/components/filter-chip';
+import { ArticleIcon, InboxArrowIcon, PodcastIcon, PostIcon, VideoIcon } from '@/components/icons';
 import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
 import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
-import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
+import {
+  Colors,
+  Typography,
+  Spacing,
+  Radius,
+  ContentColors,
+  FilterChipPalette,
+} from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteInboxItems, useArchiveItem, useBookmarkItem } from '@/hooks/use-items-trpc';
-import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import {
+  mapContentType,
+  mapProvider,
+  type ContentType,
+  type Provider,
+  type UIContentType,
+} from '@/lib/content-utils';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import {
   addPendingDismissedId,
@@ -29,18 +54,76 @@ import {
 
 const REENTRY_CLEANUP_DELAY = 500;
 const INBOX_PAGE_SIZE = 20;
+const INBOX_TOP_THRESHOLD = 4;
 
-function InboxEmptyState({ colors }: { colors: (typeof Colors)['light'] }) {
+const contentTypeFilters: {
+  id: UIContentType;
+  label: string;
+  icon: ComponentType<{ size?: number; color?: string }>;
+  dotColor: string;
+  selectedColor: string;
+  selectedSurfaceColor: string;
+  contentType: ApiContentType;
+}[] = [
+  {
+    id: 'article',
+    label: 'Articles',
+    icon: ArticleIcon,
+    dotColor: ContentColors.article,
+    selectedColor: FilterChipPalette.article.accent,
+    selectedSurfaceColor: FilterChipPalette.article.surface,
+    contentType: ApiContentType.ARTICLE,
+  },
+  {
+    id: 'podcast',
+    label: 'Podcasts',
+    icon: PodcastIcon,
+    dotColor: ContentColors.podcast,
+    selectedColor: FilterChipPalette.podcast.accent,
+    selectedSurfaceColor: FilterChipPalette.podcast.surface,
+    contentType: ApiContentType.PODCAST,
+  },
+  {
+    id: 'video',
+    label: 'Videos',
+    icon: VideoIcon,
+    dotColor: ContentColors.video,
+    selectedColor: FilterChipPalette.video.accent,
+    selectedSurfaceColor: FilterChipPalette.video.surface,
+    contentType: ApiContentType.VIDEO,
+  },
+  {
+    id: 'post',
+    label: 'Posts',
+    icon: PostIcon,
+    dotColor: ContentColors.post,
+    selectedColor: FilterChipPalette.post.accent,
+    selectedSurfaceColor: FilterChipPalette.post.surface,
+    contentType: ApiContentType.POST,
+  },
+];
+
+function InboxEmptyState({
+  colors,
+  selectedFilterLabel,
+}: {
+  colors: (typeof Colors)['light'];
+  selectedFilterLabel?: string;
+}) {
+  const title = selectedFilterLabel
+    ? `No ${selectedFilterLabel.toLowerCase()}`
+    : 'Your inbox is clear';
+  const description = selectedFilterLabel
+    ? `New ${selectedFilterLabel.toLowerCase()} from your sources will appear here.`
+    : 'New content from your sources will appear here. Bookmark what you want to keep, archive the rest.';
+
   return (
     <Animated.View style={styles.emptyState}>
       <View style={[styles.emptyIcon, { backgroundColor: colors.backgroundSecondary }]}>
         <InboxArrowIcon size={48} color={colors.primary} />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.text }]}>Your inbox is clear</Text>
-      <Text style={[styles.emptyDescription, { color: colors.textSubheader }]}>
-        New content from your sources will appear here. Bookmark what you want to keep, archive the
-        rest.
-      </Text>
+      <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.emptyDescription, { color: colors.textSubheader }]}>{description}</Text>
       <View style={[styles.emptyHint, { backgroundColor: colors.backgroundSecondary }]}>
         <Text style={[styles.emptyHintText, { color: colors.textTertiary }]}>
           Connect integrations in Settings to start receiving content
@@ -56,18 +139,43 @@ export default function InboxScreen() {
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
+  const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
 
   useTabPrefetch('inbox');
 
+  const apiContentTypeFilter = contentTypeFilter
+    ? contentTypeFilters.find((filter) => filter.id === contentTypeFilter)?.contentType
+    : undefined;
+
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useInfiniteInboxItems({ limit: INBOX_PAGE_SIZE });
+    useInfiniteInboxItems({
+      limit: INBOX_PAGE_SIZE,
+      ...(apiContentTypeFilter ? { filter: { contentType: apiContentTypeFilter } } : {}),
+    });
 
   const [reappearingItems, setReappearingItems] = useState<Map<string, EnterDirection>>(new Map());
   const [pendingDismissedItemIds, setPendingDismissedItemIds] = useState<Set<string>>(new Set());
   const listRef = useRef<Animated.FlatList<ItemCardData>>(null);
+  const scrollOffsetYRef = useRef(0);
+  const selectedContentTypeFilter = contentTypeFilters.find(
+    (filter) => filter.id === contentTypeFilter
+  );
 
   const archiveMutation = useArchiveItem();
   const bookmarkMutation = useBookmarkItem();
+
+  const handleContentTypeFilterPress = useCallback((id: UIContentType) => {
+    setContentTypeFilter((current) => (current === id ? null : id));
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+  }, []);
+
+  const handleInboxScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
+      handleScroll(event);
+    },
+    [handleScroll]
+  );
 
   const markAsReappearing = useCallback((id: string, enterFrom: EnterDirection) => {
     setReappearingItems((prev) => new Map(prev).set(id, enterFrom));
@@ -114,7 +222,7 @@ export default function InboxScreen() {
     [bookmarkMutation, markAsReappearing, toast]
   );
 
-  const { syncAll, isLoading: isSyncing, progress: syncProgress, lastResult } = useSyncAll();
+  const { syncAll, isLoading: isSyncing, lastResult } = useSyncAll();
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const isOffline = !isConnected || isInternetReachable === false;
 
@@ -201,13 +309,6 @@ export default function InboxScreen() {
     void fetchNextPage();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
-  const inboxCountLabel =
-    visibleInboxItems.length === 0
-      ? 'Decide what to keep'
-      : hasNextPage
-        ? `${visibleInboxItems.length}+ items to triage`
-        : `${visibleInboxItems.length} item${visibleInboxItems.length === 1 ? '' : 's'} to triage`;
-
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
       <SwipeableInboxItem
@@ -222,19 +323,28 @@ export default function InboxScreen() {
   );
 
   useEffect(() => {
-    return navigation.addListener('tabPress', () => {
+    const tabNavigation = navigation.getParent?.() ?? navigation;
+
+    return tabNavigation.addListener('tabPress', () => {
       if (!navigation.isFocused()) return;
+
+      const isAtTop = scrollOffsetYRef.current <= INBOX_TOP_THRESHOLD;
+
+      if (contentTypeFilter !== null && isAtTop) {
+        setContentTypeFilter(null);
+        return;
+      }
 
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [navigation]);
+  }, [contentTypeFilter, navigation]);
 
   const listEmptyComponent = isLoading ? (
     <LoadingState />
   ) : error ? (
     <ErrorState message={error.message} />
   ) : (
-    <InboxEmptyState colors={colors} />
+    <InboxEmptyState colors={colors} selectedFilterLabel={selectedContentTypeFilter?.label} />
   );
 
   return (
@@ -256,28 +366,34 @@ export default function InboxScreen() {
         contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
+        onScroll={handleInboxScroll}
         scrollEventThrottle={32}
         onRefresh={handleRefresh}
         refreshing={isSyncing}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Inbox</Text>
-            {syncProgress && syncProgress.total > 0 ? (
-              <Animated.View exiting={FadeOut.duration(200)}>
-                <Text style={[styles.headerSubtitle, { color: colors.primary }]}>
-                  Syncing {syncProgress.completed}/{syncProgress.total}...
-                </Text>
-              </Animated.View>
-            ) : (
-              <Text style={[styles.headerSubtitle, { color: colors.textSubheader }]}>
-                {inboxCountLabel}
-              </Text>
-            )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterContainer}
+            >
+              {contentTypeFilters.map((filter) => (
+                <FilterChip
+                  key={filter.id}
+                  label={filter.label}
+                  isSelected={contentTypeFilter === filter.id}
+                  onPress={() => handleContentTypeFilterPress(filter.id)}
+                  icon={filter.icon}
+                  dotColor={filter.dotColor}
+                  selectedColor={filter.selectedColor}
+                  selectedSurfaceColor={filter.selectedSurfaceColor}
+                />
+              ))}
+            </ScrollView>
           </View>
         }
         ListEmptyComponent={listEmptyComponent}
-        itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
         ListFooterComponent={
@@ -306,10 +422,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...Typography.displayMedium,
-    marginBottom: Spacing.xs,
   },
-  headerSubtitle: {
-    ...Typography.bodyMedium,
+  filterContainer: {
+    paddingTop: Spacing.md,
+    gap: Spacing.sm,
   },
   listContent: {
     flexGrow: 1,
