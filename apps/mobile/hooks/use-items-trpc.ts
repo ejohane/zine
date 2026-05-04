@@ -484,6 +484,42 @@ export function useUserTags() {
   return trpc.items.listTags.useQuery();
 }
 
+export function useCollections() {
+  return trpc.collections.list.useQuery();
+}
+
+export function useCollectionsForItem(userItemId: string) {
+  return trpc.collections.forItem.useQuery(
+    { userItemId },
+    {
+      enabled: !!userItemId,
+      placeholderData: keepPreviousData,
+    }
+  );
+}
+
+export function useCreateCollection() {
+  const utils = trpc.useUtils();
+
+  return trpc.collections.create.useMutation({
+    onSuccess: () => {
+      utils.collections.list.invalidate();
+    },
+  });
+}
+
+export function useSetCollectionItemOverride() {
+  const utils = trpc.useUtils();
+
+  return trpc.collections.setItemOverride.useMutation({
+    onSuccess: (_data, { collectionId, userItemId }) => {
+      utils.collections.list.invalidate();
+      utils.collections.items.invalidate({ id: collectionId });
+      utils.collections.forItem.invalidate({ userItemId });
+    },
+  });
+}
+
 /**
  * Hook for bookmarking an item with optimistic updates
  *

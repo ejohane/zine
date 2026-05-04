@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { ContentType, Provider } from '@zine/shared';
+import { CollectionSort, ContentType, Provider } from '@zine/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { renderRoute } from './test/render-router';
@@ -242,6 +242,40 @@ describe('BookmarksPage', () => {
     expect(screen.getByText(articleItem.title)).toBeVisible();
     expect(screen.getByText(videoItem.title)).toBeVisible();
     expect(screen.getByText(podcastItem.title)).toBeVisible();
+  });
+
+  test('saves the selected filter as a smart collection', async () => {
+    const user = userEvent.setup();
+
+    renderRoute(
+      <>
+        <BookmarksPage />
+        <LocationProbe />
+      </>,
+      {
+        route: '/bookmarks?contentType=video',
+        path: '/bookmarks',
+      }
+    );
+
+    await user.click(screen.getByRole('button', { name: /Save as collection/i }));
+
+    await waitFor(() => {
+      expect(mutationSpies.collectionsCreate).toHaveBeenCalledWith({
+        name: 'Videos collection',
+        description: null,
+        rules: {
+          contentTypes: [ContentType.VIDEO],
+          isFinished: false,
+        },
+        sort: CollectionSort.NEWEST_SAVED,
+      });
+    });
+
+    await waitFor(() => {
+      expect(invalidateSpies.collectionsListInvalidate).toHaveBeenCalled();
+      expect(screen.getByTestId('location-search')).toHaveTextContent('?collection=collection-1');
+    });
   });
 
   test('navigates to the settings page from the sidebar', async () => {

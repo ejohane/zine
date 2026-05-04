@@ -190,6 +190,55 @@ export const userItemTags = sqliteTable(
   ]
 );
 
+// Smart Collections
+// Saved library filters with optional per-item overrides.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const collections = sqliteTable(
+  'collections',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    name: text('name').notNull(),
+    normalizedName: text('normalized_name').notNull(),
+    description: text('description'),
+    rulesJson: text('rules_json').notNull(),
+    sort: text('sort').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('collections_user_normalized_name_idx').on(table.userId, table.normalizedName),
+    index('collections_user_updated_idx').on(table.userId, table.updatedAt),
+  ]
+);
+
+// Smart Collection Overrides
+// PIN forces an item in; HIDE excludes a matching item. A unique row keeps actions exclusive.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const collectionItemOverrides = sqliteTable(
+  'collection_item_overrides',
+  {
+    id: text('id').primaryKey(), // ULID
+    collectionId: text('collection_id')
+      .notNull()
+      .references(() => collections.id),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id),
+    action: text('action').notNull(),
+    position: integer('position'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('collection_item_overrides_unique_idx').on(table.collectionId, table.userItemId),
+    index('collection_item_overrides_collection_action_idx').on(table.collectionId, table.action),
+    index('collection_item_overrides_user_item_idx').on(table.userItemId),
+  ]
+);
+
 // Item Enrichments
 // Canonical AI-generated enrichment for a content item and content hash.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

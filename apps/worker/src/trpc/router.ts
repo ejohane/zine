@@ -12,6 +12,7 @@ import { adminRouter } from './routers/admin';
 import { insightsRouter } from './routers/insights';
 import { searchRouter } from './routers/search';
 import { peopleRouter } from './routers/people';
+import { collectionsRouter } from './routers/collections';
 
 /**
  * Root tRPC router
@@ -68,6 +69,7 @@ export const appRouter = router({
   // Creator view operations
   creators: creatorsRouter,
   people: peopleRouter,
+  collections: collectionsRouter,
   search: searchRouter,
   insights: insightsRouter,
 });
