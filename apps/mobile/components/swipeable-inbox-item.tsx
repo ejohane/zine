@@ -18,7 +18,6 @@
  * - ReanimatedSwipeable runs gesture handling on UI thread (not JS thread)
  * - All interpolations use useAnimatedStyle worklets (UI thread)
  * - Exit animations use hardware-accelerated transforms (SlideOut)
- * - Layout animation uses spring physics with controlled damping (no bounce)
  * - Haptics are fire-and-forget (async, non-blocking)
  * - Callbacks wrapped in useCallback to prevent re-renders
  *
@@ -48,7 +47,6 @@ import Animated, {
   type SharedValue,
   SlideOutLeft,
   SlideOutRight,
-  Layout,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -416,7 +414,6 @@ export function SwipeableInboxItem({
   return (
     <Animated.View
       exiting={exitAnimation}
-      layout={Layout.springify().damping(15).stiffness(100)}
       accessible={true}
       accessibilityRole="button"
       accessibilityLabel={`${item.title}${item.creator ? ` by ${item.creator}` : ''}`}

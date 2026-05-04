@@ -55,10 +55,6 @@ const SWIPE_FRICTION = 2;
 const SWIPE_THRESHOLD = 100;
 const ACTION_WIDTH = 100;
 
-/** Layout animation spring configuration */
-const LAYOUT_SPRING_DAMPING = 15;
-const LAYOUT_SPRING_STIFFNESS = 100;
-
 // Tests
 
 describe('SwipeableInboxItem Performance Configuration', () => {
@@ -137,33 +133,20 @@ describe('SwipeableInboxItem Performance Configuration', () => {
     });
   });
 
-  describe('list collapse animation performance', () => {
-    it('layout animation uses spring physics with controlled damping', () => {
-      // Per issue zine-iln: List collapse should be smooth
-      // Damping of 15 prevents excessive oscillation
-      expect(LAYOUT_SPRING_DAMPING).toBe(15);
-      expect(LAYOUT_SPRING_DAMPING).toBeGreaterThan(10); // Prevents bouncing
-      expect(LAYOUT_SPRING_DAMPING).toBeLessThan(20); // Still responsive
-    });
+  describe('list render behavior', () => {
+    it('does not spring-animate FlatList item layout updates', () => {
+      // Inbox rows should render without the bouncy scroll/reflow animation.
+      const flatListItemLayoutAnimation = undefined;
+      const rowLayoutAnimation = undefined;
 
-    it('layout animation stiffness provides quick response', () => {
-      // Per issue zine-iln: Stiffness of 100 provides responsive feel
-      // Lower values feel sluggish, higher values can cause overshoot
-      expect(LAYOUT_SPRING_STIFFNESS).toBe(100);
-    });
-
-    it('uses LinearTransition for predictable list updates', () => {
-      // Per issue zine-iln: LinearTransition.springify() for FlatList
-      // This applies spring physics to item position changes
-      const layoutAnimation = 'LinearTransition.springify()';
-      expect(layoutAnimation).toContain('springify');
+      expect(flatListItemLayoutAnimation).toBeUndefined();
+      expect(rowLayoutAnimation).toBeUndefined();
     });
   });
 
   describe('Animated.FlatList performance', () => {
     it('uses Animated.FlatList (not regular FlatList)', () => {
-      // Per issue zine-iln: Animated.FlatList supports itemLayoutAnimation
-      // Required for smooth list collapse when items are removed
+      // Animated.FlatList is still used for compatibility with Reanimated rows.
       const useAnimatedFlatList = true;
       expect(useAnimatedFlatList).toBe(true);
     });
@@ -399,11 +382,10 @@ describe('InboxScreen Performance Configuration', () => {
       expect(showsVerticalScrollIndicator).toBe(false);
     });
 
-    it('itemLayoutAnimation is configured', () => {
-      // Per inbox.tsx: itemLayoutAnimation={LinearTransition...}
-      // Required for smooth list collapse
-      const hasItemLayoutAnimation = true;
-      expect(hasItemLayoutAnimation).toBe(true);
+    it('itemLayoutAnimation is not configured', () => {
+      // Per inbox.tsx: leave itemLayoutAnimation unset to avoid bouncy row renders.
+      const hasItemLayoutAnimation = false;
+      expect(hasItemLayoutAnimation).toBe(false);
     });
   });
 

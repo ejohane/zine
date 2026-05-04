@@ -12,7 +12,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { ContentType as ApiContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
@@ -394,7 +394,6 @@ export default function InboxScreen() {
           </View>
         }
         ListEmptyComponent={listEmptyComponent}
-        itemLayoutAnimation={LinearTransition.springify().damping(15).stiffness(100)}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
         ListFooterComponent={
