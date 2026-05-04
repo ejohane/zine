@@ -28,6 +28,7 @@ describe('useSearchResults', () => {
         query: 'Joe Rogan',
         scope: 'library',
         creatorsLimit: 5,
+        peopleLimit: 5,
         itemsLimit: 20,
       },
       expect.objectContaining({

@@ -7,10 +7,15 @@ import type { SearchBarCommands } from 'react-native-screens';
 
 import { type ItemCardData, ItemCard } from '@/components/item-card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
+import { PersonResultRow } from '@/components/person-result-row';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
-import { useSearchResults, type CreatorSearchResult } from '@/hooks/use-search';
+import {
+  useSearchResults,
+  type CreatorSearchResult,
+  type PersonSearchResult,
+} from '@/hooks/use-search';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
@@ -21,6 +26,10 @@ type SearchRow =
   | {
       type: 'creator';
       creator: CreatorSearchResult;
+    }
+  | {
+      type: 'person';
+      person: PersonSearchResult;
     }
   | {
       type: 'item';
@@ -66,6 +75,13 @@ export default function SearchTabScreen() {
           return {
             type: 'creator',
             creator: result,
+          };
+        }
+
+        if (result.type === 'person') {
+          return {
+            type: 'person',
+            person: result,
           };
         }
 
@@ -117,6 +133,20 @@ export default function SearchTabScreen() {
       return <CreatorResultRow creator={item.creator} />;
     }
 
+    if (item.type === 'person') {
+      return (
+        <PersonResultRow
+          source="search"
+          person={{
+            id: item.person.personId,
+            displayName: item.person.displayName,
+            itemCount: item.person.itemCount,
+            latestItemTitle: item.person.latestItemTitle,
+          }}
+        />
+      );
+    }
+
     return <ItemCard item={item.item} shape="row" index={index} />;
   }, []);
 
@@ -161,7 +191,11 @@ export default function SearchTabScreen() {
         ref={listScrollRef}
         data={isShowingState ? [] : searchRows}
         keyExtractor={(item) =>
-          item.type === 'creator' ? `creator:${item.creator.creatorId}` : `item:${item.item.id}`
+          item.type === 'creator'
+            ? `creator:${item.creator.creatorId}`
+            : item.type === 'person'
+              ? `person:${item.person.personId}`
+              : `item:${item.item.id}`
         }
         renderItem={renderItem}
         style={styles.listContainer}

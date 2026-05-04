@@ -1,10 +1,10 @@
-import { and, desc, eq, lt, ne, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, ne, or, sql, type SQL, type SQLWrapper } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Provider } from '@zine/shared';
 import { UserItemState } from '@zine/shared';
 
 import { router, protectedProcedure } from '../trpc';
-import { creators, items, subscriptions, userItems } from '../../db/schema';
+import { creators, items, subscriptions, userItems, userPeople } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { toItemViewsWithTags, type ItemView } from './items';
 
@@ -14,6 +14,7 @@ const SearchInputSchema = z.object({
   query: z.string().trim().min(1).max(100),
   scope: z.enum(['library']).default('library'),
   creatorsLimit: z.number().int().min(0).max(10).default(DEFAULT_CREATORS_LIMIT),
+  peopleLimit: z.number().int().min(0).max(10).default(DEFAULT_CREATORS_LIMIT),
   itemsLimit: z.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
   cursor: z.string().optional(),
 });
@@ -52,6 +53,25 @@ export type CreatorSearchResult = {
   score: number;
 };
 
+export type PersonSearchRow = {
+  id: string;
+  displayName: string;
+  itemCount: number;
+  latestSeenAt: number | null;
+  latestItemTitle: string | null;
+};
+
+export type PersonSearchResult = {
+  type: 'person';
+  id: string;
+  personId: string;
+  displayName: string;
+  itemCount: number;
+  latestSeenAt: number | null;
+  latestItemTitle: string | null;
+  score: number;
+};
+
 export type SearchItemView = ItemView;
 
 export type ItemSearchResult = SearchItemView & {
@@ -59,12 +79,13 @@ export type ItemSearchResult = SearchItemView & {
   score: number;
 };
 
-export type SearchResult = CreatorSearchResult | ItemSearchResult;
+export type SearchResult = CreatorSearchResult | PersonSearchResult | ItemSearchResult;
 
 export type SearchResponse = {
   results: SearchResult[];
   sections: {
     creators: CreatorSearchResult[];
+    people: PersonSearchResult[];
     items: ItemSearchResult[];
   };
   nextCursor: string | null;
@@ -166,6 +187,12 @@ function scoreItem(query: string, item: SearchItemView): number {
   return Math.max(titleScore, creatorScore);
 }
 
+function scorePerson(query: string, person: PersonSearchRow): number {
+  const nameScore = scoreTextMatch(query, person.displayName);
+  const libraryBoost = person.itemCount > 0 ? Math.min(10, person.itemCount) : 0;
+  return nameScore + libraryBoost;
+}
+
 function mergeCreatorRows(query: string, rows: CreatorSearchRow[]): CreatorSearchResult[] {
   const merged = new Map<string, CreatorSearchRow>();
 
@@ -213,14 +240,30 @@ function mergeCreatorRows(query: string, rows: CreatorSearchRow[]): CreatorSearc
 export function buildSearchResponse(input: {
   query: string;
   creatorRows: CreatorSearchRow[];
+  personRows?: PersonSearchRow[];
   items: SearchItemView[];
   nextCursor: string | null;
   creatorsLimit?: number;
+  peopleLimit?: number;
 }): SearchResponse {
   const creatorsSection = mergeCreatorRows(input.query, input.creatorRows).slice(
     0,
     input.creatorsLimit ?? DEFAULT_CREATORS_LIMIT
   );
+  const peopleSection = (input.personRows ?? [])
+    .map((row) => ({
+      type: 'person' as const,
+      id: row.id,
+      personId: row.id,
+      displayName: row.displayName,
+      itemCount: row.itemCount,
+      latestSeenAt: row.latestSeenAt,
+      latestItemTitle: row.latestItemTitle,
+      score: scorePerson(input.query, row),
+    }))
+    .filter((result) => result.score > 0)
+    .sort((a, b) => b.score - a.score || a.displayName.localeCompare(b.displayName))
+    .slice(0, input.peopleLimit ?? DEFAULT_CREATORS_LIMIT);
   const itemsSection = input.items.map((item) => ({
     ...item,
     type: 'item' as const,
@@ -228,9 +271,10 @@ export function buildSearchResponse(input: {
   }));
 
   return {
-    results: [...creatorsSection, ...itemsSection],
+    results: [...creatorsSection, ...peopleSection, ...itemsSection],
     sections: {
       creators: creatorsSection,
+      people: peopleSection,
       items: itemsSection,
     },
     nextCursor: input.nextCursor,
@@ -279,7 +323,12 @@ export const searchRouter = router({
     const cursor = input.cursor ? decodeCursor(input.cursor) : null;
     const searchConditions = buildSearchConditions(search, [items.title, creators.name]);
     const creatorSearchConditions = buildSearchConditions(search, [creators.name, creators.handle]);
+    const peopleSearchConditions = buildSearchConditions(search, [
+      userPeople.displayName,
+      userPeople.normalizedName,
+    ]);
     const creatorRows: CreatorSearchRow[] = [];
+    const personRows: PersonSearchRow[] = [];
 
     if (!cursor && input.creatorsLimit > 0) {
       const subscribedCreatorRows = await ctx.db
@@ -359,6 +408,37 @@ export const searchRouter = router({
       );
     }
 
+    if (!cursor && input.peopleLimit > 0) {
+      const matchedPeopleRows = await ctx.db
+        .select({
+          id: userPeople.id,
+          displayName: userPeople.displayName,
+          itemCount: userPeople.itemCount,
+          latestSeenAt: userPeople.latestSeenAt,
+          latestItemTitle: sql<string | null>`null`,
+        })
+        .from(userPeople)
+        .where(
+          and(
+            eq(userPeople.userId, ctx.userId),
+            gt(userPeople.itemCount, 0),
+            or(...peopleSearchConditions)!
+          )
+        )
+        .orderBy(desc(userPeople.itemCount), desc(userPeople.latestSeenAt), userPeople.displayName)
+        .limit(input.peopleLimit * 3);
+
+      personRows.push(
+        ...matchedPeopleRows.map((row) => ({
+          id: row.id,
+          displayName: row.displayName,
+          itemCount: Number(row.itemCount ?? 0),
+          latestSeenAt: row.latestSeenAt,
+          latestItemTitle: row.latestItemTitle,
+        }))
+      );
+    }
+
     const itemConditions = [
       eq(userItems.userId, ctx.userId),
       eq(userItems.state, UserItemState.BOOKMARKED),
@@ -402,9 +482,11 @@ export const searchRouter = router({
     return buildSearchResponse({
       query: search,
       creatorRows,
+      personRows,
       items: itemViews,
       nextCursor,
       creatorsLimit: input.creatorsLimit,
+      peopleLimit: input.peopleLimit,
     });
   }),
 });

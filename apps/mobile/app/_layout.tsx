@@ -78,6 +78,10 @@ export default function RootLayout() {
                     name="recap/weekly"
                     options={{ headerShown: true, title: 'Weekly Recap', headerBackTitle: '' }}
                   />
+                  <Stack.Screen
+                    name="person/[id]"
+                    options={{ headerShown: true, title: 'Person', headerBackTitle: '' }}
+                  />
                   <Stack.Screen name="handle-share" options={{ headerShown: false }} />
                   <Stack.Screen
                     name="add-link"

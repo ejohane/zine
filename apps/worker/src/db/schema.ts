@@ -269,6 +269,82 @@ export const userItemEnrichments = sqliteTable(
   ]
 );
 
+// User People
+// Private per-user people index derived from bookmarked item enrichment.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userPeople = sqliteTable(
+  'user_people',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    displayName: text('display_name').notNull(),
+    normalizedName: text('normalized_name').notNull(),
+    itemCount: integer('item_count').notNull().default(0),
+    latestSeenAt: integer('latest_seen_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_people_user_normalized_idx').on(table.userId, table.normalizedName),
+    index('user_people_user_count_seen_idx').on(table.userId, table.itemCount, table.latestSeenAt),
+    index('user_people_user_seen_idx').on(table.userId, table.latestSeenAt),
+  ]
+);
+
+// User Person Mentions
+// Active/deactivated per-user associations between bookmarked items and user_people.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const userPersonMentions = sqliteTable(
+  'user_person_mentions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    userPersonId: text('user_person_id')
+      .notNull()
+      .references(() => userPeople.id),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id),
+    itemEnrichmentId: text('item_enrichment_id')
+      .notNull()
+      .references(() => itemEnrichments.id),
+    rawName: text('raw_name').notNull(),
+    rawType: text('raw_type').notNull(),
+    relationship: text('relationship').notNull().default('MENTIONED'),
+    confidence: real('confidence').notNull(),
+    evidenceText: text('evidence_text'),
+    seenAt: integer('seen_at').notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_person_mentions_user_item_person_idx').on(
+      table.userId,
+      table.userItemId,
+      table.userPersonId
+    ),
+    index('user_person_mentions_person_active_idx').on(
+      table.userPersonId,
+      table.isActive,
+      table.updatedAt
+    ),
+    index('user_person_mentions_user_item_idx').on(table.userId, table.itemId),
+    index('user_person_mentions_user_active_confidence_idx').on(
+      table.userId,
+      table.isActive,
+      table.confidence
+    ),
+  ]
+);
+
 // Item Embedding References
 // D1 reference records for vectors stored in Cloudflare Vectorize.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
