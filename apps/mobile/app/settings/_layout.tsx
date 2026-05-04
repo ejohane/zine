@@ -21,6 +21,12 @@ export default function SettingsLayout() {
         }}
       />
       <Stack.Screen
+        name="collections"
+        options={{
+          title: 'Collections',
+        }}
+      />
+      <Stack.Screen
         name="account"
         options={{
           title: 'Account',

@@ -508,6 +508,30 @@ export function useCreateCollection() {
   });
 }
 
+export function useUpdateCollection() {
+  const utils = trpc.useUtils();
+
+  return trpc.collections.update.useMutation({
+    onSuccess: () => {
+      utils.collections.list.invalidate();
+      utils.collections.items.invalidate();
+      utils.collections.forItem.invalidate();
+    },
+  });
+}
+
+export function useDeleteCollection() {
+  const utils = trpc.useUtils();
+
+  return trpc.collections.delete.useMutation({
+    onSuccess: () => {
+      utils.collections.list.invalidate();
+      utils.collections.items.invalidate();
+      utils.collections.forItem.invalidate();
+    },
+  });
+}
+
 export function useSetCollectionItemOverride() {
   const utils = trpc.useUtils();
 
