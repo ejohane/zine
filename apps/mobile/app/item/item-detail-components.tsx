@@ -22,10 +22,9 @@ import { formatRelativeTime } from '@/lib/format';
 import { logger } from '@/lib/logger';
 
 import { ItemDetailActions } from './detail/components/ItemDetailActions';
-import { ItemDetailEnrichmentCard } from './detail/components/ItemDetailEnrichmentCard';
 import { ItemDetailFloatingBack } from './detail/components/ItemDetailFloatingBack';
 import { ItemDetailOtherBookmarks } from './detail/components/ItemDetailOtherBookmarks';
-import type { ItemDetailEnrichment, ItemDetailItem } from './detail/types';
+import type { ItemDetailItem } from './detail/types';
 import { extractXHandle } from './item-detail-helpers';
 import { styles, xPostStyles } from './item-detail-styles';
 
@@ -96,9 +95,6 @@ export function LinkedText({
  */
 export function XPostBookmarkView({
   item,
-  enrichment,
-  enrichmentLoading,
-  enrichmentError,
   colors,
   insets,
   onBack,
@@ -135,9 +131,6 @@ export function XPostBookmarkView({
     provider: string;
     state: UserItemState;
   };
-  enrichment?: ItemDetailEnrichment;
-  enrichmentLoading?: boolean;
-  enrichmentError?: unknown;
   colors: typeof Colors.dark;
   insets: { top: number; bottom: number; left: number; right: number };
   onBack: () => void;
@@ -328,13 +321,6 @@ export function XPostBookmarkView({
           </View>
         </View>
       </Animated.View>
-
-      <ItemDetailEnrichmentCard
-        enrichment={enrichment}
-        isLoading={enrichmentLoading}
-        error={enrichmentError}
-        colors={colors}
-      />
 
       {onOtherBookmarkPress && (
         <ItemDetailOtherBookmarks
