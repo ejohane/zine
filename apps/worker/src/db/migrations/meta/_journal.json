@@ -85,6 +85,13 @@
       "when": 1777766400000,
       "tag": "0011_add_user_people",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777766401000,
+      "tag": "0012_add_smart_collections",
+      "breakpoints": true
     }
   ]
 }

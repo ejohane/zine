@@ -25,7 +25,7 @@ import {
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Colors, ContentColors, ProviderColors, getButtonMetrics } from '@zine/design-system';
-import { ContentType, Provider } from '@zine/shared';
+import { CollectionSort, ContentType, Provider } from '@zine/shared';
 
 import { Button, EmptyState, cn } from './components';
 import { BookmarkTagsDialog } from './components/bookmark-tags-dialog';
@@ -52,6 +52,7 @@ const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
   { label: 'Posts', value: ContentType.POST },
 ];
 const CONTENT_FILTER_SEARCH_PARAM = 'contentType';
+const COLLECTION_SEARCH_PARAM = 'collection';
 
 const BOOKMARK_ACTION_BUTTON_SIZE = 56;
 const BOOKMARK_ACTION_ICON_SIZE = 22;
@@ -812,8 +813,19 @@ export function BookmarksPage() {
   const [bookmarkTagsOpen, setBookmarkTagsOpen] = useState(false);
   const isPhoneLayout = useMediaQuery('(max-width: 700px)');
   const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
+  const activeCollectionId = searchParams.get(COLLECTION_SEARCH_PARAM) || null;
   const bookmarkSearch = searchParams.toString();
   const bookmarkSearchString = bookmarkSearch ? `?${bookmarkSearch}` : '';
+  const collectionsQuery = trpc.collections.list.useQuery();
+  const createCollectionMutation = trpc.collections.create.useMutation({
+    onSuccess: (collection) => {
+      void utils.collections.list.invalidate();
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+      nextSearchParams.set(COLLECTION_SEARCH_PARAM, collection.id);
+      setSearchParams(nextSearchParams);
+    },
+  });
 
   const bookmarksQuery = trpc.items.library.useQuery(
     {
@@ -824,11 +836,24 @@ export function BookmarksPage() {
       placeholderData: (previousData) => previousData,
     }
   );
-  const bookmarks = bookmarksQuery.data?.items ?? [];
+  const collectionItemsQuery = trpc.collections.items.useQuery(
+    {
+      id: activeCollectionId ?? '',
+      limit: 50,
+    },
+    {
+      enabled: Boolean(activeCollectionId),
+      placeholderData: (previousData) => previousData,
+    }
+  );
+  const activeItemsQuery = activeCollectionId ? collectionItemsQuery : bookmarksQuery;
+  const bookmarks = activeItemsQuery.data?.items ?? [];
   const filteredBookmarks = useMemo(
     () =>
-      bookmarkFilter ? bookmarks.filter((item) => item.contentType === bookmarkFilter) : bookmarks,
-    [bookmarkFilter, bookmarks]
+      bookmarkFilter && !activeCollectionId
+        ? bookmarks.filter((item) => item.contentType === bookmarkFilter)
+        : bookmarks,
+    [activeCollectionId, bookmarkFilter, bookmarks]
   );
   const selectedBookmarkId = bookmarkId ?? null;
   const selectedBookmark = useMemo(
@@ -915,10 +940,11 @@ export function BookmarksPage() {
   const bookmarkFilterLabel = CONTENT_FILTERS.find(
     (filter) => filter.value === bookmarkFilter
   )?.label;
+  const collections = collectionsQuery.data?.collections ?? [];
   const libraryIsEmpty = filteredBookmarks.length === 0;
-  const hasBookmarkData = Boolean(bookmarksQuery.data);
-  const bookmarksAreRefreshing = bookmarksQuery.isFetching;
-  const showInitialBookmarksLoadingState = !hasBookmarkData && bookmarksQuery.isLoading;
+  const hasBookmarkData = Boolean(activeItemsQuery.data);
+  const bookmarksAreRefreshing = activeItemsQuery.isFetching;
+  const showInitialBookmarksLoadingState = !hasBookmarkData && activeItemsQuery.isLoading;
   const showBookmarkDetailSkeleton =
     showInitialBookmarksLoadingState ||
     Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
@@ -964,6 +990,23 @@ export function BookmarksPage() {
       ]);
     },
   });
+
+  const handleCreateCollection = useCallback(() => {
+    if (!bookmarkFilter || createCollectionMutation.isPending) {
+      return;
+    }
+
+    const label = CONTENT_FILTERS.find((filter) => filter.value === bookmarkFilter)?.label;
+    createCollectionMutation.mutate({
+      name: label ? `${label} collection` : 'Smart collection',
+      description: null,
+      rules: {
+        contentTypes: [bookmarkFilter],
+        isFinished: false,
+      },
+      sort: CollectionSort.NEWEST_SAVED,
+    });
+  }, [bookmarkFilter, createCollectionMutation]);
 
   useEffect(() => {
     if (!manualBookmarkNotice) {
@@ -1014,12 +1057,12 @@ export function BookmarksPage() {
     [bookmarkSearchString, navigate, utils.items.get, utils.items.home, utils.items.library]
   );
 
-  if (bookmarksQuery.error && !hasBookmarkData) {
+  if (activeItemsQuery.error && !hasBookmarkData) {
     return (
       <main className={cn('new-page-screen', isPhoneLayout && 'new-page-screen--phone')}>
         <EmptyState
           title="Could not load bookmarks"
-          message={bookmarksQuery.error.message ?? 'Please refresh and try again.'}
+          message={activeItemsQuery.error.message ?? 'Please refresh and try again.'}
         />
         {showMobileTabBar ? <MobileTabBar /> : null}
       </main>
@@ -1136,6 +1179,27 @@ export function BookmarksPage() {
               <div className="new-page-column-card__header">
                 <h2 className="new-page-column-card__title">Bookmarks</h2>
                 <div className="new-page-column-card__chips">
+                  {collections.map((collection) => (
+                    <FilterChip
+                      key={collection.id}
+                      label={collection.name}
+                      size="small"
+                      selected={activeCollectionId === collection.id}
+                      tone="default"
+                      onClick={() => {
+                        const nextSearchParams = new URLSearchParams(searchParams);
+                        nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+
+                        if (activeCollectionId === collection.id) {
+                          nextSearchParams.delete(COLLECTION_SEARCH_PARAM);
+                        } else {
+                          nextSearchParams.set(COLLECTION_SEARCH_PARAM, collection.id);
+                        }
+
+                        setSearchParams(nextSearchParams);
+                      }}
+                    />
+                  ))}
                   {CONTENT_FILTERS.map((filter) => (
                     <FilterChip
                       key={filter.label}
@@ -1146,6 +1210,7 @@ export function BookmarksPage() {
                       onClick={() => {
                         const nextSearchParams = new URLSearchParams(searchParams);
                         const nextFilter = serializeBookmarkFilter(filter.value);
+                        nextSearchParams.delete(COLLECTION_SEARCH_PARAM);
 
                         if (nextFilter) {
                           nextSearchParams.set(CONTENT_FILTER_SEARCH_PARAM, nextFilter);
@@ -1158,6 +1223,18 @@ export function BookmarksPage() {
                     />
                   ))}
                 </div>
+                {bookmarkFilter && !activeCollectionId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleCreateCollection}
+                    disabled={createCollectionMutation.isPending}
+                  >
+                    <CirclePlus size={14} strokeWidth={2.2} />
+                    {createCollectionMutation.isPending ? 'Saving' : 'Save as collection'}
+                  </Button>
+                ) : null}
               </div>
 
               <div
@@ -1192,7 +1269,9 @@ export function BookmarksPage() {
                 ) : libraryIsEmpty ? (
                   <p className="new-page-column-card__empty">
                     {bookmarks.length === 0
-                      ? 'Add a bookmark to start building your library.'
+                      ? activeCollectionId
+                        ? 'This collection has no matching bookmarks yet.'
+                        : 'Add a bookmark to start building your library.'
                       : bookmarkFilterLabel
                         ? `No ${bookmarkFilterLabel.toLowerCase()} bookmarks match this filter.`
                         : 'No bookmarks match this filter.'}

@@ -94,6 +94,7 @@ export const invalidateSpies = {
   newslettersStatsInvalidate: vi.fn(async () => undefined),
   rssListInvalidate: vi.fn(async () => undefined),
   rssStatsInvalidate: vi.fn(async () => undefined),
+  collectionsListInvalidate: vi.fn(async () => undefined),
 };
 
 export const mutationSpies = {
@@ -106,6 +107,10 @@ export const mutationSpies = {
   newslettersSyncNow: vi.fn(async (_input: unknown) => ({ success: true })),
   newslettersUpdateStatus: vi.fn(async (_input: unknown) => ({ success: true })),
   rssAdd: vi.fn(async (_input: unknown) => ({ success: true })),
+  collectionsCreate: vi.fn(async (_input: unknown) => ({
+    id: 'collection-1',
+    name: 'Smart collection',
+  })),
 };
 
 export const hookSpies = {
@@ -123,6 +128,15 @@ export const hookSpies = {
   ),
   itemsListTagsUseQuery: vi.fn<() => QueryResult<{ tags: ItemTag[] }>>(() =>
     createQueryResult({ tags: [] })
+  ),
+  collectionsListUseQuery: vi.fn<() => QueryResult<{ collections: unknown[] }>>(() =>
+    createQueryResult({ collections: [] })
+  ),
+  collectionsItemsUseQuery: vi.fn<
+    (input: { id: string; limit: number }, options?: unknown) => QueryResult<unknown>
+  >((_input) => createQueryResult({ items: [] })),
+  collectionsCreateUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.collectionsCreate, options)
   ),
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
@@ -284,6 +298,10 @@ export function resetTrpcMocks() {
   mutationSpies.newslettersSyncNow.mockResolvedValue({ success: true });
   mutationSpies.newslettersUpdateStatus.mockResolvedValue({ success: true });
   mutationSpies.rssAdd.mockResolvedValue({ success: true });
+  mutationSpies.collectionsCreate.mockResolvedValue({
+    id: 'collection-1',
+    name: 'Smart collection',
+  });
 
   hookSpies.itemsLibraryUseQuery.mockReset();
   hookSpies.itemsLibraryUseQuery.mockImplementation((_input) => createQueryResult());
@@ -299,6 +317,21 @@ export function resetTrpcMocks() {
 
   hookSpies.itemsListTagsUseQuery.mockReset();
   hookSpies.itemsListTagsUseQuery.mockImplementation(() => createQueryResult({ tags: [] }));
+
+  hookSpies.collectionsListUseQuery.mockReset();
+  hookSpies.collectionsListUseQuery.mockImplementation(() =>
+    createQueryResult({ collections: [] })
+  );
+
+  hookSpies.collectionsItemsUseQuery.mockReset();
+  hookSpies.collectionsItemsUseQuery.mockImplementation((_input) =>
+    createQueryResult({ items: [] })
+  );
+
+  hookSpies.collectionsCreateUseMutation.mockReset();
+  hookSpies.collectionsCreateUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.collectionsCreate, options)
+  );
 
   hookSpies.bookmarksPreviewUseQuery.mockReset();
   hookSpies.bookmarksPreviewUseQuery.mockImplementation((_input) => createQueryResult());
@@ -438,6 +471,9 @@ export const trpc = {
       home: { invalidate: invalidateSpies.itemsHomeInvalidate },
       listTags: { invalidate: invalidateSpies.itemsListTagsInvalidate },
     },
+    collections: {
+      list: { invalidate: invalidateSpies.collectionsListInvalidate },
+    },
     subscriptions: {
       connections: {
         list: { invalidate: invalidateSpies.subscriptionsConnectionsInvalidate },
@@ -482,6 +518,18 @@ export const trpc = {
     },
     markOpened: {
       useMutation: (options?: MutationOptions) => hookSpies.markOpenedUseMutation(options),
+    },
+  },
+  collections: {
+    list: {
+      useQuery: () => hookSpies.collectionsListUseQuery(),
+    },
+    items: {
+      useQuery: (input: { id: string; limit: number }, options?: unknown) =>
+        hookSpies.collectionsItemsUseQuery(input, options),
+    },
+    create: {
+      useMutation: (options?: MutationOptions) => hookSpies.collectionsCreateUseMutation(options),
     },
   },
   creators: {

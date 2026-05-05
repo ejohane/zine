@@ -51,6 +51,22 @@ export type { UIContentType, UIProvider } from './format';
 // Tag normalization helpers
 export { normalizeTagKey, normalizeTagName, sanitizeTagNames } from './tags';
 
+// Smart collection contracts
+export {
+  CollectionItemMembership,
+  CollectionOverrideAction,
+  CollectionOverrideActionSchema,
+  CollectionRulesSchema,
+  CollectionSort,
+  CollectionSortSchema,
+} from './collections';
+export type {
+  CollectionItemMembershipValue,
+  CollectionOverrideActionValue,
+  CollectionRules,
+  CollectionSortValue,
+} from './collections';
+
 // Schemas (Zod validation for tRPC input)
 export { ContentTypeSchema, ProviderSchema, SubscriptionStatusSchema } from './schemas';
 
