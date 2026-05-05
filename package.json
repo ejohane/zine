@@ -10,6 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:ios": "bun run --cwd apps/mobile build:ios",
+    "deploy:ios:production": "bun run --cwd apps/mobile deploy:ios:production",
     "dev": "turbo run dev",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:worktree": "./scripts/dev.sh",

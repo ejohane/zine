@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -17,14 +18,19 @@
       }
     },
     "production": {
-      "distribution": "internal",
-      "credentialsSource": "local",
+      "distribution": "store",
+      "credentialsSource": "remote",
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.myzine.app"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6766139146"
+      }
+    }
   }
 }

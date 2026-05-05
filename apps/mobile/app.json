@@ -9,6 +9,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "3",
       "bundleIdentifier": "app.zine.mobile",
       "entitlements": {
         "com.apple.security.application-groups": ["group.app.zine.mobile"]
