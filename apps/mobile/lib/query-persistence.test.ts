@@ -44,9 +44,9 @@ describe('query persistence helpers', () => {
     expect(isAllowlistedQueryKey([['items', 'inbox']])).toBe(true);
     expect(isAllowlistedQueryKey(['items', 'library'])).toBe(true);
     expect(isAllowlistedQueryKey([['items', 'get']])).toBe(true);
-    expect(isAllowlistedQueryKey([['collections', 'list']])).toBe(true);
-    expect(isAllowlistedQueryKey([['collections', 'items']])).toBe(true);
-    expect(isAllowlistedQueryKey([['collections', 'forItem']])).toBe(true);
+    expect(isAllowlistedQueryKey([['collections', 'list']])).toBe(false);
+    expect(isAllowlistedQueryKey([['collections', 'items']])).toBe(false);
+    expect(isAllowlistedQueryKey([['collections', 'forItem']])).toBe(false);
     expect(isAllowlistedQueryKey([['insights', 'weeklyRecap']])).toBe(true);
     expect(isAllowlistedQueryKey([['insights', 'weeklyRecapTeaser']])).toBe(true);
     expect(isAllowlistedQueryKey([['subscriptions', 'list']])).toBe(true);

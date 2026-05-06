@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
@@ -16,9 +17,11 @@ import { Stack } from 'expo-router';
 import { useToast } from 'heroui-native';
 import {
   CollectionSort,
+  HomeCollectionLayout,
   ContentType,
   Provider,
   type CollectionRules,
+  type HomeCollectionLayoutValue,
   type CollectionSortValue,
 } from '@zine/shared';
 
@@ -29,6 +32,7 @@ import {
   useCollections,
   useCreateCollection,
   useDeleteCollection,
+  useSetCollectionHomeSection,
   useUpdateCollection,
   useUserTags,
 } from '@/hooks/use-items-trpc';
@@ -55,6 +59,8 @@ type CollectionFormState = {
   maxLengthMinutes: string;
   search: string;
   sort: CollectionSortValue;
+  showOnHome: boolean;
+  homeLayout: HomeCollectionLayoutValue;
 };
 
 const contentTypeOptions = [
@@ -88,6 +94,13 @@ const sortOptions = [
   { value: CollectionSort.RECENTLY_OPENED, label: 'Recently opened' },
 ] as const;
 
+const homeLayoutOptions = [
+  { value: HomeCollectionLayout.STACK_RAIL, label: 'Stack rail' },
+  { value: HomeCollectionLayout.COVER_RAIL, label: 'Cover rail' },
+  { value: HomeCollectionLayout.ROW_GRID, label: 'Row grid' },
+  { value: HomeCollectionLayout.COMPACT_LIST, label: 'Compact list' },
+] as const;
+
 const emptyForm: CollectionFormState = {
   name: '',
   description: '',
@@ -99,6 +112,8 @@ const emptyForm: CollectionFormState = {
   maxLengthMinutes: '',
   search: '',
   sort: CollectionSort.NEWEST_SAVED,
+  showOnHome: false,
+  homeLayout: HomeCollectionLayout.STACK_RAIL,
 };
 
 function rulesToFinishFilter(rules: CollectionRules): FinishFilter {
@@ -126,6 +141,8 @@ function collectionToForm(collection: CollectionListItem): CollectionFormState {
         : String(collection.rules.maxLengthMinutes),
     search: collection.rules.search ?? '',
     sort: collection.sort as CollectionSortValue,
+    showOnHome: collection.homeSection != null,
+    homeLayout: collection.homeSection?.layout ?? HomeCollectionLayout.STACK_RAIL,
   };
 }
 
@@ -183,11 +200,15 @@ export default function SettingsCollectionsScreen() {
   const createCollectionMutation = useCreateCollection();
   const updateCollectionMutation = useUpdateCollection();
   const deleteCollectionMutation = useDeleteCollection();
+  const setCollectionHomeSectionMutation = useSetCollectionHomeSection();
   const [form, setForm] = useState<CollectionFormState | null>(null);
 
   const collections = collectionsQuery.data?.collections ?? [];
   const tags = tagsQuery.data?.tags ?? [];
-  const isSaving = createCollectionMutation.isPending || updateCollectionMutation.isPending;
+  const isSaving =
+    createCollectionMutation.isPending ||
+    updateCollectionMutation.isPending ||
+    setCollectionHomeSectionMutation.isPending;
   const isDeleting = deleteCollectionMutation.isPending;
   const canSave = Boolean(form?.name.trim()) && !isSaving && !isDeleting;
 
@@ -230,12 +251,22 @@ export default function SettingsCollectionsScreen() {
     };
 
     try {
+      let collectionId = form.id;
       if (form.id) {
         await updateCollectionMutation.mutateAsync({ id: form.id, ...input });
         showSuccess(toast, 'Collection updated');
       } else {
-        await createCollectionMutation.mutateAsync(input);
+        const collection = await createCollectionMutation.mutateAsync(input);
+        collectionId = collection.id;
         showSuccess(toast, 'Collection created');
+      }
+
+      if (collectionId) {
+        await setCollectionHomeSectionMutation.mutateAsync({
+          id: collectionId,
+          enabled: form.showOnHome,
+          layout: form.homeLayout,
+        });
       }
       setForm(null);
     } catch (error) {
@@ -540,6 +571,43 @@ export default function SettingsCollectionsScreen() {
                 ))}
               </RuleSection>
 
+              <View style={[styles.homePanel, { backgroundColor: colors.backgroundSecondary }]}>
+                <View style={styles.homeToggleRow}>
+                  <View style={styles.homeToggleCopy}>
+                    <Text style={[styles.homeToggleTitle, { color: colors.text }]}>
+                      Show on Home
+                    </Text>
+                    <Text style={[styles.homeToggleMeta, { color: colors.textSubheader }]}>
+                      Add this collection as a scrollable Home section.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={form.showOnHome}
+                    onValueChange={(showOnHome) => setForm({ ...form, showOnHome })}
+                    trackColor={{ false: colors.border, true: colors.buttonPrimary }}
+                    thumbColor={colors.buttonPrimaryText}
+                    accessibilityLabel="Show collection on Home"
+                  />
+                </View>
+
+                {form.showOnHome ? (
+                  <View style={styles.homeLayoutGroup}>
+                    <FieldLabel label="Home layout" colors={colors} />
+                    <View style={styles.chipWrap}>
+                      {homeLayoutOptions.map((option) => (
+                        <Chip
+                          key={option.value}
+                          label={option.label}
+                          selected={form.homeLayout === option.value}
+                          colors={colors}
+                          onPress={() => setForm({ ...form, homeLayout: option.value })}
+                        />
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+
               <View style={[styles.preview, { backgroundColor: colors.backgroundSecondary }]}>
                 <Text style={[styles.previewLabel, { color: colors.textTertiary }]}>Preview</Text>
                 <Text style={[styles.previewText, { color: colors.text }]}>{rulePreview}</Text>
@@ -795,6 +863,33 @@ const styles = StyleSheet.create({
   },
   lengthSeparator: {
     ...Typography.bodyMedium,
+  },
+  homePanel: {
+    borderRadius: Radius.lg,
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+  },
+  homeToggleRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  homeToggleCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  homeToggleTitle: {
+    ...Typography.bodyLarge,
+    fontWeight: '700',
+  },
+  homeToggleMeta: {
+    ...Typography.bodySmall,
+  },
+  homeLayoutGroup: {
+    gap: Spacing.xs,
   },
   preview: {
     borderRadius: Radius.lg,

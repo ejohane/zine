@@ -15,7 +15,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import type { ContentType as ApiContentType } from '@zine/shared';
+import { HomeCollectionLayout, type ContentType as ApiContentType } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, PodcastIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
@@ -107,6 +107,22 @@ const contentTypeFilters: {
   },
 ];
 
+function mapHomeItemToCard(
+  item: NonNullable<ReturnType<typeof useHomeData>['data']>['recentBookmarks'][number]
+): ItemCardData {
+  return {
+    id: item.id,
+    title: item.title,
+    creator: item.publisher ?? item.creator,
+    creatorImageUrl: item.creatorImageUrl ?? null,
+    thumbnailUrl: item.thumbnailUrl ?? null,
+    contentType: mapContentType(item.contentType) as ContentType,
+    provider: mapProvider(item.provider) as Provider,
+    duration: item.duration ?? null,
+    readingTimeMinutes: item.readingTimeMinutes ?? null,
+  };
+}
+
 function SectionHeader({
   title,
   count,
@@ -166,6 +182,13 @@ type HomeSectionItem =
   | {
       key: 'podcasts' | 'articles' | 'videos';
       type: 'cover-rail' | 'stack-rail';
+      title: string;
+      count: number;
+      items: ItemCardData[];
+    }
+  | {
+      key: string;
+      type: 'custom-cover-rail' | 'custom-stack-rail' | 'custom-row-grid' | 'custom-compact-list';
       title: string;
       count: number;
       items: ItemCardData[];
@@ -290,6 +313,33 @@ export default function HomeScreen() {
     }));
   }, [homeData?.byContentType.articles]);
 
+  const customCollectionSections = useMemo((): HomeSectionItem[] => {
+    return (homeData?.customCollections ?? [])
+      .filter((section) => section.items.length > 0)
+      .map((section) => {
+        const allItems = section.items.map(mapHomeItemToCard);
+        const type =
+          section.layout === HomeCollectionLayout.COVER_RAIL
+            ? 'custom-cover-rail'
+            : section.layout === HomeCollectionLayout.ROW_GRID
+              ? 'custom-row-grid'
+              : section.layout === HomeCollectionLayout.COMPACT_LIST
+                ? 'custom-compact-list'
+                : 'custom-stack-rail';
+
+        return {
+          key: `collection-${section.collectionId}`,
+          type,
+          title: section.title,
+          count: section.count,
+          items:
+            section.layout === HomeCollectionLayout.COMPACT_LIST
+              ? allItems.slice(0, HOME_INBOX_VISIBLE_LIMIT)
+              : allItems,
+        };
+      });
+  }, [homeData?.customCollections]);
+
   const handleOpenSettings = useCallback(() => {
     router.push('/settings');
   }, [router]);
@@ -366,6 +416,8 @@ export default function HomeScreen() {
       });
     }
 
+    items.push(...customCollectionSections);
+
     if (showPodcastsSection && podcasts.length > 0) {
       items.push({
         key: 'podcasts',
@@ -399,6 +451,7 @@ export default function HomeScreen() {
     return items;
   }, [
     articles,
+    customCollectionSections,
     filteredInboxItems,
     filteredJumpBackInItems,
     filteredRecentlyBookmarked,
@@ -496,6 +549,7 @@ export default function HomeScreen() {
             </View>
           );
         case 'cover-rail':
+        case 'custom-cover-rail':
           return (
             <View>
               <SectionHeader title={item.title} count={item.count} colors={colors} />
@@ -512,6 +566,7 @@ export default function HomeScreen() {
             </View>
           );
         case 'stack-rail':
+        case 'custom-stack-rail':
           return (
             <View>
               <SectionHeader title={item.title} count={item.count} colors={colors} />
@@ -525,6 +580,35 @@ export default function HomeScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.horizontalList}
               />
+            </View>
+          );
+        case 'custom-row-grid':
+          return (
+            <View>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <View style={styles.jumpBackInGrid}>
+                {item.items.map((sectionItem) => (
+                  <View
+                    key={sectionItem.id}
+                    style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                  >
+                    <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        case 'custom-compact-list':
+          return (
+            <View style={styles.section}>
+              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <View
+                style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
+              >
+                {item.items.map((sectionItem, index) => (
+                  <ItemCard key={sectionItem.id} item={sectionItem} shape="row" index={index} />
+                ))}
+              </View>
             </View>
           );
       }

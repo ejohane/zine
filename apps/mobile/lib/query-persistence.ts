@@ -10,12 +10,17 @@ import {
 } from '@zine/shared';
 import { ZINE_VERSION } from '@zine/shared';
 
+const MOBILE_QUERY_CACHE_SCHEMA_VERSION = '2';
+
 export function getAppVersion(): string {
   return process.env.EXPO_PUBLIC_APP_VERSION?.trim() || Constants.expoConfig?.version || '0.0.0';
 }
 
 export function getApiSchemaVersion(): string {
-  return process.env.EXPO_PUBLIC_API_SCHEMA_VERSION?.trim() || ZINE_VERSION;
+  return (
+    process.env.EXPO_PUBLIC_API_SCHEMA_VERSION?.trim() ||
+    `${ZINE_VERSION}-mobile-cache-${MOBILE_QUERY_CACHE_SCHEMA_VERSION}`
+  );
 }
 
 export function buildQueryPersistenceBuster(

@@ -203,6 +203,7 @@ function createMockItemsCaller(options: {
             .filter((item) => item.contentType === ContentType.ARTICLE)
             .slice(0, 20),
         },
+        customCollections: [],
       };
     },
 
@@ -1045,6 +1046,7 @@ describe('Items Router', () => {
       expect(result).toHaveProperty('recentBookmarks');
       expect(result).toHaveProperty('jumpBackIn');
       expect(result).toHaveProperty('byContentType');
+      expect(result).toHaveProperty('customCollections');
       expect(result.byContentType).toHaveProperty('videos');
       expect(result.byContentType).toHaveProperty('podcasts');
       expect(result.byContentType).toHaveProperty('articles');
@@ -1055,6 +1057,7 @@ describe('Items Router', () => {
       expect(Array.isArray(result.byContentType.videos)).toBe(true);
       expect(Array.isArray(result.byContentType.podcasts)).toBe(true);
       expect(Array.isArray(result.byContentType.articles)).toBe(true);
+      expect(Array.isArray(result.customCollections)).toBe(true);
     });
 
     it('should populate jumpBackIn with recently opened bookmarks', async () => {

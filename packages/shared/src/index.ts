@@ -59,12 +59,15 @@ export {
   CollectionRulesSchema,
   CollectionSort,
   CollectionSortSchema,
+  HomeCollectionLayout,
+  HomeCollectionLayoutSchema,
 } from './collections';
 export type {
   CollectionItemMembershipValue,
   CollectionOverrideActionValue,
   CollectionRules,
   CollectionSortValue,
+  HomeCollectionLayoutValue,
 } from './collections';
 
 // Schemas (Zod validation for tRPC input)
