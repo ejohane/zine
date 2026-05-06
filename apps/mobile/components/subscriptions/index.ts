@@ -19,4 +19,5 @@ export {
   SourceSearchField,
   SourceSectionHeader,
   SourceSubscriptionRow,
+  SwipeableSourceSubscriptionRow,
 } from './source-ui';

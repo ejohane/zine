@@ -57,6 +57,44 @@ jest.mock('lucide-react-native', () => {
   };
 });
 
+jest.mock('expo-haptics', () => ({
+  ImpactFeedbackStyle: {
+    Light: 'Light',
+    Medium: 'Medium',
+  },
+  impactAsync: jest.fn(),
+}));
+
+jest.mock('react-native-gesture-handler/ReanimatedSwipeable', () => {
+  const Swipeable = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('div', null, children);
+
+  return {
+    __esModule: true,
+    default: Swipeable,
+  };
+});
+
+jest.mock('react-native-reanimated', () => {
+  const AnimatedView = ({ children }: { children?: React.ReactNode }) =>
+    React.createElement('div', null, children);
+
+  return {
+    __esModule: true,
+    default: {
+      View: AnimatedView,
+    },
+    Extrapolation: {
+      CLAMP: 'clamp',
+    },
+    interpolate: jest.fn(() => 0),
+    runOnJS: (fn: () => void) => fn,
+    useAnimatedReaction: jest.fn(),
+    useAnimatedStyle: jest.fn(() => ({})),
+    useSharedValue: (value: unknown) => ({ value }),
+  };
+});
+
 jest.mock('@/components/primitives', () => ({
   Badge: ({ label }: { label: string }) => React.createElement('span', null, label),
   Button: ({ label, onPress }: { label: string; onPress?: () => void }) =>

@@ -1,9 +1,30 @@
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { useCallback, useRef } from 'react';
 import { View, Image, Pressable, StyleSheet, TextInput } from 'react-native';
 import { Rss } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  runOnJS,
+  type SharedValue,
+  useAnimatedReaction,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 
-import { Badge, Button, Surface, Text } from '@/components/primitives';
-import { ChevronRightIcon, SearchIcon } from '@/components/icons';
+import { Badge, Button, IconButton, Surface, Text } from '@/components/primitives';
+import {
+  CheckIcon,
+  CheckOutlineIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+} from '@/components/icons';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
@@ -14,6 +35,16 @@ import {
 } from '@/lib/subscription-sources';
 
 const SOURCE_BRAND_ICON_COLOR = '#FFFFFF'; // design-system-exception: white brand glyphs
+const ACTION_LANE_WIDTH = 220;
+const ACTION_CIRCLE_SIZE = 64;
+const ACTION_ICON_SIZE = 24;
+const STRETCH_START_DISTANCE = 96;
+const COMMIT_DISTANCE = 164;
+const ACTION_STRETCHED_WIDTH = 156;
+const ACTION_MAX_WIDTH = 204;
+const SWIPE_THRESHOLD = COMMIT_DISTANCE;
+const SWIPE_FRICTION = 1.08;
+const OVERSHOOT_FRICTION = 8;
 
 // design-system-exception: brand colors matching FAB config in item-detail-helpers.tsx
 const SOURCE_BRAND: Record<SubscriptionSource, { bg: string; icon: React.ReactNode }> = {
@@ -76,6 +107,192 @@ function Avatar({ imageUrl, title }: { imageUrl?: string | null; title: string }
         {title.charAt(0).toUpperCase()}
       </Text>
     </View>
+  );
+}
+
+interface SwipeActionPanelProps {
+  progress: SharedValue<number>;
+  translation: SharedValue<number>;
+  releaseLocked: SharedValue<boolean>;
+}
+
+type SwipeCapsuleProps = SwipeActionPanelProps & {
+  direction: 'left' | 'right';
+  color: string;
+  children: React.ReactNode;
+};
+
+function triggerSwipeCommitHaptic() {
+  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+}
+
+function SwipeActionCapsule({
+  progress,
+  translation,
+  releaseLocked,
+  direction,
+  color,
+  children,
+}: SwipeCapsuleProps) {
+  const isLeft = direction === 'left';
+  const frozenWidth = useSharedValue(-1);
+
+  const getDragDistance = () => {
+    'worklet';
+    return isLeft ? Math.max(translation.value, 0) : Math.max(-translation.value, 0);
+  };
+
+  const getCapsuleWidth = (dragDistance: number) => {
+    'worklet';
+    return interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [ACTION_CIRCLE_SIZE, ACTION_CIRCLE_SIZE, ACTION_STRETCHED_WIDTH, ACTION_MAX_WIDTH],
+      Extrapolation.CLAMP
+    );
+  };
+
+  useAnimatedReaction(
+    () => {
+      const dragDistance = isLeft
+        ? Math.max(translation.value, 0)
+        : Math.max(-translation.value, 0);
+      return dragDistance >= COMMIT_DISTANCE;
+    },
+    (isCommitted, wasCommitted) => {
+      if (isCommitted && !wasCommitted) {
+        runOnJS(triggerSwipeCommitHaptic)();
+      }
+    },
+    [isLeft]
+  );
+
+  useAnimatedReaction(
+    () => ({
+      dragDistance: getDragDistance(),
+      releaseLocked: releaseLocked.value,
+    }),
+    ({ dragDistance, releaseLocked: isReleaseLocked }) => {
+      if (!isReleaseLocked) {
+        frozenWidth.value = -1;
+        return;
+      }
+
+      if (frozenWidth.value < 0) {
+        frozenWidth.value = getCapsuleWidth(dragDistance);
+      }
+    },
+    [isLeft]
+  );
+
+  const capsuleStyle = useAnimatedStyle(() => {
+    const dragDistance = getDragDistance();
+    const width = frozenWidth.value >= 0 ? frozenWidth.value : getCapsuleWidth(dragDistance);
+    const scaleY = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 1.035, 1.035],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(progress.value, [0, 0.18, 0.35], [0, 0.8, 1], Extrapolation.CLAMP);
+
+    return {
+      width,
+      opacity,
+      transform: [{ scaleY }],
+    };
+  });
+
+  const iconStyle = useAnimatedStyle(() => {
+    const dragDistance = getDragDistance();
+    const scaleX = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 1.15, 1.28],
+      Extrapolation.CLAMP
+    );
+    const scaleY = interpolate(
+      dragDistance,
+      [0, STRETCH_START_DISTANCE, COMMIT_DISTANCE, ACTION_LANE_WIDTH],
+      [1, 1, 0.9, 0.84],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      transform: [{ scaleX }, { scaleY }],
+    };
+  });
+
+  return (
+    <View style={[styles.actionPanel, isLeft ? styles.leftActionPanel : styles.rightActionPanel]}>
+      <Animated.View style={[styles.actionCapsule, { backgroundColor: color }, capsuleStyle]}>
+        <Animated.View style={iconStyle}>{children}</Animated.View>
+      </Animated.View>
+    </View>
+  );
+}
+
+function AddActionPanel({ progress, translation, releaseLocked }: SwipeActionPanelProps) {
+  const { colors } = useAppTheme();
+
+  return (
+    <SwipeActionCapsule
+      progress={progress}
+      translation={translation}
+      releaseLocked={releaseLocked}
+      direction="left"
+      color={colors.statusSuccess}
+    >
+      <PlusIcon size={ACTION_ICON_SIZE} color={colors.overlayForeground} />
+    </SwipeActionCapsule>
+  );
+}
+
+function RemoveActionPanel({ progress, translation, releaseLocked }: SwipeActionPanelProps) {
+  const { colors } = useAppTheme();
+
+  return (
+    <SwipeActionCapsule
+      progress={progress}
+      translation={translation}
+      releaseLocked={releaseLocked}
+      direction="right"
+      color={colors.statusError}
+    >
+      <TrashIcon size={ACTION_ICON_SIZE} color={colors.overlayForeground} />
+    </SwipeActionCapsule>
+  );
+}
+
+function SubscriptionToggle({
+  checked,
+  disabled = false,
+  onPress,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useAppTheme();
+
+  return (
+    <IconButton
+      size="sm"
+      variant="ghost"
+      disabled={disabled}
+      onPress={onPress}
+      accessibilityRole="switch"
+      accessibilityLabel={checked ? 'Remove subscription' : 'Add subscription'}
+      accessibilityState={{ checked, disabled }}
+      accessibilityHint={checked ? 'Turns this subscription off.' : 'Turns this subscription on.'}
+      style={styles.subscriptionToggle}
+    >
+      {checked ? (
+        <CheckIcon size={ACTION_ICON_SIZE} color={colors.statusSuccess} />
+      ) : (
+        <CheckOutlineIcon size={ACTION_ICON_SIZE} color={colors.textTertiary} />
+      )}
+    </IconButton>
   );
 }
 
@@ -288,11 +505,16 @@ export function SourceSearchField({
 }
 
 export function SourceSubscriptionRow({
+  source: _source,
+  variant = 'card',
   title,
   subtitle,
   meta,
   imageUrl,
   statusLabel,
+  toggleChecked,
+  onToggle,
+  toggleDisabled = false,
   primaryActionLabel,
   onPrimaryAction,
   primaryActionVariant = 'secondary',
@@ -306,13 +528,18 @@ export function SourceSubscriptionRow({
   onTertiaryAction,
   tertiaryActionTone = 'danger',
 }: {
+  source?: SubscriptionSource;
+  variant?: 'card' | 'flat';
   title: string;
   subtitle?: string | null;
   meta?: string | null;
   imageUrl?: string | null;
   statusLabel?: string | null;
-  primaryActionLabel: string;
-  onPrimaryAction: () => void;
+  toggleChecked?: boolean;
+  onToggle?: (() => void) | null;
+  toggleDisabled?: boolean;
+  primaryActionLabel?: string | null;
+  onPrimaryAction?: (() => void) | null;
   primaryActionVariant?: 'primary' | 'secondary' | 'outline' | 'ghost';
   primaryActionTone?: 'default' | 'danger';
   primaryActionLoading?: boolean;
@@ -325,9 +552,18 @@ export function SourceSubscriptionRow({
   tertiaryActionTone?: 'default' | 'danger';
 }) {
   const { colors } = useAppTheme();
+  const Container = variant === 'flat' ? View : Surface;
+  const containerProps =
+    variant === 'flat' ? {} : ({ tone: 'elevated', border: 'subtle', radius: 'xl' } as const);
 
   return (
-    <Surface tone="elevated" border="subtle" radius="xl" style={styles.subscriptionRow}>
+    <Container
+      {...containerProps}
+      style={[
+        variant === 'flat' ? styles.flatSubscriptionRow : styles.subscriptionRow,
+        variant === 'flat' ? { backgroundColor: colors.surfaceCanvas } : null,
+      ]}
+    >
       <Avatar imageUrl={imageUrl} title={title} />
 
       <View style={styles.subscriptionCopy}>
@@ -353,42 +589,154 @@ export function SourceSubscriptionRow({
         ) : null}
       </View>
 
-      <View style={styles.rowActions}>
-        <Button
-          label={primaryActionLabel}
-          onPress={onPrimaryAction}
-          variant={primaryActionVariant}
-          tone={primaryActionTone}
-          size="sm"
-          loading={primaryActionLoading}
-          disabled={primaryActionDisabled}
+      {primaryActionLabel && onPrimaryAction ? (
+        <View style={styles.rowActions}>
+          <Button
+            label={primaryActionLabel}
+            onPress={onPrimaryAction}
+            variant={primaryActionVariant}
+            tone={primaryActionTone}
+            size="sm"
+            loading={primaryActionLoading}
+            disabled={primaryActionDisabled}
+          />
+          {secondaryActionLabel && onSecondaryAction ? (
+            <Button
+              label={secondaryActionLabel}
+              onPress={onSecondaryAction}
+              variant="ghost"
+              tone={secondaryActionTone}
+              size="sm"
+              labelStyle={{
+                color: secondaryActionTone === 'danger' ? colors.statusError : colors.textSecondary,
+              }}
+            />
+          ) : null}
+          {tertiaryActionLabel && onTertiaryAction ? (
+            <Button
+              label={tertiaryActionLabel}
+              onPress={onTertiaryAction}
+              variant="ghost"
+              tone={tertiaryActionTone}
+              size="sm"
+              labelStyle={{
+                color: tertiaryActionTone === 'danger' ? colors.statusError : colors.textSecondary,
+              }}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {typeof toggleChecked === 'boolean' && onToggle ? (
+        <SubscriptionToggle checked={toggleChecked} disabled={toggleDisabled} onPress={onToggle} />
+      ) : null}
+      {variant === 'flat' ? (
+        <View style={[styles.flatRowSeparator, { backgroundColor: colors.borderDefault }]} />
+      ) : null}
+    </Container>
+  );
+}
+
+export function SwipeableSourceSubscriptionRow({
+  title,
+  imageUrl,
+  isSubscribed,
+  isProcessing = false,
+  onAdd,
+  onRemove,
+}: {
+  title: string;
+  imageUrl?: string | null;
+  isSubscribed: boolean;
+  isProcessing?: boolean;
+  onAdd: () => void;
+  onRemove: () => void;
+}) {
+  const swipeableRef = useRef<SwipeableMethods>(null);
+  const releaseLocked = useSharedValue(false);
+  const { colors } = useAppTheme();
+
+  const executeAction = useCallback(
+    (direction: 'left' | 'right') => {
+      if (
+        isProcessing ||
+        (direction === 'right' && isSubscribed) ||
+        (direction === 'left' && !isSubscribed)
+      ) {
+        swipeableRef.current?.close();
+        return;
+      }
+
+      if (direction === 'right') {
+        onAdd();
+      } else {
+        onRemove();
+      }
+
+      swipeableRef.current?.close();
+    },
+    [isProcessing, isSubscribed, onAdd, onRemove]
+  );
+
+  const renderLeftActions = (progress: SharedValue<number>, translation: SharedValue<number>) => (
+    <AddActionPanel progress={progress} translation={translation} releaseLocked={releaseLocked} />
+  );
+
+  const renderRightActions = (progress: SharedValue<number>, translation: SharedValue<number>) => (
+    <RemoveActionPanel
+      progress={progress}
+      translation={translation}
+      releaseLocked={releaseLocked}
+    />
+  );
+
+  const handleSwipeableWillOpen = useCallback(() => {
+    releaseLocked.value = true;
+  }, [releaseLocked]);
+
+  const handleSwipeableWillClose = useCallback(() => {
+    releaseLocked.value = false;
+  }, [releaseLocked]);
+
+  const handleSwipeableOpen = useCallback(
+    (direction: 'left' | 'right') => {
+      executeAction(direction);
+    },
+    [executeAction]
+  );
+
+  const handleToggle = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    executeAction(isSubscribed ? 'left' : 'right');
+  }, [executeAction, isSubscribed]);
+
+  return (
+    <Animated.View accessible={false}>
+      <ReanimatedSwipeable
+        ref={swipeableRef}
+        friction={SWIPE_FRICTION}
+        leftThreshold={SWIPE_THRESHOLD}
+        rightThreshold={SWIPE_THRESHOLD}
+        overshootLeft={true}
+        overshootRight={true}
+        overshootFriction={OVERSHOOT_FRICTION}
+        renderLeftActions={renderLeftActions}
+        renderRightActions={renderRightActions}
+        onSwipeableWillOpen={handleSwipeableWillOpen}
+        onSwipeableWillClose={handleSwipeableWillClose}
+        onSwipeableOpen={handleSwipeableOpen}
+        containerStyle={styles.swipeableContainer}
+        childrenContainerStyle={{ backgroundColor: colors.surfaceCanvas }}
+      >
+        <SourceSubscriptionRow
+          variant="flat"
+          title={title}
+          imageUrl={imageUrl}
+          toggleChecked={isSubscribed}
+          toggleDisabled={isProcessing}
+          onToggle={handleToggle}
         />
-        {secondaryActionLabel && onSecondaryAction ? (
-          <Button
-            label={secondaryActionLabel}
-            onPress={onSecondaryAction}
-            variant="ghost"
-            tone={secondaryActionTone}
-            size="sm"
-            labelStyle={{
-              color: secondaryActionTone === 'danger' ? colors.statusError : colors.textSecondary,
-            }}
-          />
-        ) : null}
-        {tertiaryActionLabel && onTertiaryAction ? (
-          <Button
-            label={tertiaryActionLabel}
-            onPress={onTertiaryAction}
-            variant="ghost"
-            tone={tertiaryActionTone}
-            size="sm"
-            labelStyle={{
-              color: tertiaryActionTone === 'danger' ? colors.statusError : colors.textSecondary,
-            }}
-          />
-        ) : null}
-      </View>
-    </Surface>
+      </ReanimatedSwipeable>
+    </Animated.View>
   );
 }
 
@@ -489,6 +837,14 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     padding: Spacing.md,
   },
+  flatSubscriptionRow: {
+    minHeight: 76,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
   avatarImage: {
     width: 48,
     height: 48,
@@ -516,9 +872,43 @@ const styles = StyleSheet.create({
   statusBadge: {
     maxWidth: 150,
   },
+  subscriptionToggle: {
+    flexShrink: 0,
+  },
   rowActions: {
     alignItems: 'flex-end',
     gap: Spacing.xs,
+  },
+  flatRowSeparator: {
+    position: 'absolute',
+    left: 80,
+    right: 0,
+    bottom: 0,
+    height: StyleSheet.hairlineWidth,
+  },
+  swipeableContainer: {
+    minHeight: 76,
+  },
+  actionPanel: {
+    width: ACTION_LANE_WIDTH,
+    flex: 1,
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  leftActionPanel: {
+    alignItems: 'flex-start',
+    paddingLeft: Spacing.sm,
+  },
+  rightActionPanel: {
+    alignItems: 'flex-end',
+    paddingRight: Spacing.sm,
+  },
+  actionCapsule: {
+    height: ACTION_CIRCLE_SIZE,
+    minWidth: ACTION_CIRCLE_SIZE,
+    borderRadius: ACTION_CIRCLE_SIZE / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',

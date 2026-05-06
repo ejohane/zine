@@ -22,6 +22,7 @@ import {
   Sparkles,
   Square,
   SquareCheck,
+  Trash2,
   Tv,
 } from 'lucide-react-native';
 
@@ -125,6 +126,10 @@ export function PlusIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
 
 export function PlusCircleIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
   return <PlusCircle size={size} color={color} strokeWidth={2} />;
+}
+
+export function TrashIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {
+  return <Trash2 size={size} color={color} strokeWidth={2} />;
 }
 
 export function SearchIcon({ size = 24, color = DEFAULT_ICON_COLOR }: IconProps) {

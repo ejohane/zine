@@ -12,6 +12,7 @@ import {
   SourceSearchField,
   SourceSectionHeader,
   SourceSubscriptionRow,
+  SwipeableSourceSubscriptionRow,
 } from '@/components/subscriptions';
 import { Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
@@ -265,7 +266,7 @@ export default function ProviderDetailScreen() {
   ]);
 
   const handleSubscribe = useCallback(
-    (subscription: UnifiedSubscription) => {
+    (subscription: UnifiedSubscription, nextSubscribed?: boolean) => {
       if (processingIds.has(subscription.id)) {
         return;
       }
@@ -276,9 +277,20 @@ export default function ProviderDetailScreen() {
 
       setProcessingIds((current) => new Set(current).add(subscription.id));
 
-      if (subscription.isSubscribed && subscription.subscriptionId) {
+      const shouldSubscribe = nextSubscribed ?? !subscription.isSubscribed;
+
+      if (shouldSubscribe === subscription.isSubscribed) {
+        setProcessingIds((current) => {
+          const next = new Set(current);
+          next.delete(subscription.id);
+          return next;
+        });
+        return;
+      }
+
+      if (!shouldSubscribe && subscription.subscriptionId) {
         unsubscribe({ subscriptionId: subscription.subscriptionId });
-      } else {
+      } else if (shouldSubscribe) {
         subscribe({
           provider: provider === 'SPOTIFY' ? ProviderEnum.SPOTIFY : ProviderEnum.YOUTUBE,
           providerChannelId: subscription.id,
@@ -482,22 +494,19 @@ export default function ProviderDetailScreen() {
                 }
               />
             ) : (
-              <SourceSubscriptionRow
+              <SwipeableSourceSubscriptionRow
                 title={(item as UnifiedSubscription).title}
                 imageUrl={(item as UnifiedSubscription).imageUrl}
-                statusLabel={(item as UnifiedSubscription).isSubscribed ? 'Subscribed' : null}
-                primaryActionLabel={
-                  (item as UnifiedSubscription).isSubscribed ? 'Remove' : 'Subscribe'
-                }
-                onPrimaryAction={() => handleSubscribe(item as UnifiedSubscription)}
-                primaryActionVariant={
-                  (item as UnifiedSubscription).isSubscribed ? 'secondary' : 'primary'
-                }
-                primaryActionLoading={processingIds.has((item as UnifiedSubscription).id)}
+                isSubscribed={(item as UnifiedSubscription).isSubscribed}
+                isProcessing={processingIds.has((item as UnifiedSubscription).id)}
+                onAdd={() => handleSubscribe(item as UnifiedSubscription, true)}
+                onRemove={() => handleSubscribe(item as UnifiedSubscription, false)}
               />
             )
           }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={
+            provider === 'GMAIL' ? () => <View style={styles.separator} /> : undefined
+          }
         />
       )}
     </Surface>

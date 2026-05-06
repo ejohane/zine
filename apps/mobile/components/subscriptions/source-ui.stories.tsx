@@ -12,6 +12,7 @@ import {
   SourceSearchField,
   SourceSectionHeader,
   SourceSubscriptionRow,
+  SwipeableSourceSubscriptionRow,
 } from './source-ui';
 
 const meta = {
@@ -53,7 +54,6 @@ export const Overview: Story = {
       />
       <SourceSearchField value="" onChangeText={() => {}} placeholder="Search subscriptions" />
       <SourceSubscriptionRow
-        source="RSS"
         title="Example Feed"
         subtitle="https://example.com/feed.xml"
         meta="Last synced Mar 22, 2026"
@@ -64,6 +64,13 @@ export const Overview: Story = {
         onSecondaryAction={() => {}}
         tertiaryActionLabel="Remove"
         onTertiaryAction={() => {}}
+      />
+      <SwipeableSourceSubscriptionRow
+        title="Design Details"
+        imageUrl={null}
+        isSubscribed={false}
+        onAdd={() => {}}
+        onRemove={() => {}}
       />
       <SourceEmptyState
         title="No subscriptions yet"
