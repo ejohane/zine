@@ -240,6 +240,12 @@ function SettingsScreenContent({
             alertDotTestID="settings-subscriptions-alert-dot"
             onPress={() => router.push('/subscriptions')}
           />
+          <SettingsRow
+            title="Collections"
+            subtitle="Create and manage saved bookmark views"
+            rightText="→"
+            onPress={() => router.push('/settings/collections')}
+          />
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>INSIGHTS</Text>

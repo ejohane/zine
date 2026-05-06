@@ -25,7 +25,7 @@ import {
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
 import { Colors, ContentColors, ProviderColors, getButtonMetrics } from '@zine/design-system';
-import { ContentType, Provider } from '@zine/shared';
+import { CollectionSort, ContentType, Provider } from '@zine/shared';
 
 import { Button, EmptyState, cn } from './components';
 import { BookmarkTagsDialog } from './components/bookmark-tags-dialog';
@@ -52,6 +52,7 @@ const CONTENT_FILTERS: Array<{ label: string; value?: ContentType }> = [
   { label: 'Posts', value: ContentType.POST },
 ];
 const CONTENT_FILTER_SEARCH_PARAM = 'contentType';
+const COLLECTION_SEARCH_PARAM = 'collection';
 
 const BOOKMARK_ACTION_BUTTON_SIZE = 56;
 const BOOKMARK_ACTION_ICON_SIZE = 22;
@@ -203,7 +204,6 @@ type BookmarkDetailItem = Pick<
   | 'canonicalUrl'
 >;
 type CreatorProfile = RouterOutputs['creators']['get'];
-type BookmarkEnrichment = RouterOutputs['items']['getEnrichment'];
 
 function formatBookmarkRelativeTime(value?: string | number | null) {
   if (!value) {
@@ -327,258 +327,6 @@ function getBookmarkAboutLabel(contentType: ContentType) {
     default:
       return 'About this article';
   }
-}
-
-function formatEnrichmentLabel(value: string) {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function formatEnrichmentScore(value: number) {
-  const normalized = value <= 1 ? value * 100 : value;
-  return `${Math.round(normalized)}%`;
-}
-
-function formatEnrichmentDate(value: number | null) {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(value));
-}
-
-function getStringEnrichmentValue(value?: string | null) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
-}
-
-function getConfidenceEntries(confidence: BookmarkEnrichment['item']['confidence']) {
-  if (!confidence) {
-    return [];
-  }
-
-  return Object.entries(confidence).flatMap(([key, value]) =>
-    typeof value === 'number' ? [{ label: formatEnrichmentLabel(key), value }] : []
-  );
-}
-
-function hasBookmarkEnrichment(enrichment: BookmarkEnrichment | undefined) {
-  if (!enrichment) {
-    return false;
-  }
-
-  return Boolean(
-    getStringEnrichmentValue(enrichment.item.summaryShort) ||
-    getStringEnrichmentValue(enrichment.item.summaryDetail) ||
-    getStringEnrichmentValue(enrichment.item.primaryCategory) ||
-    enrichment.item.secondaryCategories.length > 0 ||
-    enrichment.item.topics.length > 0 ||
-    enrichment.item.entities.length > 0 ||
-    getStringEnrichmentValue(enrichment.item.intent) ||
-    getStringEnrichmentValue(enrichment.item.difficulty) ||
-    typeof enrichment.item.evergreenScore === 'number' ||
-    getStringEnrichmentValue(enrichment.item.timeSensitivity) ||
-    getConfidenceEntries(enrichment.item.confidence).length > 0 ||
-    enrichment.userItem.suggestedTags.length > 0 ||
-    getStringEnrichmentValue(enrichment.userItem.inferredSaveIntent) ||
-    getStringEnrichmentValue(enrichment.userItem.reasonToRevisit)
-  );
-}
-
-function EnrichmentField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="new-page-bookmark-view__enrichment-field">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
-}
-
-function EnrichmentChipList({
-  items,
-  getLabel,
-}: {
-  items: readonly unknown[];
-  getLabel: (item: unknown) => string | null;
-}) {
-  const labels = items.map(getLabel).filter((label): label is string => Boolean(label));
-
-  if (labels.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="new-page-bookmark-view__enrichment-chips">
-      {labels.map((label) => (
-        <span key={label}>{label}</span>
-      ))}
-    </div>
-  );
-}
-
-function BookmarkEnrichmentCard({ enrichment }: { enrichment: BookmarkEnrichment }) {
-  if (!hasBookmarkEnrichment(enrichment)) {
-    return null;
-  }
-
-  const confidenceEntries = getConfidenceEntries(enrichment.item.confidence);
-  const enrichedAt =
-    formatEnrichmentDate(enrichment.userItem.enrichedAt) ??
-    formatEnrichmentDate(enrichment.item.enrichedAt);
-  const modelLabel = [enrichment.item.modelProvider, enrichment.item.modelName]
-    .filter((value): value is string => Boolean(value))
-    .join(' · ');
-
-  return (
-    <section className="new-page-bookmark-view__section new-page-bookmark-view__enrichment">
-      <div className="new-page-bookmark-view__enrichment-header">
-        <p className="eyebrow new-page-bookmark-view__section-label">Enrichment</p>
-        {enrichedAt ? <span>Extracted {enrichedAt}</span> : null}
-      </div>
-
-      <dl className="new-page-bookmark-view__enrichment-grid">
-        {getStringEnrichmentValue(enrichment.item.summaryShort) ? (
-          <EnrichmentField label="Short summary">
-            {getStringEnrichmentValue(enrichment.item.summaryShort)}
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.item.summaryDetail) ? (
-          <EnrichmentField label="Detailed summary">
-            {getStringEnrichmentValue(enrichment.item.summaryDetail)}
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.item.primaryCategory) ? (
-          <EnrichmentField label="Primary category">
-            {enrichment.item.primaryCategory}
-          </EnrichmentField>
-        ) : null}
-
-        {enrichment.item.secondaryCategories.length > 0 ? (
-          <EnrichmentField label="Secondary categories">
-            <EnrichmentChipList
-              items={enrichment.item.secondaryCategories}
-              getLabel={(item) => (typeof item === 'string' ? item : null)}
-            />
-          </EnrichmentField>
-        ) : null}
-
-        {enrichment.item.topics.length > 0 ? (
-          <EnrichmentField label="Topics">
-            <EnrichmentChipList
-              items={enrichment.item.topics}
-              getLabel={(item) => {
-                const topic = item as { name?: unknown; confidence?: unknown };
-                return typeof topic.name === 'string'
-                  ? typeof topic.confidence === 'number'
-                    ? `${topic.name} ${formatEnrichmentScore(topic.confidence)}`
-                    : topic.name
-                  : null;
-              }}
-            />
-          </EnrichmentField>
-        ) : null}
-
-        {enrichment.item.entities.length > 0 ? (
-          <EnrichmentField label="Entities">
-            <EnrichmentChipList
-              items={enrichment.item.entities}
-              getLabel={(item) => {
-                const entity = item as { name?: unknown; type?: unknown; confidence?: unknown };
-                if (typeof entity.name !== 'string') {
-                  return null;
-                }
-
-                const type =
-                  typeof entity.type === 'string' ? formatEnrichmentLabel(entity.type) : null;
-                const score =
-                  typeof entity.confidence === 'number'
-                    ? formatEnrichmentScore(entity.confidence)
-                    : null;
-                return [entity.name, type, score].filter(Boolean).join(' · ');
-              }}
-            />
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.item.intent) ? (
-          <EnrichmentField label="Content intent">{enrichment.item.intent}</EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.item.difficulty) ? (
-          <EnrichmentField label="Difficulty">
-            {formatEnrichmentLabel(getStringEnrichmentValue(enrichment.item.difficulty) ?? '')}
-          </EnrichmentField>
-        ) : null}
-
-        {typeof enrichment.item.evergreenScore === 'number' ? (
-          <EnrichmentField label="Evergreen score">
-            {formatEnrichmentScore(enrichment.item.evergreenScore)}
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.item.timeSensitivity) ? (
-          <EnrichmentField label="Time sensitivity">
-            {formatEnrichmentLabel(getStringEnrichmentValue(enrichment.item.timeSensitivity) ?? '')}
-          </EnrichmentField>
-        ) : null}
-
-        {enrichment.userItem.suggestedTags.length > 0 ? (
-          <EnrichmentField label="Suggested tags">
-            <EnrichmentChipList
-              items={enrichment.userItem.suggestedTags}
-              getLabel={(item) => {
-                const tag = item as { name?: unknown; kind?: unknown; confidence?: unknown };
-                if (typeof tag.name !== 'string') {
-                  return null;
-                }
-
-                const kind = typeof tag.kind === 'string' ? formatEnrichmentLabel(tag.kind) : null;
-                const score =
-                  typeof tag.confidence === 'number' ? formatEnrichmentScore(tag.confidence) : null;
-                return [tag.name, kind, score].filter(Boolean).join(' · ');
-              }}
-            />
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.userItem.inferredSaveIntent) ? (
-          <EnrichmentField label="Inferred save intent">
-            {enrichment.userItem.inferredSaveIntent}
-          </EnrichmentField>
-        ) : null}
-
-        {getStringEnrichmentValue(enrichment.userItem.reasonToRevisit) ? (
-          <EnrichmentField label="Reason to revisit">
-            {enrichment.userItem.reasonToRevisit}
-          </EnrichmentField>
-        ) : null}
-
-        {confidenceEntries.length > 0 ? (
-          <EnrichmentField label="Confidence">
-            <EnrichmentChipList
-              items={confidenceEntries}
-              getLabel={(item) => {
-                const entry = item as { label: string; value: number };
-                return `${entry.label} ${formatEnrichmentScore(entry.value)}`;
-              }}
-            />
-          </EnrichmentField>
-        ) : null}
-
-        {modelLabel ? <EnrichmentField label="Model">{modelLabel}</EnrichmentField> : null}
-      </dl>
-    </section>
-  );
 }
 
 function getBookmarkFabConfig(provider: Provider | string): {
@@ -812,8 +560,19 @@ export function BookmarksPage() {
   const [bookmarkTagsOpen, setBookmarkTagsOpen] = useState(false);
   const isPhoneLayout = useMediaQuery('(max-width: 700px)');
   const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
+  const activeCollectionId = searchParams.get(COLLECTION_SEARCH_PARAM) || null;
   const bookmarkSearch = searchParams.toString();
   const bookmarkSearchString = bookmarkSearch ? `?${bookmarkSearch}` : '';
+  const collectionsQuery = trpc.collections.list.useQuery();
+  const createCollectionMutation = trpc.collections.create.useMutation({
+    onSuccess: (collection) => {
+      void utils.collections.list.invalidate();
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+      nextSearchParams.set(COLLECTION_SEARCH_PARAM, collection.id);
+      setSearchParams(nextSearchParams);
+    },
+  });
 
   const bookmarksQuery = trpc.items.library.useQuery(
     {
@@ -824,11 +583,24 @@ export function BookmarksPage() {
       placeholderData: (previousData) => previousData,
     }
   );
-  const bookmarks = bookmarksQuery.data?.items ?? [];
+  const collectionItemsQuery = trpc.collections.items.useQuery(
+    {
+      id: activeCollectionId ?? '',
+      limit: 50,
+    },
+    {
+      enabled: Boolean(activeCollectionId),
+      placeholderData: (previousData) => previousData,
+    }
+  );
+  const activeItemsQuery = activeCollectionId ? collectionItemsQuery : bookmarksQuery;
+  const bookmarks = activeItemsQuery.data?.items ?? [];
   const filteredBookmarks = useMemo(
     () =>
-      bookmarkFilter ? bookmarks.filter((item) => item.contentType === bookmarkFilter) : bookmarks,
-    [bookmarkFilter, bookmarks]
+      bookmarkFilter && !activeCollectionId
+        ? bookmarks.filter((item) => item.contentType === bookmarkFilter)
+        : bookmarks,
+    [activeCollectionId, bookmarkFilter, bookmarks]
   );
   const selectedBookmarkId = bookmarkId ?? null;
   const selectedBookmark = useMemo(
@@ -865,7 +637,7 @@ export function BookmarksPage() {
   ]);
 
   const displayBookmark = selectedBookmarkDetailQuery.data ?? selectedBookmark;
-  const selectedBookmarkEnrichmentQuery = trpc.items.getEnrichment.useQuery(
+  trpc.items.getEnrichment.useQuery(
     { id: selectedBookmarkId ?? '' },
     { enabled: Boolean(selectedBookmarkId) }
   );
@@ -887,7 +659,6 @@ export function BookmarksPage() {
   const isPhonePostView = isPhoneLayout && displayBookmark?.contentType === ContentType.POST;
   const isPhoneDetailView = isPhoneLayout && Boolean(selectedBookmarkId);
   const bookmarkPlainSummary = displayBookmark ? formatPlainText(displayBookmark.summary) : null;
-  const bookmarkEnrichment = selectedBookmarkEnrichmentQuery.data;
   const bookmarkPostHandle =
     displayBookmark?.provider === Provider.X
       ? (selectedBookmarkCreatorQuery.data?.handle ?? extractXHandle(displayBookmark.canonicalUrl))
@@ -915,10 +686,11 @@ export function BookmarksPage() {
   const bookmarkFilterLabel = CONTENT_FILTERS.find(
     (filter) => filter.value === bookmarkFilter
   )?.label;
+  const collections = collectionsQuery.data?.collections ?? [];
   const libraryIsEmpty = filteredBookmarks.length === 0;
-  const hasBookmarkData = Boolean(bookmarksQuery.data);
-  const bookmarksAreRefreshing = bookmarksQuery.isFetching;
-  const showInitialBookmarksLoadingState = !hasBookmarkData && bookmarksQuery.isLoading;
+  const hasBookmarkData = Boolean(activeItemsQuery.data);
+  const bookmarksAreRefreshing = activeItemsQuery.isFetching;
+  const showInitialBookmarksLoadingState = !hasBookmarkData && activeItemsQuery.isLoading;
   const showBookmarkDetailSkeleton =
     showInitialBookmarksLoadingState ||
     Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
@@ -964,6 +736,23 @@ export function BookmarksPage() {
       ]);
     },
   });
+
+  const handleCreateCollection = useCallback(() => {
+    if (!bookmarkFilter || createCollectionMutation.isPending) {
+      return;
+    }
+
+    const label = CONTENT_FILTERS.find((filter) => filter.value === bookmarkFilter)?.label;
+    createCollectionMutation.mutate({
+      name: label ? `${label} collection` : 'Smart collection',
+      description: null,
+      rules: {
+        contentTypes: [bookmarkFilter],
+        isFinished: false,
+      },
+      sort: CollectionSort.NEWEST_SAVED,
+    });
+  }, [bookmarkFilter, createCollectionMutation]);
 
   useEffect(() => {
     if (!manualBookmarkNotice) {
@@ -1014,12 +803,12 @@ export function BookmarksPage() {
     [bookmarkSearchString, navigate, utils.items.get, utils.items.home, utils.items.library]
   );
 
-  if (bookmarksQuery.error && !hasBookmarkData) {
+  if (activeItemsQuery.error && !hasBookmarkData) {
     return (
       <main className={cn('new-page-screen', isPhoneLayout && 'new-page-screen--phone')}>
         <EmptyState
           title="Could not load bookmarks"
-          message={bookmarksQuery.error.message ?? 'Please refresh and try again.'}
+          message={activeItemsQuery.error.message ?? 'Please refresh and try again.'}
         />
         {showMobileTabBar ? <MobileTabBar /> : null}
       </main>
@@ -1136,6 +925,27 @@ export function BookmarksPage() {
               <div className="new-page-column-card__header">
                 <h2 className="new-page-column-card__title">Bookmarks</h2>
                 <div className="new-page-column-card__chips">
+                  {collections.map((collection) => (
+                    <FilterChip
+                      key={collection.id}
+                      label={collection.name}
+                      size="small"
+                      selected={activeCollectionId === collection.id}
+                      tone="default"
+                      onClick={() => {
+                        const nextSearchParams = new URLSearchParams(searchParams);
+                        nextSearchParams.delete(CONTENT_FILTER_SEARCH_PARAM);
+
+                        if (activeCollectionId === collection.id) {
+                          nextSearchParams.delete(COLLECTION_SEARCH_PARAM);
+                        } else {
+                          nextSearchParams.set(COLLECTION_SEARCH_PARAM, collection.id);
+                        }
+
+                        setSearchParams(nextSearchParams);
+                      }}
+                    />
+                  ))}
                   {CONTENT_FILTERS.map((filter) => (
                     <FilterChip
                       key={filter.label}
@@ -1146,6 +956,7 @@ export function BookmarksPage() {
                       onClick={() => {
                         const nextSearchParams = new URLSearchParams(searchParams);
                         const nextFilter = serializeBookmarkFilter(filter.value);
+                        nextSearchParams.delete(COLLECTION_SEARCH_PARAM);
 
                         if (nextFilter) {
                           nextSearchParams.set(CONTENT_FILTER_SEARCH_PARAM, nextFilter);
@@ -1158,6 +969,18 @@ export function BookmarksPage() {
                     />
                   ))}
                 </div>
+                {bookmarkFilter && !activeCollectionId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleCreateCollection}
+                    disabled={createCollectionMutation.isPending}
+                  >
+                    <CirclePlus size={14} strokeWidth={2.2} />
+                    {createCollectionMutation.isPending ? 'Saving' : 'Save as collection'}
+                  </Button>
+                ) : null}
               </div>
 
               <div
@@ -1192,7 +1015,9 @@ export function BookmarksPage() {
                 ) : libraryIsEmpty ? (
                   <p className="new-page-column-card__empty">
                     {bookmarks.length === 0
-                      ? 'Add a bookmark to start building your library.'
+                      ? activeCollectionId
+                        ? 'This collection has no matching bookmarks yet.'
+                        : 'Add a bookmark to start building your library.'
                       : bookmarkFilterLabel
                         ? `No ${bookmarkFilterLabel.toLowerCase()} bookmarks match this filter.`
                         : 'No bookmarks match this filter.'}
@@ -1571,10 +1396,6 @@ export function BookmarksPage() {
                           </p>
                         </section>
                       )}
-
-                      {bookmarkEnrichment ? (
-                        <BookmarkEnrichmentCard enrichment={bookmarkEnrichment} />
-                      ) : null}
 
                       {selectedBookmarkDetailQuery.isLoading ? (
                         <p className="new-page-bookmark-view__loading-copy">

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { ContentType, Provider } from '@zine/shared';
+import { CollectionSort, ContentType, Provider } from '@zine/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { renderRoute } from './test/render-router';
@@ -244,6 +244,40 @@ describe('BookmarksPage', () => {
     expect(screen.getByText(podcastItem.title)).toBeVisible();
   });
 
+  test('saves the selected filter as a smart collection', async () => {
+    const user = userEvent.setup();
+
+    renderRoute(
+      <>
+        <BookmarksPage />
+        <LocationProbe />
+      </>,
+      {
+        route: '/bookmarks?contentType=video',
+        path: '/bookmarks',
+      }
+    );
+
+    await user.click(screen.getByRole('button', { name: /Save as collection/i }));
+
+    await waitFor(() => {
+      expect(mutationSpies.collectionsCreate).toHaveBeenCalledWith({
+        name: 'Videos collection',
+        description: null,
+        rules: {
+          contentTypes: [ContentType.VIDEO],
+          isFinished: false,
+        },
+        sort: CollectionSort.NEWEST_SAVED,
+      });
+    });
+
+    await waitFor(() => {
+      expect(invalidateSpies.collectionsListInvalidate).toHaveBeenCalled();
+      expect(screen.getByTestId('location-search')).toHaveTextContent('?collection=collection-1');
+    });
+  });
+
   test('navigates to the settings page from the sidebar', async () => {
     const user = userEvent.setup();
 
@@ -367,7 +401,7 @@ describe('BookmarksPage', () => {
     expect(invalidateSpies.itemsHomeInvalidate).toHaveBeenCalled();
   });
 
-  test('renders enrichment data beneath the bookmark detail when extracted data exists', () => {
+  test('does not render enrichment data beneath the bookmark detail when extracted data exists', () => {
     hookSpies.itemsGetEnrichmentUseQuery.mockImplementation((input) => ({
       data:
         input.id === videoItem.id
@@ -421,13 +455,15 @@ describe('BookmarksPage', () => {
       path: '/bookmarks/:bookmarkId',
     });
 
-    expect(screen.getByText('Enrichment')).toBeVisible();
-    expect(screen.getByText('A compact overview of design system scaling.')).toBeVisible();
-    expect(screen.getByText('Design tokens 92%')).toBeVisible();
-    expect(screen.getByText('Zine · Product · 81%')).toBeVisible();
-    expect(screen.getByText('Use as a reference for future UI work.')).toBeVisible();
-    expect(screen.getByText('Overall 91%')).toBeVisible();
-    expect(screen.getByText('cloudflare · @cf/qwen/qwen3-30b-a3b-fp8')).toBeVisible();
+    expect(screen.queryByText('Enrichment')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('A compact overview of design system scaling.')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Design tokens 92%')).not.toBeInTheDocument();
+    expect(screen.queryByText('Zine · Product · 81%')).not.toBeInTheDocument();
+    expect(screen.queryByText('Use as a reference for future UI work.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Overall 91%')).not.toBeInTheDocument();
+    expect(screen.queryByText('cloudflare · @cf/qwen/qwen3-30b-a3b-fp8')).not.toBeInTheDocument();
   });
 
   test('uses the mobile-complete green fill for finished bookmark icons in detail view', () => {

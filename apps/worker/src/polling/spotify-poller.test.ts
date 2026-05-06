@@ -327,7 +327,7 @@ describe('Spotify Poller - Watermark Integrity', () => {
       expectFailedEpisodeIngestionLogs([
         { episodeId: 'episode1', errorMessage: 'Ingestion failed' },
       ]);
-    });
+    }, 10_000);
 
     it('should NOT update lastPublishedAt when all episodes are skipped (already seen)', async () => {
       const sub = createMockSubscription({

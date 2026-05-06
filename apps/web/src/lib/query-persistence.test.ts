@@ -22,6 +22,15 @@ describe('web query persistence', () => {
 
   test('persists only the allowlisted successful queries', () => {
     expect(shouldPersistQuery({ queryKey: [['items', 'library']], status: 'success' })).toBe(true);
+    expect(shouldPersistQuery({ queryKey: [['collections', 'list']], status: 'success' })).toBe(
+      true
+    );
+    expect(shouldPersistQuery({ queryKey: [['collections', 'items']], status: 'success' })).toBe(
+      true
+    );
+    expect(shouldPersistQuery({ queryKey: [['collections', 'forItem']], status: 'success' })).toBe(
+      true
+    );
     expect(shouldPersistQuery({ queryKey: [['creators', 'get']], status: 'success' })).toBe(true);
     expect(shouldPersistQuery({ queryKey: [['bookmarks', 'preview']], status: 'success' })).toBe(
       false

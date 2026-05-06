@@ -30,6 +30,7 @@ import {
 import { XPostBookmarkView } from './item-detail-components';
 import { styles } from './item-detail-styles';
 import { ItemDetailContent } from './detail/components/ItemDetailContent';
+import { ItemCollectionsSheet } from './detail/components/ItemCollectionsSheet';
 import {
   ItemDetailParallaxLayout,
   ItemDetailScrollLayout,
@@ -52,19 +53,11 @@ export default function ItemDetailScreen() {
   const insets = useSafeAreaInsets();
   const [contentTopY, setContentTopY] = useState<number | null>(null);
   const [titleOffsetY, setTitleOffsetY] = useState<number | null>(null);
+  const [collectionsSheetOpen, setCollectionsSheetOpen] = useState(false);
 
   const { id, isValid, message } = useItemDetailParams();
-  const {
-    item,
-    enrichment,
-    enrichmentLoading,
-    enrichmentError,
-    otherUnfinishedBookmarks,
-    isLoading,
-    error,
-    refetch,
-    creatorData,
-  } = useItemDetailData({ id, isValid });
+  const { item, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
+    useItemDetailData({ id, isValid });
   const {
     handleOpenLink,
     handleShare,
@@ -106,6 +99,12 @@ export default function ItemDetailScreen() {
   const handleTitleLayout = useCallback((nextTitleOffsetY: number) => {
     setTitleOffsetY((current) => (current === nextTitleOffsetY ? current : nextTitleOffsetY));
   }, []);
+  const handleOpenCollectionsSheet = useCallback(() => {
+    setCollectionsSheetOpen(true);
+  }, []);
+  const handleCloseCollectionsSheet = useCallback(() => {
+    setCollectionsSheetOpen(false);
+  }, []);
 
   if (!isValid) {
     return (
@@ -129,36 +128,41 @@ export default function ItemDetailScreen() {
 
   if (viewState.isXPost) {
     return (
-      <XPostBookmarkView
-        item={item}
-        colors={colors}
-        insets={insets}
-        onBack={() => router.back()}
-        onOpenLink={handleOpenLink}
-        onShare={handleShare}
-        onBookmarkToggle={handleToggleBookmark}
-        onSecondaryAction={handleSecondaryAction}
-        onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
-        onCreatorPress={
-          item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
-        }
-        bookmarkActionIcon={viewState.bookmarkActionIcon}
-        bookmarkActionColor={viewState.bookmarkActionColor}
-        isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
-        secondaryActionIcon={viewState.secondaryActionIcon}
-        secondaryActionColor={viewState.secondaryActionColor}
-        isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
-        creatorData={creatorData}
-        enrichment={enrichment}
-        enrichmentLoading={enrichmentLoading}
-        enrichmentError={enrichmentError}
-        showCollapsedTitle={showCollapsedTitle}
-        onScroll={handleScroll}
-        onContentLayout={handleContentLayout}
-        onTitleLayout={handleTitleLayout}
-        otherUnfinishedBookmarks={otherUnfinishedBookmarks}
-        onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
-      />
+      <>
+        <XPostBookmarkView
+          item={item}
+          colors={colors}
+          insets={insets}
+          onBack={() => router.back()}
+          onOpenLink={handleOpenLink}
+          onShare={handleShare}
+          onBookmarkToggle={handleToggleBookmark}
+          onSecondaryAction={handleSecondaryAction}
+          onManageTags={handleOpenCollectionsSheet}
+          onCreatorPress={
+            item.creatorId ? () => router.push(`/creator/${item.creatorId}`) : undefined
+          }
+          bookmarkActionIcon={viewState.bookmarkActionIcon}
+          bookmarkActionColor={viewState.bookmarkActionColor}
+          isBookmarkActionDisabled={viewState.isBookmarkActionDisabled}
+          secondaryActionIcon={viewState.secondaryActionIcon}
+          secondaryActionColor={viewState.secondaryActionColor}
+          isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
+          creatorData={creatorData}
+          showCollapsedTitle={showCollapsedTitle}
+          onScroll={handleScroll}
+          onContentLayout={handleContentLayout}
+          onTitleLayout={handleTitleLayout}
+          otherUnfinishedBookmarks={otherUnfinishedBookmarks}
+          onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
+        />
+        <ItemCollectionsSheet
+          item={item}
+          colors={colors}
+          visible={collectionsSheetOpen}
+          onClose={handleCloseCollectionsSheet}
+        />
+      </>
     );
   }
 
@@ -186,9 +190,6 @@ export default function ItemDetailScreen() {
       >
         <ItemDetailContent
           item={item}
-          enrichment={enrichment}
-          enrichmentLoading={enrichmentLoading}
-          enrichmentError={enrichmentError}
           colors={colors}
           creatorData={creatorData}
           creatorImageUrl={upgradedCreatorImageUrl}
@@ -204,7 +205,7 @@ export default function ItemDetailScreen() {
           isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
           onBookmarkToggle={handleToggleBookmark}
           onSecondaryAction={handleSecondaryAction}
-          onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
+          onManageTags={handleOpenCollectionsSheet}
           onShare={handleShare}
           onOpenLink={handleOpenLink}
           otherUnfinishedBookmarks={otherUnfinishedBookmarks}
@@ -213,6 +214,12 @@ export default function ItemDetailScreen() {
           useAnimatedDescription
           onContentLayout={handleContentLayout}
           onTitleLayout={handleTitleLayout}
+        />
+        <ItemCollectionsSheet
+          item={item}
+          colors={colors}
+          visible={collectionsSheetOpen}
+          onClose={handleCloseCollectionsSheet}
         />
       </ItemDetailParallaxLayout>
     );
@@ -229,9 +236,6 @@ export default function ItemDetailScreen() {
     >
       <ItemDetailContent
         item={item}
-        enrichment={enrichment}
-        enrichmentLoading={enrichmentLoading}
-        enrichmentError={enrichmentError}
         colors={colors}
         creatorData={creatorData}
         creatorImageUrl={item.creatorImageUrl}
@@ -247,7 +251,7 @@ export default function ItemDetailScreen() {
         isSecondaryActionDisabled={viewState.isSecondaryActionDisabled}
         onBookmarkToggle={handleToggleBookmark}
         onSecondaryAction={handleSecondaryAction}
-        onManageTags={() => router.push(`/item-tags/${item.id}` as Href)}
+        onManageTags={handleOpenCollectionsSheet}
         onShare={handleShare}
         onOpenLink={handleOpenLink}
         otherUnfinishedBookmarks={otherUnfinishedBookmarks}
@@ -256,6 +260,12 @@ export default function ItemDetailScreen() {
         useAnimatedDescription={false}
         onContentLayout={handleContentLayout}
         onTitleLayout={handleTitleLayout}
+      />
+      <ItemCollectionsSheet
+        item={item}
+        colors={colors}
+        visible={collectionsSheetOpen}
+        onClose={handleCloseCollectionsSheet}
       />
     </ItemDetailScrollLayout>
   );
