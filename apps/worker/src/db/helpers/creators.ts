@@ -224,6 +224,7 @@ function extractXCreator(metadata: unknown): CreatorParams | null {
       id?: unknown;
       name?: unknown;
       username?: unknown;
+      profile_image_url?: unknown;
     };
   };
   const author = candidate.author;
@@ -233,6 +234,8 @@ function extractXCreator(metadata: unknown): CreatorParams | null {
   const authorId = typeof author.id === 'string' ? author.id : undefined;
   const authorName = typeof author.name === 'string' ? author.name : undefined;
   const authorUsername = typeof author.username === 'string' ? author.username : undefined;
+  const authorImageUrl =
+    typeof author.profile_image_url === 'string' ? author.profile_image_url : undefined;
 
   if (!authorId || !authorName) return null;
 
@@ -240,6 +243,7 @@ function extractXCreator(metadata: unknown): CreatorParams | null {
     provider: 'X',
     providerCreatorId: authorId,
     name: authorName,
+    imageUrl: authorImageUrl,
     handle: authorUsername,
   };
 }

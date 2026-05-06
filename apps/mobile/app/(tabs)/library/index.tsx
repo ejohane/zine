@@ -245,6 +245,7 @@ export default function LibraryScreen() {
       (peopleData?.pages.flatMap((page) => page.people) ?? []).map((person) => ({
         id: person.id,
         displayName: person.displayName,
+        profileImageUrl: person.profileImageUrl,
         itemCount: person.itemCount,
         latestItemTitle: person.latestItemTitle,
       })),

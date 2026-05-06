@@ -254,6 +254,7 @@ describe('extractCreatorFromMetadata', () => {
           id: '12345678',
           name: 'Test User',
           username: 'testuser',
+          profile_image_url: 'https://pbs.twimg.com/profile_images/test.jpg',
         },
       };
 
@@ -263,6 +264,7 @@ describe('extractCreatorFromMetadata', () => {
         provider: 'X',
         providerCreatorId: '12345678',
         name: 'Test User',
+        imageUrl: 'https://pbs.twimg.com/profile_images/test.jpg',
         handle: 'testuser',
       });
     });

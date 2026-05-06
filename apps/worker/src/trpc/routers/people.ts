@@ -114,6 +114,9 @@ export const peopleRouter = router({
       .select({
         id: userPeople.id,
         displayName: userPeople.displayName,
+        profileImageUrl: userPeople.profileImageUrl,
+        profileImageSource: userPeople.profileImageSource,
+        xHandle: userPeople.xHandle,
         itemCount: userPeople.itemCount,
         latestSeenAt: userPeople.latestSeenAt,
       })
@@ -131,6 +134,9 @@ export const peopleRouter = router({
       people: pageRows.map((row) => ({
         id: row.id,
         displayName: row.displayName,
+        profileImageUrl: row.profileImageUrl,
+        profileImageSource: row.profileImageSource,
+        xHandle: row.xHandle,
         itemCount: row.itemCount,
         latestSeenAt: row.latestSeenAt,
         latestItemTitle: latestTitles.get(row.id) ?? null,
@@ -144,6 +150,10 @@ export const peopleRouter = router({
       .select({
         id: userPeople.id,
         displayName: userPeople.displayName,
+        profileImageUrl: userPeople.profileImageUrl,
+        profileImageSource: userPeople.profileImageSource,
+        profileImageSourceUrl: userPeople.profileImageSourceUrl,
+        xHandle: userPeople.xHandle,
         itemCount: userPeople.itemCount,
         latestSeenAt: userPeople.latestSeenAt,
         createdAt: userPeople.createdAt,

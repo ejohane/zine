@@ -1,8 +1,9 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   StyleSheet,
   Text,
   View,
@@ -34,12 +35,22 @@ function formatLatestSeen(value: number | null): string | null {
   return `Latest seen ${date.toLocaleDateString()}`;
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 export default function PersonScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const personId = typeof id === 'string' ? id : '';
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
+  const [profileImageFailed, setProfileImageFailed] = useState(false);
 
   const personQuery = usePerson(personId);
   const itemsQuery = usePersonItems(personId, { limit: PAGE_SIZE });
@@ -77,15 +88,35 @@ export default function PersonScreen() {
 
   const person = personQuery.data;
   const latestSeen = formatLatestSeen(person?.latestSeenAt ?? null);
+  const initials = useMemo(() => getInitials(person?.displayName ?? ''), [person?.displayName]);
+  const showProfileImage = Boolean(person?.profileImageUrl && !profileImageFailed);
   const isLoading = personQuery.isLoading || itemsQuery.isLoading;
   const error = personQuery.error ?? itemsQuery.error;
 
+  useEffect(() => {
+    setProfileImageFailed(false);
+  }, [person?.profileImageUrl]);
+
   const header = person ? (
     <View style={styles.header}>
-      <Text style={[styles.title, { color: colors.text }]}>{person.displayName}</Text>
-      <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
-        {[formatCount(person.itemCount), latestSeen].filter(Boolean).join(' · ')}
-      </Text>
+      <View style={[styles.avatar, { backgroundColor: colors.surfaceRaised }]}>
+        {showProfileImage ? (
+          <Image
+            source={{ uri: person.profileImageUrl! }}
+            style={styles.avatarImage}
+            onError={() => setProfileImageFailed(true)}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <Text style={[styles.avatarInitials, { color: colors.textSubheader }]}>{initials}</Text>
+        )}
+      </View>
+      <View style={styles.headerText}>
+        <Text style={[styles.title, { color: colors.text }]}>{person.displayName}</Text>
+        <Text style={[styles.subtitle, { color: colors.textSubheader }]}>
+          {[formatCount(person.itemCount), latestSeen].filter(Boolean).join(' · ')}
+        </Text>
+      </View>
     </View>
   ) : null;
 
@@ -152,6 +183,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarInitials: {
+    ...Typography.titleMedium,
+  },
+  headerText: {
+    flex: 1,
+    minWidth: 0,
     gap: Spacing.xs,
   },
   title: {

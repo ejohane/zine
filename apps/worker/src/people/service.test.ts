@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractPersonEntities, normalizePersonName } from './service';
+import {
+  extractPersonEntities,
+  getProfileImageCandidateForPerson,
+  normalizePersonName,
+} from './service';
 
 describe('people service helpers', () => {
   it('normalizes person names conservatively', () => {
@@ -41,5 +45,60 @@ describe('people service helpers', () => {
   it('returns no candidates for malformed enrichment JSON', () => {
     expect(extractPersonEntities('{not json')).toEqual([]);
     expect(extractPersonEntities(JSON.stringify({ name: 'Joe Rogan' }))).toEqual([]);
+  });
+
+  it('prefers X profile image candidates when a matching X creator exists', () => {
+    expect(
+      getProfileImageCandidateForPerson(
+        { normalizedName: 'joe rogan' },
+        {
+          provider: 'X',
+          normalizedName: 'joe rogan',
+          imageUrl: 'https://pbs.twimg.com/profile_images/joe.jpg',
+          externalUrl: 'https://x.com/joerogan',
+          handle: 'joerogan',
+        }
+      )
+    ).toEqual({
+      imageUrl: 'https://pbs.twimg.com/profile_images/joe.jpg',
+      source: 'X',
+      sourceUrl: 'https://x.com/joerogan',
+      xHandle: 'joerogan',
+    });
+  });
+
+  it('uses matching non-X creator images as fallback candidates', () => {
+    expect(
+      getProfileImageCandidateForPerson(
+        { normalizedName: 'joe rogan' },
+        {
+          provider: 'SPOTIFY',
+          normalizedName: 'joe rogan',
+          imageUrl: 'https://example.com/creator.jpg',
+          externalUrl: 'https://open.spotify.com/show/example',
+          handle: null,
+        }
+      )
+    ).toEqual({
+      imageUrl: 'https://example.com/creator.jpg',
+      source: 'CREATOR',
+      sourceUrl: 'https://open.spotify.com/show/example',
+      xHandle: null,
+    });
+  });
+
+  it('does not use creator images when the creator name does not match the person', () => {
+    expect(
+      getProfileImageCandidateForPerson(
+        { normalizedName: 'sam harris' },
+        {
+          provider: 'X',
+          normalizedName: 'joe rogan',
+          imageUrl: 'https://pbs.twimg.com/profile_images/joe.jpg',
+          externalUrl: 'https://x.com/joerogan',
+          handle: 'joerogan',
+        }
+      )
+    ).toBeNull();
   });
 });

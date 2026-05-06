@@ -59,6 +59,9 @@ const baseItem: SearchItemView = {
 const basePerson: PersonSearchRow = {
   id: 'person_joe',
   displayName: 'Joe Rogan',
+  profileImageUrl: 'https://pbs.twimg.com/profile_images/joe.jpg',
+  profileImageSource: 'X',
+  xHandle: 'joerogan',
   itemCount: 7,
   latestSeenAt: 1777593600000,
   latestItemTitle: null,
@@ -132,6 +135,9 @@ describe('buildSearchResponse', () => {
       type: 'person',
       personId: 'person_joe',
       displayName: 'Joe Rogan',
+      profileImageUrl: 'https://pbs.twimg.com/profile_images/joe.jpg',
+      profileImageSource: 'X',
+      xHandle: 'joerogan',
       itemCount: 7,
     });
   });
