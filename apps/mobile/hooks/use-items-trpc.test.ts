@@ -113,6 +113,7 @@ type MockHomeData = {
     podcasts: ReturnType<typeof createMockItem>[];
     articles: ReturnType<typeof createMockItem>[];
   };
+  customCollections: [];
 };
 
 function createMockHomeData(items: ReturnType<typeof createMockItem>[] = []): MockHomeData {
@@ -124,6 +125,7 @@ function createMockHomeData(items: ReturnType<typeof createMockItem>[] = []): Mo
       podcasts: items.filter((item) => item.contentType === ContentType.PODCAST),
       articles: items.filter((item) => item.contentType === ContentType.ARTICLE),
     },
+    customCollections: [],
   };
 }
 

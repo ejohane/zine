@@ -29,6 +29,16 @@ export const CollectionItemMembership = {
 export type CollectionItemMembershipValue =
   (typeof CollectionItemMembership)[keyof typeof CollectionItemMembership];
 
+export const HomeCollectionLayout = {
+  STACK_RAIL: 'STACK_RAIL',
+  COVER_RAIL: 'COVER_RAIL',
+  ROW_GRID: 'ROW_GRID',
+  COMPACT_LIST: 'COMPACT_LIST',
+} as const;
+
+export type HomeCollectionLayoutValue =
+  (typeof HomeCollectionLayout)[keyof typeof HomeCollectionLayout];
+
 export const CollectionRulesSchema = z
   .object({
     contentTypes: z.array(z.nativeEnum(ContentType)).max(8).optional(),
@@ -67,3 +77,4 @@ export type CollectionRules = z.infer<typeof CollectionRulesSchema>;
 
 export const CollectionSortSchema = z.nativeEnum(CollectionSort);
 export const CollectionOverrideActionSchema = z.nativeEnum(CollectionOverrideAction);
+export const HomeCollectionLayoutSchema = z.nativeEnum(HomeCollectionLayout);

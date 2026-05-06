@@ -5,6 +5,7 @@ import { TRPCError } from '@trpc/server';
 import {
   eq,
   and,
+  asc,
   desc,
   ne,
   or,
@@ -18,9 +19,15 @@ import {
 import { router, protectedProcedure } from '../trpc';
 import {
   ContentType,
+  CollectionOverrideAction,
+  CollectionRulesSchema,
+  CollectionSort,
+  CollectionSortSchema,
+  HomeCollectionLayoutSchema,
   isJsonObject,
   type JsonObject,
   type Provider,
+  type CollectionRules,
   UserItemState,
   ProviderSchema,
   ContentTypeSchema,
@@ -31,6 +38,9 @@ import {
   items,
   creators,
   itemEnrichments,
+  collectionItemOverrides,
+  collections,
+  homeCollectionSections,
   tags,
   userItemTags,
   userItemEnrichments,
@@ -373,6 +383,91 @@ function toHomeItemViews(
   });
 }
 
+function parseCollectionRules(rulesJson: string): CollectionRules {
+  try {
+    return CollectionRulesSchema.parse(JSON.parse(rulesJson));
+  } catch {
+    return {};
+  }
+}
+
+function estimatedCollectionLengthSecondsSql(): SQL {
+  return sql`COALESCE(${items.duration}, ${items.readingTimeMinutes} * 60, 0)`;
+}
+
+function collectionSortSql(sort: z.infer<typeof CollectionSortSchema>): SQL {
+  switch (sort) {
+    case CollectionSort.OLDEST_SAVED:
+    case CollectionSort.NEWEST_SAVED:
+      return sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;
+    case CollectionSort.SHORTEST:
+    case CollectionSort.LONGEST:
+      return estimatedCollectionLengthSecondsSql();
+    case CollectionSort.RECENTLY_OPENED:
+      return sql`COALESCE(${userItems.lastOpenedAt}, '')`;
+  }
+}
+
+function isAscendingCollectionSort(sort: z.infer<typeof CollectionSortSchema>): boolean {
+  return sort === CollectionSort.OLDEST_SAVED || sort === CollectionSort.SHORTEST;
+}
+
+function buildCollectionSearchCondition(search: string): SQL {
+  const query = `%${search.trim().toLowerCase()}%`;
+  return or(
+    sql`lower(${items.title}) LIKE ${query}`,
+    sql`lower(coalesce(${creators.name}, '')) LIKE ${query}`,
+    sql`lower(coalesce(${items.publisher}, '')) LIKE ${query}`
+  )!;
+}
+
+function buildCollectionRuleConditions(rules: CollectionRules): SQL[] {
+  const conditions: SQL[] = [];
+
+  if (rules.contentTypes && rules.contentTypes.length > 0) {
+    conditions.push(inArray(items.contentType, rules.contentTypes));
+  }
+
+  if (rules.providers && rules.providers.length > 0) {
+    conditions.push(inArray(items.provider, rules.providers));
+  }
+
+  if (rules.isFinished !== undefined) {
+    conditions.push(eq(userItems.isFinished, rules.isFinished));
+  }
+
+  if (rules.minLengthMinutes !== undefined) {
+    conditions.push(
+      sql`${estimatedCollectionLengthSecondsSql()} >= ${rules.minLengthMinutes * 60}`
+    );
+  }
+
+  if (rules.maxLengthMinutes !== undefined) {
+    conditions.push(
+      sql`${estimatedCollectionLengthSecondsSql()} <= ${rules.maxLengthMinutes * 60}`
+    );
+  }
+
+  if (rules.search) {
+    conditions.push(buildCollectionSearchCondition(rules.search));
+  }
+
+  if (rules.tagIds && rules.tagIds.length > 0) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1
+          FROM ${userItemTags}
+          INNER JOIN ${tags} ON ${userItemTags.tagId} = ${tags.id}
+        WHERE ${userItemTags.userItemId} = ${userItems.id}
+          AND ${tags.userId} = ${userItems.userId}
+          AND ${inArray(tags.id, rules.tagIds)}
+      )`
+    );
+  }
+
+  return conditions;
+}
+
 type ConsumptionEventType = 'OPENED' | 'FINISHED' | 'UNFINISHED' | 'PROGRESS_DELTA';
 type ConsumptionEventSource = 'ITEM_DETAIL_OPEN' | 'MANUAL_FINISH_TOGGLE' | 'PLAYER' | 'READER';
 
@@ -682,14 +777,90 @@ export const itemsRouter = router({
       .orderBy(desc(userItems.bookmarkedAt))
       .limit(SECTION_LIMIT);
 
+    const homeSectionsQuery = ctx.db
+      .select({
+        collectionId: collections.id,
+        title: collections.name,
+        rulesJson: collections.rulesJson,
+        sort: collections.sort,
+        layout: homeCollectionSections.layout,
+        position: homeCollectionSections.position,
+      })
+      .from(homeCollectionSections)
+      .innerJoin(collections, eq(homeCollectionSections.collectionId, collections.id))
+      .where(and(eq(homeCollectionSections.userId, ctx.userId), eq(collections.userId, ctx.userId)))
+      .orderBy(asc(homeCollectionSections.position), asc(homeCollectionSections.createdAt));
+
     // Execute all queries in parallel
-    const [recentBookmarks, jumpBackIn, videos, podcasts, articles] = await Promise.all([
-      recentBookmarksQuery,
-      jumpBackInQuery,
-      videosQuery,
-      podcastsQuery,
-      articlesQuery,
-    ]);
+    const [recentBookmarks, jumpBackIn, videos, podcasts, articles, homeSections] =
+      await Promise.all([
+        recentBookmarksQuery,
+        jumpBackInQuery,
+        videosQuery,
+        podcastsQuery,
+        articlesQuery,
+        homeSectionsQuery,
+      ]);
+
+    const customCollections = await Promise.all(
+      homeSections.map(async (section) => {
+        const rules = parseCollectionRules(section.rulesJson);
+        const sort = CollectionSortSchema.parse(section.sort);
+        const sortField = collectionSortSql(sort);
+        const orderDirection = isAscendingCollectionSort(sort) ? asc(sortField) : desc(sortField);
+        const ruleConditions = buildCollectionRuleConditions(rules);
+        const matchesRules = ruleConditions.length > 0 ? and(...ruleConditions)! : sql`0 = 1`;
+        const membershipCondition = or(
+          and(
+            matchesRules,
+            or(
+              sql`${collectionItemOverrides.action} IS NULL`,
+              ne(collectionItemOverrides.action, CollectionOverrideAction.HIDE)
+            )!
+          ),
+          eq(collectionItemOverrides.action, CollectionOverrideAction.PIN)
+        )!;
+        const collectionConditions = [
+          eq(userItems.userId, ctx.userId),
+          eq(userItems.state, UserItemState.BOOKMARKED),
+          membershipCondition,
+        ];
+        if (contentTypeFilter) {
+          collectionConditions.push(eq(items.contentType, contentTypeFilter));
+        }
+
+        const sectionItems = await ctx.db
+          .select()
+          .from(userItems)
+          .innerJoin(items, eq(userItems.itemId, items.id))
+          .leftJoin(creators, eq(items.creatorId, creators.id))
+          .leftJoin(
+            collectionItemOverrides,
+            and(
+              eq(collectionItemOverrides.userItemId, userItems.id),
+              eq(collectionItemOverrides.collectionId, section.collectionId)
+            )
+          )
+          .where(and(...collectionConditions))
+          .orderBy(
+            desc(
+              sql`CASE WHEN ${collectionItemOverrides.action} = ${CollectionOverrideAction.PIN} THEN 1 ELSE 0 END`
+            ),
+            orderDirection,
+            desc(userItems.id)
+          )
+          .limit(SECTION_LIMIT);
+
+        return {
+          collectionId: section.collectionId,
+          title: section.title,
+          layout: HomeCollectionLayoutSchema.parse(section.layout),
+          position: section.position,
+          count: sectionItems.length,
+          items: toHomeItemViews(sectionItems),
+        };
+      })
+    );
 
     const recentBookmarksViews = toHomeItemViews(recentBookmarks);
     const jumpBackInViews = toHomeItemViews(jumpBackIn);
@@ -705,6 +876,7 @@ export const itemsRouter = router({
         podcasts: podcastsViews,
         articles: articlesViews,
       },
+      customCollections,
     };
   }),
 

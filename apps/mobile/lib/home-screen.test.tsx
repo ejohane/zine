@@ -23,6 +23,15 @@ type MockFeedItem = {
   readingTimeMinutes: number | null;
 };
 
+type MockHomeCollection = {
+  collectionId: string;
+  title: string;
+  layout: 'STACK_RAIL' | 'COVER_RAIL' | 'ROW_GRID' | 'COMPACT_LIST';
+  position: number;
+  count: number;
+  items: MockFeedItem[];
+};
+
 type MockHomeData = {
   jumpBackIn: MockFeedItem[];
   recentBookmarks: MockFeedItem[];
@@ -31,6 +40,7 @@ type MockHomeData = {
     videos: MockFeedItem[];
     articles: MockFeedItem[];
   };
+  customCollections: MockHomeCollection[];
 };
 
 const mockUseInfiniteInboxItems = jest.fn((_options?: unknown) => ({
@@ -48,6 +58,7 @@ const mockUseHomeData = jest.fn((_options?: unknown) => ({
       videos: [],
       articles: [],
     },
+    customCollections: [],
   } as MockHomeData,
   isLoading: false,
 }));
@@ -458,6 +469,64 @@ describe('HomeScreen', () => {
     });
   });
 
+  it('renders configured custom collection sections on Home', () => {
+    mockUseHomeData.mockReturnValue({
+      data: {
+        jumpBackIn: [],
+        recentBookmarks: [],
+        byContentType: {
+          podcasts: [],
+          videos: [],
+          articles: [],
+        },
+        customCollections: [
+          {
+            collectionId: 'collection-1',
+            title: 'Weekend queue',
+            layout: 'COMPACT_LIST',
+            position: 1,
+            count: 6,
+            items: Array.from({ length: 6 }, (_, index) => ({
+              id: `collection-item-${index + 1}`,
+              title: 'Collection item',
+              creator: 'Creator',
+              publisher: 'Publisher',
+              creatorImageUrl: null,
+              thumbnailUrl: null,
+              contentType: 'ARTICLE',
+              provider: 'RSS',
+              duration: null,
+              readingTimeMinutes: null,
+            })),
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const sections = findHomeList(renderer!).props.data as Array<{
+      key: string;
+      type: string;
+      title: string;
+      items: unknown[];
+    }>;
+
+    expect(sections).toEqual([
+      expect.objectContaining({
+        key: 'collection-collection-1',
+        type: 'custom-compact-list',
+        title: 'Weekend queue',
+        items: expect.arrayContaining([expect.objectContaining({ id: 'collection-item-1' })]),
+      }),
+    ]);
+    expect(sections[0].items).toHaveLength(4);
+  });
+
   it('restores the home section visual caps without changing the expanded fetch size', () => {
     mockUseHomeData.mockReturnValue({
       data: {
@@ -500,6 +569,7 @@ describe('HomeScreen', () => {
           videos: [],
           articles: [],
         },
+        customCollections: [],
       },
       isLoading: false,
     });

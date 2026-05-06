@@ -59,6 +59,11 @@ function removeItemFromHomeData(
       podcasts: old.byContentType.podcasts.filter((item) => item.id !== id),
       articles: old.byContentType.articles.filter((item) => item.id !== id),
     },
+    customCollections: old.customCollections.map((section) => ({
+      ...section,
+      count: Math.max(0, section.count - section.items.filter((item) => item.id === id).length),
+      items: section.items.filter((item) => item.id !== id),
+    })),
   };
 }
 
@@ -485,7 +490,10 @@ export function useUserTags() {
 }
 
 export function useCollections() {
-  return trpc.collections.list.useQuery();
+  return trpc.collections.list.useQuery(undefined, {
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
 }
 
 export function useCollectionsForItem(userItemId: string) {
@@ -528,6 +536,17 @@ export function useDeleteCollection() {
       utils.collections.list.invalidate();
       utils.collections.items.invalidate();
       utils.collections.forItem.invalidate();
+    },
+  });
+}
+
+export function useSetCollectionHomeSection() {
+  const utils = trpc.useUtils();
+
+  return trpc.collections.setHomeSection.useMutation({
+    onSuccess: () => {
+      utils.collections.list.invalidate();
+      utils.items.home.invalidate();
     },
   });
 }

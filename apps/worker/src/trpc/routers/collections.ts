@@ -9,6 +9,8 @@ import {
   CollectionRulesSchema,
   CollectionSort,
   CollectionSortSchema,
+  HomeCollectionLayout,
+  HomeCollectionLayoutSchema,
   UserItemState,
   type CollectionRules,
 } from '@zine/shared';
@@ -18,6 +20,7 @@ import {
   collectionItemOverrides,
   collections,
   creators,
+  homeCollectionSections,
   items,
   tags,
   userItems,
@@ -233,8 +236,19 @@ const CollectionMutationInput = z.object({
 export const collectionsRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const rows = await ctx.db
-      .select()
+      .select({
+        id: collections.id,
+        name: collections.name,
+        description: collections.description,
+        rulesJson: collections.rulesJson,
+        sort: collections.sort,
+        createdAt: collections.createdAt,
+        updatedAt: collections.updatedAt,
+        homeLayout: homeCollectionSections.layout,
+        homePosition: homeCollectionSections.position,
+      })
       .from(collections)
+      .leftJoin(homeCollectionSections, eq(homeCollectionSections.collectionId, collections.id))
       .where(eq(collections.userId, ctx.userId))
       .orderBy(desc(collections.updatedAt), desc(collections.createdAt));
 
@@ -245,6 +259,13 @@ export const collectionsRouter = router({
         description: collection.description,
         rules: parseRules(collection.rulesJson),
         sort: collection.sort,
+        homeSection:
+          collection.homeLayout === null || collection.homePosition === null
+            ? null
+            : {
+                layout: HomeCollectionLayoutSchema.parse(collection.homeLayout),
+                position: collection.homePosition,
+              },
         createdAt: collection.createdAt,
         updatedAt: collection.updatedAt,
       })),
@@ -262,6 +283,7 @@ export const collectionsRouter = router({
         description: collection.description,
         rules: parseRules(collection.rulesJson),
         sort: collection.sort,
+        homeSection: null,
         createdAt: collection.createdAt,
         updatedAt: collection.updatedAt,
       };
@@ -341,8 +363,65 @@ export const collectionsRouter = router({
         .delete(collectionItemOverrides)
         .where(eq(collectionItemOverrides.collectionId, input.id));
       await ctx.db
+        .delete(homeCollectionSections)
+        .where(eq(homeCollectionSections.collectionId, input.id));
+      await ctx.db
         .delete(collections)
         .where(and(eq(collections.id, input.id), eq(collections.userId, ctx.userId)));
+
+      return { success: true as const };
+    }),
+
+  setHomeSection: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        enabled: z.boolean(),
+        layout: HomeCollectionLayoutSchema.default(HomeCollectionLayout.STACK_RAIL),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      await requireCollection(ctx, input.id);
+
+      if (!input.enabled) {
+        await ctx.db
+          .delete(homeCollectionSections)
+          .where(eq(homeCollectionSections.collectionId, input.id));
+        return { success: true as const };
+      }
+
+      const now = Date.now();
+      const existingRows = await ctx.db
+        .select({ id: homeCollectionSections.id })
+        .from(homeCollectionSections)
+        .where(eq(homeCollectionSections.collectionId, input.id))
+        .limit(1);
+
+      if (existingRows[0]) {
+        await ctx.db
+          .update(homeCollectionSections)
+          .set({ layout: input.layout, updatedAt: now })
+          .where(eq(homeCollectionSections.id, existingRows[0].id));
+        return { success: true as const };
+      }
+
+      const nextPositionRows = await ctx.db
+        .select({
+          nextPosition: sql<number>`COALESCE(MAX(${homeCollectionSections.position}), 0) + 1`,
+        })
+        .from(homeCollectionSections)
+        .where(eq(homeCollectionSections.userId, ctx.userId));
+      const position = nextPositionRows[0]?.nextPosition ?? 1;
+
+      await ctx.db.insert(homeCollectionSections).values({
+        id: ulid(),
+        userId: ctx.userId,
+        collectionId: input.id,
+        position,
+        layout: input.layout,
+        createdAt: now,
+        updatedAt: now,
+      });
 
       return { success: true as const };
     }),

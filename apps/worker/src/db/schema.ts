@@ -239,6 +239,30 @@ export const collectionItemOverrides = sqliteTable(
   ]
 );
 
+// Home collection sections
+// Stores which custom collections appear on the mobile Home screen and their layout.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const homeCollectionSections = sqliteTable(
+  'home_collection_sections',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    collectionId: text('collection_id')
+      .notNull()
+      .references(() => collections.id),
+    position: integer('position').notNull(),
+    layout: text('layout').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('home_collection_sections_collection_idx').on(table.collectionId),
+    index('home_collection_sections_user_position_idx').on(table.userId, table.position),
+  ]
+);
+
 // Item Enrichments
 // Canonical AI-generated enrichment for a content item and content hash.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
