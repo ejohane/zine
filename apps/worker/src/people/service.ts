@@ -3,7 +3,14 @@ import { ulid } from 'ulid';
 import { UserItemState } from '@zine/shared';
 
 import type { Database } from '../db';
-import { itemEnrichments, userItems, userPeople, userPersonMentions } from '../db/schema';
+import {
+  creators,
+  itemEnrichments,
+  items,
+  userItems,
+  userPeople,
+  userPersonMentions,
+} from '../db/schema';
 import { logger } from '../lib/logger';
 import { ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
 
@@ -34,6 +41,21 @@ type PersonEntityCandidate = {
   displayName: string;
   normalizedName: string;
   confidence: number;
+};
+
+type PersonProfileImageCandidate = {
+  imageUrl: string;
+  source: 'X' | 'CREATOR';
+  sourceUrl: string | null;
+  xHandle: string | null;
+};
+
+type ItemCreatorProfileSource = {
+  provider: string;
+  normalizedName: string;
+  imageUrl: string | null;
+  externalUrl: string | null;
+  handle: string | null;
 };
 
 function toFiniteConfidence(value: unknown): number | null {
@@ -146,18 +168,45 @@ async function upsertUserPerson(
     userId: string;
     displayName: string;
     normalizedName: string;
+    profileImage?: PersonProfileImageCandidate | null;
     now: number;
   }
 ): Promise<string> {
   const existing = await db
-    .select({ id: userPeople.id })
+    .select({
+      id: userPeople.id,
+      profileImageSource: userPeople.profileImageSource,
+      profileImageUrl: userPeople.profileImageUrl,
+    })
     .from(userPeople)
     .where(
       and(eq(userPeople.userId, input.userId), eq(userPeople.normalizedName, input.normalizedName))
     )
     .limit(1);
 
-  if (existing[0]) return existing[0].id;
+  if (existing[0]) {
+    const profileImage = input.profileImage;
+    const shouldSetImage =
+      profileImage &&
+      (!existing[0].profileImageUrl ||
+        existing[0].profileImageSource !== 'X' ||
+        profileImage.source === 'X');
+
+    if (shouldSetImage) {
+      await db
+        .update(userPeople)
+        .set({
+          profileImageUrl: profileImage.imageUrl,
+          profileImageSource: profileImage.source,
+          profileImageSourceUrl: profileImage.sourceUrl,
+          xHandle: profileImage.xHandle,
+          updatedAt: input.now,
+        })
+        .where(eq(userPeople.id, existing[0].id));
+    }
+
+    return existing[0].id;
+  }
 
   const id = ulid();
   await db.insert(userPeople).values({
@@ -165,6 +214,10 @@ async function upsertUserPerson(
     userId: input.userId,
     displayName: input.displayName,
     normalizedName: input.normalizedName,
+    profileImageUrl: input.profileImage?.imageUrl ?? null,
+    profileImageSource: input.profileImage?.source ?? null,
+    profileImageSourceUrl: input.profileImage?.sourceUrl ?? null,
+    xHandle: input.profileImage?.xHandle ?? null,
     itemCount: 0,
     latestSeenAt: null,
     createdAt: input.now,
@@ -172,6 +225,51 @@ async function upsertUserPerson(
   });
 
   return id;
+}
+
+async function loadItemCreatorProfileSource(
+  db: Database,
+  itemId: string
+): Promise<ItemCreatorProfileSource | null> {
+  const rows = await db
+    .select({
+      provider: creators.provider,
+      normalizedName: creators.normalizedName,
+      imageUrl: creators.imageUrl,
+      externalUrl: creators.externalUrl,
+      handle: creators.handle,
+    })
+    .from(items)
+    .innerJoin(creators, eq(items.creatorId, creators.id))
+    .where(eq(items.id, itemId))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export function getProfileImageCandidateForPerson(
+  person: Pick<PersonEntityCandidate, 'normalizedName'>,
+  source: ItemCreatorProfileSource | null
+): PersonProfileImageCandidate | null {
+  if (!source?.imageUrl || source.normalizedName !== person.normalizedName) {
+    return null;
+  }
+
+  if (source.provider === 'X') {
+    return {
+      imageUrl: source.imageUrl,
+      source: 'X',
+      sourceUrl: source.externalUrl,
+      xHandle: source.handle,
+    };
+  }
+
+  return {
+    imageUrl: source.imageUrl,
+    source: 'CREATOR',
+    sourceUrl: source.externalUrl,
+    xHandle: null,
+  };
 }
 
 async function recomputePeopleStats(db: Database, personIds: Iterable<string>): Promise<void> {
@@ -215,6 +313,7 @@ async function syncPeopleForBookmarkedUserItem(
   const now = Date.now();
   const seenAt = getSeenAt(userItem);
   const people = extractPersonEntities(enrichment.entitiesJson);
+  const creatorProfileSource = await loadItemCreatorProfileSource(db, userItem.itemId);
   const activeBefore = await db
     .select({ userPersonId: userPersonMentions.userPersonId })
     .from(userPersonMentions)
@@ -235,6 +334,7 @@ async function syncPeopleForBookmarkedUserItem(
       userId: userItem.userId,
       displayName: person.displayName,
       normalizedName: person.normalizedName,
+      profileImage: getProfileImageCandidateForPerson(person, creatorProfileSource),
       now,
     });
 
@@ -435,6 +535,7 @@ export async function deactivatePeopleForUserItemBestEffort(
 
 export const peopleServiceInternals = {
   extractPersonEntities,
+  getProfileImageCandidateForPerson,
   normalizePersonName,
   recomputePeopleStats,
 };

@@ -85,6 +85,13 @@
       "when": 1777766400000,
       "tag": "0011_add_user_people",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777852800000,
+      "tag": "0012_add_user_people_profile_images",
+      "breakpoints": true
     }
   ]
 }

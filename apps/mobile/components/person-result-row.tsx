@@ -1,6 +1,6 @@
 import { useRouter, type Href } from 'expo-router';
-import { memo, useCallback, useMemo } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Surface, Text } from '@/components/primitives';
 import { Radius, Spacing } from '@/constants/theme';
@@ -9,6 +9,7 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 export type PersonResultRowData = {
   id: string;
   displayName: string;
+  profileImageUrl?: string | null;
   itemCount: number;
   latestItemTitle?: string | null;
 };
@@ -36,6 +37,12 @@ export const PersonResultRow = memo(function PersonResultRow({
   const router = useRouter();
   const { colors, motion } = useAppTheme();
   const initials = useMemo(() => getInitials(person.displayName), [person.displayName]);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(person.profileImageUrl && !imageFailed);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [person.profileImageUrl]);
 
   const handlePress = useCallback(() => {
     router.push(`/person/${person.id}?source=${source}` as Href);
@@ -50,9 +57,18 @@ export const PersonResultRow = memo(function PersonResultRow({
     >
       <Surface tone="transparent" style={styles.row}>
         <View style={[styles.avatar, { backgroundColor: colors.surfaceRaised }]}>
-          <Text variant="labelLarge" tone="secondary" transform="none">
-            {initials}
-          </Text>
+          {showImage ? (
+            <Image
+              source={{ uri: person.profileImageUrl! }}
+              style={styles.avatarImage}
+              onError={() => setImageFailed(true)}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <Text variant="labelLarge" tone="secondary" transform="none">
+              {initials}
+            </Text>
+          )}
         </View>
 
         <View style={styles.content}>
@@ -85,6 +101,11 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   content: {
     flex: 1,

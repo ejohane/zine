@@ -56,6 +56,9 @@ export type CreatorSearchResult = {
 export type PersonSearchRow = {
   id: string;
   displayName: string;
+  profileImageUrl: string | null;
+  profileImageSource: string | null;
+  xHandle: string | null;
   itemCount: number;
   latestSeenAt: number | null;
   latestItemTitle: string | null;
@@ -66,6 +69,9 @@ export type PersonSearchResult = {
   id: string;
   personId: string;
   displayName: string;
+  profileImageUrl: string | null;
+  profileImageSource: string | null;
+  xHandle: string | null;
   itemCount: number;
   latestSeenAt: number | null;
   latestItemTitle: string | null;
@@ -256,6 +262,9 @@ export function buildSearchResponse(input: {
       id: row.id,
       personId: row.id,
       displayName: row.displayName,
+      profileImageUrl: row.profileImageUrl,
+      profileImageSource: row.profileImageSource,
+      xHandle: row.xHandle,
       itemCount: row.itemCount,
       latestSeenAt: row.latestSeenAt,
       latestItemTitle: row.latestItemTitle,
@@ -413,6 +422,9 @@ export const searchRouter = router({
         .select({
           id: userPeople.id,
           displayName: userPeople.displayName,
+          profileImageUrl: userPeople.profileImageUrl,
+          profileImageSource: userPeople.profileImageSource,
+          xHandle: userPeople.xHandle,
           itemCount: userPeople.itemCount,
           latestSeenAt: userPeople.latestSeenAt,
           latestItemTitle: sql<string | null>`null`,
@@ -432,6 +444,9 @@ export const searchRouter = router({
         ...matchedPeopleRows.map((row) => ({
           id: row.id,
           displayName: row.displayName,
+          profileImageUrl: row.profileImageUrl,
+          profileImageSource: row.profileImageSource,
+          xHandle: row.xHandle,
           itemCount: Number(row.itemCount ?? 0),
           latestSeenAt: row.latestSeenAt,
           latestItemTitle: row.latestItemTitle,

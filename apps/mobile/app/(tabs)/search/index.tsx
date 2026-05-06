@@ -140,6 +140,7 @@ export default function SearchTabScreen() {
           person={{
             id: item.person.personId,
             displayName: item.person.displayName,
+            profileImageUrl: item.person.profileImageUrl,
             itemCount: item.person.itemCount,
             latestItemTitle: item.person.latestItemTitle,
           }}
