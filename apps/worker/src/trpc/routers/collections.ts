@@ -26,7 +26,7 @@ import {
   userItems,
   userItemTags,
 } from '../../db/schema';
-import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { toItemViewsWithTags } from './items';
 import type { Database } from '../../db';
 
@@ -63,25 +63,83 @@ function collectionSortSql(sort: z.infer<typeof CollectionSortSchema>): SQL {
   }
 }
 
+type CollectionItemsCursor = {
+  priority: number;
+  sortValue: string;
+  id: string;
+};
+
 function isAscendingSort(sort: z.infer<typeof CollectionSortSchema>): boolean {
   return sort === CollectionSort.OLDEST_SAVED || sort === CollectionSort.SHORTEST;
+}
+
+function encodeCollectionItemsCursor(cursor: CollectionItemsCursor): string {
+  return btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeCollectionItemsCursor(cursorString: string): CollectionItemsCursor | null {
+  try {
+    let base64 = cursorString.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+
+    const parsed = JSON.parse(atob(base64));
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof parsed.sortValue === 'string' &&
+      typeof parsed.id === 'string'
+    ) {
+      return {
+        priority: typeof parsed.priority === 'number' ? parsed.priority : 0,
+        sortValue: parsed.sortValue,
+        id: parsed.id,
+      };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function parseCollectionCursorSortValue(
+  sort: z.infer<typeof CollectionSortSchema>,
+  sortValue: string
+): string | number | null {
+  if (sort === CollectionSort.SHORTEST || sort === CollectionSort.LONGEST) {
+    const numericSortValue = Number(sortValue);
+    return Number.isFinite(numericSortValue) ? numericSortValue : null;
+  }
+
+  return sortValue;
 }
 
 function buildCursorCondition(
   sort: z.infer<typeof CollectionSortSchema>,
   sortField: SQL,
-  cursor: ReturnType<typeof decodeCursor> | null
+  priorityField: SQL,
+  cursor: CollectionItemsCursor | null
 ): SQL | undefined {
   if (!cursor) return undefined;
-  if (sort !== CollectionSort.NEWEST_SAVED && sort !== CollectionSort.OLDEST_SAVED) {
-    return undefined;
-  }
 
+  const sortValue = parseCollectionCursorSortValue(sort, cursor.sortValue);
+  if (sortValue === null) return undefined;
+
+  const priority = Number.isFinite(cursor.priority) ? cursor.priority : 0;
   const compare = isAscendingSort(sort)
-    ? sql`${sortField} > ${cursor.sortValue}`
-    : sql`${sortField} < ${cursor.sortValue}`;
+    ? sql`${sortField} > ${sortValue}`
+    : sql`${sortField} < ${sortValue}`;
+  const samePriorityRemainder = or(
+    compare,
+    and(sql`${sortField} = ${sortValue}`, lt(userItems.id, cursor.id))
+  )!;
 
-  return or(compare, and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id)))!;
+  return or(
+    sql`${priorityField} < ${priority}`,
+    and(sql`${priorityField} = ${priority}`, samePriorityRemainder)
+  )!;
 }
 
 function buildSearchCondition(search: string): SQL {
@@ -91,6 +149,25 @@ function buildSearchCondition(search: string): SQL {
     sql`lower(coalesce(${creators.name}, '')) LIKE ${query}`,
     sql`lower(coalesce(${items.publisher}, '')) LIKE ${query}`
   )!;
+}
+
+function getCollectionSortValue(
+  sort: z.infer<typeof CollectionSortSchema>,
+  row: {
+    user_items: typeof userItems.$inferSelect;
+    items: typeof items.$inferSelect;
+  }
+): string {
+  switch (sort) {
+    case CollectionSort.OLDEST_SAVED:
+    case CollectionSort.NEWEST_SAVED:
+      return row.user_items.bookmarkedAt ?? row.user_items.ingestedAt;
+    case CollectionSort.SHORTEST:
+    case CollectionSort.LONGEST:
+      return String(row.items.duration ?? (row.items.readingTimeMinutes ?? 0) * 60);
+    case CollectionSort.RECENTLY_OPENED:
+      return row.user_items.lastOpenedAt ?? '';
+  }
 }
 
 function buildRuleConditions(rules: CollectionRules): SQL[] {
@@ -439,11 +516,12 @@ export const collectionsRouter = router({
       const rules = parseRules(collection.rulesJson);
       const sort = CollectionSortSchema.parse(collection.sort);
       const sortField = collectionSortSql(sort);
-      const cursor = input.cursor ? decodeCursor(input.cursor) : null;
+      const priorityField = sql<number>`CASE WHEN ${collectionItemOverrides.action} = ${CollectionOverrideAction.PIN} THEN 1 ELSE 0 END`;
+      const cursor = input.cursor ? decodeCollectionItemsCursor(input.cursor) : null;
 
       const ruleConditions = buildRuleConditions(rules);
       const matchesRules = ruleConditions.length > 0 ? and(...ruleConditions)! : sql`0 = 1`;
-      const cursorCondition = buildCursorCondition(sort, sortField, cursor);
+      const cursorCondition = buildCursorCondition(sort, sortField, priorityField, cursor);
 
       const membershipCondition = or(
         and(
@@ -479,13 +557,7 @@ export const collectionsRouter = router({
           )
         )
         .where(and(...conditions))
-        .orderBy(
-          desc(
-            sql`CASE WHEN ${collectionItemOverrides.action} = ${CollectionOverrideAction.PIN} THEN 1 ELSE 0 END`
-          ),
-          orderDirection,
-          desc(userItems.id)
-        )
+        .orderBy(desc(priorityField), orderDirection, desc(userItems.id))
         .limit(input.limit + 1);
 
       const hasMore = results.length > input.limit;
@@ -493,12 +565,14 @@ export const collectionsRouter = router({
       const itemViews = await toItemViewsWithTags(ctx, pageResults);
 
       const lastResult = pageResults[pageResults.length - 1];
-      const canCursor =
-        sort === CollectionSort.NEWEST_SAVED || sort === CollectionSort.OLDEST_SAVED;
       const nextCursor =
-        canCursor && hasMore && lastResult
-          ? encodeCursor({
-              sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
+        hasMore && lastResult
+          ? encodeCollectionItemsCursor({
+              priority:
+                lastResult.collection_item_overrides?.action === CollectionOverrideAction.PIN
+                  ? 1
+                  : 0,
+              sortValue: getCollectionSortValue(sort, lastResult),
               id: lastResult.user_items.id,
             })
           : null;

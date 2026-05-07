@@ -525,6 +525,15 @@ describe('HomeScreen', () => {
       }),
     ]);
     expect(sections[0].items).toHaveLength(4);
+
+    act(() => {
+      findButtonByText(renderer!, 'Weekend queue').props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(tabs)/index/collection/[id]',
+      params: { id: 'collection-1' },
+    });
   });
 
   it('restores the home section visual caps without changing the expanded fetch size', () => {
