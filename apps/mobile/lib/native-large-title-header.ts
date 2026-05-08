@@ -47,6 +47,7 @@ export function createLightweightHeaderScreenOptions({
   showScreenTitle?: boolean;
 }): ExtendedStackNavigationOptions {
   return {
+    headerBackButtonDisplayMode: 'minimal',
     headerLargeTitle: false,
     headerTransparent: false,
     headerShadowVisible: false,
