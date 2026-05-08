@@ -531,7 +531,7 @@ describe('HomeScreen', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(tabs)/index/collection/[id]',
+      pathname: '/(tabs)/collection/[id]',
       params: { id: 'collection-1' },
     });
   });
