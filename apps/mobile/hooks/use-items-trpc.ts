@@ -126,6 +126,11 @@ type LibraryItemsOptions = {
   limit?: number;
 };
 
+type CollectionItemsOptions = {
+  id: string;
+  limit?: number;
+};
+
 /**
  * Factory function to create optimistic mutation config
  *
@@ -496,6 +501,30 @@ export function useCollections() {
   });
 }
 
+export function useCollection(id: string) {
+  return trpc.collections.get.useQuery(
+    { id },
+    {
+      enabled: !!id,
+      placeholderData: keepPreviousData,
+    }
+  );
+}
+
+export function useInfiniteCollectionItems(options: CollectionItemsOptions) {
+  return trpc.collections.items.useInfiniteQuery(
+    {
+      id: options.id,
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+    },
+    {
+      enabled: !!options.id,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+      placeholderData: keepPreviousData,
+    }
+  );
+}
+
 export function useCollectionsForItem(userItemId: string) {
   return trpc.collections.forItem.useQuery(
     { userItemId },
@@ -522,8 +551,10 @@ export function useUpdateCollection() {
   return trpc.collections.update.useMutation({
     onSuccess: () => {
       utils.collections.list.invalidate();
+      utils.collections.get.invalidate();
       utils.collections.items.invalidate();
       utils.collections.forItem.invalidate();
+      utils.items.home.invalidate();
     },
   });
 }
@@ -534,8 +565,10 @@ export function useDeleteCollection() {
   return trpc.collections.delete.useMutation({
     onSuccess: () => {
       utils.collections.list.invalidate();
+      utils.collections.get.invalidate();
       utils.collections.items.invalidate();
       utils.collections.forItem.invalidate();
+      utils.items.home.invalidate();
     },
   });
 }
@@ -546,6 +579,7 @@ export function useSetCollectionHomeSection() {
   return trpc.collections.setHomeSection.useMutation({
     onSuccess: () => {
       utils.collections.list.invalidate();
+      utils.collections.get.invalidate();
       utils.items.home.invalidate();
     },
   });
@@ -559,6 +593,7 @@ export function useSetCollectionItemOverride() {
       utils.collections.list.invalidate();
       utils.collections.items.invalidate({ id: collectionId });
       utils.collections.forItem.invalidate({ userItemId });
+      utils.items.home.invalidate();
     },
   });
 }

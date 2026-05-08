@@ -188,6 +188,7 @@ type HomeSectionItem =
     }
   | {
       key: string;
+      collectionId: string;
       type: 'custom-cover-rail' | 'custom-stack-rail' | 'custom-row-grid' | 'custom-compact-list';
       title: string;
       count: number;
@@ -329,6 +330,7 @@ export default function HomeScreen() {
 
         return {
           key: `collection-${section.collectionId}`,
+          collectionId: section.collectionId,
           type,
           title: section.title,
           count: section.count,
@@ -339,6 +341,16 @@ export default function HomeScreen() {
         };
       });
   }, [homeData?.customCollections]);
+
+  const handleOpenCollection = useCallback(
+    (collectionId: string) => {
+      router.push({
+        pathname: '/(tabs)/index/collection/[id]',
+        params: { id: collectionId },
+      });
+    },
+    [router]
+  );
 
   const handleOpenSettings = useCallback(() => {
     router.push('/settings');
@@ -552,7 +564,16 @@ export default function HomeScreen() {
         case 'custom-cover-rail':
           return (
             <View>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                count={item.count}
+                colors={colors}
+                onPress={
+                  item.type === 'custom-cover-rail'
+                    ? () => handleOpenCollection(item.collectionId)
+                    : undefined
+                }
+              />
               <FlatList
                 horizontal
                 data={item.items}
@@ -569,7 +590,16 @@ export default function HomeScreen() {
         case 'custom-stack-rail':
           return (
             <View>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                count={item.count}
+                colors={colors}
+                onPress={
+                  item.type === 'custom-stack-rail'
+                    ? () => handleOpenCollection(item.collectionId)
+                    : undefined
+                }
+              />
               <FlatList
                 horizontal
                 data={item.items}
@@ -585,7 +615,12 @@ export default function HomeScreen() {
         case 'custom-row-grid':
           return (
             <View>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                count={item.count}
+                colors={colors}
+                onPress={() => handleOpenCollection(item.collectionId)}
+              />
               <View style={styles.jumpBackInGrid}>
                 {item.items.map((sectionItem) => (
                   <View
@@ -601,7 +636,12 @@ export default function HomeScreen() {
         case 'custom-compact-list':
           return (
             <View style={styles.section}>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                count={item.count}
+                colors={colors}
+                onPress={() => handleOpenCollection(item.collectionId)}
+              />
               <View
                 style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
               >
@@ -613,7 +653,7 @@ export default function HomeScreen() {
           );
       }
     },
-    [colors, featuredGridItemWidth, router]
+    [colors, featuredGridItemWidth, handleOpenCollection, router]
   );
 
   useEffect(() => {
