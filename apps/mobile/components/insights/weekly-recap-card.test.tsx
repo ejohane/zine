@@ -5,7 +5,7 @@ import { WeeklyRecapCard } from './weekly-recap-card';
 
 type RenderedNode = {
   type: unknown;
-  children: ReadonlyArray<unknown>;
+  children: readonly unknown[];
 };
 
 jest.mock('react-native', () => ({
