@@ -56,7 +56,7 @@ export default function ItemDetailScreen() {
   const [collectionsSheetOpen, setCollectionsSheetOpen] = useState(false);
 
   const { id, isValid, message } = useItemDetailParams();
-  const { item, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
+  const { item, enrichment, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
     useItemDetailData({ id, isValid });
   const {
     handleOpenLink,
@@ -190,6 +190,7 @@ export default function ItemDetailScreen() {
       >
         <ItemDetailContent
           item={item}
+          enrichment={enrichment}
           colors={colors}
           creatorData={creatorData}
           creatorImageUrl={upgradedCreatorImageUrl}
@@ -208,6 +209,7 @@ export default function ItemDetailScreen() {
           onManageTags={handleOpenCollectionsSheet}
           onShare={handleShare}
           onOpenLink={handleOpenLink}
+          onPersonPress={(personId) => router.push(`/person/${personId}?source=item` as Href)}
           otherUnfinishedBookmarks={otherUnfinishedBookmarks}
           onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
           useAnimatedActions
@@ -236,6 +238,7 @@ export default function ItemDetailScreen() {
     >
       <ItemDetailContent
         item={item}
+        enrichment={enrichment}
         colors={colors}
         creatorData={creatorData}
         creatorImageUrl={item.creatorImageUrl}
@@ -254,6 +257,7 @@ export default function ItemDetailScreen() {
         onManageTags={handleOpenCollectionsSheet}
         onShare={handleShare}
         onOpenLink={handleOpenLink}
+        onPersonPress={(personId) => router.push(`/person/${personId}?source=item` as Href)}
         otherUnfinishedBookmarks={otherUnfinishedBookmarks}
         onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
         useAnimatedActions={false}

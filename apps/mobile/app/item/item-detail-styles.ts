@@ -211,6 +211,41 @@ export const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
+  // People
+  peopleContainer: {
+    marginTop: Spacing.md,
+    paddingHorizontal: Spacing.xl,
+  },
+  peopleSurface: {
+    paddingVertical: Spacing.lg,
+    overflow: 'hidden',
+  },
+  peopleHeader: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  peopleList: {
+    gap: Spacing.xs,
+  },
+  peopleRow: {
+    minHeight: 44,
+    paddingHorizontal: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  peopleAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peopleName: {
+    flex: 1,
+    minWidth: 0,
+  },
+
   // Enrichment
   enrichmentContainer: {
     marginTop: Spacing.md,

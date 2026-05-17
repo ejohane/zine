@@ -5,16 +5,23 @@ import Animated from 'react-native-reanimated';
 import { Surface } from '@/components/primitives/surface';
 
 import { styles } from '../../item-detail-styles';
-import type { ItemDetailColors, ItemDetailCreator, ItemDetailItem } from '../types';
+import type {
+  ItemDetailColors,
+  ItemDetailCreator,
+  ItemDetailEnrichment,
+  ItemDetailItem,
+} from '../types';
 import { ItemDetailActions } from './ItemDetailActions';
 import { ItemDetailCreatorRow } from './ItemDetailCreatorRow';
 import { ItemDetailDescription } from './ItemDetailDescription';
 import { ItemDetailHeader } from './ItemDetailHeader';
 import { ItemDetailMetaRow } from './ItemDetailMetaRow';
 import { ItemDetailOtherBookmarks } from './ItemDetailOtherBookmarks';
+import { ItemDetailPeopleCard } from './ItemDetailPeopleCard';
 
 type ItemDetailContentProps = {
   item: ItemDetailItem;
+  enrichment?: ItemDetailEnrichment;
   colors: ItemDetailColors;
   creatorData?: ItemDetailCreator;
   creatorImageUrl?: string | null;
@@ -31,6 +38,7 @@ type ItemDetailContentProps = {
   onManageTags: () => void;
   onShare: () => void;
   onOpenLink: () => void;
+  onPersonPress?: (personId: string) => void;
   otherUnfinishedBookmarks?: ItemDetailItem[];
   onOtherBookmarkPress?: (id: string) => void;
   useAnimatedDescription: boolean;
@@ -41,6 +49,7 @@ type ItemDetailContentProps = {
 
 export function ItemDetailContent({
   item,
+  enrichment,
   colors,
   creatorData,
   creatorImageUrl,
@@ -57,6 +66,7 @@ export function ItemDetailContent({
   onManageTags,
   onShare,
   onOpenLink,
+  onPersonPress,
   otherUnfinishedBookmarks = [],
   onOtherBookmarkPress,
   useAnimatedActions,
@@ -98,6 +108,13 @@ export function ItemDetailContent({
         onShare={onShare}
         onOpenLink={onOpenLink}
         useAnimatedContainer={useAnimatedActions}
+      />
+
+      <ItemDetailPeopleCard
+        item={item}
+        enrichment={enrichment}
+        colors={colors}
+        onPersonPress={onPersonPress}
       />
 
       {item.summary && (
