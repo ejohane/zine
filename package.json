@@ -14,6 +14,7 @@
     "dev": "turbo run dev",
     "dev:web": "bun run --cwd apps/web dev",
     "dev:worktree": "./scripts/dev.sh",
+    "data:prod:local": "bun run ./scripts/sync-prod-user-to-local.mjs",
     "design-system:check": "node ./scripts/check-mobile-design-system.mjs",
     "storybook:mobile": "bun run --cwd apps/mobile storybook",
     "storybook:web": "bun run --cwd apps/web storybook",

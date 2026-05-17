@@ -64,6 +64,9 @@ Thumbs.db
 .wrangler/
 .dev.vars
 
+# Local production-shaped snapshots
+.local-data/
+
 # Bun
 bun.lockb
 

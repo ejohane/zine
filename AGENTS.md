@@ -62,6 +62,19 @@
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
 
+### Production-Shaped Local Data
+
+- To refresh local D1 from the primary production account, run `bun run data:prod:local -- --yes` from the repo root.
+- The script exports production D1, keeps only `user_31ejjz59G6mTX1SIyErOi0fwu4A`, remaps it to local `dev-user-001`, sanitizes sensitive fields, and restores the result into `apps/worker/.wrangler/state`.
+- Sensitive production values are not meant to survive this flow:
+  - OAuth tokens in `provider_connections` are replaced with local redacted placeholders.
+  - Provider connections are marked `EXPIRED`.
+  - Gmail mailbox identity/cursor fields and newsletter unsubscribe targets are scrubbed.
+  - Raw production export artifacts are deleted by default; sanitized SQL remains under `.local-data/`, which is gitignored.
+- The script backs up the previous local Wrangler state under `.local-data/local-d1-backups/` before replacing it.
+- After refreshing the main worktree this way, feature worktrees can pick up the refreshed data through the normal `bun run dev:reset && bun run dev:worktree` seed-from-main flow.
+- Use `--skip-restore` to generate and inspect the sanitized SQL without replacing local D1. Use `--keep-raw` only for short-lived debugging, and remove raw exports afterward.
+
 ### Agent Browser Verification
 
 - When manually verifying the web app with `agent-browser`, prefer the local development auth bypass instead of trying to sign into Clerk.
