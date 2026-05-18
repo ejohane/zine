@@ -1,5 +1,6 @@
 import {
   getFeaturedGridItemWidth,
+  getFeaturedGridRows,
   getValidFeaturedGridItems,
   getVisibleFeaturedGridItems,
 } from './home-layout';
@@ -69,5 +70,19 @@ describe('getFeaturedGridItemWidth', () => {
 
   it('clamps negative widths to zero', () => {
     expect(getFeaturedGridItemWidth(8, 16)).toBe(0);
+  });
+});
+
+describe('getFeaturedGridRows', () => {
+  it('groups featured items into rows of two', () => {
+    expect(getFeaturedGridRows([1, 2, 3, 4, 5, 6])).toEqual([
+      [1, 2],
+      [3, 4],
+      [5, 6],
+    ]);
+  });
+
+  it('keeps an odd final row', () => {
+    expect(getFeaturedGridRows([1, 2, 3])).toEqual([[1, 2], [3]]);
   });
 });

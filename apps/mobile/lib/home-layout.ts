@@ -13,6 +13,16 @@ export function getFeaturedGridItemWidth(containerWidth: number, gap: number): n
   return Math.max(0, (containerWidth - gap * (FEATURED_GRID_COLUMNS - 1)) / FEATURED_GRID_COLUMNS);
 }
 
+export function getFeaturedGridRows<T>(items: readonly T[]): T[][] {
+  const rows: T[][] = [];
+
+  for (let index = 0; index < items.length; index += FEATURED_GRID_COLUMNS) {
+    rows.push(items.slice(index, index + FEATURED_GRID_COLUMNS));
+  }
+
+  return rows;
+}
+
 export function getVisibleFeaturedGridItems<T extends FeaturedGridItem>(
   items: readonly T[],
   contentTypeFilter: string | null

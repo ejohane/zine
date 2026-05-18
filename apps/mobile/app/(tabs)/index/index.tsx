@@ -30,7 +30,11 @@ import {
 } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
-import { getFeaturedGridItemWidth, getVisibleFeaturedGridItems } from '@/lib/home-layout';
+import {
+  getFeaturedGridItemWidth,
+  getFeaturedGridRows,
+  getVisibleFeaturedGridItems,
+} from '@/lib/home-layout';
 import { useInfiniteInboxItems, useHomeData } from '@/hooks/use-items-trpc';
 import {
   mapContentType,
@@ -515,12 +519,19 @@ export default function HomeScreen() {
             <View>
               <SectionHeader title={item.title} count={item.count} colors={colors} />
               <View style={styles.jumpBackInGrid}>
-                {item.items.map((sectionItem) => (
+                {getFeaturedGridRows(item.items).map((row) => (
                   <View
-                    key={sectionItem.id}
-                    style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                    key={row.map((sectionItem) => sectionItem.id).join(':')}
+                    style={styles.jumpBackInGridRow}
                   >
-                    <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                    {row.map((sectionItem) => (
+                      <View
+                        key={sectionItem.id}
+                        style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                      >
+                        <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                      </View>
+                    ))}
                   </View>
                 ))}
               </View>
@@ -622,12 +633,19 @@ export default function HomeScreen() {
                 onPress={() => handleOpenCollection(item.collectionId)}
               />
               <View style={styles.jumpBackInGrid}>
-                {item.items.map((sectionItem) => (
+                {getFeaturedGridRows(item.items).map((row) => (
                   <View
-                    key={sectionItem.id}
-                    style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                    key={row.map((sectionItem) => sectionItem.id).join(':')}
+                    style={styles.jumpBackInGridRow}
                   >
-                    <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                    {row.map((sectionItem) => (
+                      <View
+                        key={sectionItem.id}
+                        style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
+                      >
+                        <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                      </View>
+                    ))}
                   </View>
                 ))}
               </View>
@@ -820,11 +838,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xl,
   },
   jumpBackInGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     paddingHorizontal: Spacing.md,
     gap: Spacing.md,
     marginBottom: Spacing.xl,
+  },
+  jumpBackInGridRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
   },
   jumpBackInGridItem: {
     minWidth: 0,
