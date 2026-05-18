@@ -1,6 +1,7 @@
 import { Platform, DynamicColorIOS } from 'react-native';
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { AuthGuard } from '@/components/auth-guard';
+import { Colors } from '@/constants/theme';
 
 // Tab Layout - iOS 26 Native Tabs with Liquid Glass
 
@@ -35,8 +36,10 @@ export default function TabLayout() {
         labelStyle={{
           color: dynamicLabelColor,
         }}
+        backgroundColor={Colors.dark.background}
+        disableTransparentOnScrollEdge
       >
-        <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger name="index" contentStyle={{ backgroundColor: Colors.dark.background }}>
           <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
             sf={{ default: 'house', selected: 'house.fill' }}
@@ -44,7 +47,7 @@ export default function TabLayout() {
           />
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="inbox">
+        <NativeTabs.Trigger name="inbox" contentStyle={{ backgroundColor: Colors.dark.background }}>
           <NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
             sf={{ default: 'tray', selected: 'tray.fill' }}
@@ -52,11 +55,18 @@ export default function TabLayout() {
           />
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="search" role="search">
+        <NativeTabs.Trigger
+          name="search"
+          role="search"
+          contentStyle={{ backgroundColor: Colors.dark.background }}
+        >
           <NativeTabs.Trigger.Label>Search</NativeTabs.Trigger.Label>
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="library">
+        <NativeTabs.Trigger
+          name="library"
+          contentStyle={{ backgroundColor: Colors.dark.background }}
+        >
           <NativeTabs.Trigger.Label>Library</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
             sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }}
@@ -65,7 +75,10 @@ export default function TabLayout() {
         </NativeTabs.Trigger>
 
         {isStorybookEnabled && (
-          <NativeTabs.Trigger name="storybook">
+          <NativeTabs.Trigger
+            name="storybook"
+            contentStyle={{ backgroundColor: Colors.dark.background }}
+          >
             <NativeTabs.Trigger.Label>Storybook</NativeTabs.Trigger.Label>
             <NativeTabs.Trigger.Icon sf={{ default: 'hammer', selected: 'hammer.fill' }} />
           </NativeTabs.Trigger>

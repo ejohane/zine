@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native'
 import { Spacing } from '@/constants/theme';
 import { createDarkCanvasDecorator } from '@/components/storybook/decorators';
 import { itemCardFixtures } from '@/components/storybook/fixtures';
-import { getFeaturedGridItemWidth } from '@/lib/home-layout';
+import { getFeaturedGridItemWidth, getFeaturedGridRows } from '@/lib/home-layout';
 import { ItemCard } from './item-card';
 
 const meta = {
@@ -42,20 +42,22 @@ export const FeaturedRow: Story = {
   render: function Render(args) {
     const { width } = useWindowDimensions();
     const featuredGridItemWidth = getFeaturedGridItemWidth(width - Spacing.md * 2, Spacing.md);
+    const items = [itemCardFixtures.article, itemCardFixtures.video];
 
     return (
       <View style={styles.featuredGrid}>
-        <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
-          <ItemCard {...args} />
-        </View>
-        <View style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}>
-          <ItemCard
-            item={itemCardFixtures.video}
-            shape="row"
-            rowStyle="featured"
-            onPress={args.onPress}
-          />
-        </View>
+        {getFeaturedGridRows(items).map((row) => (
+          <View key={row.map((item) => item.id).join(':')} style={styles.featuredGridRow}>
+            {row.map((item) => (
+              <View
+                key={item.id}
+                style={[styles.featuredGridItem, { width: featuredGridItemWidth }]}
+              >
+                <ItemCard {...args} item={item} />
+              </View>
+            ))}
+          </View>
+        ))}
       </View>
     );
   },
@@ -146,9 +148,11 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   featuredGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     paddingHorizontal: Spacing.md,
+    gap: Spacing.md,
+  },
+  featuredGridRow: {
+    flexDirection: 'row',
     gap: Spacing.md,
   },
   featuredGridItem: {
