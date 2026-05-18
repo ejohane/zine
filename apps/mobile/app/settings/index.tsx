@@ -12,7 +12,7 @@
 import { useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, ScrollView, Pressable, StyleSheet, Linking, Share } from 'react-native';
-import { Stack, useNavigation, useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
 import { useClerk } from '@clerk/clerk-expo';
 import Constants from 'expo-constants';
 
@@ -244,7 +244,7 @@ function SettingsScreenContent({
             title="Collections"
             subtitle="Create and manage saved bookmark views"
             rightText="→"
-            onPress={() => router.push('/settings/collections')}
+            onPress={() => router.push('/settings/collections' as Href)}
           />
         </View>
 

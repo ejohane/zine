@@ -1,4 +1,4 @@
-import { Stack, useNavigation, useRouter } from 'expo-router';
+import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
 import { Surface } from 'heroui-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
@@ -347,7 +347,7 @@ export default function HomeScreen() {
       router.push({
         pathname: '/(tabs)/collection/[id]',
         params: { id: collectionId },
-      });
+      } as unknown as Href);
     },
     [router]
   );

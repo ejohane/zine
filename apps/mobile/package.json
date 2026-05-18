@@ -16,6 +16,7 @@
     "test:coverage": "jest --coverage",
     "build:ios:preview": "env -u EXPO_PUBLIC_STORYBOOK_ENABLED EXPO_NO_DOTENV=1 dotenv -e .env.preview -- env EXPO_PUBLIC_API_URL=https://api.myzine.app eas build --platform ios --profile preview --local --output ./build/preview.ipa --non-interactive",
     "deploy:ios:production": "eas build --platform ios --profile production --auto-submit --non-interactive",
+    "deploy:ios:testflight:local": "./scripts/deploy-testflight-local.sh",
     "deploy:ios:preview": "./scripts/build-and-install-ios.sh"
   },
   "dependencies": {

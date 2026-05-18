@@ -1,0 +1,193 @@
+require "json"
+require "cfpropertylist"
+require "fileutils"
+require "shellwords"
+
+default_platform(:ios)
+
+APP_IDENTIFIER = "app.zine.mobile"
+SHARE_EXTENSION_IDENTIFIER = "#{APP_IDENTIFIER}.ShareExtension"
+ASC_APP_ID = "6766139146"
+MOBILE_ROOT = File.expand_path("..", __dir__)
+IOS_WORKSPACE = File.join(MOBILE_ROOT, "ios/zine.xcworkspace")
+IOS_SCHEME = "zine"
+PRODUCTION_API_URL = "https://api.myzine.app"
+SETUP_DOC = "../../docs/mobile/testflight-local.md"
+
+def require_env!(name)
+  value = ENV[name].to_s.strip
+  UI.user_error!("Missing #{name}. See #{SETUP_DOC} for setup.") if value.empty?
+  value
+end
+
+def load_env_file(path)
+  return unless File.exist?(path)
+
+  File.readlines(path).each do |line|
+    stripped = line.strip
+    next if stripped.empty? || stripped.start_with?("#") || !stripped.include?("=")
+
+    key, value = stripped.split("=", 2)
+    key = key.strip
+    next unless key.match?(/\A[A-Za-z_][A-Za-z0-9_]*\z/)
+    next if ENV.key?(key)
+
+    value = value.strip
+    if (value.start_with?('"') && value.end_with?('"')) || (value.start_with?("'") && value.end_with?("'"))
+      value = value[1...-1]
+    end
+
+    ENV[key] = value
+  end
+end
+
+def expo_ios_version
+  config = JSON.parse(File.read(File.join(MOBILE_ROOT, "app.json")))
+  expo = config.fetch("expo")
+  ios = expo.fetch("ios")
+
+  {
+    version: expo.fetch("version"),
+    build_number: ios.fetch("buildNumber")
+  }
+end
+
+def build_xcargs(team_id:, version:, build_number:, asc_key_id:, asc_issuer_id:, asc_key_path:)
+  [
+    "DEVELOPMENT_TEAM=#{team_id.shellescape}",
+    "CODE_SIGN_STYLE=Automatic",
+    "MARKETING_VERSION=#{version.shellescape}",
+    "CURRENT_PROJECT_VERSION=#{build_number.shellescape}",
+    provisioning_xcargs(
+      asc_key_id: asc_key_id,
+      asc_issuer_id: asc_issuer_id,
+      asc_key_path: asc_key_path
+    )
+  ].join(" ")
+end
+
+def provisioning_xcargs(asc_key_id:, asc_issuer_id:, asc_key_path:)
+  [
+    "-allowProvisioningUpdates",
+    "-authenticationKeyIssuerID #{asc_issuer_id.shellescape}",
+    "-authenticationKeyID #{asc_key_id.shellescape}",
+    "-authenticationKeyPath #{asc_key_path.shellescape}"
+  ].join(" ")
+end
+
+def write_export_options_plist(path, team_id:)
+  plist = CFPropertyList::List.new
+  plist.value = CFPropertyList.guess(
+    {
+      "method" => "app-store",
+      "signingStyle" => "automatic",
+      "teamID" => team_id,
+      "uploadBitcode" => false,
+      "uploadSymbols" => true
+    }
+  )
+  plist.save(path, CFPropertyList::List::FORMAT_XML)
+end
+
+def with_clean_bundler_env(&block)
+  if Bundler.respond_to?(:with_unbundled_env)
+    Bundler.with_unbundled_env(&block)
+  else
+    Bundler.with_clean_env(&block)
+  end
+end
+
+platform :ios do
+  desc "Build locally with Xcode and upload the IPA to TestFlight without EAS Build"
+  lane :local_testflight do
+    load_env_file(File.join(MOBILE_ROOT, ".env.production"))
+
+    ENV.delete("EXPO_PUBLIC_STORYBOOK_ENABLED")
+    ENV["EXPO_NO_DOTENV"] = "1"
+    ENV["NODE_ENV"] = "production"
+    ENV["EXPO_PUBLIC_API_URL"] ||= PRODUCTION_API_URL
+
+    require_env!("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY")
+    require_env!("EXPO_PUBLIC_SPOTIFY_CLIENT_ID")
+    require_env!("EXPO_PUBLIC_YOUTUBE_CLIENT_ID")
+    require_env!("EXPO_PUBLIC_X_CLIENT_ID")
+
+    team_id = require_env!("APPLE_TEAM_ID")
+    asc_key_id = require_env!("ASC_KEY_ID")
+    asc_issuer_id = require_env!("ASC_ISSUER_ID")
+    asc_key_path = File.expand_path(require_env!("ASC_KEY_PATH"))
+    UI.user_error!("ASC_KEY_PATH does not exist: #{asc_key_path}") unless File.exist?(asc_key_path)
+
+    version = expo_ios_version
+    output_directory = File.join(MOBILE_ROOT, "build/testflight")
+    ipa_path = File.join(output_directory, "zine.ipa")
+    archive_path = File.join(output_directory, "zine.xcarchive")
+    export_options_path = File.join(output_directory, "ExportOptions.plist")
+
+    api_key = app_store_connect_api_key(
+      key_id: asc_key_id,
+      issuer_id: asc_issuer_id,
+      key_filepath: asc_key_path,
+      in_house: false
+    )
+
+    prebuild_command = "bunx expo prebuild --platform ios --no-install"
+    prebuild_command += " --clean" unless ENV["ZINE_PREBUILD_CLEAN"] == "0"
+    Dir.chdir(MOBILE_ROOT) do
+      sh(prebuild_command)
+    end
+
+    with_clean_bundler_env do
+      Dir.chdir(File.join(MOBILE_ROOT, "ios")) do
+        sh("pod install")
+      end
+    end
+
+    build_app(
+      workspace: IOS_WORKSPACE,
+      scheme: IOS_SCHEME,
+      configuration: "Release",
+      clean: true,
+      skip_package_ipa: true,
+      archive_path: archive_path,
+      output_directory: output_directory,
+      output_name: "zine.ipa",
+      xcargs: build_xcargs(
+        team_id: team_id,
+        version: version.fetch(:version),
+        build_number: version.fetch(:build_number),
+        asc_key_id: asc_key_id,
+        asc_issuer_id: asc_issuer_id,
+        asc_key_path: asc_key_path
+      )
+    )
+
+    FileUtils.mkdir_p(output_directory)
+    FileUtils.rm_f(ipa_path)
+    write_export_options_plist(export_options_path, team_id: team_id)
+    sh(
+      [
+        "xcodebuild",
+        "-exportArchive",
+        "-archivePath #{archive_path.shellescape}",
+        "-exportPath #{output_directory.shellescape}",
+        "-exportOptionsPlist #{export_options_path.shellescape}",
+        provisioning_xcargs(
+          asc_key_id: asc_key_id,
+          asc_issuer_id: asc_issuer_id,
+          asc_key_path: asc_key_path
+        )
+      ].join(" ")
+    )
+    UI.user_error!("Expected IPA was not created: #{ipa_path}") unless File.exist?(ipa_path)
+
+    upload_to_testflight(
+      api_key: api_key,
+      app_identifier: APP_IDENTIFIER,
+      apple_id: ASC_APP_ID,
+      ipa: ipa_path,
+      changelog: ENV["TESTFLIGHT_CHANGELOG"],
+      skip_waiting_for_build_processing: true
+    )
+  end
+end
