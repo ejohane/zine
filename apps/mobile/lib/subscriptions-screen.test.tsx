@@ -8,6 +8,8 @@ const mockBack = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockStackScreen = jest.fn();
 let consoleErrorSpy: jest.SpyInstance;
+let mockConnections: Array<{ provider: string; status: string }> = [];
+let mockSubscriptions: Array<{ provider: string; status?: string }> = [];
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
 
@@ -92,28 +94,34 @@ jest.mock('@/components/subscriptions', () => ({
   SourceListRow: ({
     source,
     summary,
+    needsAttention,
+    attentionTestID,
     onPress,
   }: {
     source: string;
     summary: string;
+    needsAttention?: boolean;
+    attentionTestID?: string;
     onPress: () => void;
-  }) => React.createElement('button', { onClick: onPress, onPress }, `${source}:${summary}`),
+  }) =>
+    React.createElement(
+      'button',
+      { onClick: onPress, onPress, 'data-needs-attention': needsAttention },
+      `${source}:${summary}`,
+      needsAttention ? React.createElement('span', { testID: attentionTestID }, 'attention') : null
+    ),
 }));
 
 jest.mock('@/hooks/use-connections', () => ({
   useConnections: () => ({
-    data: [
-      { provider: 'YOUTUBE', status: 'ACTIVE' },
-      { provider: 'SPOTIFY', status: 'ACTIVE' },
-      { provider: 'GMAIL', status: 'ACTIVE' },
-    ],
+    data: mockConnections,
     isLoading: false,
   }),
 }));
 
 jest.mock('@/hooks/use-subscriptions', () => ({
   useSubscriptions: () => ({
-    subscriptions: [{ provider: 'YOUTUBE' }, { provider: 'SPOTIFY' }, { provider: 'SPOTIFY' }],
+    subscriptions: mockSubscriptions,
     isLoading: false,
   }),
 }));
@@ -152,6 +160,16 @@ jest.mock('@/lib/trpc', () => ({
 describe('SubscriptionsScreen header', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConnections = [
+      { provider: 'YOUTUBE', status: 'ACTIVE' },
+      { provider: 'SPOTIFY', status: 'ACTIVE' },
+      { provider: 'GMAIL', status: 'ACTIVE' },
+    ];
+    mockSubscriptions = [
+      { provider: 'YOUTUBE', status: 'ACTIVE' },
+      { provider: 'SPOTIFY', status: 'ACTIVE' },
+      { provider: 'SPOTIFY', status: 'ACTIVE' },
+    ];
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -209,5 +227,29 @@ describe('SubscriptionsScreen header', () => {
     };
 
     expect(stackScreenProps.options.headerLeft).toBeUndefined();
+  });
+
+  it('marks the provider row that needs reconnection', () => {
+    mockConnections = [
+      { provider: 'YOUTUBE', status: 'ACTIVE' },
+      { provider: 'SPOTIFY', status: 'EXPIRED' },
+      { provider: 'GMAIL', status: 'ACTIVE' },
+    ];
+    mockSubscriptions = [
+      { provider: 'YOUTUBE', status: 'ACTIVE' },
+      { provider: 'SPOTIFY', status: 'DISCONNECTED' },
+    ];
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<SubscriptionsScreen />);
+    });
+
+    expect(() =>
+      renderer!.root.findByProps({ testID: 'subscriptions-spotify-attention-dot' })
+    ).not.toThrow();
+    expect(() =>
+      renderer!.root.findByProps({ testID: 'subscriptions-youtube-attention-dot' })
+    ).toThrow();
   });
 });

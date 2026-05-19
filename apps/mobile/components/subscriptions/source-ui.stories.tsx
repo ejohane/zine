@@ -36,7 +36,8 @@ export const Overview: Story = {
       <SourceHero source="YOUTUBE" summary="Integration connected · 12 subscriptions" />
       <SourceListRow
         source="GMAIL"
-        summary="Integration connected · 8 newsletters"
+        summary="Integration needs attention · 8 newsletters"
+        needsAttention
         onPress={() => {}}
       />
       <IntegrationCard
