@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
+import { z } from 'zod';
 
 import type { Database } from '../db';
 import {
@@ -11,16 +12,38 @@ import {
   userPersonMentions,
 } from '../db/schema';
 import { logger } from '../lib/logger';
-import { searchXUsers, type XUser } from '../providers/x';
+import { lookupXUserByUsername, searchXUsers, type XUser } from '../providers/x';
 import type { Bindings } from '../types';
-import { ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
+import { DEFAULT_ENRICHMENT_MODEL, ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
 
 const socialLogger = logger.child('people-social-resolution');
 
 const AUTO_LINK_THRESHOLD = 0.82;
 const CANDIDATE_THRESHOLD = 0.45;
+const INFERRED_HANDLE_MIN_CONFIDENCE = 0.68;
 const MAX_SEARCH_QUERIES_PER_PERSON = 4;
 const MAX_CANDIDATES_PER_QUERY = 5;
+const MAX_INFERRED_HANDLES_PER_PERSON = 3;
+
+type XResolutionEnv = Pick<Bindings, 'X_BEARER_TOKEN' | 'AI' | 'ENRICHMENT_MODEL'>;
+
+type WorkersAIRun = {
+  run(model: string, input: unknown): Promise<unknown>;
+};
+
+const XHandleInferenceSchema = z.object({
+  candidates: z
+    .array(
+      z.object({
+        username: z.string().min(1).max(80),
+        confidence: z.number().min(0).max(1),
+        reason: z.string().min(1).max(240).nullable().optional(),
+      })
+    )
+    .max(5),
+});
+
+type InferredXHandleCandidate = z.infer<typeof XHandleInferenceSchema>['candidates'][number];
 
 const STOPWORDS = new Set([
   'about',
@@ -88,6 +111,8 @@ export type ScoredXProfileCandidate = XProfileCandidate & {
   confidence: number;
   matchedTerms: string[];
   negativeSignals: string[];
+  inferredHandleConfidence?: number;
+  inferredHandleReason?: string | null;
 };
 
 function compact(value: string): string {
@@ -104,6 +129,76 @@ function normalizedWords(value: string): string[] {
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
+}
+
+function normalizeXUsername(value: string): string | null {
+  const withoutUrl = value
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?(?:x|twitter)\.com\//i, '')
+    .split(/[/?#]/)[0]
+    ?.replace(/^@/, '')
+    .trim();
+
+  if (!withoutUrl || !/^[A-Za-z0-9_]{1,15}$/.test(withoutUrl)) {
+    return null;
+  }
+
+  return withoutUrl;
+}
+
+function getResponseText(response: unknown): string | null {
+  if (typeof response === 'string') return response;
+  if (!response || typeof response !== 'object') return null;
+
+  const record = response as Record<string, unknown>;
+  if (typeof record.response === 'string') return record.response;
+  if (typeof record.result === 'string') return record.result;
+  if (typeof record.text === 'string') return record.text;
+  if (typeof record.output_text === 'string') return record.output_text;
+  if (Array.isArray(record.choices)) {
+    for (const choice of record.choices) {
+      if (!choice || typeof choice !== 'object') continue;
+      const choiceRecord = choice as Record<string, unknown>;
+      if (typeof choiceRecord.text === 'string') return choiceRecord.text;
+      if (choiceRecord.message && typeof choiceRecord.message === 'object') {
+        const message = choiceRecord.message as Record<string, unknown>;
+        if (typeof message.content === 'string') return message.content;
+      }
+    }
+  }
+
+  return null;
+}
+
+function stripJsonFence(text: string): string {
+  const trimmed = text.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced?.[1]?.trim() ?? trimmed;
+}
+
+function parseHandleInferenceResponse(response: unknown): InferredXHandleCandidate[] {
+  const direct = XHandleInferenceSchema.safeParse(response);
+  if (direct.success) return direct.data.candidates;
+
+  if (response && typeof response === 'object') {
+    const record = response as Record<string, unknown>;
+    const nestedResponse = XHandleInferenceSchema.safeParse(record.response);
+    if (nestedResponse.success) return nestedResponse.data.candidates;
+
+    const nestedResult = XHandleInferenceSchema.safeParse(record.result);
+    if (nestedResult.success) return nestedResult.data.candidates;
+  }
+
+  const text = getResponseText(response);
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(stripJsonFence(text)) as unknown;
+    const validated = XHandleInferenceSchema.safeParse(parsed);
+    return validated.success ? validated.data.candidates : [];
+  } catch {
+    return [];
+  }
 }
 
 function parseMetadataText(rawMetadata: string | null): string {
@@ -216,6 +311,50 @@ export function scoreXProfileCandidate(input: {
     confidence: Math.max(0, Math.min(1, Number(confidence.toFixed(3)))),
     matchedTerms,
     negativeSignals,
+  };
+}
+
+function hasStrongNameMatch(personName: string, candidateName: string): boolean {
+  const personCompact = compact(personName);
+  const candidateNameCompact = compact(candidateName);
+  const personParts = normalizedWords(personName).map(compact);
+
+  return (
+    candidateNameCompact === personCompact ||
+    candidateNameCompact.includes(personCompact) ||
+    (personParts.length > 1 && personParts.every((part) => candidateNameCompact.includes(part)))
+  );
+}
+
+export function scoreInferredXProfileCandidate(input: {
+  personName: string;
+  contextTerms: string[];
+  candidate: XProfileCandidate;
+  inferredHandle: InferredXHandleCandidate;
+}): ScoredXProfileCandidate {
+  const base = scoreXProfileCandidate(input);
+  if (
+    input.inferredHandle.confidence < INFERRED_HANDLE_MIN_CONFIDENCE ||
+    !hasStrongNameMatch(input.personName, input.candidate.name) ||
+    base.negativeSignals.length > 0
+  ) {
+    return {
+      ...base,
+      inferredHandleConfidence: input.inferredHandle.confidence,
+      inferredHandleReason: input.inferredHandle.reason ?? null,
+    };
+  }
+
+  const inferredConfidence = Math.min(
+    0.96,
+    0.82 + input.inferredHandle.confidence * 0.12 + Math.min(0.02, base.matchedTerms.length * 0.01)
+  );
+
+  return {
+    ...base,
+    confidence: Math.max(base.confidence, Number(inferredConfidence.toFixed(3))),
+    inferredHandleConfidence: input.inferredHandle.confidence,
+    inferredHandleReason: input.inferredHandle.reason ?? null,
   };
 }
 
@@ -374,13 +513,19 @@ async function upsertCandidate(
       },
     });
 
-  if (input.status === 'LINKED' && input.candidate.profileImageUrl) {
+  if (input.status === 'LINKED') {
+    const profileImageFields = input.candidate.profileImageUrl
+      ? {
+          profileImageUrl: input.candidate.profileImageUrl,
+          profileImageSource: 'X',
+          profileImageSourceUrl: profileUrl,
+        }
+      : {};
+
     await db
       .update(userPeople)
       .set({
-        profileImageUrl: input.candidate.profileImageUrl,
-        profileImageSource: 'X',
-        profileImageSourceUrl: profileUrl,
+        ...profileImageFields,
         xHandle: input.candidate.username,
         updatedAt: input.now,
       })
@@ -389,41 +534,169 @@ async function upsertCandidate(
 }
 
 async function searchCandidatesForPerson(params: {
-  bearerToken: string;
+  env: XResolutionEnv;
   person: PersonForResolution;
   item: ItemContext;
 }): Promise<ScoredXProfileCandidate[]> {
   const queries = buildXSearchQueries(params.person, params.item);
   const contextTerms = extractContextTerms(params.item, params.person);
-  const usersById = new Map<string, XProfileCandidate>();
+  const candidatesById = new Map<string, ScoredXProfileCandidate>();
 
   for (const query of queries) {
-    const users = await searchXUsers({
-      bearerToken: params.bearerToken,
-      query,
-      maxResults: MAX_CANDIDATES_PER_QUERY,
-    });
+    try {
+      const users = await searchXUsers({
+        bearerToken: params.env.X_BEARER_TOKEN!,
+        query,
+        maxResults: MAX_CANDIDATES_PER_QUERY,
+      });
 
-    for (const user of users) {
-      usersById.set(user.id, toXProfileCandidate(user));
+      for (const user of users) {
+        const candidate = scoreXProfileCandidate({
+          personName: params.person.displayName,
+          contextTerms,
+          candidate: toXProfileCandidate(user),
+        });
+        if (candidate.confidence >= CANDIDATE_THRESHOLD) {
+          candidatesById.set(candidate.id, candidate);
+        }
+      }
+    } catch (error) {
+      socialLogger.warn('X user search failed during profile resolution', {
+        itemId: params.item.itemId,
+        userPersonId: params.person.id,
+        query,
+        error,
+      });
     }
   }
 
-  return [...usersById.values()]
-    .map((candidate) =>
-      scoreXProfileCandidate({
-        personName: params.person.displayName,
-        contextTerms,
-        candidate,
-      })
-    )
+  const hasSearchAutoLinkCandidate = [...candidatesById.values()].some(
+    (candidate) => candidate.confidence >= AUTO_LINK_THRESHOLD
+  );
+
+  if (!hasSearchAutoLinkCandidate) {
+    const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
+    for (const inferredHandle of inferredHandles) {
+      try {
+        const user = await lookupXUserByUsername({
+          bearerToken: params.env.X_BEARER_TOKEN!,
+          username: inferredHandle.username,
+        });
+        if (!user) continue;
+
+        const candidate = scoreInferredXProfileCandidate({
+          personName: params.person.displayName,
+          contextTerms,
+          candidate: toXProfileCandidate(user),
+          inferredHandle,
+        });
+        const existing = candidatesById.get(candidate.id);
+        if (!existing || candidate.confidence > existing.confidence) {
+          candidatesById.set(candidate.id, candidate);
+        }
+      } catch (error) {
+        socialLogger.warn('X inferred user lookup failed during profile resolution', {
+          itemId: params.item.itemId,
+          userPersonId: params.person.id,
+          username: inferredHandle.username,
+          error,
+        });
+      }
+    }
+  }
+
+  return [...candidatesById.values()]
     .filter((candidate) => candidate.confidence >= CANDIDATE_THRESHOLD)
     .sort((a, b) => b.confidence - a.confidence);
 }
 
+async function inferXHandleCandidates(
+  env: XResolutionEnv,
+  person: PersonForResolution,
+  item: ItemContext
+): Promise<InferredXHandleCandidate[]> {
+  const ai = env.AI as unknown as WorkersAIRun | undefined;
+  if (!ai) return [];
+
+  const prompt = {
+    task: 'Suggest likely official X usernames for the named person in this content item.',
+    constraints: [
+      'Return only JSON with one top-level key: candidates.',
+      'Each candidate must include username, confidence, and reason.',
+      'Usernames must be X handles without @.',
+      'Use public/common-knowledge inference when a well-known handle is strongly associated with the exact person.',
+      'Do not guess for common or ambiguous names.',
+      'Do not include fan, parody, quote, or topic accounts.',
+      'Use confidence below 0.68 unless the handle is very likely to belong to this exact person.',
+    ],
+    person: {
+      name: person.displayName,
+      relationship: person.relationship,
+      evidenceText: person.evidenceText,
+    },
+    item: {
+      title: item.title,
+      provider: item.provider,
+      contentType: item.contentType,
+      publisher: item.publisher,
+      creatorName: item.creatorName,
+      creatorHandle: item.creatorHandle,
+      creatorDescription: item.creatorDescription,
+    },
+    outputContract: {
+      candidates: [
+        {
+          username: 'string, X handle without @',
+          confidence: 'number from 0 to 1',
+          reason: 'short reason or null',
+        },
+      ],
+    },
+  };
+
+  try {
+    const response = await ai.run(env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL, {
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You identify official social media handles. Prefer returning no candidates over speculative matches.',
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(prompt),
+        },
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 300,
+    });
+
+    const candidates = parseHandleInferenceResponse(response)
+      .map((candidate) => ({
+        ...candidate,
+        username: normalizeXUsername(candidate.username) ?? '',
+      }))
+      .filter(
+        (candidate) =>
+          candidate.username.length > 0 && candidate.confidence >= INFERRED_HANDLE_MIN_CONFIDENCE
+      );
+
+    return unique(candidates.map((candidate) => candidate.username))
+      .map((username) => candidates.find((candidate) => candidate.username === username)!)
+      .slice(0, MAX_INFERRED_HANDLES_PER_PERSON);
+  } catch (error) {
+    socialLogger.warn('X handle inference failed during profile resolution', {
+      itemId: item.itemId,
+      userPersonId: person.id,
+      error,
+    });
+    return [];
+  }
+}
+
 export async function resolveXProfilesForItem(
   db: Database,
-  env: Pick<Bindings, 'X_BEARER_TOKEN'>,
+  env: XResolutionEnv,
   input: { itemId: string }
 ): Promise<{ linked: number; candidates: number; skipped: number }> {
   if (!env.X_BEARER_TOKEN) {
@@ -444,7 +717,7 @@ export async function resolveXProfilesForItem(
       }
 
       const candidates = await searchCandidatesForPerson({
-        bearerToken: env.X_BEARER_TOKEN,
+        env,
         person,
         item: context.item,
       });
@@ -466,6 +739,8 @@ export async function resolveXProfilesForItem(
             evidenceText: person.evidenceText,
             matchedTerms: candidate.matchedTerms,
             negativeSignals: candidate.negativeSignals,
+            inferredHandleConfidence: candidate.inferredHandleConfidence ?? null,
+            inferredHandleReason: candidate.inferredHandleReason ?? null,
           },
           now,
         });
@@ -485,11 +760,21 @@ export async function resolveXProfilesForItem(
     }
   }
 
+  socialLogger.info('X profile resolution completed', {
+    itemId: input.itemId,
+    people: context.people.length,
+    linked: totals.linked,
+    candidates: totals.candidates,
+    skipped: totals.skipped,
+  });
+
   return totals;
 }
 
 export const socialResolutionInternals = {
   buildXSearchQueries,
   extractContextTerms,
+  normalizeXUsername,
+  scoreInferredXProfileCandidate,
   scoreXProfileCandidate,
 };
