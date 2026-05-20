@@ -139,6 +139,26 @@ describe('enrichWithQwen', () => {
     expect(result.confidence.overall).toBe(output.confidence.overall);
   });
 
+  it('normalizes common model enum drift before validation', async () => {
+    const output = createValidModelOutput();
+    output.entities = [
+      {
+        name: 'Example Publisher',
+        type: 'ORGANIZATION',
+        relationship: 'PUBLISHER',
+        confidence: 0.81,
+        evidenceText: 'Published by Example Publisher.',
+      },
+    ];
+    output.suggestedTags = [{ name: 'software design', kind: 'concept', confidence: 0.78 }];
+    const run = vi.fn().mockResolvedValue({ response: JSON.stringify(output) });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.entities[0]?.relationship).toBe('CREATOR');
+    expect(result.suggestedTags[0]?.kind).toBe('topic');
+  });
+
   it('throws validation error when both model attempts are invalid', async () => {
     const run = vi.fn().mockResolvedValue({ response: '{bad-json' });
 
