@@ -24,6 +24,8 @@ const INFERRED_HANDLE_MIN_CONFIDENCE = 0.68;
 const MAX_SEARCH_QUERIES_PER_PERSON = 4;
 const MAX_CANDIDATES_PER_QUERY = 5;
 const MAX_INFERRED_HANDLES_PER_PERSON = 3;
+const MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON = 12;
+const ITEM_SUMMARY_CONTEXT_LIMIT = 1200;
 
 type XResolutionEnv = Pick<Bindings, 'X_BEARER_TOKEN' | 'AI' | 'ENRICHMENT_MODEL'>;
 
@@ -44,6 +46,10 @@ const XHandleInferenceSchema = z.object({
 });
 
 type InferredXHandleCandidate = z.infer<typeof XHandleInferenceSchema>['candidates'][number];
+type XHandleCandidateSource = 'AI_INFERRED' | 'CONTEXT_EXPLICIT' | 'NAME_DERIVED';
+type XHandleLookupCandidate = InferredXHandleCandidate & {
+  source: XHandleCandidateSource;
+};
 
 const STOPWORDS = new Set([
   'about',
@@ -90,6 +96,7 @@ export type ItemContext = {
   provider: string;
   contentType: string;
   publisher: string | null;
+  summary: string | null;
   rawMetadata: string | null;
   creatorName: string | null;
   creatorDescription: string | null;
@@ -113,6 +120,7 @@ export type ScoredXProfileCandidate = XProfileCandidate & {
   negativeSignals: string[];
   inferredHandleConfidence?: number;
   inferredHandleReason?: string | null;
+  inferredHandleSource?: XHandleCandidateSource;
 };
 
 function compact(value: string): string {
@@ -129,6 +137,13 @@ function normalizedWords(value: string): string[] {
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
+}
+
+function truncate(value: string | null | undefined, maxLength: number): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength - 3)}...`;
 }
 
 function normalizeXUsername(value: string): string | null {
@@ -214,6 +229,7 @@ function contextText(context: ItemContext, person: Pick<PersonForResolution, 'ev
   return [
     context.title,
     context.publisher,
+    truncate(context.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
     context.creatorName,
     context.creatorDescription,
     context.creatorHandle,
@@ -330,7 +346,7 @@ export function scoreInferredXProfileCandidate(input: {
   personName: string;
   contextTerms: string[];
   candidate: XProfileCandidate;
-  inferredHandle: InferredXHandleCandidate;
+  inferredHandle: XHandleLookupCandidate;
 }): ScoredXProfileCandidate {
   const base = scoreXProfileCandidate(input);
   if (
@@ -342,6 +358,16 @@ export function scoreInferredXProfileCandidate(input: {
       ...base,
       inferredHandleConfidence: input.inferredHandle.confidence,
       inferredHandleReason: input.inferredHandle.reason ?? null,
+      inferredHandleSource: input.inferredHandle.source,
+    };
+  }
+
+  if (input.inferredHandle.source === 'NAME_DERIVED' && base.matchedTerms.length === 0) {
+    return {
+      ...base,
+      inferredHandleConfidence: input.inferredHandle.confidence,
+      inferredHandleReason: input.inferredHandle.reason ?? null,
+      inferredHandleSource: input.inferredHandle.source,
     };
   }
 
@@ -355,7 +381,73 @@ export function scoreInferredXProfileCandidate(input: {
     confidence: Math.max(base.confidence, Number(inferredConfidence.toFixed(3))),
     inferredHandleConfidence: input.inferredHandle.confidence,
     inferredHandleReason: input.inferredHandle.reason ?? null,
+    inferredHandleSource: input.inferredHandle.source,
   };
+}
+
+function normalizedNameParts(value: string): string[] {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildNameDerivedHandleCandidates(person: PersonForResolution): XHandleLookupCandidate[] {
+  const parts = normalizedNameParts(person.displayName);
+  if (parts.length < 2) return [];
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const firstInitial = first[0];
+  const lastInitial = last[0];
+
+  return unique(
+    [
+      `${first}${last}`,
+      `${first}_${last}`,
+      `${firstInitial}${last}`,
+      `${firstInitial}_${last}`,
+      `${first}${lastInitial}`,
+      `${first}_${lastInitial}`,
+      `${last}${first}`,
+      `${last}_${first}`,
+      `${last}${firstInitial}`,
+      `${last}_${firstInitial}`,
+    ]
+      .map((candidate) => normalizeXUsername(candidate))
+      .filter((candidate): candidate is string => Boolean(candidate))
+  ).map((username) => ({
+    username,
+    confidence: 0.72,
+    source: 'NAME_DERIVED',
+    reason: 'Generated from the person name and validated by direct X profile lookup.',
+  }));
+}
+
+function extractExplicitHandleCandidates(
+  item: ItemContext,
+  person: PersonForResolution
+): XHandleLookupCandidate[] {
+  const text = contextText(item, person);
+  const handles = new Set<string>();
+  const handlePattern =
+    /(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/|(?<![A-Za-z0-9_])@)([A-Za-z0-9_]{1,15})(?=$|[^A-Za-z0-9_])/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = handlePattern.exec(text)) !== null) {
+    const username = normalizeXUsername(match[1] ?? '');
+    if (username) handles.add(username);
+  }
+
+  return [...handles].map((username) => ({
+    username,
+    confidence: 0.92,
+    source: 'CONTEXT_EXPLICIT',
+    reason: 'Handle appears in the content context.',
+  }));
 }
 
 function toXProfileCandidate(user: XUser): XProfileCandidate {
@@ -382,6 +474,7 @@ async function loadResolutionContext(
       provider: items.provider,
       contentType: items.contentType,
       publisher: items.publisher,
+      summary: items.summary,
       rawMetadata: items.rawMetadata,
       creatorName: creators.name,
       creatorDescription: creators.description,
@@ -575,8 +668,20 @@ async function searchCandidatesForPerson(params: {
   );
 
   if (!hasSearchAutoLinkCandidate) {
+    const explicitHandles = extractExplicitHandleCandidates(params.item, params.person);
     const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
-    for (const inferredHandle of inferredHandles) {
+    const nameDerivedHandles = buildNameDerivedHandleCandidates(params.person);
+    const lookupHandlesByUsername = new Map<string, XHandleLookupCandidate>();
+    for (const candidate of [...explicitHandles, ...inferredHandles, ...nameDerivedHandles]) {
+      if (!lookupHandlesByUsername.has(candidate.username)) {
+        lookupHandlesByUsername.set(candidate.username, candidate);
+      }
+    }
+
+    for (const inferredHandle of [...lookupHandlesByUsername.values()].slice(
+      0,
+      MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON
+    )) {
       try {
         const user = await lookupXUserByUsername({
           bearerToken: params.env.X_BEARER_TOKEN!,
@@ -614,7 +719,7 @@ async function inferXHandleCandidates(
   env: XResolutionEnv,
   person: PersonForResolution,
   item: ItemContext
-): Promise<InferredXHandleCandidate[]> {
+): Promise<XHandleLookupCandidate[]> {
   const ai = env.AI as unknown as WorkersAIRun | undefined;
   if (!ai) return [];
 
@@ -639,6 +744,7 @@ async function inferXHandleCandidates(
       provider: item.provider,
       contentType: item.contentType,
       publisher: item.publisher,
+      summary: truncate(item.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
       creatorName: item.creatorName,
       creatorHandle: item.creatorHandle,
       creatorDescription: item.creatorDescription,
@@ -675,6 +781,7 @@ async function inferXHandleCandidates(
       .map((candidate) => ({
         ...candidate,
         username: normalizeXUsername(candidate.username) ?? '',
+        source: 'AI_INFERRED' as const,
       }))
       .filter(
         (candidate) =>
@@ -741,6 +848,7 @@ export async function resolveXProfilesForItem(
             negativeSignals: candidate.negativeSignals,
             inferredHandleConfidence: candidate.inferredHandleConfidence ?? null,
             inferredHandleReason: candidate.inferredHandleReason ?? null,
+            inferredHandleSource: candidate.inferredHandleSource ?? null,
           },
           now,
         });
@@ -773,7 +881,9 @@ export async function resolveXProfilesForItem(
 
 export const socialResolutionInternals = {
   buildXSearchQueries,
+  buildNameDerivedHandleCandidates,
   extractContextTerms,
+  extractExplicitHandleCandidates,
   normalizeXUsername,
   scoreInferredXProfileCandidate,
   scoreXProfileCandidate,

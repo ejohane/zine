@@ -44,6 +44,7 @@ describe('social profile resolution helpers', () => {
       inferredHandle: {
         username: 'pmarca',
         confidence: 0.9,
+        source: 'AI_INFERRED',
         reason: 'Well-known X handle for Marc Andreessen.',
       },
       candidate: {
@@ -95,6 +96,7 @@ describe('social profile resolution helpers', () => {
         provider: 'SPOTIFY',
         contentType: 'PODCAST',
         publisher: null,
+        summary: 'Flask maintainer interview with Armin Ronacher.',
         rawMetadata: null,
         creatorName: 'The Changelog',
         creatorDescription: 'Developer podcast',
@@ -104,5 +106,89 @@ describe('social profile resolution helpers', () => {
 
     expect(queries[0]).toBe('"Armin Ronacher"');
     expect(queries.some((query) => query.includes('Flask') || query.includes('flask'))).toBe(true);
+  });
+
+  it('uses item summaries as social-resolution context', () => {
+    const terms = socialResolutionInternals.extractContextTerms(
+      {
+        itemId: 'item-1',
+        title: 'Google I/O reactions',
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        publisher: null,
+        summary: 'The Verge executive editor Jake Kastrenakes joins the livestream.',
+        rawMetadata: null,
+        creatorName: 'The Verge',
+        creatorDescription: null,
+        creatorHandle: '@theverge',
+      },
+      {
+        displayName: 'Jake Kastrenakes',
+        evidenceText: 'executive editor Jake Kastrenakes',
+      }
+    );
+
+    expect(terms).toContain('verge');
+    expect(terms).toContain('executive');
+  });
+
+  it('generates common validated lookup handles from names', () => {
+    const candidates = socialResolutionInternals.buildNameDerivedHandleCandidates({
+      id: 'person-1',
+      userId: 'user-1',
+      displayName: 'Jake Kastrenakes',
+      normalizedName: 'jake kastrenakes',
+      profileImageSource: null,
+      xHandle: null,
+      relationship: 'GUEST',
+      evidenceText: 'executive editor Jake Kastrenakes',
+    });
+
+    expect(candidates.map((candidate) => candidate.username)).toContain('jake_k');
+  });
+
+  it('does not boost name-derived handles without profile context support', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'James Smith',
+      contextTerms: ['podcast', 'venture'],
+      inferredHandle: {
+        username: 'jamessmith',
+        confidence: 0.72,
+        source: 'NAME_DERIVED',
+        reason: 'Generated from the person name.',
+      },
+      candidate: {
+        id: 'x-5',
+        name: 'James Smith',
+        username: 'jamessmith',
+        description: 'Personal account.',
+      },
+    });
+
+    expect(scored.confidence).toBeLessThan(0.82);
+  });
+
+  it('can boost name-derived handles when the validated profile matches item context', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'Jake Kastrenakes',
+      contextTerms: ['verge', 'executive', 'editor'],
+      inferredHandle: {
+        username: 'jake_k',
+        confidence: 0.72,
+        source: 'NAME_DERIVED',
+        reason: 'Generated from the person name.',
+      },
+      candidate: {
+        id: 'x-6',
+        name: 'Jake Kastrenakes',
+        username: 'jake_k',
+        description: 'Executive editor at The Verge.',
+        profileImageUrl: 'https://pbs.twimg.com/profile_images/jake.jpg',
+        followersCount: 10000,
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(scored.inferredHandleSource).toBe('NAME_DERIVED');
   });
 });
