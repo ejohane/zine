@@ -15,6 +15,7 @@ type PersonEntity = {
   name: string;
   personId: string | null;
   profileImageUrl: string | null;
+  xHandle: string | null;
   relationship: string;
   confidence: number;
 };
@@ -76,6 +77,12 @@ function getInitials(name: string): string {
     .join('');
 }
 
+function formatXHandle(value: string | null): string | null {
+  if (!value) return null;
+  const handle = value.trim().replace(/^@/, '');
+  return handle ? `@${handle}` : null;
+}
+
 function getPeopleCardLabel(contentType: string): string {
   switch (contentType.toUpperCase()) {
     case 'VIDEO':
@@ -110,6 +117,7 @@ function toPeople(entities: EnrichmentEntity[]): PersonEntity[] {
       name,
       personId: entity.personId ?? null,
       profileImageUrl: entity.profileImageUrl ?? null,
+      xHandle: entity.xHandle ?? null,
       relationship: entity.relationship ?? 'MENTIONED',
       confidence: entity.confidence,
     };
@@ -118,6 +126,7 @@ function toPeople(entities: EnrichmentEntity[]): PersonEntity[] {
           ...next,
           personId: next.personId ?? existing.personId,
           profileImageUrl: next.profileImageUrl ?? existing.profileImageUrl,
+          xHandle: next.xHandle ?? existing.xHandle,
         }
       : next;
 
@@ -125,6 +134,7 @@ function toPeople(entities: EnrichmentEntity[]): PersonEntity[] {
       !existing ||
       (!existing.personId && candidate.personId) ||
       (!existing.profileImageUrl && candidate.profileImageUrl) ||
+      (!existing.xHandle && candidate.xHandle) ||
       relationshipPriority(candidate.relationship) > relationshipPriority(existing.relationship) ||
       (candidate.relationship === existing.relationship &&
         candidate.confidence > existing.confidence)
@@ -159,6 +169,7 @@ function PersonRow({
   const isNavigable = Boolean(personId && onPersonPress);
   const relationship = formatRelationship(person.relationship);
   const label = relationship ? `${person.name} / ${relationship}` : person.name;
+  const xHandle = formatXHandle(person.xHandle);
 
   useEffect(() => {
     setImageFailed(false);
@@ -180,16 +191,23 @@ function PersonRow({
           </Text>
         )}
       </View>
-      <Text
-        variant="bodyMedium"
-        tone="primary"
-        colors={colors}
-        transform="none"
-        numberOfLines={1}
-        style={styles.peopleName}
-      >
-        {label}
-      </Text>
+      <View style={styles.peopleTextStack}>
+        <Text
+          variant="bodyMedium"
+          tone="primary"
+          colors={colors}
+          transform="none"
+          numberOfLines={1}
+          style={styles.peopleName}
+        >
+          {label}
+        </Text>
+        {xHandle ? (
+          <Text variant="labelSmall" tone="tertiary" colors={colors} transform="none">
+            {xHandle}
+          </Text>
+        ) : null}
+      </View>
       {isNavigable ? (
         <Ionicons name="chevron-forward" size={IconSizes.sm} color={colors.textTertiary} />
       ) : null}

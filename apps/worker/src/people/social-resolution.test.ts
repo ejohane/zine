@@ -37,6 +37,30 @@ describe('social profile resolution helpers', () => {
     expect(scored.confidence).toBeLessThan(0.82);
   });
 
+  it('can auto-link validated inferred handles that do not resemble the person name', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'Marc Andreessen',
+      contextTerms: ['joe', 'rogan', 'venture'],
+      inferredHandle: {
+        username: 'pmarca',
+        confidence: 0.9,
+        reason: 'Well-known X handle for Marc Andreessen.',
+      },
+      candidate: {
+        id: 'x-4',
+        name: 'Marc Andreessen',
+        username: 'pmarca',
+        description: 'Co-founder of Andreessen Horowitz.',
+        profileImageUrl: 'https://pbs.twimg.com/profile_images/pmarca.jpg',
+        verified: true,
+        followersCount: 1200000,
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(scored.inferredHandleConfidence).toBe(0.9);
+  });
+
   it('penalizes parody and fan accounts', () => {
     const scored = socialResolutionInternals.scoreXProfileCandidate({
       personName: 'Elon Musk',

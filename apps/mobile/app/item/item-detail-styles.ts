@@ -247,8 +247,12 @@ export const styles = StyleSheet.create({
     height: '100%',
   },
   peopleName: {
+    minWidth: 0,
+  },
+  peopleTextStack: {
     flex: 1,
     minWidth: 0,
+    gap: Spacing.xs,
   },
 
   // Enrichment

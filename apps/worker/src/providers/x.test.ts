@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchXBookmarksPage, searchXUsers, XAuthError } from './x';
+import { fetchXBookmarksPage, lookupXUserByUsername, searchXUsers, XAuthError } from './x';
 import type { XRateLimitError } from './x';
 
 type FetchMock = ReturnType<typeof vi.fn>;
@@ -115,5 +115,35 @@ describe('X provider', () => {
       }),
     });
     expect(users[0].username).toBe('mitsuhiko');
+  });
+
+  it('looks up an X user by username with profile fields', async () => {
+    const fetchMock = globalThis.fetch as unknown as FetchMock;
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            id: 'user-2',
+            name: 'Marc Andreessen',
+            username: 'pmarca',
+            description: 'Partner at a16z.',
+            profile_image_url: 'https://pbs.twimg.com/profile_images/pmarca.jpg',
+            verified: true,
+          },
+        }),
+        { status: 200 }
+      )
+    );
+
+    const user = await lookupXUserByUsername({
+      bearerToken: 'bearer',
+      username: 'pmarca',
+    });
+
+    const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestedUrl.pathname).toBe('/2/users/by/username/pmarca');
+    expect(requestedUrl.searchParams.get('user.fields')).toContain('profile_image_url');
+    expect(user?.name).toBe('Marc Andreessen');
+    expect(user?.username).toBe('pmarca');
   });
 });

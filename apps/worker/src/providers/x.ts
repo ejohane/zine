@@ -84,6 +84,17 @@ export class XAuthError extends Error {
 export const X_BOOKMARKS_MAX_RESULTS = 100;
 export const X_USER_SEARCH_MAX_RESULTS = 10;
 
+const X_USER_FIELDS = [
+  'description',
+  'id',
+  'name',
+  'profile_image_url',
+  'public_metrics',
+  'url',
+  'username',
+  'verified',
+].join(',');
+
 function parseRateLimit(headers: Headers): XRateLimitInfo {
   const limit = headers.get('x-rate-limit-limit');
   const remaining = headers.get('x-rate-limit-remaining');
@@ -157,19 +168,7 @@ export async function searchXUsers(params: {
 }): Promise<XUser[]> {
   const url = new URL('https://api.x.com/2/users/search');
   url.searchParams.set('query', params.query);
-  url.searchParams.set(
-    'user.fields',
-    [
-      'description',
-      'id',
-      'name',
-      'profile_image_url',
-      'public_metrics',
-      'url',
-      'username',
-      'verified',
-    ].join(',')
-  );
+  url.searchParams.set('user.fields', X_USER_FIELDS);
   url.searchParams.set('max_results', String(params.maxResults ?? X_USER_SEARCH_MAX_RESULTS));
 
   const response = await fetch(url.toString(), {
@@ -196,4 +195,43 @@ export async function searchXUsers(params: {
 
   const body = (await response.json()) as { data?: XUser[] };
   return body.data ?? [];
+}
+
+export async function lookupXUserByUsername(params: {
+  bearerToken: string;
+  username: string;
+}): Promise<XUser | null> {
+  const url = new URL(
+    `https://api.x.com/2/users/by/username/${encodeURIComponent(params.username)}`
+  );
+  url.searchParams.set('user.fields', X_USER_FIELDS);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${params.bearerToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const rateLimit = parseRateLimit(response.headers);
+
+  if (response.status === 429) {
+    throw new XRateLimitError('X user lookup rate limit exceeded', rateLimit);
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    const text = await response.text();
+    throw new XAuthError(response.status, text || `X user lookup failed: ${response.status}`);
+  }
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`X user lookup failed: ${response.status} ${text}`);
+  }
+
+  const body = (await response.json()) as { data?: XUser; errors?: unknown[] };
+  return body.data ?? null;
 }
