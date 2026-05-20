@@ -6,6 +6,7 @@ import { UserItemState } from '@zine/shared';
 import { router, protectedProcedure } from '../trpc';
 import { creators, items, subscriptions, userItems, userPeople } from '../../db/schema';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
+import { normalizePersonDisplayName } from '../../people/service';
 import { toItemViewsWithTags, type ItemView } from './items';
 
 const DEFAULT_CREATORS_LIMIT = 5;
@@ -261,7 +262,7 @@ export function buildSearchResponse(input: {
       type: 'person' as const,
       id: row.id,
       personId: row.id,
-      displayName: row.displayName,
+      displayName: normalizePersonDisplayName(row.displayName),
       profileImageUrl: row.profileImageUrl,
       profileImageSource: row.profileImageSource,
       xHandle: row.xHandle,
@@ -443,7 +444,7 @@ export const searchRouter = router({
       personRows.push(
         ...matchedPeopleRows.map((row) => ({
           id: row.id,
-          displayName: row.displayName,
+          displayName: normalizePersonDisplayName(row.displayName),
           profileImageUrl: row.profileImageUrl,
           profileImageSource: row.profileImageSource,
           xHandle: row.xHandle,

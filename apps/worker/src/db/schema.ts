@@ -422,6 +422,52 @@ export const userPersonMentions = sqliteTable(
   ]
 );
 
+// Inferred social profiles for private per-user people records.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const personSocialProfiles = sqliteTable(
+  'person_social_profiles',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    userPersonId: text('user_person_id')
+      .notNull()
+      .references(() => userPeople.id),
+    provider: text('provider').notNull(),
+    providerProfileId: text('provider_profile_id').notNull(),
+    handle: text('handle').notNull(),
+    displayName: text('display_name').notNull(),
+    avatarUrl: text('avatar_url'),
+    profileUrl: text('profile_url').notNull(),
+    description: text('description'),
+    verified: integer('verified', { mode: 'boolean' }).notNull().default(false),
+    confidence: real('confidence').notNull(),
+    status: text('status').notNull(),
+    evidenceJson: text('evidence_json'),
+    lastCheckedAt: integer('last_checked_at').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('person_social_profiles_person_provider_profile_idx').on(
+      table.userPersonId,
+      table.provider,
+      table.providerProfileId
+    ),
+    index('person_social_profiles_person_status_idx').on(
+      table.userPersonId,
+      table.provider,
+      table.status,
+      table.confidence
+    ),
+    index('person_social_profiles_provider_profile_idx').on(
+      table.provider,
+      table.providerProfileId
+    ),
+  ]
+);
+
 // Item Embedding References
 // D1 reference records for vectors stored in Cloudflare Vectorize.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

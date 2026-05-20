@@ -46,4 +46,16 @@ describe('enrichment prompt helpers', () => {
 
     expect(buildArticleExcerpt(articleContent)).not.toContain('tail-marker');
   });
+
+  it('asks the model to preserve show host and owner relationships', () => {
+    const messages = buildEnrichmentMessages(createPromptInput('Hosted by Casey Newton.'));
+    const userPayload = JSON.parse(String(messages[1].content)) as {
+      constraints: string[];
+    };
+
+    expect(userPayload.constraints.join(' ')).toContain('HOST');
+    expect(userPayload.constraints.join(' ')).toContain('co-hosts');
+    expect(userPayload.constraints.join(' ')).toContain('owners');
+    expect(userPayload.constraints.join(' ')).toContain('evidenceText');
+  });
 });

@@ -56,6 +56,7 @@ import { enqueueBookmarkEnrichment } from '../../enrichment/service';
 import { ENRICHMENT_SCHEMA_VERSION, type SuggestedTag } from '../../enrichment/types';
 import {
   deactivatePeopleForUserItemBestEffort,
+  normalizePersonDisplayName,
   normalizePersonName,
   syncPeopleForUserItemBestEffort,
 } from '../../people/service';
@@ -1006,9 +1007,13 @@ export const itemsRouter = router({
 
       const canonical = canonicalRows[0] ?? null;
       const userEnrichment = userRows[0] ?? null;
-      const parsedEntities = parseJsonArray<{ name: string; type: string; confidence: number }>(
-        canonical?.entitiesJson ?? null
-      );
+      const parsedEntities = parseJsonArray<{
+        name: string;
+        type: string;
+        relationship?: string;
+        confidence: number;
+        evidenceText?: string | null;
+      }>(canonical?.entitiesJson ?? null);
       const activePersonRows =
         parsedEntities.length > 0
           ? await ctx.db
@@ -1042,13 +1047,18 @@ export const itemsRouter = router({
           topics: parseJsonArray<{ name: string; confidence: number }>(
             canonical?.topicsJson ?? null
           ),
-          entities: parsedEntities.map((entity) => ({
-            ...entity,
-            personId:
-              normalizePersonName(entity.name) && entity.type.trim().toLowerCase() === 'person'
-                ? (personIdByNormalizedName.get(normalizePersonName(entity.name)) ?? null)
+          entities: parsedEntities.map((entity) => {
+            const isPerson = entity.type.trim().toLowerCase() === 'person';
+            const normalizedPersonName = isPerson ? normalizePersonName(entity.name) : '';
+
+            return {
+              ...entity,
+              name: isPerson ? normalizePersonDisplayName(entity.name) : entity.name,
+              personId: normalizedPersonName
+                ? (personIdByNormalizedName.get(normalizedPersonName) ?? null)
                 : null,
-          })),
+            };
+          }),
           intent: canonical?.intent ?? null,
           difficulty: canonical?.difficulty ?? null,
           evergreenScore: canonical?.evergreenScore ?? null,

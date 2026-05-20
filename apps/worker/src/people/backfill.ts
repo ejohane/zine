@@ -4,7 +4,9 @@ import { UserItemState } from '@zine/shared';
 import type { Database } from '../db';
 import { userItems } from '../db/schema';
 import { logger } from '../lib/logger';
+import type { Bindings } from '../types';
 import { syncPeopleForUserItem } from './service';
+import { resolveXProfilesForItem } from './social-resolution';
 
 const backfillLogger = logger.child('people-backfill');
 
@@ -27,6 +29,8 @@ export interface PeopleBackfillResult {
   indexed: number;
   deactivated: number;
   skipped: number;
+  socialProfilesLinked: number;
+  socialProfileCandidates: number;
   candidates: Array<{
     userItemId: string;
     userId: string;
@@ -41,6 +45,7 @@ function normalizeLimit(value: number | undefined): number {
 
 export async function backfillPeopleIndex(
   db: Database,
+  env?: Pick<Bindings, 'X_BEARER_TOKEN'>,
   options: PeopleBackfillOptions = {}
 ): Promise<PeopleBackfillResult> {
   const dryRun = options.dryRun ?? true;
@@ -69,6 +74,8 @@ export async function backfillPeopleIndex(
   let indexed = 0;
   let deactivated = 0;
   let skipped = 0;
+  let socialProfilesLinked = 0;
+  let socialProfileCandidates = 0;
 
   if (!dryRun) {
     for (const row of rows) {
@@ -79,6 +86,12 @@ export async function backfillPeopleIndex(
       indexed += result.indexed;
       deactivated += result.deactivated;
       skipped += result.skipped;
+
+      if (env) {
+        const socialResult = await resolveXProfilesForItem(db, env, { itemId: row.itemId });
+        socialProfilesLinked += socialResult.linked;
+        socialProfileCandidates += socialResult.candidates;
+      }
     }
   }
 
@@ -93,6 +106,8 @@ export async function backfillPeopleIndex(
     indexed,
     deactivated,
     skipped,
+    socialProfilesLinked,
+    socialProfileCandidates,
   });
 
   return {
@@ -104,6 +119,8 @@ export async function backfillPeopleIndex(
     indexed,
     deactivated,
     skipped,
+    socialProfilesLinked,
+    socialProfileCandidates,
     candidates: rows,
   };
 }
