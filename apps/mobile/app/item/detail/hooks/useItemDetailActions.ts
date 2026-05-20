@@ -26,6 +26,12 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
   const toggleFinishedMutation = useToggleFinished();
   const markOpenedMutation = useMarkItemOpened();
 
+  const handleMarkLinkOpened = useCallback(() => {
+    if (item?.state === UserItemState.BOOKMARKED) {
+      markOpenedMutation.mutate({ id: item.id });
+    }
+  }, [item?.id, item?.state, markOpenedMutation]);
+
   const handleOpenLink = useCallback(async () => {
     if (!item?.canonicalUrl) return;
 
@@ -56,13 +62,13 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
         }
       }
 
-      if (didOpen && item.state === UserItemState.BOOKMARKED) {
-        markOpenedMutation.mutate({ id: item.id });
+      if (didOpen) {
+        handleMarkLinkOpened();
       }
     } catch (err) {
       logger.error('Failed to open URL', { error: err });
     }
-  }, [item, markOpenedMutation]);
+  }, [handleMarkLinkOpened, item]);
 
   const handleShare = useCallback(async () => {
     if (!item) return;
@@ -120,6 +126,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
 
   return {
     handleOpenLink,
+    handleMarkLinkOpened,
     handleShare,
     handleToggleBookmark,
     handleSecondaryAction,

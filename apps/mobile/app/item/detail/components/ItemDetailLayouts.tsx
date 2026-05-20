@@ -18,6 +18,7 @@ type ItemDetailLayoutBaseProps = {
   onScroll: ScrollViewProps['onScroll'];
   screenTitle: string;
   showCollapsedTitle: boolean;
+  overlay?: ReactNode;
 };
 
 export function ItemDetailParallaxLayout({
@@ -28,6 +29,7 @@ export function ItemDetailParallaxLayout({
   onScroll,
   screenTitle,
   showCollapsedTitle,
+  overlay,
   headerImage,
   headerAspectRatio,
 }: ItemDetailLayoutBaseProps & {
@@ -55,6 +57,7 @@ export function ItemDetailParallaxLayout({
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
       />
+      {overlay}
     </View>
   );
 }
@@ -67,6 +70,7 @@ export function ItemDetailScrollLayout({
   onScroll,
   screenTitle,
   showCollapsedTitle,
+  overlay,
 }: ItemDetailLayoutBaseProps) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -89,6 +93,7 @@ export function ItemDetailScrollLayout({
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
       />
+      {overlay}
     </View>
   );
 }

@@ -14,12 +14,15 @@
  */
 
 import { Image } from 'expo-image';
+import * as Haptics from 'expo-haptics';
 import { useRouter, type Href } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ContentType } from '@/hooks/use-items-trpc';
 import { upgradeSpotifyImageUrl, upgradeYouTubeImageUrl } from '@/lib/content-utils';
 import {
   COLLAPSED_TITLE_THRESHOLD,
@@ -29,6 +32,7 @@ import {
 
 import { XPostBookmarkView } from './item-detail-components';
 import { styles } from './item-detail-styles';
+import { ItemDetailArticleWebView } from './detail/components/ItemDetailArticleWebView';
 import { ItemDetailContent } from './detail/components/ItemDetailContent';
 import { ItemCollectionsSheet } from './detail/components/ItemCollectionsSheet';
 import {
@@ -54,12 +58,14 @@ export default function ItemDetailScreen() {
   const [contentTopY, setContentTopY] = useState<number | null>(null);
   const [titleOffsetY, setTitleOffsetY] = useState<number | null>(null);
   const [collectionsSheetOpen, setCollectionsSheetOpen] = useState(false);
+  const [articleWebViewOpen, setArticleWebViewOpen] = useState(false);
 
   const { id, isValid, message } = useItemDetailParams();
   const { item, enrichment, otherUnfinishedBookmarks, isLoading, error, refetch, creatorData } =
     useItemDetailData({ id, isValid });
   const {
     handleOpenLink,
+    handleMarkLinkOpened,
     handleShare,
     handleToggleBookmark,
     handleSecondaryAction,
@@ -105,6 +111,38 @@ export default function ItemDetailScreen() {
   const handleCloseCollectionsSheet = useCallback(() => {
     setCollectionsSheetOpen(false);
   }, []);
+  const shouldUsePreloadedArticleWebView =
+    Platform.OS === 'ios' &&
+    item?.contentType === ContentType.ARTICLE &&
+    item.provider !== 'SUBSTACK' &&
+    !!item.canonicalUrl;
+  const handleOpenPrimaryLink = useCallback(() => {
+    if (!shouldUsePreloadedArticleWebView) {
+      void handleOpenLink();
+      return;
+    }
+
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setArticleWebViewOpen(true);
+    handleMarkLinkOpened();
+  }, [handleMarkLinkOpened, handleOpenLink, shouldUsePreloadedArticleWebView]);
+  const handleCloseArticleWebView = useCallback(() => {
+    setArticleWebViewOpen(false);
+  }, []);
+
+  useEffect(() => {
+    setArticleWebViewOpen(false);
+  }, [item?.id]);
+
+  const articleWebViewOverlay = (
+    <ItemDetailArticleWebView
+      url={shouldUsePreloadedArticleWebView ? item?.canonicalUrl : null}
+      colors={colors}
+      insets={insets}
+      visible={articleWebViewOpen}
+      onClose={handleCloseArticleWebView}
+    />
+  );
 
   if (!isValid) {
     return (
@@ -134,7 +172,7 @@ export default function ItemDetailScreen() {
           colors={colors}
           insets={insets}
           onBack={() => router.back()}
-          onOpenLink={handleOpenLink}
+          onOpenLink={handleOpenPrimaryLink}
           onShare={handleShare}
           onBookmarkToggle={handleToggleBookmark}
           onSecondaryAction={handleSecondaryAction}
@@ -187,6 +225,7 @@ export default function ItemDetailScreen() {
           />
         }
         headerAspectRatio={viewState.headerAspectRatio}
+        overlay={articleWebViewOverlay}
       >
         <ItemDetailContent
           item={item}
@@ -208,7 +247,7 @@ export default function ItemDetailScreen() {
           onSecondaryAction={handleSecondaryAction}
           onManageTags={handleOpenCollectionsSheet}
           onShare={handleShare}
-          onOpenLink={handleOpenLink}
+          onOpenLink={handleOpenPrimaryLink}
           onPersonPress={(personId) => router.push(`/person/${personId}?source=item` as Href)}
           otherUnfinishedBookmarks={otherUnfinishedBookmarks}
           onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
@@ -235,6 +274,7 @@ export default function ItemDetailScreen() {
       onScroll={handleScroll}
       screenTitle={item.title}
       showCollapsedTitle={showCollapsedTitle}
+      overlay={articleWebViewOverlay}
     >
       <ItemDetailContent
         item={item}
@@ -256,7 +296,7 @@ export default function ItemDetailScreen() {
         onSecondaryAction={handleSecondaryAction}
         onManageTags={handleOpenCollectionsSheet}
         onShare={handleShare}
-        onOpenLink={handleOpenLink}
+        onOpenLink={handleOpenPrimaryLink}
         onPersonPress={(personId) => router.push(`/person/${personId}?source=item` as Href)}
         otherUnfinishedBookmarks={otherUnfinishedBookmarks}
         onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
