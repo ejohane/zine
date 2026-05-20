@@ -1,27 +1,31 @@
 import React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { SourceHero } from './source-ui';
+import { SourceHero, SourceListRow } from './source-ui';
+
+type Renderer = ReturnType<typeof TestRenderer.create>;
 
 jest.mock('react-native', () => ({
   __esModule: true,
   Platform: {
     select: (options: Record<string, unknown>) => options.ios ?? options.default,
   },
-  View: ({ children }: { children?: React.ReactNode }) =>
-    React.createElement('div', null, children),
+  View: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children),
   Image: ({ children }: { children?: React.ReactNode }) =>
     React.createElement('img', null, children),
   Pressable: ({
     children,
     onPress,
+    accessibilityLabel,
   }: {
     children?: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
     onPress?: () => void;
+    accessibilityLabel?: string;
   }) =>
     React.createElement(
       'button',
-      { onClick: onPress, onPress },
+      { onClick: onPress, onPress, accessibilityLabel },
       typeof children === 'function' ? children({ pressed: false }) : children
     ),
   TextInput: ({
@@ -117,6 +121,7 @@ jest.mock('@/hooks/use-app-theme', () => ({
       textPrimary: '#ffffff',
       textTertiary: '#777777',
       statusInfo: '#33aaff',
+      statusWarning: '#ffaa33',
     },
     motion: {
       opacity: {
@@ -135,5 +140,27 @@ describe('SourceHero', () => {
         );
       });
     }).not.toThrow();
+  });
+});
+
+describe('SourceListRow', () => {
+  it('marks provider rows that need attention', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(
+        <SourceListRow
+          source="SPOTIFY"
+          summary="Integration needs attention"
+          needsAttention
+          attentionTestID="spotify-attention-dot"
+          onPress={() => {}}
+        />
+      );
+    });
+
+    expect(() => renderer!.root.findByProps({ testID: 'spotify-attention-dot' })).not.toThrow();
+    expect(renderer!.root.findByType('button').props.accessibilityLabel).toContain(
+      'needs attention'
+    );
   });
 });

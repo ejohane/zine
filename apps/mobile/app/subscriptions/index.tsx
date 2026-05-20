@@ -15,6 +15,7 @@ import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
+import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
 import {
   getHubStatusText,
   getIntegrationState,
@@ -77,6 +78,10 @@ export default function SubscriptionsScreen() {
   const gmailCount = newsletterStatsQuery.data?.active ?? 0;
   const xCount = xBookmarksStatusQuery.data?.importedCount ?? 0;
   const rssCount = rssStatsQuery.data?.active ?? 0;
+  const attentionProviders = useMemo(
+    () => new Set(getSubscriptionIntegrationAttention(connections, subscriptions).providers),
+    [connections, subscriptions]
+  );
 
   const sourceRows = useMemo(
     () =>
@@ -101,14 +106,20 @@ export default function SubscriptionsScreen() {
                 : source === 'X'
                   ? xStatus
                   : null;
+        const needsAttention = source !== 'RSS' && attentionProviders.has(source);
+        const integrationState = needsAttention
+          ? 'needsAttention'
+          : getIntegrationState(source, status);
 
         return {
           source,
           route: getSubscriptionSourceConfig(source).route,
-          summary: getHubStatusText(source, getIntegrationState(source, status), count),
+          summary: getHubStatusText(source, integrationState, count),
+          needsAttention,
         };
       }),
     [
+      attentionProviders,
       gmailCount,
       gmailStatus,
       rssCount,
@@ -156,6 +167,8 @@ export default function SubscriptionsScreen() {
                 key={row.source}
                 source={row.source}
                 summary={row.summary}
+                needsAttention={row.needsAttention}
+                attentionTestID={`subscriptions-${row.source.toLowerCase()}-attention-dot`}
                 onPress={() => router.push(row.route)}
               />
             ))}

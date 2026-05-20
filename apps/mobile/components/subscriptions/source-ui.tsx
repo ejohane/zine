@@ -299,10 +299,14 @@ function SubscriptionToggle({
 export function SourceListRow({
   source,
   summary,
+  needsAttention = false,
+  attentionTestID,
   onPress,
 }: {
   source: SubscriptionSource;
   summary: string;
+  needsAttention?: boolean;
+  attentionTestID?: string;
   onPress: () => void;
 }) {
   const { colors, motion } = useAppTheme();
@@ -312,7 +316,7 @@ export function SourceListRow({
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Open ${config.name} subscriptions`}
+      accessibilityLabel={`Open ${config.name} subscriptions${needsAttention ? ', needs attention' : ''}`}
       style={({ pressed }) => [pressed && { opacity: motion.opacity.pressed }]}
     >
       <Surface tone="elevated" border="subtle" radius="xl" style={styles.sourceRow}>
@@ -325,7 +329,17 @@ export function SourceListRow({
             {summary}
           </Text>
         </View>
-        <ChevronRightIcon size={18} color={colors.textTertiary} />
+        <View style={styles.sourceRowTrailing}>
+          {needsAttention ? (
+            <View
+              testID={attentionTestID}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+              style={[styles.attentionDot, { backgroundColor: colors.statusWarning }]}
+            />
+          ) : null}
+          <ChevronRightIcon size={18} color={colors.textTertiary} />
+        </View>
       </Surface>
     </Pressable>
   );
@@ -770,6 +784,16 @@ const styles = StyleSheet.create({
   sourceRowCopy: {
     flex: 1,
     gap: Spacing.xs,
+  },
+  sourceRowTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  attentionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
   },
   hero: {
     flexDirection: 'row',
