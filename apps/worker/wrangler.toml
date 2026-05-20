@@ -268,3 +268,4 @@ invocation_logs = true
 #
 # Optional Variables:
 # - CLERK_JWKS_URL: Override default JWKS URL for token verification
+# - X_PROFILE_SEARCH_USER_ID: Clerk user ID whose active X OAuth connection powers full-name X profile search

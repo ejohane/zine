@@ -8,10 +8,16 @@ import {
   itemEnrichments,
   items,
   personSocialProfiles,
+  providerConnections,
   userPeople,
   userPersonMentions,
 } from '../db/schema';
 import { logger } from '../lib/logger';
+import {
+  getValidAccessToken,
+  type ProviderConnection,
+  type TokenRefreshEnv,
+} from '../lib/token-refresh';
 import { lookupXUserByUsername, searchXUsers, type XUser } from '../providers/x';
 import type { Bindings } from '../types';
 import { DEFAULT_ENRICHMENT_MODEL, ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
@@ -27,7 +33,23 @@ const MAX_INFERRED_HANDLES_PER_PERSON = 3;
 const MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON = 12;
 const ITEM_SUMMARY_CONTEXT_LIMIT = 1200;
 
-type XResolutionEnv = Pick<Bindings, 'X_BEARER_TOKEN' | 'AI' | 'ENRICHMENT_MODEL'>;
+export type XResolutionEnv = Pick<
+  Bindings,
+  | 'AI'
+  | 'DB'
+  | 'ENRICHMENT_MODEL'
+  | 'ENCRYPTION_KEY'
+  | 'GOOGLE_CLIENT_ID'
+  | 'GOOGLE_CLIENT_SECRET'
+  | 'OAUTH_STATE_KV'
+  | 'SPOTIFY_CLIENT_ID'
+  | 'SPOTIFY_CLIENT_SECRET'
+  | 'TOKEN_REFRESH_LOCK_WAIT_MS'
+  | 'X_BEARER_TOKEN'
+  | 'X_CLIENT_ID'
+  | 'X_CLIENT_SECRET'
+  | 'X_PROFILE_SEARCH_USER_ID'
+>;
 
 type WorkersAIRun = {
   run(model: string, input: unknown): Promise<unknown>;
@@ -49,6 +71,11 @@ type InferredXHandleCandidate = z.infer<typeof XHandleInferenceSchema>['candidat
 type XHandleCandidateSource = 'AI_INFERRED' | 'CONTEXT_EXPLICIT' | 'NAME_DERIVED';
 type XHandleLookupCandidate = InferredXHandleCandidate & {
   source: XHandleCandidateSource;
+};
+
+type XAccessTokens = {
+  userSearchAccessToken: string | null;
+  directLookupAccessToken: string | null;
 };
 
 const STOPWORDS = new Set([
@@ -463,6 +490,62 @@ function toXProfileCandidate(user: XUser): XProfileCandidate {
   };
 }
 
+async function getXUserSearchAccessToken(
+  db: Database,
+  env: XResolutionEnv
+): Promise<string | null> {
+  const serviceUserId = env.X_PROFILE_SEARCH_USER_ID?.trim();
+  if (!serviceUserId) return null;
+
+  if (!env.DB || !env.OAUTH_STATE_KV || !env.ENCRYPTION_KEY || !env.X_CLIENT_ID) {
+    socialLogger.warn('X profile search user configured without token refresh bindings', {
+      hasDb: !!env.DB,
+      hasOauthStateKv: !!env.OAUTH_STATE_KV,
+      hasEncryptionKey: !!env.ENCRYPTION_KEY,
+      hasXClientId: !!env.X_CLIENT_ID,
+    });
+    return null;
+  }
+
+  const connection = await db.query.providerConnections.findFirst({
+    where: and(
+      eq(providerConnections.userId, serviceUserId),
+      eq(providerConnections.provider, 'X'),
+      eq(providerConnections.status, 'ACTIVE')
+    ),
+  });
+
+  if (!connection) {
+    socialLogger.warn('X profile search user has no active X provider connection', {
+      serviceUserId,
+    });
+    return null;
+  }
+
+  try {
+    return await getValidAccessToken(
+      connection as ProviderConnection,
+      env as unknown as TokenRefreshEnv
+    );
+  } catch (error) {
+    socialLogger.warn('Failed to get X profile search user access token', {
+      serviceUserId,
+      connectionId: connection.id,
+      error,
+    });
+    return null;
+  }
+}
+
+async function resolveXAccessTokens(db: Database, env: XResolutionEnv): Promise<XAccessTokens> {
+  const userSearchAccessToken = await getXUserSearchAccessToken(db, env);
+  const appOnlyAccessToken = env.X_BEARER_TOKEN?.trim() || null;
+  return {
+    userSearchAccessToken,
+    directLookupAccessToken: appOnlyAccessToken ?? userSearchAccessToken,
+  };
+}
+
 async function loadResolutionContext(
   db: Database,
   itemId: string
@@ -628,6 +711,7 @@ async function upsertCandidate(
 
 async function searchCandidatesForPerson(params: {
   env: XResolutionEnv;
+  tokens: XAccessTokens;
   person: PersonForResolution;
   item: ItemContext;
 }): Promise<ScoredXProfileCandidate[]> {
@@ -635,31 +719,33 @@ async function searchCandidatesForPerson(params: {
   const contextTerms = extractContextTerms(params.item, params.person);
   const candidatesById = new Map<string, ScoredXProfileCandidate>();
 
-  for (const query of queries) {
-    try {
-      const users = await searchXUsers({
-        bearerToken: params.env.X_BEARER_TOKEN!,
-        query,
-        maxResults: MAX_CANDIDATES_PER_QUERY,
-      });
-
-      for (const user of users) {
-        const candidate = scoreXProfileCandidate({
-          personName: params.person.displayName,
-          contextTerms,
-          candidate: toXProfileCandidate(user),
+  if (params.tokens.userSearchAccessToken) {
+    for (const query of queries) {
+      try {
+        const users = await searchXUsers({
+          bearerToken: params.tokens.userSearchAccessToken,
+          query,
+          maxResults: MAX_CANDIDATES_PER_QUERY,
         });
-        if (candidate.confidence >= CANDIDATE_THRESHOLD) {
-          candidatesById.set(candidate.id, candidate);
+
+        for (const user of users) {
+          const candidate = scoreXProfileCandidate({
+            personName: params.person.displayName,
+            contextTerms,
+            candidate: toXProfileCandidate(user),
+          });
+          if (candidate.confidence >= CANDIDATE_THRESHOLD) {
+            candidatesById.set(candidate.id, candidate);
+          }
         }
+      } catch (error) {
+        socialLogger.warn('X user search failed during profile resolution', {
+          itemId: params.item.itemId,
+          userPersonId: params.person.id,
+          query,
+          error,
+        });
       }
-    } catch (error) {
-      socialLogger.warn('X user search failed during profile resolution', {
-        itemId: params.item.itemId,
-        userPersonId: params.person.id,
-        query,
-        error,
-      });
     }
   }
 
@@ -667,7 +753,7 @@ async function searchCandidatesForPerson(params: {
     (candidate) => candidate.confidence >= AUTO_LINK_THRESHOLD
   );
 
-  if (!hasSearchAutoLinkCandidate) {
+  if (!hasSearchAutoLinkCandidate && params.tokens.directLookupAccessToken) {
     const explicitHandles = extractExplicitHandleCandidates(params.item, params.person);
     const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
     const nameDerivedHandles = buildNameDerivedHandleCandidates(params.person);
@@ -684,7 +770,7 @@ async function searchCandidatesForPerson(params: {
     )) {
       try {
         const user = await lookupXUserByUsername({
-          bearerToken: params.env.X_BEARER_TOKEN!,
+          bearerToken: params.tokens.directLookupAccessToken,
           username: inferredHandle.username,
         });
         if (!user) continue;
@@ -806,7 +892,8 @@ export async function resolveXProfilesForItem(
   env: XResolutionEnv,
   input: { itemId: string }
 ): Promise<{ linked: number; candidates: number; skipped: number }> {
-  if (!env.X_BEARER_TOKEN) {
+  const tokens = await resolveXAccessTokens(db, env);
+  if (!tokens.userSearchAccessToken && !tokens.directLookupAccessToken) {
     return { linked: 0, candidates: 0, skipped: 1 };
   }
 
@@ -825,6 +912,7 @@ export async function resolveXProfilesForItem(
 
       const candidates = await searchCandidatesForPerson({
         env,
+        tokens,
         person,
         item: context.item,
       });
@@ -885,6 +973,7 @@ export const socialResolutionInternals = {
   extractContextTerms,
   extractExplicitHandleCandidates,
   normalizeXUsername,
+  resolveXAccessTokens,
   scoreInferredXProfileCandidate,
   scoreXProfileCandidate,
 };

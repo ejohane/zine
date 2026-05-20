@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getValidAccessToken } from '../lib/token-refresh';
 import { socialResolutionInternals } from './social-resolution';
 
+vi.mock('../lib/token-refresh', () => ({
+  getValidAccessToken: vi.fn(),
+}));
+
 describe('social profile resolution helpers', () => {
+  beforeEach(() => {
+    vi.mocked(getValidAccessToken).mockReset();
+  });
+
   it('scores exact X display-name matches higher when profile context matches content', () => {
     const scored = socialResolutionInternals.scoreXProfileCandidate({
       personName: 'Armin Ronacher',
@@ -190,5 +199,69 @@ describe('social profile resolution helpers', () => {
 
     expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
     expect(scored.inferredHandleSource).toBe('NAME_DERIVED');
+  });
+
+  it('uses a configured X service user connection for user-search access', async () => {
+    vi.mocked(getValidAccessToken).mockResolvedValueOnce('user-context-token');
+    const connection = {
+      id: 'connection-1',
+      userId: 'service-user-1',
+      provider: 'X',
+      providerUserId: 'x-user-1',
+      accessToken: 'encrypted-access',
+      refreshToken: 'encrypted-refresh',
+      tokenExpiresAt: Date.now() + 60_000,
+      scopes: 'tweet.read users.read offline.access',
+      connectedAt: Date.now(),
+      lastRefreshedAt: null,
+      status: 'ACTIVE',
+    };
+    const db = {
+      query: {
+        providerConnections: {
+          findFirst: vi.fn().mockResolvedValue(connection),
+        },
+      },
+    };
+
+    const tokens = await socialResolutionInternals.resolveXAccessTokens(db as never, {
+      DB: {} as D1Database,
+      OAUTH_STATE_KV: {} as KVNamespace,
+      ENCRYPTION_KEY: '0'.repeat(64),
+      X_CLIENT_ID: 'x-client-id',
+      X_PROFILE_SEARCH_USER_ID: 'service-user-1',
+      X_BEARER_TOKEN: 'app-only-token',
+    });
+
+    expect(db.query.providerConnections.findFirst).toHaveBeenCalledTimes(1);
+    expect(getValidAccessToken).toHaveBeenCalledWith(connection, expect.anything());
+    expect(tokens).toEqual({
+      userSearchAccessToken: 'user-context-token',
+      directLookupAccessToken: 'app-only-token',
+    });
+  });
+
+  it('falls back to app-only direct lookup when no X service user is configured', async () => {
+    const db = {
+      query: {
+        providerConnections: {
+          findFirst: vi.fn(),
+        },
+      },
+    };
+
+    const tokens = await socialResolutionInternals.resolveXAccessTokens(
+      db as never,
+      {
+        X_BEARER_TOKEN: 'app-only-token',
+      } as never
+    );
+
+    expect(db.query.providerConnections.findFirst).not.toHaveBeenCalled();
+    expect(getValidAccessToken).not.toHaveBeenCalled();
+    expect(tokens).toEqual({
+      userSearchAccessToken: null,
+      directLookupAccessToken: 'app-only-token',
+    });
   });
 });
