@@ -8,10 +8,16 @@ import {
   itemEnrichments,
   items,
   personSocialProfiles,
+  providerConnections,
   userPeople,
   userPersonMentions,
 } from '../db/schema';
 import { logger } from '../lib/logger';
+import {
+  getValidAccessToken,
+  type ProviderConnection,
+  type TokenRefreshEnv,
+} from '../lib/token-refresh';
 import { lookupXUserByUsername, searchXUsers, type XUser } from '../providers/x';
 import type { Bindings } from '../types';
 import { DEFAULT_ENRICHMENT_MODEL, ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
@@ -24,8 +30,26 @@ const INFERRED_HANDLE_MIN_CONFIDENCE = 0.68;
 const MAX_SEARCH_QUERIES_PER_PERSON = 4;
 const MAX_CANDIDATES_PER_QUERY = 5;
 const MAX_INFERRED_HANDLES_PER_PERSON = 3;
+const MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON = 12;
+const ITEM_SUMMARY_CONTEXT_LIMIT = 1200;
 
-type XResolutionEnv = Pick<Bindings, 'X_BEARER_TOKEN' | 'AI' | 'ENRICHMENT_MODEL'>;
+export type XResolutionEnv = Pick<
+  Bindings,
+  | 'AI'
+  | 'DB'
+  | 'ENRICHMENT_MODEL'
+  | 'ENCRYPTION_KEY'
+  | 'GOOGLE_CLIENT_ID'
+  | 'GOOGLE_CLIENT_SECRET'
+  | 'OAUTH_STATE_KV'
+  | 'SPOTIFY_CLIENT_ID'
+  | 'SPOTIFY_CLIENT_SECRET'
+  | 'TOKEN_REFRESH_LOCK_WAIT_MS'
+  | 'X_BEARER_TOKEN'
+  | 'X_CLIENT_ID'
+  | 'X_CLIENT_SECRET'
+  | 'X_PROFILE_SEARCH_USER_ID'
+>;
 
 type WorkersAIRun = {
   run(model: string, input: unknown): Promise<unknown>;
@@ -44,6 +68,15 @@ const XHandleInferenceSchema = z.object({
 });
 
 type InferredXHandleCandidate = z.infer<typeof XHandleInferenceSchema>['candidates'][number];
+type XHandleCandidateSource = 'AI_INFERRED' | 'CONTEXT_EXPLICIT' | 'NAME_DERIVED';
+type XHandleLookupCandidate = InferredXHandleCandidate & {
+  source: XHandleCandidateSource;
+};
+
+type XAccessTokens = {
+  userSearchAccessToken: string | null;
+  directLookupAccessToken: string | null;
+};
 
 const STOPWORDS = new Set([
   'about',
@@ -90,6 +123,7 @@ export type ItemContext = {
   provider: string;
   contentType: string;
   publisher: string | null;
+  summary: string | null;
   rawMetadata: string | null;
   creatorName: string | null;
   creatorDescription: string | null;
@@ -113,6 +147,7 @@ export type ScoredXProfileCandidate = XProfileCandidate & {
   negativeSignals: string[];
   inferredHandleConfidence?: number;
   inferredHandleReason?: string | null;
+  inferredHandleSource?: XHandleCandidateSource;
 };
 
 function compact(value: string): string {
@@ -129,6 +164,13 @@ function normalizedWords(value: string): string[] {
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
+}
+
+function truncate(value: string | null | undefined, maxLength: number): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength - 3)}...`;
 }
 
 function normalizeXUsername(value: string): string | null {
@@ -214,6 +256,7 @@ function contextText(context: ItemContext, person: Pick<PersonForResolution, 'ev
   return [
     context.title,
     context.publisher,
+    truncate(context.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
     context.creatorName,
     context.creatorDescription,
     context.creatorHandle,
@@ -330,7 +373,7 @@ export function scoreInferredXProfileCandidate(input: {
   personName: string;
   contextTerms: string[];
   candidate: XProfileCandidate;
-  inferredHandle: InferredXHandleCandidate;
+  inferredHandle: XHandleLookupCandidate;
 }): ScoredXProfileCandidate {
   const base = scoreXProfileCandidate(input);
   if (
@@ -342,6 +385,16 @@ export function scoreInferredXProfileCandidate(input: {
       ...base,
       inferredHandleConfidence: input.inferredHandle.confidence,
       inferredHandleReason: input.inferredHandle.reason ?? null,
+      inferredHandleSource: input.inferredHandle.source,
+    };
+  }
+
+  if (input.inferredHandle.source === 'NAME_DERIVED' && base.matchedTerms.length === 0) {
+    return {
+      ...base,
+      inferredHandleConfidence: input.inferredHandle.confidence,
+      inferredHandleReason: input.inferredHandle.reason ?? null,
+      inferredHandleSource: input.inferredHandle.source,
     };
   }
 
@@ -355,7 +408,73 @@ export function scoreInferredXProfileCandidate(input: {
     confidence: Math.max(base.confidence, Number(inferredConfidence.toFixed(3))),
     inferredHandleConfidence: input.inferredHandle.confidence,
     inferredHandleReason: input.inferredHandle.reason ?? null,
+    inferredHandleSource: input.inferredHandle.source,
   };
+}
+
+function normalizedNameParts(value: string): string[] {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildNameDerivedHandleCandidates(person: PersonForResolution): XHandleLookupCandidate[] {
+  const parts = normalizedNameParts(person.displayName);
+  if (parts.length < 2) return [];
+
+  const first = parts[0];
+  const last = parts[parts.length - 1];
+  const firstInitial = first[0];
+  const lastInitial = last[0];
+
+  return unique(
+    [
+      `${first}${last}`,
+      `${first}_${last}`,
+      `${firstInitial}${last}`,
+      `${firstInitial}_${last}`,
+      `${first}${lastInitial}`,
+      `${first}_${lastInitial}`,
+      `${last}${first}`,
+      `${last}_${first}`,
+      `${last}${firstInitial}`,
+      `${last}_${firstInitial}`,
+    ]
+      .map((candidate) => normalizeXUsername(candidate))
+      .filter((candidate): candidate is string => Boolean(candidate))
+  ).map((username) => ({
+    username,
+    confidence: 0.72,
+    source: 'NAME_DERIVED',
+    reason: 'Generated from the person name and validated by direct X profile lookup.',
+  }));
+}
+
+function extractExplicitHandleCandidates(
+  item: ItemContext,
+  person: PersonForResolution
+): XHandleLookupCandidate[] {
+  const text = contextText(item, person);
+  const handles = new Set<string>();
+  const handlePattern =
+    /(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/|(?<![A-Za-z0-9_])@)([A-Za-z0-9_]{1,15})(?=$|[^A-Za-z0-9_])/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = handlePattern.exec(text)) !== null) {
+    const username = normalizeXUsername(match[1] ?? '');
+    if (username) handles.add(username);
+  }
+
+  return [...handles].map((username) => ({
+    username,
+    confidence: 0.92,
+    source: 'CONTEXT_EXPLICIT',
+    reason: 'Handle appears in the content context.',
+  }));
 }
 
 function toXProfileCandidate(user: XUser): XProfileCandidate {
@@ -371,6 +490,62 @@ function toXProfileCandidate(user: XUser): XProfileCandidate {
   };
 }
 
+async function getXUserSearchAccessToken(
+  db: Database,
+  env: XResolutionEnv
+): Promise<string | null> {
+  const serviceUserId = env.X_PROFILE_SEARCH_USER_ID?.trim();
+  if (!serviceUserId) return null;
+
+  if (!env.DB || !env.OAUTH_STATE_KV || !env.ENCRYPTION_KEY || !env.X_CLIENT_ID) {
+    socialLogger.warn('X profile search user configured without token refresh bindings', {
+      hasDb: !!env.DB,
+      hasOauthStateKv: !!env.OAUTH_STATE_KV,
+      hasEncryptionKey: !!env.ENCRYPTION_KEY,
+      hasXClientId: !!env.X_CLIENT_ID,
+    });
+    return null;
+  }
+
+  const connection = await db.query.providerConnections.findFirst({
+    where: and(
+      eq(providerConnections.userId, serviceUserId),
+      eq(providerConnections.provider, 'X'),
+      eq(providerConnections.status, 'ACTIVE')
+    ),
+  });
+
+  if (!connection) {
+    socialLogger.warn('X profile search user has no active X provider connection', {
+      serviceUserId,
+    });
+    return null;
+  }
+
+  try {
+    return await getValidAccessToken(
+      connection as ProviderConnection,
+      env as unknown as TokenRefreshEnv
+    );
+  } catch (error) {
+    socialLogger.warn('Failed to get X profile search user access token', {
+      serviceUserId,
+      connectionId: connection.id,
+      error,
+    });
+    return null;
+  }
+}
+
+async function resolveXAccessTokens(db: Database, env: XResolutionEnv): Promise<XAccessTokens> {
+  const userSearchAccessToken = await getXUserSearchAccessToken(db, env);
+  const appOnlyAccessToken = env.X_BEARER_TOKEN?.trim() || null;
+  return {
+    userSearchAccessToken,
+    directLookupAccessToken: appOnlyAccessToken ?? userSearchAccessToken,
+  };
+}
+
 async function loadResolutionContext(
   db: Database,
   itemId: string
@@ -382,6 +557,7 @@ async function loadResolutionContext(
       provider: items.provider,
       contentType: items.contentType,
       publisher: items.publisher,
+      summary: items.summary,
       rawMetadata: items.rawMetadata,
       creatorName: creators.name,
       creatorDescription: creators.description,
@@ -535,6 +711,7 @@ async function upsertCandidate(
 
 async function searchCandidatesForPerson(params: {
   env: XResolutionEnv;
+  tokens: XAccessTokens;
   person: PersonForResolution;
   item: ItemContext;
 }): Promise<ScoredXProfileCandidate[]> {
@@ -542,31 +719,33 @@ async function searchCandidatesForPerson(params: {
   const contextTerms = extractContextTerms(params.item, params.person);
   const candidatesById = new Map<string, ScoredXProfileCandidate>();
 
-  for (const query of queries) {
-    try {
-      const users = await searchXUsers({
-        bearerToken: params.env.X_BEARER_TOKEN!,
-        query,
-        maxResults: MAX_CANDIDATES_PER_QUERY,
-      });
-
-      for (const user of users) {
-        const candidate = scoreXProfileCandidate({
-          personName: params.person.displayName,
-          contextTerms,
-          candidate: toXProfileCandidate(user),
+  if (params.tokens.userSearchAccessToken) {
+    for (const query of queries) {
+      try {
+        const users = await searchXUsers({
+          bearerToken: params.tokens.userSearchAccessToken,
+          query,
+          maxResults: MAX_CANDIDATES_PER_QUERY,
         });
-        if (candidate.confidence >= CANDIDATE_THRESHOLD) {
-          candidatesById.set(candidate.id, candidate);
+
+        for (const user of users) {
+          const candidate = scoreXProfileCandidate({
+            personName: params.person.displayName,
+            contextTerms,
+            candidate: toXProfileCandidate(user),
+          });
+          if (candidate.confidence >= CANDIDATE_THRESHOLD) {
+            candidatesById.set(candidate.id, candidate);
+          }
         }
+      } catch (error) {
+        socialLogger.warn('X user search failed during profile resolution', {
+          itemId: params.item.itemId,
+          userPersonId: params.person.id,
+          query,
+          error,
+        });
       }
-    } catch (error) {
-      socialLogger.warn('X user search failed during profile resolution', {
-        itemId: params.item.itemId,
-        userPersonId: params.person.id,
-        query,
-        error,
-      });
     }
   }
 
@@ -574,12 +753,24 @@ async function searchCandidatesForPerson(params: {
     (candidate) => candidate.confidence >= AUTO_LINK_THRESHOLD
   );
 
-  if (!hasSearchAutoLinkCandidate) {
+  if (!hasSearchAutoLinkCandidate && params.tokens.directLookupAccessToken) {
+    const explicitHandles = extractExplicitHandleCandidates(params.item, params.person);
     const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
-    for (const inferredHandle of inferredHandles) {
+    const nameDerivedHandles = buildNameDerivedHandleCandidates(params.person);
+    const lookupHandlesByUsername = new Map<string, XHandleLookupCandidate>();
+    for (const candidate of [...explicitHandles, ...inferredHandles, ...nameDerivedHandles]) {
+      if (!lookupHandlesByUsername.has(candidate.username)) {
+        lookupHandlesByUsername.set(candidate.username, candidate);
+      }
+    }
+
+    for (const inferredHandle of [...lookupHandlesByUsername.values()].slice(
+      0,
+      MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON
+    )) {
       try {
         const user = await lookupXUserByUsername({
-          bearerToken: params.env.X_BEARER_TOKEN!,
+          bearerToken: params.tokens.directLookupAccessToken,
           username: inferredHandle.username,
         });
         if (!user) continue;
@@ -614,7 +805,7 @@ async function inferXHandleCandidates(
   env: XResolutionEnv,
   person: PersonForResolution,
   item: ItemContext
-): Promise<InferredXHandleCandidate[]> {
+): Promise<XHandleLookupCandidate[]> {
   const ai = env.AI as unknown as WorkersAIRun | undefined;
   if (!ai) return [];
 
@@ -639,6 +830,7 @@ async function inferXHandleCandidates(
       provider: item.provider,
       contentType: item.contentType,
       publisher: item.publisher,
+      summary: truncate(item.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
       creatorName: item.creatorName,
       creatorHandle: item.creatorHandle,
       creatorDescription: item.creatorDescription,
@@ -675,6 +867,7 @@ async function inferXHandleCandidates(
       .map((candidate) => ({
         ...candidate,
         username: normalizeXUsername(candidate.username) ?? '',
+        source: 'AI_INFERRED' as const,
       }))
       .filter(
         (candidate) =>
@@ -699,7 +892,8 @@ export async function resolveXProfilesForItem(
   env: XResolutionEnv,
   input: { itemId: string }
 ): Promise<{ linked: number; candidates: number; skipped: number }> {
-  if (!env.X_BEARER_TOKEN) {
+  const tokens = await resolveXAccessTokens(db, env);
+  if (!tokens.userSearchAccessToken && !tokens.directLookupAccessToken) {
     return { linked: 0, candidates: 0, skipped: 1 };
   }
 
@@ -718,6 +912,7 @@ export async function resolveXProfilesForItem(
 
       const candidates = await searchCandidatesForPerson({
         env,
+        tokens,
         person,
         item: context.item,
       });
@@ -741,6 +936,7 @@ export async function resolveXProfilesForItem(
             negativeSignals: candidate.negativeSignals,
             inferredHandleConfidence: candidate.inferredHandleConfidence ?? null,
             inferredHandleReason: candidate.inferredHandleReason ?? null,
+            inferredHandleSource: candidate.inferredHandleSource ?? null,
           },
           now,
         });
@@ -773,8 +969,11 @@ export async function resolveXProfilesForItem(
 
 export const socialResolutionInternals = {
   buildXSearchQueries,
+  buildNameDerivedHandleCandidates,
   extractContextTerms,
+  extractExplicitHandleCandidates,
   normalizeXUsername,
+  resolveXAccessTokens,
   scoreInferredXProfileCandidate,
   scoreXProfileCandidate,
 };

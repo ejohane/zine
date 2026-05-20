@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { getValidAccessToken } from '../lib/token-refresh';
 import { socialResolutionInternals } from './social-resolution';
 
+vi.mock('../lib/token-refresh', () => ({
+  getValidAccessToken: vi.fn(),
+}));
+
 describe('social profile resolution helpers', () => {
+  beforeEach(() => {
+    vi.mocked(getValidAccessToken).mockReset();
+  });
+
   it('scores exact X display-name matches higher when profile context matches content', () => {
     const scored = socialResolutionInternals.scoreXProfileCandidate({
       personName: 'Armin Ronacher',
@@ -44,6 +53,7 @@ describe('social profile resolution helpers', () => {
       inferredHandle: {
         username: 'pmarca',
         confidence: 0.9,
+        source: 'AI_INFERRED',
         reason: 'Well-known X handle for Marc Andreessen.',
       },
       candidate: {
@@ -95,6 +105,7 @@ describe('social profile resolution helpers', () => {
         provider: 'SPOTIFY',
         contentType: 'PODCAST',
         publisher: null,
+        summary: 'Flask maintainer interview with Armin Ronacher.',
         rawMetadata: null,
         creatorName: 'The Changelog',
         creatorDescription: 'Developer podcast',
@@ -104,5 +115,153 @@ describe('social profile resolution helpers', () => {
 
     expect(queries[0]).toBe('"Armin Ronacher"');
     expect(queries.some((query) => query.includes('Flask') || query.includes('flask'))).toBe(true);
+  });
+
+  it('uses item summaries as social-resolution context', () => {
+    const terms = socialResolutionInternals.extractContextTerms(
+      {
+        itemId: 'item-1',
+        title: 'Google I/O reactions',
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        publisher: null,
+        summary: 'The Verge executive editor Jake Kastrenakes joins the livestream.',
+        rawMetadata: null,
+        creatorName: 'The Verge',
+        creatorDescription: null,
+        creatorHandle: '@theverge',
+      },
+      {
+        displayName: 'Jake Kastrenakes',
+        evidenceText: 'executive editor Jake Kastrenakes',
+      }
+    );
+
+    expect(terms).toContain('verge');
+    expect(terms).toContain('executive');
+  });
+
+  it('generates common validated lookup handles from names', () => {
+    const candidates = socialResolutionInternals.buildNameDerivedHandleCandidates({
+      id: 'person-1',
+      userId: 'user-1',
+      displayName: 'Jake Kastrenakes',
+      normalizedName: 'jake kastrenakes',
+      profileImageSource: null,
+      xHandle: null,
+      relationship: 'GUEST',
+      evidenceText: 'executive editor Jake Kastrenakes',
+    });
+
+    expect(candidates.map((candidate) => candidate.username)).toContain('jake_k');
+  });
+
+  it('does not boost name-derived handles without profile context support', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'James Smith',
+      contextTerms: ['podcast', 'venture'],
+      inferredHandle: {
+        username: 'jamessmith',
+        confidence: 0.72,
+        source: 'NAME_DERIVED',
+        reason: 'Generated from the person name.',
+      },
+      candidate: {
+        id: 'x-5',
+        name: 'James Smith',
+        username: 'jamessmith',
+        description: 'Personal account.',
+      },
+    });
+
+    expect(scored.confidence).toBeLessThan(0.82);
+  });
+
+  it('can boost name-derived handles when the validated profile matches item context', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'Jake Kastrenakes',
+      contextTerms: ['verge', 'executive', 'editor'],
+      inferredHandle: {
+        username: 'jake_k',
+        confidence: 0.72,
+        source: 'NAME_DERIVED',
+        reason: 'Generated from the person name.',
+      },
+      candidate: {
+        id: 'x-6',
+        name: 'Jake Kastrenakes',
+        username: 'jake_k',
+        description: 'Executive editor at The Verge.',
+        profileImageUrl: 'https://pbs.twimg.com/profile_images/jake.jpg',
+        followersCount: 10000,
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(scored.inferredHandleSource).toBe('NAME_DERIVED');
+  });
+
+  it('uses a configured X service user connection for user-search access', async () => {
+    vi.mocked(getValidAccessToken).mockResolvedValueOnce('user-context-token');
+    const connection = {
+      id: 'connection-1',
+      userId: 'service-user-1',
+      provider: 'X',
+      providerUserId: 'x-user-1',
+      accessToken: 'encrypted-access',
+      refreshToken: 'encrypted-refresh',
+      tokenExpiresAt: Date.now() + 60_000,
+      scopes: 'tweet.read users.read offline.access',
+      connectedAt: Date.now(),
+      lastRefreshedAt: null,
+      status: 'ACTIVE',
+    };
+    const db = {
+      query: {
+        providerConnections: {
+          findFirst: vi.fn().mockResolvedValue(connection),
+        },
+      },
+    };
+
+    const tokens = await socialResolutionInternals.resolveXAccessTokens(db as never, {
+      DB: {} as D1Database,
+      OAUTH_STATE_KV: {} as KVNamespace,
+      ENCRYPTION_KEY: '0'.repeat(64),
+      X_CLIENT_ID: 'x-client-id',
+      X_PROFILE_SEARCH_USER_ID: 'service-user-1',
+      X_BEARER_TOKEN: 'app-only-token',
+    });
+
+    expect(db.query.providerConnections.findFirst).toHaveBeenCalledTimes(1);
+    expect(getValidAccessToken).toHaveBeenCalledWith(connection, expect.anything());
+    expect(tokens).toEqual({
+      userSearchAccessToken: 'user-context-token',
+      directLookupAccessToken: 'app-only-token',
+    });
+  });
+
+  it('falls back to app-only direct lookup when no X service user is configured', async () => {
+    const db = {
+      query: {
+        providerConnections: {
+          findFirst: vi.fn(),
+        },
+      },
+    };
+
+    const tokens = await socialResolutionInternals.resolveXAccessTokens(
+      db as never,
+      {
+        X_BEARER_TOKEN: 'app-only-token',
+      } as never
+    );
+
+    expect(db.query.providerConnections.findFirst).not.toHaveBeenCalled();
+    expect(getValidAccessToken).not.toHaveBeenCalled();
+    expect(tokens).toEqual({
+      userSearchAccessToken: null,
+      directLookupAccessToken: 'app-only-token',
+    });
   });
 });

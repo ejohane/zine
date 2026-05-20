@@ -58,6 +58,8 @@ export interface Bindings {
   X_CLIENT_SECRET?: string;
   /** X API bearer token for app-level public profile lookup */
   X_BEARER_TOKEN?: string;
+  /** Clerk user ID whose active X OAuth connection is used for user-context profile search */
+  X_PROFILE_SEARCH_USER_ID?: string;
   /** OAuth redirect URI */
   OAUTH_REDIRECT_URI?: string;
   /** Spotify episode fetch concurrency limit (default: 5) */
