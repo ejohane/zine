@@ -141,6 +141,44 @@ describe('social profile resolution helpers', () => {
     expect(terms).toContain('executive');
   });
 
+  it('prioritizes person evidence and creator context before long summaries', () => {
+    const terms = socialResolutionInternals.extractContextTerms(
+      {
+        itemId: 'item-1',
+        title: 'Google I/O 2026 reactions | The Vergecast Livestream',
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        publisher: null,
+        summary:
+          'Google I/O is upon us with keynote reactions, Android demos, Gemini updates, search announcements, hardware rumors, live chat, subscriber questions, and analysis from The Verge senior AI reporter Hayden Field and executive editor Jake Kastrenakes.',
+        rawMetadata: null,
+        creatorName: 'The Verge',
+        creatorDescription: 'Technology news and analysis from the Verge team.',
+        creatorHandle: '@theverge',
+      },
+      {
+        displayName: 'Jake Kastrenakes',
+        evidenceText: 'executive editor Jake Kastrenakes',
+      }
+    );
+
+    expect(terms.slice(0, 3)).toEqual(['executive', 'editor', 'verge']);
+
+    const scored = socialResolutionInternals.scoreXProfileCandidate({
+      personName: 'Jake Kastrenakes',
+      contextTerms: terms,
+      candidate: {
+        id: 'x-6',
+        name: 'Jake Kastrenakes',
+        username: 'jake_k',
+        description: 'executive editor @verge / contact me: https://t.co/52CumWCN0M',
+      },
+    });
+
+    expect(scored.matchedTerms).toEqual(expect.arrayContaining(['executive', 'editor', 'verge']));
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+  });
+
   it('generates common validated lookup handles from names', () => {
     const candidates = socialResolutionInternals.buildNameDerivedHandleCandidates({
       id: 'person-1',
