@@ -9,18 +9,6 @@ import {
 } from './types';
 
 const llmLogger = logger.child('enrichment-llm');
-const ENTITY_RELATIONSHIPS = [
-  'HOST',
-  'CO_HOST',
-  'OWNER',
-  'CREATOR',
-  'AUTHOR',
-  'GUEST',
-  'INTERVIEWER',
-  'INTERVIEWEE',
-  'PRIMARY_SUBJECT',
-  'MENTIONED',
-];
 
 export class EnrichmentModelValidationError extends Error {
   constructor(message: string) {
@@ -112,108 +100,6 @@ function parseModelResponse(response: unknown): EnrichmentModelOutput {
   return validated.data;
 }
 
-function buildJsonModeSchema() {
-  return {
-    type: 'json_schema',
-    json_schema: {
-      type: 'object',
-      additionalProperties: false,
-      required: [
-        'summary',
-        'classification',
-        'topics',
-        'entities',
-        'suggestedTags',
-        'userContext',
-        'confidence',
-      ],
-      properties: {
-        summary: {
-          type: 'object',
-          required: ['short', 'detail'],
-          properties: {
-            short: { type: 'string' },
-            detail: { type: 'string' },
-          },
-        },
-        classification: {
-          type: 'object',
-          required: [
-            'primaryCategory',
-            'secondaryCategories',
-            'intent',
-            'difficulty',
-            'evergreenScore',
-            'timeSensitivity',
-          ],
-          properties: {
-            primaryCategory: { type: 'string' },
-            secondaryCategories: { type: 'array', items: { type: 'string' } },
-            intent: { type: 'string' },
-            difficulty: { type: 'string' },
-            evergreenScore: { type: 'number' },
-            timeSensitivity: { type: 'string' },
-          },
-        },
-        topics: {
-          type: 'array',
-          items: {
-            type: 'object',
-            required: ['name', 'confidence'],
-            properties: {
-              name: { type: 'string' },
-              confidence: { type: 'number' },
-            },
-          },
-        },
-        entities: {
-          type: 'array',
-          items: {
-            type: 'object',
-            required: ['name', 'type', 'relationship', 'confidence', 'evidenceText'],
-            properties: {
-              name: { type: 'string' },
-              type: { type: 'string' },
-              relationship: { type: 'string', enum: ENTITY_RELATIONSHIPS },
-              confidence: { type: 'number' },
-              evidenceText: { type: ['string', 'null'] },
-            },
-          },
-        },
-        suggestedTags: {
-          type: 'array',
-          items: {
-            type: 'object',
-            required: ['name', 'kind', 'confidence'],
-            properties: {
-              name: { type: 'string' },
-              kind: { type: 'string', enum: ['topic', 'entity', 'intent', 'format'] },
-              confidence: { type: 'number' },
-            },
-          },
-        },
-        userContext: {
-          type: 'object',
-          required: ['inferredSaveIntent', 'reasonToRevisit'],
-          properties: {
-            inferredSaveIntent: { type: 'string' },
-            reasonToRevisit: { type: 'string' },
-          },
-        },
-        confidence: {
-          type: 'object',
-          required: ['overall', 'summary', 'classification', 'tags'],
-          properties: {
-            overall: { type: 'number' },
-            summary: { type: 'number' },
-            classification: { type: 'number' },
-            tags: { type: 'number' },
-          },
-        },
-      },
-    },
-  };
-}
 async function runQwen(env: Bindings, input: unknown): Promise<unknown> {
   const ai = env.AI as unknown as WorkersAIRun | undefined;
   if (!ai) {
@@ -230,7 +116,9 @@ export async function enrichWithQwen(
   const messages = buildEnrichmentMessages(input);
   const request = {
     messages,
-    response_format: buildJsonModeSchema(),
+    // Workers AI JSON schema mode can reject larger nested schemas before returning output.
+    // Keep generation constrained to JSON and let the local Zod schema enforce the contract.
+    response_format: { type: 'json_object' },
     max_tokens: 1800,
   };
 

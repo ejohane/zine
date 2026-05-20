@@ -74,7 +74,7 @@ describe('enrichWithQwen', () => {
     expect(run).toHaveBeenCalledWith(
       '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       expect.objectContaining({
-        response_format: expect.objectContaining({ type: 'json_schema' }),
+        response_format: { type: 'json_object' },
       })
     );
   });
@@ -89,32 +89,19 @@ describe('enrichWithQwen', () => {
     expect(run).toHaveBeenCalledWith(
       '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
       expect.objectContaining({
-        response_format: {
-          type: 'json_schema',
-          json_schema: expect.objectContaining({
-            type: 'object',
-            properties: expect.objectContaining({
-              entities: expect.objectContaining({
-                items: expect.objectContaining({
-                  required: expect.arrayContaining(['relationship', 'evidenceText']),
-                }),
-              }),
-              summary: expect.any(Object),
-            }),
-          }),
-        },
+        response_format: { type: 'json_object' },
       })
     );
   });
 
-  it('does not use the OpenAI named schema wrapper for Workers AI JSON Mode', async () => {
+  it('does not send a JSON schema to Workers AI JSON Mode', async () => {
     const output = createValidModelOutput();
     const run = vi.fn().mockResolvedValue({ response: output });
 
     await enrichWithQwen({ AI: { run } } as never, createPromptInput());
 
-    expect(run.mock.calls[0][1].response_format.json_schema).not.toHaveProperty('name');
-    expect(run.mock.calls[0][1].response_format.json_schema).not.toHaveProperty('schema');
+    expect(run.mock.calls[0][1].response_format).toEqual({ type: 'json_object' });
+    expect(run.mock.calls[0][1].response_format).not.toHaveProperty('json_schema');
   });
 
   it('retries once when model output is invalid and accepts repaired JSON', async () => {
