@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, Pressable, View } from 'react-native';
 
 import { Surface } from '@/components/primitives/surface';
 import { Text } from '@/components/primitives/text';
@@ -13,6 +14,7 @@ type EnrichmentEntity = NonNullable<ItemDetailEnrichment>['item']['entities'][nu
 type PersonEntity = {
   name: string;
   personId: string | null;
+  profileImageUrl: string | null;
   relationship: string;
   confidence: number;
 };
@@ -107,14 +109,22 @@ function toPeople(entities: EnrichmentEntity[]): PersonEntity[] {
     const next: PersonEntity = {
       name,
       personId: entity.personId ?? null,
+      profileImageUrl: entity.profileImageUrl ?? null,
       relationship: entity.relationship ?? 'MENTIONED',
       confidence: entity.confidence,
     };
-    const candidate = existing && !next.personId ? { ...next, personId: existing.personId } : next;
+    const candidate = existing
+      ? {
+          ...next,
+          personId: next.personId ?? existing.personId,
+          profileImageUrl: next.profileImageUrl ?? existing.profileImageUrl,
+        }
+      : next;
 
     if (
       !existing ||
       (!existing.personId && candidate.personId) ||
+      (!existing.profileImageUrl && candidate.profileImageUrl) ||
       relationshipPriority(candidate.relationship) > relationshipPriority(existing.relationship) ||
       (candidate.relationship === existing.relationship &&
         candidate.confidence > existing.confidence)
@@ -144,15 +154,31 @@ function PersonRow({
 }) {
   const initials = getInitials(person.name);
   const personId = person.personId;
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(person.profileImageUrl && !imageFailed);
   const isNavigable = Boolean(personId && onPersonPress);
   const relationship = formatRelationship(person.relationship);
   const label = relationship ? `${person.name} / ${relationship}` : person.name;
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [person.profileImageUrl]);
+
   const content = (
     <>
       <View style={[styles.peopleAvatar, { backgroundColor: colors.backgroundTertiary }]}>
-        <Text variant="labelSmall" tone="tertiary" colors={colors} transform="none">
-          {initials}
-        </Text>
+        {showImage ? (
+          <Image
+            source={{ uri: person.profileImageUrl! }}
+            style={styles.peopleAvatarImage}
+            onError={() => setImageFailed(true)}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <Text variant="labelSmall" tone="tertiary" colors={colors} transform="none">
+            {initials}
+          </Text>
+        )}
       </View>
       <Text
         variant="bodyMedium"
