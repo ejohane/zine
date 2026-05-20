@@ -136,7 +136,7 @@ export async function enrichWithQwen(
         {
           role: 'user',
           content:
-            'Retry. Return only valid JSON matching the schema exactly. No markdown or commentary.',
+            'Retry. Return only one valid JSON object with top-level keys summary, classification, topics, entities, suggestedTags, userContext, and confidence. No markdown or commentary.',
         },
       ],
     };
