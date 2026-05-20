@@ -267,17 +267,43 @@ function contextText(context: ItemContext, person: Pick<PersonForResolution, 'ev
     .join(' ');
 }
 
+function prioritizedContextTextParts(
+  context: ItemContext,
+  person: Pick<PersonForResolution, 'evidenceText'>
+) {
+  return [
+    person.evidenceText,
+    context.creatorName,
+    context.publisher,
+    context.title,
+    context.creatorHandle,
+    context.creatorDescription,
+    truncate(context.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
+    parseMetadataText(context.rawMetadata),
+  ].filter((text): text is string => Boolean(text));
+}
+
 export function extractContextTerms(
   context: ItemContext,
   person: Pick<PersonForResolution, 'displayName' | 'evidenceText'>
 ) {
-  const words = normalizedWords(contextText(context, person));
   const personWords = new Set(normalizedWords(person.displayName));
-  const weighted = words.filter((word) => !personWords.has(word));
+  const terms: string[] = [];
 
-  return unique(weighted)
-    .filter((word) => !/^\d+$/.test(word))
-    .slice(0, 16);
+  for (const text of prioritizedContextTextParts(context, person)) {
+    for (const word of normalizedWords(text)) {
+      if (personWords.has(word) || /^\d+$/.test(word) || terms.includes(word)) {
+        continue;
+      }
+
+      terms.push(word);
+      if (terms.length >= 16) {
+        return terms;
+      }
+    }
+  }
+
+  return terms;
 }
 
 export function buildXSearchQueries(person: PersonForResolution, context: ItemContext): string[] {
