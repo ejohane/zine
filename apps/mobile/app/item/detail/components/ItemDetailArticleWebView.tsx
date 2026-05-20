@@ -18,6 +18,9 @@ import { logger } from '@/lib/logger';
 
 import type { ItemDetailColors } from '../types';
 
+const articleScrollPositions = new Map<string, number>();
+const RESTORE_SCROLL_RETRY_DELAYS_MS = [150, 500];
+
 type ItemDetailArticleWebViewProps = {
   url: string | null;
   colors: ItemDetailColors;
@@ -45,12 +48,22 @@ export function ItemDetailArticleWebView({
   }, [url]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !url) return;
 
     setControlsHidden(false);
-    requestAnimationFrame(() => {
-      webViewRef.current?.scrollTo({ x: 0, y: 0, animated: false });
-    });
+    const savedY = articleScrollPositions.get(url) ?? 0;
+    const restoreScrollPosition = () => {
+      webViewRef.current?.scrollTo({ x: 0, y: savedY, animated: false });
+    };
+    const frameId = requestAnimationFrame(restoreScrollPosition);
+    const retryTimeouts = RESTORE_SCROLL_RETRY_DELAYS_MS.map((delay) =>
+      setTimeout(restoreScrollPosition, delay)
+    );
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      retryTimeouts.forEach(clearTimeout);
+    };
   }, [url, visible]);
 
   useEffect(() => {
@@ -61,27 +74,40 @@ export function ItemDetailArticleWebView({
     }).start();
   }, [controlsHidden, controlsOpacity]);
 
-  const handleReaderMessage = useCallback((event: { nativeEvent: { data: string } }) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data) as { type?: string; y?: number };
-      if (message.type === 'article-tap') {
-        setControlsHidden(false);
-        return;
-      }
-
-      if (message.type !== 'article-scroll' || typeof message.y !== 'number') return;
-
-      setControlsHidden((current) => {
-        if (current) {
-          return message.y > 8;
+  const handleReaderMessage = useCallback(
+    (event: { nativeEvent: { data: string } }) => {
+      try {
+        const message = JSON.parse(event.nativeEvent.data) as {
+          type?: string;
+          y?: number;
+        };
+        if (message.type === 'article-tap') {
+          if (visible) {
+            setControlsHidden(false);
+          }
+          return;
         }
 
-        return message.y > 28;
-      });
-    } catch {
-      // Ignore messages that are not from the article scroll bridge.
-    }
-  }, []);
+        if (message.type !== 'article-scroll' || typeof message.y !== 'number') return;
+
+        const scrollY = Math.max(0, message.y);
+        if (visible && url) {
+          articleScrollPositions.set(url, scrollY);
+        }
+
+        setControlsHidden((current) => {
+          if (current) {
+            return scrollY > 8;
+          }
+
+          return scrollY > 28;
+        });
+      } catch {
+        // Ignore messages that are not from the article scroll bridge.
+      }
+    },
+    [url, visible]
+  );
 
   const handleOpenOriginal = useCallback(() => {
     if (!url) return;
@@ -176,6 +202,7 @@ const ARTICLE_SCROLL_BRIDGE_SCRIPT = `
   function sendScrollPosition() {
     rafId = null;
     var y = window.scrollY || document.documentElement.scrollTop || 0;
+
     if (Math.abs(y - lastSent) < 8 && !(lastSent <= 28 && y <= 28)) {
       return;
     }
