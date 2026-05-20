@@ -56,6 +56,8 @@ export interface Bindings {
   X_CLIENT_ID?: string;
   /** X OAuth client secret (optional for PKCE public clients) */
   X_CLIENT_SECRET?: string;
+  /** X API bearer token for app-level public profile lookup */
+  X_BEARER_TOKEN?: string;
   /** OAuth redirect URI */
   OAUTH_REDIRECT_URI?: string;
   /** Spotify episode fetch concurrency limit (default: 5) */

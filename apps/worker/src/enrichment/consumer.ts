@@ -14,6 +14,7 @@ import {
 import { getArticleContent } from '../lib/article-storage';
 import { logger } from '../lib/logger';
 import { syncPeopleForItem } from '../people/service';
+import { resolveXProfilesForItem } from '../people/social-resolution';
 import type { Bindings } from '../types';
 import { upsertItemEmbedding } from './embeddings';
 import { EnrichmentModelValidationError, enrichWithQwen } from './llm';
@@ -407,11 +408,15 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
 
       try {
         await syncPeopleForItem(db, { itemId: effectiveBody.itemId });
+        await resolveXProfilesForItem(db, env, { itemId: effectiveBody.itemId });
       } catch (error) {
-        enrichmentLogger.warn('People indexing failed for existing canonical enrichment', {
-          itemId: effectiveBody.itemId,
-          error,
-        });
+        enrichmentLogger.warn(
+          'People indexing or social profile resolution failed for existing canonical enrichment',
+          {
+            itemId: effectiveBody.itemId,
+            error,
+          }
+        );
       }
 
       message.ack();
@@ -434,11 +439,15 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
 
     try {
       await syncPeopleForItem(db, { itemId: effectiveBody.itemId });
+      await resolveXProfilesForItem(db, env, { itemId: effectiveBody.itemId });
     } catch (error) {
-      enrichmentLogger.warn('People indexing failed after enrichment completion', {
-        itemId: effectiveBody.itemId,
-        error,
-      });
+      enrichmentLogger.warn(
+        'People indexing or social profile resolution failed after enrichment completion',
+        {
+          itemId: effectiveBody.itemId,
+          error,
+        }
+      );
     }
 
     const suggestedTags = normalizeSuggestedTags(output.suggestedTags, existingTags);

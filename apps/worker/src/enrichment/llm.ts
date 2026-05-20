@@ -9,6 +9,18 @@ import {
 } from './types';
 
 const llmLogger = logger.child('enrichment-llm');
+const ENTITY_RELATIONSHIPS = [
+  'HOST',
+  'CO_HOST',
+  'OWNER',
+  'CREATOR',
+  'AUTHOR',
+  'GUEST',
+  'INTERVIEWER',
+  'INTERVIEWEE',
+  'PRIMARY_SUBJECT',
+  'MENTIONED',
+];
 
 export class EnrichmentModelValidationError extends Error {
   constructor(message: string) {
@@ -158,11 +170,13 @@ function buildJsonModeSchema() {
           type: 'array',
           items: {
             type: 'object',
-            required: ['name', 'type', 'confidence'],
+            required: ['name', 'type', 'relationship', 'confidence', 'evidenceText'],
             properties: {
               name: { type: 'string' },
               type: { type: 'string' },
+              relationship: { type: 'string', enum: ENTITY_RELATIONSHIPS },
               confidence: { type: 'number' },
+              evidenceText: { type: ['string', 'null'] },
             },
           },
         },

@@ -1,19 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchXBookmarksPage, XAuthError } from './x';
+import { fetchXBookmarksPage, searchXUsers, XAuthError } from './x';
 import type { XRateLimitError } from './x';
 
+type FetchMock = ReturnType<typeof vi.fn>;
+
 describe('X provider', () => {
+  const originalFetch = globalThis.fetch;
+
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn());
+    globalThis.fetch = vi.fn() as never;
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
   });
 
   it('fetches one capped bookmark page with minimal display fields', async () => {
-    const fetchMock = vi.mocked(fetch);
+    const fetchMock = globalThis.fetch as unknown as FetchMock;
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -48,7 +52,7 @@ describe('X provider', () => {
   });
 
   it('throws a structured rate-limit error for 429 responses', async () => {
-    vi.mocked(fetch).mockResolvedValue(
+    (globalThis.fetch as unknown as FetchMock).mockResolvedValue(
       new Response(JSON.stringify({ errors: [{ title: 'Too Many Requests' }] }), {
         status: 429,
         headers: {
@@ -66,10 +70,50 @@ describe('X provider', () => {
   });
 
   it('throws an auth error for revoked or insufficient X access', async () => {
-    vi.mocked(fetch).mockResolvedValue(new Response('Forbidden', { status: 403 }));
+    (globalThis.fetch as unknown as FetchMock).mockResolvedValue(
+      new Response('Forbidden', { status: 403 })
+    );
 
     await expect(
       fetchXBookmarksPage({ accessToken: 'token', userId: 'x-user-1' })
     ).rejects.toBeInstanceOf(XAuthError);
+  });
+
+  it('searches X users with profile fields for inferred social resolution', async () => {
+    const fetchMock = globalThis.fetch as unknown as FetchMock;
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: 'user-1',
+              name: 'Armin Ronacher',
+              username: 'mitsuhiko',
+              description: 'Creator of Flask',
+              profile_image_url: 'https://pbs.twimg.com/profile_images/armin.jpg',
+              verified: true,
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+
+    const users = await searchXUsers({
+      bearerToken: 'bearer',
+      query: '"Armin Ronacher" Flask',
+      maxResults: 5,
+    });
+
+    const requestedUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(requestedUrl.pathname).toBe('/2/users/search');
+    expect(requestedUrl.searchParams.get('query')).toBe('"Armin Ronacher" Flask');
+    expect(requestedUrl.searchParams.get('user.fields')).toContain('profile_image_url');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer bearer',
+      }),
+    });
+    expect(users[0].username).toBe('mitsuhiko');
   });
 });

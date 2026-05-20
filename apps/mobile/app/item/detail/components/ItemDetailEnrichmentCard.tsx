@@ -136,7 +136,16 @@ function renderEntity(
 ) {
   const confidence = formatPercent(entity.confidence);
   const isResolvedPerson = Boolean(entity.personId);
-  const label = [entity.name, formatLabel(entity.type), isResolvedPerson ? null : confidence]
+  const relationship =
+    entity.relationship && entity.relationship !== 'MENTIONED'
+      ? formatLabel(entity.relationship)
+      : null;
+  const label = [
+    entity.name,
+    relationship,
+    formatLabel(entity.type),
+    isResolvedPerson ? null : confidence,
+  ]
     .filter(Boolean)
     .join(' / ');
 

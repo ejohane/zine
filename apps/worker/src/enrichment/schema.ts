@@ -3,6 +3,18 @@ import { z } from 'zod';
 import { ENRICHMENT_SCHEMA_VERSION, type EnrichmentModelOutput, type SuggestedTag } from './types';
 
 const ConfidenceSchema = z.number().min(0).max(1);
+export const EntityRelationshipSchema = z.enum([
+  'HOST',
+  'CO_HOST',
+  'OWNER',
+  'CREATOR',
+  'AUTHOR',
+  'GUEST',
+  'INTERVIEWER',
+  'INTERVIEWEE',
+  'PRIMARY_SUBJECT',
+  'MENTIONED',
+]);
 
 export const EnrichmentQueueMessageSchema = z.object({
   itemId: z.string().min(1),
@@ -51,7 +63,9 @@ export const EnrichmentModelOutputSchema = z.object({
       z.object({
         name: z.string().min(1).max(120),
         type: z.string().min(1).max(64),
+        relationship: EntityRelationshipSchema,
         confidence: ConfidenceSchema,
+        evidenceText: z.string().min(1).max(300).nullable(),
       })
     )
     .max(20),

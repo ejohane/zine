@@ -1,6 +1,6 @@
 import type { ContentType, Provider } from '@zine/shared';
 
-export const ENRICHMENT_SCHEMA_VERSION = 1;
+export const ENRICHMENT_SCHEMA_VERSION = 2;
 export const DEFAULT_ENRICHMENT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const DEFAULT_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 export const DEFAULT_EMBEDDING_DIMENSIONS = 1024;
@@ -28,8 +28,22 @@ export interface EnrichmentTopic {
 export interface EnrichmentEntity {
   name: string;
   type: string;
+  relationship: EntityRelationship;
   confidence: number;
+  evidenceText: string | null;
 }
+
+export type EntityRelationship =
+  | 'HOST'
+  | 'CO_HOST'
+  | 'OWNER'
+  | 'CREATOR'
+  | 'AUTHOR'
+  | 'GUEST'
+  | 'INTERVIEWER'
+  | 'INTERVIEWEE'
+  | 'PRIMARY_SUBJECT'
+  | 'MENTIONED';
 
 export interface SuggestedTag {
   name: string;

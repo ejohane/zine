@@ -8,6 +8,7 @@ import { creators, items, userItems, userPeople, userPersonMentions } from '../.
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { router, protectedProcedure } from '../trpc';
 import { toItemViewsWithTags } from './items';
+import { normalizePersonDisplayName } from '../../people/service';
 
 const PeopleListInputSchema = z.object({
   query: z.string().trim().max(100).optional(),
@@ -133,7 +134,7 @@ export const peopleRouter = router({
     return {
       people: pageRows.map((row) => ({
         id: row.id,
-        displayName: row.displayName,
+        displayName: normalizePersonDisplayName(row.displayName),
         profileImageUrl: row.profileImageUrl,
         profileImageSource: row.profileImageSource,
         xHandle: row.xHandle,
@@ -174,7 +175,10 @@ export const peopleRouter = router({
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Person not found' });
     }
 
-    return person;
+    return {
+      ...person,
+      displayName: normalizePersonDisplayName(person.displayName),
+    };
   }),
 
   listItems: protectedProcedure.input(PersonItemsInputSchema).query(async ({ ctx, input }) => {

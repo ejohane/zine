@@ -12,11 +12,29 @@ import {
   userPersonMentions,
 } from '../db/schema';
 import { logger } from '../lib/logger';
-import { ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
+import { ENRICHMENT_SCHEMA_VERSION, type EntityRelationship } from '../enrichment/types';
 
 const peopleLogger = logger.child('people-service');
 
 export const PERSON_CONFIDENCE_THRESHOLD = 0.65;
+
+const LOWERCASE_NAME_PARTICLES = new Set([
+  'al',
+  'bin',
+  'da',
+  'de',
+  'del',
+  'der',
+  'di',
+  'dos',
+  'du',
+  'ibn',
+  'la',
+  'le',
+  'van',
+  'von',
+  'y',
+]);
 
 type UserItemPersonSource = {
   id: string;
@@ -40,7 +58,9 @@ type PersonEntityCandidate = {
   rawType: string;
   displayName: string;
   normalizedName: string;
+  relationship: EntityRelationship;
   confidence: number;
+  evidenceText: string | null;
 };
 
 type PersonProfileImageCandidate = {
@@ -66,6 +86,49 @@ function normalizeEntityType(value: string): string {
   return value.trim().toLowerCase().replace(/[_-]+/g, ' ');
 }
 
+function normalizeEntityRelationship(value: unknown): EntityRelationship {
+  if (typeof value !== 'string') return 'MENTIONED';
+
+  const normalized = value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  switch (normalized) {
+    case 'HOST':
+    case 'CO_HOST':
+    case 'OWNER':
+    case 'CREATOR':
+    case 'AUTHOR':
+    case 'GUEST':
+    case 'INTERVIEWER':
+    case 'INTERVIEWEE':
+    case 'PRIMARY_SUBJECT':
+    case 'MENTIONED':
+      return normalized;
+    default:
+      return 'MENTIONED';
+  }
+}
+
+function relationshipPriority(relationship: EntityRelationship): number {
+  switch (relationship) {
+    case 'HOST':
+    case 'CO_HOST':
+    case 'OWNER':
+    case 'CREATOR':
+      return 4;
+    case 'AUTHOR':
+    case 'INTERVIEWER':
+    case 'INTERVIEWEE':
+    case 'GUEST':
+      return 3;
+    case 'PRIMARY_SUBJECT':
+      return 2;
+    case 'MENTIONED':
+      return 1;
+  }
+}
+
 export function normalizePersonName(value: string): string {
   return value
     .replace(/\s+/g, ' ')
@@ -78,13 +141,52 @@ export function normalizePersonName(value: string): string {
 }
 
 function normalizeDisplayName(value: string): string {
-  return value
+  const trimmed = value
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^[\s"'`.,;:!?()[\]{}<>]+/, '')
     .replace(/[\s"'`.,;:!?()[\]{}<>]+$/, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+  return normalizePersonDisplayName(trimmed);
+}
+
+function capitalizeNameSegment(value: string): string {
+  if (!value) return value;
+  const rest = value.slice(1);
+  const shouldNormalizeRest = value === value.toLowerCase() || value === value.toUpperCase();
+  return `${value[0]?.toUpperCase() ?? ''}${shouldNormalizeRest ? rest.toLowerCase() : rest}`;
+}
+
+function capitalizeNameWord(value: string, wordIndex: number): string {
+  const lower = value.toLowerCase();
+  if (wordIndex > 0 && LOWERCASE_NAME_PARTICLES.has(lower)) {
+    return lower;
+  }
+  if (/^([a-z]\.)+[a-z]?\.?$/i.test(value)) {
+    return value.toUpperCase();
+  }
+
+  return value
+    .split('-')
+    .map((hyphenPart) =>
+      hyphenPart
+        .split("'")
+        .map((apostrophePart) => capitalizeNameSegment(apostrophePart))
+        .join("'")
+    )
+    .join('-');
+}
+
+export function normalizePersonDisplayName(value: string): string {
+  const trimmed = value.replace(/\s+/g, ' ').trim();
+  if (!trimmed) return '';
+
+  return trimmed
+    .split(' ')
+    .map((word, index) => capitalizeNameWord(word, index))
+    .join(' ');
 }
 
 export function extractPersonEntities(entitiesJson: string | null): PersonEntityCandidate[] {
@@ -104,7 +206,13 @@ export function extractPersonEntities(entitiesJson: string | null): PersonEntity
   for (const entity of parsed) {
     if (!entity || typeof entity !== 'object' || Array.isArray(entity)) continue;
 
-    const candidate = entity as { name?: unknown; type?: unknown; confidence?: unknown };
+    const candidate = entity as {
+      name?: unknown;
+      type?: unknown;
+      relationship?: unknown;
+      confidence?: unknown;
+      evidenceText?: unknown;
+    };
     if (typeof candidate.name !== 'string' || typeof candidate.type !== 'string') continue;
 
     const confidence = toFiniteConfidence(candidate.confidence);
@@ -121,10 +229,16 @@ export function extractPersonEntities(entitiesJson: string | null): PersonEntity
       rawType: candidate.type,
       displayName,
       normalizedName,
+      relationship: normalizeEntityRelationship(candidate.relationship),
       confidence,
+      evidenceText: typeof candidate.evidenceText === 'string' ? candidate.evidenceText : null,
     };
     const existing = deduped.get(normalizedName);
-    if (!existing || next.confidence > existing.confidence) {
+    if (
+      !existing ||
+      relationshipPriority(next.relationship) > relationshipPriority(existing.relationship) ||
+      (next.relationship === existing.relationship && next.confidence > existing.confidence)
+    ) {
       deduped.set(normalizedName, next);
     }
   }
@@ -175,6 +289,7 @@ async function upsertUserPerson(
   const existing = await db
     .select({
       id: userPeople.id,
+      displayName: userPeople.displayName,
       profileImageSource: userPeople.profileImageSource,
       profileImageUrl: userPeople.profileImageUrl,
     })
@@ -196,10 +311,19 @@ async function upsertUserPerson(
       await db
         .update(userPeople)
         .set({
+          displayName: input.displayName,
           profileImageUrl: profileImage.imageUrl,
           profileImageSource: profileImage.source,
           profileImageSourceUrl: profileImage.sourceUrl,
           xHandle: profileImage.xHandle,
+          updatedAt: input.now,
+        })
+        .where(eq(userPeople.id, existing[0].id));
+    } else if (existing[0].displayName !== input.displayName) {
+      await db
+        .update(userPeople)
+        .set({
+          displayName: input.displayName,
           updatedAt: input.now,
         })
         .where(eq(userPeople.id, existing[0].id));
@@ -352,9 +476,9 @@ async function syncPeopleForBookmarkedUserItem(
         itemEnrichmentId: enrichment.id,
         rawName: person.rawName,
         rawType: person.rawType,
-        relationship: 'MENTIONED',
+        relationship: person.relationship,
         confidence: person.confidence,
-        evidenceText: null,
+        evidenceText: person.evidenceText,
         seenAt,
         isActive: true,
         createdAt: now,
@@ -371,8 +495,9 @@ async function syncPeopleForBookmarkedUserItem(
           itemEnrichmentId: enrichment.id,
           rawName: person.rawName,
           rawType: person.rawType,
-          relationship: 'MENTIONED',
+          relationship: person.relationship,
           confidence: person.confidence,
+          evidenceText: person.evidenceText,
           seenAt,
           isActive: true,
           updatedAt: now,
@@ -536,6 +661,7 @@ export async function deactivatePeopleForUserItemBestEffort(
 export const peopleServiceInternals = {
   extractPersonEntities,
   getProfileImageCandidateForPerson,
+  normalizePersonDisplayName,
   normalizePersonName,
   recomputePeopleStats,
 };

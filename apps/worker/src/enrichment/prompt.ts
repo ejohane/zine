@@ -73,6 +73,11 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
       'Prefer stable categories and short lowercase tag names.',
       'Do not invent facts not supported by the input.',
       'Use confidence below 0.6 when the input is thin or ambiguous.',
+      'For each entity, set relationship to its role in this item: HOST, CO_HOST, OWNER, CREATOR, AUTHOR, GUEST, INTERVIEWER, INTERVIEWEE, PRIMARY_SUBJECT, or MENTIONED.',
+      'For podcast, video, interview, and newsletter items, explicitly identify all supported human show hosts, co-hosts, owners, primary creators, and guests; do not collapse them into a generic person list.',
+      'Use HOST or CO_HOST only for people who are explicitly framed as running/presenting the show or episode. Use OWNER/CREATOR only when the input supports ownership or primary creator status.',
+      'If a show, publisher, or channel name is a brand rather than a human name, do not invent a person behind it.',
+      'Set evidenceText to a short supporting phrase from the title, creator, metadata, or content when available; otherwise null.',
     ],
     item: {
       title: input.item.title,
@@ -115,7 +120,9 @@ export function buildEmbeddingText(params: {
     `Summary: ${params.output.summary.short} ${params.output.summary.detail}`,
     `Primary category: ${params.output.classification.primaryCategory}`,
     `Topics: ${params.output.topics.map((topic) => topic.name).join(', ')}`,
-    `Entities: ${params.output.entities.map((entity) => entity.name).join(', ')}`,
+    `Entities: ${params.output.entities
+      .map((entity) => `${entity.name} (${entity.relationship})`)
+      .join(', ')}`,
     params.articleExcerpt ? `Excerpt: ${params.articleExcerpt}` : '',
   ];
 

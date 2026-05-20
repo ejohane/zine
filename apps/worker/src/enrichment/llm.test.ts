@@ -40,7 +40,15 @@ function createValidModelOutput() {
       timeSensitivity: 'evergreen',
     },
     topics: [{ name: 'workers ai', confidence: 0.9 }],
-    entities: [{ name: 'Cloudflare Workers', type: 'technology', confidence: 0.9 }],
+    entities: [
+      {
+        name: 'Cloudflare Workers',
+        type: 'technology',
+        relationship: 'PRIMARY_SUBJECT',
+        confidence: 0.9,
+        evidenceText: 'Workers AI can run models near a Cloudflare Worker.',
+      },
+    ],
     suggestedTags: [{ name: 'cloudflare', kind: 'topic', confidence: 0.9 }],
     userContext: {
       inferredSaveIntent: 'Learn Workers AI implementation details.',
@@ -86,6 +94,11 @@ describe('enrichWithQwen', () => {
           json_schema: expect.objectContaining({
             type: 'object',
             properties: expect.objectContaining({
+              entities: expect.objectContaining({
+                items: expect.objectContaining({
+                  required: expect.arrayContaining(['relationship', 'evidenceText']),
+                }),
+              }),
               summary: expect.any(Object),
             }),
           }),

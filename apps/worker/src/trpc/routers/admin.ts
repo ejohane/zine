@@ -196,7 +196,7 @@ export const adminRouter = router({
         cursor: input.cursor,
       });
 
-      return backfillPeopleIndex(ctx.db, {
+      return backfillPeopleIndex(ctx.db, ctx.env, {
         dryRun: input.dryRun,
         limit: input.limit,
         cursor: input.cursor ?? null,

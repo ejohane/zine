@@ -8,7 +8,13 @@ export type XUser = {
   id: string;
   name: string;
   username: string;
+  description?: string;
   profile_image_url?: string;
+  url?: string;
+  verified?: boolean;
+  public_metrics?: {
+    followers_count?: number;
+  };
 };
 
 export type XMedia = {
@@ -76,6 +82,7 @@ export class XAuthError extends Error {
 }
 
 export const X_BOOKMARKS_MAX_RESULTS = 100;
+export const X_USER_SEARCH_MAX_RESULTS = 10;
 
 function parseRateLimit(headers: Headers): XRateLimitInfo {
   const limit = headers.get('x-rate-limit-limit');
@@ -141,4 +148,52 @@ export async function fetchXBookmarksPage(params: {
     ...body,
     rateLimit,
   };
+}
+
+export async function searchXUsers(params: {
+  bearerToken: string;
+  query: string;
+  maxResults?: number;
+}): Promise<XUser[]> {
+  const url = new URL('https://api.x.com/2/users/search');
+  url.searchParams.set('query', params.query);
+  url.searchParams.set(
+    'user.fields',
+    [
+      'description',
+      'id',
+      'name',
+      'profile_image_url',
+      'public_metrics',
+      'url',
+      'username',
+      'verified',
+    ].join(',')
+  );
+  url.searchParams.set('max_results', String(params.maxResults ?? X_USER_SEARCH_MAX_RESULTS));
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${params.bearerToken}`,
+      Accept: 'application/json',
+    },
+  });
+  const rateLimit = parseRateLimit(response.headers);
+
+  if (response.status === 429) {
+    throw new XRateLimitError('X user search rate limit exceeded', rateLimit);
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    const text = await response.text();
+    throw new XAuthError(response.status, text || `X user search failed: ${response.status}`);
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`X user search failed: ${response.status} ${text}`);
+  }
+
+  const body = (await response.json()) as { data?: XUser[] };
+  return body.data ?? [];
 }

@@ -13,6 +13,7 @@ type EnrichmentEntity = NonNullable<ItemDetailEnrichment>['item']['entities'][nu
 type PersonEntity = {
   name: string;
   personId: string | null;
+  relationship: string;
   confidence: number;
 };
 
@@ -31,6 +32,37 @@ function normalizeEntityType(value: string): string {
 
 function normalizePersonName(value: string): string {
   return value.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function formatRelationship(value: string | null | undefined): string | null {
+  if (!value || value === 'MENTIONED') {
+    return null;
+  }
+
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function relationshipPriority(value: string | null | undefined): number {
+  switch (value) {
+    case 'HOST':
+    case 'CO_HOST':
+    case 'OWNER':
+    case 'CREATOR':
+      return 4;
+    case 'AUTHOR':
+    case 'INTERVIEWER':
+    case 'INTERVIEWEE':
+    case 'GUEST':
+      return 3;
+    case 'PRIMARY_SUBJECT':
+      return 2;
+    default:
+      return 1;
+  }
 }
 
 function getInitials(name: string): string {
@@ -72,25 +104,31 @@ function toPeople(entities: EnrichmentEntity[]): PersonEntity[] {
     }
 
     const existing = peopleByName.get(normalizedName);
-    const next = {
+    const next: PersonEntity = {
       name,
       personId: entity.personId ?? null,
+      relationship: entity.relationship ?? 'MENTIONED',
       confidence: entity.confidence,
     };
+    const candidate = existing && !next.personId ? { ...next, personId: existing.personId } : next;
 
     if (
       !existing ||
-      (!existing.personId && next.personId) ||
-      next.confidence > existing.confidence
+      (!existing.personId && candidate.personId) ||
+      relationshipPriority(candidate.relationship) > relationshipPriority(existing.relationship) ||
+      (candidate.relationship === existing.relationship &&
+        candidate.confidence > existing.confidence)
     ) {
-      peopleByName.set(normalizedName, next);
+      peopleByName.set(normalizedName, candidate);
     }
   }
 
   return [...peopleByName.values()]
     .sort(
       (a, b) =>
-        Number(Boolean(b.personId)) - Number(Boolean(a.personId)) || b.confidence - a.confidence
+        Number(Boolean(b.personId)) - Number(Boolean(a.personId)) ||
+        relationshipPriority(b.relationship) - relationshipPriority(a.relationship) ||
+        b.confidence - a.confidence
     )
     .slice(0, MAX_VISIBLE_PEOPLE);
 }
@@ -107,6 +145,8 @@ function PersonRow({
   const initials = getInitials(person.name);
   const personId = person.personId;
   const isNavigable = Boolean(personId && onPersonPress);
+  const relationship = formatRelationship(person.relationship);
+  const label = relationship ? `${person.name} / ${relationship}` : person.name;
   const content = (
     <>
       <View style={[styles.peopleAvatar, { backgroundColor: colors.backgroundTertiary }]}>
@@ -122,7 +162,7 @@ function PersonRow({
         numberOfLines={1}
         style={styles.peopleName}
       >
-        {person.name}
+        {label}
       </Text>
       {isNavigable ? (
         <Ionicons name="chevron-forward" size={IconSizes.sm} color={colors.textTertiary} />
