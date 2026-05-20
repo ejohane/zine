@@ -43,6 +43,49 @@ function formatCreator(creator: EnrichmentSourceCreator | null): string {
   );
 }
 
+const OUTPUT_CONTRACT = {
+  summary: {
+    short: 'string, 1-2 sentences',
+    detail: 'string, concise paragraph',
+  },
+  classification: {
+    primaryCategory: 'string',
+    secondaryCategories: ['string'],
+    intent: 'string',
+    difficulty: 'string',
+    evergreenScore: 'number from 0 to 1',
+    timeSensitivity: 'string',
+  },
+  topics: [{ name: 'string', confidence: 'number from 0 to 1' }],
+  entities: [
+    {
+      name: 'string',
+      type: 'person | organization | product | technology | place | concept | other',
+      relationship:
+        'HOST | CO_HOST | OWNER | CREATOR | AUTHOR | GUEST | INTERVIEWER | INTERVIEWEE | PRIMARY_SUBJECT | MENTIONED',
+      confidence: 'number from 0 to 1',
+      evidenceText: 'short supporting phrase or null',
+    },
+  ],
+  suggestedTags: [
+    {
+      name: 'string',
+      kind: 'topic | entity | intent | format',
+      confidence: 'number from 0 to 1',
+    },
+  ],
+  userContext: {
+    inferredSaveIntent: 'string',
+    reasonToRevisit: 'string',
+  },
+  confidence: {
+    overall: 'number from 0 to 1',
+    summary: 'number from 0 to 1',
+    classification: 'number from 0 to 1',
+    tags: 'number from 0 to 1',
+  },
+};
+
 export function buildArticleContent(content: string | null): string | null {
   return stripHtml(content ?? '') || null;
 }
@@ -69,7 +112,9 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
   const userContent = {
     task: 'Enrich this saved bookmark for a personal knowledge/recommendation app.',
     constraints: [
-      'Return only JSON matching the requested schema.',
+      'Return one JSON object with exactly these top-level keys: summary, classification, topics, entities, suggestedTags, userContext, confidence.',
+      'Do not return only an entity list, a wrapper object, markdown, commentary, or prose outside JSON.',
+      'Every entity must include name, type, relationship, confidence, and evidenceText.',
       'Prefer stable categories and short lowercase tag names.',
       'Do not invent facts not supported by the input.',
       'Use confidence below 0.6 when the input is thin or ambiguous.',
@@ -90,6 +135,7 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
       metadataExcerpt,
       articleContent: input.articleContent,
     },
+    outputContract: OUTPUT_CONTRACT,
   };
 
   return [

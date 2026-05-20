@@ -51,11 +51,38 @@ describe('enrichment prompt helpers', () => {
     const messages = buildEnrichmentMessages(createPromptInput('Hosted by Casey Newton.'));
     const userPayload = JSON.parse(String(messages[1].content)) as {
       constraints: string[];
+      outputContract: {
+        entities: Array<{
+          relationship: string;
+          evidenceText: string;
+        }>;
+      };
     };
 
     expect(userPayload.constraints.join(' ')).toContain('HOST');
     expect(userPayload.constraints.join(' ')).toContain('co-hosts');
     expect(userPayload.constraints.join(' ')).toContain('owners');
     expect(userPayload.constraints.join(' ')).toContain('evidenceText');
+    expect(userPayload.outputContract.entities[0]?.relationship).toContain('PRIMARY_SUBJECT');
+    expect(userPayload.outputContract.entities[0]?.evidenceText).toContain('null');
+  });
+
+  it('includes the full top-level output contract in the prompt', () => {
+    const messages = buildEnrichmentMessages(createPromptInput('A short item.'));
+    const userPayload = JSON.parse(String(messages[1].content)) as {
+      constraints: string[];
+      outputContract: Record<string, unknown>;
+    };
+
+    expect(userPayload.constraints.join(' ')).toContain('exactly these top-level keys');
+    expect(Object.keys(userPayload.outputContract)).toEqual([
+      'summary',
+      'classification',
+      'topics',
+      'entities',
+      'suggestedTags',
+      'userContext',
+      'confidence',
+    ]);
   });
 });
