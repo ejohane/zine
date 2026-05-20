@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { ENRICHMENT_SCHEMA_VERSION, type EnrichmentModelOutput, type SuggestedTag } from './types';
 
 const ConfidenceSchema = z.number().min(0).max(1);
-export const EntityRelationshipSchema = z.enum([
+const BaseEntityRelationshipSchema = z.enum([
   'HOST',
   'CO_HOST',
   'OWNER',
@@ -15,6 +15,53 @@ export const EntityRelationshipSchema = z.enum([
   'PRIMARY_SUBJECT',
   'MENTIONED',
 ]);
+const BaseSuggestedTagKindSchema = z.enum(['topic', 'entity', 'intent', 'format']);
+
+function normalizeEnumishString(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+export const EntityRelationshipSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+
+  const normalized = normalizeEnumishString(value);
+  switch (normalized) {
+    case 'PUBLISHER':
+    case 'PUBLICATION':
+    case 'SOURCE':
+      return 'CREATOR';
+    case 'PRESENTER':
+    case 'PRESENTED_BY':
+      return 'HOST';
+    default:
+      return normalized;
+  }
+}, BaseEntityRelationshipSchema);
+
+const SuggestedTagKindSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return value;
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  switch (normalized) {
+    case 'concept':
+    case 'theme':
+    case 'keyword':
+      return 'topic';
+    case 'person':
+    case 'company':
+    case 'organization':
+    case 'organisation':
+      return 'entity';
+    default:
+      return normalized;
+  }
+}, BaseSuggestedTagKindSchema);
 
 export const EnrichmentQueueMessageSchema = z.object({
   itemId: z.string().min(1),
@@ -28,7 +75,7 @@ export const EnrichmentQueueMessageSchema = z.object({
 
 export const ModelSuggestedTagSchema = z.object({
   name: z.string().min(1).max(64),
-  kind: z.enum(['topic', 'entity', 'intent', 'format']),
+  kind: SuggestedTagKindSchema,
   confidence: ConfidenceSchema,
 });
 
@@ -80,10 +127,12 @@ export const EnrichmentModelOutputSchema = z.object({
     classification: ConfidenceSchema,
     tags: ConfidenceSchema,
   }),
-}) satisfies z.ZodType<EnrichmentModelOutput>;
+}) satisfies z.ZodType<EnrichmentModelOutput, z.ZodTypeDef, unknown>;
 
 export const SuggestedTagsSchema = z.array(SuggestedTagSchema).max(10) satisfies z.ZodType<
-  SuggestedTag[]
+  SuggestedTag[],
+  z.ZodTypeDef,
+  unknown
 >;
 
 export type EnrichmentQueueMessageInput = z.infer<typeof EnrichmentQueueMessageSchema>;
