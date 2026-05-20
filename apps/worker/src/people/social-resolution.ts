@@ -73,6 +73,17 @@ type XHandleLookupCandidate = InferredXHandleCandidate & {
   source: XHandleCandidateSource;
 };
 
+type StoredXProfileCandidate = Pick<
+  typeof personSocialProfiles.$inferSelect,
+  | 'providerProfileId'
+  | 'handle'
+  | 'displayName'
+  | 'avatarUrl'
+  | 'profileUrl'
+  | 'description'
+  | 'verified'
+>;
+
 type XAccessTokens = {
   userSearchAccessToken: string | null;
   directLookupAccessToken: string | null;
@@ -735,7 +746,65 @@ async function upsertCandidate(
   }
 }
 
+export function scoreStoredXProfileCandidate(input: {
+  personName: string;
+  contextTerms: string[];
+  profile: StoredXProfileCandidate;
+}): ScoredXProfileCandidate {
+  return scoreXProfileCandidate({
+    personName: input.personName,
+    contextTerms: input.contextTerms,
+    candidate: {
+      id: input.profile.providerProfileId,
+      name: input.profile.displayName,
+      username: input.profile.handle,
+      description: input.profile.description ?? undefined,
+      profileImageUrl: input.profile.avatarUrl ?? undefined,
+      url: input.profile.profileUrl,
+      verified: input.profile.verified,
+    },
+  });
+}
+
+async function loadStoredXProfileCandidates(
+  db: Database,
+  input: {
+    person: PersonForResolution;
+    contextTerms: string[];
+  }
+): Promise<ScoredXProfileCandidate[]> {
+  const rows = await db
+    .select({
+      providerProfileId: personSocialProfiles.providerProfileId,
+      handle: personSocialProfiles.handle,
+      displayName: personSocialProfiles.displayName,
+      avatarUrl: personSocialProfiles.avatarUrl,
+      profileUrl: personSocialProfiles.profileUrl,
+      description: personSocialProfiles.description,
+      verified: personSocialProfiles.verified,
+    })
+    .from(personSocialProfiles)
+    .where(
+      and(
+        eq(personSocialProfiles.userPersonId, input.person.id),
+        eq(personSocialProfiles.provider, 'X'),
+        eq(personSocialProfiles.status, 'CANDIDATE')
+      )
+    );
+
+  return rows
+    .map((profile) =>
+      scoreStoredXProfileCandidate({
+        personName: input.person.displayName,
+        contextTerms: input.contextTerms,
+        profile,
+      })
+    )
+    .filter((candidate) => candidate.confidence >= CANDIDATE_THRESHOLD);
+}
+
 async function searchCandidatesForPerson(params: {
+  db: Database;
   env: XResolutionEnv;
   tokens: XAccessTokens;
   person: PersonForResolution;
@@ -744,6 +813,13 @@ async function searchCandidatesForPerson(params: {
   const queries = buildXSearchQueries(params.person, params.item);
   const contextTerms = extractContextTerms(params.item, params.person);
   const candidatesById = new Map<string, ScoredXProfileCandidate>();
+
+  for (const candidate of await loadStoredXProfileCandidates(params.db, {
+    person: params.person,
+    contextTerms,
+  })) {
+    candidatesById.set(candidate.id, candidate);
+  }
 
   if (params.tokens.userSearchAccessToken) {
     for (const query of queries) {
@@ -937,6 +1013,7 @@ export async function resolveXProfilesForItem(
       }
 
       const candidates = await searchCandidatesForPerson({
+        db,
         env,
         tokens,
         person,
@@ -1000,6 +1077,7 @@ export const socialResolutionInternals = {
   extractExplicitHandleCandidates,
   normalizeXUsername,
   resolveXAccessTokens,
+  scoreStoredXProfileCandidate,
   scoreInferredXProfileCandidate,
   scoreXProfileCandidate,
 };

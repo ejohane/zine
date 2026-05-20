@@ -179,6 +179,25 @@ describe('social profile resolution helpers', () => {
     expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
   });
 
+  it('rescoring stored X candidates can promote previously conservative matches', () => {
+    const scored = socialResolutionInternals.scoreStoredXProfileCandidate({
+      personName: 'Jake Kastrenakes',
+      contextTerms: ['executive', 'editor', 'verge'],
+      profile: {
+        providerProfileId: '1973331',
+        handle: 'jake_k',
+        displayName: 'Jake Kastrenakes',
+        avatarUrl: 'https://pbs.twimg.com/profile_images/jake.jpg',
+        profileUrl: 'https://x.com/jake_k',
+        description: 'executive editor @verge / contact me: https://t.co/52CumWCN0M',
+        verified: false,
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(scored.matchedTerms).toEqual(['executive', 'editor', 'verge']);
+  });
+
   it('generates common validated lookup handles from names', () => {
     const candidates = socialResolutionInternals.buildNameDerivedHandleCandidates({
       id: 'person-1',
