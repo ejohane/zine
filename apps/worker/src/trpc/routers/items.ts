@@ -1020,6 +1020,9 @@ export const itemsRouter = router({
               .select({
                 personId: userPeople.id,
                 normalizedName: userPeople.normalizedName,
+                profileImageUrl: userPeople.profileImageUrl,
+                profileImageSource: userPeople.profileImageSource,
+                xHandle: userPeople.xHandle,
               })
               .from(userPersonMentions)
               .innerJoin(userPeople, eq(userPersonMentions.userPersonId, userPeople.id))
@@ -1031,8 +1034,8 @@ export const itemsRouter = router({
                 )
               )
           : [];
-      const personIdByNormalizedName = new Map(
-        activePersonRows.map((row) => [row.normalizedName, row.personId])
+      const personByNormalizedName = new Map(
+        activePersonRows.map((row) => [row.normalizedName, row])
       );
 
       return {
@@ -1055,7 +1058,16 @@ export const itemsRouter = router({
               ...entity,
               name: isPerson ? normalizePersonDisplayName(entity.name) : entity.name,
               personId: normalizedPersonName
-                ? (personIdByNormalizedName.get(normalizedPersonName) ?? null)
+                ? (personByNormalizedName.get(normalizedPersonName)?.personId ?? null)
+                : null,
+              profileImageUrl: normalizedPersonName
+                ? (personByNormalizedName.get(normalizedPersonName)?.profileImageUrl ?? null)
+                : null,
+              profileImageSource: normalizedPersonName
+                ? (personByNormalizedName.get(normalizedPersonName)?.profileImageSource ?? null)
+                : null,
+              xHandle: normalizedPersonName
+                ? (personByNormalizedName.get(normalizedPersonName)?.xHandle ?? null)
                 : null,
             };
           }),

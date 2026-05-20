@@ -240,6 +240,11 @@ export const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  peopleAvatarImage: {
+    width: '100%',
+    height: '100%',
   },
   peopleName: {
     flex: 1,
