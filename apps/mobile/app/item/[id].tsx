@@ -15,6 +15,7 @@
 
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
+import { usePreventRemove } from '@react-navigation/native';
 import { useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
@@ -129,6 +130,9 @@ export default function ItemDetailScreen() {
   const handleCloseArticleWebView = useCallback(() => {
     setArticleWebViewOpen(false);
   }, []);
+  usePreventRemove(articleWebViewOpen, () => {
+    setArticleWebViewOpen(false);
+  });
 
   useEffect(() => {
     setArticleWebViewOpen(false);
