@@ -581,6 +581,38 @@ export function useSetCollectionHomeSection() {
       utils.collections.list.invalidate();
       utils.collections.get.invalidate();
       utils.items.home.invalidate();
+      utils.homeSettings.get.invalidate();
+    },
+  });
+}
+
+export function useHomeScreenSettings() {
+  return trpc.homeSettings.get.useQuery(undefined, {
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
+}
+
+export function useUpdateHomeScreenSettings() {
+  const utils = trpc.useUtils();
+
+  return trpc.homeSettings.update.useMutation({
+    onSuccess: () => {
+      utils.homeSettings.get.invalidate();
+      utils.items.home.invalidate();
+      utils.collections.list.invalidate();
+    },
+  });
+}
+
+export function useResetHomeScreenSettings() {
+  const utils = trpc.useUtils();
+
+  return trpc.homeSettings.reset.useMutation({
+    onSuccess: () => {
+      utils.homeSettings.get.invalidate();
+      utils.items.home.invalidate();
+      utils.collections.list.invalidate();
     },
   });
 }

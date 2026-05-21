@@ -70,6 +70,26 @@ export type {
   HomeCollectionLayoutValue,
 } from './collections';
 
+// Home screen customization contracts
+export {
+  HOME_SCREEN_COLLECTION_INSERT_AFTER,
+  HOME_SCREEN_DEFAULT_BUILT_IN_SECTIONS,
+  HomeScreenBuiltInSection,
+  HomeScreenBuiltInSectionSchema,
+  HomeScreenLayoutSectionSchema,
+  HomeScreenSectionKind,
+  HomeScreenSectionKindSchema,
+  HomeScreenSettingsSectionInputSchema,
+  getHomeScreenBuiltInSectionSubtitle,
+  getHomeScreenBuiltInSectionTitle,
+} from './home-screen';
+export type {
+  HomeScreenBuiltInSectionValue,
+  HomeScreenLayoutSection,
+  HomeScreenSectionKindValue,
+  HomeScreenSettingsSectionInput,
+} from './home-screen';
+
 // Schemas (Zod validation for tRPC input)
 export { ContentTypeSchema, ProviderSchema, SubscriptionStatusSchema } from './schemas';
 

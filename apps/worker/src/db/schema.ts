@@ -263,6 +263,31 @@ export const homeCollectionSections = sqliteTable(
   ]
 );
 
+// Home screen sections
+// Stores the user's ordered built-in and custom collection Home screen layout.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const homeScreenSections = sqliteTable(
+  'home_screen_sections',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    sectionType: text('section_type').notNull(),
+    builtInSection: text('built_in_section'),
+    collectionId: text('collection_id').references(() => collections.id),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    position: integer('position').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('home_screen_sections_user_builtin_idx').on(table.userId, table.builtInSection),
+    uniqueIndex('home_screen_sections_user_collection_idx').on(table.userId, table.collectionId),
+    index('home_screen_sections_user_position_idx').on(table.userId, table.position),
+  ]
+);
+
 // Item Enrichments
 // Canonical AI-generated enrichment for a content item and content hash.
 // Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.

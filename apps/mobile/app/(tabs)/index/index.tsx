@@ -15,7 +15,14 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { HomeCollectionLayout, type ContentType as ApiContentType } from '@zine/shared';
+import {
+  HomeCollectionLayout,
+  HomeScreenBuiltInSection,
+  HomeScreenSectionKind,
+  type ContentType as ApiContentType,
+  type HomeScreenBuiltInSectionValue,
+  type HomeScreenLayoutSection,
+} from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, PodcastIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
@@ -198,6 +205,7 @@ type HomeSectionItem =
       count: number;
       items: ItemCardData[];
     };
+type CustomHomeSectionItem = Extract<HomeSectionItem, { collectionId: string }>;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -318,7 +326,7 @@ export default function HomeScreen() {
     }));
   }, [homeData?.byContentType.articles]);
 
-  const customCollectionSections = useMemo((): HomeSectionItem[] => {
+  const customCollectionSections = useMemo((): CustomHomeSectionItem[] => {
     return (homeData?.customCollections ?? [])
       .filter((section) => section.items.length > 0)
       .map((section) => {
@@ -400,68 +408,103 @@ export default function HomeScreen() {
   const showArticlesSection = contentTypeFilter === null || contentTypeFilter === 'article';
 
   const sections = useMemo((): HomeSectionItem[] => {
-    const items: HomeSectionItem[] = [];
+    const builtInSections: Partial<Record<HomeScreenBuiltInSectionValue, HomeSectionItem>> = {};
 
     if (filteredJumpBackInItems.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.JUMP_BACK_IN] = {
         key: 'jump-back-in',
         type: 'jump-back-in',
         title: 'Jump Back In',
         count: filteredJumpBackInItems.length,
         items: filteredJumpBackInItems,
-      });
+      };
     }
 
     if (filteredRecentlyBookmarked.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.RECENTLY_BOOKMARKED] = {
         key: 'recently-bookmarked',
         type: 'recently-bookmarked',
         title: 'Recently Bookmarked',
         count: filteredRecentlyBookmarked.length,
         items: filteredRecentlyBookmarked,
-      });
+      };
     }
 
     if (filteredInboxItems.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.INBOX] = {
         key: 'inbox',
         type: 'inbox',
         title: 'Inbox',
         count: filteredInboxItems.length,
         items: filteredInboxItems,
-      });
+      };
     }
 
-    items.push(...customCollectionSections);
-
     if (showPodcastsSection && podcasts.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.PODCASTS] = {
         key: 'podcasts',
         type: 'cover-rail',
         title: 'Podcasts',
         count: podcasts.length,
         items: podcasts.slice(0, HOME_PODCASTS_VISIBLE_LIMIT),
-      });
+      };
     }
 
     if (showArticlesSection && articles.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.ARTICLES] = {
         key: 'articles',
         type: 'stack-rail',
         title: 'Articles',
         count: articles.length,
         items: articles,
-      });
+      };
     }
 
     if (showVideosSection && videos.length > 0) {
-      items.push({
+      builtInSections[HomeScreenBuiltInSection.VIDEOS] = {
         key: 'videos',
         type: 'stack-rail',
         title: 'Videos',
         count: videos.length,
         items: videos,
-      });
+      };
+    }
+
+    const collectionSectionsById = new Map(
+      customCollectionSections.map((section) => [section.collectionId, section] as const)
+    );
+    const fallbackOrder: HomeScreenLayoutSection[] = [
+      {
+        kind: HomeScreenSectionKind.BUILT_IN,
+        builtInSection: HomeScreenBuiltInSection.JUMP_BACK_IN,
+      },
+      {
+        kind: HomeScreenSectionKind.BUILT_IN,
+        builtInSection: HomeScreenBuiltInSection.RECENTLY_BOOKMARKED,
+      },
+      { kind: HomeScreenSectionKind.BUILT_IN, builtInSection: HomeScreenBuiltInSection.INBOX },
+      ...customCollectionSections.map(
+        (section): HomeScreenLayoutSection => ({
+          kind: HomeScreenSectionKind.COLLECTION,
+          collectionId: section.collectionId,
+        })
+      ),
+      { kind: HomeScreenSectionKind.BUILT_IN, builtInSection: HomeScreenBuiltInSection.PODCASTS },
+      { kind: HomeScreenSectionKind.BUILT_IN, builtInSection: HomeScreenBuiltInSection.ARTICLES },
+      { kind: HomeScreenSectionKind.BUILT_IN, builtInSection: HomeScreenBuiltInSection.VIDEOS },
+    ];
+    const orderedSections = homeData?.sectionOrder ?? fallbackOrder;
+    const items: HomeSectionItem[] = [];
+
+    for (const section of orderedSections) {
+      if (section.kind === HomeScreenSectionKind.BUILT_IN) {
+        const builtInSection = builtInSections[section.builtInSection];
+        if (builtInSection) items.push(builtInSection);
+        continue;
+      }
+
+      const collectionSection = collectionSectionsById.get(section.collectionId);
+      if (collectionSection) items.push(collectionSection);
     }
 
     return items;
@@ -475,6 +518,7 @@ export default function HomeScreen() {
     showArticlesSection,
     showPodcastsSection,
     showVideosSection,
+    homeData?.sectionOrder,
     videos,
   ]);
 

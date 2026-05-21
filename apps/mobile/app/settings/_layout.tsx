@@ -27,6 +27,12 @@ export default function SettingsLayout() {
         }}
       />
       <Stack.Screen
+        name="home-screen"
+        options={{
+          title: 'Home Screen',
+        }}
+      />
+      <Stack.Screen
         name="account"
         options={{
           title: 'Account',
