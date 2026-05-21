@@ -71,6 +71,9 @@ export interface ItemCardProps {
   /** Optional list index for parent list ordering */
   index?: number;
 
+  /** Whether the card should render an outer border when its visual treatment supports one */
+  bordered?: boolean;
+
   /** Custom press handler (default: navigate to detail) */
   onPress?: () => void;
 }
@@ -94,6 +97,7 @@ function areItemCardPropsEqual(previous: ItemCardProps, next: ItemCardProps): bo
     previous.shape === next.shape &&
     previous.rowStyle === next.rowStyle &&
     previous.index === next.index &&
+    previous.bordered === next.bordered &&
     previous.onPress === next.onPress &&
     areItemCardItemsEqual(previous.item, next.item)
   );
@@ -104,6 +108,7 @@ function ItemCardComponent({
   shape = 'row',
   rowStyle = 'compact',
   index: _index,
+  bordered = true,
   onPress,
 }: ItemCardProps) {
   const router = useRouter();
@@ -293,7 +298,11 @@ function ItemCardComponent({
         style={({ pressed }) => [
           styles.rowFeaturedCard,
           styles.rowFeaturedWrapper,
-          { backgroundColor: colors.surfaceElevated, borderColor: colors.borderDefault },
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: bordered ? colors.borderDefault : 'transparent',
+            borderWidth: bordered ? 1 : 0,
+          },
           pressed && { opacity: motion.opacity.pressed },
         ]}
       >

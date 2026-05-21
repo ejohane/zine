@@ -7,6 +7,7 @@ export default function HomeLayout() {
     <Stack screenOptions={lightweightHeaderStackScreenOptions}>
       <Stack.Screen name="index" options={{ title: 'Home' }} />
       <Stack.Screen name="collection/[id]" options={{ title: 'Collection', headerBackTitle: '' }} />
+      <Stack.Screen name="section/[section]" options={{ title: 'Section', headerBackTitle: '' }} />
     </Stack>
   );
 }

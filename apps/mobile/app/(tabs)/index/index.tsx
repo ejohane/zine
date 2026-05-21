@@ -1,9 +1,12 @@
 import { Stack, useNavigation, useRouter, type Href } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Surface } from 'heroui-native';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import {
   View,
   Text,
+  Animated,
+  Modal,
   ScrollView,
   StyleSheet,
   Pressable,
@@ -27,14 +30,7 @@ import {
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, PodcastIcon, PostIcon, SettingsIcon, VideoIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
-import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  ContentColors,
-  FilterChipPalette,
-} from '@/constants/theme';
+import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import {
@@ -67,54 +63,49 @@ const HOME_RECENT_BOOKMARKS_VISIBLE_LIMIT = 6;
 const HOME_INBOX_VISIBLE_LIMIT = 4;
 const HOME_PODCASTS_VISIBLE_LIMIT = 5;
 const HOME_TOP_THRESHOLD = 4;
-const HOME_COLLAPSED_TITLE_THRESHOLD = 44;
+const NAVIGATION_PANE_WIDTH = 304;
+const NAVIGATION_PANE_ANIMATION_MS = 220;
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
+type BuiltInHomeSectionKey =
+  | 'jump-back-in'
+  | 'recently-bookmarked'
+  | 'podcasts'
+  | 'articles'
+  | 'videos';
 
 const contentTypeFilters: {
-  id: UIContentType;
+  id: UIContentType | null;
   label: string;
-  icon: ComponentType<{ size?: number; color?: string }>;
-  dotColor: string;
-  selectedColor: string;
-  selectedSurfaceColor: string;
+  icon?: ComponentType<{ size?: number; color?: string }>;
+  dotColor?: string;
 }[] = [
+  {
+    id: null,
+    label: 'All',
+  },
   {
     id: 'article',
     label: 'Articles',
     icon: ArticleIcon,
     dotColor: ContentColors.article,
-    selectedColor: FilterChipPalette.article.accent,
-    selectedSurfaceColor: FilterChipPalette.article.surface,
   },
   {
     id: 'podcast',
     label: 'Podcasts',
     icon: PodcastIcon,
     dotColor: ContentColors.podcast,
-    selectedColor: FilterChipPalette.podcast.accent,
-    selectedSurfaceColor: FilterChipPalette.podcast.surface,
   },
   {
     id: 'video',
     label: 'Videos',
     icon: VideoIcon,
     dotColor: ContentColors.video,
-    selectedColor: FilterChipPalette.video.accent,
-    selectedSurfaceColor: FilterChipPalette.video.surface,
   },
   {
     id: 'post',
     label: 'Posts',
     icon: PostIcon,
     dotColor: ContentColors.post,
-    selectedColor: FilterChipPalette.post.accent,
-    selectedSurfaceColor: FilterChipPalette.post.surface,
   },
 ];
 
@@ -136,12 +127,10 @@ function mapHomeItemToCard(
 
 function SectionHeader({
   title,
-  count,
   colors,
   onPress,
 }: {
   title: string;
-  count?: number;
   colors: typeof Colors.dark;
   onPress?: () => void;
 }) {
@@ -149,9 +138,6 @@ function SectionHeader({
     <Pressable onPress={onPress} style={styles.sectionHeader} disabled={!onPress}>
       <View style={styles.sectionHeaderLeft}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-        {count !== undefined && (
-          <Text style={[styles.sectionCount, { color: colors.textTertiary }]}>{count}</Text>
-        )}
       </View>
       {onPress && <ChevronRightIcon size={20} color={colors.textTertiary} />}
     </Pressable>
@@ -212,13 +198,20 @@ export default function HomeScreen() {
   const navigation = useNavigation() as HomeScreenNavigation;
   const listRef = useRef<FlatList<HomeSectionItem>>(null);
   const scrollOffsetYRef = useRef(0);
+  const navigationPaneProgress = useRef(new Animated.Value(0)).current;
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'dark'];
   const { width: windowWidth } = useWindowDimensions();
-  const greeting = useMemo(() => getGreeting(), []);
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
-  const [showCollapsedTitle, setShowCollapsedTitle] = useState(false);
+  const [isNavigationPaneMounted, setNavigationPaneMounted] = useState(false);
+  const [isNavigationPaneOpen, setNavigationPaneOpen] = useState(false);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
+  const headerContentWidth = Math.max(windowWidth - Spacing.md * 2, 240);
+  const headerFilterWidth = Math.max(headerContentWidth - 38, 180);
+  const headerFadeEndColor =
+    (colorScheme as string | null | undefined) === 'light'
+      ? 'rgba(255, 255, 255, 0)'
+      : 'rgba(0, 0, 0, 0)';
   const apiContentTypeFilter = useMemo(
     () => (contentTypeFilter ? (contentTypeFilter.toUpperCase() as ApiContentType) : undefined),
     [contentTypeFilter]
@@ -364,21 +357,52 @@ export default function HomeScreen() {
     [router]
   );
 
-  const handleOpenSettings = useCallback(() => {
-    router.push('/settings');
-  }, [router]);
+  const handleOpenHomeSection = useCallback(
+    (section: BuiltInHomeSectionKey) => {
+      router.push({
+        pathname: '/(tabs)/section/[section]',
+        params: { section },
+      } as unknown as Href);
+    },
+    [router]
+  );
+
+  const handleOpenNavigationPane = useCallback(() => {
+    setNavigationPaneMounted(true);
+    setNavigationPaneOpen(true);
+  }, []);
+
+  const handleCloseNavigationPane = useCallback(() => {
+    setNavigationPaneOpen(false);
+  }, []);
+
+  const handleNavigationPaneRoute = useCallback(
+    (href: Href) => {
+      setNavigationPaneOpen(false);
+      router.push(href);
+    },
+    [router]
+  );
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    scrollOffsetYRef.current = offsetY;
-
-    const shouldShowCollapsedTitle = offsetY > HOME_COLLAPSED_TITLE_THRESHOLD;
-    setShowCollapsedTitle((current) =>
-      current === shouldShowCollapsedTitle ? current : shouldShowCollapsedTitle
-    );
+    scrollOffsetYRef.current = event.nativeEvent.contentOffset.y;
   }, []);
 
   const isLoading = isInboxLoading || isHomeLoading;
+
+  useEffect(() => {
+    if (!isNavigationPaneMounted) return;
+
+    Animated.timing(navigationPaneProgress, {
+      toValue: isNavigationPaneOpen ? 1 : 0,
+      duration: NAVIGATION_PANE_ANIMATION_MS,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished && !isNavigationPaneOpen) {
+        setNavigationPaneMounted(false);
+      }
+    });
+  }, [isNavigationPaneMounted, isNavigationPaneOpen, navigationPaneProgress]);
 
   const filteredJumpBackInItems = useMemo(
     () => getVisibleFeaturedGridItems(jumpBackInItems, contentTypeFilter),
@@ -522,37 +546,79 @@ export default function HomeScreen() {
     videos,
   ]);
 
-  const listHeader = useMemo(
+  const headerContent = useMemo(
     () => (
-      <>
-        <View style={styles.header}>
-          <Text style={[styles.homeTitle, { color: colors.text }]}>Home</Text>
-          <Text style={[styles.greeting, { color: colors.textSubheader }]}>{greeting}</Text>
+      <View style={[styles.headerContent, { width: headerContentWidth }]}>
+        <View style={styles.headerSettingsArea}>
+          <Pressable
+            onPress={handleOpenNavigationPane}
+            style={[styles.settingsButton, { backgroundColor: colors.surfaceSubtle }]}
+            hitSlop={12}
+            accessibilityLabel={
+              hasSettingsAlert
+                ? 'Open navigation menu. Subscription integrations need attention'
+                : 'Open navigation menu'
+            }
+            accessibilityRole="button"
+          >
+            <SettingsIcon size={20} color={colors.text} />
+            {hasSettingsAlert ? (
+              <View
+                testID="home-settings-alert-dot"
+                pointerEvents="none"
+                style={[
+                  styles.settingsAlertDot,
+                  {
+                    backgroundColor: colors.warning,
+                    borderColor: colors.background,
+                  },
+                ]}
+              />
+            ) : null}
+          </Pressable>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[colors.background, headerFadeEndColor]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.headerFilterFade}
+          />
         </View>
-
         <ScrollView
           horizontal
+          style={[styles.headerFilterScroll, { width: headerFilterWidth }]}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContainer}
+          contentContainerStyle={styles.headerFilterContainer}
         >
           {contentTypeFilters.map((filter) => (
             <FilterChip
-              key={filter.id}
+              key={filter.id ?? 'all'}
               label={filter.label}
               isSelected={contentTypeFilter === filter.id}
-              onPress={() =>
-                setContentTypeFilter((current) => (current === filter.id ? null : filter.id))
-              }
+              onPress={() => setContentTypeFilter(filter.id)}
               icon={filter.icon}
               dotColor={filter.dotColor}
-              selectedColor={filter.selectedColor}
-              selectedSurfaceColor={filter.selectedSurfaceColor}
+              selectedColor={colors.warning}
+              selectedSurfaceColor={colors.warning}
+              selectedForegroundColor={colors.statusWarningForeground}
             />
           ))}
         </ScrollView>
-      </>
+      </View>
     ),
-    [colors.text, colors.textSubheader, contentTypeFilter, greeting]
+    [
+      colors.background,
+      colors.surfaceSubtle,
+      colors.statusWarningForeground,
+      colors.text,
+      colors.warning,
+      contentTypeFilter,
+      handleOpenNavigationPane,
+      hasSettingsAlert,
+      headerContentWidth,
+      headerFadeEndColor,
+      headerFilterWidth,
+    ]
   );
 
   const renderSection = useCallback(
@@ -561,7 +627,11 @@ export default function HomeScreen() {
         case 'jump-back-in':
           return (
             <View>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                colors={colors}
+                onPress={() => handleOpenHomeSection('jump-back-in')}
+              />
               <View style={styles.jumpBackInGrid}>
                 {getFeaturedGridRows(item.items).map((row) => (
                   <View
@@ -573,7 +643,12 @@ export default function HomeScreen() {
                         key={sectionItem.id}
                         style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
                       >
-                        <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                        <ItemCard
+                          item={sectionItem}
+                          shape="row"
+                          rowStyle="featured"
+                          bordered={false}
+                        />
                       </View>
                     ))}
                   </View>
@@ -584,12 +659,16 @@ export default function HomeScreen() {
         case 'recently-bookmarked':
           return (
             <View>
-              <SectionHeader title={item.title} count={item.count} colors={colors} />
+              <SectionHeader
+                title={item.title}
+                colors={colors}
+                onPress={() => handleOpenHomeSection('recently-bookmarked')}
+              />
               <FlatList
                 horizontal
                 data={item.items}
                 renderItem={({ item: sectionItem, index }) => (
-                  <ItemCard item={sectionItem} shape="stack" index={index} />
+                  <ItemCard item={sectionItem} shape="stack" index={index} bordered={false} />
                 )}
                 keyExtractor={(sectionItem) => sectionItem.id}
                 showsHorizontalScrollIndicator={false}
@@ -602,7 +681,6 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <SectionHeader
                 title={item.title}
-                count={item.count}
                 colors={colors}
                 onPress={() => router.push('/(tabs)/inbox')}
               />
@@ -610,7 +688,13 @@ export default function HomeScreen() {
                 style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
               >
                 {item.items.map((sectionItem, index) => (
-                  <ItemCard key={sectionItem.id} item={sectionItem} shape="row" index={index} />
+                  <ItemCard
+                    key={sectionItem.id}
+                    item={sectionItem}
+                    shape="row"
+                    index={index}
+                    bordered={false}
+                  />
                 ))}
               </View>
             </View>
@@ -621,19 +705,18 @@ export default function HomeScreen() {
             <View>
               <SectionHeader
                 title={item.title}
-                count={item.count}
                 colors={colors}
                 onPress={
                   item.type === 'custom-cover-rail'
                     ? () => handleOpenCollection(item.collectionId)
-                    : undefined
+                    : () => handleOpenHomeSection(item.key as BuiltInHomeSectionKey)
                 }
               />
               <FlatList
                 horizontal
                 data={item.items}
                 renderItem={({ item: sectionItem, index }) => (
-                  <ItemCard item={sectionItem} shape="cover" index={index} />
+                  <ItemCard item={sectionItem} shape="cover" index={index} bordered={false} />
                 )}
                 keyExtractor={(sectionItem) => sectionItem.id}
                 showsHorizontalScrollIndicator={false}
@@ -647,19 +730,18 @@ export default function HomeScreen() {
             <View>
               <SectionHeader
                 title={item.title}
-                count={item.count}
                 colors={colors}
                 onPress={
                   item.type === 'custom-stack-rail'
                     ? () => handleOpenCollection(item.collectionId)
-                    : undefined
+                    : () => handleOpenHomeSection(item.key as BuiltInHomeSectionKey)
                 }
               />
               <FlatList
                 horizontal
                 data={item.items}
                 renderItem={({ item: sectionItem, index }) => (
-                  <ItemCard item={sectionItem} shape="stack" index={index} />
+                  <ItemCard item={sectionItem} shape="stack" index={index} bordered={false} />
                 )}
                 keyExtractor={(sectionItem) => sectionItem.id}
                 showsHorizontalScrollIndicator={false}
@@ -672,7 +754,6 @@ export default function HomeScreen() {
             <View>
               <SectionHeader
                 title={item.title}
-                count={item.count}
                 colors={colors}
                 onPress={() => handleOpenCollection(item.collectionId)}
               />
@@ -687,7 +768,12 @@ export default function HomeScreen() {
                         key={sectionItem.id}
                         style={[styles.jumpBackInGridItem, { width: featuredGridItemWidth }]}
                       >
-                        <ItemCard item={sectionItem} shape="row" rowStyle="featured" />
+                        <ItemCard
+                          item={sectionItem}
+                          shape="row"
+                          rowStyle="featured"
+                          bordered={false}
+                        />
                       </View>
                     ))}
                   </View>
@@ -700,7 +786,6 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <SectionHeader
                 title={item.title}
-                count={item.count}
                 colors={colors}
                 onPress={() => handleOpenCollection(item.collectionId)}
               />
@@ -708,14 +793,20 @@ export default function HomeScreen() {
                 style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
               >
                 {item.items.map((sectionItem, index) => (
-                  <ItemCard key={sectionItem.id} item={sectionItem} shape="row" index={index} />
+                  <ItemCard
+                    key={sectionItem.id}
+                    item={sectionItem}
+                    shape="row"
+                    index={index}
+                    bordered={false}
+                  />
                 ))}
               </View>
             </View>
           );
       }
     },
-    [colors, featuredGridItemWidth, handleOpenCollection, router]
+    [colors, featuredGridItemWidth, handleOpenCollection, handleOpenHomeSection, router]
   );
 
   useEffect(() => {
@@ -739,7 +830,7 @@ export default function HomeScreen() {
     <Surface style={[styles.container, { backgroundColor: colors.background }]} collapsable={false}>
       <Stack.Screen
         options={{
-          title: showCollapsedTitle ? 'Home' : '',
+          title: '',
           headerLargeTitle: false,
           headerTransparent: false,
           headerShadowVisible: false,
@@ -750,33 +841,8 @@ export default function HomeScreen() {
           headerTitleStyle: {
             color: colors.text,
           },
-          headerRight: () => (
-            <Pressable
-              onPress={handleOpenSettings}
-              style={styles.settingsButton}
-              accessibilityLabel={
-                hasSettingsAlert
-                  ? 'Open settings. Subscription integrations need attention'
-                  : 'Open settings'
-              }
-              accessibilityRole="button"
-            >
-              <SettingsIcon size={20} color={colors.text} />
-              {hasSettingsAlert ? (
-                <View
-                  testID="home-settings-alert-dot"
-                  pointerEvents="none"
-                  style={[
-                    styles.settingsAlertDot,
-                    {
-                      backgroundColor: colors.warning,
-                      borderColor: colors.background,
-                    },
-                  ]}
-                />
-              ) : null}
-            </Pressable>
-          ),
+          headerTitleAlign: 'left',
+          headerTitle: () => headerContent,
         }}
       />
 
@@ -791,7 +857,6 @@ export default function HomeScreen() {
         onScroll={handleScroll}
         scrollEventThrottle={32}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={listHeader}
         ListFooterComponent={<View style={styles.bottomSpacer} />}
         ListEmptyComponent={
           isLoading ? (
@@ -805,6 +870,85 @@ export default function HomeScreen() {
         updateCellsBatchingPeriod={16}
         windowSize={5}
       />
+      <Modal
+        visible={isNavigationPaneMounted}
+        transparent
+        animationType="none"
+        onRequestClose={handleCloseNavigationPane}
+      >
+        <View style={styles.navigationPaneRoot}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.navigationPaneScrim,
+              {
+                opacity: navigationPaneProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 1],
+                }),
+              },
+            ]}
+          />
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleCloseNavigationPane}
+            accessibilityLabel="Close navigation menu"
+            accessibilityRole="button"
+          />
+          <Animated.View
+            style={[
+              styles.navigationPane,
+              {
+                backgroundColor: colors.background,
+                transform: [
+                  {
+                    translateX: navigationPaneProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-NAVIGATION_PANE_WIDTH, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.navigationPaneHeader}>
+              <Text style={[styles.navigationPaneTitle, { color: colors.text }]}>Zine</Text>
+            </View>
+
+            <View style={styles.navigationPaneRows}>
+              {[
+                { label: 'Edit Homescreen', href: '/settings/home-screen' as Href },
+                { label: 'Settings', href: '/settings' as Href, showAlertDot: hasSettingsAlert },
+                { label: 'Home', href: '/(tabs)' as Href, isActive: true },
+                { label: 'Inbox', href: '/(tabs)/inbox' as Href },
+                { label: 'Search', href: '/(tabs)/search' as Href },
+                { label: 'Library', href: '/(tabs)/library' as Href },
+              ].map((item) => (
+                <Pressable
+                  key={item.label}
+                  onPress={() => handleNavigationPaneRoute(item.href)}
+                  style={({ pressed }) => [
+                    styles.navigationPaneRow,
+                    item.isActive ? { backgroundColor: colors.surfaceSubtle } : null,
+                    pressed ? { opacity: 0.72 } : null,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open ${item.label}`}
+                >
+                  <Text style={[styles.navigationPaneRowLabel, { color: colors.text }]}>
+                    {item.label}
+                  </Text>
+                  {item.showAlertDot ? (
+                    <View
+                      style={[styles.navigationPaneAlertDot, { backgroundColor: colors.warning }]}
+                    />
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </Surface>
   );
 }
@@ -820,17 +964,50 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingBottom: 32,
   },
-  header: {
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.xl,
+  navigationPaneRoot: {
+    flex: 1,
   },
-  homeTitle: {
-    ...Typography.displayMedium,
+  navigationPaneScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+  },
+  navigationPane: {
+    width: NAVIGATION_PANE_WIDTH,
+    height: '100%',
+    paddingTop: 72,
+    paddingHorizontal: Spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  navigationPaneHeader: {
+    marginBottom: Spacing.xl,
+  },
+  navigationPaneTitle: {
+    ...Typography.titleLarge,
     marginBottom: Spacing.xs,
   },
-  greeting: {
-    ...Typography.labelMedium,
+  navigationPaneRows: {
+    gap: Spacing.xs,
+  },
+  navigationPaneRow: {
+    minHeight: 48,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  navigationPaneRowLabel: {
+    ...Typography.bodyMedium,
+    fontWeight: '600',
+  },
+  navigationPaneAlertDot: {
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
   },
   settingsButton: {
     width: 36,
@@ -839,7 +1016,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    borderWidth: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   settingsAlertDot: {
     position: 'absolute',
@@ -850,10 +1029,32 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     borderWidth: 2,
   },
-  filterContainer: {
-    paddingHorizontal: Spacing.md,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerSettingsArea: {
+    width: 38,
+    height: 36,
+    position: 'relative',
+    zIndex: 2,
+  },
+  headerFilterFade: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 28,
+    width: 30,
+    zIndex: 1,
+  },
+  headerFilterScroll: {
+    flexGrow: 0,
+    marginLeft: Spacing.xs,
+  },
+  headerFilterContainer: {
     gap: Spacing.sm,
-    marginBottom: Spacing.lg,
+    paddingLeft: Spacing.sm,
+    paddingRight: Spacing.sm,
   },
   section: {
     marginBottom: Spacing.xl,
@@ -872,9 +1073,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...Typography.titleLarge,
-  },
-  sectionCount: {
-    ...Typography.bodySmall,
   },
   horizontalList: {
     paddingHorizontal: Spacing.md,

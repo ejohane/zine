@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useToast } from 'heroui-native';
 import {
   NestableDraggableFlatList,
@@ -180,6 +180,8 @@ function AddCollectionRow({
 }
 
 export default function HomeScreenSettingsScreen() {
+  const navigation = useNavigation();
+  const router = useRouter();
   const { toast } = useToast();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
@@ -316,6 +318,23 @@ export default function HomeScreenSettingsScreen() {
   const headerRight = () => (
     <HeaderButton label="Save" disabled={!canSave} onPress={handleSave} colors={colors} />
   );
+  const headerLeft = () => (
+    <Pressable
+      accessibilityLabel="Go back"
+      onPress={() => {
+        if (navigation.canGoBack()) {
+          router.back();
+          return;
+        }
+
+        router.replace('/(tabs)');
+      }}
+      hitSlop={8}
+      style={styles.headerBack}
+    >
+      <Ionicons name="chevron-back" size={28} color={colors.text} />
+    </Pressable>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -325,6 +344,7 @@ export default function HomeScreenSettingsScreen() {
           tintColor: colors.text,
           screenTitle: 'Home Screen',
           showScreenTitle: showCollapsedTitle,
+          headerLeft,
           headerRight,
         })}
       />
@@ -533,5 +553,8 @@ const styles = StyleSheet.create({
   headerButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  headerBack: {
+    marginLeft: -Spacing.xs,
   },
 });
