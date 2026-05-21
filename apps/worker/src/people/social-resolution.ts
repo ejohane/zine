@@ -82,6 +82,7 @@ type StoredXProfileCandidate = Pick<
   | 'profileUrl'
   | 'description'
   | 'verified'
+  | 'evidenceJson'
 >;
 
 type XAccessTokens = {
@@ -404,6 +405,21 @@ function hasStrongNameMatch(personName: string, candidateName: string): boolean 
     candidateNameCompact.includes(personCompact) ||
     (personParts.length > 1 && personParts.every((part) => candidateNameCompact.includes(part)))
   );
+}
+
+export function isAmbiguousPersonNameForSocialResolution(personName: string): boolean {
+  return normalizedNameParts(personName).length < 2;
+}
+
+export function canAutoLinkXProfileCandidate(input: {
+  personName: string;
+  candidate: Pick<ScoredXProfileCandidate, 'inferredHandleSource'>;
+}): boolean {
+  if (!isAmbiguousPersonNameForSocialResolution(input.personName)) {
+    return true;
+  }
+
+  return input.candidate.inferredHandleSource === 'CONTEXT_EXPLICIT';
 }
 
 export function scoreInferredXProfileCandidate(input: {
@@ -751,7 +767,8 @@ export function scoreStoredXProfileCandidate(input: {
   contextTerms: string[];
   profile: StoredXProfileCandidate;
 }): ScoredXProfileCandidate {
-  return scoreXProfileCandidate({
+  const storedEvidence = parseStoredCandidateEvidence(input.profile.evidenceJson);
+  const scored = scoreXProfileCandidate({
     personName: input.personName,
     contextTerms: input.contextTerms,
     candidate: {
@@ -764,6 +781,40 @@ export function scoreStoredXProfileCandidate(input: {
       verified: input.profile.verified,
     },
   });
+
+  return {
+    ...scored,
+    ...storedEvidence,
+  };
+}
+
+function parseStoredCandidateEvidence(
+  evidenceJson: string | null
+): Pick<
+  ScoredXProfileCandidate,
+  'inferredHandleConfidence' | 'inferredHandleReason' | 'inferredHandleSource'
+> {
+  if (!evidenceJson) return {};
+
+  try {
+    const parsed = JSON.parse(evidenceJson) as Record<string, unknown>;
+    const source = parsed.inferredHandleSource;
+    if (source !== 'AI_INFERRED' && source !== 'CONTEXT_EXPLICIT' && source !== 'NAME_DERIVED') {
+      return {};
+    }
+
+    return {
+      inferredHandleSource: source,
+      inferredHandleConfidence:
+        typeof parsed.inferredHandleConfidence === 'number'
+          ? parsed.inferredHandleConfidence
+          : undefined,
+      inferredHandleReason:
+        typeof parsed.inferredHandleReason === 'string' ? parsed.inferredHandleReason : undefined,
+    };
+  } catch {
+    return {};
+  }
 }
 
 async function loadStoredXProfileCandidates(
@@ -782,6 +833,7 @@ async function loadStoredXProfileCandidates(
       profileUrl: personSocialProfiles.profileUrl,
       description: personSocialProfiles.description,
       verified: personSocialProfiles.verified,
+      evidenceJson: personSocialProfiles.evidenceJson,
     })
     .from(personSocialProfiles)
     .where(
@@ -851,11 +903,16 @@ async function searchCandidatesForPerson(params: {
     }
   }
 
-  const hasSearchAutoLinkCandidate = [...candidatesById.values()].some(
-    (candidate) => candidate.confidence >= AUTO_LINK_THRESHOLD
+  const hasAutoLinkCandidate = [...candidatesById.values()].some(
+    (candidate) =>
+      candidate.confidence >= AUTO_LINK_THRESHOLD &&
+      canAutoLinkXProfileCandidate({
+        personName: params.person.displayName,
+        candidate,
+      })
   );
 
-  if (!hasSearchAutoLinkCandidate && params.tokens.directLookupAccessToken) {
+  if (!hasAutoLinkCandidate && params.tokens.directLookupAccessToken) {
     const explicitHandles = extractExplicitHandleCandidates(params.item, params.person);
     const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
     const nameDerivedHandles = buildNameDerivedHandleCandidates(params.person);
@@ -1020,11 +1077,19 @@ export async function resolveXProfilesForItem(
         item: context.item,
       });
       const now = Date.now();
-      const best = candidates[0] ?? null;
+      const bestAutoLinkCandidate =
+        candidates.find(
+          (candidate) =>
+            candidate.confidence >= AUTO_LINK_THRESHOLD &&
+            canAutoLinkXProfileCandidate({
+              personName: person.displayName,
+              candidate,
+            })
+        ) ?? null;
 
       for (const candidate of candidates.slice(0, 3)) {
         const status =
-          candidate.id === best?.id && candidate.confidence >= AUTO_LINK_THRESHOLD
+          candidate.id === bestAutoLinkCandidate?.id && candidate.confidence >= AUTO_LINK_THRESHOLD
             ? 'LINKED'
             : 'CANDIDATE';
         await upsertCandidate(db, {
@@ -1045,7 +1110,7 @@ export async function resolveXProfilesForItem(
         });
       }
 
-      if (best && best.confidence >= AUTO_LINK_THRESHOLD) {
+      if (bestAutoLinkCandidate) {
         totals.linked += 1;
       }
       totals.candidates += candidates.length;
@@ -1073,8 +1138,10 @@ export async function resolveXProfilesForItem(
 export const socialResolutionInternals = {
   buildXSearchQueries,
   buildNameDerivedHandleCandidates,
+  canAutoLinkXProfileCandidate,
   extractContextTerms,
   extractExplicitHandleCandidates,
+  isAmbiguousPersonNameForSocialResolution,
   normalizeXUsername,
   resolveXAccessTokens,
   scoreStoredXProfileCandidate,
