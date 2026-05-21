@@ -246,6 +246,12 @@ function SettingsScreenContent({
             rightText="→"
             onPress={() => router.push('/settings/collections' as Href)}
           />
+          <SettingsRow
+            title="Home Screen"
+            subtitle="Choose and arrange sections"
+            rightText="→"
+            onPress={() => router.push('/settings/home-screen' as Href)}
+          />
         </View>
 
         <Text style={[styles.sectionTitle, { color: colors.textSubheader }]}>INSIGHTS</Text>

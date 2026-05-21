@@ -21,6 +21,7 @@ import {
   collections,
   creators,
   homeCollectionSections,
+  homeScreenSections,
   items,
   tags,
   userItems,
@@ -29,6 +30,10 @@ import {
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { toItemViewsWithTags } from './items';
 import type { Database } from '../../db';
+import {
+  addCollectionToHomeScreenIfMissing,
+  removeCollectionFromHomeScreen,
+} from '../../home-screen/layout';
 
 function parseRules(rulesJson: string): CollectionRules {
   try {
@@ -442,6 +447,7 @@ export const collectionsRouter = router({
       await ctx.db
         .delete(homeCollectionSections)
         .where(eq(homeCollectionSections.collectionId, input.id));
+      await ctx.db.delete(homeScreenSections).where(eq(homeScreenSections.collectionId, input.id));
       await ctx.db
         .delete(collections)
         .where(and(eq(collections.id, input.id), eq(collections.userId, ctx.userId)));
@@ -464,6 +470,7 @@ export const collectionsRouter = router({
         await ctx.db
           .delete(homeCollectionSections)
           .where(eq(homeCollectionSections.collectionId, input.id));
+        await removeCollectionFromHomeScreen(ctx.db, ctx.userId, input.id);
         return { success: true as const };
       }
 
@@ -479,6 +486,7 @@ export const collectionsRouter = router({
           .update(homeCollectionSections)
           .set({ layout: input.layout, updatedAt: now })
           .where(eq(homeCollectionSections.id, existingRows[0].id));
+        await addCollectionToHomeScreenIfMissing(ctx.db, ctx.userId, input.id);
         return { success: true as const };
       }
 
@@ -499,6 +507,7 @@ export const collectionsRouter = router({
         createdAt: now,
         updatedAt: now,
       });
+      await addCollectionToHomeScreenIfMissing(ctx.db, ctx.userId, input.id);
 
       return { success: true as const };
     }),

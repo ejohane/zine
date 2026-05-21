@@ -24,6 +24,7 @@ import {
   CollectionSort,
   CollectionSortSchema,
   HomeCollectionLayoutSchema,
+  HomeScreenSectionKind,
   isJsonObject,
   type JsonObject,
   type Provider,
@@ -48,6 +49,7 @@ import {
   userPeople,
   userPersonMentions,
 } from '../../db/schema';
+import { getHomeScreenLayoutSections } from '../../home-screen/layout';
 import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
@@ -791,9 +793,10 @@ export const itemsRouter = router({
       .innerJoin(collections, eq(homeCollectionSections.collectionId, collections.id))
       .where(and(eq(homeCollectionSections.userId, ctx.userId), eq(collections.userId, ctx.userId)))
       .orderBy(asc(homeCollectionSections.position), asc(homeCollectionSections.createdAt));
+    const homeLayoutSectionsQuery = getHomeScreenLayoutSections(ctx.db, ctx.userId);
 
     // Execute all queries in parallel
-    const [recentBookmarks, jumpBackIn, videos, podcasts, articles, homeSections] =
+    const [recentBookmarks, jumpBackIn, videos, podcasts, articles, homeSections, sectionOrder] =
       await Promise.all([
         recentBookmarksQuery,
         jumpBackInQuery,
@@ -801,6 +804,7 @@ export const itemsRouter = router({
         podcastsQuery,
         articlesQuery,
         homeSectionsQuery,
+        homeLayoutSectionsQuery,
       ]);
 
     const customCollections = await Promise.all(
@@ -878,6 +882,15 @@ export const itemsRouter = router({
         articles: articlesViews,
       },
       customCollections,
+      sectionOrder: sectionOrder.filter(
+        (section) =>
+          section.kind === HomeScreenSectionKind.BUILT_IN ||
+          customCollections.some(
+            (collection) =>
+              section.kind === HomeScreenSectionKind.COLLECTION &&
+              collection.collectionId === section.collectionId
+          )
+      ),
     };
   }),
 
