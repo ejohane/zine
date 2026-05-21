@@ -41,6 +41,9 @@ export interface FilterChipProps {
   /** Optional selected surface color for type-associated selection states */
   selectedSurfaceColor?: string;
 
+  /** Optional selected foreground color for filled selection states */
+  selectedForegroundColor?: string;
+
   /** Size variant */
   size?: 'small' | 'medium';
 }
@@ -75,6 +78,7 @@ export function FilterChip({
   dotColor,
   selectedColor,
   selectedSurfaceColor,
+  selectedForegroundColor,
   size = 'medium',
 }: FilterChipProps) {
   const { colors, motion } = useAppTheme();
@@ -85,9 +89,10 @@ export function FilterChip({
   const chipBorderColor = isSelected
     ? (selectedColor ?? colors.borderDefault)
     : colors.borderSubtle;
-  const selectedForegroundColor = hasTintedSelection ? selectedColor : colors.textPrimary;
+  const resolvedSelectedForegroundColor =
+    selectedForegroundColor ?? (hasTintedSelection ? selectedColor : colors.textPrimary);
   const unselectedForegroundColor = colors.textSubheader;
-  const iconColor = isSelected ? selectedForegroundColor : unselectedForegroundColor;
+  const iconColor = isSelected ? resolvedSelectedForegroundColor : unselectedForegroundColor;
 
   const sizeStyles = size === 'small' ? styles.chipSmall : styles.chipMedium;
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
@@ -119,7 +124,7 @@ export function FilterChip({
         tone={isSelected ? 'primary' : 'subheader'}
         style={[
           textStyles,
-          { color: isSelected ? selectedForegroundColor : unselectedForegroundColor },
+          { color: isSelected ? resolvedSelectedForegroundColor : unselectedForegroundColor },
         ]}
       >
         {label}

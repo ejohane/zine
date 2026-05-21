@@ -99,6 +99,15 @@ function findButtonByText(renderer: Renderer, text: string) {
   );
 }
 
+function findSectionHeaderButton(renderer: Renderer, text: string) {
+  return renderer.root.find(
+    (node: TestNode) =>
+      node.type === 'button' &&
+      !node.props.accessibilityLabel &&
+      getTextContent(node).includes(text)
+  );
+}
+
 function findFilterChip(renderer: Renderer, label: string) {
   return renderer.root.find(
     (node: TestNode) =>
@@ -128,6 +137,21 @@ function pressHomeTab() {
   tabPressListener();
 }
 
+function createFeedItem(id: string, contentType = 'ARTICLE'): MockFeedItem {
+  return {
+    id,
+    title: id,
+    creator: 'Creator',
+    publisher: 'Publisher',
+    creatorImageUrl: null,
+    thumbnailUrl: null,
+    contentType,
+    provider: 'RSS',
+    duration: null,
+    readingTimeMinutes: null,
+  };
+}
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -139,9 +163,16 @@ jest.mock('expo-router', () => ({
     }: {
       options?: {
         headerRight?: () => React.ReactNode;
+        headerTitle?: () => React.ReactNode;
       };
-    }) => React.createElement(React.Fragment, null, options?.headerRight?.()),
+    }) =>
+      React.createElement(React.Fragment, null, options?.headerTitle?.(), options?.headerRight?.()),
   },
+}));
+
+jest.mock('expo-linear-gradient', () => ({
+  LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('div', props, children),
 }));
 
 jest.mock('react-native', () => ({
@@ -167,6 +198,8 @@ jest.mock('react-native', () => ({
   ),
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
+    absoluteFill: { position: 'absolute' },
+    absoluteFillObject: { position: 'absolute' },
   },
   Pressable: ({
     children,
@@ -221,6 +254,20 @@ jest.mock('react-native', () => ({
     }
   ),
   ActivityIndicator: () => React.createElement('span', null, 'loading'),
+  Animated: {
+    Value: class {
+      interpolate() {
+        return 0;
+      }
+    },
+    View: ({ children, ...props }: { children?: React.ReactNode }) =>
+      React.createElement('div', props, children),
+    timing: () => ({
+      start: (callback?: (result: { finished: boolean }) => void) => callback?.({ finished: true }),
+    }),
+  },
+  Modal: ({ children, visible }: { children?: React.ReactNode; visible?: boolean }) =>
+    visible ? React.createElement('modal', null, children) : null,
   useWindowDimensions: () => ({ width: 390, height: 844, scale: 1, fontScale: 1 }),
 }));
 
@@ -343,7 +390,7 @@ describe('HomeScreen', () => {
     expect(getTextContent(renderer!.root)).not.toContain('Weekly recap card');
   });
 
-  it('keeps settings navigation on the Home screen', () => {
+  it('opens settings from the Home navigation pane', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<HomeScreen />);
@@ -353,19 +400,48 @@ describe('HomeScreen', () => {
       findButtonByText(renderer!, 'Settings icon').props.onPress();
     });
 
+    act(() => {
+      renderer!.root.findByProps({ accessibilityLabel: 'Open Settings' }).props.onPress();
+    });
+
     expect(mockPush).toHaveBeenCalledWith('/settings');
   });
 
-  it('keeps the home settings button background transparent without custom press feedback', () => {
+  it('opens the Home screen editor from the top navigation pane row', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<HomeScreen />);
     });
 
-    const settingsButton = renderer!.root.findByProps({ accessibilityLabel: 'Open settings' });
+    act(() => {
+      findButtonByText(renderer!, 'Settings icon').props.onPress();
+    });
 
-    expect(settingsButton.props.style).toEqual(
-      expect.objectContaining({ backgroundColor: 'transparent' })
+    act(() => {
+      renderer!.root.findByProps({ accessibilityLabel: 'Open Edit Homescreen' }).props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith('/settings/home-screen');
+  });
+
+  it('keeps the home settings button flat with a subtle circular background', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const settingsButton = renderer!.root.findByProps({
+      accessibilityLabel: 'Open navigation menu',
+    });
+    const styleObjects = Array.isArray(settingsButton.props.style)
+      ? settingsButton.props.style
+      : [settingsButton.props.style];
+
+    expect(styleObjects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ borderWidth: 0, shadowOpacity: 0, elevation: 0 }),
+        expect.objectContaining({ backgroundColor: expect.any(String) }),
+      ])
     );
   });
 
@@ -534,6 +610,63 @@ describe('HomeScreen', () => {
       pathname: '/(tabs)/collection/[id]',
       params: { id: 'collection-1' },
     });
+  });
+
+  it('opens built-in home section list views from their headers', () => {
+    mockUseHomeData.mockReturnValue({
+      data: {
+        jumpBackIn: [createFeedItem('jump-1')],
+        recentBookmarks: [createFeedItem('bookmark-1')],
+        byContentType: {
+          podcasts: [createFeedItem('podcast-1', 'PODCAST')],
+          videos: [createFeedItem('video-1', 'VIDEO')],
+          articles: [createFeedItem('article-1', 'ARTICLE')],
+        },
+        customCollections: [],
+      },
+      isLoading: false,
+    });
+    mockUseInfiniteInboxItems.mockReturnValue({
+      data: {
+        pages: [
+          {
+            items: [createFeedItem('inbox-1')],
+            nextCursor: null,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const builtInRoutes = [
+      ['Jump Back In', 'jump-back-in'],
+      ['Recently Bookmarked', 'recently-bookmarked'],
+      ['Podcasts', 'podcasts'],
+      ['Articles', 'articles'],
+      ['Videos', 'videos'],
+    ] as const;
+
+    builtInRoutes.forEach(([label, section]) => {
+      act(() => {
+        findSectionHeaderButton(renderer!, label).props.onPress();
+      });
+
+      expect(mockPush).toHaveBeenLastCalledWith({
+        pathname: '/(tabs)/section/[section]',
+        params: { section },
+      });
+    });
+
+    act(() => {
+      findSectionHeaderButton(renderer!, 'Inbox').props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/inbox');
   });
 
   it('restores the home section visual caps without changing the expanded fetch size', () => {
