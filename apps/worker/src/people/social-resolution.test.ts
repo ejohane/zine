@@ -191,11 +191,62 @@ describe('social profile resolution helpers', () => {
         profileUrl: 'https://x.com/jake_k',
         description: 'executive editor @verge / contact me: https://t.co/52CumWCN0M',
         verified: false,
+        evidenceJson: null,
       },
     });
 
     expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
     expect(scored.matchedTerms).toEqual(['executive', 'editor', 'verge']);
+  });
+
+  it('does not auto-link first-name-only people from search matches', () => {
+    const scored = socialResolutionInternals.scoreXProfileCandidate({
+      personName: 'Ben',
+      contextTerms: ['technology', 'podcast', 'writer', 'newsletter'],
+      candidate: {
+        id: 'x-ben',
+        name: 'Ben Thompson',
+        username: 'benthompson',
+        description: 'Technology writer, newsletter author, and podcast host.',
+        verified: true,
+        followersCount: 100000,
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(
+      socialResolutionInternals.canAutoLinkXProfileCandidate({
+        personName: 'Ben',
+        candidate: scored,
+      })
+    ).toBe(false);
+  });
+
+  it('allows first-name-only auto-linking when the handle is explicit in context', () => {
+    const scored = socialResolutionInternals.scoreInferredXProfileCandidate({
+      personName: 'Ben',
+      contextTerms: ['technology', 'podcast', 'writer'],
+      inferredHandle: {
+        username: 'benthompson',
+        confidence: 0.92,
+        source: 'CONTEXT_EXPLICIT',
+        reason: 'The handle appears in the content context.',
+      },
+      candidate: {
+        id: 'x-ben',
+        name: 'Ben Thompson',
+        username: 'benthompson',
+        description: 'Technology writer and podcast host.',
+      },
+    });
+
+    expect(scored.confidence).toBeGreaterThanOrEqual(0.82);
+    expect(
+      socialResolutionInternals.canAutoLinkXProfileCandidate({
+        personName: 'Ben',
+        candidate: scored,
+      })
+    ).toBe(true);
   });
 
   it('generates common validated lookup handles from names', () => {

@@ -59,7 +59,7 @@ const OUTPUT_CONTRACT = {
   topics: [{ name: 'string', confidence: 'number from 0 to 1' }],
   entities: [
     {
-      name: 'string',
+      name: 'string, prefer full real names for people; avoid first-name-only people unless unambiguous',
       type: 'person | organization | product | technology | place | concept | other',
       relationship:
         'HOST | CO_HOST | OWNER | CREATOR | AUTHOR | GUEST | INTERVIEWER | INTERVIEWEE | PRIMARY_SUBJECT | MENTIONED',
@@ -115,6 +115,7 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
       'Return one JSON object with exactly these top-level keys: summary, classification, topics, entities, suggestedTags, userContext, confidence.',
       'Do not return only an entity list, a wrapper object, markdown, commentary, or prose outside JSON.',
       'Every entity must include name, type, relationship, confidence, and evidenceText.',
+      'For human PERSON entities, prefer full real names. Do not emit first-name-only people unless the input clearly identifies that exact person; if only a first name is available, either omit it or assign confidence below 0.6.',
       'Prefer stable categories and short lowercase tag names.',
       'Do not invent facts not supported by the input.',
       'Use confidence below 0.6 when the input is thin or ambiguous.',

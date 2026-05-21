@@ -67,6 +67,23 @@ describe('enrichment prompt helpers', () => {
     expect(userPayload.outputContract.entities[0]?.evidenceText).toContain('null');
   });
 
+  it('discourages first-name-only person entities', () => {
+    const messages = buildEnrichmentMessages(createPromptInput('Ben joins the show.'));
+    const userPayload = JSON.parse(String(messages[1].content)) as {
+      constraints: string[];
+      outputContract: {
+        entities: Array<{
+          name: string;
+        }>;
+      };
+    };
+    const constraints = userPayload.constraints.join(' ');
+
+    expect(constraints).toContain('full real names');
+    expect(constraints).toContain('first-name-only');
+    expect(userPayload.outputContract.entities[0]?.name).toContain('avoid first-name-only');
+  });
+
   it('includes the full top-level output contract in the prompt', () => {
     const messages = buildEnrichmentMessages(createPromptInput('A short item.'));
     const userPayload = JSON.parse(String(messages[1].content)) as {
