@@ -1,7 +1,7 @@
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useCallback, useRef } from 'react';
 import { View, Image, Pressable, StyleSheet, TextInput } from 'react-native';
-import { Rss } from 'lucide-react-native';
+import { Check, Rss } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import ReanimatedSwipeable, {
   type SwipeableMethods,
@@ -18,7 +18,6 @@ import Animated, {
 
 import { Badge, Button, IconButton, Surface, Text } from '@/components/primitives';
 import {
-  CheckIcon,
   CheckOutlineIcon,
   ChevronRightIcon,
   PlusIcon,
@@ -266,14 +265,17 @@ function RemoveActionPanel({ progress, translation, releaseLocked }: SwipeAction
 
 function SubscriptionToggle({
   checked,
+  checkedColor,
   disabled = false,
   onPress,
 }: {
   checked: boolean;
+  checkedColor?: string;
   disabled?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useAppTheme();
+  const activeColor = checkedColor ?? colors.statusSuccess;
 
   return (
     <IconButton
@@ -288,7 +290,9 @@ function SubscriptionToggle({
       style={styles.subscriptionToggle}
     >
       {checked ? (
-        <CheckIcon size={ACTION_ICON_SIZE} color={colors.statusSuccess} />
+        <View style={[styles.subscriptionToggleCheckedIcon, { backgroundColor: activeColor }]}>
+          <Check size={17} color={colors.overlayForeground} strokeWidth={3} />
+        </View>
       ) : (
         <CheckOutlineIcon size={ACTION_ICON_SIZE} color={colors.textTertiary} />
       )}
@@ -527,6 +531,7 @@ export function SourceSubscriptionRow({
   imageUrl,
   statusLabel,
   toggleChecked,
+  toggleCheckedColor,
   onToggle,
   toggleDisabled = false,
   primaryActionLabel,
@@ -550,6 +555,7 @@ export function SourceSubscriptionRow({
   imageUrl?: string | null;
   statusLabel?: string | null;
   toggleChecked?: boolean;
+  toggleCheckedColor?: string;
   onToggle?: (() => void) | null;
   toggleDisabled?: boolean;
   primaryActionLabel?: string | null;
@@ -641,7 +647,12 @@ export function SourceSubscriptionRow({
         </View>
       ) : null}
       {typeof toggleChecked === 'boolean' && onToggle ? (
-        <SubscriptionToggle checked={toggleChecked} disabled={toggleDisabled} onPress={onToggle} />
+        <SubscriptionToggle
+          checked={toggleChecked}
+          checkedColor={toggleCheckedColor}
+          disabled={toggleDisabled}
+          onPress={onToggle}
+        />
       ) : null}
       {variant === 'flat' ? (
         <View style={[styles.flatRowSeparator, { backgroundColor: colors.borderDefault }]} />
@@ -898,6 +909,13 @@ const styles = StyleSheet.create({
   },
   subscriptionToggle: {
     flexShrink: 0,
+  },
+  subscriptionToggleCheckedIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowActions: {
     alignItems: 'flex-end',

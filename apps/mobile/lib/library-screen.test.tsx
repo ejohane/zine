@@ -37,6 +37,12 @@ function findLibraryList(renderer: Renderer) {
   return renderer.root.find((node: TestNode) => node.type === 'flat-list');
 }
 
+function findObjectTile(renderer: Renderer, label: string) {
+  return renderer.root.find(
+    (node: TestNode) => node.type === 'button' && node.props.accessibilityLabel === `Show ${label}`
+  );
+}
+
 function pressLibraryTab() {
   if (!tabPressListener) {
     throw new Error('Expected library tab press listener to be registered');
@@ -186,8 +192,8 @@ jest.mock('@/components/filter-chip', () => ({
 
 jest.mock('@/components/icons', () => ({
   ArticleIcon: () => null,
-  CheckOutlineIcon: () => null,
   HeadphonesIcon: () => null,
+  PodcastIcon: () => null,
   PostIcon: () => null,
   VideoIcon: () => null,
 }));
@@ -200,6 +206,10 @@ jest.mock('@/components/list-states', () => ({
   LoadingState: () => React.createElement('div', null, 'loading'),
   ErrorState: ({ message }: { message: string }) => React.createElement('div', null, message),
   EmptyState: ({ title }: { title: string }) => React.createElement('div', null, title),
+}));
+
+jest.mock('@/components/subscriptions/source-ui', () => ({
+  SourceSubscriptionRow: ({ title }: { title: string }) => React.createElement('div', null, title),
 }));
 
 jest.mock('@/hooks/use-color-scheme', () => ({
@@ -240,8 +250,117 @@ jest.mock('@/hooks/use-items-trpc', () => ({
     hasNextPage: false,
     isFetchingNextPage: false,
   }),
+  useCollections: () => ({
+    data: {
+      collections: [
+        {
+          id: 'collection-1',
+          name: 'Example collection',
+          description: null,
+          rules: {},
+          sort: 'NEWEST_SAVED',
+          homeSection: null,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    },
+    isLoading: false,
+    error: null,
+  }),
   mapContentType: (value: string) => value.toLowerCase(),
   mapProvider: (value: string) => value,
+}));
+
+jest.mock('@/hooks/use-subscriptions-query', () => ({
+  useSubscriptions: () => ({
+    data: {
+      items: [
+        {
+          id: 'subscription-1',
+          provider: 'YOUTUBE',
+          providerChannelId: 'channel-1',
+          name: 'Example channel',
+          imageUrl: null,
+          status: 'ACTIVE',
+          createdAt: 1,
+          lastItemAt: null,
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    },
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+jest.mock('@/lib/trpc', () => ({
+  trpc: {
+    subscriptions: {
+      newsletters: {
+        list: {
+          useQuery: () => ({
+            data: {
+              items: [
+                {
+                  id: 'newsletter-1',
+                  displayName: 'Example newsletter',
+                  fromAddress: 'newsletter@example.com',
+                  listId: null,
+                  imageUrl: null,
+                  status: 'ACTIVE',
+                },
+              ],
+              nextCursor: null,
+              hasMore: false,
+            },
+            isLoading: false,
+            error: null,
+          }),
+        },
+      },
+      rss: {
+        list: {
+          useQuery: () => ({
+            data: {
+              items: [
+                {
+                  id: 'rss-1',
+                  title: 'Example RSS',
+                  feedUrl: 'https://example.com/feed.xml',
+                  siteUrl: 'https://example.com',
+                  imageUrl: null,
+                  status: 'ACTIVE',
+                },
+              ],
+              nextCursor: null,
+              hasMore: false,
+            },
+            isLoading: false,
+            error: null,
+          }),
+        },
+      },
+      xBookmarks: {
+        status: {
+          useQuery: () => ({
+            data: {
+              connected: true,
+              connectionStatus: 'ACTIVE',
+              importedCount: 12,
+              sync: {
+                status: 'SUCCESS',
+                dailySyncEnabled: true,
+              },
+            },
+            isLoading: false,
+            error: null,
+          }),
+        },
+      },
+    },
+  },
 }));
 
 jest.mock('@/hooks/use-people', () => ({
@@ -306,28 +425,35 @@ describe('LibraryScreen', () => {
       pressLibraryTab();
     });
 
+    expect(findObjectTile(renderer!, 'Bookmarks').props.accessibilityState.selected).toBe(true);
+    expect(findFilterChip(renderer!, 'All').props['data-selected']).toBe(true);
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
     expect(mockScrollToOffset).not.toHaveBeenCalled();
   });
 
-  it('clears the completed filter when the library tab is reselected at the top', () => {
+  it('resets bookmark filters to all when bookmarks is selected', () => {
     let renderer: Renderer;
     act(() => {
       renderer = TestRenderer.create(<LibraryScreen />);
     });
 
     act(() => {
-      findFilterChip(renderer!, 'Completed').props.onPress();
+      findFilterChip(renderer!, 'Articles').props.onPress();
     });
 
-    expect(findFilterChip(renderer!, 'Completed').props['data-selected']).toBe(true);
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
 
     act(() => {
-      pressLibraryTab();
+      findObjectTile(renderer!, 'People').props.onPress();
     });
 
-    expect(findFilterChip(renderer!, 'Completed').props['data-selected']).toBe(false);
-    expect(mockScrollToOffset).not.toHaveBeenCalled();
+    act(() => {
+      findObjectTile(renderer!, 'Bookmarks').props.onPress();
+    });
+
+    expect(findObjectTile(renderer!, 'Bookmarks').props.accessibilityState.selected).toBe(true);
+    expect(findFilterChip(renderer!, 'All').props['data-selected']).toBe(true);
+    expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
   });
 
   it('scrolls to the top without clearing the active filter when the library tab is reselected mid-scroll', () => {
@@ -355,6 +481,7 @@ describe('LibraryScreen', () => {
     });
 
     expect(mockScrollToOffset).toHaveBeenCalledWith({ offset: 0, animated: true });
+    expect(findObjectTile(renderer!, 'Bookmarks').props.accessibilityState.selected).toBe(true);
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(true);
   });
 
@@ -374,6 +501,8 @@ describe('LibraryScreen', () => {
       pressLibraryTab();
     });
 
+    expect(findObjectTile(renderer!, 'Bookmarks').props.accessibilityState.selected).toBe(true);
+    expect(findFilterChip(renderer!, 'All').props['data-selected']).toBe(true);
     expect(findFilterChip(renderer!, 'Articles').props['data-selected']).toBe(false);
     expect(mockScrollToOffset).not.toHaveBeenCalled();
   });
