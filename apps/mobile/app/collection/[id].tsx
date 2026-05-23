@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Surface } from 'heroui-native';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -31,10 +31,7 @@ import {
   type UIProvider,
 } from '@/lib/content-utils';
 import { isValidId } from '@/lib/route-validation';
-import {
-  createLightweightHeaderScreenOptions,
-  useCollapsedHeaderTitle,
-} from '@/lib/native-large-title-header';
+import { createLightweightHeaderScreenOptions } from '@/lib/native-large-title-header';
 
 const COLLECTION_PAGE_SIZE = 20;
 
@@ -135,8 +132,6 @@ export default function CollectionScreen() {
   const collectionId = isValidId(rawId) ? rawId : '';
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
-  const listRef = useRef<FlatList<ItemCardData>>(null);
-  const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
 
   const collectionQuery = useCollection(collectionId);
   const tagsQuery = useUserTags();
@@ -230,12 +225,11 @@ export default function CollectionScreen() {
           backgroundColor: colors.background,
           tintColor: colors.text,
           screenTitle: collectionTitle,
-          showScreenTitle: collectionQuery.isLoading || Boolean(activeError) || showCollapsedTitle,
+          showScreenTitle: true,
         })}
       />
 
       <FlatList
-        ref={listRef}
         data={collectionQuery.isLoading || isLoading || activeError ? [] : collectionItems}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
@@ -243,13 +237,10 @@ export default function CollectionScreen() {
         contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={32}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.6}
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>{collectionTitle}</Text>
             {collection?.description ? (
               <Text style={[styles.description, { color: colors.textSubheader }]}>
                 {collection.description}
@@ -305,14 +296,9 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.md,
   },
-  headerTitle: {
-    ...Typography.displayMedium,
-    paddingHorizontal: Spacing.md,
-  },
   description: {
     ...Typography.bodyMedium,
     paddingHorizontal: Spacing.md,
-    marginTop: Spacing.xs,
   },
   ruleChipContainer: {
     paddingHorizontal: Spacing.md,
