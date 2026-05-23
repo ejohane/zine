@@ -349,7 +349,7 @@ export default function HomeScreen() {
   const handleOpenCollection = useCallback(
     (collectionId: string) => {
       router.push({
-        pathname: '/(tabs)/collection/[id]',
+        pathname: '/collection/[id]',
         params: { id: collectionId },
       } as unknown as Href);
     },

@@ -10,8 +10,12 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import type { ContentType as ApiContentType, Provider as ApiProvider } from '@zine/shared';
-import { CollectionSort, type CollectionRules } from '@zine/shared';
+import {
+  CollectionSort,
+  type CollectionRules,
+  type ContentType as ApiContentType,
+  type Provider as ApiProvider,
+} from '@zine/shared';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { EmptyState, ErrorState, InvalidParamState, LoadingState } from '@/components/list-states';

@@ -75,6 +75,10 @@ export default function RootLayout() {
                     options={{ headerShown: true, headerBackTitle: '' }}
                   />
                   <Stack.Screen
+                    name="collection/[id]"
+                    options={{ headerShown: true, title: 'Collection', headerBackTitle: '' }}
+                  />
+                  <Stack.Screen
                     name="recap/weekly"
                     options={{ headerShown: true, title: 'Weekly Recap', headerBackTitle: '' }}
                   />
