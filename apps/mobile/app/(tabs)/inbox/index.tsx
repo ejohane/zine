@@ -20,14 +20,7 @@ import { ArticleIcon, InboxArrowIcon, PodcastIcon, PostIcon, VideoIcon } from '@
 import { type ItemCardData } from '@/components/item-card';
 import { LoadingState, ErrorState } from '@/components/list-states';
 import { SwipeableInboxItem, type EnterDirection } from '@/components/swipeable-inbox-item';
-import {
-  Colors,
-  Typography,
-  Spacing,
-  Radius,
-  ContentColors,
-  FilterChipPalette,
-} from '@/constants/theme';
+import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteInboxItems, useArchiveItem, useBookmarkItem } from '@/hooks/use-items-trpc';
@@ -61,8 +54,6 @@ const contentTypeFilters: {
   label: string;
   icon: ComponentType<{ size?: number; color?: string }>;
   dotColor: string;
-  selectedColor: string;
-  selectedSurfaceColor: string;
   contentType: ApiContentType;
 }[] = [
   {
@@ -70,8 +61,6 @@ const contentTypeFilters: {
     label: 'Articles',
     icon: ArticleIcon,
     dotColor: ContentColors.article,
-    selectedColor: FilterChipPalette.article.accent,
-    selectedSurfaceColor: FilterChipPalette.article.surface,
     contentType: ApiContentType.ARTICLE,
   },
   {
@@ -79,8 +68,6 @@ const contentTypeFilters: {
     label: 'Podcasts',
     icon: PodcastIcon,
     dotColor: ContentColors.podcast,
-    selectedColor: FilterChipPalette.podcast.accent,
-    selectedSurfaceColor: FilterChipPalette.podcast.surface,
     contentType: ApiContentType.PODCAST,
   },
   {
@@ -88,8 +75,6 @@ const contentTypeFilters: {
     label: 'Videos',
     icon: VideoIcon,
     dotColor: ContentColors.video,
-    selectedColor: FilterChipPalette.video.accent,
-    selectedSurfaceColor: FilterChipPalette.video.surface,
     contentType: ApiContentType.VIDEO,
   },
   {
@@ -97,8 +82,6 @@ const contentTypeFilters: {
     label: 'Posts',
     icon: PostIcon,
     dotColor: ContentColors.post,
-    selectedColor: FilterChipPalette.post.accent,
-    selectedSurfaceColor: FilterChipPalette.post.surface,
     contentType: ApiContentType.POST,
   },
 ];
@@ -386,8 +369,9 @@ export default function InboxScreen() {
                   onPress={() => handleContentTypeFilterPress(filter.id)}
                   icon={filter.icon}
                   dotColor={filter.dotColor}
-                  selectedColor={filter.selectedColor}
-                  selectedSurfaceColor={filter.selectedSurfaceColor}
+                  selectedColor={colors.warning}
+                  selectedSurfaceColor={colors.warning}
+                  selectedForegroundColor={colors.statusWarningForeground}
                 />
               ))}
             </ScrollView>
