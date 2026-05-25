@@ -85,4 +85,30 @@ describe('FilterChip', () => {
     expect(mockSelectionAsync).toHaveBeenCalledTimes(1);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it('still calls onPress if haptics fails', async () => {
+    const onPress = jest.fn();
+    const rejection = new Error('haptics unavailable');
+    mockSelectionAsync.mockRejectedValueOnce(rejection);
+
+    let renderer: ReturnType<typeof TestRenderer.create>;
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(FilterChip, {
+          label: 'Podcasts',
+          isSelected: true,
+          onPress,
+        })
+      );
+    });
+
+    act(() => {
+      renderer.root.findByType('button').props.onPress();
+    });
+
+    await Promise.resolve();
+
+    expect(mockSelectionAsync).toHaveBeenCalledTimes(1);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
 });
