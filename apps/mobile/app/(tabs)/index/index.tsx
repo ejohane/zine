@@ -968,7 +968,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navigationPaneScrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0, 0, 0, 0.48)',
   },
   navigationPane: {

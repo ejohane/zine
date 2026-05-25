@@ -1,5 +1,5 @@
-import { DarkTheme, ThemeProvider, type Theme } from '@react-navigation/native';
 import * as SystemUI from 'expo-system-ui';
+import { DarkTheme, ThemeProvider, type Theme } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { HeroUINativeProvider, ToastProvider } from 'heroui-native';

@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   floatingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 100,
   },
   floatingHeaderBackdrop: {

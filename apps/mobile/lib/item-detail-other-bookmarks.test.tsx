@@ -40,7 +40,7 @@ jest.mock('react-native', () => ({
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     flatten: (style: unknown) => style,
-    absoluteFillObject: {},
+    absoluteFill: {},
   },
   Platform: {
     OS: 'ios',

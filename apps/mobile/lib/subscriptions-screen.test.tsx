@@ -29,7 +29,7 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('@react-navigation/elements', () => ({
+jest.mock('expo-router/react-navigation', () => ({
   HeaderBackButton: (props: Record<string, unknown>) =>
     React.createElement('header-back-button', props),
 }));

@@ -15,8 +15,8 @@
 
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
-import { usePreventRemove } from '@react-navigation/native';
 import { useRouter, type Href } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
