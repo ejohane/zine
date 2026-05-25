@@ -199,7 +199,6 @@ jest.mock('react-native', () => ({
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     absoluteFill: { position: 'absolute' },
-    absoluteFillObject: { position: 'absolute' },
   },
   Pressable: ({
     children,

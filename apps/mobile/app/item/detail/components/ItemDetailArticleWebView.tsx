@@ -232,7 +232,7 @@ const ARTICLE_SCROLL_BRIDGE_SCRIPT = `
 
 const componentStyles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   overlayVisible: {
     opacity: 1,
@@ -266,7 +266,7 @@ const componentStyles = StyleSheet.create({
     shadowRadius: 8,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },

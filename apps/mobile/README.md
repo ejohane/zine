@@ -48,11 +48,11 @@ You can start developing by editing the files inside the **app** directory. This
    bun run dev
    ```
 
-## Expo doctor notes (SDK 55)
+## Expo doctor notes (SDK 56)
 
 - Run `npx expo-doctor` from `apps/mobile` for local diagnostics.
 - The repo pins Bun `1.3.4` and uses a hoisted linker via [`bunfig.toml`](/Users/erikjohansson/.codex/worktrees/97ca/zine/bunfig.toml) so Expo dependency resolution stays deduplicated under Bun workspaces.
-- We exclude `react` and `react-dom` from `expo.install` validation in [`package.json`](/Users/erikjohansson/.codex/worktrees/97ca/zine/apps/mobile/package.json) because Expo SDK 55 still recommends `19.2.0`, while Bun + Clerk require a newer `19.2.x` patch to avoid nested React installs that fail `expo-doctor`.
+- React and React DOM are pinned to the SDK 56-compatible `19.2.3` release so they match React Native's renderer version in Expo Go and development builds.
 - We keep `expo.doctor.reactNativeDirectoryCheck.listUnknownPackages=false` because React Native Directory metadata remains noisy for some Expo and Storybook-adjacent packages used in this app.
 
 ## Learn more

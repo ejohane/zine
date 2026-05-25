@@ -48,6 +48,7 @@ jest.mock('react-native', () => ({
   StyleSheet: {
     create: jest.fn((styles) => styles),
     flatten: jest.fn((style) => style),
+    absoluteFill: {},
   },
   Dimensions: {
     get: jest.fn(() => ({ width: 375, height: 812 })),
@@ -68,8 +69,8 @@ jest.mock('react-native-svg', () => ({
   default: 'Svg',
 }));
 
-// Mock react-navigation hooks
-jest.mock('@react-navigation/native', () => ({
+// Mock Expo Router navigation hooks
+jest.mock('expo-router/react-navigation', () => ({
   useFocusEffect: (callback) => callback(),
 }));
 

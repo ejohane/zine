@@ -32,6 +32,7 @@ module.exports = {
           allowSyntheticDefaultImports: true,
           module: 'CommonJS',
           moduleResolution: 'node',
+          types: ['jest', 'node'],
         },
       },
     ],
