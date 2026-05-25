@@ -98,7 +98,9 @@ export function FilterChip({
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
   const iconSize = size === 'small' ? 12 : 14;
   const handlePress = () => {
-    void Haptics.selectionAsync();
+    void Haptics.selectionAsync().catch(() => {
+      // Best-effort haptic feedback should never block chip interaction.
+    });
     onPress();
   };
 
