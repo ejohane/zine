@@ -50,12 +50,16 @@ const INBOX_PAGE_SIZE = 20;
 const INBOX_TOP_THRESHOLD = 4;
 
 const contentTypeFilters: {
-  id: UIContentType;
+  id: UIContentType | null;
   label: string;
-  icon: ComponentType<{ size?: number; color?: string }>;
-  dotColor: string;
-  contentType: ApiContentType;
+  icon?: ComponentType<{ size?: number; color?: string }>;
+  dotColor?: string;
+  contentType?: ApiContentType;
 }[] = [
+  {
+    id: null,
+    label: 'All',
+  },
   {
     id: 'article',
     label: 'Articles',
@@ -140,14 +144,14 @@ export default function InboxScreen() {
   const [pendingDismissedItemIds, setPendingDismissedItemIds] = useState<Set<string>>(new Set());
   const listRef = useRef<Animated.FlatList<ItemCardData>>(null);
   const scrollOffsetYRef = useRef(0);
-  const selectedContentTypeFilter = contentTypeFilters.find(
-    (filter) => filter.id === contentTypeFilter
-  );
+  const selectedContentTypeFilter = contentTypeFilter
+    ? contentTypeFilters.find((filter) => filter.id === contentTypeFilter)
+    : undefined;
 
   const archiveMutation = useArchiveItem();
   const bookmarkMutation = useBookmarkItem();
 
-  const handleContentTypeFilterPress = useCallback((id: UIContentType) => {
+  const handleContentTypeFilterPress = useCallback((id: UIContentType | null) => {
     setContentTypeFilter((current) => (current === id ? null : id));
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
   }, []);
@@ -363,7 +367,7 @@ export default function InboxScreen() {
             >
               {contentTypeFilters.map((filter) => (
                 <FilterChip
-                  key={filter.id}
+                  key={filter.id ?? 'all'}
                   label={filter.label}
                   isSelected={contentTypeFilter === filter.id}
                   onPress={() => handleContentTypeFilterPress(filter.id)}
