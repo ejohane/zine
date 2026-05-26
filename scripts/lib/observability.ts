@@ -109,6 +109,8 @@ type ScanViolation = {
   content: string;
 };
 
+const FLATTENED_FIELDS_CACHE = new WeakMap<object, ScalarField[]>();
+
 export interface CloudflareLogResult {
   ok: boolean;
   command: string[];
@@ -180,9 +182,20 @@ function flattenScalarFields(value: JsonValue, prefix: string = ''): ScalarField
   return [];
 }
 
+function getFlattenedFields(record: JsonRecord): ScalarField[] {
+  const cached = FLATTENED_FIELDS_CACHE.get(record as object);
+  if (cached) {
+    return cached;
+  }
+
+  const flattened = flattenScalarFields(record);
+  FLATTENED_FIELDS_CACHE.set(record as object, flattened);
+  return flattened;
+}
+
 function hasFieldMatch(record: JsonRecord, aliases: string[], needle: string): boolean {
   const normalizedNeedle = needle.toLowerCase();
-  const fields = flattenScalarFields(record);
+  const fields = getFlattenedFields(record);
 
   return fields.some((field) => {
     const fieldPath = normalizePath(field.path);
@@ -200,7 +213,7 @@ function hasFieldMatch(record: JsonRecord, aliases: string[], needle: string): b
 }
 
 function collectFieldValues(record: JsonRecord, aliases: string[]): string[] {
-  const values = flattenScalarFields(record)
+  const values = getFlattenedFields(record)
     .filter((field) => {
       const fieldPath = normalizePath(field.path);
       return aliases.some((alias) => {
