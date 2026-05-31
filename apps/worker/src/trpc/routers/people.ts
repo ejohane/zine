@@ -5,7 +5,14 @@ import { UserItemState } from '@zine/shared';
 
 import type { Database } from '../../db';
 import { creators, items, userItems, userPeople, userPersonMentions } from '../../db/schema';
-import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
+import {
+  decodeCursor,
+  decodeCursorPayload,
+  encodeCursor,
+  encodeCursorPayload,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+} from '../../lib/pagination';
 import { router, protectedProcedure } from '../trpc';
 import { toItemViewsWithTags } from './items';
 import { normalizePersonDisplayName } from '../../people/service';
@@ -31,30 +38,24 @@ type PeopleOffsetCursor = {
 };
 
 function encodeOffsetCursor(offset: number): string {
-  return btoa(JSON.stringify({ offset }))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+  return encodeCursorPayload({ offset });
 }
 
 function decodeOffsetCursor(value: string | undefined): PeopleOffsetCursor | null {
   if (!value) return null;
-  try {
-    let base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) base64 += '=';
-    const parsed = JSON.parse(atob(base64));
-    if (
-      parsed &&
-      typeof parsed === 'object' &&
-      typeof parsed.offset === 'number' &&
-      Number.isInteger(parsed.offset) &&
-      parsed.offset >= 0
-    ) {
-      return { offset: parsed.offset };
-    }
-  } catch {
-    return null;
+
+  const parsed = decodeCursorPayload(value);
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    'offset' in parsed &&
+    typeof parsed.offset === 'number' &&
+    Number.isInteger(parsed.offset) &&
+    parsed.offset >= 0
+  ) {
+    return { offset: parsed.offset };
   }
+
   return null;
 }
 

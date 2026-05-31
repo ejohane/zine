@@ -27,7 +27,12 @@ import {
   userItems,
   userItemTags,
 } from '../../db/schema';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../lib/pagination';
+import {
+  decodeCursorPayload,
+  encodeCursorPayload,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+} from '../../lib/pagination';
 import { toItemViewsWithTags } from './items';
 import type { Database } from '../../db';
 import {
@@ -79,31 +84,24 @@ function isAscendingSort(sort: z.infer<typeof CollectionSortSchema>): boolean {
 }
 
 function encodeCollectionItemsCursor(cursor: CollectionItemsCursor): string {
-  return btoa(JSON.stringify(cursor)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return encodeCursorPayload(cursor);
 }
 
 function decodeCollectionItemsCursor(cursorString: string): CollectionItemsCursor | null {
-  try {
-    let base64 = cursorString.replace(/-/g, '+').replace(/_/g, '/');
-    while (base64.length % 4) {
-      base64 += '=';
-    }
-
-    const parsed = JSON.parse(atob(base64));
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.sortValue === 'string' &&
-      typeof parsed.id === 'string'
-    ) {
-      return {
-        priority: typeof parsed.priority === 'number' ? parsed.priority : 0,
-        sortValue: parsed.sortValue,
-        id: parsed.id,
-      };
-    }
-  } catch {
-    return null;
+  const parsed = decodeCursorPayload(cursorString);
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'sortValue' in parsed &&
+    'id' in parsed &&
+    typeof parsed.sortValue === 'string' &&
+    typeof parsed.id === 'string'
+  ) {
+    return {
+      priority: 'priority' in parsed && typeof parsed.priority === 'number' ? parsed.priority : 0,
+      sortValue: parsed.sortValue,
+      id: parsed.id,
+    };
   }
 
   return null;
