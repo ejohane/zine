@@ -40,7 +40,7 @@ export function ItemCollectionsBottomSheet({
     () => [
       frame({ maxWidth: Infinity, maxHeight: Infinity, alignment: 'topLeading' }),
       background(backgroundColor),
-      ignoreSafeArea({ regions: 'container', edges: 'bottom' }),
+      ignoreSafeArea({ regions: 'all', edges: 'bottom' }),
       presentationDetents([initialDetent, 'large'], {
         selection: selectedDetent,
         onSelectionChange: setSelectedDetent,
@@ -62,7 +62,12 @@ export function ItemCollectionsBottomSheet({
           style={[styles.backdropPressTarget, { height, width }]}
         />
       ) : null}
-      <Host colorScheme="dark" pointerEvents="box-none" style={[styles.host, { width }]}>
+      <Host
+        colorScheme="dark"
+        ignoreSafeArea="all"
+        pointerEvents="box-none"
+        style={[styles.host, { height, width }]}
+      >
         <BottomSheet
           isPresented={visible}
           onIsPresentedChange={(isPresented) => {
