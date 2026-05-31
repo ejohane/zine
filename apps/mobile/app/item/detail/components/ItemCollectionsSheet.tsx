@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +25,7 @@ import {
 } from '@/hooks/use-items-trpc';
 import { showError, showSuccess } from '@/lib/toast-utils';
 
+import { ItemCollectionsBottomSheet } from '@/lib/item-collections-bottom-sheet';
 import type { ItemDetailColors, ItemDetailItem } from '../types';
 
 type ItemCollectionsSheetProps = {
@@ -166,194 +164,174 @@ export function ItemCollectionsSheet({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.backdrop}
-      >
-        <Pressable style={styles.backdropPressTarget} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.background }]}>
-          <View style={styles.handleWrap}>
-            <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          </View>
-
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Add to collection</Text>
-            <Text style={[styles.subtitle, { color: colors.textSubheader }]} numberOfLines={2}>
-              {subtitle}
-            </Text>
-          </View>
-
-          <View style={styles.createRow}>
-            <TextInput
-              value={newCollectionName}
-              onChangeText={setNewCollectionName}
-              placeholder="New collection name"
-              placeholderTextColor={colors.textTertiary}
-              style={[
-                styles.input,
-                {
-                  color: colors.text,
-                  backgroundColor: colors.backgroundSecondary,
-                  borderColor: colors.border,
-                },
-              ]}
-              returnKeyType="done"
-              onSubmitEditing={handleCreateCollection}
-            />
-            <Pressable
-              onPress={handleCreateCollection}
-              disabled={!canCreate || isMutating}
-              accessibilityRole="button"
-              accessibilityLabel="Create collection"
-              style={({ pressed }) => [
-                styles.createButton,
-                {
-                  backgroundColor: canCreate ? colors.primary : colors.backgroundTertiary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              {createCollectionMutation.isPending ? (
-                <ActivityIndicator color={colors.overlayForeground} />
-              ) : (
-                <PlusCircleIcon size={22} color={colors.overlayForeground} />
-              )}
-            </Pressable>
-          </View>
-
-          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-            {collectionsQuery.isLoading ? (
-              <View style={styles.loadingRow}>
-                <ActivityIndicator color={colors.primary} />
-              </View>
-            ) : collections.length === 0 ? (
-              <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
-                Create a collection to organize this bookmark.
-              </Text>
-            ) : (
-              collections.map((collection) => {
-                const checked = isChecked(collection.membership);
-                const hidden = collection.membership === CollectionItemMembership.HIDDEN;
-                const pillLabel = getMembershipPillLabel(collection.membership);
-                const pillBorderColor = hidden ? colors.statusWarning : colors.border;
-                const pillBackgroundColor = hidden
-                  ? colors.statusWarningSurface
-                  : colors.backgroundTertiary;
-                const pillTextColor = checked
-                  ? colors.statusSuccess
-                  : hidden
-                    ? colors.statusWarning
-                    : colors.textSubheader;
-
-                return (
-                  <Pressable
-                    key={collection.id}
-                    onPress={() => handleToggleCollection(collection)}
-                    disabled={setOverrideMutation.isPending}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked }}
-                    accessibilityLabel={getActionAccessibilityLabel(
-                      collection.name,
-                      collection.membership
-                    )}
-                    style={({ pressed }) => [
-                      styles.collectionRow,
-                      {
-                        backgroundColor: colors.backgroundSecondary,
-                        borderColor: checked
-                          ? colors.primary
-                          : hidden
-                            ? colors.statusWarning
-                            : colors.border,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}
-                  >
-                    <View style={styles.collectionCopy}>
-                      <Text style={[styles.collectionName, { color: colors.text }]}>
-                        {collection.name}
-                      </Text>
-                      <Text style={[styles.collectionMeta, { color: colors.textTertiary }]}>
-                        {getMembershipLabel(collection.membership)}
-                      </Text>
-                    </View>
-                    <View
-                      style={
-                        checked
-                          ? styles.checkOnly
-                          : [
-                              styles.statusPill,
-                              {
-                                borderColor: pillBorderColor,
-                                backgroundColor: pillBackgroundColor,
-                              },
-                            ]
-                      }
-                    >
-                      {checked ? (
-                        <Text style={[styles.statusIcon, { color: pillTextColor }]}>✓</Text>
-                      ) : null}
-                      {pillLabel ? (
-                        <Text style={[styles.statusPillText, { color: pillTextColor }]}>
-                          {pillLabel}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <Pressable
-              onPress={onClose}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                styles.doneButton,
-                {
-                  backgroundColor: colors.backgroundSecondary,
-                  opacity: pressed ? 0.85 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.doneText, { color: colors.text }]}>Done</Text>
-            </Pressable>
-          </View>
+    <ItemCollectionsBottomSheet
+      visible={visible}
+      onClose={onClose}
+      backgroundColor={colors.background}
+    >
+      <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.text }]}>Add to collection</Text>
+          <Text style={[styles.subtitle, { color: colors.textSubheader }]} numberOfLines={2}>
+            {subtitle}
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <View style={styles.createRow}>
+          <TextInput
+            value={newCollectionName}
+            onChangeText={setNewCollectionName}
+            placeholder="New collection name"
+            placeholderTextColor={colors.textTertiary}
+            style={[
+              styles.input,
+              {
+                color: colors.text,
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.border,
+              },
+            ]}
+            returnKeyType="done"
+            onSubmitEditing={handleCreateCollection}
+          />
+          <Pressable
+            onPress={handleCreateCollection}
+            disabled={!canCreate || isMutating}
+            accessibilityRole="button"
+            accessibilityLabel="Create collection"
+            style={({ pressed }) => [
+              styles.createButton,
+              {
+                backgroundColor: canCreate ? colors.primary : colors.backgroundTertiary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            {createCollectionMutation.isPending ? (
+              <ActivityIndicator color={colors.overlayForeground} />
+            ) : (
+              <PlusCircleIcon size={22} color={colors.overlayForeground} />
+            )}
+          </Pressable>
+        </View>
+
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {collectionsQuery.isLoading ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : collections.length === 0 ? (
+            <Text style={[styles.emptyText, { color: colors.textTertiary }]}>
+              Create a collection to organize this bookmark.
+            </Text>
+          ) : (
+            collections.map((collection) => {
+              const checked = isChecked(collection.membership);
+              const hidden = collection.membership === CollectionItemMembership.HIDDEN;
+              const pillLabel = getMembershipPillLabel(collection.membership);
+              const pillBorderColor = hidden ? colors.statusWarning : colors.border;
+              const pillBackgroundColor = hidden
+                ? colors.statusWarningSurface
+                : colors.backgroundTertiary;
+              const pillTextColor = checked
+                ? colors.statusSuccess
+                : hidden
+                  ? colors.statusWarning
+                  : colors.textSubheader;
+
+              return (
+                <Pressable
+                  key={collection.id}
+                  onPress={() => handleToggleCollection(collection)}
+                  disabled={setOverrideMutation.isPending}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked }}
+                  accessibilityLabel={getActionAccessibilityLabel(
+                    collection.name,
+                    collection.membership
+                  )}
+                  style={({ pressed }) => [
+                    styles.collectionRow,
+                    {
+                      backgroundColor: colors.backgroundSecondary,
+                      borderColor: checked
+                        ? colors.primary
+                        : hidden
+                          ? colors.statusWarning
+                          : colors.border,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.collectionCopy}>
+                    <Text style={[styles.collectionName, { color: colors.text }]}>
+                      {collection.name}
+                    </Text>
+                    <Text style={[styles.collectionMeta, { color: colors.textTertiary }]}>
+                      {getMembershipLabel(collection.membership)}
+                    </Text>
+                  </View>
+                  <View
+                    style={
+                      checked
+                        ? styles.checkOnly
+                        : [
+                            styles.statusPill,
+                            {
+                              borderColor: pillBorderColor,
+                              backgroundColor: pillBackgroundColor,
+                            },
+                          ]
+                    }
+                  >
+                    {checked ? (
+                      <Text style={[styles.statusIcon, { color: pillTextColor }]}>✓</Text>
+                    ) : null}
+                    {pillLabel ? (
+                      <Text style={[styles.statusPillText, { color: pillTextColor }]}>
+                        {pillLabel}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </ScrollView>
+
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <Pressable
+            onPress={onClose}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.doneButton,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.doneText, { color: colors.text }]}>Done</Text>
+          </Pressable>
+        </View>
+      </View>
+    </ItemCollectionsBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-  },
-  backdropPressTarget: {
-    flex: 1,
-  },
   sheet: {
-    maxHeight: '82%',
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
+    flex: 1,
     overflow: 'hidden',
-  },
-  handleWrap: {
-    alignItems: 'center',
-    paddingTop: Spacing.sm,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: Radius.full,
   },
   header: {
     paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing['3xl'],
     paddingBottom: Spacing.sm,
     gap: Spacing.xs,
   },
@@ -386,6 +364,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   list: {
+    flex: 1,
     minHeight: 180,
   },
   listContent: {
