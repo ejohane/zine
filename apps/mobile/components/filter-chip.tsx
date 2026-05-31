@@ -29,6 +29,9 @@ export interface FilterChipProps {
   /** Handler called when chip is pressed */
   onPress: () => void;
 
+  /** Whether the chip should render as static/non-interactive */
+  disabled?: boolean;
+
   /** Optional leading icon component */
   icon?: ComponentType<FilterChipIconProps>;
 
@@ -74,6 +77,7 @@ export function FilterChip({
   label,
   isSelected,
   onPress,
+  disabled = false,
   icon: Icon,
   dotColor,
   selectedColor,
@@ -98,6 +102,8 @@ export function FilterChip({
   const textStyles = size === 'small' ? styles.textSmall : styles.textMedium;
   const iconSize = size === 'small' ? 12 : 14;
   const handlePress = () => {
+    if (disabled) return;
+
     void Haptics.selectionAsync();
     onPress();
   };
@@ -105,6 +111,8 @@ export function FilterChip({
   return (
     <Pressable
       onPress={handlePress}
+      disabled={disabled}
+      accessibilityState={disabled ? { disabled: true } : undefined}
       style={({ pressed }) => [
         styles.chip,
         sizeStyles,
@@ -112,7 +120,7 @@ export function FilterChip({
           backgroundColor: chipBackgroundColor,
           borderColor: chipBorderColor,
         },
-        pressed && { opacity: motion.opacity.pressed },
+        pressed && !disabled && { opacity: motion.opacity.pressed },
       ]}
     >
       {Icon ? <Icon size={iconSize} color={iconColor} /> : null}

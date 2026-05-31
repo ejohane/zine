@@ -1,4 +1,4 @@
-import { Stack, useNavigation } from 'expo-router';
+import { Stack, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Surface, useToast } from 'heroui-native';
 import type { ComponentType } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -90,6 +90,19 @@ const contentTypeFilters: {
   },
 ];
 
+const LOCKABLE_CONTENT_TYPE_FILTERS = contentTypeFilters.filter(
+  (filter): filter is (typeof contentTypeFilters)[number] & { id: UIContentType } =>
+    filter.id !== null
+);
+
+function parseLockedContentTypeFilter(value: string | string[] | undefined): UIContentType | null {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  return LOCKABLE_CONTENT_TYPE_FILTERS.some((filter) => filter.id === rawValue)
+    ? (rawValue as UIContentType)
+    : null;
+}
+
 function InboxEmptyState({
   colors,
   selectedFilterLabel,
@@ -122,16 +135,20 @@ function InboxEmptyState({
 
 export default function InboxScreen() {
   const navigation = useNavigation();
+  const params = useLocalSearchParams<{ contentType?: string | string[] }>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const { toast } = useToast();
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
   const [contentTypeFilter, setContentTypeFilter] = useState<UIContentType | null>(null);
+  const lockedContentTypeFilter = parseLockedContentTypeFilter(params.contentType);
+  const activeContentTypeFilter = lockedContentTypeFilter ?? contentTypeFilter;
+  const isContentTypeFilterLocked = lockedContentTypeFilter !== null;
 
   useTabPrefetch('inbox');
 
-  const apiContentTypeFilter = contentTypeFilter
-    ? contentTypeFilters.find((filter) => filter.id === contentTypeFilter)?.contentType
+  const apiContentTypeFilter = activeContentTypeFilter
+    ? contentTypeFilters.find((filter) => filter.id === activeContentTypeFilter)?.contentType
     : undefined;
 
   const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -144,8 +161,8 @@ export default function InboxScreen() {
   const [pendingDismissedItemIds, setPendingDismissedItemIds] = useState<Set<string>>(new Set());
   const listRef = useRef<Animated.FlatList<ItemCardData>>(null);
   const scrollOffsetYRef = useRef(0);
-  const selectedContentTypeFilter = contentTypeFilter
-    ? contentTypeFilters.find((filter) => filter.id === contentTypeFilter)
+  const selectedContentTypeFilter = activeContentTypeFilter
+    ? contentTypeFilters.find((filter) => filter.id === activeContentTypeFilter)
     : undefined;
 
   const archiveMutation = useArchiveItem();
@@ -317,14 +334,14 @@ export default function InboxScreen() {
 
       const isAtTop = scrollOffsetYRef.current <= INBOX_TOP_THRESHOLD;
 
-      if (contentTypeFilter !== null && isAtTop) {
+      if (!isContentTypeFilterLocked && contentTypeFilter !== null && isAtTop) {
         setContentTypeFilter(null);
         return;
       }
 
       listRef.current?.scrollToOffset({ offset: 0, animated: true });
     });
-  }, [contentTypeFilter, navigation]);
+  }, [contentTypeFilter, isContentTypeFilterLocked, navigation]);
 
   const listEmptyComponent = isLoading ? (
     <LoadingState />
@@ -365,12 +382,16 @@ export default function InboxScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.filterContainer}
             >
-              {contentTypeFilters.map((filter) => (
+              {(isContentTypeFilterLocked && selectedContentTypeFilter
+                ? [selectedContentTypeFilter]
+                : contentTypeFilters
+              ).map((filter) => (
                 <FilterChip
                   key={filter.id ?? 'all'}
                   label={filter.label}
-                  isSelected={contentTypeFilter === filter.id}
+                  isSelected={activeContentTypeFilter === filter.id}
                   onPress={() => handleContentTypeFilterPress(filter.id)}
+                  disabled={isContentTypeFilterLocked}
                   icon={filter.icon}
                   dotColor={filter.dotColor}
                   selectedColor={colors.warning}

@@ -668,6 +668,60 @@ describe('HomeScreen', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/(tabs)/inbox');
   });
 
+  it('passes the active content type filter when opening Home list views', () => {
+    mockUseHomeData.mockReturnValue({
+      data: {
+        jumpBackIn: [createFeedItem('jump-1')],
+        recentBookmarks: [createFeedItem('bookmark-1')],
+        byContentType: {
+          podcasts: [],
+          videos: [],
+          articles: [createFeedItem('article-1', 'ARTICLE')],
+        },
+        customCollections: [],
+      },
+      isLoading: false,
+    });
+    mockUseInfiniteInboxItems.mockReturnValue({
+      data: {
+        pages: [
+          {
+            items: [createFeedItem('inbox-1')],
+            nextCursor: null,
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    act(() => {
+      findFilterChip(renderer!, 'Articles').props.onPress();
+    });
+
+    act(() => {
+      findSectionHeaderButton(renderer!, 'Recently Bookmarked').props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(tabs)/section/[section]',
+      params: { section: 'recently-bookmarked', contentType: 'article' },
+    });
+
+    act(() => {
+      findSectionHeaderButton(renderer!, 'Inbox').props.onPress();
+    });
+
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(tabs)/inbox',
+      params: { contentType: 'article' },
+    });
+  });
+
   it('restores the home section visual caps without changing the expanded fetch size', () => {
     mockUseHomeData.mockReturnValue({
       data: {
