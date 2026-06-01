@@ -1,11 +1,22 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Surface } from 'heroui-native';
+import type { ComponentType } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
-import { FlatList, StyleSheet, Text, View, type ListRenderItemInfo } from 'react-native';
+import {
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
+import { ContentType as ApiContentType } from '@zine/shared';
 
+import { FilterChip } from '@/components/filter-chip';
+import { ArticleIcon, PodcastIcon, PostIcon, VideoIcon } from '@/components/icons';
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { EmptyState, ErrorState, InvalidParamState, LoadingState } from '@/components/list-states';
-import { Colors, Spacing, Typography } from '@/constants/theme';
+import { Colors, ContentColors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHomeData } from '@/hooks/use-items-trpc';
 import {
@@ -32,12 +43,56 @@ const SECTION_TITLES: Record<HomeSectionKey, string> = {
 };
 
 const VALID_SECTION_KEYS = Object.keys(SECTION_TITLES) as HomeSectionKey[];
+const contentTypeFilters: {
+  id: UIContentType;
+  label: string;
+  icon?: ComponentType<{ size?: number; color?: string }>;
+  dotColor?: string;
+  contentType: ApiContentType;
+}[] = [
+  {
+    id: 'article',
+    label: 'Articles',
+    icon: ArticleIcon,
+    dotColor: ContentColors.article,
+    contentType: ApiContentType.ARTICLE,
+  },
+  {
+    id: 'podcast',
+    label: 'Podcasts',
+    icon: PodcastIcon,
+    dotColor: ContentColors.podcast,
+    contentType: ApiContentType.PODCAST,
+  },
+  {
+    id: 'video',
+    label: 'Videos',
+    icon: VideoIcon,
+    dotColor: ContentColors.video,
+    contentType: ApiContentType.VIDEO,
+  },
+  {
+    id: 'post',
+    label: 'Posts',
+    icon: PostIcon,
+    dotColor: ContentColors.post,
+    contentType: ApiContentType.POST,
+  },
+];
 
 function parseSectionKey(value: string | string[] | undefined): HomeSectionKey | null {
   const rawValue = Array.isArray(value) ? value[0] : value;
 
   return VALID_SECTION_KEYS.includes(rawValue as HomeSectionKey)
     ? (rawValue as HomeSectionKey)
+    : null;
+}
+
+function parseContentTypeFilter(value: string | string[] | undefined): UIContentType | null {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+
+  return contentTypeFilters.some((filter) => filter.id === rawValue)
+    ? (rawValue as UIContentType)
     : null;
 }
 
@@ -78,19 +133,35 @@ function getSectionItems(
 }
 
 export default function HomeSectionScreen() {
-  const params = useLocalSearchParams<{ section?: string }>();
+  const params = useLocalSearchParams<{ section?: string; contentType?: string | string[] }>();
   const sectionKey = parseSectionKey(params.section);
+  const contentTypeFilter = parseContentTypeFilter(params.contentType);
+  const selectedContentTypeFilter = contentTypeFilter
+    ? contentTypeFilters.find((filter) => filter.id === contentTypeFilter)
+    : undefined;
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const listRef = useRef<FlatList<ItemCardData>>(null);
   const { handleScroll, showCollapsedTitle } = useCollapsedHeaderTitle();
-  const { data: homeData, isLoading, error, refetch } = useHomeData();
+  const {
+    data: homeData,
+    isLoading,
+    error,
+    refetch,
+  } = useHomeData(
+    selectedContentTypeFilter
+      ? { filter: { contentType: selectedContentTypeFilter.contentType } }
+      : undefined
+  );
 
   const sectionTitle = sectionKey ? SECTION_TITLES[sectionKey] : 'Section';
-  const sectionItems = useMemo(
-    () => (sectionKey ? getSectionItems(homeData, sectionKey) : []),
-    [homeData, sectionKey]
-  );
+  const sectionItems = useMemo(() => {
+    const items = sectionKey ? getSectionItems(homeData, sectionKey) : [];
+
+    return contentTypeFilter
+      ? items.filter((item) => item.contentType === contentTypeFilter)
+      : items;
+  }, [contentTypeFilter, homeData, sectionKey]);
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ItemCardData>) => (
@@ -154,6 +225,25 @@ export default function HomeSectionScreen() {
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>{sectionTitle}</Text>
+            {selectedContentTypeFilter ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterContainer}
+              >
+                <FilterChip
+                  label={selectedContentTypeFilter.label}
+                  isSelected
+                  onPress={() => {}}
+                  disabled
+                  icon={selectedContentTypeFilter.icon}
+                  dotColor={selectedContentTypeFilter.dotColor}
+                  selectedColor={colors.warning}
+                  selectedSurfaceColor={colors.warning}
+                  selectedForegroundColor={colors.statusWarningForeground}
+                />
+              </ScrollView>
+            ) : null}
           </View>
         }
         ListEmptyComponent={listEmptyComponent}
@@ -181,6 +271,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...Typography.displayMedium,
     paddingHorizontal: Spacing.md,
+  },
+  filterContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    gap: Spacing.sm,
   },
   listFooter: {
     minHeight: Spacing['3xl'],

@@ -85,4 +85,27 @@ describe('FilterChip', () => {
     expect(mockSelectionAsync).toHaveBeenCalledTimes(1);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it('does not trigger haptics or onPress when disabled', () => {
+    const onPress = jest.fn();
+    let renderer: ReturnType<typeof TestRenderer.create>;
+
+    act(() => {
+      renderer = TestRenderer.create(
+        React.createElement(FilterChip, {
+          label: 'Articles',
+          isSelected: true,
+          onPress,
+          disabled: true,
+        })
+      );
+    });
+
+    act(() => {
+      renderer.root.findByType('button').props.onPress();
+    });
+
+    expect(mockSelectionAsync).not.toHaveBeenCalled();
+    expect(onPress).not.toHaveBeenCalled();
+  });
 });

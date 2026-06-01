@@ -359,13 +359,30 @@ export default function HomeScreen() {
 
   const handleOpenHomeSection = useCallback(
     (section: BuiltInHomeSectionKey) => {
+      const params: { section: BuiltInHomeSectionKey; contentType?: UIContentType } = { section };
+      if (contentTypeFilter) {
+        params.contentType = contentTypeFilter;
+      }
+
       router.push({
         pathname: '/(tabs)/section/[section]',
-        params: { section },
+        params,
       } as unknown as Href);
     },
-    [router]
+    [contentTypeFilter, router]
   );
+
+  const handleOpenInbox = useCallback(() => {
+    if (!contentTypeFilter) {
+      router.push('/(tabs)/inbox');
+      return;
+    }
+
+    router.push({
+      pathname: '/(tabs)/inbox',
+      params: { contentType: contentTypeFilter },
+    } as unknown as Href);
+  }, [contentTypeFilter, router]);
 
   const handleOpenNavigationPane = useCallback(() => {
     setNavigationPaneMounted(true);
@@ -679,11 +696,7 @@ export default function HomeScreen() {
         case 'inbox':
           return (
             <View style={styles.section}>
-              <SectionHeader
-                title={item.title}
-                colors={colors}
-                onPress={() => router.push('/(tabs)/inbox')}
-              />
+              <SectionHeader title={item.title} colors={colors} onPress={handleOpenInbox} />
               <View
                 style={[styles.inboxContainer, { backgroundColor: colors.backgroundSecondary }]}
               >
@@ -806,7 +819,7 @@ export default function HomeScreen() {
           );
       }
     },
-    [colors, featuredGridItemWidth, handleOpenCollection, handleOpenHomeSection, router]
+    [colors, featuredGridItemWidth, handleOpenCollection, handleOpenHomeSection, handleOpenInbox]
   );
 
   useEffect(() => {
