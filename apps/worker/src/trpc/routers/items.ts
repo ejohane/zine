@@ -536,8 +536,7 @@ export const itemsRouter = router({
   /**
    * Get items in the triage queue (INBOX state).
    * Supports filtering by provider and content type.
-   * Uses cursor-based pagination sorted by publishedAt DESC (most recent first).
-   * Falls back to ingestedAt for items without a publishedAt date.
+   * Uses cursor-based pagination sorted by ingestedAt DESC (most recently added first).
    */
   inbox: protectedProcedure.input(PaginationSchema.optional()).query(async ({ input, ctx }) => {
     const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
@@ -550,15 +549,12 @@ export const itemsRouter = router({
       eq(userItems.isFinished, false),
     ];
 
-    // Use COALESCE to handle NULL publishedAt - falls back to ingestedAt
-    const sortField = sql`COALESCE(${items.publishedAt}, ${userItems.ingestedAt})`;
-
-    // Apply cursor-based pagination (fetch items published before cursor)
+    // Apply cursor-based pagination (fetch items ingested before cursor)
     if (cursor) {
       conditions.push(
         or(
-          sql`${sortField} < ${cursor.sortValue}`,
-          and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
+          lt(userItems.ingestedAt, cursor.sortValue),
+          and(eq(userItems.ingestedAt, cursor.sortValue), lt(userItems.id, cursor.id))
         )!
       );
     }
@@ -578,7 +574,7 @@ export const itemsRouter = router({
       .innerJoin(items, eq(userItems.itemId, items.id))
       .leftJoin(creators, eq(items.creatorId, creators.id))
       .where(and(...conditions))
-      .orderBy(sql`${sortField} DESC`, desc(userItems.id))
+      .orderBy(desc(userItems.ingestedAt), desc(userItems.id))
       .limit(limit + 1); // Fetch one extra to check for more
 
     // Check if there are more results
@@ -593,7 +589,7 @@ export const itemsRouter = router({
     if (hasMore && pageResults.length > 0) {
       const lastResult = pageResults[pageResults.length - 1];
       nextCursor = encodeCursor({
-        sortValue: lastResult.items.publishedAt ?? lastResult.user_items.ingestedAt,
+        sortValue: lastResult.user_items.ingestedAt,
         id: lastResult.user_items.id,
       });
     }
