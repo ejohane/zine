@@ -127,6 +127,8 @@ function createMockItemsCaller(options: {
         items = items.filter((item) => item.contentType === input.filter!.contentType);
       }
 
+      items.sort((a, b) => b.ingestedAt.localeCompare(a.ingestedAt) || b.id.localeCompare(a.id));
+
       const limit = input?.limit ?? 20;
       const hasMore = items.length > limit;
       const pageItems = hasMore ? items.slice(0, limit) : items;
@@ -514,6 +516,32 @@ describe('Items Router', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].contentType).toBe(ContentType.VIDEO);
+    });
+
+    it('should sort by most recently ingested instead of published date', async () => {
+      const olderReleaseAddedRecently = createMockItemView({
+        id: 'ui-added-recently',
+        title: 'Older release added recently',
+        publishedAt: '2024-01-01T00:00:00Z',
+        ingestedAt: '2024-12-03T00:00:00Z',
+      });
+      const newerReleaseAddedEarlier = createMockItemView({
+        id: 'ui-added-earlier',
+        title: 'Newer release added earlier',
+        publishedAt: '2024-12-01T00:00:00Z',
+        ingestedAt: '2024-12-01T00:00:00Z',
+      });
+
+      const caller = createMockItemsCaller({
+        userId: TEST_USER_ID,
+        inboxItems: [newerReleaseAddedEarlier, olderReleaseAddedRecently],
+      });
+      const result = await caller.inbox();
+
+      expect(result.items.map((item) => item.id)).toEqual([
+        'ui-added-recently',
+        'ui-added-earlier',
+      ]);
     });
   });
 
