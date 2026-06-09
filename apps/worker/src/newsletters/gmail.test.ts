@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { Provider } from '@zine/shared';
 
 import {
+  classifyNewsletterIssue,
   computeNewsletterScore,
   isLikelyNewsletterFeedIdentity,
   normalizeUnsubscribeIdentityUrl,
@@ -214,6 +216,39 @@ describe('gmail newsletter detection', () => {
     });
 
     expect(bestUrl).toBe('https://lenny.substack.com/p/getting-paid-to-vibe-code');
+  });
+
+  it('classifies Substack newsletter issues as Substack items', () => {
+    const classification = classifyNewsletterIssue({
+      issueUrl:
+        'https://open.substack.com/pub/lennysnewsletter/p/getting-paid-to-vibe-code?utm_source=email',
+      gmailProviderId: 'google-sub:gmail-message-id',
+      listId: '<lennysnewsletter.substack.com>',
+      fromAddress: 'lenny@substack.com',
+      unsubscribeUrl: 'https://substack.com/unsubscribe?token=abc',
+    });
+
+    expect(classification).toEqual({
+      provider: Provider.SUBSTACK,
+      providerId: 'lennysnewsletter/getting-paid-to-vibe-code',
+      canonicalUrl: 'https://lennysnewsletter.substack.com/p/getting-paid-to-vibe-code',
+    });
+  });
+
+  it('keeps non-Substack newsletter issues as Gmail items', () => {
+    const classification = classifyNewsletterIssue({
+      issueUrl: 'https://newsletter.example.com/posts/42',
+      gmailProviderId: 'google-sub:gmail-message-id',
+      listId: '<newsletter.example.com>',
+      fromAddress: 'news@newsletter.example.com',
+      unsubscribeUrl: 'https://newsletter.example.com/unsubscribe',
+    });
+
+    expect(classification).toEqual({
+      provider: Provider.GMAIL,
+      providerId: 'google-sub:gmail-message-id',
+      canonicalUrl: 'https://newsletter.example.com/posts/42',
+    });
   });
 
   it('returns null when only non-content links are present', () => {

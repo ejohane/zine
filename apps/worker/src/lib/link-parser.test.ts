@@ -264,6 +264,19 @@ describe('parseLink', () => {
 
         expect(result?.providerId).toBe('stratechery/the-great-analysis');
       });
+
+      it('normalizes open.substack.com article links', () => {
+        const result = parseLink(
+          'https://open.substack.com/pub/lennysnewsletter/p/getting-paid-to-vibe-code?utm_source=mail'
+        );
+
+        expect(result).toEqual({
+          provider: Provider.SUBSTACK,
+          contentType: ContentType.ARTICLE,
+          providerId: 'lennysnewsletter/getting-paid-to-vibe-code',
+          canonicalUrl: 'https://lennysnewsletter.substack.com/p/getting-paid-to-vibe-code',
+        });
+      });
     });
 
     describe('tracking parameter stripping', () => {

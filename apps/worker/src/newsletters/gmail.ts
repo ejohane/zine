@@ -1,6 +1,12 @@
 import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
-import { ContentType, Provider } from '@zine/shared';
+import {
+  ContentType,
+  getSubstackArticleProviderId,
+  hasSubstackNewsletterIdentity,
+  normalizeSubstackArticleUrl,
+  Provider,
+} from '@zine/shared';
 import { parseHTML } from 'linkedom/worker';
 
 import { createDb, type Database } from '../db';
@@ -180,6 +186,12 @@ interface FeedSeedResult {
     | 'no_matching_message'
     | 'no_search_query';
 }
+
+export type NewsletterIssueClassification = {
+  provider: Provider;
+  providerId: string;
+  canonicalUrl: string;
+};
 
 export interface FeedBackfillResult {
   createdCount: number;
@@ -801,6 +813,8 @@ async function maybeUpgradeExistingNewsletterItem(params: {
     where: eq(items.id, params.itemId),
     columns: {
       id: true,
+      provider: true,
+      providerId: true,
       canonicalUrl: true,
       creatorId: true,
       thumbnailUrl: true,
@@ -854,6 +868,33 @@ async function maybeUpgradeExistingNewsletterItem(params: {
     }
   }
 
+  const itemUpdates: Partial<typeof items.$inferInsert> = {};
+  const substackCanonicalUrl = normalizeSubstackArticleUrl(canonicalUrl);
+  const substackProviderId = getSubstackArticleProviderId(substackCanonicalUrl);
+  if (
+    existingItem.provider === Provider.GMAIL &&
+    substackCanonicalUrl &&
+    substackProviderId &&
+    hasSubstackNewsletterIdentity({
+      canonicalUrl: substackCanonicalUrl,
+      listId: params.parsed.listId,
+      fromAddress: params.parsed.fromAddress,
+      unsubscribeUrl: params.parsed.unsubscribeUrl,
+    })
+  ) {
+    const existingSubstackItem = await params.db.query.items.findFirst({
+      where: and(eq(items.provider, Provider.SUBSTACK), eq(items.providerId, substackProviderId)),
+      columns: { id: true },
+    });
+
+    if (!existingSubstackItem || existingSubstackItem.id === existingItem.id) {
+      canonicalUrl = substackCanonicalUrl;
+      itemUpdates.provider = Provider.SUBSTACK;
+      itemUpdates.providerId = substackProviderId;
+      itemUpdates.canonicalUrl = substackCanonicalUrl;
+    }
+  }
+
   const newsletterAvatarUrl = buildNewsletterAvatarUrl({
     canonicalUrl,
     listId: params.parsed.listId,
@@ -862,7 +903,6 @@ async function maybeUpgradeExistingNewsletterItem(params: {
     creatorHandle: params.parsed.fromAddress,
   });
 
-  const itemUpdates: Partial<typeof items.$inferInsert> = {};
   if (shouldPersistCanonicalUpdate) {
     itemUpdates.canonicalUrl = canonicalUrl;
     itemUpdates.rawMetadata = rawMetadata;
@@ -1163,6 +1203,39 @@ export function shouldUpgradeNewsletterIssueUrl(currentUrl: string, nextUrl: str
   }
 
   return false;
+}
+
+export function classifyNewsletterIssue(params: {
+  issueUrl: string;
+  gmailProviderId: string;
+  listId: string | null;
+  fromAddress: string;
+  unsubscribeUrl: string | null;
+}): NewsletterIssueClassification {
+  const normalizedSubstackUrl = normalizeSubstackArticleUrl(params.issueUrl);
+  const substackProviderId = getSubstackArticleProviderId(normalizedSubstackUrl);
+  const isSubstackIssue =
+    Boolean(normalizedSubstackUrl && substackProviderId) &&
+    hasSubstackNewsletterIdentity({
+      canonicalUrl: normalizedSubstackUrl,
+      listId: params.listId,
+      fromAddress: params.fromAddress,
+      unsubscribeUrl: params.unsubscribeUrl,
+    });
+
+  if (isSubstackIssue && normalizedSubstackUrl && substackProviderId) {
+    return {
+      provider: Provider.SUBSTACK,
+      providerId: substackProviderId,
+      canonicalUrl: normalizedSubstackUrl,
+    };
+  }
+
+  return {
+    provider: Provider.GMAIL,
+    providerId: params.gmailProviderId,
+    canonicalUrl: params.issueUrl,
+  };
 }
 
 async function gmailGet<T>(accessToken: string, path: string): Promise<T> {
@@ -1572,7 +1645,14 @@ async function ingestNewsletterMessage(params: {
     accessToken: params.accessToken,
     parsed: params.parsed,
   });
-  const issueUrl = issueUrlResolution.url;
+  const issueClassification = classifyNewsletterIssue({
+    issueUrl: issueUrlResolution.url,
+    gmailProviderId: providerId,
+    listId: params.parsed.listId,
+    fromAddress: params.parsed.fromAddress,
+    unsubscribeUrl: params.parsed.unsubscribeUrl,
+  });
+  const issueUrl = issueClassification.canonicalUrl;
   const newsletterAvatarUrl = buildNewsletterAvatarUrl({
     canonicalUrl: issueUrl,
     listId: params.parsed.listId,
@@ -1600,8 +1680,8 @@ async function ingestNewsletterMessage(params: {
     .values({
       id: ulid(),
       contentType: ContentType.ARTICLE,
-      provider: Provider.GMAIL,
-      providerId,
+      provider: issueClassification.provider,
+      providerId: issueClassification.providerId,
       canonicalUrl: issueUrl,
       title: params.parsed.subject,
       thumbnailUrl: newsletterAvatarUrl,
@@ -1612,6 +1692,8 @@ async function ingestNewsletterMessage(params: {
       publishedAt: publishedAtIso,
       rawMetadata: JSON.stringify({
         messageId: params.parsed.messageId,
+        deliveryProvider: Provider.GMAIL,
+        deliveryProviderId: providerId,
         threadId: params.parsed.threadId,
         listId: params.parsed.listId,
         fromAddress: params.parsed.fromAddress,
@@ -1629,12 +1711,17 @@ async function ingestNewsletterMessage(params: {
     });
 
   const canonicalItem = await params.db.query.items.findFirst({
-    where: and(eq(items.provider, Provider.GMAIL), eq(items.providerId, providerId)),
+    where: and(
+      eq(items.provider, issueClassification.provider),
+      eq(items.providerId, issueClassification.providerId)
+    ),
     columns: { id: true },
   });
 
   if (!canonicalItem) {
-    throw new Error(`Failed to load created newsletter item for providerId=${providerId}`);
+    throw new Error(
+      `Failed to load created newsletter item for providerId=${issueClassification.providerId}`
+    );
   }
 
   await params.db

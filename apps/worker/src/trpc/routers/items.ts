@@ -27,11 +27,13 @@ import {
   HomeScreenSectionKind,
   isJsonObject,
   type JsonObject,
-  type Provider,
+  Provider,
   type CollectionRules,
   UserItemState,
   ProviderSchema,
   ContentTypeSchema,
+  hasSubstackNewsletterIdentity,
+  isSubstackArticleUrl,
 } from '@zine/shared';
 import { normalizeTagKey, normalizeTagName } from '@zine/shared/tags';
 import {
@@ -260,6 +262,21 @@ function toItemView(
     item.provider === 'GMAIL'
       ? (normalizedCreatorImageUrl ?? newsletterAvatarUrl)
       : normalizedCreatorImageUrl;
+  const responseProvider =
+    item.provider === Provider.GMAIL &&
+    isSubstackArticleUrl(item.canonicalUrl) &&
+    hasSubstackNewsletterIdentity({
+      canonicalUrl: item.canonicalUrl,
+      listId: getStringMetadataField(metadata, 'listId'),
+      fromAddress:
+        getStringMetadataField(metadata, 'fromAddress') ??
+        getStringMetadataField(metadata, 'sender') ??
+        creator?.handle ??
+        null,
+      unsubscribeUrl: getStringMetadataField(metadata, 'unsubscribeUrl'),
+    })
+      ? Provider.SUBSTACK
+      : item.provider;
 
   return {
     id: userItem.id,
@@ -268,7 +285,7 @@ function toItemView(
     thumbnailUrl,
     canonicalUrl: normalizeCanonicalUrlForResponse(item.canonicalUrl),
     contentType: item.contentType as ContentType,
-    provider: item.provider as Provider,
+    provider: responseProvider as Provider,
     // Creator data from creators table (normalized)
     creator: creator?.name ?? 'Unknown Creator',
     creatorImageUrl,

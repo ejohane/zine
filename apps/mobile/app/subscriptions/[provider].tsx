@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { hasSubstackNewsletterIdentity } from '@zine/shared';
 import { Provider as ProviderEnum, type OAuthProvider } from '@zine/shared/types';
 
 import { ErrorState, LoadingState } from '@/components/list-states';
@@ -607,11 +608,7 @@ function getNewsletterImageUrl(feed: NewsletterFeed): string | null {
 }
 
 function isSubstackNewsletter(feed: NewsletterFeed): boolean {
-  return Boolean(
-    feed.fromAddress?.toLowerCase().endsWith('@substack.com') ||
-    feed.listId?.toLowerCase().includes('substack.com') ||
-    feed.unsubscribeUrl?.toLowerCase().includes('substack.com')
-  );
+  return hasSubstackNewsletterIdentity(feed);
 }
 
 function getNewsletterStatusLabel(feed: NewsletterFeed): string {

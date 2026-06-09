@@ -14,7 +14,15 @@ import { z } from 'zod';
 import { ulid } from 'ulid';
 import { eq, and } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
-import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
+import {
+  ContentType,
+  ContentTypeSchema,
+  getSubstackArticleProviderId,
+  normalizeSubstackArticleUrl,
+  Provider,
+  ProviderSchema,
+  UserItemState,
+} from '@zine/shared';
 import { items, userItems, users, providerConnections } from '../../db/schema';
 import { fetchLinkPreview } from '../../lib/link-preview';
 import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refresh';
@@ -161,10 +169,17 @@ export const bookmarksRouter = router({
    */
   save: protectedProcedure.input(SaveInputSchema).mutation(async ({ input, ctx }) => {
     const now = new Date().toISOString();
+    const substackCanonicalUrl =
+      normalizeSubstackArticleUrl(input.canonicalUrl) ?? normalizeSubstackArticleUrl(input.url);
+    const substackProviderId = getSubstackArticleProviderId(substackCanonicalUrl);
+    const provider = substackProviderId ? Provider.SUBSTACK : input.provider;
+    const contentType = substackProviderId ? ContentType.ARTICLE : input.contentType;
+    const providerId = substackProviderId ?? input.providerId;
+    const canonicalUrl = substackCanonicalUrl ?? input.canonicalUrl;
 
     // 1. Find or create the canonical item
     const existingItem = await ctx.db.query.items.findFirst({
-      where: and(eq(items.provider, input.provider), eq(items.providerId, input.providerId)),
+      where: and(eq(items.provider, provider), eq(items.providerId, providerId)),
     });
 
     let itemId: string;
@@ -176,14 +191,14 @@ export const bookmarksRouter = router({
     if (input.rawMetadata) {
       try {
         const parsedMetadata = JSON.parse(input.rawMetadata);
-        const creatorParams = extractCreatorFromMetadata(input.provider, parsedMetadata);
+        const creatorParams = extractCreatorFromMetadata(provider, parsedMetadata);
 
         if (creatorParams) {
           const creator = await findOrCreateCreator(ctx, creatorParams);
           creatorId = creator.id;
           bookmarksLogger.debug('Creator extracted from metadata', {
             creatorId,
-            provider: input.provider,
+            provider,
             name: creatorParams.name,
           });
         }
@@ -194,9 +209,9 @@ export const bookmarksRouter = router({
 
     // Fallback: use creator name with synthetic ID
     if (!creatorId && input.creator) {
-      const syntheticId = generateSyntheticCreatorId(input.provider, input.creator);
+      const syntheticId = generateSyntheticCreatorId(provider, input.creator);
       const creator = await findOrCreateCreator(ctx, {
-        provider: input.provider,
+        provider,
         providerCreatorId: syntheticId,
         name: input.creator,
         imageUrl: input.creatorImageUrl ?? undefined,
@@ -204,7 +219,7 @@ export const bookmarksRouter = router({
       creatorId = creator.id;
       bookmarksLogger.debug('Creator created with synthetic ID', {
         creatorId,
-        provider: input.provider,
+        provider,
         name: input.creator,
         syntheticId,
       });
@@ -237,14 +252,14 @@ export const bookmarksRouter = router({
       let articleContentKey: string | null = null;
 
       // For WEB provider items with article content, extract and store the article
-      if (input.provider === 'WEB' && input.hasArticleContent === true) {
+      if (provider === Provider.WEB && input.hasArticleContent === true) {
         try {
           bookmarksLogger.debug('Extracting article content', {
-            url: input.canonicalUrl,
+            url: canonicalUrl,
             itemId,
           });
 
-          const articleData = await extractArticle(input.canonicalUrl);
+          const articleData = await extractArticle(canonicalUrl);
 
           if (articleData?.content && ctx.env.ARTICLE_CONTENT) {
             // Store article content in R2
@@ -275,7 +290,7 @@ export const bookmarksRouter = router({
           // Article storage is best-effort - log error but don't fail the save
           bookmarksLogger.error('Failed to extract/store article content', {
             error,
-            url: input.canonicalUrl,
+            url: canonicalUrl,
             itemId,
           });
         }
@@ -285,10 +300,10 @@ export const bookmarksRouter = router({
       // These deprecated fields are no longer written.
       await ctx.db.insert(items).values({
         id: itemId,
-        contentType: input.contentType,
-        provider: input.provider,
-        providerId: input.providerId,
-        canonicalUrl: input.canonicalUrl,
+        contentType,
+        provider,
+        providerId,
+        canonicalUrl,
         title: input.title,
         thumbnailUrl: input.thumbnailUrl,
         creatorId,

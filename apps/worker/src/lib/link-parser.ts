@@ -5,7 +5,12 @@
  * Used by the Manual Link Saving feature to process user-submitted URLs.
  */
 
-import { ContentType, Provider } from '@zine/shared';
+import {
+  ContentType,
+  getSubstackArticleProviderId,
+  normalizeSubstackArticleUrl,
+  Provider,
+} from '@zine/shared';
 
 /**
  * Result of parsing a URL
@@ -173,30 +178,10 @@ function parseSpotify(url: URL): ParsedLink | null {
  * - *.substack.com/p/SLUG
  */
 function parseSubstack(url: URL): ParsedLink | null {
-  const hostname = url.hostname.toLowerCase();
+  const canonicalUrl = normalizeSubstackArticleUrl(url.toString());
+  const providerId = getSubstackArticleProviderId(canonicalUrl);
 
-  // Check for *.substack.com pattern
-  if (!hostname.endsWith('.substack.com') && hostname !== 'substack.com') {
-    return null;
-  }
-
-  // Parse /p/SLUG pattern
-  if (url.pathname.startsWith('/p/')) {
-    const slug = url.pathname.split('/p/')[1]?.split('/')[0]?.split('?')[0] ?? null;
-
-    if (!slug) {
-      return null;
-    }
-
-    // Extract publication name from subdomain
-    const publication = hostname.replace('.substack.com', '');
-
-    // Provider ID combines publication and slug for uniqueness
-    const providerId = `${publication}/${slug}`;
-
-    // Build canonical URL (strip tracking params)
-    const canonicalUrl = stripTrackingParams(url);
-
+  if (canonicalUrl && providerId) {
     return {
       provider: Provider.SUBSTACK,
       contentType: ContentType.ARTICLE,
