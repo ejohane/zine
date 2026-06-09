@@ -129,6 +129,18 @@ bun run design-system:check
 
 Expo Go provides a pre-built native runtime that loads JavaScript bundles over the network. This is sufficient for testing UI, navigation, and most app functionality.
 
+### Real Device Preview Deploys
+
+When the user asks to push, deploy, install, or send the app to their phone or device, assume they mean the iOS preview build unless they explicitly say otherwise.
+
+Use the deploy wrapper from `apps/mobile`:
+
+```bash
+bun run deploy:ios:preview
+```
+
+The script creates the EAS preview build, downloads the IPA, discovers the connected iOS device, and installs it with `devicectl`. Do not substitute production, TestFlight, or raw EAS commands unless requested.
+
 ### Running the App
 
 ```bash

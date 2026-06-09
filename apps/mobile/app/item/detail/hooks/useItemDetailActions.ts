@@ -19,6 +19,15 @@ import { showError } from '@/lib/toast-utils';
 
 import type { ItemDetailItem } from '../types';
 
+function isWebUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function useItemDetailActions(item?: ItemDetailItem | null) {
   const { toast } = useToast();
   const bookmarkMutation = useBookmarkItem();
@@ -36,9 +45,8 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
   const handleOpenLink = useCallback(async () => {
     if (!item?.canonicalUrl) return;
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
     try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       const isArticle = item.contentType === ContentType.ARTICLE;
       const isSubstack = item.provider === 'SUBSTACK' || isSubstackArticleUrl(item.canonicalUrl);
       let didOpen = false;
@@ -46,19 +54,16 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
           enableBarCollapsing: true,
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.AUTOMATIC,
         });
+        didOpen = true;
+      } else if (isWebUrl(item.canonicalUrl)) {
+        await Linking.openURL(item.canonicalUrl);
         didOpen = true;
       } else {
         const supported = await Linking.canOpenURL(item.canonicalUrl);
         if (supported) {
           await Linking.openURL(item.canonicalUrl);
-          didOpen = true;
-        } else if (isSubstack) {
-          await WebBrowser.openBrowserAsync(item.canonicalUrl, {
-            enableBarCollapsing: true,
-            presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-          });
           didOpen = true;
         }
       }
@@ -68,8 +73,9 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
       }
     } catch (err) {
       logger.error('Failed to open URL', { error: err });
+      showError(toast, err, 'Failed to open link', 'itemDetail.openLink');
     }
-  }, [handleMarkLinkOpened, item]);
+  }, [handleMarkLinkOpened, item, toast]);
 
   const handleShare = useCallback(async () => {
     if (!item) return;

@@ -36,6 +36,7 @@ jest.mock('expo-web-browser', () => ({
   ) => mockOpenBrowserAsync(...args),
   WebBrowserPresentationStyle: {
     FULL_SCREEN: 'FULL_SCREEN',
+    AUTOMATIC: 'AUTOMATIC',
   },
 }));
 
@@ -142,9 +143,11 @@ describe('useItemDetailActions', () => {
       await result.current.handleOpenLink();
     });
 
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenURL).not.toHaveBeenCalled();
     expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
       enableBarCollapsing: true,
-      presentationStyle: 'FULL_SCREEN',
+      presentationStyle: 'AUTOMATIC',
     });
     expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
   });
@@ -153,6 +156,25 @@ describe('useItemDetailActions', () => {
     const item = {
       ...baseItem,
       contentType: 'VIDEO',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+  });
+
+  it('checks support before opening non-web external links', async () => {
+    const item = {
+      ...baseItem,
+      canonicalUrl: 'spotify:show:show-123',
+      contentType: 'PODCAST',
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
@@ -181,9 +203,30 @@ describe('useItemDetailActions', () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
     expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+  });
+
+  it('opens provider-classified substack articles on custom domains with Linking', async () => {
+    const item = {
+      ...baseItem,
+      provider: 'SUBSTACK',
+      canonicalUrl: 'https://blog.pragmaticengineer.com/ideas-slow-down-to-speed-up/',
+      contentType: 'ARTICLE',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
   });
 
   it('opens substack article URLs with Linking even when provider is Gmail', async () => {
@@ -201,18 +244,20 @@ describe('useItemDetailActions', () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
     expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
     expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
   });
 
-  it('falls back to browser when substack can not be opened', async () => {
-    mockCanOpenURL.mockResolvedValueOnce(false);
+  it('shows feedback when a web URL can not be opened', async () => {
+    const error = new Error('no handler');
+    mockOpenURL.mockRejectedValueOnce(error);
 
     const item = {
       ...baseItem,
       provider: 'SUBSTACK',
+      canonicalUrl: 'https://blog.pragmaticengineer.com/ideas-slow-down-to-speed-up/',
       contentType: 'ARTICLE',
       state: UserItemState.BOOKMARKED,
     } as unknown as ItemDetailItem;
@@ -223,12 +268,17 @@ describe('useItemDetailActions', () => {
       await result.current.handleOpenLink();
     });
 
-    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
-    expect(mockOpenURL).not.toHaveBeenCalled();
-    expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
-      enableBarCollapsing: true,
-      presentationStyle: 'FULL_SCREEN',
-    });
+    expect(mockCanOpenURL).not.toHaveBeenCalled();
+    expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
+    expect(mockShowError).toHaveBeenCalledWith(
+      mockToastManager,
+      error,
+      'Failed to open link',
+      'itemDetail.openLink'
+    );
+    expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
   it('does not mark opened after a successful open when the item is not bookmarked', async () => {
@@ -252,7 +302,16 @@ describe('useItemDetailActions', () => {
     });
 
     expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
-    expect(mockOpenBrowserAsync).toHaveBeenCalled();
+    expect(mockOpenBrowserAsync).toHaveBeenCalledWith(baseItem.canonicalUrl, {
+      enableBarCollapsing: true,
+      presentationStyle: 'AUTOMATIC',
+    });
+    expect(mockShowError).toHaveBeenCalledWith(
+      mockToastManager,
+      error,
+      'Failed to open link',
+      'itemDetail.openLink'
+    );
     expect(mockMarkOpenedMutation.mutate).not.toHaveBeenCalled();
   });
 
@@ -260,7 +319,8 @@ describe('useItemDetailActions', () => {
     mockCanOpenURL.mockResolvedValueOnce(false);
     const item = {
       ...baseItem,
-      contentType: 'VIDEO',
+      canonicalUrl: 'spotify:show:show-123',
+      contentType: 'PODCAST',
     } as unknown as ItemDetailItem;
     const { result } = renderHook(() => useItemDetailActions(item));
     mockMarkOpenedMutation.mutate.mockClear();
