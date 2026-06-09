@@ -129,6 +129,15 @@ export default function ItemDetailScreen() {
     return <ItemDetailNotFoundState colors={colors} />;
   }
 
+  const collectionsSheet = (
+    <ItemCollectionsSheet
+      item={item}
+      colors={colors}
+      visible={collectionsSheetOpen}
+      onClose={handleCloseCollectionsSheet}
+    />
+  );
+
   if (viewState.isXPost) {
     return (
       <>
@@ -159,12 +168,7 @@ export default function ItemDetailScreen() {
           otherUnfinishedBookmarks={otherUnfinishedBookmarks}
           onOtherBookmarkPress={(bookmarkId) => router.push(`/item/${bookmarkId}` as Href)}
         />
-        <ItemCollectionsSheet
-          item={item}
-          colors={colors}
-          visible={collectionsSheetOpen}
-          onClose={handleCloseCollectionsSheet}
-        />
+        {collectionsSheet}
       </>
     );
   }
@@ -181,6 +185,7 @@ export default function ItemDetailScreen() {
         onScroll={handleScroll}
         screenTitle={item.title}
         showCollapsedTitle={showCollapsedTitle}
+        overlay={collectionsSheet}
         headerImage={
           <Image
             source={{ uri: item.thumbnailUrl! }}
@@ -220,12 +225,6 @@ export default function ItemDetailScreen() {
           onContentLayout={handleContentLayout}
           onTitleLayout={handleTitleLayout}
         />
-        <ItemCollectionsSheet
-          item={item}
-          colors={colors}
-          visible={collectionsSheetOpen}
-          onClose={handleCloseCollectionsSheet}
-        />
       </ItemDetailParallaxLayout>
     );
   }
@@ -238,6 +237,7 @@ export default function ItemDetailScreen() {
       onScroll={handleScroll}
       screenTitle={item.title}
       showCollapsedTitle={showCollapsedTitle}
+      overlay={collectionsSheet}
     >
       <ItemDetailContent
         item={item}
@@ -267,12 +267,6 @@ export default function ItemDetailScreen() {
         useAnimatedDescription={false}
         onContentLayout={handleContentLayout}
         onTitleLayout={handleTitleLayout}
-      />
-      <ItemCollectionsSheet
-        item={item}
-        colors={colors}
-        visible={collectionsSheetOpen}
-        onClose={handleCloseCollectionsSheet}
       />
     </ItemDetailScrollLayout>
   );

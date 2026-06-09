@@ -1,8 +1,9 @@
 import type { Ionicons } from '@expo/vector-icons';
 import type { StyleProp, ViewStyle } from 'react-native';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
+import { IconButton } from '@/components/primitives';
 import { UserItemState } from '@/hooks/use-items-trpc';
 
 import { getFabConfig } from '../../item-detail-helpers';
@@ -77,12 +78,16 @@ export function ItemDetailActions({
         <IconActionButton icon="share-outline" color={colors.textSecondary} onPress={onShare} />
         <IconActionButton icon="ellipsis-horizontal" color={colors.textSecondary} />
       </View>
-      <Pressable
+      <IconButton
         onPress={onOpenLink}
+        size="lg"
+        variant="solid"
+        colors={colors}
+        accessibilityLabel="Open source link"
         style={[styles.fabButton, { backgroundColor: fabConfig.backgroundColor }]}
       >
         {fabConfig.providerIcon}
-      </Pressable>
+      </IconButton>
     </Container>
   );
 }

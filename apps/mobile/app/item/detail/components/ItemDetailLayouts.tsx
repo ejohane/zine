@@ -57,7 +57,11 @@ export function ItemDetailParallaxLayout({
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
       />
-      {overlay}
+      {overlay ? (
+        <View pointerEvents="box-none" style={styles.overlayContainer}>
+          {overlay}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -93,7 +97,11 @@ export function ItemDetailScrollLayout({
         screenTitle={screenTitle}
         showCollapsedTitle={showCollapsedTitle}
       />
-      {overlay}
+      {overlay ? (
+        <View pointerEvents="box-none" style={styles.overlayContainer}>
+          {overlay}
+        </View>
+      ) : null}
     </View>
   );
 }

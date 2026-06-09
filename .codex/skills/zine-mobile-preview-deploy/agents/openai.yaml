@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Zine Mobile Preview Deploy'
+  short_description: 'Deploy the Zine iOS preview build to a phone'
+  default_prompt: 'Use $zine-mobile-preview-deploy to build and install the Zine mobile preview app on my phone.'
+
+policy:
+  allow_implicit_invocation: true

@@ -9,6 +9,10 @@ export const styles = StyleSheet.create({
   animatedContainer: {
     flex: 1,
   },
+  overlayContainer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 200,
+  },
   safeArea: {
     flex: 1,
   },
