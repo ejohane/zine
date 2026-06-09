@@ -30,6 +30,10 @@
       "types": "./src/tags.ts",
       "import": "./src/tags.ts"
     },
+    "./substack": {
+      "types": "./src/substack.ts",
+      "import": "./src/substack.ts"
+    },
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"

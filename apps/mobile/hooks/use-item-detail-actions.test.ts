@@ -186,6 +186,27 @@ describe('useItemDetailActions', () => {
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
   });
 
+  it('opens substack article URLs with Linking even when provider is Gmail', async () => {
+    const item = {
+      ...baseItem,
+      provider: 'GMAIL',
+      canonicalUrl: 'https://lennysnewsletter.substack.com/p/getting-paid-to-vibe-code',
+      contentType: 'ARTICLE',
+      state: UserItemState.BOOKMARKED,
+    } as unknown as ItemDetailItem;
+    const { result } = renderHook(() => useItemDetailActions(item));
+    mockMarkOpenedMutation.mutate.mockClear();
+
+    await act(async () => {
+      await result.current.handleOpenLink();
+    });
+
+    expect(mockCanOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenURL).toHaveBeenCalledWith(item.canonicalUrl);
+    expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+    expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
+  });
+
   it('falls back to browser when substack can not be opened', async () => {
     mockCanOpenURL.mockResolvedValueOnce(false);
 

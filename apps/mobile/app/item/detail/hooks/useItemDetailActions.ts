@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
+import { isSubstackArticleUrl } from '@zine/shared';
 import { useToast } from 'heroui-native';
 import { useCallback } from 'react';
 import { Linking, Share } from 'react-native';
@@ -39,7 +40,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
 
     try {
       const isArticle = item.contentType === ContentType.ARTICLE;
-      const isSubstack = item.provider === 'SUBSTACK';
+      const isSubstack = item.provider === 'SUBSTACK' || isSubstackArticleUrl(item.canonicalUrl);
       let didOpen = false;
 
       if (isArticle && !isSubstack) {

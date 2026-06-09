@@ -51,6 +51,14 @@ export type { UIContentType, UIProvider } from './format';
 // Tag normalization helpers
 export { normalizeTagKey, normalizeTagName, sanitizeTagNames } from './tags';
 
+// Substack URL and newsletter identity helpers
+export {
+  getSubstackArticleProviderId,
+  hasSubstackNewsletterIdentity,
+  isSubstackArticleUrl,
+  normalizeSubstackArticleUrl,
+} from './substack';
+
 // Smart collection contracts
 export {
   CollectionItemMembership,
