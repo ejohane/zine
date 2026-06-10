@@ -139,7 +139,7 @@ Use the deploy wrapper from `apps/mobile`:
 bun run deploy:ios:preview
 ```
 
-The script creates the EAS preview build, downloads the IPA, discovers the connected iOS device, and installs it with `devicectl`. Do not substitute production, TestFlight, or raw EAS commands unless requested.
+The script resolves and validates the preview env, creates a local EAS preview build, discovers the connected iOS device, and installs it with `devicectl`. It uses the current worktree's `apps/mobile/.env.preview` when present, falls back to the `main` worktree's `apps/mobile/.env.preview`, and supports `ZINE_MOBILE_PREVIEW_ENV_FILE=/absolute/path/to/.env.preview` for an explicit override. Do not substitute production, TestFlight, or raw EAS commands unless requested.
 
 ### Running the App
 
