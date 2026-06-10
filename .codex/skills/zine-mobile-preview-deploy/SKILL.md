@@ -18,7 +18,12 @@ Default workflow:
    bun run deploy:ios:preview
    ```
 
-3. Let the script handle the EAS preview build, IPA download, device discovery, and `devicectl` install.
+3. Let the script handle preview env resolution, required env validation, the local EAS preview build, device discovery, and `devicectl` install.
+   - The script reads `apps/mobile/.env.preview` from the current worktree when present.
+   - In Codex or other linked worktrees that do not have `.env.preview`, it falls back to the `main` worktree's `apps/mobile/.env.preview`.
+   - To override explicitly, set `ZINE_MOBILE_PREVIEW_ENV_FILE=/absolute/path/to/.env.preview`.
+   - Do not copy secrets by hand; if required preview env values are missing, fix the env source and rerun the script.
+   - To validate env resolution without building, run `./scripts/build-and-install-ios.sh --check-env` from `apps/mobile`.
 4. Do not run production, TestFlight, or ad hoc EAS commands unless the user explicitly asks for that.
 5. If the script appears quiet, check EAS status with:
 
