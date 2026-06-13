@@ -88,6 +88,12 @@
 - This bypass is the preferred path for `agent-browser` screenshots and UI checks on localhost because it exercises protected routes without needing an interactive Clerk login flow.
 - If `/bookmarks` or other protected pages load but show empty state unexpectedly, do not assume auth is broken; first follow **Empty Local Data Recovery** below to verify the worktree D1 file actually contains the expected local data for `dev-user-001`.
 
+### Mobile Auth Verification
+
+- Always start mobile verification with `bun run dev:worktree`.
+- If Expo Go lands on Clerk sign-in, use `ZINE_TEST_EMAIL` and `ZINE_TEST_PASSWORD` from `apps/mobile/.env.local`; do not print their values.
+- If credential login is blocked and the task is not auth-related, use the local Clerk-disabled bypass and call that out.
+
 ### Empty Local Data Recovery
 
 - Symptom: Expo Go loads, but Home/Inbox/Library are empty even though local test data should exist.
