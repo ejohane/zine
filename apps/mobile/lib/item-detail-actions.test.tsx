@@ -46,6 +46,13 @@ jest.mock('react-native-reanimated', () => ({
   },
 }));
 
+jest.mock('react-native-svg', () => ({
+  __esModule: true,
+  default: ({ children, ...props }: { children?: React.ReactNode }) =>
+    React.createElement('Svg', props, children),
+  Path: (props: Record<string, unknown>) => React.createElement('Path', props),
+}));
+
 jest.mock('@expo/vector-icons', () => {
   const Icon = ({ name }: { name: string }) => React.createElement('Icon', { name });
 
@@ -54,6 +61,19 @@ jest.mock('@expo/vector-icons', () => {
     FontAwesome5: Icon,
   };
 });
+
+function styleHasBackgroundColor(style: unknown, backgroundColor: string): boolean {
+  if (Array.isArray(style)) {
+    return style.some((entry) => styleHasBackgroundColor(entry, backgroundColor));
+  }
+
+  return (
+    typeof style === 'object' &&
+    style !== null &&
+    'backgroundColor' in style &&
+    style.backgroundColor === backgroundColor
+  );
+}
 
 jest.mock('@/hooks/use-app-theme', () => ({
   useAppTheme: () => ({
@@ -111,5 +131,38 @@ describe('ItemDetailActions', () => {
     });
 
     expect(onOpenLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders Substack links with the orange Substack FAB', () => {
+    let renderer: ReturnType<typeof create> | null = null;
+
+    act(() => {
+      renderer = create(
+        <ItemDetailActions
+          item={{ state: UserItemState.BOOKMARKED, provider: 'SUBSTACK' }}
+          colors={Colors.dark}
+          bookmarkActionIcon="bookmark-outline"
+          bookmarkActionColor={Colors.dark.text}
+          isBookmarkActionDisabled={false}
+          secondaryActionIcon="checkmark-circle-outline"
+          secondaryActionColor={Colors.dark.textSecondary}
+          isSecondaryActionDisabled={false}
+          onBookmarkToggle={jest.fn()}
+          onSecondaryAction={jest.fn()}
+          onManageTags={jest.fn()}
+          onShare={jest.fn()}
+          onOpenLink={jest.fn()}
+          useAnimatedContainer={false}
+        />
+      );
+    });
+
+    const fab = renderer!.root.findByProps({ accessibilityLabel: 'Open source link' });
+    const substackPath = renderer!.root.findByProps({
+      d: 'M15 3.604H1v1.891h14v-1.89ZM1 7.208V16l7-3.926L15 16V7.208zM15 0H1v1.89h14z',
+    });
+
+    expect(styleHasBackgroundColor(fab.props.style, '#FF6719')).toBe(true);
+    expect(substackPath.props.fill).toBe('#FFFFFF');
   });
 });
