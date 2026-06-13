@@ -147,7 +147,7 @@ describe('useItemDetailActions', () => {
     expect(mockOpenURL).not.toHaveBeenCalled();
     expect(mockOpenBrowserAsync).toHaveBeenCalledWith(item.canonicalUrl, {
       enableBarCollapsing: true,
-      presentationStyle: 'AUTOMATIC',
+      presentationStyle: 'FULL_SCREEN',
     });
     expect(mockMarkOpenedMutation.mutate).toHaveBeenCalledWith({ id: item.id });
   });
@@ -304,7 +304,7 @@ describe('useItemDetailActions', () => {
     expect(logger.error).toHaveBeenCalledWith('Failed to open URL', { error });
     expect(mockOpenBrowserAsync).toHaveBeenCalledWith(baseItem.canonicalUrl, {
       enableBarCollapsing: true,
-      presentationStyle: 'AUTOMATIC',
+      presentationStyle: 'FULL_SCREEN',
     });
     expect(mockShowError).toHaveBeenCalledWith(
       mockToastManager,

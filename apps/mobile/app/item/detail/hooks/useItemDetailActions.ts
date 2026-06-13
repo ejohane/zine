@@ -54,7 +54,7 @@ export function useItemDetailActions(item?: ItemDetailItem | null) {
       if (isArticle && !isSubstack) {
         await WebBrowser.openBrowserAsync(item.canonicalUrl, {
           enableBarCollapsing: true,
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.AUTOMATIC,
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
         didOpen = true;
       } else if (isWebUrl(item.canonicalUrl)) {

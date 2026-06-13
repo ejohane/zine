@@ -36,7 +36,7 @@ export function ExternalLink({ href, onPress, platformOverride, onOpenExternal, 
           } else {
             await openBrowserAsync(href, {
               enableBarCollapsing: true,
-              presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
+              presentationStyle: WebBrowserPresentationStyle.FULL_SCREEN,
             });
           }
         }
