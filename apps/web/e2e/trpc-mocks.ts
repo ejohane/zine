@@ -100,6 +100,59 @@ const creators = {
   },
 } as const;
 
+const people = [
+  {
+    id: 'person-1',
+    displayName: 'Alice Example',
+    profileImageUrl: null,
+    profileImageSource: null,
+    xHandle: 'alice',
+    itemCount: 3,
+    latestSeenAt: '2025-02-20T09:00:00.000Z',
+    latestItemTitle: 'Design systems at scale',
+  },
+  {
+    id: 'person-2',
+    displayName: 'Bob Example',
+    profileImageUrl: null,
+    profileImageSource: null,
+    xHandle: null,
+    itemCount: 2,
+    latestSeenAt: '2025-02-19T09:00:00.000Z',
+    latestItemTitle: 'Product taste and pacing',
+  },
+];
+
+const collections = [
+  {
+    id: 'collection-1',
+    name: 'Design systems',
+    description: 'Interfaces worth revisiting',
+    rules: { contentTypes: [ContentType.ARTICLE, ContentType.VIDEO], isFinished: false },
+    sort: 'NEWEST_SAVED',
+    homeSection: { layout: 'STACK_RAIL', position: 1 },
+    createdAt: 1739890000000,
+    updatedAt: 1739890000000,
+  },
+];
+
+const inboxItems = [
+  {
+    ...libraryItems[0],
+    id: 'inbox-1',
+    state: 'INBOX',
+    title: 'A new article from the queue',
+    bookmarkedAt: null,
+  },
+  {
+    ...libraryItems[1],
+    id: 'inbox-2',
+    state: 'INBOX',
+    title: 'A new video from the queue',
+    bookmarkedAt: null,
+  },
+];
+
 type MockMode = 'default' | 'empty' | 'error';
 
 function unwrapInput(value: unknown): unknown {
@@ -184,6 +237,53 @@ export async function mockWebTrpc(page: Page, mode: MockMode = 'default') {
         return success({ items: filteredItems });
       }
 
+      if (procedure === 'items.home') {
+        if (mode === 'empty') {
+          return success({
+            recentBookmarks: [],
+            jumpBackIn: [],
+            byContentType: { videos: [], podcasts: [], articles: [] },
+            customCollections: [],
+            sectionOrder: [],
+          });
+        }
+
+        return success({
+          recentBookmarks: libraryItems,
+          jumpBackIn: [libraryItems[1], libraryItems[2]],
+          byContentType: {
+            videos: libraryItems.filter((item) => item.contentType === ContentType.VIDEO),
+            podcasts: libraryItems.filter((item) => item.contentType === ContentType.PODCAST),
+            articles: libraryItems.filter((item) => item.contentType === ContentType.ARTICLE),
+          },
+          customCollections: [
+            {
+              collectionId: 'collection-1',
+              title: 'Design systems',
+              layout: 'STACK_RAIL',
+              position: 1,
+              count: 2,
+              items: [libraryItems[0], libraryItems[1]],
+            },
+          ],
+          sectionOrder: [],
+        });
+      }
+
+      if (procedure === 'items.inbox') {
+        if (mode === 'empty') {
+          return success({ items: [], nextCursor: null });
+        }
+
+        const input =
+          (inputs[index] as { filter?: { contentType?: ContentType } } | undefined) ?? {};
+        const filteredItems = input.filter?.contentType
+          ? inboxItems.filter((item) => item.contentType === input.filter?.contentType)
+          : inboxItems;
+
+        return success({ items: filteredItems, nextCursor: null });
+      }
+
       if (procedure === 'items.get') {
         const input = (inputs[index] as { id?: string } | undefined) ?? {};
         const item = libraryItems.find((candidate) => candidate.id === input.id);
@@ -193,6 +293,153 @@ export async function mockWebTrpc(page: Page, mode: MockMode = 'default') {
       if (procedure === 'creators.get') {
         const input = (inputs[index] as { creatorId?: keyof typeof creators } | undefined) ?? {};
         return success(input.creatorId ? (creators[input.creatorId] ?? null) : null);
+      }
+
+      if (procedure === 'search.query') {
+        const input = (inputs[index] as { query?: string } | undefined) ?? {};
+        const query = input.query?.trim().toLowerCase() ?? '';
+        const matchedItems = query
+          ? libraryItems.filter((item) =>
+              [item.title, item.creator, item.publisher]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase()
+                .includes(query)
+            )
+          : [];
+        const matchedPeople = query
+          ? people.filter((person) => person.displayName.toLowerCase().includes(query))
+          : [];
+        const creatorResults = query.includes('zine')
+          ? [
+              {
+                type: 'creator',
+                creatorId: 'creator-1',
+                name: 'Zine Editorial',
+                handle: 'zine-editorial',
+                imageUrl: null,
+                provider: Provider.YOUTUBE,
+                description: 'Hosted by Alice Example',
+                externalUrl: 'https://zine.example',
+                isSubscribed: true,
+                subscriptionId: 'subscription-1',
+                libraryItemCount: 2,
+                latestPublishedAt: '2025-02-18T09:45:00.000Z',
+              },
+            ]
+          : [];
+
+        return success({
+          query: input.query ?? '',
+          results: [
+            ...creatorResults,
+            ...matchedPeople.map((person) => ({
+              type: 'person',
+              personId: person.id,
+              displayName: person.displayName,
+              profileImageUrl: person.profileImageUrl,
+              itemCount: person.itemCount,
+              latestItemTitle: person.latestItemTitle,
+            })),
+            ...matchedItems.map((item) => ({ type: 'item', ...item })),
+          ],
+          sections: {
+            creators: creatorResults,
+            people: matchedPeople.map((person) => ({
+              type: 'person',
+              personId: person.id,
+              displayName: person.displayName,
+              profileImageUrl: person.profileImageUrl,
+              itemCount: person.itemCount,
+              latestItemTitle: person.latestItemTitle,
+            })),
+            items: matchedItems,
+          },
+          nextCursor: null,
+        });
+      }
+
+      if (procedure === 'people.list') {
+        return success({ people, nextCursor: null });
+      }
+
+      if (procedure === 'collections.list') {
+        return success({ collections });
+      }
+
+      if (procedure === 'subscriptions.list') {
+        return success({
+          items: [
+            {
+              id: 'subscription-1',
+              provider: Provider.YOUTUBE,
+              name: 'Zine Editorial',
+              status: 'ACTIVE',
+              imageUrl: null,
+            },
+            {
+              id: 'subscription-2',
+              provider: Provider.SPOTIFY,
+              name: 'Studio Dispatch',
+              status: 'ACTIVE',
+              imageUrl: null,
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+
+      if (procedure === 'subscriptions.newsletters.list') {
+        return success({
+          items: [
+            {
+              id: 'newsletter-1',
+              displayName: 'Interface Notes',
+              fromAddress: 'notes@example.com',
+              listId: 'interface-notes',
+              status: 'ACTIVE',
+              imageUrl: null,
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+
+      if (procedure === 'subscriptions.rss.list') {
+        return success({
+          items: [
+            {
+              id: 'rss-1',
+              title: 'Zine RSS',
+              feedUrl: 'https://zine.example/feed.xml',
+              siteUrl: 'https://zine.example',
+              status: 'ACTIVE',
+              imageUrl: null,
+            },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        });
+      }
+
+      if (procedure === 'subscriptions.xBookmarks.status') {
+        return success({
+          connected: true,
+          importedCount: 4,
+          connectionStatus: 'ACTIVE',
+        });
+      }
+
+      if (
+        procedure === 'items.bookmark' ||
+        procedure === 'items.archive' ||
+        procedure === 'items.unbookmark' ||
+        procedure === 'items.toggleFinished' ||
+        procedure === 'items.markOpened'
+      ) {
+        return success({ success: true });
       }
 
       return failure(`Unhandled mock procedure: ${procedure}`, procedure);

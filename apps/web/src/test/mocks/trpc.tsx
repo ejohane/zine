@@ -22,6 +22,22 @@ type ItemsLibraryInput = {
   };
 };
 
+type ItemsHomeInput =
+  | {
+      filter?: {
+        contentType?: ContentType;
+      };
+    }
+  | undefined;
+
+type ItemsInboxInput = {
+  limit: number;
+  cursor?: string;
+  filter: {
+    contentType?: ContentType;
+  };
+};
+
 type ItemsGetInput = {
   id: string;
 };
@@ -50,6 +66,11 @@ type DiscoverAvailableInput = {
 type NewslettersListInput = {
   status?: string;
   search?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+type SubscriptionsListInput = {
   limit?: number;
   cursor?: string;
 };
@@ -84,6 +105,7 @@ const sessionState: SessionState = {
 
 export const invalidateSpies = {
   itemsGetInvalidate: vi.fn(async () => undefined),
+  itemsInboxInvalidate: vi.fn(async () => undefined),
   itemsLibraryInvalidate: vi.fn(async () => undefined),
   itemsHomeInvalidate: vi.fn(async () => undefined),
   itemsListTagsInvalidate: vi.fn(async () => undefined),
@@ -99,6 +121,8 @@ export const invalidateSpies = {
 
 export const mutationSpies = {
   toggleFinished: vi.fn(async (_input: unknown) => undefined),
+  bookmark: vi.fn(async (_input: unknown) => undefined),
+  archive: vi.fn(async (_input: unknown) => undefined),
   unbookmark: vi.fn(async (_input: unknown) => undefined),
   setTags: vi.fn(async (_input: unknown) => undefined),
   markOpened: vi.fn(async (_input: unknown) => undefined),
@@ -114,6 +138,18 @@ export const mutationSpies = {
 };
 
 export const hookSpies = {
+  itemsHomeUseQuery: vi.fn<(input?: ItemsHomeInput) => QueryResult<unknown>>((_input) =>
+    createQueryResult({
+      recentBookmarks: [],
+      jumpBackIn: [],
+      byContentType: { videos: [], podcasts: [], articles: [] },
+      customCollections: [],
+      sectionOrder: [],
+    })
+  ),
+  itemsInboxUseQuery: vi.fn<(input: ItemsInboxInput) => QueryResult<unknown>>((_input) =>
+    createQueryResult({ items: [], nextCursor: null })
+  ),
   itemsLibraryUseQuery: vi.fn<(input: ItemsLibraryInput) => QueryResult<unknown>>((_input) =>
     createQueryResult({})
   ),
@@ -156,6 +192,23 @@ export const hookSpies = {
   markOpenedUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.markOpened, options)
   ),
+  bookmarkUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.bookmark, options)
+  ),
+  archiveUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.archive, options)
+  ),
+  searchQueryUseQuery: vi.fn<(input: unknown, options?: unknown) => QueryResult<unknown>>(
+    (_input) =>
+      createQueryResult({
+        results: [],
+        sections: { creators: [], people: [], items: [] },
+        nextCursor: null,
+      })
+  ),
+  peopleListUseQuery: vi.fn<(input: unknown) => QueryResult<unknown>>((_input) =>
+    createQueryResult({ people: [], nextCursor: null })
+  ),
   connectionsListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
     createQueryResult({
       YOUTUBE: null,
@@ -163,7 +216,7 @@ export const hookSpies = {
       GMAIL: null,
     })
   ),
-  subscriptionsListUseQuery: vi.fn<() => QueryResult<unknown>>(() =>
+  subscriptionsListUseQuery: vi.fn<(input?: SubscriptionsListInput) => QueryResult<unknown>>(() =>
     createQueryResult({ items: [], nextCursor: null, hasMore: false })
   ),
   discoverAvailableUseQuery: vi.fn<
@@ -233,6 +286,14 @@ export const hookSpies = {
   rssAddUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.rssAdd, options)
   ),
+  xBookmarksStatusUseQuery: vi.fn<(_input?: unknown, options?: unknown) => QueryResult<unknown>>(
+    () =>
+      createQueryResult({
+        connected: false,
+        importedCount: 0,
+        connectionStatus: null,
+      })
+  ),
 };
 
 function createQueryResult<T>(data?: T, overrides: Partial<QueryResult<T>> = {}): QueryResult<T> {
@@ -290,6 +351,8 @@ export function resetTrpcMocks() {
   });
 
   mutationSpies.toggleFinished.mockResolvedValue(undefined);
+  mutationSpies.bookmark.mockResolvedValue(undefined);
+  mutationSpies.archive.mockResolvedValue(undefined);
   mutationSpies.unbookmark.mockResolvedValue(undefined);
   mutationSpies.setTags.mockResolvedValue(undefined);
   mutationSpies.markOpened.mockResolvedValue(undefined);
@@ -302,6 +365,22 @@ export function resetTrpcMocks() {
     id: 'collection-1',
     name: 'Smart collection',
   });
+
+  hookSpies.itemsHomeUseQuery.mockReset();
+  hookSpies.itemsHomeUseQuery.mockImplementation((_input) =>
+    createQueryResult({
+      recentBookmarks: [],
+      jumpBackIn: [],
+      byContentType: { videos: [], podcasts: [], articles: [] },
+      customCollections: [],
+      sectionOrder: [],
+    })
+  );
+
+  hookSpies.itemsInboxUseQuery.mockReset();
+  hookSpies.itemsInboxUseQuery.mockImplementation((_input) =>
+    createQueryResult({ items: [], nextCursor: null })
+  );
 
   hookSpies.itemsLibraryUseQuery.mockReset();
   hookSpies.itemsLibraryUseQuery.mockImplementation((_input) => createQueryResult());
@@ -359,6 +438,30 @@ export function resetTrpcMocks() {
   hookSpies.markOpenedUseMutation.mockReset();
   hookSpies.markOpenedUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.markOpened, options)
+  );
+
+  hookSpies.bookmarkUseMutation.mockReset();
+  hookSpies.bookmarkUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.bookmark, options)
+  );
+
+  hookSpies.archiveUseMutation.mockReset();
+  hookSpies.archiveUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.archive, options)
+  );
+
+  hookSpies.searchQueryUseQuery.mockReset();
+  hookSpies.searchQueryUseQuery.mockImplementation((_input) =>
+    createQueryResult({
+      results: [],
+      sections: { creators: [], people: [], items: [] },
+      nextCursor: null,
+    })
+  );
+
+  hookSpies.peopleListUseQuery.mockReset();
+  hookSpies.peopleListUseQuery.mockImplementation((_input) =>
+    createQueryResult({ people: [], nextCursor: null })
   );
 
   hookSpies.connectionsListUseQuery.mockReset();
@@ -453,6 +556,15 @@ export function resetTrpcMocks() {
   hookSpies.rssAddUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.rssAdd, options)
   );
+
+  hookSpies.xBookmarksStatusUseQuery.mockReset();
+  hookSpies.xBookmarksStatusUseQuery.mockImplementation(() =>
+    createQueryResult({
+      connected: false,
+      importedCount: 0,
+      connectionStatus: null,
+    })
+  );
 }
 
 export function setAuthAvailability(nextState: Partial<typeof authAvailability>) {
@@ -467,6 +579,7 @@ export const trpc = {
   useUtils: () => ({
     items: {
       get: { invalidate: invalidateSpies.itemsGetInvalidate },
+      inbox: { invalidate: invalidateSpies.itemsInboxInvalidate },
       library: { invalidate: invalidateSpies.itemsLibraryInvalidate },
       home: { invalidate: invalidateSpies.itemsHomeInvalidate },
       listTags: { invalidate: invalidateSpies.itemsListTagsInvalidate },
@@ -493,6 +606,12 @@ export const trpc = {
     },
   }),
   items: {
+    home: {
+      useQuery: (input?: ItemsHomeInput) => hookSpies.itemsHomeUseQuery(input),
+    },
+    inbox: {
+      useQuery: (input: ItemsInboxInput) => hookSpies.itemsInboxUseQuery(input),
+    },
     library: {
       useQuery: (input: ItemsLibraryInput) => hookSpies.itemsLibraryUseQuery(input),
     },
@@ -519,6 +638,12 @@ export const trpc = {
     markOpened: {
       useMutation: (options?: MutationOptions) => hookSpies.markOpenedUseMutation(options),
     },
+    bookmark: {
+      useMutation: (options?: MutationOptions) => hookSpies.bookmarkUseMutation(options),
+    },
+    archive: {
+      useMutation: (options?: MutationOptions) => hookSpies.archiveUseMutation(options),
+    },
   },
   collections: {
     list: {
@@ -538,6 +663,17 @@ export const trpc = {
         hookSpies.creatorsGetUseQuery(input, options),
     },
   },
+  search: {
+    query: {
+      useQuery: (input: unknown, options?: unknown) =>
+        hookSpies.searchQueryUseQuery(input, options),
+    },
+  },
+  people: {
+    list: {
+      useQuery: (input: unknown) => hookSpies.peopleListUseQuery(input),
+    },
+  },
   bookmarks: {
     preview: {
       useQuery: (input: BookmarkPreviewInput, options?: unknown) =>
@@ -554,7 +690,7 @@ export const trpc = {
       },
     },
     list: {
-      useQuery: () => hookSpies.subscriptionsListUseQuery(),
+      useQuery: (input?: SubscriptionsListInput) => hookSpies.subscriptionsListUseQuery(input),
     },
     add: {
       useMutation: (options?: MutationOptions) => hookSpies.subscriptionAddUseMutation(options),
@@ -595,6 +731,12 @@ export const trpc = {
       },
       add: {
         useMutation: (options?: MutationOptions) => hookSpies.rssAddUseMutation(options),
+      },
+    },
+    xBookmarks: {
+      status: {
+        useQuery: (input?: unknown, options?: unknown) =>
+          hookSpies.xBookmarksStatusUseQuery(input, options),
       },
     },
   },

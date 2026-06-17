@@ -1,12 +1,15 @@
 import {
   Bookmark,
-  BookmarkCheck,
   CircleCheck,
   CirclePlus,
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  Home,
+  Inbox,
+  Library,
   Plus,
+  Search,
   Settings,
   Share,
 } from 'lucide-react';
@@ -22,7 +25,14 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { Link, NavLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  NavLink,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 
 import { Colors, ContentColors, ProviderColors, getButtonMetrics } from '@zine/design-system';
 import { CollectionSort, ContentType, Provider } from '@zine/shared';
@@ -35,6 +45,7 @@ import { FilterChip } from './components/ui/filter-chip';
 import { AppWordmark } from './app-wordmark';
 import {
   formatDuration,
+  formatDisplayText,
   formatPlainText,
   isValidUrl,
   mapContentType,
@@ -188,7 +199,7 @@ function serializeBookmarkFilter(value: ContentType | undefined): string | null 
 
 function buildBookmarksLocation(bookmarkId: string | null | undefined, search: string) {
   return {
-    pathname: bookmarkId ? `/bookmarks/${bookmarkId}` : '/bookmarks',
+    pathname: bookmarkId ? `/item/${bookmarkId}` : '/library/bookmarks',
     search,
   };
 }
@@ -553,6 +564,7 @@ function BookmarkDetailSkeleton() {
 export function BookmarksPage() {
   const utils = trpc.useUtils();
   const navigate = useNavigate();
+  const currentLocation = useLocation();
   const { bookmarkId } = useParams<{ bookmarkId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
@@ -637,6 +649,7 @@ export function BookmarksPage() {
   ]);
 
   const displayBookmark = selectedBookmarkDetailQuery.data ?? selectedBookmark;
+  const displayBookmarkTitle = displayBookmark ? formatDisplayText(displayBookmark.title) : '';
   trpc.items.getEnrichment.useQuery(
     { id: selectedBookmarkId ?? '' },
     { enabled: Boolean(selectedBookmarkId) }
@@ -822,11 +835,7 @@ export function BookmarksPage() {
           <div className="new-page-sidebar__rail">
             <div className="new-page-sidebar__rail-top">
               <div className="new-page-sidebar__rail-header">
-                <Link
-                  to={buildBookmarksLocation(null, bookmarkSearchString)}
-                  className="new-page-sidebar__brand"
-                  aria-label="Go to bookmarks"
-                >
+                <Link to="/home" className="new-page-sidebar__brand" aria-label="Go to home">
                   <div className="new-page-sidebar__brand-icon">
                     <AppWordmark compact />
                   </div>
@@ -835,7 +844,7 @@ export function BookmarksPage() {
 
               <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
                 <NavLink
-                  to={buildBookmarksLocation(null, bookmarkSearchString)}
+                  to="/home"
                   end
                   className={({ isActive }) =>
                     cn(
@@ -843,11 +852,55 @@ export function BookmarksPage() {
                       isActive && 'new-page-sidebar__rail-btn--active'
                     )
                   }
-                  aria-label="Bookmarks"
-                  title="Bookmarks"
+                  aria-label="Home"
+                  title="Home"
                 >
-                  <BookmarkCheck size={18} strokeWidth={2.15} />
-                  <span>Bookmarks</span>
+                  <Home size={18} strokeWidth={2.15} />
+                  <span>Home</span>
+                </NavLink>
+                <NavLink
+                  to="/inbox"
+                  className={({ isActive }) =>
+                    cn(
+                      'new-page-sidebar__rail-btn',
+                      isActive && 'new-page-sidebar__rail-btn--active'
+                    )
+                  }
+                  aria-label="Inbox"
+                  title="Inbox"
+                >
+                  <Inbox size={18} strokeWidth={2.15} />
+                  <span>Inbox</span>
+                </NavLink>
+                <NavLink
+                  to="/search"
+                  className={({ isActive }) =>
+                    cn(
+                      'new-page-sidebar__rail-btn',
+                      isActive && 'new-page-sidebar__rail-btn--active'
+                    )
+                  }
+                  aria-label="Search"
+                  title="Search"
+                >
+                  <Search size={18} strokeWidth={2.15} />
+                  <span>Search</span>
+                </NavLink>
+                <NavLink
+                  to="/library/bookmarks"
+                  className={() =>
+                    cn(
+                      'new-page-sidebar__rail-btn',
+                      (currentLocation.pathname.startsWith('/library') ||
+                        currentLocation.pathname.startsWith('/item/')) &&
+                        'new-page-sidebar__rail-btn--active'
+                    )
+                  }
+                  aria-label="Library"
+                  title="Library"
+                >
+                  <Library size={18} strokeWidth={2.15} />
+                  <span>Library</span>
                 </NavLink>
               </nav>
             </div>
@@ -887,7 +940,7 @@ export function BookmarksPage() {
                       Bookmarks
                     </Link>
                     <ChevronRight size={14} strokeWidth={2.2} />
-                    <strong className="new-page-breadcrumb__title">{displayBookmark.title}</strong>
+                    <strong className="new-page-breadcrumb__title">{displayBookmarkTitle}</strong>
                   </>
                 ) : (
                   <strong>Bookmarks</strong>
@@ -1052,7 +1105,7 @@ export function BookmarksPage() {
                         <div className="bookmark-row__cover bookmark-row__cover--empty" />
                       )}
                       <div className="bookmark-row__info">
-                        <span className="bookmark-row__title">{item.title}</span>
+                        <span className="bookmark-row__title">{formatDisplayText(item.title)}</span>
                         <div className="bookmark-row__author">
                           {item.creatorImageUrl ? (
                             <img
@@ -1156,7 +1209,7 @@ export function BookmarksPage() {
                         ) : null}
 
                         {!isPhonePostView ? (
-                          <h2 className="new-page-bookmark-view__title">{displayBookmark.title}</h2>
+                          <h2 className="new-page-bookmark-view__title">{displayBookmarkTitle}</h2>
                         ) : null}
                       </div>
                       <div className="new-page-bookmark-view__creator-block">
@@ -1204,7 +1257,7 @@ export function BookmarksPage() {
                             size="icon"
                             className="new-page-bookmark-view__icon-action"
                             style={detailActionButtonStyle}
-                            aria-label={`Remove bookmark for ${displayBookmark.title}`}
+                            aria-label={`Remove bookmark for ${displayBookmarkTitle}`}
                             title="Remove bookmark"
                             disabled={!selectedBookmarkId || unbookmarkMutation.isPending}
                             onClick={() => {
@@ -1234,8 +1287,8 @@ export function BookmarksPage() {
                             style={detailActionButtonStyle}
                             aria-label={
                               selectedBookmarkIsFinished
-                                ? `Mark ${displayBookmark.title} as unfinished`
-                                : `Mark ${displayBookmark.title} as finished`
+                                ? `Mark ${displayBookmarkTitle} as unfinished`
+                                : `Mark ${displayBookmarkTitle} as finished`
                             }
                             title={selectedBookmarkIsFinished ? 'Mark unfinished' : 'Mark finished'}
                             disabled={!selectedBookmarkId || toggleFinishedMutation.isPending}
@@ -1255,7 +1308,7 @@ export function BookmarksPage() {
                             size="icon"
                             className="new-page-bookmark-view__icon-action"
                             style={detailActionButtonStyle}
-                            aria-label={`Manage tags for ${displayBookmark.title}`}
+                            aria-label={`Manage tags for ${displayBookmarkTitle}`}
                             title="Manage tags"
                             disabled={!selectedBookmarkId}
                             onClick={() => setBookmarkTagsOpen(true)}
@@ -1268,7 +1321,7 @@ export function BookmarksPage() {
                             size="icon"
                             className="new-page-bookmark-view__icon-action"
                             style={detailActionButtonStyle}
-                            aria-label={`Share ${displayBookmark.title}`}
+                            aria-label={`Share ${displayBookmarkTitle}`}
                             title="Share"
                             disabled={!selectedBookmarkSourceUrl}
                             onClick={async () => {
@@ -1282,7 +1335,7 @@ export function BookmarksPage() {
                               ) {
                                 try {
                                   await navigator.share({
-                                    title: displayBookmark.title,
+                                    title: displayBookmarkTitle,
                                     url: selectedBookmarkSourceUrl,
                                   });
                                   return;
@@ -1307,7 +1360,7 @@ export function BookmarksPage() {
                             size="icon"
                             className="new-page-bookmark-view__icon-action"
                             style={detailActionButtonStyle}
-                            aria-label={`More actions for ${displayBookmark.title}`}
+                            aria-label={`More actions for ${displayBookmarkTitle}`}
                             title="More actions"
                           >
                             <Ellipsis size={BOOKMARK_ACTION_ICON_SIZE} strokeWidth={2.15} />
@@ -1374,11 +1427,11 @@ export function BookmarksPage() {
                               </div>
 
                               <p className="new-page-bookmark-view__post-text">
-                                {displayBookmark.title}
+                                {displayBookmarkTitle}
                               </p>
 
                               {bookmarkPlainSummary &&
-                              bookmarkPlainSummary !== displayBookmark.title ? (
+                              bookmarkPlainSummary !== displayBookmarkTitle ? (
                                 <p className="new-page-bookmark-view__post-text new-page-bookmark-view__post-text--secondary">
                                   {bookmarkPlainSummary}
                                 </p>

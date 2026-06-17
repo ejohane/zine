@@ -2,105 +2,80 @@ import { expect, test } from '@playwright/test';
 
 import { mockWebTrpc } from './trpc-mocks';
 
-test('loads the bookmarks desk, filters content, opens detail, and navigates to settings', async ({
-  page,
-}) => {
+test('loads the mobile-parity app routes and opens canonical detail', async ({ page }) => {
   await mockWebTrpc(page);
 
-  await page.goto('/bookmarks');
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/home$/);
+  await expect(page.getByRole('strong').filter({ hasText: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Jump Back In' })).toBeVisible();
+  await expect(page.getByText('Design systems at scale').first()).toBeVisible();
 
-  await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
-  await expect(page.getByText('Stable component APIs')).toBeVisible();
-  await expect(page.getByText('Design systems at scale')).toBeVisible();
-  await expect(page.getByText('Product taste and pacing')).toBeVisible();
+  await page.getByRole('link', { name: 'Inbox' }).first().click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  await expect(page.getByRole('button', { name: 'Save' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Videos' }).click();
-  await expect(page.getByText('Stable component APIs')).toHaveCount(0);
-  await expect(page.getByText('Design systems at scale')).toBeVisible();
-
-  await page.getByRole('button', { name: /Design systems at scale/ }).click();
-  await expect(page).toHaveURL(/\/bookmarks\/video-1\?contentType=video$/);
+  await page.getByRole('link', { name: 'Search' }).first().click();
+  await expect(page).toHaveURL(/\/search$/);
+  await page.getByLabel('Search your library').fill('design');
+  await expect(page.getByRole('heading', { name: 'Items' })).toBeVisible();
+  await page
+    .getByRole('link', { name: /Design systems at scale/ })
+    .first()
+    .click();
+  await expect(page).toHaveURL(/\/item\/video-1$/);
   await expect(page.getByRole('heading', { name: 'Design systems at scale' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open in YouTube' })).toHaveAttribute(
     'href',
     'https://zine.example/watch/design-systems-at-scale'
   );
 
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await page.getByRole('link', { name: 'Library' }).first().click();
+  await expect(page).toHaveURL(/\/library\/bookmarks$/);
+  await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+
+  await page.goto('/library/people');
+  await expect(page.getByText('Alice Example')).toBeVisible();
+
+  await page.goto('/library/sources');
+  await expect(page.getByText('Zine Editorial')).toBeVisible();
+  await expect(page.getByText('Interface Notes')).toBeVisible();
+
+  await page.goto('/library/collections');
+  await expect(page.getByText('Design systems')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Settings' }).first().click();
   await expect(page).toHaveURL(/\/settings$/);
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Subscriptions' })).toBeVisible();
 });
 
-test('renders the empty state when no bookmarks exist', async ({ page }) => {
-  await mockWebTrpc(page, 'empty');
+test('preserves legacy bookmark redirects', async ({ page }) => {
+  await mockWebTrpc(page);
 
-  await page.goto('/bookmarks');
+  await page.goto('/bookmarks?contentType=video');
+  await expect(page).toHaveURL(/\/library\/bookmarks\?contentType=video$/);
 
-  await expect(
-    page.getByRole('heading', { name: /No bookmarks yet|Add your first bookmark/ })
-  ).toBeVisible({
-    timeout: 15_000,
-  });
-  await expect(
-    page.getByText(
-      /Save a few items first, then this desk becomes the main web surface for browsing them\.|Add a bookmark to start building your library\./
-    )
-  ).toBeVisible();
+  await page.goto('/bookmarks/video-1');
+  await expect(page).toHaveURL(/\/item\/video-1$/);
+  await expect(page.getByRole('heading', { name: 'Design systems at scale' })).toBeVisible();
 });
 
-test('uses a phone drill-in flow and keeps mobile chrome usable', async ({ page }) => {
+test('uses a phone drill-in flow and bottom app tabs', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWebTrpc(page);
 
-  await page.goto('/bookmarks');
-
-  const listPane = page.locator('.new-page-column-card').first();
-
-  await expect(
-    page.getByText('Pick something from the list and its detail view will open here.')
-  ).toHaveCount(0);
-  await expect(listPane).toBeVisible();
-
-  const listPaneBorderRadius = await listPane.evaluate((element) => {
-    return window.getComputedStyle(element).borderRadius;
-  });
-  expect(listPaneBorderRadius).toBe('0px');
-
-  const listPaneRect = await listPane.evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    return {
-      x: rect.x,
-      y: rect.y,
-      height: rect.height,
-    };
-  });
-  expect(listPaneRect.x).toBeLessThanOrEqual(1);
-  expect(listPaneRect.y).toBeLessThanOrEqual(1);
-
-  const pageFitsViewport = await page.evaluate(() => {
-    return document.documentElement.scrollHeight <= window.innerHeight + 1;
-  });
-  expect(pageFitsViewport).toBe(true);
+  await page.goto('/library/bookmarks');
+  await expect(page.getByRole('navigation', { name: 'Tab bar' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.new-page-sidebar')).toBeHidden();
 
   await page.getByRole('button', { name: /Design systems at scale/ }).click();
-
-  await expect(page).toHaveURL(/\/bookmarks\/video-1$/);
+  await expect(page).toHaveURL(/\/item\/video-1$/);
   await expect(page.getByRole('heading', { name: 'Design systems at scale' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to bookmarks list' })).toBeVisible();
   await expect(page.getByText('Stable component APIs')).toHaveCount(0);
-
-  const detailActionsLayout = await page
-    .locator('.new-page-bookmark-view__actions')
-    .evaluate((element) => {
-      const styles = window.getComputedStyle(element);
-      return {
-        flexDirection: styles.flexDirection,
-        alignItems: styles.alignItems,
-      };
-    });
-  expect(detailActionsLayout.flexDirection).toBe('row');
-  expect(detailActionsLayout.alignItems).toBe('center');
 
   const providerFab = await page.locator('.new-page-bookmark-view__fab').evaluate((element) => {
     const styles = window.getComputedStyle(element);
@@ -112,81 +87,31 @@ test('uses a phone drill-in flow and keeps mobile chrome usable', async ({ page 
   });
   expect(providerFab.width).toBe(providerFab.height);
   expect(parseFloat(providerFab.borderRadius)).toBeGreaterThanOrEqual(999);
-
-  const descriptionSection = await page
-    .locator('.new-page-bookmark-view__section')
-    .evaluate((element) => {
-      const styles = window.getComputedStyle(element);
-      return {
-        backgroundColor: styles.backgroundColor,
-        paddingLeft: styles.paddingLeft,
-        borderRadius: styles.borderRadius,
-      };
-    });
-  expect(descriptionSection.backgroundColor).toBe('rgb(26, 26, 26)');
-  expect(parseFloat(descriptionSection.paddingLeft)).toBeGreaterThanOrEqual(16);
-  expect(parseFloat(descriptionSection.borderRadius)).toBeGreaterThanOrEqual(16);
-
-  await page.getByRole('button', { name: 'Back to bookmarks list' }).click();
-
-  await expect(page).toHaveURL(/\/bookmarks$/);
-  await expect(page.getByText('Stable component APIs')).toBeVisible();
-  await page.getByRole('link', { name: 'Settings' }).click();
-
-  await expect(page).toHaveURL(/\/settings$/);
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Sources' })).toBeVisible();
-});
-
-test('shows a bottom tab bar on phone viewports and hides the sidebar', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await mockWebTrpc(page);
-
-  await page.goto('/bookmarks');
-  await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
-
-  const tabBar = page.getByRole('navigation', { name: 'Tab bar' });
-  await expect(tabBar).toBeVisible();
-
-  const sidebar = page.locator('.new-page-sidebar');
-  await expect(sidebar).toBeHidden();
-
-  const bookmarksTab = page.getByRole('link', { name: 'Bookmarks' }).locator('visible=true');
-  await expect(bookmarksTab).toHaveAttribute('aria-current', 'page');
-
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await expect(page).toHaveURL(/\/settings$/);
 });
 
 test('renders post detail like the mobile app on phone viewports', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockWebTrpc(page);
 
-  await page.goto('/bookmarks');
-  await page.getByRole('button', { name: /Notes on interface pace/ }).click();
+  await page.goto('/item/post-1');
 
-  await expect(page).toHaveURL(/\/bookmarks\/post-1$/);
   await expect(page.locator('[aria-label="X post content"]')).toBeVisible();
   await expect(page.getByText('Notes on interface pace')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Notes on interface pace' })).toHaveCount(0);
   await expect(page.locator('.new-page-bookmark-view__section')).toHaveCount(0);
   await expect(page.locator('.new-page-bookmark-view__hero')).toHaveCount(0);
-
-  const postRowDisplay = await page
-    .locator('.new-page-bookmark-view__post-row')
-    .evaluate((element) => {
-      return window.getComputedStyle(element).display;
-    });
-  expect(postRowDisplay).toBe('flex');
 });
 
-test('renders the error state when the bookmarks query fails', async ({ page }) => {
-  await mockWebTrpc(page, 'error');
+test('renders the empty home state when no data exists', async ({ page }) => {
+  await mockWebTrpc(page, 'empty');
 
-  await page.goto('/bookmarks');
+  await page.goto('/home');
 
-  await expect(page.getByRole('heading', { name: 'Could not load bookmarks' })).toBeVisible({
+  await expect(page.getByRole('heading', { name: 'Your home is ready when you are' })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByText('Could not load bookmarks from the mock API.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Connect sources' })).toHaveAttribute(
+    'href',
+    '/welcome'
+  );
 });

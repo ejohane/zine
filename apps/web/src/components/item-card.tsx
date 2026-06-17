@@ -6,6 +6,7 @@ import type { ContentType, Provider } from '@zine/shared';
 
 import {
   formatDuration,
+  formatDisplayText,
   formatPlainText,
   formatRelativeDate,
   mapContentType,
@@ -152,32 +153,38 @@ export function ItemCardView({
   item,
   actionSlot,
   shape = 'row',
+  href,
 }: {
   item: ItemCardData;
   actionSlot?: ReactNode;
   shape?: ItemCardShape;
+  href?: string;
 }) {
   const sourceLabel = item.canonicalUrl
     ? new URL(item.canonicalUrl).hostname.replace(/^www\./, '')
     : 'original source';
-  const summary =
-    formatPlainText(item.summary) ?? item.creator ?? item.publisher ?? 'Untitled source';
+  const plainSummary = formatPlainText(item.summary);
+  const summary = plainSummary ?? item.creator ?? item.publisher ?? 'Untitled source';
+  const title = formatDisplayText(item.title);
   const creatorLabel = item.creator || item.publisher || 'Unknown creator';
-  const href = '/bookmarks';
+  const itemHref = href ?? `/item/${item.id}`;
   const inlineLengthLabel = getLengthLabel(item);
   const relativeLabel = getRelativeLabel(item);
+  const featureDescription =
+    plainSummary && plainSummary !== title && plainSummary !== creatorLabel
+      ? plainSummary
+      : sourceLabel;
 
   if (shape === 'feature') {
     return (
-      <Link to={href} className="group block">
-        <Surface className="overflow-hidden transition-transform duration-150 group-hover:-translate-y-0.5">
-          <div className="grid min-h-[104px] grid-cols-[92px_minmax(0,1fr)] sm:grid-cols-[104px_minmax(0,1fr)]">
-            <div className="bg-[var(--surface-raised)]">
+      <Link to={itemHref} className="group block h-full">
+        <Surface className="item-card-feature overflow-hidden transition-transform duration-150 group-hover:-translate-y-0.5">
+          <div className="item-card-feature__layout">
+            <div className="item-card-feature__media bg-[var(--surface-raised)]">
               <MediaThumb item={item} />
             </div>
-            <div className="flex min-w-0 flex-col justify-between p-4">
-              <div className="grid gap-2">
-                <ItemMetaRow item={item} />
+            <div className="flex min-w-0 flex-col justify-start gap-2 p-4">
+              <div className="grid min-w-0 gap-1.5">
                 <p
                   className="m-0 line-clamp-2 text-foreground"
                   style={{
@@ -185,20 +192,28 @@ export function ItemCardView({
                     letterSpacing: '-0.03em',
                   }}
                 >
-                  {item.title}
+                  {title}
                 </p>
+                <div
+                  className="flex min-w-0 items-center gap-2 text-[var(--text-subheader)]"
+                  style={typographyStyle(Typography.bodySmall)}
+                >
+                  <IdentityMark item={item} />
+                  <span className="truncate">{creatorLabel}</span>
+                  {inlineLengthLabel ? (
+                    <span className="shrink-0 text-[var(--text-tertiary)]">&bull;</span>
+                  ) : null}
+                  {inlineLengthLabel ? <span className="shrink-0">{inlineLengthLabel}</span> : null}
+                </div>
               </div>
-
-              <div
-                className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[var(--text-subheader)]"
-                style={typographyStyle(Typography.bodySmall)}
-              >
-                <span className="truncate">{creatorLabel}</span>
-                {inlineLengthLabel ? (
-                  <span className="text-[var(--text-tertiary)]">&bull;</span>
-                ) : null}
-                {inlineLengthLabel ? <span>{inlineLengthLabel}</span> : null}
-              </div>
+              {featureDescription ? (
+                <p
+                  className="m-0 line-clamp-2 text-[var(--text-subheader)]"
+                  style={typographyStyle(Typography.bodySmall)}
+                >
+                  {featureDescription}
+                </p>
+              ) : null}
             </div>
           </div>
         </Surface>
@@ -208,7 +223,7 @@ export function ItemCardView({
 
   if (shape === 'stack') {
     return (
-      <Link to={href} className="group block min-w-0 h-full">
+      <Link to={itemHref} className="group block min-w-0 h-full">
         <Surface className="flex h-full min-h-[272px] flex-col overflow-hidden transition-transform duration-150 group-hover:-translate-y-1">
           <div className="aspect-[1.1/0.86] bg-[var(--surface-raised)]">
             <MediaThumb item={item} />
@@ -223,7 +238,7 @@ export function ItemCardView({
                   letterSpacing: '-0.04em',
                 }}
               >
-                {item.title}
+                {title}
               </p>
               <p
                 className="m-0 line-clamp-2 text-[var(--text-subheader)]"
@@ -274,9 +289,9 @@ export function ItemCardView({
                   ...typographyStyle(Typography.titleMedium),
                   letterSpacing: '-0.03em',
                 }}
-                to={href}
+                to={itemHref}
               >
-                {item.title}
+                {title}
               </Link>
               <p
                 className="m-0 line-clamp-2 text-[var(--text-subheader)]"

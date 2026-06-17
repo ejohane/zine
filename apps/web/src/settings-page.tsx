@@ -1,11 +1,14 @@
 import {
-  BookmarkCheck,
   ChevronRight,
+  Home,
+  Inbox,
+  Library,
   LogOut,
   Mail,
   Newspaper,
   Podcast,
   Rss,
+  Search,
   Settings,
   Sparkles,
   Video,
@@ -199,11 +202,7 @@ export function SettingsPage() {
         <div className="new-page-sidebar__rail">
           <div className="new-page-sidebar__rail-top">
             <div className="new-page-sidebar__rail-header">
-              <Link
-                to="/bookmarks"
-                className="new-page-sidebar__brand"
-                aria-label="Go to bookmarks"
-              >
+              <Link to="/home" className="new-page-sidebar__brand" aria-label="Go to home">
                 <div className="new-page-sidebar__brand-icon">
                   <AppWordmark compact />
                 </div>
@@ -212,16 +211,49 @@ export function SettingsPage() {
 
             <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
               <NavLink
-                to="/bookmarks"
+                to="/home"
                 end
                 className={({ isActive }) =>
                   cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
                 }
-                aria-label="Bookmarks"
-                title="Bookmarks"
+                aria-label="Home"
+                title="Home"
               >
-                <BookmarkCheck size={18} strokeWidth={2.15} />
-                <span>Bookmarks</span>
+                <Home size={18} strokeWidth={2.15} />
+                <span>Home</span>
+              </NavLink>
+              <NavLink
+                to="/inbox"
+                className={({ isActive }) =>
+                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
+                }
+                aria-label="Inbox"
+                title="Inbox"
+              >
+                <Inbox size={18} strokeWidth={2.15} />
+                <span>Inbox</span>
+              </NavLink>
+              <NavLink
+                to="/search"
+                className={({ isActive }) =>
+                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
+                }
+                aria-label="Search"
+                title="Search"
+              >
+                <Search size={18} strokeWidth={2.15} />
+                <span>Search</span>
+              </NavLink>
+              <NavLink
+                to="/library/bookmarks"
+                className={({ isActive }) =>
+                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
+                }
+                aria-label="Library"
+                title="Library"
+              >
+                <Library size={18} strokeWidth={2.15} />
+                <span>Library</span>
               </NavLink>
             </nav>
           </div>

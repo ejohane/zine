@@ -70,13 +70,16 @@ describe('SettingsPage', () => {
     }));
   });
 
-  test('renders the bookmarks shell with a settings breadcrumb and a single card', () => {
+  test('renders the app shell with a settings breadcrumb and a single card', () => {
     const { container } = renderRoute(<SettingsPage />, {
       route: '/settings',
       path: '/settings',
     });
 
-    expect(screen.getByRole('link', { name: 'Bookmarks' })).toHaveAttribute('href', '/bookmarks');
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute(
+      'href',
+      '/library/bookmarks'
+    );
     expect(screen.getByRole('link', { name: 'Settings' })).toHaveClass(
       'new-page-sidebar__rail-btn--active'
     );

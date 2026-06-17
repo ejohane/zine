@@ -355,7 +355,7 @@ describe('BookmarksPage', () => {
     renderRoute(<BookmarksPage />, {
       route: '/bookmarks/missing-bookmark',
       path: '/bookmarks/:bookmarkId',
-      redirects: [{ path: '/bookmarks', element: <div>Bookmarks fallback</div> }],
+      redirects: [{ path: '/library/bookmarks', element: <div>Bookmarks fallback</div> }],
     });
 
     expect(await screen.findByText('Bookmarks fallback')).toBeVisible();
@@ -606,8 +606,19 @@ describe('BookmarksPage', () => {
         <LocationProbe />
       </>,
       {
-        route: '/bookmarks',
-        path: '/bookmarks/:bookmarkId?',
+        route: '/library/bookmarks',
+        path: '/library/bookmarks',
+        redirects: [
+          {
+            path: '/item/:bookmarkId',
+            element: (
+              <>
+                <BookmarksPage />
+                <LocationProbe />
+              </>
+            ),
+          },
+        ],
       }
     );
 
@@ -622,7 +633,7 @@ describe('BookmarksPage', () => {
     await user.click(screen.getByRole('button', { name: /Design systems at scale/ }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks/video-1');
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/item/video-1');
     });
 
     expect(screen.getByRole('heading', { name: videoItem.title })).toBeVisible();
@@ -632,7 +643,7 @@ describe('BookmarksPage', () => {
     await user.click(screen.getByRole('button', { name: 'Back to bookmarks list' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks');
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/library/bookmarks');
     });
 
     expect(screen.getByText(articleItem.title)).toBeVisible();
@@ -650,8 +661,19 @@ describe('BookmarksPage', () => {
         <LocationProbe />
       </>,
       {
-        route: `/bookmarks/${videoItem.id}`,
-        path: '/bookmarks/:bookmarkId?',
+        route: `/item/${videoItem.id}`,
+        path: '/item/:bookmarkId',
+        redirects: [
+          {
+            path: '/library/bookmarks',
+            element: (
+              <>
+                <BookmarksPage />
+                <LocationProbe />
+              </>
+            ),
+          },
+        ],
       }
     );
 
@@ -664,7 +686,7 @@ describe('BookmarksPage', () => {
     await user.click(selectedBookmarkCard as HTMLElement);
 
     await waitFor(() => {
-      expect(screen.getByTestId('location-path')).toHaveTextContent('/bookmarks');
+      expect(screen.getByTestId('location-path')).toHaveTextContent('/library/bookmarks');
     });
 
     expect(selectedBookmarkCard).toHaveAttribute('aria-pressed', 'false');
@@ -676,18 +698,18 @@ describe('BookmarksPage', () => {
     setViewportWidth(390);
 
     const view = renderRoute(<BookmarksPage />, {
-      route: '/bookmarks',
-      path: '/bookmarks/:bookmarkId?',
+      route: '/library/bookmarks',
+      path: '/library/bookmarks',
     });
 
     const tabBar = screen.getByRole('navigation', { name: 'Tab bar' });
     expect(tabBar).toBeInTheDocument();
 
-    expect(screen.getByRole('link', { name: 'Bookmarks' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Library' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument();
 
-    const bookmarksTab = screen.getByRole('link', { name: 'Bookmarks' });
-    expect(bookmarksTab).toHaveAttribute('aria-current', 'page');
+    const libraryTab = screen.getByRole('link', { name: 'Library' });
+    expect(libraryTab).toHaveAttribute('aria-current', 'page');
     expect(document.documentElement).toHaveClass('mobile-bookmarks-scroll-lock');
     expect(document.body).toHaveClass('mobile-bookmarks-scroll-lock');
 

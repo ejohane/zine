@@ -1,7 +1,8 @@
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
 import { AuthPage } from './auth-page';
 import { BookmarksPage } from './bookmarks-page';
+import { HomePage, InboxPage, LibraryPage, SearchPage } from './mobile-parity-pages';
 import { OAuthCallbackPage } from './oauth-callback-page';
 import { PwaProvider } from './lib/pwa';
 import { ProtectedRoute } from './protected-route';
@@ -9,14 +10,15 @@ import { PwaSupport } from './pwa-support';
 import { SettingsPage } from './settings-page';
 import { WelcomePage } from './welcome-page';
 
-function LegacyItemRedirect() {
+function LegacyBookmarksRedirect({ detail = false }: { detail?: boolean }) {
   const { bookmarkId } = useParams<{ bookmarkId: string }>();
+  const location = useLocation();
 
-  if (!bookmarkId) {
-    return <Navigate to="/bookmarks" replace />;
+  if (detail) {
+    return <Navigate to={`/item/${bookmarkId ?? ''}${location.search}`} replace />;
   }
 
-  return <Navigate to={`/bookmarks/${bookmarkId}`} replace />;
+  return <Navigate to={`/library/bookmarks${location.search}`} replace />;
 }
 
 export default function App() {
@@ -35,7 +37,31 @@ export default function App() {
             }
           />
           <Route
-            path="/bookmarks"
+            path="/home"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inbox"
+            element={
+              <ProtectedRoute>
+                <InboxPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/search"
+            element={
+              <ProtectedRoute>
+                <SearchPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/library/bookmarks"
             element={
               <ProtectedRoute>
                 <BookmarksPage />
@@ -43,7 +69,31 @@ export default function App() {
             }
           />
           <Route
-            path="/bookmarks/:bookmarkId"
+            path="/library/people"
+            element={
+              <ProtectedRoute>
+                <LibraryPage object="people" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/library/sources"
+            element={
+              <ProtectedRoute>
+                <LibraryPage object="sources" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/library/collections"
+            element={
+              <ProtectedRoute>
+                <LibraryPage object="collections" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/item/:bookmarkId"
             element={
               <ProtectedRoute>
                 <BookmarksPage />
@@ -66,9 +116,10 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/item/:bookmarkId" element={<LegacyItemRedirect />} />
-          <Route path="/" element={<Navigate to="/bookmarks" replace />} />
-          <Route path="*" element={<Navigate to="/bookmarks" replace />} />
+          <Route path="/bookmarks" element={<LegacyBookmarksRedirect />} />
+          <Route path="/bookmarks/:bookmarkId" element={<LegacyBookmarksRedirect detail />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
         <PwaSupport />
       </PwaProvider>
