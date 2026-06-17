@@ -1,4 +1,4 @@
-import { BookmarkCheck, Settings } from 'lucide-react';
+import { BookmarkCheck, Home, Inbox, Search, Settings } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 import { cn } from '../components';
@@ -14,14 +14,44 @@ export function MobileTabBar() {
   return (
     <nav className="mobile-tab-bar" aria-label="Tab bar">
       <NavLink
-        to="/bookmarks"
+        to="/home"
         className={({ isActive }) =>
           cn('mobile-tab-bar__tab', isActive && 'mobile-tab-bar__tab--active')
         }
-        aria-label="Bookmarks"
+        aria-label="Home"
+      >
+        <Home size={20} strokeWidth={2} />
+        <span className="mobile-tab-bar__label">Home</span>
+      </NavLink>
+      <NavLink
+        to="/inbox"
+        className={({ isActive }) =>
+          cn('mobile-tab-bar__tab', isActive && 'mobile-tab-bar__tab--active')
+        }
+        aria-label="Inbox"
+      >
+        <Inbox size={20} strokeWidth={2} />
+        <span className="mobile-tab-bar__label">Inbox</span>
+      </NavLink>
+      <NavLink
+        to="/search"
+        className={({ isActive }) =>
+          cn('mobile-tab-bar__tab', isActive && 'mobile-tab-bar__tab--active')
+        }
+        aria-label="Search"
+      >
+        <Search size={20} strokeWidth={2} />
+        <span className="mobile-tab-bar__label">Search</span>
+      </NavLink>
+      <NavLink
+        to="/library/bookmarks"
+        className={({ isActive }) =>
+          cn('mobile-tab-bar__tab', isActive && 'mobile-tab-bar__tab--active')
+        }
+        aria-label="Library"
       >
         <BookmarkCheck size={20} strokeWidth={2} />
-        <span className="mobile-tab-bar__label">Bookmarks</span>
+        <span className="mobile-tab-bar__label">Library</span>
       </NavLink>
       <NavLink
         to="/settings"

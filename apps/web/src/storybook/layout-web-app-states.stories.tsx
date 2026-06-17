@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import {
-  BookmarkCheck,
   ChevronRight,
+  Home,
+  Inbox,
+  Library,
   LogOut,
   Newspaper,
+  Search,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -51,12 +54,12 @@ function AuthStateReference() {
         <p className="eyebrow">Web channel</p>
         <h1>A single calm place for everything you bookmarked.</h1>
         <p>
-          The browser surface stays focused on saved items first: scan the shelf, open one in
-          context, and get back to the original source without losing your place.
+          The browser surface now mirrors the mobile rhythm: home, inbox, search, library, and
+          detail surfaces keep the same reading semantics across screen sizes.
         </p>
         <div className="auth-hero__grid">
-          <StatCard label="Surface" value="1" detail="Bookmarks only" />
-          <StatCard label="Route" value="/bookmarks" detail="The default signed-in landing page" />
+          <StatCard label="Tabs" value="4" detail="Home, Inbox, Search, Library" />
+          <StatCard label="Route" value="/home" detail="The signed-in landing page" />
         </div>
       </section>
       <section className="auth-panel">
@@ -65,7 +68,8 @@ function AuthStateReference() {
           <p style={accessibleEyebrowStyle}>Sign in</p>
           <h2>Continue where you left off.</h2>
           <p>
-            Clerk handles the browser auth step, then drops you directly onto the bookmarks desk.
+            Clerk handles the browser auth step, then drops you directly onto the mobile-parity web
+            shell.
           </p>
           <div className="button-row">
             <Button>Continue with Clerk</Button>
@@ -91,8 +95,21 @@ function BookmarkSelectionReference() {
               </div>
             </div>
             <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
+              <div className="new-page-sidebar__rail-btn">
+                <Home size={18} strokeWidth={2.15} />
+                <span>Home</span>
+              </div>
+              <div className="new-page-sidebar__rail-btn">
+                <Inbox size={18} strokeWidth={2.15} />
+                <span>Inbox</span>
+              </div>
+              <div className="new-page-sidebar__rail-btn">
+                <Search size={18} strokeWidth={2.15} />
+                <span>Search</span>
+              </div>
               <div className="new-page-sidebar__rail-btn new-page-sidebar__rail-btn--active">
-                <span>Bookmarks</span>
+                <Library size={18} strokeWidth={2.15} />
+                <span>Library</span>
               </div>
             </nav>
           </div>
@@ -224,7 +241,7 @@ function BookmarkEmptyReference() {
     <main className="new-page-screen">
       <EmptyState
         title="No bookmarks yet"
-        message="Save a few items first, then this desk becomes the main web surface for browsing them."
+        message="Save a few items first, then Home and Library become the main web surfaces for browsing them."
       />
     </main>
   );
@@ -237,11 +254,7 @@ function SettingsReference() {
         <div className="new-page-sidebar__rail">
           <div className="new-page-sidebar__rail-top">
             <div className="new-page-sidebar__rail-header">
-              <Link
-                to="/bookmarks"
-                className="new-page-sidebar__brand"
-                aria-label="Go to bookmarks"
-              >
+              <Link to="/home" className="new-page-sidebar__brand" aria-label="Go to home">
                 <div className="new-page-sidebar__brand-icon">
                   <AppWordmark compact />
                 </div>
@@ -249,9 +262,25 @@ function SettingsReference() {
             </div>
 
             <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
-              <Link to="/bookmarks" className="new-page-sidebar__rail-btn" aria-label="Bookmarks">
-                <BookmarkCheck size={18} strokeWidth={2.15} />
-                <span>Bookmarks</span>
+              <Link to="/home" className="new-page-sidebar__rail-btn" aria-label="Home">
+                <Home size={18} strokeWidth={2.15} />
+                <span>Home</span>
+              </Link>
+              <Link to="/inbox" className="new-page-sidebar__rail-btn" aria-label="Inbox">
+                <Inbox size={18} strokeWidth={2.15} />
+                <span>Inbox</span>
+              </Link>
+              <Link to="/search" className="new-page-sidebar__rail-btn" aria-label="Search">
+                <Search size={18} strokeWidth={2.15} />
+                <span>Search</span>
+              </Link>
+              <Link
+                to="/library/bookmarks"
+                className="new-page-sidebar__rail-btn"
+                aria-label="Library"
+              >
+                <Library size={18} strokeWidth={2.15} />
+                <span>Library</span>
               </Link>
             </nav>
           </div>

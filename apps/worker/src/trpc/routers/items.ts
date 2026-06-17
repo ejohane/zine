@@ -129,11 +129,13 @@ type HomeItemView = Pick<
   | 'id'
   | 'title'
   | 'thumbnailUrl'
+  | 'canonicalUrl'
   | 'contentType'
   | 'provider'
   | 'creator'
   | 'creatorImageUrl'
   | 'publisher'
+  | 'summary'
   | 'duration'
   | 'readingTimeMinutes'
   | 'lastOpenedAt'
@@ -391,11 +393,13 @@ function toHomeItemViews(
       id: itemView.id,
       title: itemView.title,
       thumbnailUrl: itemView.thumbnailUrl,
+      canonicalUrl: itemView.canonicalUrl,
       contentType: itemView.contentType,
       provider: itemView.provider,
       creator: itemView.creator,
       creatorImageUrl: itemView.creatorImageUrl,
       publisher: itemView.publisher,
+      summary: itemView.summary,
       duration: itemView.duration,
       readingTimeMinutes: itemView.readingTimeMinutes,
       lastOpenedAt: itemView.lastOpenedAt,

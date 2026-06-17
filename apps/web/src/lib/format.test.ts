@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  formatDisplayText,
   formatDuration,
   formatEstimatedMinutes,
   formatPlainText,
@@ -15,6 +16,11 @@ describe('format utilities', () => {
         '<style>body{}</style><script>alert(1)</script><p>Hello&nbsp;<strong>world</strong> &amp; friends</p>'
       )
     ).toBe('Hello world & friends');
+  });
+
+  test('formats display text without leaking markup or entities', () => {
+    expect(formatDisplayText('Joy &amp; Curiosity #89')).toBe('Joy & Curiosity #89');
+    expect(formatDisplayText('<span></span>', 'Fallback')).toBe('Fallback');
   });
 
   test('formats durations across minute and hour boundaries', () => {

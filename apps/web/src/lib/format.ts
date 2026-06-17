@@ -36,6 +36,10 @@ export function formatPlainText(value?: string | null) {
   return plainText.length > 0 ? plainText : null;
 }
 
+export function formatDisplayText(value?: string | null, fallback = 'Untitled') {
+  return formatPlainText(value) ?? fallback;
+}
+
 export function formatDuration(seconds?: number | null): string | undefined {
   return formatDurationTimestamp(seconds);
 }
