@@ -65,6 +65,9 @@ const HOME_PODCASTS_VISIBLE_LIMIT = 5;
 const HOME_TOP_THRESHOLD = 4;
 const NAVIGATION_PANE_WIDTH = 304;
 const NAVIGATION_PANE_ANIMATION_MS = 220;
+const HOME_HEADER_SETTINGS_BUTTON_SIZE = 36;
+const HOME_HEADER_SETTINGS_AREA_WIDTH = 44;
+const HOME_HEADER_FILTER_MIN_WIDTH = 180;
 
 type BuiltInHomeSectionKey =
   | 'jump-back-in'
@@ -207,7 +210,10 @@ export default function HomeScreen() {
   const [isNavigationPaneOpen, setNavigationPaneOpen] = useState(false);
   const featuredGridItemWidth = getFeaturedGridItemWidth(windowWidth - Spacing.md * 2, Spacing.md);
   const headerContentWidth = Math.max(windowWidth - Spacing.md * 2, 240);
-  const headerFilterWidth = Math.max(headerContentWidth - 38, 180);
+  const headerFilterWidth = Math.max(
+    headerContentWidth - HOME_HEADER_SETTINGS_AREA_WIDTH,
+    HOME_HEADER_FILTER_MIN_WIDTH
+  );
   const headerFadeEndColor =
     (colorScheme as string | null | undefined) === 'light'
       ? 'rgba(255, 255, 255, 0)'
@@ -1023,15 +1029,16 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   settingsButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: HOME_HEADER_SETTINGS_BUTTON_SIZE,
+    height: HOME_HEADER_SETTINGS_BUTTON_SIZE,
+    borderRadius: HOME_HEADER_SETTINGS_BUTTON_SIZE / 2,
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0,
     shadowOpacity: 0,
     elevation: 0,
+    zIndex: 2,
   },
   settingsAlertDot: {
     position: 'absolute',
@@ -1047,8 +1054,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerSettingsArea: {
-    width: 38,
-    height: 36,
+    width: HOME_HEADER_SETTINGS_AREA_WIDTH,
+    height: HOME_HEADER_SETTINGS_BUTTON_SIZE,
     position: 'relative',
     zIndex: 2,
   },
@@ -1056,13 +1063,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
-    left: 28,
-    width: 30,
+    left: HOME_HEADER_SETTINGS_BUTTON_SIZE,
+    width: HOME_HEADER_SETTINGS_AREA_WIDTH - HOME_HEADER_SETTINGS_BUTTON_SIZE,
     zIndex: 1,
   },
   headerFilterScroll: {
     flexGrow: 0,
-    marginLeft: Spacing.xs,
   },
   headerFilterContainer: {
     gap: Spacing.sm,

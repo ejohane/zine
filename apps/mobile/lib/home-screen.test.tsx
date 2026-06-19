@@ -444,6 +444,35 @@ describe('HomeScreen', () => {
     );
   });
 
+  it('reserves header space so filter chips cannot cover the home settings button', () => {
+    let renderer: Renderer;
+    act(() => {
+      renderer = TestRenderer.create(<HomeScreen />);
+    });
+
+    const settingsButton = renderer!.root.findByProps({
+      accessibilityLabel: 'Open navigation menu',
+    });
+    const settingsAreaStyle = settingsButton.parent?.props.style;
+    const settingsButtonStyle = Array.isArray(settingsButton.props.style)
+      ? settingsButton.props.style
+      : [settingsButton.props.style];
+    const filterScroll = renderer!.root.find(
+      (node: TestNode) => node.type === 'scroll-view' && node.props.horizontal === true
+    );
+    const filterScrollStyle = Array.isArray(filterScroll.props.style)
+      ? filterScroll.props.style
+      : [filterScroll.props.style];
+
+    expect(settingsAreaStyle).toEqual(expect.objectContaining({ width: 44 }));
+    expect(settingsButtonStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: 36 })])
+    );
+    expect(filterScrollStyle).toEqual(
+      expect.arrayContaining([expect.objectContaining({ width: 322 })])
+    );
+  });
+
   it('shows an alert dot on the settings button when an integration is disconnected', () => {
     mockSubscriptionsData = {
       items: [{ provider: 'YOUTUBE', status: 'DISCONNECTED' }],
