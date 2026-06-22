@@ -359,6 +359,50 @@ describe('link-preview', () => {
         expect(result!.source).toBe('fxtwitter');
       });
 
+      it('rounds fractional FxTwitter video durations to whole seconds', async () => {
+        mockFetchFxTwitterByUrl.mockResolvedValue({
+          code: 200,
+          message: 'OK',
+          tweet: {
+            id: '2068396380327170238',
+            url: 'https://x.com/Baconbrix/status/2068396380327170238',
+            text: 'New in serve-sim',
+            created_at: 'Sat Jun 20 18:11:40 +0000 2026',
+            created_timestamp: 1781979100,
+            author: {
+              name: 'Evan Bacon',
+              screen_name: 'Baconbrix',
+              avatar_url: 'https://pbs.twimg.com/profile_images/avatar.jpg',
+            },
+            likes: 804,
+            retweets: 45,
+            replies: 33,
+            views: 52513,
+            lang: 'en',
+            source: 'Twitter Web App',
+            media: {
+              videos: [
+                {
+                  url: 'https://video.twimg.com/amplify_video/video.mp4',
+                  thumbnail_url: 'https://pbs.twimg.com/amplify_video_thumb/thumb.jpg',
+                  width: 1712,
+                  height: 1080,
+                  duration: 15.232,
+                },
+              ],
+            },
+          },
+        });
+
+        const result = await fetchLinkPreview(
+          'https://x.com/Baconbrix/status/2068396380327170238?s=20'
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.duration).toBe(15);
+        expect(result!.thumbnailUrl).toBe('https://pbs.twimg.com/amplify_video_thumb/thumb.jpg');
+      });
+
       it('uses article metadata when a link-only tweet has empty text', async () => {
         mockFetchFxTwitterByUrl.mockResolvedValue({
           code: 200,

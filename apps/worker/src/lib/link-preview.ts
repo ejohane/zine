@@ -504,6 +504,14 @@ function getTweetTitle(tweet: FxTwitterTweet, creator: string): string {
   return `Post by ${creator}`;
 }
 
+function normalizeDurationSeconds(duration: number | null | undefined): number | null {
+  if (typeof duration !== 'number' || !Number.isFinite(duration)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round(duration));
+}
+
 /**
  * Map FxTwitter response to LinkPreviewResult
  * If the tweet has no attached media but contains external URLs,
@@ -575,7 +583,7 @@ async function mapFxTwitterToPreview(
   const publishedAt = new Date(tweet.created_timestamp * 1000).toISOString();
 
   // Get video duration if available
-  const duration = tweet.media?.videos?.[0]?.duration ?? null;
+  const duration = normalizeDurationSeconds(tweet.media?.videos?.[0]?.duration);
 
   return {
     provider: parsedLink.provider,
