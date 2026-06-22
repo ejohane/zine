@@ -59,6 +59,28 @@ type BookmarkPreviewInput = {
   url: string;
 };
 
+type ApiTokenScope = 'bookmarks:read' | 'bookmarks:write';
+
+type ApiTokenSummary = {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: ApiTokenScope[];
+  createdAt: number;
+  lastUsedAt: number | null;
+  expiresAt: number | null;
+  revokedAt: number | null;
+};
+
+type ApiTokensCreateInput = {
+  name: string;
+  scopes: ApiTokenScope[];
+};
+
+type ApiTokensRevokeInput = {
+  id: string;
+};
+
 type DiscoverAvailableInput = {
   provider: string;
 };
@@ -117,6 +139,7 @@ export const invalidateSpies = {
   rssListInvalidate: vi.fn(async () => undefined),
   rssStatsInvalidate: vi.fn(async () => undefined),
   collectionsListInvalidate: vi.fn(async () => undefined),
+  apiTokensListInvalidate: vi.fn(async () => undefined),
 };
 
 export const mutationSpies = {
@@ -135,6 +158,20 @@ export const mutationSpies = {
     id: 'collection-1',
     name: 'Smart collection',
   })),
+  apiTokensCreate: vi.fn(async (_input: ApiTokensCreateInput) => ({
+    token: {
+      id: 'token-2',
+      name: 'Codex on MacBook',
+      tokenPrefix: 'zine_pat_created',
+      scopes: ['bookmarks:read', 'bookmarks:write'] as ApiTokenScope[],
+      createdAt: Date.now(),
+      lastUsedAt: null,
+      expiresAt: null,
+      revokedAt: null,
+    },
+    rawToken: 'zine_pat_created_raw_token',
+  })),
+  apiTokensRevoke: vi.fn(async (_input: ApiTokensRevokeInput) => ({ success: true })),
 };
 
 export const hookSpies = {
@@ -173,6 +210,15 @@ export const hookSpies = {
   >((_input) => createQueryResult({ items: [] })),
   collectionsCreateUseMutation: vi.fn((options?: MutationOptions) =>
     createMutationResult(mutationSpies.collectionsCreate, options)
+  ),
+  apiTokensListUseQuery: vi.fn<() => QueryResult<{ tokens: ApiTokenSummary[] }>>(() =>
+    createQueryResult({ tokens: [] })
+  ),
+  apiTokensCreateUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.apiTokensCreate, options)
+  ),
+  apiTokensRevokeUseMutation: vi.fn((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.apiTokensRevoke, options)
   ),
   bookmarksPreviewUseQuery: vi.fn<
     (input: BookmarkPreviewInput, options?: unknown) => QueryResult<unknown>
@@ -365,6 +411,20 @@ export function resetTrpcMocks() {
     id: 'collection-1',
     name: 'Smart collection',
   });
+  mutationSpies.apiTokensCreate.mockResolvedValue({
+    token: {
+      id: 'token-2',
+      name: 'Codex on MacBook',
+      tokenPrefix: 'zine_pat_created',
+      scopes: ['bookmarks:read', 'bookmarks:write'],
+      createdAt: Date.now(),
+      lastUsedAt: null,
+      expiresAt: null,
+      revokedAt: null,
+    },
+    rawToken: 'zine_pat_created_raw_token',
+  });
+  mutationSpies.apiTokensRevoke.mockResolvedValue({ success: true });
 
   hookSpies.itemsHomeUseQuery.mockReset();
   hookSpies.itemsHomeUseQuery.mockImplementation((_input) =>
@@ -410,6 +470,19 @@ export function resetTrpcMocks() {
   hookSpies.collectionsCreateUseMutation.mockReset();
   hookSpies.collectionsCreateUseMutation.mockImplementation((options?: MutationOptions) =>
     createMutationResult(mutationSpies.collectionsCreate, options)
+  );
+
+  hookSpies.apiTokensListUseQuery.mockReset();
+  hookSpies.apiTokensListUseQuery.mockImplementation(() => createQueryResult({ tokens: [] }));
+
+  hookSpies.apiTokensCreateUseMutation.mockReset();
+  hookSpies.apiTokensCreateUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.apiTokensCreate, options)
+  );
+
+  hookSpies.apiTokensRevokeUseMutation.mockReset();
+  hookSpies.apiTokensRevokeUseMutation.mockImplementation((options?: MutationOptions) =>
+    createMutationResult(mutationSpies.apiTokensRevoke, options)
   );
 
   hookSpies.bookmarksPreviewUseQuery.mockReset();
@@ -587,6 +660,9 @@ export const trpc = {
     collections: {
       list: { invalidate: invalidateSpies.collectionsListInvalidate },
     },
+    apiTokens: {
+      list: { invalidate: invalidateSpies.apiTokensListInvalidate },
+    },
     subscriptions: {
       connections: {
         list: { invalidate: invalidateSpies.subscriptionsConnectionsInvalidate },
@@ -655,6 +731,17 @@ export const trpc = {
     },
     create: {
       useMutation: (options?: MutationOptions) => hookSpies.collectionsCreateUseMutation(options),
+    },
+  },
+  apiTokens: {
+    list: {
+      useQuery: () => hookSpies.apiTokensListUseQuery(),
+    },
+    create: {
+      useMutation: (options?: MutationOptions) => hookSpies.apiTokensCreateUseMutation(options),
+    },
+    revoke: {
+      useMutation: (options?: MutationOptions) => hookSpies.apiTokensRevokeUseMutation(options),
     },
   },
   creators: {

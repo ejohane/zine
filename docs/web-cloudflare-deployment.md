@@ -61,6 +61,21 @@ Required Cloudflare Worker secrets or vars:
 - `OAUTH_REDIRECT_URI`: Recommended only if you want the backend to force a single canonical callback origin. The web app derives its callback from the current origin, so this is not required when serving both `https://www.myzine.app` and `https://myzine.app` directly.
 - `CLERK_JWKS_URL`: Set this if you are not using the default `https://clerk.myzine.app/.well-known/jwks.json`.
 
+Personal access tokens are managed by signed-in users from Web Settings. No
+Worker secret is required for the `/api/v1` bookmark API.
+
+Personal API examples:
+
+```bash
+curl -H "Authorization: Bearer $ZINE_PAT" \
+  "https://api.myzine.app/api/v1/bookmarks?limit=10"
+
+curl -X POST "https://api.myzine.app/api/v1/bookmarks" \
+  -H "Authorization: Bearer $ZINE_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://example.com/article"}'
+```
+
 Cloudflare production resources that must already exist and match `apps/worker/wrangler.toml`:
 
 - Production D1 database

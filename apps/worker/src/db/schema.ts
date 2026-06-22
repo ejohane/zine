@@ -11,6 +11,32 @@ export const users = sqliteTable('users', {
   updatedAt: text('updated_at').notNull(), // ISO8601 (legacy)
 });
 
+// Personal access tokens
+// Stores only token hashes. Raw tokens are shown once at creation time.
+// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(), // ULID
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    tokenPrefix: text('token_prefix').notNull(),
+    scopesJson: text('scopes_json').notNull(),
+    createdAt: integer('created_at').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    expiresAt: integer('expires_at'),
+    revokedAt: integer('revoked_at'),
+  },
+  (table) => [
+    uniqueIndex('api_tokens_token_hash_idx').on(table.tokenHash),
+    index('api_tokens_user_created_idx').on(table.userId, table.createdAt),
+    index('api_tokens_user_revoked_idx').on(table.userId, table.revokedAt),
+  ]
+);
+
 // Items (Canonical Content)
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.

@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  Copy,
   Home,
   Inbox,
   Library,
@@ -11,9 +12,11 @@ import {
   Search,
   Settings,
   Sparkles,
+  Trash2,
   Video,
   type LucideIcon,
 } from 'lucide-react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 
 import { AppWordmark } from './app-wordmark';
@@ -191,6 +194,171 @@ function InstallAppSection({
   );
 }
 
+type ApiTokenScope = 'bookmarks:read' | 'bookmarks:write';
+
+function formatTimestamp(value: number | null | undefined): string {
+  if (!value) {
+    return 'Never';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value));
+}
+
+function ApiTokensSection() {
+  const utils = trpc.useUtils();
+  const tokensQuery = trpc.apiTokens.list.useQuery();
+  const [name, setName] = useState('');
+  const [readEnabled, setReadEnabled] = useState(true);
+  const [writeEnabled, setWriteEnabled] = useState(true);
+  const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const selectedScopes = useMemo(() => {
+    const scopes: ApiTokenScope[] = [];
+    if (readEnabled) scopes.push('bookmarks:read');
+    if (writeEnabled) scopes.push('bookmarks:write');
+    return scopes;
+  }, [readEnabled, writeEnabled]);
+
+  const createToken = trpc.apiTokens.create.useMutation({
+    onSuccess: (result) => {
+      setCreatedToken(result.rawToken);
+      setCopied(false);
+      setName('');
+      void utils.apiTokens.list.invalidate();
+    },
+  });
+
+  const revokeToken = trpc.apiTokens.revoke.useMutation({
+    onSuccess: () => {
+      void utils.apiTokens.list.invalidate();
+    },
+  });
+
+  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (selectedScopes.length === 0) {
+      return;
+    }
+
+    await createToken.mutateAsync({
+      name: name.trim(),
+      scopes: selectedScopes,
+    });
+  };
+
+  const handleCopy = async () => {
+    if (!createdToken || !navigator.clipboard) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(createdToken);
+    setCopied(true);
+  };
+
+  const tokens = tokensQuery.data?.tokens ?? [];
+
+  return (
+    <div className="settings-page__section api-tokens-section">
+      <div className="group-panel__header">
+        <div>
+          <h2 className="settings-page__section-title">API tokens</h2>
+        </div>
+      </div>
+
+      {createdToken ? (
+        <div className="api-token-reveal" role="status">
+          <code>{createdToken}</code>
+          <Button type="button" tone="ghost" onClick={handleCopy}>
+            <Copy size={16} aria-hidden="true" />
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        </div>
+      ) : null}
+
+      <form className="api-token-form" onSubmit={(event) => void handleCreate(event)}>
+        <label className="api-token-form__field">
+          <span>Name</span>
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Codex on MacBook"
+            maxLength={80}
+            required
+          />
+        </label>
+
+        <div className="api-token-form__scopes" aria-label="Token scopes">
+          <label>
+            <input
+              type="checkbox"
+              checked={readEnabled}
+              onChange={(event) => setReadEnabled(event.target.checked)}
+            />
+            Read bookmarks
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={writeEnabled}
+              onChange={(event) => setWriteEnabled(event.target.checked)}
+            />
+            Add bookmarks
+          </label>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={
+            createToken.isPending || name.trim().length === 0 || selectedScopes.length === 0
+          }
+        >
+          Create token
+        </Button>
+      </form>
+
+      <div className="api-token-list">
+        {tokens.length === 0 ? (
+          <p className="api-token-list__empty">No tokens yet.</p>
+        ) : (
+          tokens.map((token) => (
+            <div key={token.id} className="api-token-row">
+              <div>
+                <strong>{token.name}</strong>
+                <span>{token.tokenPrefix}...</span>
+              </div>
+              <div className="api-token-row__meta">
+                <span>{token.scopes.join(', ')}</span>
+                <span>Created {formatTimestamp(token.createdAt)}</span>
+                <span>Last used {formatTimestamp(token.lastUsedAt)}</span>
+              </div>
+              {token.revokedAt ? (
+                <Badge tone="danger">revoked</Badge>
+              ) : (
+                <Button
+                  type="button"
+                  tone="danger"
+                  variant="ghost"
+                  onClick={() => revokeToken.mutate({ id: token.id })}
+                  disabled={revokeToken.isPending}
+                  aria-label={`Revoke ${token.name}`}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                  Revoke
+                </Button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const { mode } = useAuthAvailability();
   const { signOut } = useAppSession();
@@ -314,6 +482,7 @@ export function SettingsPage() {
 
               <div className="settings-page__content">
                 <SourcesSection />
+                <ApiTokensSection />
                 <InstallAppSection
                   installAvailability={installAvailability}
                   promptInstall={promptInstall}

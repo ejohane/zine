@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -7,7 +7,14 @@ import { renderRoute } from './test/render-router';
 vi.mock('./lib/trpc', () => import('./test/mocks/trpc'));
 
 import { SettingsPage } from './settings-page';
-import { hookSpies, resetTrpcMocks, setAuthAvailability, setSessionState } from './test/mocks/trpc';
+import {
+  hookSpies,
+  invalidateSpies,
+  mutationSpies,
+  resetTrpcMocks,
+  setAuthAvailability,
+  setSessionState,
+} from './test/mocks/trpc';
 
 describe('SettingsPage', () => {
   beforeEach(() => {
@@ -176,6 +183,113 @@ describe('SettingsPage', () => {
       await user.click(within(nav).getByRole('button', { name: 'Sign out' }));
 
       expect(signOut).toHaveBeenCalledWith({ redirectUrl: '/sign-in' });
+    });
+
+    test('shows API tokens in settings', () => {
+      hookSpies.apiTokensListUseQuery.mockImplementation(() => ({
+        data: {
+          tokens: [
+            {
+              id: 'token-1',
+              name: 'Codex on MacBook',
+              tokenPrefix: 'zine_pat_abcd1234',
+              scopes: ['bookmarks:read', 'bookmarks:write'],
+              createdAt: Date.UTC(2026, 5, 1),
+              lastUsedAt: Date.UTC(2026, 5, 2),
+              expiresAt: null,
+              revokedAt: null,
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      }));
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      expect(screen.getByRole('heading', { name: 'API tokens' })).toBeVisible();
+      expect(screen.getByText('Codex on MacBook')).toBeVisible();
+      expect(screen.getByText('zine_pat_abcd1234...')).toBeVisible();
+      expect(screen.getByText('bookmarks:read, bookmarks:write')).toBeVisible();
+    });
+
+    test('creates an API token and shows the raw token once', async () => {
+      const user = userEvent.setup();
+      const writeText = vi.fn(async () => undefined);
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText },
+      });
+
+      mutationSpies.apiTokensCreate.mockResolvedValue({
+        token: {
+          id: 'token-2',
+          name: 'Codex on MacBook',
+          tokenPrefix: 'zine_pat_created',
+          scopes: ['bookmarks:read', 'bookmarks:write'],
+          createdAt: Date.now(),
+          lastUsedAt: null,
+          expiresAt: null,
+          revokedAt: null,
+        },
+        rawToken: 'zine_pat_created_raw_token',
+      });
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      await user.type(screen.getByLabelText('Name'), 'Codex on MacBook');
+      await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+      expect(await screen.findByText('zine_pat_created_raw_token')).toBeVisible();
+      expect(mutationSpies.apiTokensCreate).toHaveBeenCalledWith({
+        name: 'Codex on MacBook',
+        scopes: ['bookmarks:read', 'bookmarks:write'],
+      });
+      expect(invalidateSpies.apiTokensListInvalidate).toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: 'Copy' }));
+      expect(writeText).toHaveBeenCalledWith('zine_pat_created_raw_token');
+      expect(screen.getByRole('button', { name: 'Copied' })).toBeVisible();
+    });
+
+    test('revokes an API token', async () => {
+      const user = userEvent.setup();
+      hookSpies.apiTokensListUseQuery.mockImplementation(() => ({
+        data: {
+          tokens: [
+            {
+              id: 'token-1',
+              name: 'Codex on MacBook',
+              tokenPrefix: 'zine_pat_abcd1234',
+              scopes: ['bookmarks:read'],
+              createdAt: Date.UTC(2026, 5, 1),
+              lastUsedAt: null,
+              expiresAt: null,
+              revokedAt: null,
+            },
+          ],
+        },
+        isLoading: false,
+        error: null,
+      }));
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      await user.click(screen.getByRole('button', { name: 'Revoke Codex on MacBook' }));
+
+      await waitFor(() => {
+        expect(mutationSpies.apiTokensRevoke).toHaveBeenCalledWith({ id: 'token-1' });
+      });
+      expect(invalidateSpies.apiTokensListInvalidate).toHaveBeenCalled();
     });
   });
 });
