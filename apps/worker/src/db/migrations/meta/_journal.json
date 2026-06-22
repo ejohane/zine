@@ -127,6 +127,13 @@
       "when": 1780876800000,
       "tag": "0017_reclassify_substack_newsletters",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782172800000,
+      "tag": "0018_add_api_tokens",
+      "breakpoints": true
     }
   ]
 }

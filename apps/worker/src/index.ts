@@ -28,6 +28,7 @@ import { resolveCorsOrigin } from './lib/cors';
 import { createWorkerRequestTelemetry, getWorkerRelease } from './lib/telemetry';
 import { authMiddleware } from './middleware/auth';
 import authRoutes from './routes/auth';
+import apiV1Routes from './routes/api-v1';
 import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
 import { getDependencyHealth, getQueueHealth } from './diagnostics/health';
@@ -164,6 +165,7 @@ app.get('/health/queues', async (c) => {
 
 // Mount auth routes first (webhook endpoint handles its own auth via Svix)
 app.route('/api/auth', authRoutes);
+app.route('/api/v1', apiV1Routes);
 
 app.post('/admin/enrichment/backfill', async (c) => {
   const configuredSecret = c.env.ENRICHMENT_BACKFILL_SECRET;
