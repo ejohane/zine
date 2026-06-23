@@ -64,6 +64,7 @@ import {
   useArchiveItem,
   useToggleFinished,
 } from './use-items-trpc';
+import { LIVE_INBOX_REFETCH_INTERVAL_MS } from '@/constants/query';
 
 function createMockItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -444,6 +445,9 @@ describe('useItems list queries', () => {
     const callArgs = mockInboxUseQuery.mock.calls[0][1];
     expect(callArgs.placeholderData).toBeDefined();
     expect(typeof callArgs.placeholderData).toBe('function');
+    expect(callArgs.refetchInterval).toBe(LIVE_INBOX_REFETCH_INTERVAL_MS);
+    expect(callArgs.refetchOnMount).toBe('always');
+    expect(callArgs.staleTime).toBe(0);
   });
 
   it('uses placeholderData for library items', () => {
@@ -494,6 +498,9 @@ describe('useItems list queries', () => {
       expect.objectContaining({
         getNextPageParam: expect.any(Function),
         placeholderData: expect.any(Function),
+        refetchInterval: LIVE_INBOX_REFETCH_INTERVAL_MS,
+        refetchOnMount: 'always',
+        staleTime: 0,
       })
     );
 

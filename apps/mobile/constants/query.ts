@@ -17,6 +17,12 @@
 export const FIVE_MINUTES_MS = 5 * 60 * 1000;
 
 /**
+ * 15 seconds in milliseconds.
+ * Used by inbox queries so newly synced feed items appear without tab navigation.
+ */
+export const LIVE_INBOX_REFETCH_INTERVAL_MS = 15 * 1000;
+
+/**
  * 24 hours in milliseconds.
  * Used as default gcTime (garbage collection time) for queries.
  *
