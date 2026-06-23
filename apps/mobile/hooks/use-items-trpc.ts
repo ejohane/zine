@@ -7,6 +7,7 @@
 import { keepPreviousData } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { trpc } from '@/lib/trpc';
+import { LIVE_INBOX_REFETCH_INTERVAL_MS } from '@/constants/query';
 import { ContentType, Provider, UserItemState } from '@zine/shared';
 import {
   buildHomeItemsInput,
@@ -361,6 +362,9 @@ function buildLibraryItemsInput(options?: LibraryItemsOptions) {
 export function useInboxItems(options?: InboxItemsOptions) {
   return trpc.items.inbox.useQuery(buildInboxItemsInput(options), {
     placeholderData: keepPreviousData,
+    refetchInterval: LIVE_INBOX_REFETCH_INTERVAL_MS,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 }
 
@@ -368,6 +372,9 @@ export function useInfiniteInboxItems(options?: InboxItemsOptions) {
   return trpc.items.inbox.useInfiniteQuery(buildInboxItemsInput(options) ?? {}, {
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     placeholderData: keepPreviousData,
+    refetchInterval: LIVE_INBOX_REFETCH_INTERVAL_MS,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 }
 
