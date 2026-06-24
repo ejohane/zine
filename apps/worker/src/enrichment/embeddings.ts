@@ -16,16 +16,6 @@ type WorkersAIRun = {
   run(model: string, input: unknown): Promise<unknown>;
 };
 
-type VectorizeUpsert = {
-  upsert(
-    vectors: Array<{
-      id: string;
-      values: number[];
-      metadata?: Record<string, unknown>;
-    }>
-  ): Promise<unknown>;
-};
-
 function getEmbeddingModel(env: Bindings): string {
   return env.EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
 }
@@ -70,13 +60,38 @@ export function buildVectorId(input: Pick<EmbeddingUpsertInput, 'itemId' | 'user
     : `item:${input.itemId}`;
 }
 
+export function buildVectorMetadata(
+  input: Pick<
+    EmbeddingUpsertInput,
+    'itemId' | 'userId' | 'provider' | 'contentType' | 'primaryCategory'
+  >,
+  visibility: VectorVisibility
+): NonNullable<VectorizeVector['metadata']> {
+  const metadata: NonNullable<VectorizeVector['metadata']> = {
+    itemId: input.itemId,
+    provider: input.provider,
+    contentType: input.contentType,
+    visibility,
+  };
+
+  if (visibility === 'user') {
+    metadata.userId = input.userId;
+  }
+
+  if (input.primaryCategory) {
+    metadata.primaryCategory = input.primaryCategory;
+  }
+
+  return metadata;
+}
+
 export async function upsertItemEmbedding(
   db: Database,
   env: Bindings,
   input: EmbeddingUpsertInput
 ): Promise<void> {
   const ai = env.AI as unknown as WorkersAIRun | undefined;
-  const index = env.ITEM_VECTORS as unknown as VectorizeUpsert | undefined;
+  const index = env.ITEM_VECTORS;
 
   if (!ai) {
     throw new Error('Workers AI binding is not configured');
@@ -101,14 +116,7 @@ export async function upsertItemEmbedding(
     {
       id: vectorId,
       values: embedding,
-      metadata: {
-        itemId: input.itemId,
-        userId: visibility === 'user' ? input.userId : null,
-        provider: input.provider,
-        contentType: input.contentType,
-        primaryCategory: input.primaryCategory,
-        visibility,
-      },
+      metadata: buildVectorMetadata(input, visibility),
     },
   ]);
 
