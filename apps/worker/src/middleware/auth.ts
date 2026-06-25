@@ -34,6 +34,8 @@ interface AuthErrorResponse {
   requestId: string;
 }
 
+const AUTH_ERROR_CODE_HEADER = 'X-Zine-Auth-Error';
+
 /**
  * Create a structured auth error response
  */
@@ -83,6 +85,11 @@ export function authMiddleware(): MiddlewareHandler<Env> {
   return async (c, next) => {
     const requestId = c.get('requestId') || 'unknown';
 
+    const authError = (message: string, code: string, status: 401 | 403) => {
+      c.header(AUTH_ERROR_CODE_HEADER, code);
+      return c.json(createAuthError(message, code, requestId), status);
+    };
+
     // Development bypass: use mock user ID when no auth is configured
     if (shouldUseDevelopmentAuthBypass(c.env)) {
       // Ensure dev user exists in database (only once per process)
@@ -114,28 +121,18 @@ export function authMiddleware(): MiddlewareHandler<Env> {
 
     // Check for Authorization header
     if (!authHeader) {
-      return c.json(
-        createAuthError('Authorization header is required', 'MISSING_AUTH_HEADER', requestId),
-        401
-      );
+      return authError('Authorization header is required', 'MISSING_AUTH_HEADER', 401);
     }
 
     // Check for Bearer token format
     if (!authHeader.startsWith('Bearer ')) {
-      return c.json(
-        createAuthError(
-          'Authorization header must use Bearer scheme',
-          'INVALID_AUTH_SCHEME',
-          requestId
-        ),
-        401
-      );
+      return authError('Authorization header must use Bearer scheme', 'INVALID_AUTH_SCHEME', 401);
     }
 
     const token = authHeader.slice(7); // Remove "Bearer " prefix
 
     if (!token) {
-      return c.json(createAuthError('Bearer token is empty', 'EMPTY_TOKEN', requestId), 401);
+      return authError('Bearer token is empty', 'EMPTY_TOKEN', 401);
     }
 
     // Get JWKS URL from environment or use default
@@ -149,7 +146,7 @@ export function authMiddleware(): MiddlewareHandler<Env> {
       const statusCode =
         result.code === 'EXPIRED_TOKEN' || result.code === 'INVALID_TOKEN' ? 403 : 401;
 
-      return c.json(createAuthError(result.error, result.code, requestId), statusCode);
+      return authError(result.error, result.code, statusCode);
     }
 
     // Set userId in context for downstream handlers

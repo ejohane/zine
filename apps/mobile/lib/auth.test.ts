@@ -19,6 +19,9 @@ import { authLogger } from './logger';
 
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockAuthLogger = authLogger as jest.Mocked<typeof authLogger>;
+const secureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
 
 // Store original env value
 const originalClerkKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -45,7 +48,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
       const result = await tokenCache.getToken('clerk-token-key');
 
       expect(result).toBe('test-token-value');
-      expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('clerk-token-key');
+      expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith(
+        'clerk-token-key',
+        secureStoreOptions
+      );
     });
 
     it('returns null when token does not exist', async () => {
@@ -54,7 +60,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
       const result = await tokenCache.getToken('non-existent-key');
 
       expect(result).toBeNull();
-      expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith('non-existent-key');
+      expect(mockSecureStore.getItemAsync).toHaveBeenCalledWith(
+        'non-existent-key',
+        secureStoreOptions
+      );
     });
 
     it('logs debug message on successful retrieval', async () => {
@@ -86,7 +95,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
       expect(mockAuthLogger.error).toHaveBeenCalledWith('SecureStore getToken error', {
         error: secureStoreError,
       });
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('corrupted-key');
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
+        'corrupted-key',
+        secureStoreOptions
+      );
     });
   });
 
@@ -98,7 +110,8 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
 
       expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
         'clerk-token-key',
-        'new-token-value'
+        'new-token-value',
+        secureStoreOptions
       );
     });
 
@@ -135,7 +148,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
 
       await tokenCache.clearToken('clerk-token-key');
 
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('clerk-token-key');
+      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
+        'clerk-token-key',
+        secureStoreOptions
+      );
     });
 
     it('logs debug message on clear', async () => {

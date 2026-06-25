@@ -55,6 +55,9 @@ export function notifyQueueProcessed(): void {
  * This must match the key used by Clerk's tokenCache.
  */
 const CLERK_SESSION_TOKEN_KEY = '__clerk_client_jwt';
+const secureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
 
 /**
  * Get authentication headers for tRPC requests outside of React context.
@@ -67,7 +70,7 @@ const CLERK_SESSION_TOKEN_KEY = '__clerk_client_jwt';
  */
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
-    const token = await SecureStore.getItemAsync(CLERK_SESSION_TOKEN_KEY);
+    const token = await SecureStore.getItemAsync(CLERK_SESSION_TOKEN_KEY, secureStoreOptions);
     if (token) {
       return { Authorization: `Bearer ${token}` };
     }
