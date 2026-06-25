@@ -76,6 +76,7 @@ jest.mock('expo-router/react-navigation', () => ({
 
 // Mock expo-secure-store
 jest.mock('expo-secure-store', () => ({
+  AFTER_FIRST_UNLOCK: 'AFTER_FIRST_UNLOCK',
   getItemAsync: jest.fn(() => Promise.resolve(null)),
   setItemAsync: jest.fn(() => Promise.resolve()),
   deleteItemAsync: jest.fn(() => Promise.resolve()),

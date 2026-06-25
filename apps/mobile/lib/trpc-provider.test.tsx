@@ -30,7 +30,6 @@ type PersistOptions = {
 
 let mockUserId = 'user-123';
 const mockGetToken = jest.fn();
-const mockSignOut = jest.fn(async () => undefined);
 const mockUseAuthAvailability = jest.fn(() => ({ isEnabled: true }));
 let latestPersistOptions: PersistOptions | null = null;
 const mockRemoveClient = jest.fn(async () => undefined);
@@ -103,9 +102,6 @@ jest.mock('@clerk/clerk-expo', () => ({
     isSignedIn: true,
     userId: mockUserId,
   }),
-  useClerk: () => ({
-    signOut: mockSignOut,
-  }),
 }));
 
 jest.mock('@/lib/oauth', () => ({
@@ -139,7 +135,6 @@ describe('TRPCProvider offline queue invalidation', () => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
     mockGetToken.mockResolvedValue('token');
-    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
@@ -190,7 +185,6 @@ describe('TRPCProvider transport wiring', () => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
     mockGetToken.mockResolvedValue('token');
-    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);
@@ -299,7 +293,39 @@ describe('TRPCProvider transport wiring', () => {
     const retryInit = (telemetryFetch as jest.Mock).mock.calls[1][1] as RequestInit;
     expect(new Headers(retryInit.headers).get('Authorization')).toBe('Bearer refreshed-token');
     expect(response.status).toBe(200);
-    expect(mockSignOut).not.toHaveBeenCalled();
+  });
+
+  it('retries forbidden auth failures with a refreshed token', async () => {
+    mockGetToken.mockResolvedValueOnce('refreshed-token');
+    const forbiddenAuthResponse = {
+      status: 403,
+      headers: new Headers({ 'X-Zine-Auth-Error': 'EXPIRED_TOKEN' }),
+    } as Response;
+    const successResponse = { status: 200 } as Response;
+    (telemetryFetch as jest.Mock)
+      .mockResolvedValueOnce(forbiddenAuthResponse)
+      .mockResolvedValueOnce(successResponse);
+
+    act(() => {
+      create(
+        <TRPCProvider>
+          <></>
+        </TRPCProvider>
+      );
+    });
+
+    const fetchFn = (httpBatchLink as jest.Mock).mock.calls[0][0].fetch as typeof fetch;
+    const response = await fetchFn('https://api.myzine.app/trpc/items.home', {
+      headers: { Authorization: 'Bearer expired-token' },
+      method: 'GET',
+    });
+
+    expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
+    expect(telemetryFetch).toHaveBeenCalledTimes(2);
+
+    const retryInit = (telemetryFetch as jest.Mock).mock.calls[1][1] as RequestInit;
+    expect(new Headers(retryInit.headers).get('Authorization')).toBe('Bearer refreshed-token');
+    expect(response.status).toBe(200);
   });
 
   it('reuses the forced token refresh started on app resume', async () => {
@@ -348,11 +374,19 @@ describe('TRPCProvider transport wiring', () => {
     });
   });
 
-  it('signs out after an unauthorized retry also fails', async () => {
+  it('returns unauthorized response without clearing local auth state after retry also fails', async () => {
     const clearSpy = jest.spyOn(QueryClient.prototype, 'clear');
 
     mockGetToken.mockResolvedValueOnce('refreshed-token');
-    const unauthorizedResponse = { status: 401 } as Response;
+    const unauthorizedResponse = {
+      status: 401,
+      headers: new Headers({
+        'X-Zine-Auth-Error': 'JWKS_ERROR',
+        'X-Trace-ID': 'trc_auth_failure',
+        'X-Request-ID': 'req_auth_failure',
+        'X-Client-Request-ID': 'creq_auth_failure',
+      }),
+    } as Response;
     (telemetryFetch as jest.Mock)
       .mockResolvedValueOnce(unauthorizedResponse)
       .mockResolvedValueOnce(unauthorizedResponse);
@@ -373,8 +407,7 @@ describe('TRPCProvider transport wiring', () => {
 
     expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
     expect(response.status).toBe(401);
-    expect(clearSpy).toHaveBeenCalledTimes(1);
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    expect(clearSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -383,7 +416,6 @@ describe('TRPCProvider cache persistence', () => {
     jest.clearAllMocks();
     mockUserId = 'user-123';
     mockGetToken.mockResolvedValue('token');
-    mockSignOut.mockResolvedValue(undefined);
     latestPersistOptions = null;
     mockUseIsRestoring.mockReturnValue(false);
     mockGetItem.mockResolvedValue(null);

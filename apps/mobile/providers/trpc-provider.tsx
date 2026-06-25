@@ -19,7 +19,12 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 import { getQueryKey } from '@trpc/react-query';
 import { httpBatchLink } from '@trpc/client';
 import superjson from 'superjson';
-import { useAuth, useClerk } from '@clerk/clerk-expo';
+import {
+  TELEMETRY_CLIENT_REQUEST_HEADER,
+  TELEMETRY_REQUEST_HEADER,
+  TELEMETRY_TRACE_HEADER,
+} from '@zine/shared';
+import { useAuth } from '@clerk/clerk-expo';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
@@ -40,13 +45,29 @@ interface TRPCProviderProps {
 }
 
 const AUTH_RESUME_REFRESH_GRACE_MS = 5_000;
+const AUTH_ERROR_CODE_HEADER = 'X-Zine-Auth-Error';
 
 function isRequest(input: RequestInfo | URL): input is Request {
   return typeof Request !== 'undefined' && input instanceof Request;
 }
 
-function isUnauthorizedResponse(response: Response): boolean {
-  return response.status === 401;
+function isAuthFailureResponse(response: Response): boolean {
+  return response.status === 401 || response.status === 403;
+}
+
+function readResponseHeader(response: Response, name: string): string | undefined {
+  return response.headers.get(name) ?? undefined;
+}
+
+function getAuthFailureLogContext(response: Response, url: string) {
+  return {
+    url,
+    httpStatus: response.status,
+    authErrorCode: readResponseHeader(response, AUTH_ERROR_CODE_HEADER),
+    traceId: readResponseHeader(response, TELEMETRY_TRACE_HEADER),
+    requestId: readResponseHeader(response, TELEMETRY_REQUEST_HEADER),
+    clientRequestId: readResponseHeader(response, TELEMETRY_CLIENT_REQUEST_HEADER),
+  };
 }
 
 function buildRetryRequest(
@@ -101,14 +122,11 @@ export function TRPCProvider({ children }: TRPCProviderProps) {
 
 function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   const { getToken, userId, isLoaded, isSignedIn } = useAuth();
-  const { signOut } = useClerk();
 
   // Store getToken in a ref to avoid recreating the tRPC client when auth changes
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
-  const signOutRef = useRef(signOut);
-  signOutRef.current = signOut;
-  const hasTriggeredSignOutRef = useRef(false);
+  const hasLoggedAuthFailureRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const resumeTokenRefreshRef = useRef<Promise<string | null> | null>(null);
   const lastResumeAtRef = useRef<number | null>(null);
@@ -162,7 +180,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
   }, [getTokenForAuthRequest]);
 
   useEffect(() => {
-    hasTriggeredSignOutRef.current = false;
+    hasLoggedAuthFailureRef.current = false;
     resumeTokenRefreshRef.current = null;
     lastResumeAtRef.current = null;
   }, [userId]);
@@ -288,8 +306,9 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
 
     const fetchWithAuthRecovery: typeof telemetryFetch = async (input, init) => {
       const response = await telemetryFetch(isRequest(input) ? input.clone() : input, init);
+      let finalAuthFailureResponse = response;
 
-      if (!isUnauthorizedResponse(response)) {
+      if (!isAuthFailureResponse(response)) {
         return response;
       }
 
@@ -297,15 +316,16 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         const refreshedToken = await getTokenForAuthRequest({ skipCache: true });
 
         if (refreshedToken) {
-          trpcLogger.warn('Retrying unauthorized tRPC request with refreshed auth token', {
+          trpcLogger.warn('Retrying auth-failed tRPC request with refreshed auth token', {
             url,
             httpStatus: response.status,
           });
 
           const retryRequest = buildRetryRequest(input, init, refreshedToken);
           const retryResponse = await telemetryFetch(retryRequest.input, retryRequest.init);
+          finalAuthFailureResponse = retryResponse;
 
-          if (!isUnauthorizedResponse(retryResponse)) {
+          if (!isAuthFailureResponse(retryResponse)) {
             return retryResponse;
           }
         } else {
@@ -323,15 +343,12 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
         });
       }
 
-      if (!hasTriggeredSignOutRef.current) {
-        hasTriggeredSignOutRef.current = true;
-        queryClient.clear();
-        void signOutRef.current().catch((error) => {
-          trpcLogger.warn('Failed to sign out after repeated unauthorized tRPC request', {
-            error,
-            url,
-          });
-        });
+      if (!hasLoggedAuthFailureRef.current) {
+        hasLoggedAuthFailureRef.current = true;
+        trpcLogger.warn(
+          'Auth retry still failed; leaving Clerk session state unchanged',
+          getAuthFailureLogContext(finalAuthFailureResponse, url)
+        );
       }
 
       return response;

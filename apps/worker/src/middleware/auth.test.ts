@@ -94,6 +94,7 @@ describe('authMiddleware', () => {
     const res = await app.fetch(req, createMockEnv({ ENVIRONMENT: 'production' }));
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('X-Zine-Auth-Error')).toBe('MISSING_AUTH_HEADER');
     expect((await res.json()) as AuthResponse).toMatchObject({
       code: 'MISSING_AUTH_HEADER',
       error: 'Authorization header is required',
@@ -123,5 +124,29 @@ describe('authMiddleware', () => {
       'test-token',
       'https://clerk.myzine.app/.well-known/jwks.json'
     );
+  });
+
+  it('returns auth error code header when Clerk token verification fails', async () => {
+    mockVerifyClerkToken.mockResolvedValue({
+      success: false,
+      code: 'JWKS_ERROR',
+      error: 'No matching key found in JWKS',
+    });
+
+    const app = createTestApp();
+    const req = new Request('http://localhost/protected', {
+      headers: {
+        Authorization: 'Bearer test-token',
+      },
+    });
+
+    const res = await app.fetch(req, createMockEnv({ ENVIRONMENT: 'production' }));
+
+    expect(res.status).toBe(401);
+    expect(res.headers.get('X-Zine-Auth-Error')).toBe('JWKS_ERROR');
+    expect((await res.json()) as AuthResponse).toMatchObject({
+      code: 'JWKS_ERROR',
+      error: 'No matching key found in JWKS',
+    });
   });
 });

@@ -11,6 +11,10 @@ import { authLogger } from './logger';
 
 // Token Cache Implementation
 
+const secureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 /**
  * Creates a token cache that uses expo-secure-store on native platforms
  * and falls back to no caching on web (Clerk handles web storage internally).
@@ -21,21 +25,21 @@ function createTokenCache(): TokenCache {
   return {
     async getToken(key: string): Promise<string | undefined | null> {
       try {
-        const item = await SecureStore.getItemAsync(key);
+        const item = await SecureStore.getItemAsync(key, secureStoreOptions);
         if (item) {
           authLogger.debug('Token retrieved', { key: key.substring(0, 20) + '...' });
         }
         return item;
       } catch (error) {
         authLogger.error('SecureStore getToken error', { error });
-        await SecureStore.deleteItemAsync(key);
+        await SecureStore.deleteItemAsync(key, secureStoreOptions);
         return null;
       }
     },
 
     async saveToken(key: string, value: string): Promise<void> {
       try {
-        await SecureStore.setItemAsync(key, value);
+        await SecureStore.setItemAsync(key, value, secureStoreOptions);
         authLogger.debug('Token saved', { key: key.substring(0, 20) + '...' });
       } catch (error) {
         authLogger.error('SecureStore saveToken error', { error });
@@ -44,7 +48,7 @@ function createTokenCache(): TokenCache {
 
     async clearToken(key: string): Promise<void> {
       try {
-        await SecureStore.deleteItemAsync(key);
+        await SecureStore.deleteItemAsync(key, secureStoreOptions);
         authLogger.debug('Token cleared', { key: key.substring(0, 20) + '...' });
       } catch (error) {
         authLogger.error('SecureStore clearToken error', { error });

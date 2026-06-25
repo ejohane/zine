@@ -399,22 +399,23 @@ export function runCloudflareLogQuery(
 
   command.push('--limit', String(query.limit ?? 200));
 
-  const process = Bun.spawnSync(command, {
+  const childProcess = Bun.spawnSync(command, {
     cwd: repoRoot,
     env: process.env,
     stderr: 'pipe',
     stdout: 'pipe',
   });
 
-  const stdout = process.stdout.toString();
-  const stderr = process.stderr.toString().trim();
+  const stdout = childProcess.stdout.toString();
+  const stderr = childProcess.stderr.toString().trim();
 
-  if (process.exitCode !== 0) {
+  if (childProcess.exitCode !== 0) {
     return {
       ok: false,
       command,
       records: [],
-      error: stderr || stdout.trim() || `Cloudflare log query exited with code ${process.exitCode}`,
+      error:
+        stderr || stdout.trim() || `Cloudflare log query exited with code ${childProcess.exitCode}`,
       stderr,
     };
   }
