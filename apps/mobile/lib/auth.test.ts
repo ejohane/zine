@@ -14,11 +14,17 @@ jest.mock('./logger', () => ({
   },
 }));
 
+jest.mock('./auth-diagnostics', () => ({
+  captureAuthDiagnostic: jest.fn(),
+}));
+
 // Get the mocked modules
 import { authLogger } from './logger';
+import { captureAuthDiagnostic } from './auth-diagnostics';
 
 const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
 const mockAuthLogger = authLogger as jest.Mocked<typeof authLogger>;
+const mockCaptureAuthDiagnostic = captureAuthDiagnostic as jest.Mock;
 const secureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
 };
@@ -95,6 +101,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
       expect(mockAuthLogger.error).toHaveBeenCalledWith('SecureStore getToken error', {
         error: secureStoreError,
       });
+      expect(mockCaptureAuthDiagnostic).toHaveBeenCalledWith('token_cache.get_error', {
+        error: secureStoreError,
+        keyPrefix: 'corrupted-key',
+      });
       expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
         'corrupted-key',
         secureStoreOptions
@@ -135,6 +145,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
       expect(mockAuthLogger.error).toHaveBeenCalledWith('SecureStore saveToken error', {
         error: saveError,
       });
+      expect(mockCaptureAuthDiagnostic).toHaveBeenCalledWith('token_cache.save_error', {
+        error: saveError,
+        keyPrefix: 'clerk-key',
+      });
     });
   });
 
@@ -173,6 +187,10 @@ describe('tokenCache on native platforms (iOS/Android)', () => {
 
       expect(mockAuthLogger.error).toHaveBeenCalledWith('SecureStore clearToken error', {
         error: deleteError,
+      });
+      expect(mockCaptureAuthDiagnostic).toHaveBeenCalledWith('token_cache.clear_error', {
+        error: deleteError,
+        keyPrefix: 'missing-key',
       });
     });
   });

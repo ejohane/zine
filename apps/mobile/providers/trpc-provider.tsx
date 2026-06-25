@@ -25,6 +25,7 @@ import {
   TELEMETRY_TRACE_HEADER,
 } from '@zine/shared';
 import { useAuth } from '@clerk/clerk-expo';
+import { captureAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { trpc, API_URL } from '@/lib/trpc';
 import { setTokenGetter } from '@/lib/oauth';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
@@ -146,6 +147,7 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
       .current({ skipCache: true })
       .catch((error) => {
         trpcLogger.warn('Failed to refresh auth token on app resume', { error });
+        captureAuthDiagnostic('trpc.resume_refresh_failed', { error });
         return null;
       })
       .finally(() => {
@@ -193,6 +195,10 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
     const token = await startResumeTokenRefresh();
     if (!token) {
       trpcLogger.warn('Skipped app resume network work because auth refresh returned no token');
+      captureAuthDiagnostic('trpc.resume_refresh_no_token', {
+        isLoaded,
+        isSignedIn,
+      });
       return false;
     }
 
@@ -335,11 +341,20 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
               url,
             }
           );
+          captureAuthDiagnostic('trpc.auth_retry_no_token', {
+            url,
+            initialFailure: getAuthFailureLogContext(response, url),
+          });
         }
       } catch (error) {
         trpcLogger.warn('Failed to refresh auth token after unauthorized tRPC request', {
           error,
           url,
+        });
+        captureAuthDiagnostic('trpc.auth_retry_refresh_failed', {
+          error,
+          url,
+          initialFailure: getAuthFailureLogContext(response, url),
         });
       }
 
@@ -349,6 +364,9 @@ function AuthenticatedTRPCProvider({ children }: TRPCProviderProps) {
           'Auth retry still failed; leaving Clerk session state unchanged',
           getAuthFailureLogContext(finalAuthFailureResponse, url)
         );
+        captureAuthDiagnostic('trpc.auth_retry_still_failed', {
+          failure: getAuthFailureLogContext(finalAuthFailureResponse, url),
+        });
       }
 
       return response;

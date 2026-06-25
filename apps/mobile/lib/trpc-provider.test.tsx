@@ -17,6 +17,7 @@ import { trpc } from '@/lib/trpc';
 import { TRPCProvider } from '@/providers/trpc-provider';
 import { setQueueProcessedCallback } from '@/lib/trpc-offline-client';
 import { buildMobileTelemetryHeaders, telemetryFetch } from '@/lib/trpc-transport';
+import { captureAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { PERSISTENCE_MAX_AGE_MS, PERSISTENCE_STORAGE_PREFIX } from '@/lib/query-persistence';
 import { act, create } from 'react-test-renderer';
 type PersistOptions = {
@@ -106,6 +107,10 @@ jest.mock('@clerk/clerk-expo', () => ({
 
 jest.mock('@/lib/oauth', () => ({
   setTokenGetter: jest.fn(),
+}));
+
+jest.mock('@/lib/auth-diagnostics', () => ({
+  captureAuthDiagnostic: jest.fn(),
 }));
 
 jest.mock('@/lib/trpc-offline-client', () => ({
@@ -408,6 +413,16 @@ describe('TRPCProvider transport wiring', () => {
     expect(mockGetToken).toHaveBeenCalledWith({ skipCache: true });
     expect(response.status).toBe(401);
     expect(clearSpy).not.toHaveBeenCalled();
+    expect(captureAuthDiagnostic).toHaveBeenCalledWith('trpc.auth_retry_still_failed', {
+      failure: {
+        authErrorCode: 'JWKS_ERROR',
+        clientRequestId: 'creq_auth_failure',
+        httpStatus: 401,
+        requestId: 'req_auth_failure',
+        traceId: 'trc_auth_failure',
+        url: 'http://localhost:8787/trpc',
+      },
+    });
   });
 });
 

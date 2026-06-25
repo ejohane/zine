@@ -7,6 +7,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import type { TokenCache } from '@clerk/clerk-expo';
+import { captureAuthDiagnostic } from './auth-diagnostics';
 import { authLogger } from './logger';
 
 // Token Cache Implementation
@@ -32,6 +33,10 @@ function createTokenCache(): TokenCache {
         return item;
       } catch (error) {
         authLogger.error('SecureStore getToken error', { error });
+        captureAuthDiagnostic('token_cache.get_error', {
+          error,
+          keyPrefix: key.substring(0, 20),
+        });
         await SecureStore.deleteItemAsync(key, secureStoreOptions);
         return null;
       }
@@ -43,6 +48,10 @@ function createTokenCache(): TokenCache {
         authLogger.debug('Token saved', { key: key.substring(0, 20) + '...' });
       } catch (error) {
         authLogger.error('SecureStore saveToken error', { error });
+        captureAuthDiagnostic('token_cache.save_error', {
+          error,
+          keyPrefix: key.substring(0, 20),
+        });
       }
     },
 
@@ -52,6 +61,10 @@ function createTokenCache(): TokenCache {
         authLogger.debug('Token cleared', { key: key.substring(0, 20) + '...' });
       } catch (error) {
         authLogger.error('SecureStore clearToken error', { error });
+        captureAuthDiagnostic('token_cache.clear_error', {
+          error,
+          keyPrefix: key.substring(0, 20),
+        });
       }
     },
   };

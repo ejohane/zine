@@ -4,9 +4,10 @@
  * Provides Clerk authentication context to the app with secure token caching.
  */
 
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
-import { createContext, type ReactNode, useContext } from 'react';
+import { useAuth, ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
+import { createContext, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { tokenCache, CLERK_PUBLISHABLE_KEY, validateClerkConfig } from '@/lib/auth';
+import { captureAuthDiagnostic } from '@/lib/auth-diagnostics';
 import { authLogger } from '@/lib/logger';
 
 interface AuthProviderProps {
@@ -66,8 +67,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
   return (
     <AuthAvailabilityContext.Provider value={authAvailability}>
       <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
-        <ClerkLoaded>{children}</ClerkLoaded>
+        <ClerkLoaded>
+          <AuthLifecycleDiagnostics>{children}</AuthLifecycleDiagnostics>
+        </ClerkLoaded>
       </ClerkProvider>
     </AuthAvailabilityContext.Provider>
   );
+}
+
+function AuthLifecycleDiagnostics({ children }: AuthProviderProps) {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const previousStateRef = useRef<'loading' | 'signed_in' | 'signed_out'>('loading');
+
+  useEffect(() => {
+    if (!isLoaded) {
+      previousStateRef.current = 'loading';
+      return;
+    }
+
+    const nextState = isSignedIn ? 'signed_in' : 'signed_out';
+    const previousState = previousStateRef.current;
+    previousStateRef.current = nextState;
+
+    if (previousState === 'signed_in' && nextState === 'signed_out') {
+      authLogger.warn('Clerk auth state changed from signed-in to signed-out', {
+        hasUserId: Boolean(userId),
+      });
+      captureAuthDiagnostic('provider.signed_out_after_signed_in', {
+        previousState,
+        nextState,
+        hadUserId: Boolean(userId),
+      });
+    }
+  }, [isLoaded, isSignedIn, userId]);
+
+  return <>{children}</>;
 }
