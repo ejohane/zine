@@ -20,7 +20,7 @@ import {
 } from 'react';
 import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom';
 
-import { ContentType } from '@zine/shared';
+import { ContentType, type CollectionRules } from '@zine/shared';
 
 import { AppWordmark } from './app-wordmark';
 import { Badge, Button, EmptyState, Surface, cn } from './components';
@@ -711,15 +711,7 @@ function LibraryObjectTabs({ active }: { active: string }) {
   );
 }
 
-function getCollectionRuleSummary(rules: {
-  contentTypes?: unknown[];
-  providers?: unknown[];
-  tagIds?: unknown[];
-  isFinished?: boolean;
-  search?: string;
-  minLengthMinutes?: number;
-  maxLengthMinutes?: number;
-}) {
+function getCollectionRuleSummary(rules: CollectionRules) {
   const parts: string[] = [];
   if (rules.contentTypes?.length) parts.push('content type');
   if (rules.providers?.length) parts.push('source');

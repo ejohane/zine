@@ -28,11 +28,7 @@ function getPreviewSourceLabel(preview: NonNullable<BookmarkPreview>) {
   }
 
   if (isValidUrl(preview.canonicalUrl)) {
-    try {
-      return new URL(preview.canonicalUrl).hostname.replace(/^www\./, '');
-    } catch {
-      return mapProvider(preview.provider);
-    }
+    return new URL(preview.canonicalUrl).hostname.replace(/^www\./, '');
   }
 
   return mapProvider(preview.provider);

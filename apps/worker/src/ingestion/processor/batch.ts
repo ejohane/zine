@@ -118,7 +118,7 @@ function chunk<T>(array: T[], size: number): T[][] {
 /**
  * Ingest multiple items in consolidated batches with chunking and fallback.
  *
- * This optimized function:
+ * The function:
  * 1. Transforms and validates all items upfront
  * 2. Checks idempotency (skips already-seen items)
  * 3. Groups insert statements into configurable chunks
@@ -126,9 +126,7 @@ function chunk<T>(array: T[], size: number): T[][] {
  * 5. Falls back to individual inserts if a chunk fails
  * 6. Stores failed items in the dead-letter queue
  *
- * Performance improvement: For 10 items with default chunk size of 10:
- * - Old: 10 separate db.batch() calls → 10 round-trips
- * - New: 1 consolidated db.batch() call → 1 round-trip (10x faster)
+ * Chunking keeps the default 10-item path to one D1 batch round-trip.
  *
  * @typeParam T - The raw provider item type
  * @param userId - User ID

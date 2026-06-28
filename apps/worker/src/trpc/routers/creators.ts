@@ -1221,7 +1221,6 @@ type ProviderFetchEnv = Bindings;
  */
 function getConnectUrl(provider: string): string {
   // These URLs should match the app's OAuth flow
-  // For now, return relative paths that the mobile app can handle
   switch (provider) {
     case 'YOUTUBE':
       return '/connect/youtube';

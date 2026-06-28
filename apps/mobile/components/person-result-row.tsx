@@ -5,6 +5,7 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { Surface, Text } from '@/components/primitives';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { getInitials } from '@/lib/person';
 
 export type PersonResultRowData = {
   id: string;
@@ -13,15 +14,6 @@ export type PersonResultRowData = {
   itemCount: number;
   latestItemTitle?: string | null;
 };
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
 
 function getCountText(count: number): string {
   return `${count} saved ${count === 1 ? 'item' : 'items'}`;

@@ -5,6 +5,7 @@ import { Image, Pressable, View } from 'react-native';
 import { Surface } from '@/components/primitives/surface';
 import { Text } from '@/components/primitives/text';
 import { IconSizes } from '@/constants/theme';
+import { getInitials } from '@/lib/person';
 
 import { styles } from '../../item-detail-styles';
 import type { ItemDetailColors, ItemDetailEnrichment, ItemDetailItem } from '../types';
@@ -66,15 +67,6 @@ function relationshipPriority(value: string | null | undefined): number {
     default:
       return 1;
   }
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 function formatXHandle(value: string | null): string | null {

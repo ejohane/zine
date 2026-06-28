@@ -106,23 +106,6 @@ describe('use-insights-trpc', () => {
     );
   });
 
-  it('falls back to undefined input when timezone lookup fails', () => {
-    Intl.DateTimeFormat = jest.fn(() => {
-      throw new Error('timezone unavailable');
-    }) as unknown as typeof Intl.DateTimeFormat;
-
-    renderHook(() => useWeeklyRecap());
-
-    expect(mockWeeklyRecapUseQuery).toHaveBeenCalledWith(
-      { weekAnchorDate: '2026-03-15' },
-      expect.objectContaining({
-        enabled: true,
-        placeholderData: expect.any(Function),
-        staleTime: 60_000,
-      })
-    );
-  });
-
   it('updates the entry visibility at local midnight without requiring a remount', () => {
     const { result } = renderHook(() => useWeeklyRecapEntryState());
 

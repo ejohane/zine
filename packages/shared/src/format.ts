@@ -1,15 +1,15 @@
-import type { ContentType, Provider } from './types/domain';
+import type { ContentType, ContentTypeValue, Provider, ProviderValue } from './types/domain';
 
 export type UIContentType = Lowercase<`${ContentType}`>;
 export type UIProvider = Lowercase<`${Provider}`>;
 
-export function mapContentType(contentType: ContentType): UIContentType;
+export function mapContentType(contentType: ContentType | ContentTypeValue): UIContentType;
 export function mapContentType(contentType: string): Lowercase<string>;
 export function mapContentType(contentType: ContentType | string): Lowercase<string> {
   return contentType.toString().toLowerCase() as Lowercase<string>;
 }
 
-export function mapProvider(provider: Provider): UIProvider;
+export function mapProvider(provider: Provider | ProviderValue): UIProvider;
 export function mapProvider(provider: string): Lowercase<string>;
 export function mapProvider(provider: Provider | string): Lowercase<string> {
   return provider.toString().toLowerCase() as Lowercase<string>;

@@ -16,11 +16,12 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePerson, usePersonItems } from '@/hooks/use-people';
-import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
+import { getInitials } from '@/lib/person';
 
 const PAGE_SIZE = 20;
 
@@ -33,15 +34,6 @@ function formatLatestSeen(value: number | null): string | null {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return `Latest seen ${date.toLocaleDateString()}`;
-}
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 export default function PersonScreen() {
@@ -63,8 +55,8 @@ export default function PersonScreen() {
         creator: item.creator,
         creatorImageUrl: item.creatorImageUrl ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as ContentType,
-        provider: mapProvider(item.provider) as Provider,
+        contentType: mapContentType(item.contentType),
+        provider: mapProvider(item.provider),
         duration: item.duration ?? null,
         readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: item.bookmarkedAt ?? null,

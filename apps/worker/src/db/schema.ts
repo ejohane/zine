@@ -315,8 +315,8 @@ export const homeScreenSections = sqliteTable(
 );
 
 // Item Enrichments
-// Canonical AI-generated enrichment for a content item and content hash.
-// Uses Unix ms INTEGER timestamps (new standard). See docs/zine-tech-stack.md.
+// Canonical model enrichment for a content item and content hash.
+// Uses Unix ms INTEGER timestamps. See docs/zine-tech-stack.md.
 export const itemEnrichments = sqliteTable(
   'item_enrichments',
   {

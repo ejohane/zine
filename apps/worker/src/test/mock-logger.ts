@@ -77,6 +77,4 @@ export const mockLoggerModule = {
   authLogger: mockLogger,
   webhookLogger: mockLogger,
   ingestionLogger: mockLogger,
-  healthLogger: mockLogger,
-  quotaLogger: mockLogger,
 };

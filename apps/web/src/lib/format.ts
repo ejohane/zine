@@ -1,11 +1,11 @@
 import {
   formatDurationTimestamp,
-  formatEstimatedMinutes,
-  isValidUrl as isValidSharedUrl,
   mapContentType as mapSharedContentType,
   mapProvider as mapSharedProvider,
 } from '@zine/shared/format';
 import type { ContentType, Provider } from '@zine/shared/types';
+
+export { formatEstimatedMinutes, isValidUrl } from '@zine/shared/format';
 
 export function mapContentType(contentType: ContentType | string) {
   return mapSharedContentType(contentType);
@@ -68,10 +68,4 @@ export function formatRelativeDate(value?: string | number | null) {
   }
 
   return 'Just now';
-}
-
-export { formatEstimatedMinutes };
-
-export function isValidUrl(urlString: string): boolean {
-  return isValidSharedUrl(urlString);
 }

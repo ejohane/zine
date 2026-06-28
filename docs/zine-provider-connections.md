@@ -681,104 +681,6 @@ export async function getAllUserSubscriptions(
 For the discovery UI (`discover.available` endpoint), always use
 `getAllUserSubscriptions` to ensure users see all their subscriptions.
 
-### YouTube Quota Management
-
-**File:** `apps/worker/src/providers/youtube-quota.ts:1-515`
-
-YouTube Data API has a daily quota of **10,000 units** (resets at midnight Pacific).
-
-#### Quota Thresholds
-
-```typescript
-const DAILY_QUOTA = 10_000;
-const WARNING_THRESHOLD = 0.8; // 8,000 units
-const CRITICAL_THRESHOLD = 0.95; // 9,500 units
-```
-
-#### Tracking Implementation
-
-```typescript
-export async function trackQuotaUsage(
-  kv: KVNamespace,
-  operation: string,
-  units: number
-): Promise<QuotaStatus> {
-  const today = getQuotaDateKey(); // Pacific timezone
-  const key = `youtube:quota:${today}`;
-
-  // Atomic increment using KV
-  const current = parseInt((await kv.get(key)) ?? '0');
-  const newTotal = current + units;
-
-  await kv.put(key, newTotal.toString(), {
-    // Auto-expire after 48 hours
-    expirationTtl: 48 * 60 * 60,
-  });
-
-  return {
-    used: newTotal,
-    remaining: DAILY_QUOTA - newTotal,
-    percentUsed: newTotal / DAILY_QUOTA,
-    isWarning: newTotal >= DAILY_QUOTA * WARNING_THRESHOLD,
-    isCritical: newTotal >= DAILY_QUOTA * CRITICAL_THRESHOLD,
-  };
-}
-
-export async function canUseQuota(
-  kv: KVNamespace,
-  requiredUnits: number
-): Promise<{ allowed: boolean; status: QuotaStatus }> {
-  const status = await getQuotaStatus(kv);
-
-  // At critical threshold, only allow essential operations (≤2 units)
-  if (status.isCritical && requiredUnits > 2) {
-    return { allowed: false, status };
-  }
-
-  // Don't exceed daily quota
-  if (status.used + requiredUnits > DAILY_QUOTA) {
-    return { allowed: false, status };
-  }
-
-  return { allowed: true, status };
-}
-
-// Wrapper for automatic tracking
-export async function withQuotaTracking<T>(
-  kv: KVNamespace,
-  operation: string,
-  units: number,
-  fn: () => Promise<T>
-): Promise<T> {
-  const result = await fn();
-  await trackQuotaUsage(kv, operation, units);
-  return result;
-}
-```
-
-#### Graceful Degradation
-
-```typescript
-export function calculateSafeBatchSize(
-  status: QuotaStatus,
-  idealBatchSize: number,
-  unitsPerItem: number
-): number {
-  if (status.isCritical) {
-    // Minimum viable batch
-    return 1;
-  }
-
-  if (status.isWarning) {
-    // Reduce to 10% of remaining quota
-    const maxItems = Math.floor((status.remaining * 0.1) / unitsPerItem);
-    return Math.min(idealBatchSize, maxItems, 10);
-  }
-
-  return idealBatchSize;
-}
-```
-
 ### Spotify Provider
 
 **File:** `apps/worker/src/providers/spotify.ts:1-338`
@@ -2347,9 +2249,7 @@ This section traces the complete journey from a user connecting their YouTube ac
 │                                                                             │
 │  7. For each user:                                                          │
 │     a. Get active connection                                                │
-│     b. Check YouTube quota availability                                     │
-│        📦 apps/worker/src/providers/youtube-quota.ts:1-515                  │
-│     c. Refresh access token if needed                                       │
+│     b. Refresh access token if needed                                       │
 │                                                                             │
 │  8. For each subscription:                                                  │
 │     a. Get uploads playlist                                                 │
@@ -2358,9 +2258,7 @@ This section traces the complete journey from a user connecting their YouTube ac
 │     d. Ingest new videos                                                    │
 │     e. Update subscription timestamps                                       │
 │                                                                             │
-│  9. Track quota usage                                                       │
-│                                                                             │
-│  10. Maybe adjust poll interval based on activity                           │
+│  9. Maybe adjust poll interval based on activity                            │
 │      📦 apps/worker/src/polling/adaptive.ts:1-266                           │
 │                                                                             │
 │  ✅ New content synced to user inboxes!                                     │
@@ -2557,7 +2455,6 @@ This section traces the complete journey from a user connecting their YouTube ac
 | `apps/worker/src/lib/token-refresh.ts`           | Token refresh with locking | 1-340 |
 | `apps/worker/src/lib/crypto.ts`                  | AES-256-GCM encryption     | 1-512 |
 | `apps/worker/src/providers/youtube.ts`           | YouTube API client         | 1-340 |
-| `apps/worker/src/providers/youtube-quota.ts`     | YouTube quota management   | 1-515 |
 | `apps/worker/src/providers/spotify.ts`           | Spotify API client         | 1-338 |
 | `apps/worker/src/subscriptions/initial-fetch.ts` | Initial content fetch      | 1-385 |
 | `apps/worker/src/polling/scheduler.ts`           | Polling scheduler          | 1-622 |

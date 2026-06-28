@@ -1,4 +1,5 @@
 import type { PropsWithChildren } from 'react';
+import type { ApiTokenScope } from '@zine/shared/api-tokens';
 import type { ContentType } from '@zine/shared/types';
 import type { AuthMode } from '../../lib/trpc';
 import { vi } from 'vitest';
@@ -58,8 +59,6 @@ type ItemTag = {
 type BookmarkPreviewInput = {
   url: string;
 };
-
-type ApiTokenScope = 'bookmarks:read' | 'bookmarks:write';
 
 type ApiTokenSummary = {
   id: string;

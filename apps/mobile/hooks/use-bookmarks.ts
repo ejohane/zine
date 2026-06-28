@@ -9,7 +9,7 @@
  */
 
 import { trpc } from '../lib/trpc';
-import { ContentType, Provider, UserItemState, isValidUrl as isValidSharedUrl } from '@zine/shared';
+import { ContentType, Provider, UserItemState, isValidUrl } from '@zine/shared';
 import * as Crypto from 'expo-crypto';
 import {
   getHomeQueryInputsForContentType,
@@ -105,26 +105,7 @@ type OptimisticSaveContext = {
   previousInbox?: InboxData;
 };
 
-// Validation
-
-/**
- * Validates whether a string is a valid HTTP/HTTPS URL.
- *
- * @param urlString - The string to validate
- * @returns true if the string is a valid HTTP or HTTPS URL
- *
- * @example
- * ```typescript
- * isValidUrl('https://youtube.com/watch?v=abc123') // => true
- * isValidUrl('not a url') // => false
- * isValidUrl('ftp://example.com') // => false (not http/https)
- * isValidUrl('') // => false
- * isValidUrl('  https://example.com  ') // => true (whitespace trimmed)
- * ```
- */
-export function isValidUrl(urlString: string): boolean {
-  return isValidSharedUrl(urlString);
-}
+export { isValidUrl };
 
 /**
  * Build a temporary ItemView for optimistic bookmark saves.

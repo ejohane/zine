@@ -34,6 +34,10 @@
       "types": "./src/substack.ts",
       "import": "./src/substack.ts"
     },
+    "./api-tokens": {
+      "types": "./src/api-tokens.ts",
+      "import": "./src/api-tokens.ts"
+    },
     "./telemetry": {
       "types": "./src/telemetry.ts",
       "import": "./src/telemetry.ts"

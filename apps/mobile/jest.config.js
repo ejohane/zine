@@ -3,16 +3,14 @@
  *
  * Uses ts-jest for pure TypeScript utility tests and hook tests.
  *
- * NOTE: React Native component tests require additional setup due to
- * bun's symlink structure with jest-expo. For now, utility and hook
- * tests are configured to run with appropriate mocks.
+ * NOTE: React Native component tests need explicit mocks because Bun's
+ * symlinked dependencies and jest-expo resolve modules differently.
  *
  * @type {import('jest').Config}
  */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  // Match test files in lib/, hooks/, and components/
   testMatch: [
     '<rootDir>/lib/**/*.test.ts',
     '<rootDir>/lib/**/*.test.tsx',

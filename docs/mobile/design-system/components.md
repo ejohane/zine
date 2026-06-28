@@ -63,13 +63,12 @@ and which are dormant.
 
 ## Dev-Only and Support Modules
 
-| Path                                                            | Status     | Story Priority | Notes                                             |
-| --------------------------------------------------------------- | ---------- | -------------- | ------------------------------------------------- |
-| `apps/mobile/components/storybook/storybook-button.tsx`         | `dev-only` | `P0`           | Storybook smoke-test component.                   |
-| `apps/mobile/components/storybook/storybook-button.stories.tsx` | `dev-only` | `P0`           | Existing sample story file.                       |
-| `apps/mobile/components/creator/index.tsx`                      | `dev-only` | `n/a`          | Barrel exports for creator components.            |
-| `apps/mobile/components/subscriptions/index.ts`                 | `dev-only` | `n/a`          | Barrel exports for subscriptions components.      |
-| `apps/mobile/components/item-card-consolidation-analysis.md`    | `dev-only` | `n/a`          | Historical analysis doc, not a runtime component. |
+| Path                                                            | Status     | Story Priority | Notes                                        |
+| --------------------------------------------------------------- | ---------- | -------------- | -------------------------------------------- |
+| `apps/mobile/components/storybook/storybook-button.tsx`         | `dev-only` | `P0`           | Storybook smoke-test component.              |
+| `apps/mobile/components/storybook/storybook-button.stories.tsx` | `dev-only` | `P0`           | Existing sample story file.                  |
+| `apps/mobile/components/creator/index.tsx`                      | `dev-only` | `n/a`          | Barrel exports for creator components.       |
+| `apps/mobile/components/subscriptions/index.ts`                 | `dev-only` | `n/a`          | Barrel exports for subscriptions components. |
 
 ## Decision Rules
 

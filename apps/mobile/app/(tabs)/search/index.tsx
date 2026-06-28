@@ -10,7 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/list-states';
 import { PersonResultRow } from '@/components/person-result-row';
 import { Colors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 import {
   useSearchResults,
   type CreatorSearchResult,
@@ -93,8 +93,8 @@ export default function SearchTabScreen() {
             creator: result.creator,
             creatorImageUrl: result.creatorImageUrl ?? null,
             thumbnailUrl: result.thumbnailUrl ?? null,
-            contentType: mapContentType(result.contentType) as ContentType,
-            provider: mapProvider(result.provider) as Provider,
+            contentType: mapContentType(result.contentType),
+            provider: mapProvider(result.provider),
             duration: result.duration ?? null,
             readingTimeMinutes: result.readingTimeMinutes ?? null,
             bookmarkedAt: result.bookmarkedAt ?? null,
