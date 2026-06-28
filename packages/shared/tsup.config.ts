@@ -7,6 +7,7 @@ export default defineConfig({
     'src/schemas/index.ts',
     'src/constants/index.ts',
     'src/substack.ts',
+    'src/api-tokens.ts',
   ],
   format: ['esm'],
   dts: true,

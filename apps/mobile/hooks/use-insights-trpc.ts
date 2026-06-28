@@ -12,12 +12,8 @@ import {
 } from '@/lib/weekly-recap';
 
 export function getRecapTimezone(): string | undefined {
-  try {
-    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return typeof resolved === 'string' && resolved.trim().length > 0 ? resolved : undefined;
-  } catch {
-    return undefined;
-  }
+  const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return typeof resolved === 'string' && resolved.trim().length > 0 ? resolved : undefined;
 }
 
 function useWeeklyRecapClock(enabled = true) {

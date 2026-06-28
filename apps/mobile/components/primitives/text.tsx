@@ -1,4 +1,8 @@
 import type { ReactNode } from 'react';
+import type {
+  TextTone as DesignTextTone,
+  TextVariant as DesignTextVariant,
+} from '@zine/design-system';
 import {
   Text as RNText,
   type TextProps as RNTextProps,
@@ -10,25 +14,8 @@ import {
 import { Colors, Fonts, Typography, type ThemeColors, type ThemeName } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-export type TextVariant = keyof typeof Typography;
-
-export type TextTone =
-  | 'primary'
-  | 'subheader'
-  | 'secondary'
-  | 'tertiary'
-  | 'inverse'
-  | 'accent'
-  | 'accentMuted'
-  | 'accentForeground'
-  | 'success'
-  | 'warning'
-  | 'warningForeground'
-  | 'error'
-  | 'info'
-  | 'overlay'
-  | 'overlayMuted'
-  | 'overlaySubtle';
+export type TextVariant = DesignTextVariant;
+export type TextTone = DesignTextTone;
 
 export type TextFont = keyof typeof Fonts;
 export type TextTransform = 'default' | 'none' | 'uppercase';

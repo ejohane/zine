@@ -1,4 +1,9 @@
 import type { ReactNode } from 'react';
+import type {
+  BadgeShape as DesignBadgeShape,
+  BadgeSize as DesignBadgeSize,
+  BadgeTone as DesignBadgeTone,
+} from '@zine/design-system';
 import {
   View,
   type ViewProps,
@@ -13,18 +18,9 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 
 import { Text, type TextTone, type TextVariant } from './text';
 
-export type BadgeTone =
-  | 'subtle'
-  | 'neutral'
-  | 'accent'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'info'
-  | 'overlay';
-
-export type BadgeSize = 'sm' | 'md';
-export type BadgeShape = 'rounded' | 'pill';
+export type BadgeTone = DesignBadgeTone;
+export type BadgeSize = DesignBadgeSize;
+export type BadgeShape = DesignBadgeShape;
 
 export interface BadgeProps extends ViewProps {
   label: string;

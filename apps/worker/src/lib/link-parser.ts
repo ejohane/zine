@@ -8,6 +8,7 @@
 import {
   ContentType,
   getSubstackArticleProviderId,
+  isValidUrl,
   normalizeSubstackArticleUrl,
   Provider,
 } from '@zine/shared';
@@ -25,6 +26,8 @@ export interface ParsedLink {
   /** Cleaned URL with tracking parameters removed */
   canonicalUrl: string;
 }
+
+export { isValidUrl };
 
 // Tracking Parameter Cleanup
 
@@ -252,32 +255,6 @@ function parseGeneric(url: URL): ParsedLink {
 }
 
 // Public API
-
-/**
- * Check if a string is a valid URL
- *
- * @param url - String to validate
- * @returns true if the string is a valid HTTP/HTTPS URL
- *
- * @example
- * ```typescript
- * isValidUrl('https://youtube.com/watch?v=abc123')  // true
- * isValidUrl('not-a-url')                           // false
- * isValidUrl('ftp://example.com')                   // false (not HTTP/HTTPS)
- * ```
- */
-export function isValidUrl(url: string): boolean {
-  if (!url || typeof url !== 'string') {
-    return false;
-  }
-
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Parse a URL to extract provider information

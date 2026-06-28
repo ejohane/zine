@@ -8,15 +8,7 @@ import { Surface, Text } from '@/components/primitives';
 import { Radius, Spacing, Typography } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import type { CreatorSearchResult } from '@/hooks/use-search';
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
+import { getInitials } from '@/lib/person';
 
 function getLibraryCountText(count: number): string {
   if (count <= 0) {

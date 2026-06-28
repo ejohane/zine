@@ -1,18 +1,11 @@
-import { z } from 'zod';
+import { ApiTokenScopesSchema, type ApiTokenScope } from '@zine/shared/api-tokens';
 import type { apiTokens } from '../db/schema';
 
 export const API_TOKEN_PREFIX = 'zine_pat_';
 
-export const ApiTokenScopeSchema = z.enum(['bookmarks:read', 'bookmarks:write']);
-export const ApiTokenScopesSchema = z
-  .array(ApiTokenScopeSchema)
-  .min(1)
-  .max(2)
-  .refine((scopes) => new Set(scopes).size === scopes.length, {
-    message: 'Scopes must be unique',
-  });
+export { ApiTokenScopesSchema };
+export type { ApiTokenScope };
 
-export type ApiTokenScope = z.infer<typeof ApiTokenScopeSchema>;
 export type ApiTokenRecord = typeof apiTokens.$inferSelect;
 
 function toBase64Url(bytes: Uint8Array): string {

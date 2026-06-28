@@ -24,13 +24,7 @@ import { Colors, Typography, Spacing, Radius, ContentColors } from '@/constants/
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useInfiniteInboxItems, useArchiveItem, useBookmarkItem } from '@/hooks/use-items-trpc';
-import {
-  mapContentType,
-  mapProvider,
-  type ContentType,
-  type Provider,
-  type UIContentType,
-} from '@/lib/content-utils';
+import { mapContentType, mapProvider, type UIContentType } from '@/lib/content-utils';
 import { useSyncAll } from '@/hooks/use-sync-all';
 import {
   addPendingDismissedId,
@@ -285,8 +279,8 @@ export default function InboxScreen() {
         creator: item.creator,
         creatorImageUrl: item.creatorImageUrl ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as ContentType,
-        provider: mapProvider(item.provider) as Provider,
+        contentType: mapContentType(item.contentType),
+        provider: mapProvider(item.provider),
         duration: item.duration ?? null,
         readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: null,

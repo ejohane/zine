@@ -14,7 +14,7 @@ import {
   type ListRenderItemInfo,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { ContentType as ApiContentType } from '@zine/shared';
+import { ContentType as ApiContentType, type CollectionRules } from '@zine/shared';
 
 import { FilterChip } from '@/components/filter-chip';
 import { ArticleIcon, PodcastIcon, PostIcon, VideoIcon } from '@/components/icons';
@@ -28,17 +28,13 @@ import { useTabPrefetch } from '@/hooks/use-prefetch';
 import { useCollections, useInfiniteLibraryItems } from '@/hooks/use-items-trpc';
 import { usePeople } from '@/hooks/use-people';
 import { useSubscriptions as useSubscriptionsQuery } from '@/hooks/use-subscriptions-query';
-import {
-  mapContentType,
-  mapProvider,
-  type UIContentType,
-  type UIProvider,
-} from '@/lib/content-utils';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 import { getSubscriptionSourceConfig, type SubscriptionSource } from '@/lib/subscription-sources';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
 } from '@/lib/native-large-title-header';
+import { getInitials } from '@/lib/person';
 import { trpc } from '@/lib/trpc';
 
 function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
@@ -183,25 +179,6 @@ type LibraryObjectTileModel = {
   icon: ComponentType<{ size?: number; color?: string }>;
 };
 
-type CollectionRuleSummaryInput = {
-  contentTypes?: unknown[];
-  providers?: unknown[];
-  tagIds?: unknown[];
-  isFinished?: boolean;
-  search?: string;
-  minLengthMinutes?: number;
-  maxLengthMinutes?: number;
-};
-
-function getInitials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
-}
-
 function getLibraryObjectTitle(activeObject: LibraryObject): string {
   switch (activeObject) {
     case 'people':
@@ -216,7 +193,7 @@ function getLibraryObjectTitle(activeObject: LibraryObject): string {
   }
 }
 
-function getCollectionRuleSummary(rules: CollectionRuleSummaryInput): string {
+function getCollectionRuleSummary(rules: CollectionRules): string {
   const parts: string[] = [];
 
   if (rules.contentTypes?.length) parts.push('content type');
@@ -486,8 +463,8 @@ export default function LibraryScreen() {
         creator: item.creator,
         creatorImageUrl: item.creatorImageUrl ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as UIContentType,
-        provider: mapProvider(item.provider) as UIProvider,
+        contentType: mapContentType(item.contentType),
+        provider: mapProvider(item.provider),
         duration: item.duration ?? null,
         readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: item.bookmarkedAt ?? null,
@@ -638,7 +615,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(tabs)/collection/[id]',
         params: { id: collectionId },
-      } as unknown as Href);
+      });
     },
     [router]
   );

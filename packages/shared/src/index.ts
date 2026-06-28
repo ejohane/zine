@@ -131,6 +131,10 @@ export type {
   TelemetryEnvelope,
 } from './telemetry';
 
+// Personal access token contracts
+export { ApiTokenScopeSchema, ApiTokenScopesSchema } from './api-tokens';
+export type { ApiTokenScope } from './api-tokens';
+
 // Query persistence helpers
 export {
   QUERY_PERSISTENCE_STORAGE_PREFIX,

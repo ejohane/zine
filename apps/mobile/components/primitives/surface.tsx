@@ -1,4 +1,8 @@
 import type { ReactNode } from 'react';
+import type {
+  SurfaceBorder as DesignSurfaceBorder,
+  SurfaceTone as DesignSurfaceTone,
+} from '@zine/design-system';
 import { View, type ViewProps, type ViewStyle, type StyleProp, StyleSheet } from 'react-native';
 
 import {
@@ -11,18 +15,8 @@ import {
 } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-export type SurfaceTone =
-  | 'canvas'
-  | 'subtle'
-  | 'elevated'
-  | 'raised'
-  | 'success'
-  | 'warning'
-  | 'error'
-  | 'info'
-  | 'transparent';
-
-export type SurfaceBorder = 'none' | 'subtle' | 'default' | 'tone';
+export type SurfaceTone = DesignSurfaceTone;
+export type SurfaceBorder = DesignSurfaceBorder;
 
 export interface SurfaceProps extends ViewProps {
   children?: ReactNode;

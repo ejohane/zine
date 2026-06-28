@@ -236,7 +236,6 @@ export async function initiateSyncJob(
   ]);
 
   // 7. Enqueue messages for each subscription
-  // Note: Queue binding will be added in the next step
   const queue = (env as EnvWithQueue).SYNC_QUEUE;
   if (queue) {
     const messages: SyncQueueMessage[] = syncableSubs.map((sub) => ({
@@ -271,8 +270,7 @@ export async function initiateSyncJob(
       release: jobTelemetry.release,
     });
   } else {
-    // Fallback: Queue not available, process synchronously
-    // This allows the feature to work in development without queue setup
+    // Local development can run without a queue binding.
     syncLogger.warn('Queue not available, falling back to synchronous processing', {
       operation: 'subscriptions.syncAllAsync',
       event: 'subscriptions.sync.fallback',
@@ -284,7 +282,6 @@ export async function initiateSyncJob(
       release: jobTelemetry.release,
     });
 
-    // Process subscriptions synchronously
     await processSyncFallback(
       jobId,
       userId,

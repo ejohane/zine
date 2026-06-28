@@ -19,12 +19,7 @@ import { EmptyState, ErrorState, InvalidParamState, LoadingState } from '@/compo
 import { Colors, ContentColors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHomeData } from '@/hooks/use-items-trpc';
-import {
-  mapContentType,
-  mapProvider,
-  type UIContentType,
-  type UIProvider,
-} from '@/lib/content-utils';
+import { mapContentType, mapProvider, type UIContentType } from '@/lib/content-utils';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
@@ -103,8 +98,8 @@ function mapHomeItemToCard(item: HomeItem, contentType?: UIContentType): ItemCar
     creator: item.publisher ?? item.creator,
     creatorImageUrl: item.creatorImageUrl ?? null,
     thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: contentType ?? (mapContentType(item.contentType) as UIContentType),
-    provider: mapProvider(item.provider) as UIProvider,
+    contentType: contentType ?? mapContentType(item.contentType),
+    provider: mapProvider(item.provider),
     duration: item.duration ?? null,
     readingTimeMinutes: item.readingTimeMinutes ?? null,
   };

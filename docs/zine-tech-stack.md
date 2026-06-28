@@ -78,7 +78,6 @@ zine/
 │       │   │   └── transformers.ts # Provider data transformers
 │       │   ├── providers/         # Provider API clients
 │       │   │   ├── youtube.ts     # YouTube Data API
-│       │   │   ├── youtube-quota.ts # Quota tracking
 │       │   │   └── spotify.ts     # Spotify Web API
 │       │   ├── polling/           # Background sync
 │       │   │   ├── scheduler.ts   # Cron-based polling

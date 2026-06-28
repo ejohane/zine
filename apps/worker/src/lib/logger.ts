@@ -157,5 +157,3 @@ export const pollLogger = logger.child('poll');
 export const authLogger = logger.child('auth');
 export const webhookLogger = logger.child('webhook');
 export const ingestionLogger = logger.child('ingestion');
-export const healthLogger = logger.child('health');
-export const quotaLogger = logger.child('quota');

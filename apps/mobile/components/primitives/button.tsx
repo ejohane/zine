@@ -1,4 +1,9 @@
 import type { ReactNode } from 'react';
+import type {
+  ButtonSize as DesignButtonSize,
+  ButtonTone as DesignButtonTone,
+  ButtonVariant as DesignButtonVariant,
+} from '@zine/design-system';
 import {
   ActivityIndicator,
   Pressable,
@@ -21,9 +26,9 @@ import {
 } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
-export type ButtonTone = 'default' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonVariant = DesignButtonVariant;
+export type ButtonTone = DesignButtonTone;
+export type ButtonSize = DesignButtonSize;
 
 export interface ButtonProps extends Omit<PressableProps, 'children' | 'style'> {
   label: string;

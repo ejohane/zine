@@ -16,6 +16,7 @@ import {
   Video,
   type LucideIcon,
 } from 'lucide-react';
+import type { ApiTokenScope } from '@zine/shared/api-tokens';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 
@@ -193,8 +194,6 @@ function InstallAppSection({
     </div>
   );
 }
-
-type ApiTokenScope = 'bookmarks:read' | 'bookmarks:write';
 
 function formatTimestamp(value: number | null | undefined): string {
   if (!value) {

@@ -6,7 +6,7 @@ import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { Surface } from '@/components/primitives/surface';
 import { Text } from '@/components/primitives/text';
 import { IconSizes } from '@/constants/theme';
-import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 
 import { styles } from '../../item-detail-styles';
 import type { ItemDetailColors, ItemDetailItem } from '../types';
@@ -35,8 +35,8 @@ export function ItemDetailOtherBookmarks({
     creator: bookmark.creator,
     creatorImageUrl: bookmark.creatorImageUrl ?? null,
     thumbnailUrl: bookmark.thumbnailUrl ?? null,
-    contentType: mapContentType(bookmark.contentType) as ContentType,
-    provider: mapProvider(bookmark.provider) as Provider,
+    contentType: mapContentType(bookmark.contentType),
+    provider: mapProvider(bookmark.provider),
     duration: bookmark.duration ?? null,
     readingTimeMinutes: bookmark.readingTimeMinutes ?? null,
     bookmarkedAt: bookmark.bookmarkedAt ?? null,

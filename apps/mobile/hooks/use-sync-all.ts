@@ -4,16 +4,10 @@
  * Triggers async sync across all active subscriptions using Cloudflare Queues.
  * Provides real-time progress tracking with a non-blocking UX.
  *
- * New async architecture:
+ * Flow:
  * 1. syncAllAsync: Returns immediately after enqueuing messages
  * 2. Poll syncStatus every 2s for progress updates
  * 3. activeSyncJob: Check on app resume if sync is in progress
- *
- * Benefits over the old blocking approach:
- * - Instant response (< 500ms) vs 30+ seconds blocking
- * - Error isolation (one failure doesn't affect others)
- * - App restart safe (progress persists in KV)
- * - No subrequest limit issues
  *
  * @see zine-wsjp: Feature: Async Pull-to-Refresh with Cloudflare Queues
  */
@@ -66,24 +60,19 @@ export interface UseSyncAllReturn {
   lastResult: SyncAllResult | null;
 }
 
-// Hook Implementation
-
 export function useSyncAll(): UseSyncAllReturn {
   const utils = trpc.useUtils();
   const { ensureFreshAuthToken } = useAuthResumeGate();
 
-  // UI state
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [lastResult, setLastResult] = useState<SyncAllResult | null>(null);
   const [progress, setProgress] = useState<SyncProgress | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Refs for cleanup and tracking
   const cooldownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const statusPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const activeJobIdRef = useRef<string | null>(null);
 
-  // tRPC mutations/queries
   const syncAsyncMutation = trpc.subscriptions.syncAllAsync.useMutation();
 
   /**

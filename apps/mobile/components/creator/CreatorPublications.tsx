@@ -13,7 +13,7 @@ import { Text } from '@/components/primitives';
 import { Radius, Typography, Spacing, type ThemeColors } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { useCreatorPublications } from '@/hooks/use-creator';
-import { mapContentType, mapProvider, type ContentType, type Provider } from '@/lib/content-utils';
+import { mapContentType, mapProvider } from '@/lib/content-utils';
 
 export interface CreatorPublicationsProps {
   /** The creator ID to fetch publications for */
@@ -65,8 +65,8 @@ export function CreatorPublications({ creatorId, stateOverride }: CreatorPublica
     creator: item.creator,
     creatorImageUrl: item.creatorImageUrl ?? null,
     thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType) as ContentType,
-    provider: mapProvider(item.provider) as Provider,
+    contentType: mapContentType(item.contentType),
+    provider: mapProvider(item.provider),
     duration: item.duration ?? null,
     readingTimeMinutes: item.readingTimeMinutes ?? null,
     bookmarkedAt: item.bookmarkedAt ?? null,

@@ -10,8 +10,12 @@ import {
   View,
   type ListRenderItemInfo,
 } from 'react-native';
-import type { ContentType as ApiContentType, Provider as ApiProvider } from '@zine/shared';
-import { CollectionSort, type CollectionRules } from '@zine/shared';
+import {
+  CollectionSort,
+  type CollectionRules,
+  type ContentType as ApiContentType,
+  type Provider as ApiProvider,
+} from '@zine/shared';
 
 import { ItemCard, type ItemCardData } from '@/components/item-card';
 import { EmptyState, ErrorState, InvalidParamState, LoadingState } from '@/components/list-states';
@@ -23,8 +27,6 @@ import {
   getProviderLabel,
   mapContentType,
   mapProvider,
-  type UIContentType,
-  type UIProvider,
 } from '@/lib/content-utils';
 import { isValidId } from '@/lib/route-validation';
 import {
@@ -162,8 +164,8 @@ export default function CollectionScreen() {
         creator: item.creator,
         creatorImageUrl: item.creatorImageUrl ?? null,
         thumbnailUrl: item.thumbnailUrl ?? null,
-        contentType: mapContentType(item.contentType) as UIContentType,
-        provider: mapProvider(item.provider) as UIProvider,
+        contentType: mapContentType(item.contentType),
+        provider: mapProvider(item.provider),
         duration: item.duration ?? null,
         readingTimeMinutes: item.readingTimeMinutes ?? null,
         bookmarkedAt: item.bookmarkedAt ?? null,

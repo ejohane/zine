@@ -39,13 +39,7 @@ import {
   getVisibleFeaturedGridItems,
 } from '@/lib/home-layout';
 import { useInfiniteInboxItems, useHomeData } from '@/hooks/use-items-trpc';
-import {
-  mapContentType,
-  mapProvider,
-  type ContentType,
-  type Provider,
-  type UIContentType,
-} from '@/lib/content-utils';
+import { mapContentType, mapProvider, type UIContentType } from '@/lib/content-utils';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
@@ -121,8 +115,8 @@ function mapHomeItemToCard(
     creator: item.publisher ?? item.creator,
     creatorImageUrl: item.creatorImageUrl ?? null,
     thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType) as ContentType,
-    provider: mapProvider(item.provider) as Provider,
+    contentType: mapContentType(item.contentType),
+    provider: mapProvider(item.provider),
     duration: item.duration ?? null,
     readingTimeMinutes: item.readingTimeMinutes ?? null,
   };
@@ -246,8 +240,8 @@ export default function HomeScreen() {
       creator: item.publisher ?? item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType) as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: mapContentType(item.contentType),
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -260,8 +254,8 @@ export default function HomeScreen() {
       creator: item.publisher ?? item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType) as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: mapContentType(item.contentType),
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -276,8 +270,8 @@ export default function HomeScreen() {
       creator: item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType) as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: mapContentType(item.contentType),
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -290,8 +284,8 @@ export default function HomeScreen() {
       creator: item.publisher ?? item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'podcast' as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: 'podcast',
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -304,8 +298,8 @@ export default function HomeScreen() {
       creator: item.publisher ?? item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'video' as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: 'video',
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -318,8 +312,8 @@ export default function HomeScreen() {
       creator: item.publisher ?? item.creator,
       creatorImageUrl: item.creatorImageUrl ?? null,
       thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'article' as ContentType,
-      provider: mapProvider(item.provider) as Provider,
+      contentType: 'article',
+      provider: mapProvider(item.provider),
       duration: item.duration ?? null,
       readingTimeMinutes: item.readingTimeMinutes ?? null,
     }));
@@ -358,7 +352,7 @@ export default function HomeScreen() {
       router.push({
         pathname: '/(tabs)/collection/[id]',
         params: { id: collectionId },
-      } as unknown as Href);
+      });
     },
     [router]
   );
@@ -373,7 +367,7 @@ export default function HomeScreen() {
       router.push({
         pathname: '/(tabs)/section/[section]',
         params,
-      } as unknown as Href);
+      });
     },
     [contentTypeFilter, router]
   );
@@ -387,7 +381,7 @@ export default function HomeScreen() {
     router.push({
       pathname: '/(tabs)/inbox',
       params: { contentType: contentTypeFilter },
-    } as unknown as Href);
+    });
   }, [contentTypeFilter, router]);
 
   const handleOpenNavigationPane = useCallback(() => {
