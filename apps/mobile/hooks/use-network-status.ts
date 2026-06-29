@@ -9,7 +9,7 @@
  * @see Frontend Spec Section 9.1 for detailed requirements
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import NetInfo, {
   type NetInfoState,
   type NetInfoSubscription,
@@ -84,47 +84,4 @@ export function useNetworkStatus(): NetworkStatus {
   }, []);
 
   return status;
-}
-
-/**
- * Imperative hook for checking network status on-demand.
- *
- * Returns a function that can be called to check if the device is currently online.
- * Useful for checking connectivity before making network requests.
- *
- * Handles Android's null isInternetReachable by treating it as "assume reachable"
- * (isInternetReachable !== false instead of === true).
- *
- * @returns An async function that resolves to true if online, false if offline
- *
- * @example
- * ```tsx
- * function SubmitButton() {
- *   const checkIsOnline = useIsOnline();
- *
- *   const handleSubmit = async () => {
- *     const isOnline = await checkIsOnline();
- *
- *     if (!isOnline) {
- *       // Queue action for later
- *       await offlineQueue.enqueue(action);
- *       showToast('Saved offline. Will sync when online.');
- *       return;
- *     }
- *
- *     // Proceed with online submission
- *     await submitToServer();
- *   };
- *
- *   return <Button onPress={handleSubmit}>Submit</Button>;
- * }
- * ```
- */
-export function useIsOnline(): () => Promise<boolean> {
-  return useCallback(async () => {
-    const state = await NetInfo.fetch();
-    // isConnected must be true AND isInternetReachable must not be false
-    // (null means "unknown/assume reachable" - common on Android)
-    return state.isConnected === true && state.isInternetReachable !== false;
-  }, []);
 }

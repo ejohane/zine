@@ -45,40 +45,36 @@ const RemoveSourceInputSchema = z.object({
  * Derive a name from the feedUrl if not provided
  */
 function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
-  try {
-    const url = new URL(feedUrl);
+  const url = new URL(feedUrl);
 
-    switch (provider) {
-      case Provider.YOUTUBE:
-        // Extract channel name from YouTube URL
-        if (url.pathname.startsWith('/@')) {
-          return url.pathname.slice(2); // Remove '/@'
-        }
-        if (url.pathname.startsWith('/channel/')) {
-          return `YouTube Channel`;
-        }
-        return url.hostname;
+  switch (provider) {
+    case Provider.YOUTUBE:
+      // Extract channel name from YouTube URL
+      if (url.pathname.startsWith('/@')) {
+        return url.pathname.slice(2); // Remove '/@'
+      }
+      if (url.pathname.startsWith('/channel/')) {
+        return `YouTube Channel`;
+      }
+      return url.hostname;
 
-      case Provider.SPOTIFY:
-        // Extract show name from Spotify URL
-        return `Spotify Show`;
+    case Provider.SPOTIFY:
+      // Extract show name from Spotify URL
+      return `Spotify Show`;
 
-      case Provider.SUBSTACK:
-        // Extract subdomain or path
-        if (url.hostname.endsWith('.substack.com')) {
-          return url.hostname.replace('.substack.com', '');
-        }
-        return url.hostname;
+    case Provider.SUBSTACK:
+      // Extract subdomain or path
+      if (url.hostname.endsWith('.substack.com')) {
+        return url.hostname.replace('.substack.com', '');
+      }
+      return url.hostname;
 
-      case Provider.RSS:
-        // Use hostname as name
-        return url.hostname;
+    case Provider.RSS:
+      // Use hostname as name
+      return url.hostname;
 
-      default:
-        return url.hostname;
-    }
-  } catch {
-    return 'Unknown Source';
+    default:
+      return url.hostname;
   }
 }
 
@@ -86,43 +82,39 @@ function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
  * Extract provider ID from URL based on provider type
  */
 function extractProviderId(feedUrl: string, provider: Provider): string {
-  try {
-    const url = new URL(feedUrl);
+  const url = new URL(feedUrl);
 
-    switch (provider) {
-      case Provider.YOUTUBE:
-        // Try to extract channel ID from various YouTube URL formats
-        if (url.pathname.startsWith('/@')) {
-          return url.pathname.slice(2);
-        }
-        if (url.pathname.startsWith('/channel/')) {
-          return url.pathname.slice(9).split('/')[0];
-        }
-        // For playlist or other URLs, use the full path
-        return url.pathname.slice(1);
-
-      case Provider.SPOTIFY: {
-        // Extract show ID from Spotify URL (e.g., /show/{id})
-        const spotifyMatch = url.pathname.match(/\/show\/([a-zA-Z0-9]+)/);
-        return spotifyMatch ? spotifyMatch[1] : url.pathname;
+  switch (provider) {
+    case Provider.YOUTUBE:
+      // Try to extract channel ID from various YouTube URL formats
+      if (url.pathname.startsWith('/@')) {
+        return url.pathname.slice(2);
       }
+      if (url.pathname.startsWith('/channel/')) {
+        return url.pathname.slice(9).split('/')[0];
+      }
+      // For playlist or other URLs, use the full path
+      return url.pathname.slice(1);
 
-      case Provider.SUBSTACK:
-        // Use subdomain or path as ID
-        if (url.hostname.endsWith('.substack.com')) {
-          return url.hostname.replace('.substack.com', '');
-        }
-        return url.hostname;
-
-      case Provider.RSS:
-        // Use hostname + path as unique ID
-        return `${url.hostname}${url.pathname}`;
-
-      default:
-        return feedUrl;
+    case Provider.SPOTIFY: {
+      // Extract show ID from Spotify URL (e.g., /show/{id})
+      const spotifyMatch = url.pathname.match(/\/show\/([a-zA-Z0-9]+)/);
+      return spotifyMatch ? spotifyMatch[1] : url.pathname;
     }
-  } catch {
-    return feedUrl;
+
+    case Provider.SUBSTACK:
+      // Use subdomain or path as ID
+      if (url.hostname.endsWith('.substack.com')) {
+        return url.hostname.replace('.substack.com', '');
+      }
+      return url.hostname;
+
+    case Provider.RSS:
+      // Use hostname + path as unique ID
+      return `${url.hostname}${url.pathname}`;
+
+    default:
+      return feedUrl;
   }
 }
 

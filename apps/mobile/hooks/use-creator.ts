@@ -13,6 +13,7 @@
  */
 
 import { trpc } from '../lib/trpc';
+import type { RouterOutputs } from '../lib/trpc-types';
 
 /**
  * Creator profile returned from creators.get
@@ -30,34 +31,9 @@ export interface Creator {
   updatedAt: number;
 }
 
-/**
- * Latest content item from a creator
- * Note: Field names match backend LatestContentItem (id, externalUrl, publishedAt as number)
- */
-export interface CreatorContentItem {
-  id: string;
-  title: string;
-  description: string | null;
-  thumbnailUrl: string | null;
-  duration: number | null;
-  publishedAt: number | null;
-  externalUrl: string;
-  itemId?: string | null;
-  isBookmarked?: boolean;
-}
-
-export type LatestContentCacheStatus = 'HIT' | 'MISS';
-
-/**
- * Response from creators.fetchLatestContent
- */
-export interface LatestContentResponse {
-  items: CreatorContentItem[];
-  provider?: string;
-  cacheStatus?: LatestContentCacheStatus;
-  reason?: string;
-  connectUrl?: string;
-}
+export type LatestContentResponse = RouterOutputs['creators']['fetchLatestContent'];
+export type CreatorContentItem = LatestContentResponse['items'][number];
+export type LatestContentCacheStatus = NonNullable<LatestContentResponse['cacheStatus']>;
 
 /**
  * Response from creators.checkSubscription

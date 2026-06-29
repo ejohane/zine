@@ -3,10 +3,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { WeeklyRecapCard } from './weekly-recap-card';
 
-type RenderedNode = {
-  type: unknown;
-  children: ReadonlyArray<unknown>;
-};
+type RenderedNode = ReturnType<ReturnType<typeof TestRenderer.create>['root']['findAll']>[number];
 
 jest.mock('react-native', () => ({
   __esModule: true,
