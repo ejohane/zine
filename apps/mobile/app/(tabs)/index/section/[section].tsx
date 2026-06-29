@@ -19,7 +19,8 @@ import { EmptyState, ErrorState, InvalidParamState, LoadingState } from '@/compo
 import { Colors, ContentColors, Spacing, Typography } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useHomeData } from '@/hooks/use-items-trpc';
-import { mapContentType, mapProvider, type UIContentType } from '@/lib/content-utils';
+import { type UIContentType } from '@/lib/content-utils';
+import { mapItemToCardData } from '@/lib/item-card-data';
 import {
   createLightweightHeaderScreenOptions,
   useCollapsedHeaderTitle,
@@ -92,17 +93,7 @@ function parseContentTypeFilter(value: string | string[] | undefined): UIContent
 }
 
 function mapHomeItemToCard(item: HomeItem, contentType?: UIContentType): ItemCardData {
-  return {
-    id: item.id,
-    title: item.title,
-    creator: item.publisher ?? item.creator,
-    creatorImageUrl: item.creatorImageUrl ?? null,
-    thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: contentType ?? mapContentType(item.contentType),
-    provider: mapProvider(item.provider),
-    duration: item.duration ?? null,
-    readingTimeMinutes: item.readingTimeMinutes ?? null,
-  };
+  return mapItemToCardData(item, contentType ? { contentType } : undefined);
 }
 
 function getSectionItems(

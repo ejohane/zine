@@ -105,33 +105,29 @@ function createMockSourcesCaller(options: {
  * Derive provider ID from URL (matches router implementation)
  */
 function deriveProviderId(feedUrl: string, provider: Provider): string {
-  try {
-    const url = new URL(feedUrl);
-    switch (provider) {
-      case Provider.YOUTUBE:
-        if (url.pathname.startsWith('/@')) {
-          return url.pathname.slice(2);
-        }
-        if (url.pathname.startsWith('/channel/')) {
-          return url.pathname.slice(9).split('/')[0];
-        }
-        return url.pathname.slice(1);
-      case Provider.SPOTIFY: {
-        const spotifyMatch = url.pathname.match(/\/show\/([a-zA-Z0-9]+)/);
-        return spotifyMatch ? spotifyMatch[1] : url.pathname;
+  const url = new URL(feedUrl);
+  switch (provider) {
+    case Provider.YOUTUBE:
+      if (url.pathname.startsWith('/@')) {
+        return url.pathname.slice(2);
       }
-      case Provider.SUBSTACK:
-        if (url.hostname.endsWith('.substack.com')) {
-          return url.hostname.replace('.substack.com', '');
-        }
-        return url.hostname;
-      case Provider.RSS:
-        return `${url.hostname}${url.pathname}`;
-      default:
-        return feedUrl;
+      if (url.pathname.startsWith('/channel/')) {
+        return url.pathname.slice(9).split('/')[0];
+      }
+      return url.pathname.slice(1);
+    case Provider.SPOTIFY: {
+      const spotifyMatch = url.pathname.match(/\/show\/([a-zA-Z0-9]+)/);
+      return spotifyMatch ? spotifyMatch[1] : url.pathname;
     }
-  } catch {
-    return feedUrl;
+    case Provider.SUBSTACK:
+      if (url.hostname.endsWith('.substack.com')) {
+        return url.hostname.replace('.substack.com', '');
+      }
+      return url.hostname;
+    case Provider.RSS:
+      return `${url.hostname}${url.pathname}`;
+    default:
+      return feedUrl;
   }
 }
 
@@ -139,31 +135,27 @@ function deriveProviderId(feedUrl: string, provider: Provider): string {
  * Derive name from URL (matches router implementation)
  */
 function deriveNameFromUrl(feedUrl: string, provider: Provider): string {
-  try {
-    const url = new URL(feedUrl);
-    switch (provider) {
-      case Provider.YOUTUBE:
-        if (url.pathname.startsWith('/@')) {
-          return url.pathname.slice(2);
-        }
-        if (url.pathname.startsWith('/channel/')) {
-          return 'YouTube Channel';
-        }
-        return url.hostname;
-      case Provider.SPOTIFY:
-        return 'Spotify Show';
-      case Provider.SUBSTACK:
-        if (url.hostname.endsWith('.substack.com')) {
-          return url.hostname.replace('.substack.com', '');
-        }
-        return url.hostname;
-      case Provider.RSS:
-        return url.hostname;
-      default:
-        return 'Unknown Source';
-    }
-  } catch {
-    return 'Unknown Source';
+  const url = new URL(feedUrl);
+  switch (provider) {
+    case Provider.YOUTUBE:
+      if (url.pathname.startsWith('/@')) {
+        return url.pathname.slice(2);
+      }
+      if (url.pathname.startsWith('/channel/')) {
+        return 'YouTube Channel';
+      }
+      return url.hostname;
+    case Provider.SPOTIFY:
+      return 'Spotify Show';
+    case Provider.SUBSTACK:
+      if (url.hostname.endsWith('.substack.com')) {
+        return url.hostname.replace('.substack.com', '');
+      }
+      return url.hostname;
+    case Provider.RSS:
+      return url.hostname;
+    default:
+      return 'Unknown Source';
   }
 }
 

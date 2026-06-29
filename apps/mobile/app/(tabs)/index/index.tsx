@@ -39,7 +39,8 @@ import {
   getVisibleFeaturedGridItems,
 } from '@/lib/home-layout';
 import { useInfiniteInboxItems, useHomeData } from '@/hooks/use-items-trpc';
-import { mapContentType, mapProvider, type UIContentType } from '@/lib/content-utils';
+import { type UIContentType } from '@/lib/content-utils';
+import { mapItemToCardData } from '@/lib/item-card-data';
 import { useConnections } from '@/hooks/use-connections';
 import { useSubscriptions } from '@/hooks/use-subscriptions-query';
 import { getSubscriptionIntegrationAttention } from '@/lib/subscription-integration-attention';
@@ -109,17 +110,7 @@ const contentTypeFilters: {
 function mapHomeItemToCard(
   item: NonNullable<ReturnType<typeof useHomeData>['data']>['recentBookmarks'][number]
 ): ItemCardData {
-  return {
-    id: item.id,
-    title: item.title,
-    creator: item.publisher ?? item.creator,
-    creatorImageUrl: item.creatorImageUrl ?? null,
-    thumbnailUrl: item.thumbnailUrl ?? null,
-    contentType: mapContentType(item.contentType),
-    provider: mapProvider(item.provider),
-    duration: item.duration ?? null,
-    readingTimeMinutes: item.readingTimeMinutes ?? null,
-  };
+  return mapItemToCardData(item);
 }
 
 function SectionHeader({
@@ -234,89 +225,35 @@ export default function HomeScreen() {
   );
 
   const jumpBackInItems = useMemo((): ItemCardData[] => {
-    return (homeData?.jumpBackIn ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.publisher ?? item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType),
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return (homeData?.jumpBackIn ?? []).map((item) => mapItemToCardData(item));
   }, [homeData?.jumpBackIn]);
 
   const recentlyBookmarked = useMemo((): ItemCardData[] => {
-    return (homeData?.recentBookmarks ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.publisher ?? item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType),
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return (homeData?.recentBookmarks ?? []).map((item) => mapItemToCardData(item));
   }, [homeData?.recentBookmarks]);
 
   const inboxItems = useMemo((): ItemCardData[] => {
     const allInboxItems = inboxPages?.pages.flatMap((page) => page.items) ?? [];
 
-    return allInboxItems.map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: mapContentType(item.contentType),
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return allInboxItems.map((item) => mapItemToCardData(item));
   }, [inboxPages?.pages]);
 
   const podcasts = useMemo((): ItemCardData[] => {
-    return (homeData?.byContentType.podcasts ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.publisher ?? item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'podcast',
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return (homeData?.byContentType.podcasts ?? []).map((item) =>
+      mapItemToCardData(item, { contentType: 'podcast' })
+    );
   }, [homeData?.byContentType.podcasts]);
 
   const videos = useMemo((): ItemCardData[] => {
-    return (homeData?.byContentType.videos ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.publisher ?? item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'video',
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return (homeData?.byContentType.videos ?? []).map((item) =>
+      mapItemToCardData(item, { contentType: 'video' })
+    );
   }, [homeData?.byContentType.videos]);
 
   const articles = useMemo((): ItemCardData[] => {
-    return (homeData?.byContentType.articles ?? []).map((item) => ({
-      id: item.id,
-      title: item.title,
-      creator: item.publisher ?? item.creator,
-      creatorImageUrl: item.creatorImageUrl ?? null,
-      thumbnailUrl: item.thumbnailUrl ?? null,
-      contentType: 'article',
-      provider: mapProvider(item.provider),
-      duration: item.duration ?? null,
-      readingTimeMinutes: item.readingTimeMinutes ?? null,
-    }));
+    return (homeData?.byContentType.articles ?? []).map((item) =>
+      mapItemToCardData(item, { contentType: 'article' })
+    );
   }, [homeData?.byContentType.articles]);
 
   const customCollectionSections = useMemo((): CustomHomeSectionItem[] => {
@@ -350,7 +287,7 @@ export default function HomeScreen() {
   const handleOpenCollection = useCallback(
     (collectionId: string) => {
       router.push({
-        pathname: '/(tabs)/collection/[id]',
+        pathname: '/(tabs)/index/collection/[id]',
         params: { id: collectionId },
       });
     },
@@ -365,7 +302,7 @@ export default function HomeScreen() {
       }
 
       router.push({
-        pathname: '/(tabs)/section/[section]',
+        pathname: '/(tabs)/index/section/[section]',
         params,
       });
     },
