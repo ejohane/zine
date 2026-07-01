@@ -46,6 +46,32 @@ export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
 
 /**
+ * Encode a JSON-serializable cursor payload to a base64url string.
+ */
+export function encodeCursorPayload(payload: unknown): string {
+  const json = JSON.stringify(payload);
+  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Decode a base64url JSON cursor payload.
+ */
+export function decodeCursorPayload(cursorString: string): unknown | null {
+  try {
+    // Restore base64 from base64url
+    let base64 = cursorString.replace(/-/g, '+').replace(/_/g, '/');
+    // Add padding if needed
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Encode a pagination cursor to a base64url string
  *
  * @param cursor - The cursor object to encode
@@ -61,9 +87,7 @@ export const MAX_PAGE_SIZE = 100;
  * ```
  */
 export function encodeCursor(cursor: PaginationCursor): string {
-  const json = JSON.stringify(cursor);
-  // Use base64url encoding (URL-safe, no padding)
-  return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return encodeCursorPayload(cursor);
 }
 
 /**
@@ -79,42 +103,32 @@ export function encodeCursor(cursor: PaginationCursor): string {
  * ```
  */
 export function decodeCursor(cursorString: string): PaginationCursor | null {
-  try {
-    // Restore base64 from base64url
-    let base64 = cursorString.replace(/-/g, '+').replace(/_/g, '/');
-    // Add padding if needed
-    while (base64.length % 4) {
-      base64 += '=';
+  const parsed = decodeCursorPayload(cursorString);
+
+  // Validate the cursor structure
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    'sortValue' in parsed &&
+    'id' in parsed &&
+    typeof parsed.sortValue === 'string' &&
+    typeof parsed.id === 'string'
+  ) {
+    const sortValue = parsed.sortValue.trim();
+    const id = parsed.id.trim();
+
+    // Reject empty values and non-date sort values to avoid malformed cursors.
+    if (!sortValue || !id || Number.isNaN(Date.parse(sortValue))) {
+      return null;
     }
 
-    const json = atob(base64);
-    const parsed = JSON.parse(json);
-
-    // Validate the cursor structure
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.sortValue === 'string' &&
-      typeof parsed.id === 'string'
-    ) {
-      const sortValue = parsed.sortValue.trim();
-      const id = parsed.id.trim();
-
-      // Reject empty values and non-date sort values to avoid malformed cursors.
-      if (!sortValue || !id || Number.isNaN(Date.parse(sortValue))) {
-        return null;
-      }
-
-      return {
-        sortValue,
-        id,
-      };
-    }
-
-    return null;
-  } catch {
-    return null;
+    return {
+      sortValue,
+      id,
+    };
   }
+
+  return null;
 }
 
 /**

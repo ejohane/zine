@@ -4,11 +4,31 @@ import {
   MAX_PAGE_SIZE,
   buildPaginatedQuery,
   decodeCursor,
+  decodeCursorPayload,
   encodeCursor,
+  encodeCursorPayload,
   processPaginatedResults,
 } from './pagination';
 
 describe('pagination utilities', () => {
+  describe('generic cursor payload encoding and decoding', () => {
+    it('round-trips non-standard cursor payloads', () => {
+      const payload = {
+        offset: 40,
+        priority: 1,
+        sortValue: '120',
+        id: 'user_item_123',
+      };
+
+      expect(decodeCursorPayload(encodeCursorPayload(payload))).toEqual(payload);
+    });
+
+    it('returns null for malformed generic cursor payloads', () => {
+      expect(decodeCursorPayload('not-base64')).toBeNull();
+      expect(decodeCursorPayload('')).toBeNull();
+    });
+  });
+
   describe('cursor encoding and decoding', () => {
     it('round-trips a valid cursor', () => {
       const original = {
