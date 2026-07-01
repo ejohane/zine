@@ -29,9 +29,12 @@ const originalClerkKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 // tokenCache Tests (Native Platform - Default)
 
 describe('tokenCache on native platforms (iOS/Android)', () => {
-  // Import the module once - jest.setup.js already mocks Platform.OS as 'ios'
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { tokenCache } = require('./auth');
+  // Import once - jest.setup.js already mocks Platform.OS as 'ios'
+  let tokenCache: (typeof import('./auth'))['tokenCache'];
+
+  beforeAll(async () => {
+    ({ tokenCache } = await import('./auth'));
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -189,11 +192,10 @@ describe('tokenCache on web platform', () => {
     //
     // To test this properly, we can verify the conditional logic exists
     // by checking the behavior pattern - tokenCache exists when OS !== 'web'
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { tokenCache } = require('./auth');
-
-    // On iOS (current mock), tokenCache should be defined
-    expect(tokenCache).toBeDefined();
+    return import('./auth').then(({ tokenCache }) => {
+      // On iOS (current mock), tokenCache should be defined
+      expect(tokenCache).toBeDefined();
+    });
 
     // The web platform test requires resetting modules with different Platform mock
     // This is verified by the implementation code: Platform.OS !== 'web' ? createTokenCache() : undefined
@@ -222,9 +224,9 @@ describe('tokenCache on web platform', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const authModule = require('./auth');
-    expect(authModule.tokenCache).toBeUndefined();
+    return import('./auth').then((authModule) => {
+      expect(authModule.tokenCache).toBeUndefined();
+    });
 
     // Restore for other tests
     jest.resetModules();
@@ -250,7 +252,7 @@ describe('validateClerkConfig', () => {
     }
   });
 
-  it('does not throw when CLERK_PUBLISHABLE_KEY is set', () => {
+  it('does not throw when CLERK_PUBLISHABLE_KEY is set', async () => {
     process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_valid_key';
 
     // Import fresh to get updated env value
@@ -266,8 +268,7 @@ describe('validateClerkConfig', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { validateClerkConfig } = require('./auth');
+    const { validateClerkConfig } = await import('./auth');
 
     expect(() => validateClerkConfig()).not.toThrow();
     expect(console.warn).not.toHaveBeenCalled();
@@ -275,7 +276,7 @@ describe('validateClerkConfig', () => {
     jest.resetModules();
   });
 
-  it('logs warning in __DEV__ when key is missing', () => {
+  it('logs warning in __DEV__ when key is missing', async () => {
     delete process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
     jest.resetModules();
@@ -291,8 +292,7 @@ describe('validateClerkConfig', () => {
     }));
 
     // __DEV__ is set to true in jest.setup.js
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { validateClerkConfig } = require('./auth');
+    const { validateClerkConfig } = await import('./auth');
     validateClerkConfig();
 
     const { authLogger: reloadedAuthLogger } = jest.requireMock('./logger') as {
@@ -305,7 +305,7 @@ describe('validateClerkConfig', () => {
     jest.resetModules();
   });
 
-  it('does not throw when key is missing (just warns)', () => {
+  it('does not throw when key is missing (just warns)', async () => {
     delete process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
     jest.resetModules();
@@ -320,8 +320,7 @@ describe('validateClerkConfig', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { validateClerkConfig } = require('./auth');
+    const { validateClerkConfig } = await import('./auth');
 
     expect(() => validateClerkConfig()).not.toThrow();
 
@@ -341,7 +340,7 @@ describe('CLERK_PUBLISHABLE_KEY', () => {
     }
   });
 
-  it('exports the environment variable value', () => {
+  it('exports the environment variable value', async () => {
     process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY = 'pk_test_exported_key';
 
     jest.resetModules();
@@ -356,15 +355,14 @@ describe('CLERK_PUBLISHABLE_KEY', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CLERK_PUBLISHABLE_KEY } = require('./auth');
+    const { CLERK_PUBLISHABLE_KEY } = await import('./auth');
 
     expect(CLERK_PUBLISHABLE_KEY).toBe('pk_test_exported_key');
 
     jest.resetModules();
   });
 
-  it('is undefined when environment variable is not set', () => {
+  it('is undefined when environment variable is not set', async () => {
     delete process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
     jest.resetModules();
@@ -379,8 +377,7 @@ describe('CLERK_PUBLISHABLE_KEY', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CLERK_PUBLISHABLE_KEY } = require('./auth');
+    const { CLERK_PUBLISHABLE_KEY } = await import('./auth');
 
     expect(CLERK_PUBLISHABLE_KEY).toBeUndefined();
 
