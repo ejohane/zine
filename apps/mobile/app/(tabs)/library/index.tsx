@@ -613,7 +613,7 @@ export default function LibraryScreen() {
   const handleOpenCollection = useCallback(
     (collectionId: string) => {
       router.push({
-        pathname: '/(tabs)/collection/[id]',
+        pathname: '/(tabs)/index/collection/[id]',
         params: { id: collectionId },
       });
     },

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Save to Zine</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="popup-body">
+    <main class="popup-shell" aria-live="polite">
+      <header class="topbar">
+        <div class="brand">
+          <img src="icons/zine-logo.png" alt="" />
+          <div>
+            <p>Zine</p>
+            <span>Bookmark saver</span>
+          </div>
+        </div>
+        <button id="openOptions" class="secondary-button compact-button" type="button">
+          Settings
+        </button>
+      </header>
+
+      <section id="setupPanel" class="notice hidden">
+        <p class="notice-title">Connect your API token</p>
+        <p>Create a token in Zine Settings with Add bookmarks enabled, then paste it here once.</p>
+        <button id="setupButton" class="primary-button" type="button">Open settings</button>
+      </section>
+
+      <section id="pagePanel" class="page-panel">
+        <p id="pageDomain" class="page-domain">Current page</p>
+        <h1 id="pageTitle">Loading page...</h1>
+        <p id="pageUrl" class="page-url"></p>
+      </section>
+
+      <section id="statusPanel" class="status-panel neutral">
+        <span id="statusDot" class="status-dot"></span>
+        <p id="statusText">Ready when you are.</p>
+      </section>
+
+      <div class="action-row">
+        <button id="saveButton" class="primary-button" type="button" disabled>Save page</button>
+        <a
+          id="openZine"
+          class="secondary-button"
+          href="https://www.myzine.app/library/bookmarks"
+          target="_blank"
+          rel="noreferrer"
+          >Open Zine</a
+        >
+      </div>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

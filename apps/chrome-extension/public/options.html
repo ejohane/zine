@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Zine Extension Settings</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="options-body">
+    <main class="options-shell">
+      <header class="settings-header">
+        <div class="brand">
+          <img src="icons/zine-logo.png" alt="" />
+          <div>
+            <p>Zine</p>
+            <span>Chrome extension</span>
+          </div>
+        </div>
+        <a
+          class="secondary-button"
+          href="https://www.myzine.app/settings"
+          target="_blank"
+          rel="noreferrer"
+          >Create token</a
+        >
+      </header>
+
+      <form id="settingsForm" class="settings-form">
+        <label>
+          <span>API token</span>
+          <input
+            id="tokenInput"
+            name="token"
+            type="password"
+            autocomplete="off"
+            placeholder="zine_pat_..."
+          />
+        </label>
+
+        <label>
+          <span>API URL</span>
+          <input id="apiBaseUrlInput" name="apiBaseUrl" type="url" required />
+        </label>
+
+        <label>
+          <span>Web app URL</span>
+          <input id="webBaseUrlInput" name="webBaseUrl" type="url" required />
+        </label>
+
+        <div id="optionsStatus" class="status-panel neutral">
+          <span class="status-dot"></span>
+          <p>Paste a write-scoped API token to enable saving.</p>
+        </div>
+
+        <div class="action-row">
+          <button class="primary-button" type="submit">Save settings</button>
+          <button id="clearTokenButton" class="secondary-button" type="button">Clear token</button>
+        </div>
+      </form>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>
