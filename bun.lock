@@ -15,6 +15,13 @@
         "typescript-eslint": "^8.49.0",
       },
     },
+    "apps/chrome-extension": {
+      "name": "@zine/chrome-extension",
+      "version": "0.1.0",
+      "devDependencies": {
+        "typescript": "~5.9.2",
+      },
+    },
     "apps/mobile": {
       "name": "@zine/mobile",
       "version": "1.0.0",
@@ -1326,6 +1333,8 @@
     "@wallet-standard/wallet": ["@wallet-standard/wallet@1.1.0", "", { "dependencies": { "@wallet-standard/base": "^1.1.0" } }, "sha512-Gt8TnSlDZpAl+RWOOAB/kuvC7RpcdWAlFbHNoi4gsXsfaWa1QCT6LBcfIYTPdOZC9OVZUDwqGuGAcqZejDmHjg=="],
 
     "@xmldom/xmldom": ["@xmldom/xmldom@0.8.11", "", {}, "sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw=="],
+
+    "@zine/chrome-extension": ["@zine/chrome-extension@workspace:apps/chrome-extension"],
 
     "@zine/design-system": ["@zine/design-system@workspace:packages/design-system"],
 

@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Zine",
+  "version": "0.1.0",
+  "description": "Save the current page to your Zine bookmarks.",
+  "action": {
+    "default_title": "Save to Zine",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/zine-logo.png",
+      "32": "icons/zine-logo.png",
+      "48": "icons/zine-logo.png",
+      "128": "icons/zine-logo.png"
+    }
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Open Save to Zine"
+    }
+  },
+  "icons": {
+    "16": "icons/zine-logo.png",
+    "32": "icons/zine-logo.png",
+    "48": "icons/zine-logo.png",
+    "128": "icons/zine-logo.png"
+  },
+  "options_page": "options.html",
+  "permissions": ["activeTab", "contextMenus", "storage", "tabs"],
+  "host_permissions": ["https://api.myzine.app/*", "http://localhost/*", "http://127.0.0.1/*"]
+}

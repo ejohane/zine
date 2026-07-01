@@ -350,7 +350,7 @@ export default function HomeScreen() {
   const handleOpenCollection = useCallback(
     (collectionId: string) => {
       router.push({
-        pathname: '/(tabs)/collection/[id]',
+        pathname: '/(tabs)/index/collection/[id]',
         params: { id: collectionId },
       });
     },
@@ -365,7 +365,7 @@ export default function HomeScreen() {
       }
 
       router.push({
-        pathname: '/(tabs)/section/[section]',
+        pathname: '/(tabs)/index/section/[section]',
         params,
       });
     },

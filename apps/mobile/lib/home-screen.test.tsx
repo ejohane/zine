@@ -635,7 +635,7 @@ describe('HomeScreen', () => {
     });
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(tabs)/collection/[id]',
+      pathname: '/(tabs)/index/collection/[id]',
       params: { id: 'collection-1' },
     });
   });
@@ -685,7 +685,7 @@ describe('HomeScreen', () => {
       });
 
       expect(mockPush).toHaveBeenLastCalledWith({
-        pathname: '/(tabs)/section/[section]',
+        pathname: '/(tabs)/index/section/[section]',
         params: { section },
       });
     });
@@ -737,7 +737,7 @@ describe('HomeScreen', () => {
     });
 
     expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(tabs)/section/[section]',
+      pathname: '/(tabs)/index/section/[section]',
       params: { section: 'recently-bookmarked', contentType: 'article' },
     });
 
