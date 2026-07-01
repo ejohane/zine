@@ -98,6 +98,19 @@ describe('summarizeDiagnosticRecords', () => {
     expect(summary.jobIds).toContain('job_123');
     expect(summary.providers[0]).toEqual({ value: 'YOUTUBE', count: 2 });
   });
+
+  it('normalizes level casing so incident detection is case-insensitive', () => {
+    const summary = summarizeDiagnosticRecords([
+      { level: 'ERROR' },
+      { level: 'error' },
+      { level: 'Warn' },
+    ]);
+
+    expect(summary.levels).toEqual([
+      { value: 'error', count: 2 },
+      { value: 'warn', count: 1 },
+    ]);
+  });
 });
 
 describe('buildIncidentReport', () => {

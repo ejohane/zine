@@ -222,6 +222,14 @@ function updateCount(counter: Record<string, number>, key: string | undefined): 
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
+function normalizeLogLevel(value: string | undefined): string | undefined {
+  if (!value) {
+    return value;
+  }
+
+  return value.trim().toLowerCase();
+}
+
 function sortCounts(counter: Record<string, number>): Array<{ value: string; count: number }> {
   return Object.entries(counter)
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
@@ -350,7 +358,7 @@ export function summarizeDiagnosticRecords(records: JsonRecord[]) {
   const jobIds = new Set<string>();
 
   for (const record of records) {
-    updateCount(levels, collectFieldValues(record, SUMMARY_FIELD_ALIASES.level)[0]);
+    updateCount(levels, normalizeLogLevel(collectFieldValues(record, SUMMARY_FIELD_ALIASES.level)[0]));
     updateCount(operations, collectFieldValues(record, SUMMARY_FIELD_ALIASES.operation)[0]);
     updateCount(providers, collectFieldValues(record, SUMMARY_FIELD_ALIASES.provider)[0]);
 
