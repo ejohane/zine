@@ -160,13 +160,14 @@ describe('buildIncidentReport', () => {
 });
 
 describe('parseCommandArgs', () => {
-  it('parses equals assignments, repeated flags, and positional args', () => {
+  it('parses equals assignments, repeated flags, boolean negation, and positional args', () => {
     const parsed = parseCommandArgs([
       '--since=2h',
       '--provider',
       'youtube',
       '--provider=spotify',
       '--verbose',
+      '--no-color',
       '--',
       'incident-123',
     ]);
@@ -176,6 +177,7 @@ describe('parseCommandArgs', () => {
       since: '2h',
       provider: ['youtube', 'spotify'],
       verbose: true,
+      color: false,
     });
   });
 });

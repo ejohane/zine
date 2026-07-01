@@ -689,6 +689,11 @@ export function parseCommandArgs(argv: string[]): Record<string, string | boolea
       continue;
     }
 
+    if (assignment.startsWith('no-') && assignment.length > 3) {
+      appendValue(assignment.slice(3), false);
+      continue;
+    }
+
     const key = assignment;
     const next = argv[index + 1];
 
