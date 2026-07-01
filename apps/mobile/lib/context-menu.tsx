@@ -14,12 +14,17 @@ let ResolvedContextMenu: React.ComponentType<ContextMenuProps> = ContextMenuFall
 
 if (Platform.OS === 'ios' && UIManager.getViewManagerConfig('ContextMenu') != null) {
   // Avoid importing the native-only package when Expo renders the web/router-server bundle.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const contextMenuModule = require('react-native-context-menu-view') as {
-    default: React.ComponentType<ContextMenuProps>;
-  };
+  // If the native dependency is missing in a test/runtime edge case, gracefully fall back.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const contextMenuModule = require('react-native-context-menu-view') as {
+      default: React.ComponentType<ContextMenuProps>;
+    };
 
-  ResolvedContextMenu = contextMenuModule.default;
+    ResolvedContextMenu = contextMenuModule.default;
+  } catch {
+    ResolvedContextMenu = ContextMenuFallback;
+  }
 }
 
 export default function ContextMenu(props: ContextMenuProps) {
