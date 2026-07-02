@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
+import { ContentTypeSchema, ProviderSchema } from '@zine/shared';
 import type { Env } from '../types';
 import { createDb } from '../db';
 import { apiTokens } from '../db/schema';
@@ -20,6 +21,11 @@ const MAX_BOOKMARKS_LIMIT = 50;
 
 const SaveBookmarkBodySchema = z.object({
   url: z.string().url('Invalid URL format'),
+});
+
+const InboxQuerySchema = z.object({
+  provider: ProviderSchema.optional(),
+  contentType: ContentTypeSchema.optional(),
 });
 
 function extractBearerToken(authHeader: string | undefined): string | null {
@@ -71,6 +77,47 @@ function openApiSpec() {
     servers: [{ url: 'https://api.myzine.app' }],
     security: [{ bearerAuth: [] }],
     paths: {
+      '/api/v1/inbox': {
+        get: {
+          operationId: 'listInbox',
+          summary: 'List inbox items',
+          parameters: [
+            {
+              name: 'limit',
+              in: 'query',
+              schema: {
+                type: 'integer',
+                minimum: 1,
+                maximum: MAX_BOOKMARKS_LIMIT,
+                default: DEFAULT_BOOKMARKS_LIMIT,
+              },
+            },
+            { name: 'cursor', in: 'query', schema: { type: 'string' } },
+            {
+              name: 'provider',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: Object.values(ProviderSchema.enum),
+              },
+            },
+            {
+              name: 'contentType',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: Object.values(ContentTypeSchema.enum),
+              },
+            },
+          ],
+          responses: {
+            '200': { description: 'Inbox items' },
+            '400': { description: 'Invalid query parameters' },
+            '401': { description: 'Missing or invalid personal access token' },
+            '403': { description: 'Token is missing bookmarks:read scope' },
+          },
+        },
+      },
       '/api/v1/bookmarks': {
         get: {
           operationId: 'listBookmarks',
@@ -201,6 +248,45 @@ function personalAccessTokenAuth(requiredScope: ApiTokenScope) {
 const apiV1Routes = new Hono<Env>();
 
 apiV1Routes.get('/openapi.json', (c) => c.json(openApiSpec()));
+
+apiV1Routes.get('/inbox', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+  const parsedQuery = InboxQuerySchema.safeParse({
+    provider: c.req.query('provider'),
+    contentType: c.req.query('contentType'),
+  });
+
+  if (!parsedQuery.success) {
+    return c.json(
+      {
+        error: 'Invalid query parameters',
+        code: 'INVALID_QUERY_PARAMETERS',
+        issues: parsedQuery.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
+  const caller = appRouter.createCaller(await createContext(c));
+  const cursor = c.req.query('cursor');
+
+  const result = await caller.items.inbox({
+    limit: parseLimit(c.req.query('limit')),
+    cursor: cursor && cursor.length > 0 ? cursor : undefined,
+    filter: {
+      provider: parsedQuery.data.provider,
+      contentType: parsedQuery.data.contentType,
+    },
+  });
+
+  return c.json({
+    items: result.items,
+    nextCursor: result.nextCursor,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
 
 apiV1Routes.get('/bookmarks', personalAccessTokenAuth('bookmarks:read'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
