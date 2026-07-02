@@ -7,17 +7,25 @@ import { Hono } from 'hono';
 import { ContentType, Provider } from '@zine/shared';
 import type { Env } from '../types';
 
-const { mockCreateDb, mockCreateContext, mockCreateCaller, mockLibrary, mockPreview, mockSave } =
-  vi.hoisted(() => ({
-    mockCreateDb: vi.fn(),
-    mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
-      userId: c.get('userId'),
-    })),
-    mockCreateCaller: vi.fn(),
-    mockLibrary: vi.fn(),
-    mockPreview: vi.fn(),
-    mockSave: vi.fn(),
-  }));
+const {
+  mockCreateDb,
+  mockCreateContext,
+  mockCreateCaller,
+  mockInbox,
+  mockLibrary,
+  mockPreview,
+  mockSave,
+} = vi.hoisted(() => ({
+  mockCreateDb: vi.fn(),
+  mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
+    userId: c.get('userId'),
+  })),
+  mockCreateCaller: vi.fn(),
+  mockInbox: vi.fn(),
+  mockLibrary: vi.fn(),
+  mockPreview: vi.fn(),
+  mockSave: vi.fn(),
+}));
 
 vi.mock('../db', () => ({
   createDb: mockCreateDb,
@@ -100,6 +108,7 @@ describe('apiV1Routes', () => {
     mockDbToken(createTokenRecord(['bookmarks:read', 'bookmarks:write']));
     mockCreateCaller.mockReturnValue({
       items: {
+        inbox: mockInbox,
         library: mockLibrary,
       },
       bookmarks: {
@@ -117,6 +126,7 @@ describe('apiV1Routes', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as JsonBody;
     expect(body.openapi).toBe('3.1.0');
+    expect(body.paths).toHaveProperty('/api/v1/inbox');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks');
   });
 
@@ -177,6 +187,72 @@ describe('apiV1Routes', () => {
     expect(res.status).toBe(403);
     expect((await res.json()) as JsonBody).toMatchObject({ code: 'FORBIDDEN' });
     expect(mockPreview).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when listing inbox without read scope', async () => {
+    mockDbToken(createTokenRecord(['bookmarks:write']));
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/inbox', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect((await res.json()) as JsonBody).toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockInbox).not.toHaveBeenCalled();
+  });
+
+  it('lists inbox items for the token owner', async () => {
+    mockInbox.mockResolvedValue({
+      items: [{ id: 'ui_inbox_1', title: 'Inbox item' }],
+      nextCursor: 'next-cursor',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request(
+        'http://localhost/api/v1/inbox?limit=20&cursor=abc&provider=YOUTUBE&contentType=VIDEO',
+        {
+          headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+        }
+      ),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateCaller).toHaveBeenCalledWith({ userId: 'user_123' });
+    expect(mockInbox).toHaveBeenCalledWith({
+      limit: 20,
+      cursor: 'abc',
+      filter: {
+        provider: Provider.YOUTUBE,
+        contentType: ContentType.VIDEO,
+      },
+    });
+    expect((await res.json()) as JsonBody).toMatchObject({
+      items: [{ title: 'Inbox item' }],
+      nextCursor: 'next-cursor',
+    });
+  });
+
+  it('rejects invalid inbox filters', async () => {
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/inbox?provider=NOT_A_PROVIDER', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      code: 'INVALID_QUERY_PARAMETERS',
+    });
+    expect(mockInbox).not.toHaveBeenCalled();
   });
 
   it('lists bookmarks for the token owner', async () => {

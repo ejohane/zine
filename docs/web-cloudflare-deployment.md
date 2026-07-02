@@ -62,11 +62,14 @@ Required Cloudflare Worker secrets or vars:
 - `CLERK_JWKS_URL`: Set this if you are not using the default `https://clerk.myzine.app/.well-known/jwks.json`.
 
 Personal access tokens are managed by signed-in users from Web Settings. No
-Worker secret is required for the `/api/v1` bookmark API.
+Worker secret is required for the `/api/v1` personal API.
 
 Personal API examples:
 
 ```bash
+curl -H "Authorization: Bearer $ZINE_PAT" \
+  "https://api.myzine.app/api/v1/inbox?limit=10"
+
 curl -H "Authorization: Bearer $ZINE_PAT" \
   "https://api.myzine.app/api/v1/bookmarks?limit=10"
 
