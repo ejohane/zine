@@ -2,10 +2,11 @@ import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { ContentTypeSchema, ProviderSchema } from '@zine/shared';
+import { ulid } from 'ulid';
+import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
 import type { Env } from '../types';
 import { createDb } from '../db';
-import { apiTokens } from '../db/schema';
+import { apiTokens, userItemConsumptionEvents, userItems } from '../db/schema';
 import { appRouter } from '../trpc/router';
 import { createContext } from '../trpc/context';
 import {
@@ -27,6 +28,30 @@ const InboxQuerySchema = z.object({
   provider: ProviderSchema.optional(),
   contentType: ContentTypeSchema.optional(),
 });
+
+const FinishBookmarkBodySchema = z
+  .object({
+    isFinished: z.boolean().optional(),
+    finished: z.boolean().optional(),
+    completed: z.boolean().optional(),
+    read: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((body, ctx) => {
+    const fields = ['isFinished', 'finished', 'completed', 'read'] as const;
+    const provided = fields.filter((field) => body[field] !== undefined);
+
+    if (provided.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Provide exactly one of isFinished, finished, completed, or read',
+      });
+    }
+  });
+
+function getRequestedFinishedState(body: z.infer<typeof FinishBookmarkBodySchema>): boolean {
+  return Boolean(body.isFinished ?? body.finished ?? body.completed ?? body.read);
+}
 
 function extractBearerToken(authHeader: string | undefined): string | null {
   if (!authHeader?.startsWith('Bearer ')) {
@@ -170,6 +195,45 @@ function openApiSpec() {
             '401': { description: 'Missing or invalid personal access token' },
             '403': { description: 'Token is missing bookmarks:write scope' },
             '422': { description: 'URL could not be previewed or saved' },
+          },
+        },
+      },
+      '/api/v1/bookmarks/{id}': {
+        patch: {
+          operationId: 'updateBookmarkFinishedState',
+          summary: 'Mark a bookmark as finished or unfinished',
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    isFinished: { type: 'boolean' },
+                    finished: { type: 'boolean' },
+                    completed: { type: 'boolean' },
+                    read: { type: 'boolean' },
+                  },
+                  minProperties: 1,
+                  maxProperties: 1,
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Bookmark finished state updated' },
+            '400': { description: 'Invalid request body' },
+            '401': { description: 'Missing or invalid personal access token' },
+            '403': { description: 'Token is missing bookmarks:write scope' },
+            '404': { description: 'Bookmark not found' },
           },
         },
       },
@@ -365,6 +429,100 @@ apiV1Routes.post('/bookmarks', personalAccessTokenAuth('bookmarks:write'), async
       wordCount: preview.wordCount ?? null,
       readingTimeMinutes: preview.readingTimeMinutes ?? null,
       publishedAt: preview.publishedAt ?? null,
+    },
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
+apiV1Routes.patch('/bookmarks/:id', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = FinishBookmarkBodySchema.safeParse(body);
+
+  if (!parsedBody.success) {
+    return c.json(
+      {
+        error: 'Invalid request body',
+        code: 'INVALID_REQUEST_BODY',
+        issues: parsedBody.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
+  const bookmarkId = c.req.param('id');
+  const userId = c.get('userId');
+  if (!userId) {
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      401
+    );
+  }
+
+  const db = createDb(c.env.DB);
+  const bookmark = await db.query.userItems.findFirst({
+    where: and(
+      eq(userItems.id, bookmarkId),
+      eq(userItems.userId, userId),
+      eq(userItems.state, UserItemState.BOOKMARKED)
+    ),
+  });
+
+  if (!bookmark) {
+    return c.json(
+      {
+        error: 'Bookmark not found',
+        code: 'BOOKMARK_NOT_FOUND',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      404
+    );
+  }
+
+  const isFinished = getRequestedFinishedState(parsedBody.data);
+  const finishedAt = isFinished ? (bookmark.finishedAt ?? new Date().toISOString()) : null;
+
+  if (bookmark.isFinished !== isFinished) {
+    const now = Date.now();
+
+    await db
+      .update(userItems)
+      .set({
+        isFinished,
+        finishedAt,
+        updatedAt: new Date(now).toISOString(),
+      })
+      .where(eq(userItems.id, bookmarkId));
+
+    await db.insert(userItemConsumptionEvents).values({
+      id: ulid(),
+      userId,
+      userItemId: bookmark.id,
+      itemId: bookmark.itemId,
+      eventType: isFinished ? 'FINISHED' : 'UNFINISHED',
+      occurredAt: now,
+      positionSeconds: null,
+      durationSeconds: null,
+      deltaSeconds: null,
+      source: 'MANUAL_FINISH_TOGGLE',
+      metadata: JSON.stringify({ source: 'api_v1' }),
+    });
+  }
+
+  return c.json({
+    bookmark: {
+      id: bookmark.id,
+      itemId: bookmark.itemId,
+      isFinished,
+      finishedAt,
     },
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
