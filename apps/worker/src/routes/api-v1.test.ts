@@ -4,7 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import { ContentType, Provider } from '@zine/shared';
+import { ContentType, Provider, UserItemState } from '@zine/shared';
 import type { Env } from '../types';
 
 const {
@@ -15,6 +15,9 @@ const {
   mockLibrary,
   mockPreview,
   mockSave,
+  mockFindUserItem,
+  mockUserItemUpdateSet,
+  mockConsumptionInsertValues,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -25,6 +28,9 @@ const {
   mockLibrary: vi.fn(),
   mockPreview: vi.fn(),
   mockSave: vi.fn(),
+  mockFindUserItem: vi.fn(),
+  mockUserItemUpdateSet: vi.fn(),
+  mockConsumptionInsertValues: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -92,14 +98,45 @@ function createMockEnv(): Env['Bindings'] {
 function mockDbToken(token: ReturnType<typeof createTokenRecord> | null) {
   const tokenUpdateWhere = vi.fn().mockResolvedValue(undefined);
   const tokenUpdateSet = vi.fn().mockReturnValue({ where: tokenUpdateWhere });
+  const userItemUpdateWhere = vi.fn().mockResolvedValue(undefined);
+  mockUserItemUpdateSet.mockReturnValue({ where: userItemUpdateWhere });
+  mockConsumptionInsertValues.mockResolvedValue(undefined);
+
   mockCreateDb.mockReturnValue({
     query: {
       apiTokens: {
         findFirst: vi.fn(async () => token),
       },
+      userItems: {
+        findFirst: mockFindUserItem,
+      },
     },
-    update: vi.fn().mockReturnValue({ set: tokenUpdateSet }),
+    update: vi.fn().mockReturnValueOnce({ set: tokenUpdateSet }).mockReturnValue({
+      set: mockUserItemUpdateSet,
+    }),
+    insert: vi.fn().mockReturnValue({ values: mockConsumptionInsertValues }),
   });
+}
+
+function createBookmarkRecord(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ui_1',
+    userId: 'user_123',
+    itemId: 'item_1',
+    state: UserItemState.BOOKMARKED,
+    ingestedAt: '2026-01-01T00:00:00.000Z',
+    bookmarkedAt: '2026-01-01T00:00:00.000Z',
+    archivedAt: null,
+    lastOpenedAt: null,
+    progressPosition: null,
+    progressDuration: null,
+    progressUpdatedAt: null,
+    isFinished: false,
+    finishedAt: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
 }
 
 describe('apiV1Routes', () => {
@@ -128,6 +165,7 @@ describe('apiV1Routes', () => {
     expect(body.openapi).toBe('3.1.0');
     expect(body.paths).toHaveProperty('/api/v1/inbox');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks');
+    expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}');
   });
 
   it('returns 401 for missing and invalid tokens', async () => {
@@ -331,6 +369,141 @@ describe('apiV1Routes', () => {
       },
       item: {
         title: 'Article title',
+      },
+    });
+  });
+
+  it('marks a bookmark as finished for tokens with write scope', async () => {
+    mockFindUserItem.mockResolvedValue(createBookmarkRecord());
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isFinished: true }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockFindUserItem).toHaveBeenCalled();
+    expect(mockUserItemUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        isFinished: true,
+        finishedAt: expect.any(String),
+        updatedAt: expect.any(String),
+      })
+    );
+    expect(mockConsumptionInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user_123',
+        userItemId: 'ui_1',
+        itemId: 'item_1',
+        eventType: 'FINISHED',
+        source: 'MANUAL_FINISH_TOGGLE',
+        metadata: JSON.stringify({ source: 'api_v1' }),
+      })
+    );
+    expect((await res.json()) as JsonBody).toMatchObject({
+      bookmark: {
+        id: 'ui_1',
+        itemId: 'item_1',
+        isFinished: true,
+      },
+    });
+  });
+
+  it('accepts completed/read/finished aliases but only one at a time', async () => {
+    mockFindUserItem.mockResolvedValue(createBookmarkRecord());
+    const app = createTestApp();
+
+    const completed = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ completed: true }),
+      }),
+      createMockEnv()
+    );
+
+    const ambiguous = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ completed: true, read: true }),
+      }),
+      createMockEnv()
+    );
+
+    expect(completed.status).toBe(200);
+    expect(ambiguous.status).toBe(400);
+    expect((await ambiguous.json()) as JsonBody).toMatchObject({
+      code: 'INVALID_REQUEST_BODY',
+    });
+  });
+
+  it('returns 404 when marking a missing bookmark as finished', async () => {
+    mockFindUserItem.mockResolvedValue(null);
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/missing', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ read: true }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(404);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      code: 'BOOKMARK_NOT_FOUND',
+    });
+    expect(mockUserItemUpdateSet).not.toHaveBeenCalled();
+    expect(mockConsumptionInsertValues).not.toHaveBeenCalled();
+  });
+
+  it('does not rewrite or emit an event when the requested finished state is unchanged', async () => {
+    mockFindUserItem.mockResolvedValue(
+      createBookmarkRecord({
+        isFinished: true,
+        finishedAt: '2026-01-02T00:00:00.000Z',
+      })
+    );
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ finished: true }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockUserItemUpdateSet).not.toHaveBeenCalled();
+    expect(mockConsumptionInsertValues).not.toHaveBeenCalled();
+    expect((await res.json()) as JsonBody).toMatchObject({
+      bookmark: {
+        isFinished: true,
+        finishedAt: '2026-01-02T00:00:00.000Z',
       },
     });
   });
