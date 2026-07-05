@@ -213,6 +213,8 @@ function ApiTokensSection() {
   const [name, setName] = useState('');
   const [readEnabled, setReadEnabled] = useState(true);
   const [writeEnabled, setWriteEnabled] = useState(true);
+  const [syncReadEnabled, setSyncReadEnabled] = useState(false);
+  const [syncWriteEnabled, setSyncWriteEnabled] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -220,8 +222,10 @@ function ApiTokensSection() {
     const scopes: ApiTokenScope[] = [];
     if (readEnabled) scopes.push('bookmarks:read');
     if (writeEnabled) scopes.push('bookmarks:write');
+    if (syncReadEnabled) scopes.push('sync:read');
+    if (syncWriteEnabled) scopes.push('sync:write');
     return scopes;
-  }, [readEnabled, writeEnabled]);
+  }, [readEnabled, syncReadEnabled, syncWriteEnabled, writeEnabled]);
 
   const createToken = trpc.apiTokens.create.useMutation({
     onSuccess: (result) => {
@@ -307,6 +311,22 @@ function ApiTokensSection() {
               onChange={(event) => setWriteEnabled(event.target.checked)}
             />
             Add bookmarks
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={syncReadEnabled}
+              onChange={(event) => setSyncReadEnabled(event.target.checked)}
+            />
+            Read sync status
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={syncWriteEnabled}
+              onChange={(event) => setSyncWriteEnabled(event.target.checked)}
+            />
+            Start sync jobs
           </label>
         </div>
 
