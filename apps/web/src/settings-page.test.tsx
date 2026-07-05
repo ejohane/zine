@@ -258,6 +258,38 @@ describe('SettingsPage', () => {
       expect(screen.getByRole('button', { name: 'Copied' })).toBeVisible();
     });
 
+    test('creates an API token with sync scopes when selected', async () => {
+      const user = userEvent.setup();
+      mutationSpies.apiTokensCreate.mockResolvedValue({
+        token: {
+          id: 'token-3',
+          name: 'Sync runner',
+          tokenPrefix: 'zine_pat_sync',
+          scopes: ['bookmarks:read', 'bookmarks:write', 'sync:read', 'sync:write'],
+          createdAt: Date.now(),
+          lastUsedAt: null,
+          expiresAt: null,
+          revokedAt: null,
+        },
+        rawToken: 'zine_pat_sync_raw_token',
+      });
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      await user.type(screen.getByLabelText('Name'), 'Sync runner');
+      await user.click(screen.getByLabelText('Read sync status'));
+      await user.click(screen.getByLabelText('Start sync jobs'));
+      await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+      expect(mutationSpies.apiTokensCreate).toHaveBeenCalledWith({
+        name: 'Sync runner',
+        scopes: ['bookmarks:read', 'bookmarks:write', 'sync:read', 'sync:write'],
+      });
+    });
+
     test('revokes an API token', async () => {
       const user = userEvent.setup();
       hookSpies.apiTokensListUseQuery.mockImplementation(() => ({

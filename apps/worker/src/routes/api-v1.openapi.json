@@ -1,0 +1,1749 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Zine REST API",
+    "version": "1.1.0",
+    "description": "Personal access token REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, and subscription sync jobs."
+  },
+  "servers": [
+    {
+      "url": "https://api.myzine.app",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:8787",
+      "description": "Local worker development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Metadata",
+      "description": "API metadata and machine-readable documentation."
+    },
+    {
+      "name": "Inbox",
+      "description": "Read and triage unbookmarked inbox items."
+    },
+    {
+      "name": "Bookmarks",
+      "description": "Read, save, update, and remove bookmarked items."
+    },
+    {
+      "name": "Tags",
+      "description": "List and replace bookmark tags."
+    },
+    {
+      "name": "Reading",
+      "description": "Article content, opened events, and reading/playback progress."
+    },
+    {
+      "name": "Sync",
+      "description": "Trigger and inspect asynchronous subscription sync jobs."
+    }
+  ],
+  "paths": {
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": ["Metadata"],
+        "operationId": "getOpenApiSpec",
+        "summary": "Get the OpenAPI document",
+        "security": [],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "OpenAPI document for the Zine REST API."
+          }
+        }
+      }
+    },
+    "/api/v1/inbox": {
+      "get": {
+        "tags": ["Inbox"],
+        "operationId": "listInbox",
+        "summary": "List inbox items",
+        "description": "Returns unfinished items currently in the inbox, sorted by most recently ingested first.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Provider"
+          },
+          {
+            "$ref": "#/components/parameters/ContentType"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inbox items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedItems"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/inbox/{id}/bookmark": {
+      "post": {
+        "tags": ["Inbox"],
+        "operationId": "bookmarkInboxItem",
+        "summary": "Move an inbox item to bookmarks",
+        "description": "REST equivalent of tRPC items.bookmark for inbox triage clients.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item moved to bookmarks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/inbox/{id}/archive": {
+      "post": {
+        "tags": ["Inbox"],
+        "operationId": "archiveInboxItem",
+        "summary": "Archive an inbox item",
+        "description": "REST equivalent of tRPC items.archive for dismissing inbox items.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item archived.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "operationId": "listBookmarks",
+        "summary": "List bookmarks",
+        "description": "Returns bookmarked items, sorted by most recently bookmarked first. Supports provider and contentType filters to match tRPC items.library.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/Search"
+          },
+          {
+            "name": "isFinished",
+            "in": "query",
+            "description": "When true, returns finished bookmarks. When false or omitted, returns unfinished bookmarks.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Provider"
+          },
+          {
+            "$ref": "#/components/parameters/ContentType"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmarked items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedItems"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Bookmarks"],
+        "operationId": "saveBookmark",
+        "summary": "Save a URL as a bookmark",
+        "description": "Fetches a preview for the URL, creates or reuses the canonical item, and saves it as a bookmark for the token owner.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBookmarkRequest"
+              },
+              "examples": {
+                "webArticle": {
+                  "value": {
+                    "url": "https://example.com/article"
+                  }
+                },
+                "xPost": {
+                  "value": {
+                    "url": "https://x.com/example/status/1234567890"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bookmark saved, restored, or already present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveBookmarkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnsupportedUrl"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/preview": {
+      "post": {
+        "tags": ["Bookmarks"],
+        "operationId": "previewBookmarkUrl",
+        "summary": "Preview a URL before saving",
+        "description": "Read-only REST equivalent of tRPC bookmarks.preview for clients that want confirmation UI before saving.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBookmarkRequest"
+              },
+              "examples": {
+                "webArticle": {
+                  "value": {
+                    "url": "https://example.com/article"
+                  }
+                },
+                "xPost": {
+                  "value": {
+                    "url": "https://x.com/example/status/1234567890"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Preview metadata for the URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewBookmarkResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnsupportedUrl"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "operationId": "getBookmark",
+        "summary": "Get a bookmark",
+        "description": "REST equivalent of tRPC items.get for a single bookmarked item.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmark item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Bookmarks"],
+        "operationId": "updateBookmarkFinishedState",
+        "summary": "Mark a bookmark as finished or unfinished",
+        "description": "Sets the finished state for a bookmarked item; idempotent when the requested state already matches the stored state.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookmarkFinishedStateRequest"
+              },
+              "examples": {
+                "finished": {
+                  "value": {
+                    "isFinished": true
+                  }
+                },
+                "unreadAlias": {
+                  "value": {
+                    "read": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bookmark finished state updated or already matched.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateBookmarkFinishedStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Bookmarks"],
+        "operationId": "deleteBookmark",
+        "summary": "Remove a bookmark",
+        "description": "REST equivalent of tRPC items.unbookmark. Archives the user item and clears bookmarkedAt.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmark removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/tags": {
+      "put": {
+        "tags": ["Tags"],
+        "operationId": "setBookmarkTags",
+        "summary": "Replace tags on a bookmark",
+        "description": "REST equivalent of tRPC items.setTags.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTagsRequest"
+              },
+              "examples": {
+                "example": {
+                  "value": {
+                    "tags": ["design", "api"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tags replaced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetTagsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/opened": {
+      "post": {
+        "tags": ["Reading"],
+        "operationId": "markBookmarkOpened",
+        "summary": "Record that a bookmark was opened",
+        "description": "REST equivalent of tRPC items.markOpened for detail views and external readers.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Open event recorded when applicable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkOpenedResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/progress": {
+      "put": {
+        "tags": ["Reading"],
+        "operationId": "updateBookmarkProgress",
+        "summary": "Update reading or playback progress",
+        "description": "REST equivalent of tRPC items.updateProgress.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProgressRequest"
+              },
+              "examples": {
+                "video": {
+                  "value": {
+                    "position": 125.4,
+                    "duration": 600
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Progress updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/article-content": {
+      "get": {
+        "tags": ["Reading"],
+        "operationId": "getBookmarkArticleContent",
+        "summary": "Get stored article content",
+        "description": "REST equivalent of tRPC items.getArticleContent. Returns null content when no extracted article body is stored.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserItemId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored article content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArticleContentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/tags": {
+      "get": {
+        "tags": ["Tags"],
+        "operationId": "listTags",
+        "summary": "List all tags",
+        "description": "REST equivalent of tRPC items.listTags.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Tags for the token owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListTagsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/sync-jobs": {
+      "post": {
+        "tags": ["Sync"],
+        "operationId": "createSyncJob",
+        "summary": "Trigger a subscription sync job",
+        "description": "REST endpoint for the existing asynchronous subscription sync process. The current implementation syncs active YouTube and Spotify subscriptions; source filtering and all-provider inbox refresh orchestration remain future work.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSyncJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Sync job accepted, or an existing active job was returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncJobAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/api/v1/sync-jobs/active": {
+      "get": {
+        "tags": ["Sync"],
+        "operationId": "getActiveSyncJob",
+        "summary": "Get the active sync job",
+        "description": "REST endpoint returning the token owner's active subscription sync job when one is still in progress.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["sync:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Active sync job state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveSyncJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/sync-jobs/{jobId}": {
+      "get": {
+        "tags": ["Sync"],
+        "operationId": "getSyncJob",
+        "summary": "Get sync job status",
+        "description": "REST endpoint returning status for a sync job owned by the token owner.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["sync:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Sync job ID returned by POST /api/v1/sync-jobs.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync job status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncJobStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Zine personal access token",
+        "description": "Use a Zine personal access token with the required operation scope."
+      }
+    },
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Maximum number of items to return. Defaults to 10.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "description": "Cursor returned by the previous page.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "Search": {
+        "name": "search",
+        "in": "query",
+        "description": "Case-insensitive title or creator search.",
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "Provider": {
+        "name": "provider",
+        "in": "query",
+        "description": "Filter items by source provider.",
+        "schema": {
+          "type": "string",
+          "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
+        }
+      },
+      "ContentType": {
+        "name": "contentType",
+        "in": "query",
+        "description": "Filter items by content type.",
+        "schema": {
+          "type": "string",
+          "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"]
+        }
+      },
+      "UserItemId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "User item ID.",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "Invalid request body or query parameters.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ValidationError"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, malformed, expired, revoked, or unknown token.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Token is missing the required scope.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found for this token owner.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "UnsupportedUrl": {
+        "description": "URL could not be previewed or is unsupported.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "A sync job was started too recently.",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait before retrying.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RateLimitError"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error", "code", "requestId", "traceId"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable error summary."
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code."
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidationError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "issues": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "description": "Zod validation issues for the request."
+              }
+            }
+          }
+        ]
+      },
+      "RequestMetadata": {
+        "type": "object",
+        "required": ["requestId", "traceId"],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "Tag": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "title",
+          "thumbnailUrl",
+          "canonicalUrl",
+          "contentType",
+          "provider",
+          "creator",
+          "creatorImageUrl",
+          "creatorId",
+          "publisher",
+          "summary",
+          "duration",
+          "publishedAt",
+          "wordCount",
+          "readingTimeMinutes",
+          "state",
+          "ingestedAt",
+          "bookmarkedAt",
+          "lastOpenedAt",
+          "progress",
+          "isFinished",
+          "finishedAt",
+          "tags"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "User item ID."
+          },
+          "itemId": {
+            "type": "string",
+            "description": "Canonical item ID shared across users."
+          },
+          "title": {
+            "type": "string"
+          },
+          "thumbnailUrl": {
+            "type": ["string", "null"],
+            "format": "uri"
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"]
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
+          },
+          "creator": {
+            "type": "string"
+          },
+          "creatorImageUrl": {
+            "type": ["string", "null"],
+            "format": "uri"
+          },
+          "creatorId": {
+            "type": ["string", "null"]
+          },
+          "publisher": {
+            "type": ["string", "null"]
+          },
+          "summary": {
+            "type": ["string", "null"]
+          },
+          "duration": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "publishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "wordCount": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "readingTimeMinutes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "state": {
+            "type": "string",
+            "enum": ["INBOX", "BOOKMARKED", "ARCHIVED"]
+          },
+          "ingestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "bookmarkedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "lastOpenedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "progress": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": ["position", "duration", "percent"],
+                "properties": {
+                  "position": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "duration": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "percent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            ]
+          },
+          "isFinished": {
+            "type": "boolean"
+          },
+          "finishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          }
+        }
+      },
+      "PaginatedItems": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["items", "nextCursor"],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Item"
+                }
+              },
+              "nextCursor": {
+                "type": ["string", "null"],
+                "description": "Cursor to pass to the next request. Null means there are no more items."
+              }
+            }
+          }
+        ]
+      },
+      "ItemResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["item"],
+            "properties": {
+              "item": {
+                "$ref": "#/components/schemas/Item"
+              }
+            }
+          }
+        ]
+      },
+      "SaveBookmarkRequest": {
+        "type": "object",
+        "required": ["url"],
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "HTTP or HTTPS URL to save."
+          }
+        }
+      },
+      "PreviewItem": {
+        "type": "object",
+        "required": [
+          "provider",
+          "contentType",
+          "providerId",
+          "title",
+          "creator",
+          "creatorImageUrl",
+          "thumbnailUrl",
+          "duration",
+          "canonicalUrl",
+          "description",
+          "siteName",
+          "wordCount",
+          "readingTimeMinutes",
+          "publishedAt"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
+          },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"]
+          },
+          "providerId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "creator": {
+            "type": "string"
+          },
+          "creatorImageUrl": {
+            "type": ["string", "null"],
+            "format": "uri"
+          },
+          "thumbnailUrl": {
+            "type": ["string", "null"],
+            "format": "uri"
+          },
+          "duration": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "canonicalUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "description": {
+            "type": ["string", "null"]
+          },
+          "siteName": {
+            "type": ["string", "null"]
+          },
+          "wordCount": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "readingTimeMinutes": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          },
+          "publishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        }
+      },
+      "PreviewBookmarkResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["item"],
+            "properties": {
+              "item": {
+                "$ref": "#/components/schemas/PreviewItem"
+              }
+            }
+          }
+        ]
+      },
+      "BookmarkSaveResult": {
+        "type": "object",
+        "required": ["itemId", "userItemId", "status"],
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "userItemId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["created", "already_bookmarked", "rebookmarked"]
+          }
+        }
+      },
+      "SaveBookmarkResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["bookmark", "item"],
+            "properties": {
+              "bookmark": {
+                "$ref": "#/components/schemas/BookmarkSaveResult"
+              },
+              "item": {
+                "$ref": "#/components/schemas/PreviewItem"
+              }
+            }
+          }
+        ]
+      },
+      "UpdateBookmarkFinishedStateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Provide exactly one alias. All aliases set the same bookmark finished state.",
+        "minProperties": 1,
+        "maxProperties": 1,
+        "properties": {
+          "isFinished": {
+            "type": "boolean"
+          },
+          "finished": {
+            "type": "boolean"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "read": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UpdateBookmarkFinishedStateResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["bookmark"],
+            "properties": {
+              "bookmark": {
+                "type": "object",
+                "required": ["id", "itemId", "isFinished", "finishedAt"],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "itemId": {
+                    "type": "string"
+                  },
+                  "isFinished": {
+                    "type": "boolean"
+                  },
+                  "finishedAt": {
+                    "type": ["string", "null"],
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ActionResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["success"],
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "const": true
+              }
+            }
+          }
+        ]
+      },
+      "SetTagsRequest": {
+        "type": "object",
+        "required": ["tags"],
+        "additionalProperties": false,
+        "properties": {
+          "tags": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      },
+      "SetTagsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["success", "tags"],
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "const": true
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ListTagsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["tags"],
+            "properties": {
+              "tags": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Tag"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MarkOpenedResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["success", "updated"],
+            "properties": {
+              "success": {
+                "type": "boolean",
+                "const": true
+              },
+              "updated": {
+                "type": "boolean"
+              },
+              "lastOpenedAt": {
+                "type": ["string", "null"],
+                "format": "date-time"
+              }
+            }
+          }
+        ]
+      },
+      "UpdateProgressRequest": {
+        "type": "object",
+        "required": ["position", "duration"],
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "type": "number",
+            "minimum": 0
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "ArticleContentResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/RequestMetadata"
+          },
+          {
+            "type": "object",
+            "required": ["content"],
+            "properties": {
+              "content": {
+                "type": ["string", "null"],
+                "description": "Stored article HTML or null."
+              }
+            }
+          }
+        ]
+      },
+      "CreateSyncJobRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Reserved for future sync options. Omit the body or send an empty object in the current API.",
+        "properties": {}
+      },
+      "RateLimitError": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Error"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "retryAfterSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Seconds to wait before retrying, when known."
+              }
+            }
+          }
+        ]
+      },
+      "SyncTelemetry": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Optional sync telemetry fields emitted by the worker."
+      },
+      "SyncJobAccepted": {
+        "type": "object",
+        "required": ["jobId", "total", "existing", "requestId", "traceId"],
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of subscriptions queued for the job."
+          },
+          "existing": {
+            "type": "boolean",
+            "description": "True when an active job already existed and was returned."
+          },
+          "telemetry": {
+            "$ref": "#/components/schemas/SyncTelemetry"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "ActiveSyncJob": {
+        "type": "object",
+        "required": ["inProgress", "requestId", "traceId"],
+        "properties": {
+          "inProgress": {
+            "type": "boolean"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "status": {
+                "type": "string"
+              }
+            }
+          },
+          "telemetry": {
+            "$ref": "#/components/schemas/SyncTelemetry"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      },
+      "SyncJobStatus": {
+        "type": "object",
+        "required": [
+          "jobId",
+          "status",
+          "total",
+          "completed",
+          "succeeded",
+          "failed",
+          "itemsFound",
+          "progress",
+          "errors",
+          "requestId",
+          "traceId"
+        ],
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "completed", "failed", "partial"]
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "succeeded": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "itemsFound": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "progress": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "traceId": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
