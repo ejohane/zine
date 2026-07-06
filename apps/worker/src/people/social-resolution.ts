@@ -1,6 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
-import { z } from 'zod';
 
 import type { Database } from '../db';
 import {
@@ -18,9 +17,9 @@ import {
   type ProviderConnection,
   type TokenRefreshEnv,
 } from '../lib/token-refresh';
-import { lookupXUserByUsername, searchXUsers, type XUser } from '../providers/x';
+import { lookupXUserByUsername, type XUser } from '../providers/x';
 import type { Bindings } from '../types';
-import { DEFAULT_ENRICHMENT_MODEL, ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
+import { ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
 
 const socialLogger = logger.child('people-social-resolution');
 
@@ -28,16 +27,15 @@ const AUTO_LINK_THRESHOLD = 0.82;
 const CANDIDATE_THRESHOLD = 0.45;
 const INFERRED_HANDLE_MIN_CONFIDENCE = 0.68;
 const MAX_SEARCH_QUERIES_PER_PERSON = 4;
-const MAX_CANDIDATES_PER_QUERY = 5;
-const MAX_INFERRED_HANDLES_PER_PERSON = 3;
-const MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON = 12;
+const MAX_EXPLICIT_HANDLE_LOOKUPS_PER_PERSON = 1;
 const ITEM_SUMMARY_CONTEXT_LIMIT = 1200;
+const STORED_CANDIDATE_REUSE_MIN_CONFIDENCE = 0.7;
+const STORED_CANDIDATE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const EXPLICIT_HANDLE_NEAR_PERSON_MAX_DISTANCE = 180;
 
 export type XResolutionEnv = Pick<
   Bindings,
-  | 'AI'
   | 'DB'
-  | 'ENRICHMENT_MODEL'
   | 'ENCRYPTION_KEY'
   | 'GOOGLE_CLIENT_ID'
   | 'GOOGLE_CLIENT_SECRET'
@@ -51,25 +49,11 @@ export type XResolutionEnv = Pick<
   | 'X_PROFILE_SEARCH_USER_ID'
 >;
 
-type WorkersAIRun = {
-  run(model: string, input: unknown): Promise<unknown>;
-};
-
-const XHandleInferenceSchema = z.object({
-  candidates: z
-    .array(
-      z.object({
-        username: z.string().min(1).max(80),
-        confidence: z.number().min(0).max(1),
-        reason: z.string().min(1).max(240).nullable().optional(),
-      })
-    )
-    .max(5),
-});
-
-type InferredXHandleCandidate = z.infer<typeof XHandleInferenceSchema>['candidates'][number];
 type XHandleCandidateSource = 'AI_INFERRED' | 'CONTEXT_EXPLICIT' | 'NAME_DERIVED';
-type XHandleLookupCandidate = InferredXHandleCandidate & {
+type XHandleLookupCandidate = {
+  username: string;
+  confidence: number;
+  reason?: string | null;
   source: XHandleCandidateSource;
 };
 
@@ -200,61 +184,6 @@ function normalizeXUsername(value: string): string | null {
   return withoutUrl;
 }
 
-function getResponseText(response: unknown): string | null {
-  if (typeof response === 'string') return response;
-  if (!response || typeof response !== 'object') return null;
-
-  const record = response as Record<string, unknown>;
-  if (typeof record.response === 'string') return record.response;
-  if (typeof record.result === 'string') return record.result;
-  if (typeof record.text === 'string') return record.text;
-  if (typeof record.output_text === 'string') return record.output_text;
-  if (Array.isArray(record.choices)) {
-    for (const choice of record.choices) {
-      if (!choice || typeof choice !== 'object') continue;
-      const choiceRecord = choice as Record<string, unknown>;
-      if (typeof choiceRecord.text === 'string') return choiceRecord.text;
-      if (choiceRecord.message && typeof choiceRecord.message === 'object') {
-        const message = choiceRecord.message as Record<string, unknown>;
-        if (typeof message.content === 'string') return message.content;
-      }
-    }
-  }
-
-  return null;
-}
-
-function stripJsonFence(text: string): string {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
-  return fenced?.[1]?.trim() ?? trimmed;
-}
-
-function parseHandleInferenceResponse(response: unknown): InferredXHandleCandidate[] {
-  const direct = XHandleInferenceSchema.safeParse(response);
-  if (direct.success) return direct.data.candidates;
-
-  if (response && typeof response === 'object') {
-    const record = response as Record<string, unknown>;
-    const nestedResponse = XHandleInferenceSchema.safeParse(record.response);
-    if (nestedResponse.success) return nestedResponse.data.candidates;
-
-    const nestedResult = XHandleInferenceSchema.safeParse(record.result);
-    if (nestedResult.success) return nestedResult.data.candidates;
-  }
-
-  const text = getResponseText(response);
-  if (!text) return [];
-
-  try {
-    const parsed = JSON.parse(stripJsonFence(text)) as unknown;
-    const validated = XHandleInferenceSchema.safeParse(parsed);
-    return validated.success ? validated.data.candidates : [];
-  } catch {
-    return [];
-  }
-}
-
 function parseMetadataText(rawMetadata: string | null): string {
   if (!rawMetadata) return '';
   try {
@@ -264,19 +193,20 @@ function parseMetadataText(rawMetadata: string | null): string {
   }
 }
 
-function contextText(context: ItemContext, person: Pick<PersonForResolution, 'evidenceText'>) {
-  return [
-    context.title,
-    context.publisher,
-    truncate(context.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
-    context.creatorName,
-    context.creatorDescription,
-    context.creatorHandle,
-    person.evidenceText,
-    parseMetadataText(context.rawMetadata),
-  ]
-    .filter(Boolean)
-    .join(' ');
+function extractHandles(text: string | null | undefined): string[] {
+  if (!text) return [];
+
+  const handles = new Set<string>();
+  const handlePattern =
+    /(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/|(?<![A-Za-z0-9_])@)([A-Za-z0-9_]{1,15})(?=$|[^A-Za-z0-9_])/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = handlePattern.exec(text)) !== null) {
+    const username = normalizeXUsername(match[1] ?? '');
+    if (username) handles.add(username);
+  }
+
+  return [...handles];
 }
 
 function prioritizedContextTextParts(
@@ -511,15 +441,39 @@ function extractExplicitHandleCandidates(
   item: ItemContext,
   person: PersonForResolution
 ): XHandleLookupCandidate[] {
-  const text = contextText(item, person);
   const handles = new Set<string>();
-  const handlePattern =
-    /(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/|(?<![A-Za-z0-9_])@)([A-Za-z0-9_]{1,15})(?=$|[^A-Za-z0-9_])/gi;
-  let match: RegExpExecArray | null;
 
-  while ((match = handlePattern.exec(text)) !== null) {
-    const username = normalizeXUsername(match[1] ?? '');
+  for (const username of extractHandles(person.evidenceText)) {
+    handles.add(username);
+  }
+
+  if (
+    item.creatorHandle &&
+    item.creatorName &&
+    hasStrongNameMatch(person.displayName, item.creatorName)
+  ) {
+    const username = normalizeXUsername(item.creatorHandle);
     if (username) handles.add(username);
+  }
+
+  const personName = person.displayName.toLowerCase();
+  for (const text of [item.title, item.summary, parseMetadataText(item.rawMetadata)]) {
+    if (!text) continue;
+
+    const lowerText = text.toLowerCase();
+    const personIndex = lowerText.indexOf(personName);
+    if (personIndex === -1) continue;
+
+    const handlePattern =
+      /(?:https?:\/\/(?:www\.)?(?:x|twitter)\.com\/|(?<![A-Za-z0-9_])@)([A-Za-z0-9_]{1,15})(?=$|[^A-Za-z0-9_])/gi;
+    let match: RegExpExecArray | null;
+    while ((match = handlePattern.exec(text)) !== null) {
+      if (Math.abs(match.index - personIndex) > EXPLICIT_HANDLE_NEAR_PERSON_MAX_DISTANCE) {
+        continue;
+      }
+      const username = normalizeXUsername(match[1] ?? '');
+      if (username) handles.add(username);
+    }
   }
 
   return [...handles].map((username) => ({
@@ -834,6 +788,7 @@ async function loadStoredXProfileCandidates(
       description: personSocialProfiles.description,
       verified: personSocialProfiles.verified,
       evidenceJson: personSocialProfiles.evidenceJson,
+      lastCheckedAt: personSocialProfiles.lastCheckedAt,
     })
     .from(personSocialProfiles)
     .where(
@@ -845,6 +800,7 @@ async function loadStoredXProfileCandidates(
     );
 
   return rows
+    .filter((profile) => profile.lastCheckedAt > Date.now() - STORED_CANDIDATE_MAX_AGE_MS)
     .map((profile) =>
       scoreStoredXProfileCandidate({
         personName: input.person.displayName,
@@ -852,7 +808,7 @@ async function loadStoredXProfileCandidates(
         profile,
       })
     )
-    .filter((candidate) => candidate.confidence >= CANDIDATE_THRESHOLD);
+    .filter((candidate) => candidate.confidence >= STORED_CANDIDATE_REUSE_MIN_CONFIDENCE);
 }
 
 async function searchCandidatesForPerson(params: {
@@ -862,7 +818,6 @@ async function searchCandidatesForPerson(params: {
   person: PersonForResolution;
   item: ItemContext;
 }): Promise<ScoredXProfileCandidate[]> {
-  const queries = buildXSearchQueries(params.person, params.item);
   const contextTerms = extractContextTerms(params.item, params.person);
   const candidatesById = new Map<string, ScoredXProfileCandidate>();
 
@@ -873,51 +828,14 @@ async function searchCandidatesForPerson(params: {
     candidatesById.set(candidate.id, candidate);
   }
 
-  if (params.tokens.userSearchAccessToken) {
-    for (const query of queries) {
-      try {
-        const users = await searchXUsers({
-          bearerToken: params.tokens.userSearchAccessToken,
-          query,
-          maxResults: MAX_CANDIDATES_PER_QUERY,
-        });
-
-        for (const user of users) {
-          const candidate = scoreXProfileCandidate({
-            personName: params.person.displayName,
-            contextTerms,
-            candidate: toXProfileCandidate(user),
-          });
-          if (candidate.confidence >= CANDIDATE_THRESHOLD) {
-            candidatesById.set(candidate.id, candidate);
-          }
-        }
-      } catch (error) {
-        socialLogger.warn('X user search failed during profile resolution', {
-          itemId: params.item.itemId,
-          userPersonId: params.person.id,
-          query,
-          error,
-        });
-      }
-    }
+  if (candidatesById.size > 0) {
+    return [...candidatesById.values()].sort((a, b) => b.confidence - a.confidence);
   }
 
-  const hasAutoLinkCandidate = [...candidatesById.values()].some(
-    (candidate) =>
-      candidate.confidence >= AUTO_LINK_THRESHOLD &&
-      canAutoLinkXProfileCandidate({
-        personName: params.person.displayName,
-        candidate,
-      })
-  );
-
-  if (!hasAutoLinkCandidate && params.tokens.directLookupAccessToken) {
+  if (params.tokens.directLookupAccessToken) {
     const explicitHandles = extractExplicitHandleCandidates(params.item, params.person);
-    const inferredHandles = await inferXHandleCandidates(params.env, params.person, params.item);
-    const nameDerivedHandles = buildNameDerivedHandleCandidates(params.person);
     const lookupHandlesByUsername = new Map<string, XHandleLookupCandidate>();
-    for (const candidate of [...explicitHandles, ...inferredHandles, ...nameDerivedHandles]) {
+    for (const candidate of explicitHandles) {
       if (!lookupHandlesByUsername.has(candidate.username)) {
         lookupHandlesByUsername.set(candidate.username, candidate);
       }
@@ -925,7 +843,7 @@ async function searchCandidatesForPerson(params: {
 
     for (const inferredHandle of [...lookupHandlesByUsername.values()].slice(
       0,
-      MAX_DIRECT_LOOKUP_HANDLES_PER_PERSON
+      MAX_EXPLICIT_HANDLE_LOOKUPS_PER_PERSON
     )) {
       try {
         const user = await lookupXUserByUsername({
@@ -958,92 +876,6 @@ async function searchCandidatesForPerson(params: {
   return [...candidatesById.values()]
     .filter((candidate) => candidate.confidence >= CANDIDATE_THRESHOLD)
     .sort((a, b) => b.confidence - a.confidence);
-}
-
-async function inferXHandleCandidates(
-  env: XResolutionEnv,
-  person: PersonForResolution,
-  item: ItemContext
-): Promise<XHandleLookupCandidate[]> {
-  const ai = env.AI as unknown as WorkersAIRun | undefined;
-  if (!ai) return [];
-
-  const prompt = {
-    task: 'Suggest likely official X usernames for the named person in this content item.',
-    constraints: [
-      'Return only JSON with one top-level key: candidates.',
-      'Each candidate must include username, confidence, and reason.',
-      'Usernames must be X handles without @.',
-      'Use public/common-knowledge inference when a well-known handle is strongly associated with the exact person.',
-      'Do not guess for common or ambiguous names.',
-      'Do not include fan, parody, quote, or topic accounts.',
-      'Use confidence below 0.68 unless the handle is very likely to belong to this exact person.',
-    ],
-    person: {
-      name: person.displayName,
-      relationship: person.relationship,
-      evidenceText: person.evidenceText,
-    },
-    item: {
-      title: item.title,
-      provider: item.provider,
-      contentType: item.contentType,
-      publisher: item.publisher,
-      summary: truncate(item.summary, ITEM_SUMMARY_CONTEXT_LIMIT),
-      creatorName: item.creatorName,
-      creatorHandle: item.creatorHandle,
-      creatorDescription: item.creatorDescription,
-    },
-    outputContract: {
-      candidates: [
-        {
-          username: 'string, X handle without @',
-          confidence: 'number from 0 to 1',
-          reason: 'short reason or null',
-        },
-      ],
-    },
-  };
-
-  try {
-    const response = await ai.run(env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL, {
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You identify official social media handles. Prefer returning no candidates over speculative matches.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify(prompt),
-        },
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 300,
-    });
-
-    const candidates = parseHandleInferenceResponse(response)
-      .map((candidate) => ({
-        ...candidate,
-        username: normalizeXUsername(candidate.username) ?? '',
-        source: 'AI_INFERRED' as const,
-      }))
-      .filter(
-        (candidate) =>
-          candidate.username.length > 0 && candidate.confidence >= INFERRED_HANDLE_MIN_CONFIDENCE
-      );
-
-    return unique(candidates.map((candidate) => candidate.username))
-      .map((username) => candidates.find((candidate) => candidate.username === username)!)
-      .slice(0, MAX_INFERRED_HANDLES_PER_PERSON);
-  } catch (error) {
-    socialLogger.warn('X handle inference failed during profile resolution', {
-      itemId: item.itemId,
-      userPersonId: person.id,
-      error,
-    });
-    return [];
-  }
 }
 
 export async function resolveXProfilesForItem(

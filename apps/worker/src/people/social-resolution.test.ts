@@ -249,6 +249,122 @@ describe('social profile resolution helpers', () => {
     ).toBe(true);
   });
 
+  it('extracts explicit handles from person evidence', () => {
+    const candidates = socialResolutionInternals.extractExplicitHandleCandidates(
+      {
+        itemId: 'item-1',
+        title: 'Interview with Ben Thompson',
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        publisher: null,
+        summary: 'A discussion about strategy and technology.',
+        rawMetadata: null,
+        creatorName: 'Acquired',
+        creatorDescription: null,
+        creatorHandle: '@AcquiredFM',
+      },
+      {
+        id: 'person-1',
+        userId: 'user-1',
+        displayName: 'Ben',
+        normalizedName: 'ben',
+        profileImageSource: null,
+        xHandle: null,
+        relationship: 'GUEST',
+        evidenceText: 'Guest Ben appears as @benthompson in the show notes.',
+      }
+    );
+
+    expect(candidates.map((candidate) => candidate.username)).toEqual(['benthompson']);
+  });
+
+  it('does not use unrelated creator handles for people mentioned in an item', () => {
+    const candidates = socialResolutionInternals.extractExplicitHandleCandidates(
+      {
+        itemId: 'item-1',
+        title: 'Google I/O reactions',
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        publisher: null,
+        summary: 'The Verge executive editor Jake Kastrenakes joins the livestream.',
+        rawMetadata: null,
+        creatorName: 'The Verge',
+        creatorDescription: null,
+        creatorHandle: '@verge',
+      },
+      {
+        id: 'person-1',
+        userId: 'user-1',
+        displayName: 'Jake Kastrenakes',
+        normalizedName: 'jake kastrenakes',
+        profileImageSource: null,
+        xHandle: null,
+        relationship: 'GUEST',
+        evidenceText: 'executive editor Jake Kastrenakes',
+      }
+    );
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('uses a creator handle when the creator is the person being resolved', () => {
+    const candidates = socialResolutionInternals.extractExplicitHandleCandidates(
+      {
+        itemId: 'item-1',
+        title: 'Strategy podcast episode',
+        provider: 'RSS',
+        contentType: 'ARTICLE',
+        publisher: 'Stratechery',
+        summary: null,
+        rawMetadata: null,
+        creatorName: 'Ben Thompson',
+        creatorDescription: null,
+        creatorHandle: '@benthompson',
+      },
+      {
+        id: 'person-1',
+        userId: 'user-1',
+        displayName: 'Ben Thompson',
+        normalizedName: 'ben thompson',
+        profileImageSource: null,
+        xHandle: null,
+        relationship: 'CREATOR',
+        evidenceText: 'Ben Thompson wrote the article.',
+      }
+    );
+
+    expect(candidates.map((candidate) => candidate.username)).toEqual(['benthompson']);
+  });
+
+  it('uses handles near the person name in item text', () => {
+    const candidates = socialResolutionInternals.extractExplicitHandleCandidates(
+      {
+        itemId: 'item-1',
+        title: 'Interview',
+        provider: 'WEB',
+        contentType: 'ARTICLE',
+        publisher: null,
+        summary: 'The story quotes Marc Andreessen (@pmarca) on startups and AI.',
+        rawMetadata: null,
+        creatorName: null,
+        creatorDescription: null,
+        creatorHandle: null,
+      },
+      {
+        id: 'person-1',
+        userId: 'user-1',
+        displayName: 'Marc Andreessen',
+        normalizedName: 'marc andreessen',
+        profileImageSource: null,
+        xHandle: null,
+        relationship: 'MENTIONED',
+        evidenceText: 'Marc Andreessen',
+      }
+    );
+
+    expect(candidates.map((candidate) => candidate.username)).toEqual(['pmarca']);
+  });
+
   it('generates common validated lookup handles from names', () => {
     const candidates = socialResolutionInternals.buildNameDerivedHandleCandidates({
       id: 'person-1',
