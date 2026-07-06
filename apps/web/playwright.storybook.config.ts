@@ -16,7 +16,7 @@ export default defineConfig({
     viewport: { width: 1440, height: 1200 },
   },
   webServer: {
-    command: 'python3 -m http.server 6007 -d storybook-static',
+    command: 'node scripts/serve-static.mjs storybook-static',
     cwd: path.resolve(__dirname),
     url: 'http://127.0.0.1:6007',
     reuseExistingServer: !process.env.CI,
