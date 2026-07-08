@@ -36,6 +36,7 @@ import {
   extractCreatorFromMetadata,
   generateSyntheticCreatorId,
 } from '../../db/helpers/creators';
+import { mergeTagsForUserItem } from '../tagging';
 import type { createDb } from '../../db';
 import type { Bindings } from '../../types';
 
@@ -81,6 +82,7 @@ const SaveInputSchema = z.object({
   // X/Twitter-specific fields
   publishedAt: z.string().optional(), // ISO8601 timestamp
   rawMetadata: z.string().optional(), // JSON string of provider API response
+  tags: z.array(z.string().min(1).max(64)).max(20).optional(),
 });
 
 // Helper Functions
@@ -328,6 +330,10 @@ export const bookmarksRouter = router({
     if (existingUserItem) {
       // 3a. User already has this item
       if (existingUserItem.state === UserItemState.BOOKMARKED) {
+        if (input.tags && input.tags.length > 0) {
+          await mergeTagsForUserItem(ctx, existingUserItem.id, input.tags);
+        }
+
         // Already bookmarked - no change needed
         return {
           itemId,
@@ -357,6 +363,10 @@ export const bookmarksRouter = router({
         userItemId: existingUserItem.id,
         operation: 'bookmarks.save.rebookmark',
       });
+
+      if (input.tags && input.tags.length > 0) {
+        await mergeTagsForUserItem(ctx, existingUserItem.id, input.tags);
+      }
 
       return {
         itemId,
@@ -406,6 +416,10 @@ export const bookmarksRouter = router({
       userItemId,
       operation: 'bookmarks.save.create',
     });
+
+    if (input.tags && input.tags.length > 0) {
+      await mergeTagsForUserItem(ctx, userItemId, input.tags);
+    }
 
     return {
       itemId,

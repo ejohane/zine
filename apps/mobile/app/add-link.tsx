@@ -34,10 +34,12 @@ import * as Haptics from 'expo-haptics';
 import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { normalizeTagKey, normalizeTagName, sanitizeTagNames } from '@zine/shared/tags';
 
 import { Colors, Typography, Spacing, Radius, Shadows, type ThemeColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { usePreview, useSaveBookmark, isValidUrl } from '@/hooks/use-bookmarks';
+import { useUserTags } from '@/hooks/use-items-trpc';
 import { LinkPreviewCard } from '@/components/link-preview-card';
 import { showSuccess, showError as showErrorToast } from '@/lib/toast-utils';
 
@@ -183,6 +185,8 @@ export default function AddLinkScreen() {
   // Input state
   const [url, setUrl] = useState('');
   const [debouncedUrl, setDebouncedUrl] = useState('');
+  const [tagQuery, setTagQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [keyboardOverlap, setKeyboardOverlap] = useState(0);
   const [footerHeight, setFooterHeight] = useState(0);
   const inputRef = useRef<TextInput>(null);
@@ -260,8 +264,29 @@ export default function AddLinkScreen() {
     enabled: isValidUrl(debouncedUrl),
   });
 
+  const { data: tagsData, isLoading: tagsLoading } = useUserTags();
+
   // Save mutation
   const { saveFromPreviewAsync, isPending: isSaving, reset: resetSaveMutation } = useSaveBookmark();
+
+  const allTags = useMemo(() => tagsData?.tags ?? [], [tagsData?.tags]);
+
+  const selectedTagKeys = useMemo(
+    () => new Set(selectedTags.map((tag) => normalizeTagKey(tag))),
+    [selectedTags]
+  );
+
+  const normalizedTagQuery = normalizeTagName(tagQuery);
+  const normalizedTagQueryKey = normalizeTagKey(tagQuery);
+
+  const filteredTags = useMemo(() => {
+    if (!normalizedTagQuery) return allTags;
+    return allTags.filter((tag) => normalizeTagKey(tag.name).includes(normalizedTagQueryKey));
+  }, [allTags, normalizedTagQuery, normalizedTagQueryKey]);
+
+  const canCreateTag =
+    normalizedTagQuery.length > 0 &&
+    !allTags.some((tag) => normalizeTagKey(tag.name) === normalizedTagQueryKey);
 
   // Determine current state
   const hasInput = url.trim().length > 0;
@@ -276,6 +301,24 @@ export default function AddLinkScreen() {
   // Can save when we have a valid preview, not fetching, and not currently saving
   const canSave = preview && !isFetchingPreview && !isSaving;
   const isKeyboardVisible = keyboardOverlap > 0;
+
+  const toggleTag = useCallback((name: string) => {
+    const normalizedName = normalizeTagName(name);
+    const normalizedKey = normalizeTagKey(normalizedName);
+
+    if (!normalizedName || normalizedName.length > 32) {
+      return;
+    }
+
+    setSelectedTags((previous) => {
+      const index = previous.findIndex((tag) => normalizeTagKey(tag) === normalizedKey);
+      if (index >= 0) {
+        return previous.filter((tag) => normalizeTagKey(tag) !== normalizedKey);
+      }
+
+      return sanitizeTagNames([...previous, normalizedName]);
+    });
+  }, []);
 
   // Handle paste from clipboard
   // Note: On iOS, the paste button triggers the system paste permission dialog
@@ -293,7 +336,9 @@ export default function AddLinkScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const result = await saveFromPreviewAsync(preview, url.trim());
+      const result = await saveFromPreviewAsync(preview, url.trim(), {
+        tags: selectedTags,
+      });
 
       // Show appropriate toast based on status
       switch (result.status) {
@@ -313,7 +358,7 @@ export default function AddLinkScreen() {
     } catch (error) {
       showErrorToast(toast, error, 'Failed to save link', 'addLink.save');
     }
-  }, [preview, url, saveFromPreviewAsync, toast, router]);
+  }, [preview, url, selectedTags, saveFromPreviewAsync, toast, router]);
 
   // Handle close
   const handleClose = useCallback(() => {
@@ -334,6 +379,125 @@ export default function AddLinkScreen() {
     resetSaveMutation();
     inputRef.current?.focus();
   }, [resetSaveMutation]);
+
+  const renderTagSelector = () => (
+    <View style={styles.tagsSection}>
+      <Text style={[styles.tagsTitle, { color: colors.text }]}>Tags</Text>
+      <TextInput
+        value={tagQuery}
+        onChangeText={setTagQuery}
+        placeholder="Add or search tags"
+        placeholderTextColor={colors.textTertiary}
+        style={[
+          styles.tagInput,
+          {
+            color: colors.text,
+            borderColor: colors.border,
+            backgroundColor: colors.backgroundSecondary,
+          },
+        ]}
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="done"
+        onSubmitEditing={() => {
+          if (!normalizedTagQuery) {
+            Keyboard.dismiss();
+            return;
+          }
+
+          toggleTag(normalizedTagQuery);
+          setTagQuery('');
+        }}
+        accessibilityLabel="Tag input"
+      />
+
+      <View style={styles.selectedTags}>
+        {selectedTags.length === 0 ? (
+          <Text style={[styles.emptyTagsText, { color: colors.textTertiary }]}>
+            No tags selected
+          </Text>
+        ) : (
+          selectedTags.map((tag) => (
+            <Pressable
+              key={normalizeTagKey(tag)}
+              onPress={() => toggleTag(tag)}
+              style={({ pressed }) => [
+                styles.selectedTagChip,
+                {
+                  backgroundColor: colors.buttonPrimary,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${tag} tag`}
+            >
+              <Text style={[styles.selectedTagText, { color: colors.buttonPrimaryText }]}>
+                {tag} ×
+              </Text>
+            </Pressable>
+          ))
+        )}
+      </View>
+
+      <View style={styles.tagOptions}>
+        {canCreateTag && (
+          <Pressable
+            onPress={() => {
+              toggleTag(normalizedTagQuery);
+              setTagQuery('');
+            }}
+            style={({ pressed }) => [
+              styles.tagOption,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                borderColor: colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+            accessibilityRole="button"
+          >
+            <Text style={[styles.tagOptionText, { color: colors.text }]}>
+              {`Create "${normalizedTagQuery}"`}
+            </Text>
+          </Pressable>
+        )}
+
+        {tagsLoading ? (
+          <View style={styles.tagsLoading}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : filteredTags.length === 0 ? (
+          <Text style={[styles.emptyTagsText, { color: colors.textTertiary }]}>No tags yet</Text>
+        ) : (
+          filteredTags.map((tag) => {
+            const selected = selectedTagKeys.has(normalizeTagKey(tag.name));
+
+            return (
+              <Pressable
+                key={tag.id}
+                onPress={() => toggleTag(tag.name)}
+                style={({ pressed }) => [
+                  styles.tagOption,
+                  {
+                    backgroundColor: colors.backgroundSecondary,
+                    borderColor: selected ? colors.primary : colors.border,
+                    opacity: pressed ? 0.85 : 1,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+              >
+                <Text style={[styles.tagOptionText, { color: colors.text }]}>{tag.name}</Text>
+                {selected && (
+                  <Text style={[styles.tagSelectedText, { color: colors.primary }]}>Selected</Text>
+                )}
+              </Pressable>
+            );
+          })
+        )}
+      </View>
+    </View>
+  );
 
   const renderSaveButton = () => (
     <Pressable
@@ -489,6 +653,8 @@ export default function AddLinkScreen() {
               </Animated.View>
             )}
           </View>
+
+          {renderTagSelector()}
         </ScrollView>
       </SafeAreaView>
       <View
@@ -572,6 +738,60 @@ const styles = StyleSheet.create({
   previewSection: {
     flex: 1,
     minHeight: 200,
+  },
+
+  // Tags
+  tagsSection: {
+    gap: Spacing.sm,
+    marginTop: Spacing.xl,
+  },
+  tagsTitle: {
+    ...Typography.titleSmall,
+  },
+  tagInput: {
+    ...Typography.bodyMedium,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  selectedTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.xs,
+  },
+  selectedTagChip: {
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  selectedTagText: {
+    ...Typography.labelSmall,
+  },
+  tagOptions: {
+    gap: Spacing.sm,
+  },
+  tagOption: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tagOptionText: {
+    ...Typography.bodyMedium,
+  },
+  tagSelectedText: {
+    ...Typography.labelSmall,
+  },
+  tagsLoading: {
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+  },
+  emptyTagsText: {
+    ...Typography.bodySmall,
   },
 
   // State containers

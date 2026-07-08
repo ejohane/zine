@@ -18,6 +18,7 @@ const setupPanel = document.querySelector<HTMLElement>('#setupPanel');
 const statusPanel = document.querySelector<HTMLElement>('#statusPanel');
 const statusText = document.querySelector<HTMLParagraphElement>('#statusText');
 const openZine = document.querySelector<HTMLAnchorElement>('#openZine');
+const tagsInput = document.querySelector<HTMLInputElement>('#tagsInput');
 
 let activePage: ActivePage | null = null;
 
@@ -40,6 +41,7 @@ const ui = {
   statusPanel: requireElement(statusPanel, 'statusPanel'),
   statusText: requireElement(statusText, 'statusText'),
   openZine: requireElement(openZine, 'openZine'),
+  tagsInput: requireElement(tagsInput, 'tagsInput'),
 };
 
 function setStatus(state: SaveState, message: string): void {
@@ -80,6 +82,25 @@ function setResult(result: SaveBookmarkResult): void {
   }
 }
 
+export function parseBookmarkTags(input: string): string[] {
+  const seen = new Set<string>();
+  const tags: string[] = [];
+
+  for (const tag of input.split(',')) {
+    const trimmed = tag.trim();
+    const key = trimmed.toLowerCase();
+
+    if (!trimmed || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    tags.push(trimmed);
+  }
+
+  return tags;
+}
+
 async function openOptionsPage(): Promise<void> {
   await new Promise<void>((resolve) => {
     extensionApi.runtime.openOptionsPage(resolve);
@@ -96,7 +117,8 @@ async function handleSave(): Promise<void> {
   setStatus('saving', 'Saving this page...');
 
   const settings = await loadSettings();
-  const result = await saveBookmarkUrl(settings, activePage.url);
+  const tags = parseBookmarkTags(ui.tagsInput.value);
+  const result = await saveBookmarkUrl(settings, activePage.url, { tags });
   setResult(result);
   ui.saveButton.disabled = false;
 

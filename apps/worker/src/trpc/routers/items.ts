@@ -35,7 +35,6 @@ import {
   hasSubstackNewsletterIdentity,
   isSubstackArticleUrl,
 } from '@zine/shared';
-import { normalizeTagKey, normalizeTagName } from '@zine/shared/tags';
 import {
   userItems,
   items,
@@ -64,6 +63,7 @@ import {
   normalizePersonName,
   syncPeopleForUserItemBestEffort,
 } from '../../people/service';
+import { replaceTagsForUserItem } from '../tagging';
 
 export type ItemTag = {
   id: string;
@@ -1147,9 +1147,6 @@ export const itemsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const nowMs = Date.now();
-      const nowIso = new Date().toISOString();
-
       const existingItem = await ctx.db
         .select({ id: userItems.id, state: userItems.state })
         .from(userItems)
@@ -1170,105 +1167,7 @@ export const itemsRouter = router({
         });
       }
 
-      const normalizedMap = new Map<string, string>();
-      for (const rawTag of input.tags) {
-        const normalizedName = normalizeTagName(rawTag);
-        const normalizedKey = normalizeTagKey(rawTag);
-
-        if (!normalizedName) {
-          continue;
-        }
-        if (normalizedName.length > 32) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Tag "${normalizedName}" exceeds 32 characters`,
-          });
-        }
-
-        if (!normalizedMap.has(normalizedKey)) {
-          normalizedMap.set(normalizedKey, normalizedName);
-        }
-      }
-
-      const desiredTags = Array.from(normalizedMap.entries()).map(([normalizedName, name]) => ({
-        normalizedName,
-        name,
-      }));
-
-      const existingTags =
-        desiredTags.length > 0
-          ? await ctx.db
-              .select({
-                id: tags.id,
-                name: tags.name,
-                normalizedName: tags.normalizedName,
-              })
-              .from(tags)
-              .where(
-                and(
-                  eq(tags.userId, ctx.userId),
-                  inArray(
-                    tags.normalizedName,
-                    desiredTags.map((tag) => tag.normalizedName)
-                  )
-                )
-              )
-          : [];
-
-      const existingTagsByNormalized = new Map(
-        existingTags.map((tag) => [tag.normalizedName, { id: tag.id, name: tag.name }])
-      );
-
-      const finalTags: ItemTag[] = [];
-
-      for (const desiredTag of desiredTags) {
-        const existingTag = existingTagsByNormalized.get(desiredTag.normalizedName);
-
-        if (existingTag) {
-          await ctx.db
-            .update(tags)
-            .set({
-              name: desiredTag.name,
-              updatedAt: nowMs,
-            })
-            .where(eq(tags.id, existingTag.id));
-
-          finalTags.push({ id: existingTag.id, name: desiredTag.name });
-          continue;
-        }
-
-        const tagId = ulid();
-        await ctx.db.insert(tags).values({
-          id: tagId,
-          userId: ctx.userId,
-          name: desiredTag.name,
-          normalizedName: desiredTag.normalizedName,
-          createdAt: nowMs,
-          updatedAt: nowMs,
-        });
-
-        finalTags.push({ id: tagId, name: desiredTag.name });
-      }
-
-      await ctx.db.delete(userItemTags).where(eq(userItemTags.userItemId, input.id));
-
-      if (finalTags.length > 0) {
-        await ctx.db.insert(userItemTags).values(
-          finalTags.map((tag) => ({
-            id: ulid(),
-            userItemId: input.id,
-            tagId: tag.id,
-            createdAt: nowMs,
-          }))
-        );
-      }
-
-      await ctx.db
-        .update(userItems)
-        .set({
-          updatedAt: nowIso,
-        })
-        .where(eq(userItems.id, input.id));
+      const finalTags = await replaceTagsForUserItem(ctx, input.id, input.tags);
 
       return {
         success: true as const,

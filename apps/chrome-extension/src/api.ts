@@ -17,6 +17,10 @@ export interface SaveBookmarkFailure {
 
 export type SaveBookmarkResult = SaveBookmarkSuccess | SaveBookmarkFailure;
 
+export interface SaveBookmarkOptions {
+  tags?: string[];
+}
+
 interface SaveBookmarkResponse {
   bookmark?: {
     status?: SaveBookmarkSuccess['status'];
@@ -44,7 +48,8 @@ function getEndpoint(settings: ExtensionSettings): string {
 
 export async function saveBookmarkUrl(
   settings: ExtensionSettings,
-  url: string
+  url: string,
+  options: SaveBookmarkOptions = {}
 ): Promise<SaveBookmarkResult> {
   if (!settings.token) {
     return {
@@ -63,13 +68,18 @@ export async function saveBookmarkUrl(
   }
 
   try {
+    const payload: { url: string; tags?: string[] } = { url };
+    if (options.tags && options.tags.length > 0) {
+      payload.tags = options.tags;
+    }
+
     const response = await fetch(getEndpoint(settings), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${settings.token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(payload),
     });
 
     const body = (await response.json().catch(() => ({}))) as SaveBookmarkResponse;
