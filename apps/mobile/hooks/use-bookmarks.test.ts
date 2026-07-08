@@ -542,6 +542,23 @@ describe('useSaveBookmark', () => {
         })
       );
     });
+
+    it('passes sanitized tags to mutateAsync', async () => {
+      const { result } = renderHook(() => useSaveBookmark());
+      const preview = createMockPreview();
+
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview, undefined, {
+          tags: [' Design ', 'design', 'Mobile   UX'],
+        });
+      });
+
+      expect(mockSaveMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ['Design', 'Mobile UX'],
+        })
+      );
+    });
   });
 
   describe('cache invalidation', () => {
@@ -590,6 +607,7 @@ describe('useSaveBookmark', () => {
       expect(updatedLibrary.items[0].title).toBe(preview.title);
       expect(updatedLibrary.items[0].state).toBe(UserItemState.BOOKMARKED);
       expect(updatedLibrary.items[0].id.startsWith('temp-')).toBe(true);
+      expect(updatedLibrary.items[0].tags).toEqual([]);
 
       const homeUpdater = mockHomeSetData.mock.calls[0][1];
       const updatedHome = homeUpdater({
@@ -604,6 +622,55 @@ describe('useSaveBookmark', () => {
 
       expect(updatedHome.recentBookmarks[0].title).toBe(preview.title);
       expect(updatedHome.byContentType.videos[0].title).toBe(preview.title);
+    });
+
+    it('includes selected tags in optimistic library and home items', async () => {
+      const preview = createMockPreview();
+      const existingItem = createMockLibraryItem();
+
+      mockLibraryGetData.mockReturnValue({ items: [existingItem], nextCursor: null });
+      mockHomeGetData.mockReturnValue({
+        recentBookmarks: [existingItem],
+        jumpBackIn: [],
+        byContentType: {
+          videos: [existingItem],
+          podcasts: [],
+          articles: [],
+        },
+      });
+
+      const { result } = renderHook(() => useSaveBookmark());
+
+      await act(async () => {
+        await result.current.saveFromPreviewAsync(preview, undefined, {
+          tags: ['Design', 'design', 'Mobile UX'],
+        });
+      });
+
+      const libraryCall = mockLibrarySetData.mock.calls.find((call) => call[0] === undefined);
+      const libraryUpdater = libraryCall?.[1];
+      const updatedLibrary = libraryUpdater({ items: [existingItem], nextCursor: null });
+
+      expect(updatedLibrary.items[0].tags).toEqual([
+        { id: 'temp-tag-design', name: 'Design' },
+        { id: 'temp-tag-mobile ux', name: 'Mobile UX' },
+      ]);
+
+      const homeUpdater = mockHomeSetData.mock.calls[0][1];
+      const updatedHome = homeUpdater({
+        recentBookmarks: [existingItem],
+        jumpBackIn: [],
+        byContentType: {
+          videos: [existingItem],
+          podcasts: [],
+          articles: [],
+        },
+      });
+
+      expect(updatedHome.recentBookmarks[0].tags).toEqual([
+        { id: 'temp-tag-design', name: 'Design' },
+        { id: 'temp-tag-mobile ux', name: 'Mobile UX' },
+      ]);
     });
 
     it('removes matching inbox items during optimistic update', async () => {

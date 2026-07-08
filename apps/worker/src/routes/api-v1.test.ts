@@ -813,7 +813,7 @@ describe('apiV1Routes', () => {
           Authorization: `Bearer ${READ_WRITE_TOKEN}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: 'https://example.com/article' }),
+        body: JSON.stringify({ url: 'https://example.com/article', tags: ['Design', ' api '] }),
       }),
       createMockEnv()
     );
@@ -824,6 +824,7 @@ describe('apiV1Routes', () => {
       expect.objectContaining({
         url: 'https://example.com/article',
         title: 'Article title',
+        tags: ['Design', ' api '],
       })
     );
     expect((await res.json()) as JsonBody).toMatchObject({
@@ -833,6 +834,41 @@ describe('apiV1Routes', () => {
       item: {
         title: 'Article title',
       },
+    });
+  });
+
+  it('maps bookmark save bad request errors to REST 400 responses', async () => {
+    mockPreview.mockResolvedValue({
+      provider: Provider.WEB,
+      contentType: ContentType.ARTICLE,
+      providerId: 'https://example.com/article',
+      title: 'Article title',
+      creator: 'Example',
+      thumbnailUrl: null,
+      duration: null,
+      canonicalUrl: 'https://example.com/article',
+      source: 'opengraph',
+      description: 'Article summary',
+    });
+    mockSave.mockRejectedValue(new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid tag' }));
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: 'https://example.com/article', tags: ['Invalid tag'] }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      code: 'BAD_REQUEST',
+      error: 'Invalid tag',
     });
   });
 

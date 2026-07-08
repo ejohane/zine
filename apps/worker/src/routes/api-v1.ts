@@ -31,6 +31,11 @@ const MAX_BOOKMARKS_LIMIT = 50;
 
 const SaveBookmarkBodySchema = z.object({
   url: z.string().url('Invalid URL format'),
+  tags: z.array(z.string().min(1).max(64)).max(20).optional(),
+});
+
+const PreviewBookmarkBodySchema = z.object({
+  url: z.string().url('Invalid URL format'),
 });
 
 const InboxQuerySchema = z.object({
@@ -536,7 +541,7 @@ apiV1Routes.get('/bookmarks', personalAccessTokenAuth('bookmarks:read'), async (
 
 apiV1Routes.post('/bookmarks/preview', personalAccessTokenAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
-  const parsedBody = SaveBookmarkBodySchema.safeParse(body);
+  const parsedBody = PreviewBookmarkBodySchema.safeParse(body);
 
   if (!parsedBody.success) {
     return c.json(
@@ -610,17 +615,22 @@ apiV1Routes.post('/bookmarks', personalAccessTokenAuth('bookmarks:write'), async
     );
   }
 
-  const bookmark = await caller.bookmarks.save({
-    ...preview,
-    url: parsedBody.data.url,
-  });
+  try {
+    const bookmark = await caller.bookmarks.save({
+      ...preview,
+      url: parsedBody.data.url,
+      tags: parsedBody.data.tags,
+    });
 
-  return c.json({
-    bookmark,
-    item: toPreviewItem(preview),
-    requestId: c.get('requestId'),
-    traceId: c.get('traceId'),
-  });
+    return c.json({
+      bookmark,
+      item: toPreviewItem(preview),
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
 });
 
 apiV1Routes.get('/bookmarks/:id', personalAccessTokenAuth('bookmarks:read'), async (c) => {

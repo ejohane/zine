@@ -10,6 +10,7 @@
 
 import { trpc } from '../lib/trpc';
 import { ContentType, Provider, UserItemState, isValidUrl } from '@zine/shared';
+import { normalizeTagKey, sanitizeTagNames } from '@zine/shared/tags';
 import * as Crypto from 'expo-crypto';
 import {
   getHomeQueryInputsForContentType,
@@ -75,7 +76,12 @@ interface SaveBookmarkInput {
   // X/Twitter-specific fields
   publishedAt?: string;
   rawMetadata?: string;
+  tags?: string[];
 }
+
+type SaveFromPreviewOptions = {
+  tags?: string[];
+};
 
 type TrpcUtils = ReturnType<typeof trpc.useUtils>;
 
@@ -114,6 +120,10 @@ function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
   const now = new Date().toISOString();
   const tempUserItemId = `temp-${Crypto.randomUUID()}`;
   const tempItemId = `temp-${Crypto.randomUUID()}`;
+  const optimisticTags = sanitizeTagNames(input.tags ?? []).map((name) => ({
+    id: `temp-tag-${normalizeTagKey(name)}`,
+    name,
+  }));
 
   return {
     id: tempUserItemId,
@@ -139,7 +149,36 @@ function createOptimisticItem(input: SaveBookmarkInput): LibraryItem {
     progress: null,
     isFinished: false,
     finishedAt: null,
-    tags: [],
+    tags: optimisticTags,
+  };
+}
+
+function createSaveBookmarkInput(
+  preview: LinkPreview,
+  originalUrl?: string,
+  options?: SaveFromPreviewOptions
+): SaveBookmarkInput {
+  return {
+    url: originalUrl ?? preview.canonicalUrl,
+    provider: preview.provider,
+    contentType: preview.contentType,
+    providerId: preview.providerId,
+    title: preview.title,
+    creator: preview.creator,
+    creatorImageUrl: preview.creatorImageUrl ?? null,
+    thumbnailUrl: preview.thumbnailUrl,
+    duration: preview.duration,
+    canonicalUrl: preview.canonicalUrl,
+    description: preview.description,
+    // Article-specific fields
+    siteName: preview.siteName,
+    wordCount: preview.wordCount,
+    readingTimeMinutes: preview.readingTimeMinutes,
+    hasArticleContent: preview.hasArticleContent,
+    // X/Twitter-specific fields
+    publishedAt: preview.publishedAt,
+    rawMetadata: preview.rawMetadata,
+    tags: sanitizeTagNames(options?.tags ?? []),
   };
 }
 
@@ -411,28 +450,12 @@ export function useSaveBookmark() {
    * @param preview - The LinkPreview to save
    * @param originalUrl - The original URL entered by the user (optional, defaults to canonicalUrl)
    */
-  const saveFromPreview = (preview: LinkPreview, originalUrl?: string) => {
-    mutation.mutate({
-      url: originalUrl ?? preview.canonicalUrl,
-      provider: preview.provider,
-      contentType: preview.contentType,
-      providerId: preview.providerId,
-      title: preview.title,
-      creator: preview.creator,
-      creatorImageUrl: preview.creatorImageUrl ?? null,
-      thumbnailUrl: preview.thumbnailUrl,
-      duration: preview.duration,
-      canonicalUrl: preview.canonicalUrl,
-      description: preview.description,
-      // Article-specific fields
-      siteName: preview.siteName,
-      wordCount: preview.wordCount,
-      readingTimeMinutes: preview.readingTimeMinutes,
-      hasArticleContent: preview.hasArticleContent,
-      // X/Twitter-specific fields
-      publishedAt: preview.publishedAt,
-      rawMetadata: preview.rawMetadata,
-    });
+  const saveFromPreview = (
+    preview: LinkPreview,
+    originalUrl?: string,
+    options?: SaveFromPreviewOptions
+  ) => {
+    mutation.mutate(createSaveBookmarkInput(preview, originalUrl, options));
   };
 
   /**
@@ -447,29 +470,10 @@ export function useSaveBookmark() {
    */
   const saveFromPreviewAsync = async (
     preview: LinkPreview,
-    originalUrl?: string
+    originalUrl?: string,
+    options?: SaveFromPreviewOptions
   ): Promise<SaveResult> => {
-    return mutation.mutateAsync({
-      url: originalUrl ?? preview.canonicalUrl,
-      provider: preview.provider,
-      contentType: preview.contentType,
-      providerId: preview.providerId,
-      title: preview.title,
-      creator: preview.creator,
-      creatorImageUrl: preview.creatorImageUrl ?? null,
-      thumbnailUrl: preview.thumbnailUrl,
-      duration: preview.duration,
-      canonicalUrl: preview.canonicalUrl,
-      description: preview.description,
-      // Article-specific fields
-      siteName: preview.siteName,
-      wordCount: preview.wordCount,
-      readingTimeMinutes: preview.readingTimeMinutes,
-      hasArticleContent: preview.hasArticleContent,
-      // X/Twitter-specific fields
-      publishedAt: preview.publishedAt,
-      rawMetadata: preview.rawMetadata,
-    });
+    return mutation.mutateAsync(createSaveBookmarkInput(preview, originalUrl, options));
   };
 
   return {

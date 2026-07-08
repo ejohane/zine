@@ -4,6 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 const mockBack = jest.fn();
 const mockUsePreview = jest.fn();
 const mockUseSaveBookmark = jest.fn();
+const mockUseUserTags = jest.fn();
 const mockUseSafeAreaInsets = jest.fn();
 const keyboardListeners = new Map<
   string,
@@ -11,6 +12,7 @@ const keyboardListeners = new Map<
 >();
 
 type Renderer = ReturnType<typeof TestRenderer.create>;
+type TestNode = { props: { children?: React.ReactNode } };
 
 function flattenStyle(style: unknown): Record<string, unknown> {
   if (Array.isArray(style)) {
@@ -137,6 +139,10 @@ jest.mock('@/hooks/use-bookmarks', () => ({
   isValidUrl: (value: string) => value.startsWith('http://') || value.startsWith('https://'),
 }));
 
+jest.mock('@/hooks/use-items-trpc', () => ({
+  useUserTags: () => mockUseUserTags(),
+}));
+
 jest.mock('@/components/link-preview-card', () => ({
   LinkPreviewCard: () => React.createElement('link-preview-card'),
 }));
@@ -176,6 +182,15 @@ describe('AddLinkScreen keyboard layout', () => {
       saveFromPreviewAsync: jest.fn(),
       isPending: false,
       reset: jest.fn(),
+    });
+    mockUseUserTags.mockReturnValue({
+      data: {
+        tags: [
+          { id: 'tag-1', name: 'Design' },
+          { id: 'tag-2', name: 'Mobile UX' },
+        ],
+      },
+      isLoading: false,
     });
   });
 
@@ -251,5 +266,91 @@ describe('AddLinkScreen keyboard layout', () => {
     expect(style.flex).toBe(0);
     expect(style.justifyContent).toBe('flex-start');
     expect(style.paddingTop).toBe(Spacing.lg);
+  });
+
+  it('passes selected tags when saving a preview', async () => {
+    const saveFromPreviewAsync = jest.fn().mockResolvedValue({
+      itemId: 'item-1',
+      userItemId: 'user-item-1',
+      status: 'created',
+    });
+
+    mockUsePreview.mockReturnValue({
+      data: {
+        provider: 'YOUTUBE',
+        contentType: 'VIDEO',
+        providerId: 'video-1',
+        title: 'Preview title',
+        creator: 'Creator',
+        thumbnailUrl: null,
+        duration: null,
+        canonicalUrl: 'https://example.com/watch',
+        source: 'oembed',
+      },
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    mockUseSaveBookmark.mockReturnValue({
+      saveFromPreviewAsync,
+      isPending: false,
+      reset: jest.fn(),
+    });
+
+    let renderer: Renderer;
+
+    await act(async () => {
+      renderer = TestRenderer.create(<AddLinkScreen />);
+    });
+
+    const urlInput = renderer!.root.findByProps({ accessibilityLabel: 'URL input' });
+    await act(async () => {
+      urlInput.props.onChangeText('https://example.com/watch');
+    });
+
+    const designButton = renderer!.root.findAllByType('button').find((button: TestNode) => {
+      const children = button.props.children as any;
+      return (
+        Array.isArray(children) && children.some((child) => child?.props?.children === 'Design')
+      );
+    });
+
+    expect(designButton).toBeDefined();
+
+    await act(async () => {
+      designButton!.props.onPress();
+    });
+
+    const tagInput = renderer!.root.findByProps({ accessibilityLabel: 'Tag input' });
+    await act(async () => {
+      tagInput.props.onChangeText(' Personal   Reading ');
+    });
+
+    const createButton = renderer!.root.findAllByType('button').find((button: TestNode) => {
+      const children = button.props.children as any;
+      return children?.props?.children === 'Create "Personal Reading"';
+    });
+
+    expect(createButton).toBeDefined();
+
+    await act(async () => {
+      createButton!.props.onPress();
+    });
+
+    const saveButton = renderer!.root.findByProps({ accessibilityLabel: 'Save to library' });
+    await act(async () => {
+      await saveButton.props.onPress();
+    });
+
+    expect(saveFromPreviewAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Preview title',
+      }),
+      'https://example.com/watch',
+      {
+        tags: ['Design', 'Personal Reading'],
+      }
+    );
   });
 });

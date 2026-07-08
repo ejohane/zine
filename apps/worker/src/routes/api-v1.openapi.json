@@ -324,7 +324,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SaveBookmarkRequest"
+                "$ref": "#/components/schemas/PreviewBookmarkRequest"
               },
               "examples": {
                 "webArticle": {
@@ -1278,6 +1278,28 @@
             "type": "string",
             "format": "uri",
             "description": "HTTP or HTTPS URL to save."
+          },
+          "tags": {
+            "type": "array",
+            "description": "Optional tag names to add to the saved bookmark.",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        }
+      },
+      "PreviewBookmarkRequest": {
+        "type": "object",
+        "required": ["url"],
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "HTTP or HTTPS URL to preview."
           }
         }
       },
