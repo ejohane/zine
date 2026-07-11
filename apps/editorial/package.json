@@ -1,0 +1,26 @@
+{
+  "name": "@zine/editorial",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "zine-editorial": "./src/cli.ts"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --target bun --outdir dist",
+    "lint": "eslint src --ext .ts --cache --cache-location .eslintcache",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src",
+    "snapshot": "bun run src/cli.ts snapshot",
+    "validate": "bun run src/cli.ts validate",
+    "render": "bun run src/cli.ts render",
+    "publish": "bun run src/cli.ts publish"
+  },
+  "dependencies": {
+    "@zine/editorial-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.2"
+  }
+}

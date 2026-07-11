@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { ulid } from 'ulid';
 import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
+import { PublishEditorialEditionSchema } from '@zine/editorial-schema';
 import type { Env } from '../types';
 import { createDb } from '../db';
 import { apiTokens, userItemConsumptionEvents, userItems } from '../db/schema';
@@ -25,6 +26,14 @@ import {
   hasApiTokenScope,
   isApiTokenActive,
 } from '../lib/api-tokens';
+import {
+  EditorialConflictError,
+  EditorialValidationError,
+  getEditorialArtifact,
+  getEditorialEdition,
+  listEditorialEditions,
+  storeEditorialEdition,
+} from '../lib/editorial-storage';
 
 const DEFAULT_BOOKMARKS_LIMIT = 10;
 const MAX_BOOKMARKS_LIMIT = 50;
@@ -875,6 +884,129 @@ apiV1Routes.get('/tags', personalAccessTokenAuth('bookmarks:read'), async (c) =>
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });
+});
+
+apiV1Routes.get('/editorial/editions', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+  const editions = await listEditorialEditions(
+    c.env.DB,
+    c.get('userId')!,
+    parseLimit(c.req.query('limit'))
+  );
+  return c.json({ editions, requestId: c.get('requestId'), traceId: c.get('traceId') });
+});
+
+apiV1Routes.get(
+  '/editorial/editions/latest',
+  personalAccessTokenAuth('bookmarks:read'),
+  async (c) => {
+    const result = await getEditorialEdition(c.env.DB, c.env.ARTICLE_CONTENT, c.get('userId')!);
+    if (!result) {
+      return c.json(
+        { error: 'Edition not found', code: 'NOT_FOUND', requestId: c.get('requestId') },
+        404
+      );
+    }
+    return c.json({
+      edition: result.edition,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  }
+);
+
+apiV1Routes.get('/editorial/editions/:id', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+  const result = await getEditorialEdition(
+    c.env.DB,
+    c.env.ARTICLE_CONTENT,
+    c.get('userId')!,
+    c.req.param('id')
+  );
+  if (!result) {
+    return c.json(
+      { error: 'Edition not found', code: 'NOT_FOUND', requestId: c.get('requestId') },
+      404
+    );
+  }
+  return c.json({
+    edition: result.edition,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
+apiV1Routes.get(
+  '/editorial/editions/:id/artifacts/:artifact',
+  personalAccessTokenAuth('bookmarks:read'),
+  async (c) => {
+    const artifact = c.req.param('artifact');
+    if (!['markdown', 'snapshot', 'validation'].includes(artifact)) {
+      return c.json({ error: 'Unknown artifact', code: 'NOT_FOUND' }, 404);
+    }
+    const object = await getEditorialArtifact(
+      c.env.DB,
+      c.env.ARTICLE_CONTENT,
+      c.get('userId')!,
+      c.req.param('id'),
+      artifact as 'markdown' | 'snapshot' | 'validation'
+    );
+    if (!object) return c.json({ error: 'Artifact not found', code: 'NOT_FOUND' }, 404);
+    return new Response(object.body, {
+      headers: { 'Content-Type': object.httpMetadata?.contentType ?? 'application/octet-stream' },
+    });
+  }
+);
+
+apiV1Routes.post('/editorial/editions', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsed = PublishEditorialEditionSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid editorial edition',
+        code: 'INVALID_REQUEST_BODY',
+        issues: parsed.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+  try {
+    const result = await storeEditorialEdition(
+      c.env.DB,
+      c.env.ARTICLE_CONTENT,
+      c.get('userId')!,
+      parsed.data
+    );
+    return c.json(
+      { ...result, requestId: c.get('requestId'), traceId: c.get('traceId') },
+      result.created ? 201 : 200
+    );
+  } catch (error) {
+    if (error instanceof EditorialConflictError) {
+      return c.json(
+        {
+          error: error.message,
+          code: 'EDITION_CONFLICT',
+          requestId: c.get('requestId'),
+          traceId: c.get('traceId'),
+        },
+        409
+      );
+    }
+    if (error instanceof EditorialValidationError) {
+      return c.json(
+        {
+          error: error.message,
+          code: 'EDITORIAL_VALIDATION_FAILED',
+          requestId: c.get('requestId'),
+          traceId: c.get('traceId'),
+        },
+        400
+      );
+    }
+    throw error;
+  }
 });
 
 export default apiV1Routes;

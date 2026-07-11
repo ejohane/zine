@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Zine Daily Editorial'
+  short_description: 'Create and publish a grounded daily Zine edition'
+  default_prompt: "Use $zine-daily-editorial to produce today's grounded editorial edition from my X archive and Zine content."

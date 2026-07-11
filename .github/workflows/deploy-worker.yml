@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/worker/**'
+      - 'packages/editorial-schema/**'
       - 'packages/shared/**'
       - '.github/workflows/deploy-worker.yml'
   workflow_dispatch:
@@ -29,6 +30,9 @@ jobs:
 
       - name: Build shared package
         run: bun run build --filter=@zine/shared
+
+      - name: Build editorial schema package
+        run: bun run build --filter=@zine/editorial-schema
 
       - name: Run database migrations
         run: bun run db:migrate

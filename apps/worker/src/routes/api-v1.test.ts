@@ -228,6 +228,10 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/progress');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/article-content');
     expect(body.paths).toHaveProperty('/api/v1/tags');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/editions');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/editions/latest');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/editions/{id}');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/editions/{id}/artifacts/{artifact}');
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs');
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs/{jobId}');
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs/active');
