@@ -1,0 +1,27 @@
+{
+  "name": "@zine/x-collector",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "zine-x-collector": "./src/cli.ts"
+  },
+  "scripts": {
+    "build": "bun build src/cli.ts --target bun --outdir dist",
+    "lint": "eslint src --ext .ts --cache --cache-location .eslintcache",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src",
+    "upload": "bun run src/cli.ts upload",
+    "validate": "bun run src/cli.ts validate",
+    "receive": "bun run src/cli.ts receive"
+  },
+  "dependencies": {
+    "@zine/x-archive-schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "linkedom": "^0.18.12",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

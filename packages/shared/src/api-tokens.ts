@@ -5,11 +5,13 @@ export const ApiTokenScopeSchema = z.enum([
   'bookmarks:write',
   'sync:read',
   'sync:write',
+  'x-archive:read',
+  'x-archive:write',
 ]);
 export const ApiTokenScopesSchema = z
   .array(ApiTokenScopeSchema)
   .min(1)
-  .max(4)
+  .max(6)
   .refine((scopes) => new Set(scopes).size === scopes.length, {
     message: 'Scopes must be unique',
   });

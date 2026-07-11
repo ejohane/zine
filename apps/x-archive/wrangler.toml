@@ -1,0 +1,72 @@
+name = "zine-x-archive-dev"
+main = "src/index.ts"
+compatibility_date = "2026-07-11"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[[d1_databases]]
+binding = "AUTH_DB"
+database_name = "zine-db-dev"
+database_id = "2ce5331a-233c-48ec-9265-d04ecb539599"
+
+[[d1_databases]]
+binding = "ARCHIVE_DB"
+database_name = "zine-x-archive-dev"
+database_id = "a69f0e9e-2c1c-4c10-8538-0ef4c03418c0"
+migrations_dir = "src/db/migrations"
+
+[[r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "zine-x-archive-dev"
+
+[vars]
+ENVIRONMENT = "development"
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+[env.staging]
+name = "zine-x-archive-staging"
+workers_dev = true
+
+[[env.staging.d1_databases]]
+binding = "AUTH_DB"
+database_name = "zine-db-staging"
+database_id = "feaff315-9e1d-41ce-94c4-563489ccffba"
+
+[[env.staging.d1_databases]]
+binding = "ARCHIVE_DB"
+database_name = "zine-x-archive-staging"
+database_id = "8eee0d54-70e4-4afd-b62b-908574ef301b"
+migrations_dir = "src/db/migrations"
+
+[[env.staging.r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "zine-x-archive-staging"
+
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+[env.production]
+name = "zine-x-archive-production"
+workers_dev = true
+routes = [{ pattern = "x-archive-api.myzine.app", custom_domain = true }]
+
+[[env.production.d1_databases]]
+binding = "AUTH_DB"
+database_name = "zine-db-production"
+database_id = "82911dea-5a6b-411b-ab4b-4145cb0c191d"
+
+[[env.production.d1_databases]]
+binding = "ARCHIVE_DB"
+database_name = "zine-x-archive-production"
+database_id = "ad6f4c42-f2e9-449d-a9c6-7780fc08e9fa"
+migrations_dir = "src/db/migrations"
+
+[[env.production.r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "zine-x-archive-production"
+
+[env.production.vars]
+ENVIRONMENT = "production"

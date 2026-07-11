@@ -1,0 +1,4 @@
+interface:
+  display_name: 'X Timeline Collector'
+  short_description: 'Collect and archive the X Following timeline'
+  default_prompt: 'Use $zine-x-timeline-collector to collect the latest 500 organic posts from my X Following timeline.'

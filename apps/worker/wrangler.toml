@@ -129,7 +129,7 @@ index_name = "zine-item-vectors-staging"
 [[env.staging.d1_databases]]
 binding = "DB"
 database_name = "zine-db-staging"
-database_id = "bc9e61b1-94b2-4f3c-b19b-b3a50936b811"
+database_id = "feaff315-9e1d-41ce-94c4-563489ccffba"
 migrations_dir = "src/db/migrations"
 [env.staging.vars]
 ENVIRONMENT = "staging"

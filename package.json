@@ -26,6 +26,8 @@
     "diag:release": "bun run ./scripts/diag-release.mjs",
     "diag:queue:dlq": "bun run ./scripts/diag-queue-dlq.mjs",
     "diag:incident": "bun run ./scripts/diag-incident.mjs",
+    "x:archive:test": "bun run --cwd apps/x-archive test:run && bun run --cwd apps/x-collector test",
+    "x:archive:receive": "bun run --cwd apps/x-collector receive",
     "test": "bun run test:mobile && bun run test:worker && bun run test:web",
     "test:mobile": "bun run --cwd apps/mobile test",
     "test:web": "bun run --cwd apps/web test",

@@ -1,0 +1,23 @@
+name = "zine-x-archive-test"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "AUTH_DB"
+database_name = "zine-x-archive-auth-test"
+database_id = "x-archive-auth-test"
+migrations_dir = "src/test/auth-migrations"
+
+[[d1_databases]]
+binding = "ARCHIVE_DB"
+database_name = "zine-x-archive-test"
+database_id = "x-archive-test"
+migrations_dir = "src/db/migrations"
+
+[[r2_buckets]]
+binding = "ARCHIVE_BUCKET"
+bucket_name = "zine-x-archive-test"
+
+[vars]
+ENVIRONMENT = "test"

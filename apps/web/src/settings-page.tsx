@@ -215,6 +215,8 @@ function ApiTokensSection() {
   const [writeEnabled, setWriteEnabled] = useState(true);
   const [syncReadEnabled, setSyncReadEnabled] = useState(false);
   const [syncWriteEnabled, setSyncWriteEnabled] = useState(false);
+  const [xArchiveReadEnabled, setXArchiveReadEnabled] = useState(false);
+  const [xArchiveWriteEnabled, setXArchiveWriteEnabled] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -224,8 +226,17 @@ function ApiTokensSection() {
     if (writeEnabled) scopes.push('bookmarks:write');
     if (syncReadEnabled) scopes.push('sync:read');
     if (syncWriteEnabled) scopes.push('sync:write');
+    if (xArchiveReadEnabled) scopes.push('x-archive:read');
+    if (xArchiveWriteEnabled) scopes.push('x-archive:write');
     return scopes;
-  }, [readEnabled, syncReadEnabled, syncWriteEnabled, writeEnabled]);
+  }, [
+    readEnabled,
+    syncReadEnabled,
+    syncWriteEnabled,
+    writeEnabled,
+    xArchiveReadEnabled,
+    xArchiveWriteEnabled,
+  ]);
 
   const createToken = trpc.apiTokens.create.useMutation({
     onSuccess: (result) => {
@@ -327,6 +338,22 @@ function ApiTokensSection() {
               onChange={(event) => setSyncWriteEnabled(event.target.checked)}
             />
             Start sync jobs
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={xArchiveReadEnabled}
+              onChange={(event) => setXArchiveReadEnabled(event.target.checked)}
+            />
+            Read X archive
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={xArchiveWriteEnabled}
+              onChange={(event) => setXArchiveWriteEnabled(event.target.checked)}
+            />
+            Collect X timeline
           </label>
         </div>
 
