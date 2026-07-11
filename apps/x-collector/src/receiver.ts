@@ -12,6 +12,7 @@ const BatchSchema = z
   .object({
     posts: z.array(XPostSchema).max(200),
     items: z.array(XTimelineItemSchema).max(100),
+    adKeys: z.array(z.string().min(1).max(1_000)).max(200).default([]),
     excludedAds: z.number().int().nonnegative().default(0),
   })
   .strict();
@@ -53,7 +54,8 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
   const startedAt = options.startedAt ?? new Date().toISOString();
   const posts = new Map<string, XPost>();
   const items = new Map<string, XTimelineItem>();
-  let excludedAds = 0;
+  const acceptedAdKeys = new Set<string>();
+  let legacyExcludedAds = 0;
   let resolveCompleted!: (result: UploadResult) => void;
   let rejectCompleted!: (error: unknown) => void;
   const completed = new Promise<UploadResult>((resolve, reject) => {
@@ -67,15 +69,42 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
     async fetch(request) {
       if (request.method === 'OPTIONS') return new Response(null, { headers: corsHeaders() });
       const url = new URL(request.url);
+      const excludedAds = legacyExcludedAds + acceptedAdKeys.size;
       if (request.method === 'GET' && url.pathname === '/session') {
         return Response.json(
           {
             runId,
             startedAt,
             requestedCount: options.requestedCount,
-            collectorVersion: options.collectorVersion ?? 'chrome-dom-v1',
+            collectorVersion: options.collectorVersion ?? 'browser-dom-v2',
             posts: posts.size,
             items: items.size,
+            excludedAds,
+            nextPosition:
+              items.size === 0
+                ? 0
+                : Math.max(...[...items.values()].map((item) => item.position)) + 1,
+          },
+          { headers: corsHeaders() }
+        );
+      }
+      if (request.method === 'GET' && url.pathname === '/checkpoint') {
+        const orderedItems = [...items.values()].sort(
+          (left, right) => left.position - right.position
+        );
+        return Response.json(
+          {
+            runId,
+            startedAt,
+            requestedCount: options.requestedCount,
+            collectorVersion: options.collectorVersion ?? 'browser-dom-v2',
+            acceptedTweetIds: orderedItems.map((item) => item.tweetId),
+            acceptedAdKeys: [...acceptedAdKeys],
+            nextPosition:
+              orderedItems.length === 0
+                ? 0
+                : Math.max(...orderedItems.map((item) => item.position)) + 1,
+            canonicalPosts: posts.size,
             excludedAds,
           },
           { headers: corsHeaders() }
@@ -93,9 +122,19 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
         for (const item of parsed.data.items) {
           if (!items.has(item.tweetId)) items.set(item.tweetId, item);
         }
-        excludedAds += parsed.data.excludedAds;
+        if (parsed.data.adKeys.length > 0) {
+          for (const adKey of parsed.data.adKeys) acceptedAdKeys.add(adKey);
+        } else {
+          legacyExcludedAds += parsed.data.excludedAds;
+        }
+        const updatedExcludedAds = legacyExcludedAds + acceptedAdKeys.size;
         return Response.json(
-          { accepted: true, canonicalPosts: posts.size, timelineItems: items.size, excludedAds },
+          {
+            accepted: true,
+            canonicalPosts: posts.size,
+            timelineItems: items.size,
+            excludedAds: updatedExcludedAds,
+          },
           { headers: corsHeaders() }
         );
       }
@@ -113,8 +152,8 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             requestedCount: options.requestedCount,
             startedAt,
             completedAt: new Date().toISOString(),
-            collectorVersion: options.collectorVersion ?? 'chrome-dom-v1',
-            excludedAds,
+            collectorVersion: options.collectorVersion ?? 'browser-dom-v2',
+            excludedAds: legacyExcludedAds + acceptedAdKeys.size,
             status: parsed.data.status,
             failureReason: parsed.data.failureReason ?? null,
             posts: [...posts.values()],

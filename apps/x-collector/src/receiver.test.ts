@@ -23,13 +23,13 @@ describe('local browser receiver', () => {
         }
         if (url.pathname.includes('/chunks/')) return Response.json({ accepted: true });
         if (url.pathname.endsWith('/complete')) {
-          return Response.json({ run: { id: 'receiver-run-001', collectedCount: 1 } });
+          return Response.json({ run: { id: 'receiver-run-001', collectedCount: 2 } });
         }
-        return Response.json({ run: { id: 'receiver-run-001', collectedCount: 1 } });
+        return Response.json({ run: { id: 'receiver-run-001', collectedCount: 2 } });
       },
     });
     receiver = startReceiver({
-      requestedCount: 1,
+      requestedCount: 2,
       apiUrl: `http://${apiServer.hostname}:${apiServer.port}`,
       token: 'zine_pat_receiver-test',
       port: 0,
@@ -62,6 +62,7 @@ describe('local browser receiver', () => {
             presentation: 'POST',
           },
         ],
+        adKeys: ['ad-100'],
         excludedAds: 1,
       }),
     });
@@ -71,6 +72,54 @@ describe('local browser receiver', () => {
       excludedAds: 1,
     });
 
+    const duplicateAd = await fetch(`${receiver.url}/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ posts: [], items: [], adKeys: ['ad-100'], excludedAds: 1 }),
+    });
+    expect(await duplicateAd.json()).toMatchObject({ timelineItems: 1, excludedAds: 1 });
+
+    const checkpoint = await fetch(`${receiver.url}/checkpoint`);
+    expect(await checkpoint.json()).toMatchObject({
+      runId: 'receiver-run-001',
+      requestedCount: 2,
+      acceptedTweetIds: ['100'],
+      acceptedAdKeys: ['ad-100'],
+      nextPosition: 1,
+      excludedAds: 1,
+    });
+
+    const resumedBatch = await fetch(`${receiver.url}/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        posts: [
+          {
+            tweetId: '200',
+            url: 'https://x.com/example/status/200',
+            text: 'Resumed',
+            kind: 'POST',
+            author: { username: 'example', name: 'Example' },
+            media: [],
+            relationships: [],
+            metrics: {},
+            capturedAt: '2026-07-11T13:01:00.000Z',
+          },
+        ],
+        items: [
+          {
+            tweetId: '200',
+            position: 1,
+            observedAt: '2026-07-11T13:01:00.000Z',
+            presentation: 'POST',
+          },
+        ],
+        adKeys: ['ad-200'],
+        excludedAds: 1,
+      }),
+    });
+    expect(await resumedBatch.json()).toMatchObject({ timelineItems: 2, excludedAds: 2 });
+
     const complete = await fetch(`${receiver.url}/complete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -79,7 +128,7 @@ describe('local browser receiver', () => {
     expect(complete.status).toBe(200);
     await expect(receiver.completed).resolves.toMatchObject({
       runId: 'receiver-run-001',
-      timelineItemsSubmitted: 1,
+      timelineItemsSubmitted: 2,
       verified: true,
     });
   });

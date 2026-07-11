@@ -44,7 +44,7 @@ Ask Codex to use the `zine-x-timeline-collector` skill, or start its receiver ex
 bun run x:archive:receive -- --count 500
 ```
 
-The receiver listens only on `127.0.0.1`, accepts small browser-extracted batches, uploads chunks of at most 25 primary timeline entries, finalizes the R2 run manifest, then reads the run back for verification.
+The receiver listens only on `127.0.0.1`, accepts small browser-extracted batches, and exposes a checkpoint that lets browser control reconnect without changing the run or item positions. The collector performs bounded up/down recovery after transient X stalls before falling back to a partial run. On completion, the receiver uploads chunks of at most 25 primary timeline entries, finalizes the R2 run manifest, then reads the run back for verification.
 
 For an existing capture JSON file:
 

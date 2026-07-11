@@ -18,6 +18,7 @@ Use the repository extractor at `apps/x-collector/src/browser-extractor.mjs`. It
 - Keep deduplication state outside the page because mounted cards are recycled.
 - Pass the previously returned ad keys into the next extractor call so recycled ads are counted once.
 - Scroll one viewport at a time. Large jumps can skip cards.
+- After five empty scrolls, perform the bounded up/down recovery sequence in SKILL.md before declaring a stall.
 
 ## Primary versus referenced posts
 
@@ -33,7 +34,7 @@ The extractor rejects cards with promoted, sponsored, or ad markers outside the 
 
 ## Partial completion
 
-Use `PARTIAL` when the requested number cannot be reached. Valid concise reasons include:
+Use `PARTIAL` only when the requested number cannot be reached after supported recovery. Valid concise reasons include:
 
 - `timeline_stalled`
 - `x_rate_limited`
@@ -43,10 +44,15 @@ Use `PARTIAL` when the requested number cannot be reached. Valid concise reasons
 
 The receiver retains and uploads every successfully collected item before the failure.
 
+## Resumable browser session
+
+Use `createCollectionSession(checkpoint)` and `prepareTimelineBatch(rawBatch, state, requestedCount)` from `apps/x-collector/src/browser-session.mjs`. The receiver owns the authoritative in-progress data; browser state can be rebuilt from its checkpoint without changing the run ID or item positions.
+
 ## Local receiver API
 
 - `GET /session` returns run identity and current counts.
-- `POST /batch` accepts `{ posts, items, excludedAds }`.
+- `GET /checkpoint` returns accepted tweet IDs, accepted ad keys, and the next position for reconnecting browser control.
+- `POST /batch` accepts `{ posts, items, adKeys, excludedAds }`; stable ad keys make retries idempotent.
 - `POST /complete` accepts `{ status, failureReason }` and performs the verified Cloudflare upload.
 
 The receiver binds only to `127.0.0.1` and keeps the Zine PAT out of the X page context.
