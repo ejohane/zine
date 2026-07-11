@@ -290,6 +290,38 @@ describe('SettingsPage', () => {
       });
     });
 
+    test('creates an API token with X archive scopes when selected', async () => {
+      const user = userEvent.setup();
+      mutationSpies.apiTokensCreate.mockResolvedValue({
+        token: {
+          id: 'token-archive',
+          name: 'X collector',
+          tokenPrefix: 'zine_pat_archive',
+          scopes: ['bookmarks:read', 'bookmarks:write', 'x-archive:read', 'x-archive:write'],
+          createdAt: Date.now(),
+          lastUsedAt: null,
+          expiresAt: null,
+          revokedAt: null,
+        },
+        rawToken: 'zine_pat_archive_raw_token',
+      });
+
+      renderRoute(<SettingsPage />, {
+        route: '/settings',
+        path: '/settings',
+      });
+
+      await user.type(screen.getByLabelText('Name'), 'X collector');
+      await user.click(screen.getByLabelText('Read X archive'));
+      await user.click(screen.getByLabelText('Collect X timeline'));
+      await user.click(screen.getByRole('button', { name: 'Create token' }));
+
+      expect(mutationSpies.apiTokensCreate).toHaveBeenCalledWith({
+        name: 'X collector',
+        scopes: ['bookmarks:read', 'bookmarks:write', 'x-archive:read', 'x-archive:write'],
+      });
+    });
+
     test('revokes an API token', async () => {
       const user = userEvent.setup();
       hookSpies.apiTokensListUseQuery.mockImplementation(() => ({
