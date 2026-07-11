@@ -752,6 +752,155 @@
         }
       }
     },
+    "/api/v1/editorial/editions": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "listEditorialEditions",
+        "summary": "List daily editorial editions",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/Limit" }],
+        "responses": {
+          "200": {
+            "description": "Versioned editions for the token owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "editions": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/EditorialEditionSummary" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "publishEditorialEdition",
+        "summary": "Publish a validated daily editorial edition",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PublishEditorialEditionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Edition created." },
+          "200": { "description": "Identical edition already existed." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "description": "Edition ID already contains different content." }
+        }
+      }
+    },
+    "/api/v1/editorial/editions/latest": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getLatestEditorialEdition",
+        "summary": "Get the latest daily editorial edition",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Latest canonical JSON edition.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edition": { "$ref": "#/components/schemas/EditorialEdition" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/editions/{id}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialEdition",
+        "summary": "Get one daily editorial edition",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Canonical JSON edition.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "edition": { "$ref": "#/components/schemas/EditorialEdition" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/editions/{id}/artifacts/{artifact}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialArtifact",
+        "summary": "Get a retained editorial artifact",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "artifact",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "enum": ["markdown", "snapshot", "validation"] }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Requested retained artifact." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/sync-jobs": {
       "post": {
         "tags": ["Sync"],
@@ -1021,6 +1170,34 @@
       }
     },
     "schemas": {
+      "EditorialEditionSummary": {
+        "type": "object",
+        "required": ["id", "editionDate", "revision", "status", "headline", "qualityScore"],
+        "properties": {
+          "id": { "type": "string" },
+          "editionDate": { "type": "string", "format": "date" },
+          "revision": { "type": "integer", "minimum": 1 },
+          "status": { "type": "string", "enum": ["PUBLISHED"] },
+          "headline": { "type": "string" },
+          "qualityScore": { "type": "number", "minimum": 0, "maximum": 100 }
+        }
+      },
+      "EditorialEdition": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Canonical versioned DailyEdition document defined by @zine/editorial-schema."
+      },
+      "PublishEditorialEditionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["edition", "snapshot", "validation", "markdown"],
+        "properties": {
+          "edition": { "$ref": "#/components/schemas/EditorialEdition" },
+          "snapshot": { "type": "object", "additionalProperties": true },
+          "validation": { "type": "object", "additionalProperties": true },
+          "markdown": { "type": "string" }
+        }
+      },
       "Error": {
         "type": "object",
         "required": ["error", "code", "requestId", "traceId"],

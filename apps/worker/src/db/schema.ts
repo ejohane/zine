@@ -37,6 +37,40 @@ export const apiTokens = sqliteTable(
   ]
 );
 
+// Versioned, user-scoped editorial editions. Large artifacts live in R2.
+export const dailyEditions = sqliteTable(
+  'daily_editions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    editionDate: text('edition_date').notNull(),
+    revision: integer('revision').notNull(),
+    status: text('status').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+    headline: text('headline').notNull(),
+    windowStartAt: integer('window_start_at').notNull(),
+    windowEndAt: integer('window_end_at').notNull(),
+    editionKey: text('edition_key').notNull(),
+    markdownKey: text('markdown_key').notNull(),
+    snapshotKey: text('snapshot_key').notNull(),
+    validationKey: text('validation_key').notNull(),
+    contentHash: text('content_hash').notNull(),
+    qualityScore: real('quality_score').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('daily_editions_user_date_revision_idx').on(
+      table.userId,
+      table.editionDate,
+      table.revision
+    ),
+    index('daily_editions_user_latest_idx').on(table.userId, table.windowEndAt, table.revision),
+  ]
+);
+
 // Items (Canonical Content)
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.

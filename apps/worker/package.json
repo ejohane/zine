@@ -29,6 +29,7 @@
     "@mozilla/readability": "^0.6.0",
     "@spotify/web-api-ts-sdk": "^1.2.0",
     "@trpc/server": "^11.0.0",
+    "@zine/editorial-schema": "workspace:*",
     "@zine/shared": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "fast-xml-parser": "^5.3.6",
