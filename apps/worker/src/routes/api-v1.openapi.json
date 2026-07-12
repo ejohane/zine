@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.1.0",
-    "description": "Personal access token REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, and subscription sync jobs."
+    "version": "1.2.0",
+    "description": "REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, and subscription sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
     {
@@ -1036,8 +1036,8 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "Zine personal access token",
-        "description": "Use a Zine personal access token with the required operation scope."
+        "bearerFormat": "Clerk session JWT or Zine personal access token",
+        "description": "Use a Clerk session JWT for a signed-in Zine user, or a Zine personal access token with the required operation scope."
       }
     },
     "parameters": {

@@ -32,6 +32,7 @@ const {
   mockFindUserItem,
   mockUserItemUpdateSet,
   mockConsumptionInsertValues,
+  mockVerifyClerkRequestToken,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -58,6 +59,7 @@ const {
   mockFindUserItem: vi.fn(),
   mockUserItemUpdateSet: vi.fn(),
   mockConsumptionInsertValues: vi.fn(),
+  mockVerifyClerkRequestToken: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -72,6 +74,10 @@ vi.mock('../trpc/router', () => ({
   appRouter: {
     createCaller: mockCreateCaller,
   },
+}));
+
+vi.mock('../middleware/auth', () => ({
+  verifyClerkRequestToken: mockVerifyClerkRequestToken,
 }));
 
 vi.mock('../sync/service', async () => {
@@ -188,6 +194,11 @@ describe('apiV1Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbToken(createTokenRecord(['bookmarks:read', 'bookmarks:write']));
+    mockVerifyClerkRequestToken.mockResolvedValue({
+      success: true,
+      userId: 'clerk_user_123',
+      payload: { sub: 'clerk_user_123' },
+    });
     mockCreateCaller.mockReturnValue({
       items: {
         inbox: mockInbox,
@@ -273,6 +284,47 @@ describe('apiV1Routes', () => {
     );
 
     expect(res.status).toBe(401);
+  });
+
+  it('accepts a Clerk session token without looking up a personal access token', async () => {
+    mockLibrary.mockResolvedValue({ items: [], nextCursor: null });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks', {
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockVerifyClerkRequestToken).toHaveBeenCalledWith(
+      'clerk-session-jwt',
+      expect.objectContaining({ ENVIRONMENT: 'test' })
+    );
+    expect(mockCreateContext).toHaveBeenCalled();
+    expect(mockCreateDb).not.toHaveBeenCalled();
+  });
+
+  it('returns the Clerk authentication error for an invalid session token', async () => {
+    mockVerifyClerkRequestToken.mockResolvedValue({
+      success: false,
+      error: 'Token has expired',
+      code: 'EXPIRED_TOKEN',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks', {
+        headers: { Authorization: 'Bearer expired-clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(403);
+    expect(res.headers.get('X-Zine-Auth-Error')).toBe('EXPIRED_TOKEN');
+    expect((await res.json()) as JsonBody).toMatchObject({ code: 'EXPIRED_TOKEN' });
+    expect(mockLibrary).not.toHaveBeenCalled();
   });
 
   it('returns 403 when the token is missing the required scope', async () => {
