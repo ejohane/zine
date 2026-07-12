@@ -1,0 +1,6 @@
+// Copy this file to Local.xcconfig and use the publishable key for Zine's
+// Clerk instance. Local.xcconfig is ignored by the repository's *.local rule.
+ZINE_CLERK_PUBLISHABLE_KEY = pk_test_replace_me
+
+// Optional for local worker development.
+// ZINE_API_BASE_URL = http:/$()/localhost:8787

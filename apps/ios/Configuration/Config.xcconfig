@@ -1,0 +1,4 @@
+ZINE_API_BASE_URL = https:/$()/api.myzine.app
+ZINE_CLERK_PUBLISHABLE_KEY = pk_live_Y2xlcmsubXl6aW5lLmFwcCQ
+
+#include? "Local.xcconfig"

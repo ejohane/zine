@@ -34,6 +34,7 @@ import {
   listEditorialEditions,
   storeEditorialEdition,
 } from '../lib/editorial-storage';
+import { verifyClerkRequestToken } from '../middleware/auth';
 
 const DEFAULT_BOOKMARKS_LIMIT = 10;
 const MAX_BOOKMARKS_LIMIT = 50;
@@ -102,7 +103,7 @@ function extractBearerToken(authHeader: string | undefined): string | null {
   }
 
   const token = authHeader.slice(7).trim();
-  return token.startsWith(API_TOKEN_PREFIX) ? token : null;
+  return token.length > 0 ? token : null;
 }
 
 function parseLimit(value: string | undefined): number {
@@ -220,7 +221,7 @@ function trpcErrorResponse(c: Context<Env>, error: unknown) {
   throw error;
 }
 
-function personalAccessTokenAuth(requiredScope: ApiTokenScope) {
+function apiAuth(requiredPatScope: ApiTokenScope) {
   const middleware: MiddlewareHandler<Env> = async (c, next) => {
     const requestId = c.get('requestId');
     const traceId = c.get('traceId');
@@ -236,6 +237,26 @@ function personalAccessTokenAuth(requiredScope: ApiTokenScope) {
         },
         401
       );
+    }
+
+    if (!rawToken.startsWith(API_TOKEN_PREFIX)) {
+      const result = await verifyClerkRequestToken(rawToken, c.env);
+      if (!result.success) {
+        c.header('X-Zine-Auth-Error', result.code);
+        return c.json(
+          {
+            error: result.error,
+            code: result.code,
+            requestId,
+            traceId,
+          },
+          result.code === 'INVALID_TOKEN' || result.code === 'EXPIRED_TOKEN' ? 403 : 401
+        );
+      }
+
+      c.set('userId', result.userId);
+      await next();
+      return;
     }
 
     const tokenHash = await hashApiToken(rawToken);
@@ -256,7 +277,7 @@ function personalAccessTokenAuth(requiredScope: ApiTokenScope) {
       );
     }
 
-    if (!hasApiTokenScope(token, requiredScope)) {
+    if (!hasApiTokenScope(token, requiredPatScope)) {
       return c.json(
         {
           error: 'Forbidden',
@@ -284,7 +305,7 @@ const apiV1Routes = new Hono<Env>();
 
 apiV1Routes.get('/openapi.json', (c) => c.json(openApiSpec));
 
-apiV1Routes.post('/sync-jobs', personalAccessTokenAuth('sync:write'), async (c) => {
+apiV1Routes.post('/sync-jobs', apiAuth('sync:write'), async (c) => {
   let body: unknown;
   const contentLength = c.req.header('content-length');
   const hasPositiveContentLength =
@@ -376,7 +397,7 @@ apiV1Routes.post('/sync-jobs', personalAccessTokenAuth('sync:write'), async (c) 
   }
 });
 
-apiV1Routes.get('/sync-jobs/active', personalAccessTokenAuth('sync:read'), async (c) => {
+apiV1Routes.get('/sync-jobs/active', apiAuth('sync:read'), async (c) => {
   const userId = c.get('userId');
   if (!userId) {
     return c.json(
@@ -399,7 +420,7 @@ apiV1Routes.get('/sync-jobs/active', personalAccessTokenAuth('sync:read'), async
   });
 });
 
-apiV1Routes.get('/sync-jobs/:jobId', personalAccessTokenAuth('sync:read'), async (c) => {
+apiV1Routes.get('/sync-jobs/:jobId', apiAuth('sync:read'), async (c) => {
   const userId = c.get('userId');
   if (!userId) {
     return c.json(
@@ -436,7 +457,7 @@ apiV1Routes.get('/sync-jobs/:jobId', personalAccessTokenAuth('sync:read'), async
   });
 });
 
-apiV1Routes.get('/inbox', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/inbox', apiAuth('bookmarks:read'), async (c) => {
   const parsedQuery = InboxQuerySchema.safeParse({
     provider: c.req.query('provider'),
     contentType: c.req.query('contentType'),
@@ -475,7 +496,7 @@ apiV1Routes.get('/inbox', personalAccessTokenAuth('bookmarks:read'), async (c) =
   });
 });
 
-apiV1Routes.post('/inbox/:id/bookmark', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/inbox/:id/bookmark', apiAuth('bookmarks:write'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
@@ -490,7 +511,7 @@ apiV1Routes.post('/inbox/:id/bookmark', personalAccessTokenAuth('bookmarks:write
   }
 });
 
-apiV1Routes.post('/inbox/:id/archive', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/inbox/:id/archive', apiAuth('bookmarks:write'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
@@ -505,7 +526,7 @@ apiV1Routes.post('/inbox/:id/archive', personalAccessTokenAuth('bookmarks:write'
   }
 });
 
-apiV1Routes.get('/bookmarks', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/bookmarks', apiAuth('bookmarks:read'), async (c) => {
   const parsedQuery = BookmarkQuerySchema.safeParse({
     provider: c.req.query('provider'),
     contentType: c.req.query('contentType'),
@@ -548,7 +569,7 @@ apiV1Routes.get('/bookmarks', personalAccessTokenAuth('bookmarks:read'), async (
   });
 });
 
-apiV1Routes.post('/bookmarks/preview', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/bookmarks/preview', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = PreviewBookmarkBodySchema.safeParse(body);
 
@@ -592,7 +613,7 @@ apiV1Routes.post('/bookmarks/preview', personalAccessTokenAuth('bookmarks:write'
   }
 });
 
-apiV1Routes.post('/bookmarks', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/bookmarks', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = SaveBookmarkBodySchema.safeParse(body);
 
@@ -642,7 +663,7 @@ apiV1Routes.post('/bookmarks', personalAccessTokenAuth('bookmarks:write'), async
   }
 });
 
-apiV1Routes.get('/bookmarks/:id', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/bookmarks/:id', apiAuth('bookmarks:read'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
@@ -657,7 +678,7 @@ apiV1Routes.get('/bookmarks/:id', personalAccessTokenAuth('bookmarks:read'), asy
   }
 });
 
-apiV1Routes.patch('/bookmarks/:id', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = FinishBookmarkBodySchema.safeParse(body);
 
@@ -751,7 +772,7 @@ apiV1Routes.patch('/bookmarks/:id', personalAccessTokenAuth('bookmarks:write'), 
   });
 });
 
-apiV1Routes.delete('/bookmarks/:id', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.delete('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
@@ -766,7 +787,7 @@ apiV1Routes.delete('/bookmarks/:id', personalAccessTokenAuth('bookmarks:write'),
   }
 });
 
-apiV1Routes.put('/bookmarks/:id/tags', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.put('/bookmarks/:id/tags', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = SetTagsBodySchema.safeParse(body);
 
@@ -800,7 +821,7 @@ apiV1Routes.put('/bookmarks/:id/tags', personalAccessTokenAuth('bookmarks:write'
   }
 });
 
-apiV1Routes.post('/bookmarks/:id/opened', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/bookmarks/:id/opened', apiAuth('bookmarks:write'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
@@ -816,66 +837,58 @@ apiV1Routes.post('/bookmarks/:id/opened', personalAccessTokenAuth('bookmarks:wri
   }
 });
 
-apiV1Routes.put(
-  '/bookmarks/:id/progress',
-  personalAccessTokenAuth('bookmarks:write'),
-  async (c) => {
-    const body = await c.req.json().catch(() => null);
-    const parsedBody = UpdateProgressBodySchema.safeParse(body);
+apiV1Routes.put('/bookmarks/:id/progress', apiAuth('bookmarks:write'), async (c) => {
+  const body = await c.req.json().catch(() => null);
+  const parsedBody = UpdateProgressBodySchema.safeParse(body);
 
-    if (!parsedBody.success) {
-      return c.json(
-        {
-          error: 'Invalid request body',
-          code: 'INVALID_REQUEST_BODY',
-          issues: parsedBody.error.issues,
-          requestId: c.get('requestId'),
-          traceId: c.get('traceId'),
-        },
-        400
-      );
-    }
-
-    const caller = appRouter.createCaller(await createContext(c));
-
-    try {
-      const result = await caller.items.updateProgress({
-        id: c.req.param('id'),
-        position: parsedBody.data.position,
-        duration: parsedBody.data.duration,
-      });
-      return c.json({
-        ...result,
+  if (!parsedBody.success) {
+    return c.json(
+      {
+        error: 'Invalid request body',
+        code: 'INVALID_REQUEST_BODY',
+        issues: parsedBody.error.issues,
         requestId: c.get('requestId'),
         traceId: c.get('traceId'),
-      });
-    } catch (error) {
-      return trpcErrorResponse(c, error);
-    }
+      },
+      400
+    );
   }
-);
 
-apiV1Routes.get(
-  '/bookmarks/:id/article-content',
-  personalAccessTokenAuth('bookmarks:read'),
-  async (c) => {
-    const caller = appRouter.createCaller(await createContext(c));
+  const caller = appRouter.createCaller(await createContext(c));
 
-    try {
-      const item = await caller.items.get({ id: c.req.param('id') });
-      const result = await caller.items.getArticleContent({ itemId: item.itemId });
-      return c.json({
-        ...result,
-        requestId: c.get('requestId'),
-        traceId: c.get('traceId'),
-      });
-    } catch (error) {
-      return trpcErrorResponse(c, error);
-    }
+  try {
+    const result = await caller.items.updateProgress({
+      id: c.req.param('id'),
+      position: parsedBody.data.position,
+      duration: parsedBody.data.duration,
+    });
+    return c.json({
+      ...result,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
   }
-);
+});
 
-apiV1Routes.get('/tags', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/bookmarks/:id/article-content', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+
+  try {
+    const item = await caller.items.get({ id: c.req.param('id') });
+    const result = await caller.items.getArticleContent({ itemId: item.itemId });
+    return c.json({
+      ...result,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
+});
+
+apiV1Routes.get('/tags', apiAuth('bookmarks:read'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
   const result = await caller.items.listTags();
@@ -886,7 +899,7 @@ apiV1Routes.get('/tags', personalAccessTokenAuth('bookmarks:read'), async (c) =>
   });
 });
 
-apiV1Routes.get('/editorial/editions', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/editorial/editions', apiAuth('bookmarks:read'), async (c) => {
   const editions = await listEditorialEditions(
     c.env.DB,
     c.get('userId')!,
@@ -895,26 +908,22 @@ apiV1Routes.get('/editorial/editions', personalAccessTokenAuth('bookmarks:read')
   return c.json({ editions, requestId: c.get('requestId'), traceId: c.get('traceId') });
 });
 
-apiV1Routes.get(
-  '/editorial/editions/latest',
-  personalAccessTokenAuth('bookmarks:read'),
-  async (c) => {
-    const result = await getEditorialEdition(c.env.DB, c.env.ARTICLE_CONTENT, c.get('userId')!);
-    if (!result) {
-      return c.json(
-        { error: 'Edition not found', code: 'NOT_FOUND', requestId: c.get('requestId') },
-        404
-      );
-    }
-    return c.json({
-      edition: result.edition,
-      requestId: c.get('requestId'),
-      traceId: c.get('traceId'),
-    });
+apiV1Routes.get('/editorial/editions/latest', apiAuth('bookmarks:read'), async (c) => {
+  const result = await getEditorialEdition(c.env.DB, c.env.ARTICLE_CONTENT, c.get('userId')!);
+  if (!result) {
+    return c.json(
+      { error: 'Edition not found', code: 'NOT_FOUND', requestId: c.get('requestId') },
+      404
+    );
   }
-);
+  return c.json({
+    edition: result.edition,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
 
-apiV1Routes.get('/editorial/editions/:id', personalAccessTokenAuth('bookmarks:read'), async (c) => {
+apiV1Routes.get('/editorial/editions/:id', apiAuth('bookmarks:read'), async (c) => {
   const result = await getEditorialEdition(
     c.env.DB,
     c.env.ARTICLE_CONTENT,
@@ -936,7 +945,7 @@ apiV1Routes.get('/editorial/editions/:id', personalAccessTokenAuth('bookmarks:re
 
 apiV1Routes.get(
   '/editorial/editions/:id/artifacts/:artifact',
-  personalAccessTokenAuth('bookmarks:read'),
+  apiAuth('bookmarks:read'),
   async (c) => {
     const artifact = c.req.param('artifact');
     if (!['markdown', 'snapshot', 'validation'].includes(artifact)) {
@@ -956,7 +965,7 @@ apiV1Routes.get(
   }
 );
 
-apiV1Routes.post('/editorial/editions', personalAccessTokenAuth('bookmarks:write'), async (c) => {
+apiV1Routes.post('/editorial/editions', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = PublishEditorialEditionSchema.safeParse(body);
   if (!parsed.success) {

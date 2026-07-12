@@ -5,6 +5,7 @@
 import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../types';
 import { verifyClerkToken } from '../lib/auth';
+import type { VerifyTokenResponse } from '../lib/auth';
 import { authLogger } from '../lib/logger';
 import { createDb } from '../db';
 import { users } from '../db/schema';
@@ -53,6 +54,13 @@ function shouldUseDevelopmentAuthBypass(env: Env['Bindings']): boolean {
 
 function getClerkJwksUrl(env: Env['Bindings']): string {
   return env.CLERK_JWKS_URL || DEFAULT_CLERK_JWKS_URL;
+}
+
+export function verifyClerkRequestToken(
+  token: string,
+  env: Env['Bindings']
+): Promise<VerifyTokenResponse> {
+  return verifyClerkToken(token, getClerkJwksUrl(env));
 }
 
 /**
@@ -136,10 +144,8 @@ export function authMiddleware(): MiddlewareHandler<Env> {
     }
 
     // Get JWKS URL from environment or use default
-    const jwksUrl = getClerkJwksUrl(c.env);
-
     // Verify the token
-    const result = await verifyClerkToken(token, jwksUrl);
+    const result = await verifyClerkRequestToken(token, c.env);
 
     if (!result.success) {
       // Map error codes to HTTP status codes
