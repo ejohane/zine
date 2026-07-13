@@ -8,6 +8,7 @@ final class LibraryStore {
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var errorMessage: String?
+    private(set) var actionErrorMessage: String?
     private(set) var nextCursor: String?
 
     private let client: APIClient
@@ -97,6 +98,32 @@ final class LibraryStore {
         }
     }
 
+    func complete(_ bookmark: Bookmark) async {
+        guard !bookmark.isFinished,
+              let removal = removeOptimistically(bookmark)
+        else { return }
+
+        do {
+            _ = try await client.setFinished(id: bookmark.id, isFinished: true)
+        } catch {
+            restore(removal, message: "The bookmark couldn’t be completed. Please try again.")
+        }
+    }
+
+    func archive(_ bookmark: Bookmark) async {
+        guard let removal = removeOptimistically(bookmark) else { return }
+
+        do {
+            try await client.archiveBookmark(id: bookmark.id)
+        } catch {
+            restore(removal, message: "The bookmark couldn’t be archived. Please try again.")
+        }
+    }
+
+    func dismissActionError() {
+        actionErrorMessage = nil
+    }
+
     private func prefetchImages(in bookmarks: [Bookmark]) {
         AppImagePipeline.prefetch(bookmarks.compactMap(\.thumbnailUrl))
     }
@@ -109,4 +136,27 @@ final class LibraryStore {
             await cache.save(items: items, nextCursor: nextCursor, query: query)
         }
     }
+
+    private func removeOptimistically(_ bookmark: Bookmark) -> OptimisticRemoval? {
+        guard let index = items.firstIndex(where: { $0.id == bookmark.id }) else { return nil }
+        let removal = OptimisticRemoval(bookmark: items.remove(at: index), index: index, query: activeQuery)
+        persistCurrentState()
+        return removal
+    }
+
+    private func restore(_ removal: OptimisticRemoval, message: String) {
+        guard activeQuery == removal.query,
+              !items.contains(where: { $0.id == removal.bookmark.id })
+        else { return }
+
+        items.insert(removal.bookmark, at: min(removal.index, items.endIndex))
+        actionErrorMessage = message
+        persistCurrentState()
+    }
+}
+
+private struct OptimisticRemoval {
+    let bookmark: Bookmark
+    let index: Int
+    let query: LibraryQuery
 }

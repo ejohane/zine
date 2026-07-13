@@ -68,6 +68,12 @@ struct APIClient {
         return response.bookmark
     }
 
+    func archiveBookmark(id: String) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)"))
+        request.httpMethod = "DELETE"
+        let _: EmptyResponse = try await send(request)
+    }
+
     func markOpened(id: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/opened"))
         request.httpMethod = "POST"

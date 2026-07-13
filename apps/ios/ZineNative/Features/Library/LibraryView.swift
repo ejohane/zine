@@ -58,6 +58,13 @@ struct LibraryView: View {
             guard !Task.isCancelled else { return }
             await store.reload(query: query)
         }
+        .alert("Couldn’t update bookmark", isPresented: actionErrorBinding) {
+            Button("OK", role: .cancel) {
+                store.dismissActionError()
+            }
+        } message: {
+            Text(store.actionErrorMessage ?? "Please try again.")
+        }
     }
 
     @ViewBuilder
@@ -82,6 +89,25 @@ struct LibraryView: View {
                     BookmarkRow(bookmark: bookmark)
                 }
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if !bookmark.isFinished {
+                        Button {
+                            Task { await store.complete(bookmark) }
+                        } label: {
+                            Label("Complete", systemImage: "checkmark.circle.fill")
+                        }
+                        .tint(.green)
+                        .accessibilityLabel("Complete bookmark")
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Task { await store.archive(bookmark) }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox.fill")
+                    }
+                    .accessibilityLabel("Archive bookmark")
+                }
                 .task {
                     await store.loadMoreIfNeeded(current: bookmark)
                 }
@@ -97,6 +123,13 @@ struct LibraryView: View {
                 }
             }
         }
+    }
+
+    private var actionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { store.actionErrorMessage != nil },
+            set: { if !$0 { store.dismissActionError() } }
+        )
     }
 
     private var filterMenu: some View {
