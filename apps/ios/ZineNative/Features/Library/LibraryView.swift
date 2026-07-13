@@ -15,9 +15,9 @@ struct LibraryView: View {
     @State private var contentType: ContentType?
     @Namespace private var bookmarkTransition
 
-    init(client: APIClient) {
+    init(client: APIClient, cache: LibraryCache) {
         self.client = client
-        _store = State(initialValue: LibraryStore(client: client))
+        _store = State(initialValue: LibraryStore(client: client, cache: cache))
     }
 
     private var query: LibraryQuery {

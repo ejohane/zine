@@ -32,16 +32,14 @@ struct BookmarkRow: View {
     }
 
     private var thumbnail: some View {
-        AsyncImage(url: bookmark.thumbnailUrl) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFill()
-            default:
-                ZStack {
-                    Color.secondary.opacity(0.12)
-                    Image(systemName: bookmark.contentType.systemImage)
-                        .foregroundStyle(.secondary)
-                }
+        CachedRemoteImage(
+            url: bookmark.thumbnailUrl,
+            targetSize: CGSize(width: 96, height: 68)
+        ) {
+            ZStack {
+                Color.secondary.opacity(0.12)
+                Image(systemName: bookmark.contentType.systemImage)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(width: 96, height: 68)
