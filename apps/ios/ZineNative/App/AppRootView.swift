@@ -9,7 +9,7 @@ struct AppRootView: View {
 
     var body: some View {
         Group {
-            if clerk.user != nil {
+            if let user = clerk.user {
                 LibraryView(
                     client: APIClient(
                         baseURL: configuration.apiBaseURL,
@@ -19,7 +19,8 @@ struct AppRootView: View {
                             }
                             return token
                         }
-                    )
+                    ),
+                    cache: LibraryCache(userID: user.id)
                 )
             } else {
                 AuthView(isDismissible: false)

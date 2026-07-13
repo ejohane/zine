@@ -5,6 +5,15 @@ struct LibraryQuery: Hashable {
     var isFinished = false
     var provider: Provider?
     var contentType: ContentType?
+
+    var cacheKey: String {
+        [
+            search.trimmingCharacters(in: .whitespacesAndNewlines),
+            String(isFinished),
+            provider?.rawValue ?? "all",
+            contentType?.rawValue ?? "all",
+        ].joined(separator: "|")
+    }
 }
 
 struct APIClient {

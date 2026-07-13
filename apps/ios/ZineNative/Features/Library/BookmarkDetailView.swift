@@ -147,17 +147,15 @@ struct BookmarkDetailView: View {
     }
 
     private var heroImage: some View {
-        AsyncImage(url: bookmark.thumbnailUrl) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFill()
-            default:
-                ZStack {
-                    Color.secondary.opacity(0.12)
-                    Image(systemName: bookmark.contentType.systemImage)
-                        .font(.system(size: 48))
-                        .foregroundStyle(.secondary)
-                }
+        CachedRemoteImage(
+            url: bookmark.thumbnailUrl,
+            targetSize: CGSize(width: 430, height: 320)
+        ) {
+            ZStack {
+                Color.secondary.opacity(0.12)
+                Image(systemName: bookmark.contentType.systemImage)
+                    .font(.system(size: 48))
+                    .foregroundStyle(.secondary)
             }
         }
     }

@@ -11,16 +11,32 @@ final class LibraryStore {
     private(set) var nextCursor: String?
 
     private let client: APIClient
+    private let cache: LibraryCache
     private var activeQuery = LibraryQuery()
 
-    init(client: APIClient) {
+    init(client: APIClient, cache: LibraryCache) {
         self.client = client
+        self.cache = cache
     }
 
     func reload(query: LibraryQuery) async {
+        let queryChanged = activeQuery != query
         activeQuery = query
-        isLoading = true
         errorMessage = nil
+
+        if queryChanged {
+            items = []
+            nextCursor = nil
+        }
+
+        if let snapshot = await cache.load(query: query) {
+            guard !Task.isCancelled, activeQuery == query else { return }
+            items = snapshot.items
+            nextCursor = snapshot.nextCursor
+            prefetchImages(in: snapshot.items)
+        }
+
+        isLoading = items.isEmpty
         defer { isLoading = false }
 
         do {
@@ -28,6 +44,12 @@ final class LibraryStore {
             guard !Task.isCancelled, activeQuery == query else { return }
             items = response.items
             nextCursor = response.nextCursor
+            prefetchImages(in: response.items)
+            await cache.save(
+                items: response.items,
+                nextCursor: response.nextCursor,
+                query: query
+            )
         } catch is CancellationError {
             return
         } catch {
@@ -55,6 +77,8 @@ final class LibraryStore {
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor
+            prefetchImages(in: response.items)
+            await cache.save(items: items, nextCursor: response.nextCursor, query: activeQuery)
         } catch is CancellationError {
             return
         } catch {
@@ -69,6 +93,20 @@ final class LibraryStore {
             } else {
                 items.remove(at: index)
             }
+            persistCurrentState()
+        }
+    }
+
+    private func prefetchImages(in bookmarks: [Bookmark]) {
+        AppImagePipeline.prefetch(bookmarks.compactMap(\.thumbnailUrl))
+    }
+
+    private func persistCurrentState() {
+        let items = items
+        let nextCursor = nextCursor
+        let query = activeQuery
+        Task {
+            await cache.save(items: items, nextCursor: nextCursor, query: query)
         }
     }
 }
