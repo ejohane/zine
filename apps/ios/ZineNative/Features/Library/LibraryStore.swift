@@ -125,7 +125,12 @@ final class LibraryStore {
     }
 
     private func prefetchImages(in bookmarks: [Bookmark]) {
-        AppImagePipeline.prefetch(bookmarks.compactMap(\.thumbnailUrl))
+        var seenURLs = Set<URL>()
+        let urls = bookmarks
+            .flatMap { [$0.thumbnailUrl, $0.creatorImageUrl].compactMap { $0 } }
+            .filter { seenURLs.insert($0).inserted }
+
+        AppImagePipeline.prefetch(urls)
     }
 
     private func persistCurrentState() {

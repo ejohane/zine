@@ -61,10 +61,8 @@ struct BookmarkDetailView: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(bookmark.title)
-                    .font(.title.bold())
-                Text(bookmark.creator)
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .font(.title2.bold())
+                creatorRow
                 metadata
             }
 
@@ -110,6 +108,22 @@ struct BookmarkDetailView: View {
         .padding(.top, 28)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var creatorRow: some View {
+        HStack(spacing: 10) {
+            CreatorAvatar(
+                imageUrl: bookmark.creatorImageUrl,
+                creator: bookmark.creator,
+                contentType: bookmark.contentType,
+                size: 32
+            )
+
+            Text(bookmark.creator)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func parallaxHero(height: CGFloat) -> some View {
