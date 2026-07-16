@@ -30,7 +30,18 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
     case x = "X"
 
     var id: String { rawValue }
-    var title: String { rawValue == "RSS" || rawValue == "X" ? rawValue : rawValue.capitalized }
+
+    var title: String {
+        switch self {
+        case .youtube: "YouTube"
+        case .spotify: "Spotify"
+        case .gmail: "Gmail"
+        case .rss: "RSS"
+        case .substack: "Substack"
+        case .web: "Web"
+        case .x: "X"
+        }
+    }
 }
 
 struct BookmarkTag: Codable, Hashable, Identifiable {

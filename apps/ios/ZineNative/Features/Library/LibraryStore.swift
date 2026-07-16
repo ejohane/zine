@@ -14,6 +14,7 @@ final class LibraryStore {
     private let client: APIClient
     private let cache: LibraryCache
     private var activeQuery = LibraryQuery()
+    private var unbookmarkedIndices: [String: Int] = [:]
 
     init(client: APIClient, cache: LibraryCache) {
         self.client = client
@@ -96,6 +97,24 @@ final class LibraryStore {
             }
             persistCurrentState()
         }
+    }
+
+    func setBookmarked(_ bookmark: Bookmark, isBookmarked: Bool) {
+        if isBookmarked {
+            guard !items.contains(where: { $0.id == bookmark.id }),
+                  bookmark.isFinished == activeQuery.isFinished
+            else { return }
+
+            let index = min(unbookmarkedIndices.removeValue(forKey: bookmark.id) ?? 0, items.endIndex)
+            items.insert(bookmark, at: index)
+        } else if let index = items.firstIndex(where: { $0.id == bookmark.id }) {
+            unbookmarkedIndices[bookmark.id] = index
+            items.remove(at: index)
+        } else {
+            return
+        }
+
+        persistCurrentState()
     }
 
     func complete(_ bookmark: Bookmark) async {

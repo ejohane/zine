@@ -43,9 +43,14 @@ struct LibraryView: View {
                     }
                 }
                 .navigationDestination(for: Bookmark.self) { bookmark in
-                    BookmarkDetailView(bookmark: bookmark, client: client) { updated in
-                        store.update(updated)
-                    }
+                    BookmarkDetailView(
+                        bookmark: bookmark,
+                        client: client,
+                        onUpdate: { updated in store.update(updated) },
+                        onBookmarkChange: { changed, isBookmarked in
+                            store.setBookmarked(changed, isBookmarked: isBookmarked)
+                        }
+                    )
                     .navigationTransition(
                         .zoom(sourceID: bookmark.id, in: bookmarkTransition)
                     )

@@ -1,19 +1,31 @@
 import SwiftUI
+import UIKit
 
 struct BookmarkDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var bookmark: Bookmark
+    @State private var isBookmarked: Bool
+    @State private var hasToggledBookmark = false
+    @State private var isSavingBookmark = false
     @State private var isSaving = false
     @State private var errorMessage: String?
 
     let client: APIClient
     let onUpdate: (Bookmark) -> Void
+    let onBookmarkChange: (Bookmark, Bool) -> Void
 
-    init(bookmark: Bookmark, client: APIClient, onUpdate: @escaping (Bookmark) -> Void) {
+    init(
+        bookmark: Bookmark,
+        client: APIClient,
+        onUpdate: @escaping (Bookmark) -> Void,
+        onBookmarkChange: @escaping (Bookmark, Bool) -> Void = { _, _ in }
+    ) {
         _bookmark = State(initialValue: bookmark)
+        _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
         self.client = client
         self.onUpdate = onUpdate
+        self.onBookmarkChange = onBookmarkChange
     }
 
     var body: some View {
@@ -45,6 +57,9 @@ struct BookmarkDetailView: View {
             try? await client.markOpened(id: bookmark.id)
             if let refreshed = try? await client.getBookmark(id: bookmark.id) {
                 bookmark = refreshed
+                if !hasToggledBookmark {
+                    isBookmarked = refreshed.state == "BOOKMARKED"
+                }
             }
         }
         .alert("Couldn’t update bookmark", isPresented: Binding(
@@ -66,6 +81,8 @@ struct BookmarkDetailView: View {
                 metadata
             }
 
+            actionRow
+
             if let summary = bookmark.summary, !summary.isEmpty {
                 Text(summary)
                     .font(.body)
@@ -86,28 +103,117 @@ struct BookmarkDetailView: View {
                 }
             }
 
-            Link(destination: bookmark.canonicalUrl) {
-                Label("Open original", systemImage: "arrow.up.right.square")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-
-            Button {
-                Task { await toggleFinished() }
-            } label: {
-                Label(
-                    bookmark.isFinished ? "Mark unfinished" : "Mark finished",
-                    systemImage: bookmark.isFinished ? "arrow.uturn.backward.circle" : "checkmark.circle"
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(isSaving)
         }
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .padding(.bottom, 40)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var actionRow: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 5) {
+                bookmarkButton
+
+                completionButton
+                tagsMenu
+
+                ShareLink(item: bookmark.canonicalUrl) {
+                    actionIcon(systemName: "square.and.arrow.up")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share")
+                .actionRowHaptic()
+
+                moreMenu
+            }
+
+            Spacer(minLength: 0)
+
+            ProviderOpenButton(provider: bookmark.provider, destination: bookmark.canonicalUrl)
+                .padding(.trailing, 8)
+        }
+    }
+
+    private var bookmarkButton: some View {
+        Button {
+            Task { await toggleBookmark() }
+        } label: {
+            actionIcon(
+                systemName: isBookmarked ? "bookmark.fill" : "bookmark",
+                color: isBookmarked ? .white : .secondary
+            )
+            .contentTransition(.symbolEffect(.replace))
+        }
+        .buttonStyle(.plain)
+        .disabled(isSavingBookmark)
+        .accessibilityLabel(isBookmarked ? "Remove bookmark" : "Bookmark")
+        .actionRowHaptic()
+    }
+
+    private var completionButton: some View {
+        Button {
+            Task { await toggleFinished() }
+        } label: {
+            actionIcon(
+                systemName: bookmark.isFinished
+                    ? "checkmark.circle.fill"
+                    : "checkmark.circle",
+                color: bookmark.isFinished ? .green : .secondary
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSaving)
+        .accessibilityLabel(bookmark.isFinished ? "Mark unfinished" : "Mark complete")
+        .actionRowHaptic()
+    }
+
+    private var tagsMenu: some View {
+        Menu {
+            if bookmark.tags.isEmpty {
+                Button("No tags") {}
+                    .disabled(true)
+            } else {
+                ForEach(bookmark.tags) { tag in
+                    Button(tag.name) {}
+                        .disabled(true)
+                }
+            }
+        } label: {
+            actionIcon(systemName: "tag")
+        }
+        .accessibilityLabel(bookmark.tags.isEmpty ? "No tags" : "View tags")
+        .actionRowHaptic()
+    }
+
+    private var moreMenu: some View {
+        Menu {
+            Link(destination: bookmark.canonicalUrl) {
+                Label("Open Original", systemImage: "arrow.up.forward.app")
+            }
+
+            Button {
+                UIPasteboard.general.url = bookmark.canonicalUrl
+            } label: {
+                Label("Copy Link", systemImage: "doc.on.doc")
+            }
+        } label: {
+            actionIcon(systemName: "ellipsis")
+        }
+        .accessibilityLabel("More actions")
+        .actionRowHaptic()
+    }
+
+    private func actionIcon(
+        systemName: String,
+        color: Color = .secondary
+    ) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: 21, weight: .medium))
+            .symbolRenderingMode(.monochrome)
+            .foregroundStyle(color)
+            .frame(width: 42, height: 44)
+            .contentShape(Rectangle())
     }
 
     private var creatorRow: some View {
@@ -202,6 +308,31 @@ struct BookmarkDetailView: View {
             bookmark.finishedAt = result.finishedAt
             onUpdate(bookmark)
         } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func toggleBookmark() async {
+        guard !isSavingBookmark else { return }
+
+        let previousValue = isBookmarked
+        let newValue = !previousValue
+        hasToggledBookmark = true
+        isSavingBookmark = true
+        isBookmarked = newValue
+        onBookmarkChange(bookmark, newValue)
+
+        defer { isSavingBookmark = false }
+
+        do {
+            if newValue {
+                try await client.bookmarkItem(id: bookmark.id)
+            } else {
+                try await client.archiveBookmark(id: bookmark.id)
+            }
+        } catch {
+            isBookmarked = previousValue
+            onBookmarkChange(bookmark, previousValue)
             errorMessage = error.localizedDescription
         }
     }
