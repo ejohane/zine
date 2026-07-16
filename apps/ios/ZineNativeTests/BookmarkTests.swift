@@ -30,4 +30,23 @@ final class BookmarkTests: XCTestCase {
 
         XCTAssertNotEqual(first, second)
     }
+
+    func testProviderTitlesUseProductCapitalization() {
+        XCTAssertEqual(Provider.youtube.title, "YouTube")
+        XCTAssertEqual(Provider.x.title, "X")
+        XCTAssertEqual(Provider.rss.title, "RSS")
+    }
+
+    func testProviderOpenActionsMatchDestinationsAndBrandLogos() {
+        XCTAssertEqual(Provider.youtube.openAction.title, "Open in YouTube")
+        XCTAssertEqual(Provider.youtube.openAction.logo, .asset("YouTubeLogo"))
+        XCTAssertEqual(Provider.spotify.openAction.title, "Open in Spotify")
+        XCTAssertEqual(Provider.spotify.openAction.logo, .asset("SpotifyLogo"))
+        XCTAssertEqual(Provider.substack.openAction.title, "Open in Substack")
+        XCTAssertEqual(Provider.substack.openAction.logo, .asset("SubstackLogo"))
+        XCTAssertEqual(Provider.web.openAction.title, "Open on Web")
+        XCTAssertEqual(Provider.web.openAction.logo, .system("safari.fill"))
+        XCTAssertEqual(Provider.x.openAction.title, "Open in X")
+        XCTAssertEqual(Provider.x.openAction.logo, .asset("XLogo"))
+    }
 }

@@ -74,6 +74,12 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
+    func bookmarkItem(id: String) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/bookmark"))
+        request.httpMethod = "POST"
+        let _: EmptyResponse = try await send(request)
+    }
+
     func markOpened(id: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/opened"))
         request.httpMethod = "POST"
