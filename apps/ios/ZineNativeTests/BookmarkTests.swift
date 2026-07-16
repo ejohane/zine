@@ -31,6 +31,17 @@ final class BookmarkTests: XCTestCase {
         XCTAssertNotEqual(first, second)
     }
 
+    func testInboxQueryIdentityIncludesEveryFilter() {
+        XCTAssertNotEqual(
+            InboxQuery(provider: .youtube, contentType: .video),
+            InboxQuery(provider: .youtube, contentType: .article)
+        )
+        XCTAssertNotEqual(
+            InboxQuery(provider: .youtube),
+            InboxQuery(provider: .spotify)
+        )
+    }
+
     func testProviderTitlesUseProductCapitalization() {
         XCTAssertEqual(Provider.youtube.title, "YouTube")
         XCTAssertEqual(Provider.x.title, "X")

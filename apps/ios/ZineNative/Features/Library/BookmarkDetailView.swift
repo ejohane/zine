@@ -1,6 +1,11 @@
 import SwiftUI
 import UIKit
 
+enum BookmarkChangePhase {
+    case optimistic
+    case rollback
+}
+
 struct BookmarkDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -13,19 +18,22 @@ struct BookmarkDetailView: View {
 
     let client: APIClient
     let onUpdate: (Bookmark) -> Void
-    let onBookmarkChange: (Bookmark, Bool) -> Void
+    let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
+    let onBookmarkCommit: (Bookmark, Bool) -> Void
 
     init(
         bookmark: Bookmark,
         client: APIClient,
         onUpdate: @escaping (Bookmark) -> Void,
-        onBookmarkChange: @escaping (Bookmark, Bool) -> Void = { _, _ in }
+        onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
+        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in }
     ) {
         _bookmark = State(initialValue: bookmark)
         _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
         self.client = client
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
+        self.onBookmarkCommit = onBookmarkCommit
     }
 
     var body: some View {
@@ -115,7 +123,9 @@ struct BookmarkDetailView: View {
             HStack(spacing: 5) {
                 bookmarkButton
 
-                completionButton
+                if isBookmarked {
+                    completionButton
+                }
                 tagsMenu
 
                 ShareLink(item: bookmark.canonicalUrl) {
@@ -320,7 +330,7 @@ struct BookmarkDetailView: View {
         hasToggledBookmark = true
         isSavingBookmark = true
         isBookmarked = newValue
-        onBookmarkChange(bookmark, newValue)
+        onBookmarkChange(bookmark, newValue, .optimistic)
 
         defer { isSavingBookmark = false }
 
@@ -330,9 +340,10 @@ struct BookmarkDetailView: View {
             } else {
                 try await client.archiveBookmark(id: bookmark.id)
             }
+            onBookmarkCommit(bookmark, newValue)
         } catch {
             isBookmarked = previousValue
-            onBookmarkChange(bookmark, previousValue)
+            onBookmarkChange(bookmark, previousValue, .rollback)
             errorMessage = error.localizedDescription
         }
     }

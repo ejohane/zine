@@ -7,17 +7,33 @@ private enum AccountRoute: Hashable {
 
 struct LibraryView: View {
     let client: APIClient
+    let searchText: Binding<String>?
+    let refreshRevision: Int
 
     @State private var store: LibraryStore
-    @State private var search = ""
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
     @Namespace private var bookmarkTransition
 
-    init(client: APIClient, cache: LibraryCache) {
+    init(
+        client: APIClient,
+        cache: LibraryCache,
+        searchText: Binding<String>? = nil,
+        refreshRevision: Int = 0
+    ) {
         self.client = client
+        self.searchText = searchText
+        self.refreshRevision = refreshRevision
         _store = State(initialValue: LibraryStore(client: client, cache: cache))
+    }
+
+    private var search: String {
+        searchText?.wrappedValue ?? ""
+    }
+
+    private var isSearchMode: Bool {
+        searchText != nil
     }
 
     private var query: LibraryQuery {
@@ -32,8 +48,7 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Library")
-                .searchable(text: $search, prompt: "Search your library")
+                .navigationTitle(isSearchMode ? "Search" : "Library")
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         filterMenu
@@ -47,7 +62,7 @@ struct LibraryView: View {
                         bookmark: bookmark,
                         client: client,
                         onUpdate: { updated in store.update(updated) },
-                        onBookmarkChange: { changed, isBookmarked in
+                        onBookmarkChange: { changed, isBookmarked, _ in
                             store.setBookmarked(changed, isBookmarked: isBookmarked)
                         }
                     )
@@ -56,7 +71,11 @@ struct LibraryView: View {
                     )
                 }
         }
-        .task(id: query) {
+        .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
+            if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                store.reset()
+                return
+            }
             if !search.isEmpty {
                 try? await Task.sleep(for: .milliseconds(250))
             }
@@ -87,7 +106,21 @@ struct LibraryView: View {
                 }
             }
         } else if store.items.isEmpty {
-            ContentUnavailableView.search(text: search)
+            if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ContentUnavailableView(
+                    "Search your library",
+                    systemImage: "magnifyingglass",
+                    description: Text("Find saved items by title or creator.")
+                )
+            } else if isSearchMode {
+                ContentUnavailableView.search(text: search)
+            } else {
+                ContentUnavailableView(
+                    "No bookmarks",
+                    systemImage: "bookmark",
+                    description: Text("Items you bookmark from Inbox will appear here.")
+                )
+            }
         } else {
             List(store.items) { bookmark in
                 NavigationLink(value: bookmark) {
@@ -184,6 +217,11 @@ struct LibraryView: View {
                 }
             }
     }
+}
+
+private struct LibraryReloadKey: Hashable {
+    let query: LibraryQuery
+    let revision: Int
 }
 
 private struct AppearanceSettingsView: View {
