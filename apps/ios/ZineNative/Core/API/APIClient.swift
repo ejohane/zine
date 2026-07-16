@@ -16,6 +16,18 @@ struct LibraryQuery: Hashable {
     }
 }
 
+struct InboxQuery: Hashable {
+    var provider: Provider?
+    var contentType: ContentType?
+
+    var cacheKey: String {
+        [
+            provider?.rawValue ?? "all",
+            contentType?.rawValue ?? "all",
+        ].joined(separator: "|")
+    }
+}
+
 struct APIClient {
     typealias TokenProvider = () async throws -> String
 
@@ -39,6 +51,29 @@ struct APIClient {
         if !query.search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             items.append(URLQueryItem(name: "search", value: query.search))
         }
+        if let provider = query.provider {
+            items.append(URLQueryItem(name: "provider", value: provider.rawValue))
+        }
+        if let contentType = query.contentType {
+            items.append(URLQueryItem(name: "contentType", value: contentType.rawValue))
+        }
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = items
+        return try await request(url: components.url!)
+    }
+
+    func listInbox(
+        query: InboxQuery,
+        cursor: String? = nil,
+        limit: Int = 30
+    ) async throws -> PaginatedBookmarksResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/inbox"),
+            resolvingAgainstBaseURL: false
+        )!
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
         if let provider = query.provider {
             items.append(URLQueryItem(name: "provider", value: provider.rawValue))
         }
@@ -76,6 +111,12 @@ struct APIClient {
 
     func bookmarkItem(id: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/bookmark"))
+        request.httpMethod = "POST"
+        let _: EmptyResponse = try await send(request)
+    }
+
+    func archiveInboxItem(id: String) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/inbox/\(id)/archive"))
         request.httpMethod = "POST"
         let _: EmptyResponse = try await send(request)
     }

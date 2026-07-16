@@ -21,6 +21,14 @@ final class LibraryStore {
         self.cache = cache
     }
 
+    func reset() {
+        items = []
+        nextCursor = nil
+        errorMessage = nil
+        isLoading = false
+        isLoadingMore = false
+    }
+
     func reload(query: LibraryQuery) async {
         let queryChanged = activeQuery != query
         activeQuery = query
