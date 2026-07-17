@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.2.0",
-    "description": "REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, and subscription sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
+    "version": "1.5.0",
+    "description": "REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
     {
@@ -35,6 +35,10 @@
     {
       "name": "Reading",
       "description": "Article content, opened events, and reading/playback progress."
+    },
+    {
+      "name": "Subscriptions",
+      "description": "Manage provider subscriptions. The current REST surface is scoped to YouTube."
     },
     {
       "name": "Sync",
@@ -901,6 +905,671 @@
         }
       }
     },
+    "/api/v1/subscriptions": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "listSubscriptionSources",
+        "summary": "List subscription sources and status summaries",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": { "description": "YouTube, Spotify, Gmail, X, and RSS source summaries." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify/connection/state": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "registerSpotifyOAuthState",
+        "summary": "Register Spotify OAuth state",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthState" },
+        "responses": {
+          "200": { "description": "OAuth state registered." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify/connection/callback": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "completeSpotifyOAuth",
+        "summary": "Complete Spotify OAuth",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthCallback" },
+        "responses": {
+          "200": { "description": "Spotify connected." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify/connection": {
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "disconnectSpotify",
+        "summary": "Disconnect Spotify",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "Spotify disconnected." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "listSpotifySubscriptions",
+        "summary": "List current and available Spotify shows",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "responses": {
+          "200": { "description": "Spotify connection and show subscription state." },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "addSpotifySubscription",
+        "summary": "Add a Spotify show",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/ProviderSubscription" },
+        "responses": {
+          "201": { "description": "Spotify show added." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify/{subscriptionId}": {
+      "parameters": [{ "$ref": "#/components/parameters/SubscriptionId" }],
+      "patch": {
+        "tags": ["Subscriptions"],
+        "operationId": "updateSpotifySubscription",
+        "summary": "Pause or resume a Spotify show",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/PauseResume" },
+        "responses": {
+          "200": { "description": "Subscription updated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "removeSpotifySubscription",
+        "summary": "Remove a Spotify show",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "Subscription removed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/spotify/{subscriptionId}/sync": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "syncSpotifySubscription",
+        "summary": "Sync a Spotify show now",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "parameters": [{ "$ref": "#/components/parameters/SubscriptionId" }],
+        "responses": {
+          "200": { "description": "Subscription synced." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail/connection/state": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "registerGmailOAuthState",
+        "summary": "Register Gmail OAuth state",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthState" },
+        "responses": {
+          "200": { "description": "OAuth state registered." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail/connection/callback": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "completeGmailOAuth",
+        "summary": "Complete Gmail OAuth",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthCallback" },
+        "responses": {
+          "200": { "description": "Gmail connected and newsletter discovery started." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail/connection": {
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "disconnectGmail",
+        "summary": "Disconnect Gmail",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "Gmail disconnected." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "listNewsletters",
+        "summary": "List Gmail newsletters",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "responses": {
+          "200": { "description": "Gmail connection, newsletter list, and statistics." },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail/{feedId}": {
+      "parameters": [{ "$ref": "#/components/parameters/FeedId" }],
+      "patch": {
+        "tags": ["Subscriptions"],
+        "operationId": "updateNewsletter",
+        "summary": "Activate or hide a newsletter",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/NewsletterAction" },
+        "responses": {
+          "200": { "description": "Newsletter updated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "unsubscribeNewsletter",
+        "summary": "Unsubscribe from a newsletter",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "Unsubscribe requested." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/gmail/sync": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "syncNewsletters",
+        "summary": "Sync Gmail newsletters now",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "Newsletter sync completed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "412": { "description": "Gmail is not connected." }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x/connection/state": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "registerXOAuthState",
+        "summary": "Register X OAuth state",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthState" },
+        "responses": {
+          "200": { "description": "OAuth state registered." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x/connection/callback": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "completeXOAuth",
+        "summary": "Complete X OAuth",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/OAuthCallback" },
+        "responses": {
+          "200": { "description": "X connected." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x/connection": {
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "disconnectX",
+        "summary": "Disconnect X",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "X disconnected." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "getXBookmarkStatus",
+        "summary": "Get X bookmark sync status",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "responses": {
+          "200": { "description": "X connection, imported count, and sync state." },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x/settings": {
+      "patch": {
+        "tags": ["Subscriptions"],
+        "operationId": "updateXBookmarkSettings",
+        "summary": "Enable or disable daily X bookmark sync",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["dailySyncEnabled"],
+                "additionalProperties": false,
+                "properties": { "dailySyncEnabled": { "type": "boolean" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "X bookmark settings updated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/x/sync": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "syncXBookmarks",
+        "summary": "Sync X bookmarks now",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "X bookmark sync completed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "412": { "description": "X is not connected." },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/rss": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "listRssSubscriptions",
+        "summary": "List RSS feeds",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "responses": {
+          "200": { "description": "RSS feed list and statistics." },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "addRssSubscription",
+        "summary": "Add an RSS feed",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["feedUrl"],
+                "additionalProperties": false,
+                "properties": {
+                  "feedUrl": { "type": "string", "minLength": 1 },
+                  "seedMode": { "type": "string", "enum": ["latest", "none"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "RSS feed added and validated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "412": { "description": "Feed validation failed." }
+        }
+      }
+    },
+    "/api/v1/subscriptions/rss/{feedId}": {
+      "parameters": [{ "$ref": "#/components/parameters/FeedId" }],
+      "patch": {
+        "tags": ["Subscriptions"],
+        "operationId": "updateRssSubscription",
+        "summary": "Pause or resume an RSS feed",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "requestBody": { "$ref": "#/components/requestBodies/PauseResume" },
+        "responses": {
+          "200": { "description": "RSS feed updated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "removeRssSubscription",
+        "summary": "Remove an RSS feed",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "responses": {
+          "200": { "description": "RSS feed removed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/rss/{feedId}/sync": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "syncRssSubscription",
+        "summary": "Sync an RSS feed now",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "parameters": [{ "$ref": "#/components/parameters/FeedId" }],
+        "responses": {
+          "200": { "description": "RSS feed synced." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube/connection/state": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "registerYouTubeOAuthState",
+        "summary": "Register a YouTube OAuth state value",
+        "description": "Stores a one-time CSRF state value before the native client opens Google authorization.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["state"],
+                "additionalProperties": false,
+                "properties": {
+                  "state": { "type": "string", "minLength": 32, "maxLength": 128 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "OAuth state registered." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube/connection/callback": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "completeYouTubeOAuth",
+        "summary": "Complete YouTube OAuth",
+        "description": "Validates state, exchanges the authorization code using PKCE, and stores the encrypted provider connection.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code", "state", "codeVerifier", "redirectUri"],
+                "additionalProperties": false,
+                "properties": {
+                  "code": { "type": "string", "minLength": 1 },
+                  "state": { "type": "string", "minLength": 32, "maxLength": 128 },
+                  "codeVerifier": { "type": "string", "minLength": 43, "maxLength": 128 },
+                  "redirectUri": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "YouTube connected." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube/connection": {
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "disconnectYouTube",
+        "summary": "Disconnect YouTube",
+        "description": "Revokes the provider token when possible, removes the encrypted connection, and marks YouTube subscriptions disconnected.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "responses": {
+          "200": { "description": "YouTube disconnected." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube": {
+      "get": {
+        "tags": ["Subscriptions"],
+        "operationId": "listYouTubeSubscriptions",
+        "summary": "List current and available YouTube channels",
+        "description": "Returns Zine's current YouTube subscriptions together with followed YouTube channels that can be added.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "YouTube connection and subscription state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["connection", "connectionRequired", "items", "requestId", "traceId"],
+                  "properties": {
+                    "connection": {
+                      "oneOf": [
+                        { "type": "null" },
+                        {
+                          "type": "object",
+                          "required": ["status", "connectedAt"],
+                          "properties": {
+                            "status": { "type": "string" },
+                            "providerUserId": { "type": ["string", "null"] },
+                            "connectedAt": { "type": "integer" },
+                            "lastRefreshedAt": { "type": ["integer", "null"] }
+                          }
+                        }
+                      ]
+                    },
+                    "connectionRequired": { "type": "boolean" },
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/YouTubeSubscription" }
+                    },
+                    "requestId": { "type": "string" },
+                    "traceId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "addYouTubeSubscription",
+        "summary": "Add a YouTube channel",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["channelId"],
+                "additionalProperties": false,
+                "properties": {
+                  "channelId": { "type": "string", "minLength": 1 },
+                  "name": { "type": "string", "minLength": 1 },
+                  "imageUrl": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Subscription added." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "412": { "description": "YouTube is not connected." }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube/{subscriptionId}": {
+      "parameters": [
+        {
+          "name": "subscriptionId",
+          "in": "path",
+          "required": true,
+          "schema": { "type": "string" }
+        }
+      ],
+      "patch": {
+        "tags": ["Subscriptions"],
+        "operationId": "updateYouTubeSubscription",
+        "summary": "Pause or resume a YouTube subscription",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["action"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": { "type": "string", "enum": ["pause", "resume"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Subscription updated." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "description": "YouTube is not connected." }
+        }
+      },
+      "delete": {
+        "tags": ["Subscriptions"],
+        "operationId": "removeYouTubeSubscription",
+        "summary": "Remove a YouTube subscription",
+        "description": "Stops future ingestion, removes subscription-created inbox items, and preserves bookmarks.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "responses": {
+          "200": { "description": "Subscription removed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/subscriptions/youtube/{subscriptionId}/sync": {
+      "post": {
+        "tags": ["Subscriptions"],
+        "operationId": "syncYouTubeSubscription",
+        "summary": "Sync one YouTube subscription now",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["sync:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Subscription synced." },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "description": "YouTube is not connected." },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
     "/api/v1/sync-jobs": {
       "post": {
         "tags": ["Sync"],
@@ -1040,7 +1709,101 @@
         "description": "Use a Clerk session JWT for a signed-in Zine user, or a Zine personal access token with the required operation scope."
       }
     },
+    "requestBodies": {
+      "OAuthState": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["state"],
+              "additionalProperties": false,
+              "properties": {
+                "state": { "type": "string", "minLength": 32, "maxLength": 128 }
+              }
+            }
+          }
+        }
+      },
+      "OAuthCallback": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["code", "state", "codeVerifier", "redirectUri"],
+              "additionalProperties": false,
+              "properties": {
+                "code": { "type": "string", "minLength": 1 },
+                "state": { "type": "string", "minLength": 32, "maxLength": 128 },
+                "codeVerifier": { "type": "string", "minLength": 43, "maxLength": 128 },
+                "redirectUri": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      },
+      "ProviderSubscription": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["channelId"],
+              "additionalProperties": false,
+              "properties": {
+                "channelId": { "type": "string", "minLength": 1 },
+                "name": { "type": "string", "minLength": 1 },
+                "imageUrl": { "type": "string", "format": "uri" }
+              }
+            }
+          }
+        }
+      },
+      "PauseResume": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["action"],
+              "additionalProperties": false,
+              "properties": {
+                "action": { "type": "string", "enum": ["pause", "resume"] }
+              }
+            }
+          }
+        }
+      },
+      "NewsletterAction": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["action"],
+              "additionalProperties": false,
+              "properties": {
+                "action": { "type": "string", "enum": ["activate", "hide"] }
+              }
+            }
+          }
+        }
+      }
+    },
     "parameters": {
+      "SubscriptionId": {
+        "name": "subscriptionId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "FeedId": {
+        "name": "feedId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
       "Limit": {
         "name": "limit",
         "in": "query",
@@ -1786,6 +2549,30 @@
             }
           }
         ]
+      },
+      "YouTubeSubscription": {
+        "type": "object",
+        "required": [
+          "subscriptionId",
+          "channelId",
+          "name",
+          "imageUrl",
+          "status",
+          "isSubscribed",
+          "lastPolledAt"
+        ],
+        "properties": {
+          "subscriptionId": { "type": ["string", "null"] },
+          "channelId": { "type": "string" },
+          "name": { "type": "string" },
+          "imageUrl": { "type": ["string", "null"], "format": "uri" },
+          "status": {
+            "type": ["string", "null"],
+            "enum": ["ACTIVE", "PAUSED", "DISCONNECTED", null]
+          },
+          "isSubscribed": { "type": "boolean" },
+          "lastPolledAt": { "type": ["integer", "null"] }
+        }
       },
       "CreateSyncJobRequest": {
         "type": "object",

@@ -25,6 +25,32 @@ const {
   mockListTags,
   mockPreview,
   mockSave,
+  mockConnectionsList,
+  mockConnectionsRegisterState,
+  mockConnectionsCallback,
+  mockConnectionsDisconnect,
+  mockSubscriptionsList,
+  mockSubscriptionsDiscover,
+  mockSubscriptionsAdd,
+  mockSubscriptionsRemove,
+  mockSubscriptionsPause,
+  mockSubscriptionsResume,
+  mockSubscriptionsSyncNow,
+  mockNewslettersList,
+  mockNewslettersStats,
+  mockNewslettersUpdateStatus,
+  mockNewslettersUnsubscribe,
+  mockNewslettersSyncNow,
+  mockRssList,
+  mockRssStats,
+  mockRssAdd,
+  mockRssRemove,
+  mockRssPause,
+  mockRssResume,
+  mockRssSyncNow,
+  mockXBookmarksStatus,
+  mockXBookmarksUpdateSettings,
+  mockXBookmarksSyncNow,
   mockInitiateSyncJob,
   mockGetActiveSyncJob,
   mockGetJobStatus,
@@ -52,6 +78,32 @@ const {
   mockListTags: vi.fn(),
   mockPreview: vi.fn(),
   mockSave: vi.fn(),
+  mockConnectionsList: vi.fn(),
+  mockConnectionsRegisterState: vi.fn(),
+  mockConnectionsCallback: vi.fn(),
+  mockConnectionsDisconnect: vi.fn(),
+  mockSubscriptionsList: vi.fn(),
+  mockSubscriptionsDiscover: vi.fn(),
+  mockSubscriptionsAdd: vi.fn(),
+  mockSubscriptionsRemove: vi.fn(),
+  mockSubscriptionsPause: vi.fn(),
+  mockSubscriptionsResume: vi.fn(),
+  mockSubscriptionsSyncNow: vi.fn(),
+  mockNewslettersList: vi.fn(),
+  mockNewslettersStats: vi.fn(),
+  mockNewslettersUpdateStatus: vi.fn(),
+  mockNewslettersUnsubscribe: vi.fn(),
+  mockNewslettersSyncNow: vi.fn(),
+  mockRssList: vi.fn(),
+  mockRssStats: vi.fn(),
+  mockRssAdd: vi.fn(),
+  mockRssRemove: vi.fn(),
+  mockRssPause: vi.fn(),
+  mockRssResume: vi.fn(),
+  mockRssSyncNow: vi.fn(),
+  mockXBookmarksStatus: vi.fn(),
+  mockXBookmarksUpdateSettings: vi.fn(),
+  mockXBookmarksSyncNow: vi.fn(),
   mockInitiateSyncJob: vi.fn(),
   mockGetActiveSyncJob: vi.fn(),
   mockGetJobStatus: vi.fn(),
@@ -199,6 +251,39 @@ describe('apiV1Routes', () => {
       userId: 'clerk_user_123',
       payload: { sub: 'clerk_user_123' },
     });
+    mockConnectionsList.mockResolvedValue({
+      YOUTUBE: null,
+      SPOTIFY: null,
+      GMAIL: null,
+      X: null,
+    });
+    mockSubscriptionsList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+    mockSubscriptionsDiscover.mockResolvedValue({ items: [], connectionRequired: true });
+    mockNewslettersList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+    mockNewslettersStats.mockResolvedValue({
+      total: 0,
+      active: 0,
+      hidden: 0,
+      unsubscribed: 0,
+      lastSyncAt: null,
+      lastSyncStatus: 'IDLE',
+      lastSyncError: null,
+    });
+    mockRssList.mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
+    mockRssStats.mockResolvedValue({
+      total: 0,
+      active: 0,
+      paused: 0,
+      unsubscribed: 0,
+      error: 0,
+      lastSuccessAt: null,
+    });
+    mockXBookmarksStatus.mockResolvedValue({
+      connected: false,
+      connectionStatus: null,
+      importedCount: 0,
+      sync: null,
+    });
     mockCreateCaller.mockReturnValue({
       items: {
         inbox: mockInbox,
@@ -216,6 +301,42 @@ describe('apiV1Routes', () => {
       bookmarks: {
         preview: mockPreview,
         save: mockSave,
+      },
+      subscriptions: {
+        connections: {
+          list: mockConnectionsList,
+          registerState: mockConnectionsRegisterState,
+          callback: mockConnectionsCallback,
+          disconnect: mockConnectionsDisconnect,
+        },
+        list: mockSubscriptionsList,
+        discover: { available: mockSubscriptionsDiscover },
+        add: mockSubscriptionsAdd,
+        remove: mockSubscriptionsRemove,
+        pause: mockSubscriptionsPause,
+        resume: mockSubscriptionsResume,
+        syncNow: mockSubscriptionsSyncNow,
+        newsletters: {
+          list: mockNewslettersList,
+          stats: mockNewslettersStats,
+          updateStatus: mockNewslettersUpdateStatus,
+          unsubscribe: mockNewslettersUnsubscribe,
+          syncNow: mockNewslettersSyncNow,
+        },
+        rss: {
+          list: mockRssList,
+          stats: mockRssStats,
+          add: mockRssAdd,
+          remove: mockRssRemove,
+          pause: mockRssPause,
+          resume: mockRssResume,
+          syncNow: mockRssSyncNow,
+        },
+        xBookmarks: {
+          status: mockXBookmarksStatus,
+          updateSettings: mockXBookmarksUpdateSettings,
+          syncNow: mockXBookmarksSyncNow,
+        },
       },
     });
   });
@@ -246,6 +367,532 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs');
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs/{jobId}');
     expect(body.paths).toHaveProperty('/api/v1/sync-jobs/active');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/spotify');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/spotify/connection/callback');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/gmail');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/gmail/connection/callback');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/x');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/x/connection/callback');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/rss');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/state');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/callback');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}');
+    expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}/sync');
+  });
+
+  it('lists current and available YouTube subscriptions for a Clerk session', async () => {
+    mockConnectionsList.mockResolvedValue({
+      YOUTUBE: {
+        status: 'ACTIVE',
+        providerUserId: 'youtube_user',
+        connectedAt: 100,
+        lastRefreshedAt: 200,
+      },
+    });
+    mockSubscriptionsList.mockResolvedValue({
+      items: [
+        {
+          id: 'sub_1',
+          providerChannelId: 'channel_1',
+          name: 'Subscribed Channel',
+          imageUrl: 'https://example.com/subscribed.jpg',
+          status: 'ACTIVE',
+          lastPolledAt: 300,
+        },
+        {
+          id: 'sub_old',
+          providerChannelId: 'channel_old',
+          name: 'Old Channel',
+          imageUrl: null,
+          status: 'UNSUBSCRIBED',
+          lastPolledAt: null,
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+    mockSubscriptionsDiscover.mockResolvedValue({
+      items: [
+        {
+          id: 'channel_2',
+          name: 'Available Channel',
+          imageUrl: 'https://example.com/available.jpg',
+          isSubscribed: false,
+        },
+      ],
+      connectionRequired: false,
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube', {
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      connection: { status: 'ACTIVE', providerUserId: 'youtube_user' },
+      connectionRequired: false,
+      items: [
+        { channelId: 'channel_2', isSubscribed: false },
+        { subscriptionId: 'sub_1', channelId: 'channel_1', isSubscribed: true },
+      ],
+    });
+    expect(mockSubscriptionsList).toHaveBeenCalledWith({
+      provider: Provider.YOUTUBE,
+      limit: 100,
+      cursor: undefined,
+    });
+    expect(mockSubscriptionsDiscover).toHaveBeenCalledWith({ provider: Provider.YOUTUBE });
+  });
+
+  it('registers and completes a YouTube OAuth connection', async () => {
+    mockConnectionsRegisterState.mockResolvedValue({ success: true });
+    mockConnectionsCallback.mockResolvedValue({ success: true });
+    const app = createTestApp();
+    const state = `YOUTUBE:${'a'.repeat(36)}`;
+    const headers = {
+      Authorization: 'Bearer clerk-session-jwt',
+      'Content-Type': 'application/json',
+    };
+
+    const stateResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube/connection/state', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ state }),
+      }),
+      createMockEnv()
+    );
+    const callbackResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube/connection/callback', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          code: 'authorization-code',
+          state,
+          codeVerifier: 'v'.repeat(43),
+          redirectUri: 'com.googleusercontent.apps.test:/oauth2redirect',
+        }),
+      }),
+      createMockEnv()
+    );
+
+    expect(stateResponse.status).toBe(200);
+    expect(callbackResponse.status).toBe(200);
+    expect(mockConnectionsRegisterState).toHaveBeenCalledWith({
+      provider: Provider.YOUTUBE,
+      state,
+    });
+    expect(mockConnectionsCallback).toHaveBeenCalledWith({
+      provider: Provider.YOUTUBE,
+      code: 'authorization-code',
+      state,
+      codeVerifier: 'v'.repeat(43),
+      redirectUri: 'com.googleusercontent.apps.test:/oauth2redirect',
+    });
+  });
+
+  it('disconnects YouTube without accepting a provider from the client', async () => {
+    mockConnectionsDisconnect.mockResolvedValue({ success: true });
+    const app = createTestApp();
+
+    const response = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube/connection', {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockConnectionsDisconnect).toHaveBeenCalledWith({ provider: Provider.YOUTUBE });
+  });
+
+  it('returns one subscription hub summary across all supported sources', async () => {
+    mockConnectionsList.mockResolvedValue({
+      YOUTUBE: { status: 'ACTIVE' },
+      SPOTIFY: null,
+      GMAIL: { status: 'EXPIRED' },
+      X: { status: 'ACTIVE' },
+    });
+    mockSubscriptionsList.mockImplementation(async (input: { provider: Provider }) => ({
+      items: input.provider === Provider.YOUTUBE ? [{ id: 'youtube-1' }] : [],
+      nextCursor: null,
+      hasMore: false,
+    }));
+    mockNewslettersStats.mockResolvedValue({ active: 3 });
+    mockRssStats.mockResolvedValue({ active: 2 });
+    mockXBookmarksStatus.mockResolvedValue({ importedCount: 7 });
+    const app = createTestApp();
+
+    const response = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions', {
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      sources: [
+        { provider: 'YOUTUBE', connectionStatus: 'ACTIVE', activeCount: 1 },
+        { provider: 'SPOTIFY', connectionStatus: null, activeCount: 0 },
+        { provider: 'GMAIL', connectionStatus: 'EXPIRED', activeCount: 3 },
+        { provider: 'X', connectionStatus: 'ACTIVE', activeCount: 7 },
+        { provider: 'RSS', connectionStatus: null, activeCount: 2 },
+      ],
+    });
+  });
+
+  it('registers, completes, and disconnects Spotify OAuth using a server-owned provider', async () => {
+    mockConnectionsRegisterState.mockResolvedValue({ success: true });
+    mockConnectionsCallback.mockResolvedValue({ success: true });
+    mockConnectionsDisconnect.mockResolvedValue({ success: true });
+    const app = createTestApp();
+    const state = `SPOTIFY:${'a'.repeat(36)}`;
+    const headers = {
+      Authorization: 'Bearer clerk-session-jwt',
+      'Content-Type': 'application/json',
+    };
+
+    const stateResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/spotify/connection/state', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ state }),
+      }),
+      createMockEnv()
+    );
+    const callbackResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/spotify/connection/callback', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          code: 'spotify-code',
+          state,
+          codeVerifier: 'v'.repeat(43),
+          redirectUri: 'zine://oauth/callback',
+        }),
+      }),
+      createMockEnv()
+    );
+    const disconnectResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/spotify/connection', {
+        method: 'DELETE',
+        headers,
+      }),
+      createMockEnv()
+    );
+
+    expect(stateResponse.status).toBe(200);
+    expect(callbackResponse.status).toBe(200);
+    expect(disconnectResponse.status).toBe(200);
+    expect(mockConnectionsRegisterState).toHaveBeenCalledWith({
+      provider: Provider.SPOTIFY,
+      state,
+    });
+    expect(mockConnectionsCallback).toHaveBeenCalledWith({
+      provider: Provider.SPOTIFY,
+      code: 'spotify-code',
+      state,
+      codeVerifier: 'v'.repeat(43),
+      redirectUri: 'zine://oauth/callback',
+    });
+    expect(mockConnectionsDisconnect).toHaveBeenCalledWith({ provider: Provider.SPOTIFY });
+  });
+
+  it('manages Spotify shows through the shared subscription procedures', async () => {
+    mockConnectionsList.mockResolvedValue({
+      YOUTUBE: null,
+      SPOTIFY: { status: 'ACTIVE', providerUserId: 'spotify-user' },
+      GMAIL: null,
+      X: null,
+    });
+    mockSubscriptionsDiscover.mockResolvedValue({
+      items: [{ id: 'show-1', name: 'A Show', imageUrl: null }],
+      connectionRequired: false,
+    });
+    mockSubscriptionsAdd.mockResolvedValue({ subscriptionId: 'sub-1' });
+    const app = createTestApp();
+    const auth = { Authorization: 'Bearer clerk-session-jwt' };
+
+    const listResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/spotify', { headers: auth }),
+      createMockEnv()
+    );
+    const addResponse = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/spotify', {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId: 'show-1', name: 'A Show' }),
+      }),
+      createMockEnv()
+    );
+
+    expect(listResponse.status).toBe(200);
+    expect(await listResponse.json()).toMatchObject({
+      connection: { status: 'ACTIVE' },
+      items: [{ channelId: 'show-1', isSubscribed: false }],
+    });
+    expect(addResponse.status).toBe(201);
+    expect(mockSubscriptionsAdd).toHaveBeenCalledWith({
+      provider: Provider.SPOTIFY,
+      providerChannelId: 'show-1',
+      name: 'A Show',
+      imageUrl: undefined,
+    });
+  });
+
+  it('manages Gmail newsletters through REST', async () => {
+    mockNewslettersList.mockResolvedValue({
+      items: [{ id: 'feed-1', displayName: 'Daily Letter', status: 'ACTIVE' }],
+      nextCursor: null,
+      hasMore: false,
+    });
+    mockNewslettersUpdateStatus.mockResolvedValue({ success: true });
+    mockNewslettersUnsubscribe.mockResolvedValue({ success: true });
+    mockNewslettersSyncNow.mockResolvedValue({ success: true });
+    const app = createTestApp();
+    const auth = { Authorization: 'Bearer clerk-session-jwt' };
+
+    const list = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/gmail', { headers: auth }),
+      createMockEnv()
+    );
+    const hide = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/gmail/feed-1', {
+        method: 'PATCH',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'hide' }),
+      }),
+      createMockEnv()
+    );
+    const unsubscribe = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/gmail/feed-1', {
+        method: 'DELETE',
+        headers: auth,
+      }),
+      createMockEnv()
+    );
+    const sync = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/gmail/sync', {
+        method: 'POST',
+        headers: auth,
+      }),
+      createMockEnv()
+    );
+
+    expect([list.status, hide.status, unsubscribe.status, sync.status]).toEqual([
+      200, 200, 200, 200,
+    ]);
+    expect(mockNewslettersUpdateStatus).toHaveBeenCalledWith({
+      feedId: 'feed-1',
+      status: 'HIDDEN',
+    });
+    expect(mockNewslettersUnsubscribe).toHaveBeenCalledWith({ feedId: 'feed-1' });
+    expect(mockNewslettersSyncNow).toHaveBeenCalled();
+  });
+
+  it('manages RSS feeds through REST', async () => {
+    mockRssAdd.mockResolvedValue({ id: 'rss-1', created: true });
+    mockRssPause.mockResolvedValue({ success: true });
+    mockRssRemove.mockResolvedValue({ success: true });
+    mockRssSyncNow.mockResolvedValue({ success: true, itemsFound: 2 });
+    const app = createTestApp();
+    const auth = { Authorization: 'Bearer clerk-session-jwt' };
+
+    const add = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/rss', {
+        method: 'POST',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedUrl: 'https://example.com/feed.xml', seedMode: 'latest' }),
+      }),
+      createMockEnv()
+    );
+    const pause = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/rss/rss-1', {
+        method: 'PATCH',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pause' }),
+      }),
+      createMockEnv()
+    );
+    const sync = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/rss/rss-1/sync', {
+        method: 'POST',
+        headers: auth,
+      }),
+      createMockEnv()
+    );
+    const remove = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/rss/rss-1', {
+        method: 'DELETE',
+        headers: auth,
+      }),
+      createMockEnv()
+    );
+
+    expect([add.status, pause.status, sync.status, remove.status]).toEqual([201, 200, 200, 200]);
+    expect(mockRssAdd).toHaveBeenCalledWith({
+      feedUrl: 'https://example.com/feed.xml',
+      seedMode: 'latest',
+    });
+    expect(mockRssPause).toHaveBeenCalledWith({ feedId: 'rss-1' });
+    expect(mockRssSyncNow).toHaveBeenCalledWith({ feedId: 'rss-1' });
+    expect(mockRssRemove).toHaveBeenCalledWith({ feedId: 'rss-1' });
+  });
+
+  it('manages X bookmark sync through REST', async () => {
+    mockXBookmarksStatus.mockResolvedValue({
+      connected: true,
+      connectionStatus: 'ACTIVE',
+      importedCount: 4,
+      sync: { dailySyncEnabled: false },
+    });
+    mockXBookmarksUpdateSettings.mockResolvedValue({ success: true, dailySyncEnabled: true });
+    mockXBookmarksSyncNow.mockResolvedValue({ success: true });
+    const app = createTestApp();
+    const auth = { Authorization: 'Bearer clerk-session-jwt' };
+
+    const status = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/x', { headers: auth }),
+      createMockEnv()
+    );
+    const update = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/x/settings', {
+        method: 'PATCH',
+        headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dailySyncEnabled: true }),
+      }),
+      createMockEnv()
+    );
+    const sync = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/x/sync', {
+        method: 'POST',
+        headers: auth,
+      }),
+      createMockEnv()
+    );
+
+    expect([status.status, update.status, sync.status]).toEqual([200, 200, 200]);
+    expect(mockXBookmarksUpdateSettings).toHaveBeenCalledWith({ dailySyncEnabled: true });
+    expect(mockXBookmarksSyncNow).toHaveBeenCalled();
+  });
+
+  it('adds a YouTube subscription', async () => {
+    mockSubscriptionsAdd.mockResolvedValue({ id: 'sub_1', status: 'ACTIVE' });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer clerk-session-jwt',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channelId: 'channel_1',
+          name: 'Channel One',
+          imageUrl: 'https://example.com/channel.jpg',
+        }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockSubscriptionsAdd).toHaveBeenCalledWith({
+      provider: Provider.YOUTUBE,
+      providerChannelId: 'channel_1',
+      name: 'Channel One',
+      imageUrl: 'https://example.com/channel.jpg',
+    });
+  });
+
+  it('explains when YouTube must be connected before adding a subscription', async () => {
+    mockSubscriptionsAdd.mockRejectedValue(
+      new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Not connected to YOUTUBE. Please connect your YOUTUBE account first.',
+      })
+    );
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer clerk-session-jwt',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ channelId: 'channel_1' }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(412);
+    expect(await res.json()).toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  it('pauses, resumes, removes, and syncs a YouTube subscription', async () => {
+    mockSubscriptionsPause.mockResolvedValue({ success: true });
+    mockSubscriptionsResume.mockResolvedValue({ success: true });
+    mockSubscriptionsRemove.mockResolvedValue({ success: true });
+    mockSubscriptionsSyncNow.mockResolvedValue({ success: true, itemsFound: 2 });
+    const app = createTestApp();
+    const request = (path: string, method: string, body?: unknown) =>
+      app.fetch(
+        new Request(`http://localhost${path}`, {
+          method,
+          headers: {
+            Authorization: 'Bearer clerk-session-jwt',
+            ...(body ? { 'Content-Type': 'application/json' } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+        createMockEnv()
+      );
+
+    expect(
+      (await request('/api/v1/subscriptions/youtube/sub_1', 'PATCH', { action: 'pause' })).status
+    ).toBe(200);
+    expect(
+      (await request('/api/v1/subscriptions/youtube/sub_1', 'PATCH', { action: 'resume' })).status
+    ).toBe(200);
+    expect((await request('/api/v1/subscriptions/youtube/sub_1', 'DELETE')).status).toBe(200);
+    const sync = await request('/api/v1/subscriptions/youtube/sub_1/sync', 'POST');
+    expect(sync.status).toBe(200);
+    expect(await sync.json()).toMatchObject({ itemsFound: 2 });
+    expect(mockSubscriptionsPause).toHaveBeenCalledWith({ subscriptionId: 'sub_1' });
+    expect(mockSubscriptionsResume).toHaveBeenCalledWith({ subscriptionId: 'sub_1' });
+    expect(mockSubscriptionsRemove).toHaveBeenCalledWith({ subscriptionId: 'sub_1' });
+    expect(mockSubscriptionsSyncNow).toHaveBeenCalledWith({ subscriptionId: 'sub_1' });
+  });
+
+  it('returns a rate-limit response for repeated manual YouTube syncs', async () => {
+    mockSubscriptionsSyncNow.mockRejectedValue(
+      new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Please wait 5 minutes between manual syncs',
+      })
+    );
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/subscriptions/youtube/sub_1/sync', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer clerk-session-jwt' },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: 'RATE_LIMITED' });
   });
 
   it('returns 401 for missing and invalid tokens', async () => {

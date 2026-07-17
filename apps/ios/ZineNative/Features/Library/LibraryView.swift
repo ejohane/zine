@@ -2,6 +2,7 @@ import ClerkKitUI
 import SwiftUI
 
 private enum AccountRoute: Hashable {
+    case subscriptions
     case appearance
 }
 
@@ -204,6 +205,12 @@ struct LibraryView: View {
         UserButton()
             .userProfileRows([
                 UserProfileCustomRow(
+                    route: AccountRoute.subscriptions,
+                    title: "Subscriptions",
+                    icon: .system(name: "rectangle.stack.badge.person.crop"),
+                    placement: .before(.signOut)
+                ),
+                UserProfileCustomRow(
                     route: AccountRoute.appearance,
                     title: "Appearance",
                     icon: .system(name: "circle.lefthalf.filled"),
@@ -212,6 +219,8 @@ struct LibraryView: View {
             ])
             .userProfileDestination { route in
                 switch route {
+                case .subscriptions:
+                    SubscriptionsView(client: client)
                 case .appearance:
                     AppearanceSettingsView()
                 }
