@@ -2,5 +2,13 @@
 // Clerk instance. Local.xcconfig is ignored by the repository's *.local rule.
 ZINE_CLERK_PUBLISHABLE_KEY = pk_test_replace_me
 
+// Optional Google OAuth overrides for a development Google project.
+// ZINE_GOOGLE_CLIENT_ID = 123.apps.googleusercontent.com
+// ZINE_GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.123
+
+// Optional OAuth overrides for development provider apps.
+// ZINE_SPOTIFY_CLIENT_ID = spotify_client_id
+// ZINE_X_CLIENT_ID = x_client_id
+
 // Optional for local worker development.
 // ZINE_API_BASE_URL = http:/$()/localhost:8787

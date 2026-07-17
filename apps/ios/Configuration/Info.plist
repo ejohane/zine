@@ -28,6 +28,26 @@
 				<string>app.zine.native</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Zine provider OAuth callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zine</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>Google OAuth callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(ZINE_GOOGLE_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
@@ -50,5 +70,11 @@
 	<string>$(ZINE_API_BASE_URL)</string>
 	<key>ZINEClerkPublishableKey</key>
 	<string>$(ZINE_CLERK_PUBLISHABLE_KEY)</string>
+	<key>ZINEGoogleClientID</key>
+	<string>$(ZINE_GOOGLE_CLIENT_ID)</string>
+	<key>ZINESpotifyClientID</key>
+	<string>$(ZINE_SPOTIFY_CLIENT_ID)</string>
+	<key>ZINEXClientID</key>
+	<string>$(ZINE_X_CLIENT_ID)</string>
 </dict>
 </plist>
