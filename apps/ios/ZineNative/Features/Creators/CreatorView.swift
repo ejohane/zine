@@ -15,6 +15,7 @@ struct CreatorView: View {
 
     @State private var store: CreatorStore
     @State private var selectedSection: ContentSection = .bookmarked
+    @State private var renderedSection: ContentSection = .bookmarked
 
     init(
         creatorId: String,
@@ -106,7 +107,7 @@ struct CreatorView: View {
 
     private var contentSwitcher: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Picker("Creator content", selection: $selectedSection) {
+            Picker("Creator content", selection: sectionSelection) {
                 Text("Bookmarked")
                     .tag(ContentSection.bookmarked)
                 Text(latestSectionTitle)
@@ -115,7 +116,7 @@ struct CreatorView: View {
             .pickerStyle(.segmented)
             .sensoryFeedback(.selection, trigger: selectedSection)
 
-            switch selectedSection {
+            switch renderedSection {
             case .bookmarked:
                 savedSection
             case .latest:
@@ -126,6 +127,22 @@ struct CreatorView: View {
 
     private var latestSectionTitle: String {
         store.latestProvider.map { "Latest on \($0.title)" } ?? "Latest"
+    }
+
+    private var sectionSelection: Binding<ContentSection> {
+        Binding(
+            get: { selectedSection },
+            set: { newSelection in
+                guard newSelection != selectedSection else { return }
+                selectedSection = newSelection
+
+                Task { @MainActor in
+                    await Task.yield()
+                    guard selectedSection == newSelection else { return }
+                    renderedSection = newSelection
+                }
+            }
+        )
     }
 
     private var savedSection: some View {
@@ -214,7 +231,7 @@ struct CreatorView: View {
     }
 
     private func bookmarkRows(_ bookmarks: [Bookmark], isCompleted: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(bookmarks) { bookmark in
                 NavigationLink {
                     BookmarkDetailView(
@@ -267,7 +284,7 @@ struct CreatorView: View {
                     message: "This creator’s feed doesn’t have any recent content to show."
                 )
             } else {
-                VStack(spacing: 0) {
+                LazyVStack(spacing: 0) {
                     ForEach(store.latestContent) { item in
                         Link(destination: item.externalUrl) {
                             creatorContentRow(
