@@ -1,10 +1,4 @@
-import ClerkKitUI
 import SwiftUI
-
-private enum AccountRoute: Hashable {
-    case subscriptions
-    case appearance
-}
 
 struct LibraryView: View {
     let client: APIClient
@@ -53,9 +47,6 @@ struct LibraryView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         filterMenu
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        accountButton
                     }
                 }
                 .navigationDestination(for: Bookmark.self) { bookmark in
@@ -127,6 +118,8 @@ struct LibraryView: View {
                 NavigationLink(value: bookmark) {
                     BookmarkRow(bookmark: bookmark)
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if !bookmark.isFinished {
@@ -201,72 +194,9 @@ struct LibraryView: View {
         showsFinished || provider != nil || contentType != nil
     }
 
-    private var accountButton: some View {
-        UserButton()
-            .userProfileRows([
-                UserProfileCustomRow(
-                    route: AccountRoute.subscriptions,
-                    title: "Subscriptions",
-                    icon: .system(name: "rectangle.stack.badge.person.crop"),
-                    placement: .before(.signOut)
-                ),
-                UserProfileCustomRow(
-                    route: AccountRoute.appearance,
-                    title: "Appearance",
-                    icon: .system(name: "circle.lefthalf.filled"),
-                    placement: .before(.signOut)
-                ),
-            ])
-            .userProfileDestination { route in
-                switch route {
-                case .subscriptions:
-                    SubscriptionsView(client: client)
-                case .appearance:
-                    AppearanceSettingsView()
-                }
-            }
-    }
 }
 
 private struct LibraryReloadKey: Hashable {
     let query: LibraryQuery
     let revision: Int
-}
-
-private struct AppearanceSettingsView: View {
-    @AppStorage(AppAppearance.storageKey) private var storedAppearance = AppAppearance.system.rawValue
-
-    private var selection: Binding<AppAppearance> {
-        Binding(
-            get: { AppAppearance(rawValue: storedAppearance) ?? .system },
-            set: { storedAppearance = $0.rawValue }
-        )
-    }
-
-    var body: some View {
-        List {
-            Section {
-                ForEach(AppAppearance.allCases) { appearance in
-                    Button {
-                        selection.wrappedValue = appearance
-                    } label: {
-                        Label(appearance.title, systemImage: appearance.systemImage)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .contentShape(.rect)
-                            .overlay(alignment: .trailing) {
-                                if selection.wrappedValue == appearance {
-                                    Image(systemName: "checkmark")
-                                        .fontWeight(.semibold)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                }
-            } footer: {
-                Text("System follows your iPhone’s appearance setting.")
-            }
-        }
-        .navigationTitle("Appearance")
-        .navigationBarTitleDisplayMode(.inline)
-    }
 }

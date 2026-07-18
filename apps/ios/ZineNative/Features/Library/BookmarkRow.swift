@@ -4,33 +4,34 @@ struct BookmarkRow: View {
     let bookmark: Bookmark
 
     var body: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .center, spacing: 10) {
             thumbnail
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(bookmark.title)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary)
-                    .lineLimit(3)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
                 creatorLine
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
     }
 
     private var creatorLine: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 5) {
             CreatorAvatar(
                 imageUrl: bookmark.creatorImageUrl,
                 creator: bookmark.creator,
                 contentType: bookmark.contentType,
-                size: 22
+                size: 16
             )
 
             ViewThatFits(in: .horizontal) {
                 if let label = bookmark.consumptionLabel {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Text(bookmark.creator)
                         Text("·")
                         Text(label)
@@ -41,7 +42,7 @@ struct BookmarkRow: View {
                 Text(bookmark.creator)
                     .lineLimit(1)
             }
-            .font(.subheadline)
+            .font(.caption)
             .foregroundStyle(.secondary)
         }
     }
@@ -49,15 +50,16 @@ struct BookmarkRow: View {
     private var thumbnail: some View {
         CachedRemoteImage(
             url: bookmark.thumbnailUrl,
-            targetSize: CGSize(width: 96, height: 68)
+            targetSize: CGSize(width: 64, height: 48)
         ) {
             ZStack {
                 Color.secondary.opacity(0.12)
                 Image(systemName: bookmark.contentType.systemImage)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(width: 96, height: 68)
-        .clipShape(.rect(cornerRadius: 10))
+        .frame(width: 64, height: 48)
+        .clipShape(.rect(cornerRadius: 7))
     }
 }

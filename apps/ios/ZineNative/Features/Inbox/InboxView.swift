@@ -92,16 +92,10 @@ struct InboxView: View {
                 NavigationLink(value: bookmark) {
                     BookmarkRow(bookmark: bookmark)
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        Task { await store.archive(bookmark) }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox.fill")
-                    }
-                    .accessibilityLabel("Archive inbox item")
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button {
                         Task { await store.bookmark(bookmark) }
                     } label: {
@@ -109,6 +103,14 @@ struct InboxView: View {
                     }
                     .tint(.green)
                     .accessibilityLabel("Bookmark inbox item")
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        Task { await store.archive(bookmark) }
+                    } label: {
+                        Label("Archive", systemImage: "archivebox.fill")
+                    }
+                    .accessibilityLabel("Archive inbox item")
                 }
                 .task {
                     await store.loadMoreIfNeeded(current: bookmark)
