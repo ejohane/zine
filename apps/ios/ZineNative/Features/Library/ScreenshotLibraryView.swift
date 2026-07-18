@@ -13,6 +13,8 @@ struct ScreenshotLibraryView: View {
                 NavigationLink(value: bookmark) {
                     BookmarkRow(bookmark: bookmark)
                 }
+                .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                .listRowSeparator(.hidden)
             }
             .listStyle(.plain)
             .navigationTitle("Library")
@@ -22,11 +24,6 @@ struct ScreenshotLibraryView: View {
                     Button {} label: {
                         Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
                     }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
                 }
             }
             .navigationDestination(for: Bookmark.self) { bookmark in

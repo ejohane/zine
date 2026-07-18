@@ -51,6 +51,7 @@ private struct AuthenticatedAppView: View {
                     cache: inboxCache,
                     onLibraryChanged: markLibraryChanged
                 )
+                .tint(Color.accentColor)
             }
 
             Tab("Library", systemImage: "books.vertical") {
@@ -59,6 +60,12 @@ private struct AuthenticatedAppView: View {
                     cache: libraryCache,
                     refreshRevision: libraryRevision
                 )
+                .tint(Color.accentColor)
+            }
+
+            Tab("Settings", systemImage: "gearshape") {
+                AppSettingsView(client: client)
+                    .tint(Color.accentColor)
             }
 
             Tab(role: .search) {
@@ -69,8 +76,10 @@ private struct AuthenticatedAppView: View {
                     refreshRevision: libraryRevision
                 )
                 .searchable(text: $search, prompt: "Search your library")
+                .tint(Color.accentColor)
             }
         }
+        .tint(Color.primary)
     }
 
     private func markLibraryChanged() {
