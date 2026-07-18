@@ -8,6 +8,7 @@ struct CreatorView: View {
 
     let fallbackName: String
     let fallbackImageUrl: URL?
+    let fallbackProvider: Provider
     let client: APIClient
     let onBookmarkUpdate: (Bookmark) -> Void
     let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
@@ -21,6 +22,7 @@ struct CreatorView: View {
         creatorId: String,
         fallbackName: String,
         fallbackImageUrl: URL?,
+        fallbackProvider: Provider,
         client: APIClient,
         onBookmarkUpdate: @escaping (Bookmark) -> Void = { _ in },
         onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
@@ -28,6 +30,7 @@ struct CreatorView: View {
     ) {
         self.fallbackName = fallbackName
         self.fallbackImageUrl = fallbackImageUrl
+        self.fallbackProvider = fallbackProvider
         self.client = client
         self.onBookmarkUpdate = onBookmarkUpdate
         self.onBookmarkChange = onBookmarkChange
@@ -126,7 +129,7 @@ struct CreatorView: View {
     }
 
     private var latestSectionTitle: String {
-        store.latestProvider.map { "Latest on \($0.title)" } ?? "Latest"
+        "Latest on \((store.latestProvider ?? fallbackProvider).title)"
     }
 
     private var sectionSelection: Binding<ContentSection> {

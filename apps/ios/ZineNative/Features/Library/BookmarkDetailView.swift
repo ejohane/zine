@@ -234,6 +234,7 @@ struct BookmarkDetailView: View {
                     creatorId: creatorId,
                     fallbackName: bookmark.creator,
                     fallbackImageUrl: bookmark.creatorImageUrl,
+                    fallbackProvider: bookmark.provider,
                     client: client,
                     onBookmarkUpdate: onUpdate,
                     onBookmarkChange: onBookmarkChange,
