@@ -4,5 +4,6 @@ ZINE_GOOGLE_CLIENT_ID = 973421703522-58dfb15bdqdhvhs2r9tt88ubgg45dkq1.apps.googl
 ZINE_GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.973421703522-58dfb15bdqdhvhs2r9tt88ubgg45dkq1
 ZINE_SPOTIFY_CLIENT_ID = 4ce6c1f9fabe407ea4b2be0479dd63ff
 ZINE_X_CLIENT_ID = Vjd5eEktRTNoRDVZSm1aNGNvSWo6MTpjaQ
+ZINE_KEYCHAIN_ACCESS_GROUP = TRA7965NM5.app.zine.native
 
 #include? "Local.xcconfig"
