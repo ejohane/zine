@@ -147,6 +147,7 @@ const ListBookmarksInputSchema = z.object({
   creatorId: z.string().min(1, 'Creator ID is required'),
   cursor: z.string().optional(),
   limit: z.number().int().min(1).max(50).default(20),
+  isFinished: z.boolean().optional(),
 });
 
 const ListPublicationsInputSchema = z.object({
@@ -370,6 +371,10 @@ export const creatorsRouter = router({
           eq(userItems.userId, ctx.userId),
           eq(userItems.state, UserItemState.BOOKMARKED),
         ];
+
+        if (input.isFinished !== undefined) {
+          conditions.push(eq(userItems.isFinished, input.isFinished));
+        }
 
         // Use COALESCE to handle NULL bookmarkedAt - falls back to ingestedAt
         const sortField = sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;

@@ -17,6 +17,9 @@ const {
   mockGetItem,
   mockBookmarkInboxItem,
   mockArchiveInboxItem,
+  mockGetCreator,
+  mockCreatorBookmarks,
+  mockCreatorLatestContent,
   mockUnbookmark,
   mockSetTags,
   mockMarkOpened,
@@ -70,6 +73,9 @@ const {
   mockGetItem: vi.fn(),
   mockBookmarkInboxItem: vi.fn(),
   mockArchiveInboxItem: vi.fn(),
+  mockGetCreator: vi.fn(),
+  mockCreatorBookmarks: vi.fn(),
+  mockCreatorLatestContent: vi.fn(),
   mockUnbookmark: vi.fn(),
   mockSetTags: vi.fn(),
   mockMarkOpened: vi.fn(),
@@ -302,6 +308,11 @@ describe('apiV1Routes', () => {
         preview: mockPreview,
         save: mockSave,
       },
+      creators: {
+        get: mockGetCreator,
+        listBookmarks: mockCreatorBookmarks,
+        fetchLatestContent: mockCreatorLatestContent,
+      },
       subscriptions: {
         connections: {
           list: mockConnectionsList,
@@ -352,6 +363,9 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/inbox');
     expect(body.paths).toHaveProperty('/api/v1/inbox/{id}/bookmark');
     expect(body.paths).toHaveProperty('/api/v1/inbox/{id}/archive');
+    expect(body.paths).toHaveProperty('/api/v1/creators/{creatorId}');
+    expect(body.paths).toHaveProperty('/api/v1/creators/{creatorId}/bookmarks');
+    expect(body.paths).toHaveProperty('/api/v1/creators/{creatorId}/latest-content');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/preview');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}');
@@ -381,6 +395,79 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/callback');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}/sync');
+  });
+
+  it('returns creator profile, bookmarks, and latest content for a Clerk session', async () => {
+    const app = createTestApp();
+    mockVerifyClerkRequestToken.mockResolvedValue({
+      success: true,
+      userId: 'user_123',
+    });
+    mockGetCreator.mockResolvedValue({
+      id: 'creator_1',
+      name: 'Creator One',
+      imageUrl: null,
+      provider: Provider.YOUTUBE,
+      providerCreatorId: 'channel_1',
+      description: 'Makes thoughtful videos.',
+      handle: '@creatorone',
+      externalUrl: 'https://youtube.com/@creatorone',
+      createdAt: 1,
+      updatedAt: 2,
+    });
+    mockCreatorBookmarks.mockResolvedValue({
+      items: [{ id: 'ui_1', title: 'Saved video' }],
+      nextCursor: 'next-page',
+      hasMore: true,
+    });
+    mockCreatorLatestContent.mockResolvedValue({
+      provider: Provider.YOUTUBE,
+      items: [
+        {
+          id: 'video_1',
+          title: 'A new video',
+          description: null,
+          thumbnailUrl: null,
+          publishedAt: 1_752_797_600_000,
+          externalUrl: 'https://youtube.com/watch?v=video_1',
+          duration: 600,
+          itemId: null,
+          isBookmarked: false,
+        },
+      ],
+      cacheStatus: 'MISS',
+    });
+
+    const headers = { Authorization: 'Bearer clerk-session-token' };
+    const creator = await app.fetch(
+      new Request('http://localhost/api/v1/creators/creator_1', { headers }),
+      createMockEnv()
+    );
+    const bookmarks = await app.fetch(
+      new Request(
+        'http://localhost/api/v1/creators/creator_1/bookmarks?limit=20&cursor=page-1&isFinished=false',
+        { headers }
+      ),
+      createMockEnv()
+    );
+    const latest = await app.fetch(
+      new Request('http://localhost/api/v1/creators/creator_1/latest-content', { headers }),
+      createMockEnv()
+    );
+
+    expect(creator.status).toBe(200);
+    expect(bookmarks.status).toBe(200);
+    expect(latest.status).toBe(200);
+    expect(mockGetCreator).toHaveBeenCalledWith({ creatorId: 'creator_1' });
+    expect(mockCreatorBookmarks).toHaveBeenCalledWith({
+      creatorId: 'creator_1',
+      limit: 20,
+      cursor: 'page-1',
+      isFinished: false,
+    });
+    expect(mockCreatorLatestContent).toHaveBeenCalledWith({ creatorId: 'creator_1' });
+    expect(await bookmarks.json()).toMatchObject({ nextCursor: 'next-page' });
+    expect(await latest.json()).toMatchObject({ provider: Provider.YOUTUBE });
   });
 
   it('lists current and available YouTube subscriptions for a Clerk session', async () => {

@@ -16,6 +16,7 @@ struct BookmarkRow: View {
                 creatorLine
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
     }

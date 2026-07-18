@@ -94,6 +94,37 @@ struct APIClient {
         return response.item
     }
 
+    func getCreator(id: String) async throws -> CreatorResponse {
+        try await request(url: baseURL.appending(path: "/api/v1/creators/\(id)"))
+    }
+
+    func listCreatorBookmarks(
+        creatorId: String,
+        cursor: String? = nil,
+        isFinished: Bool? = nil,
+        limit: Int = 30
+    ) async throws -> PaginatedBookmarksResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/creators/\(creatorId)/bookmarks"),
+            resolvingAgainstBaseURL: false
+        )!
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if let isFinished {
+            items.append(URLQueryItem(name: "isFinished", value: String(isFinished)))
+        }
+        components.queryItems = items
+        return try await request(url: components.url!)
+    }
+
+    func getCreatorLatestContent(id: String) async throws -> CreatorLatestContentResponse {
+        try await request(
+            url: baseURL.appending(path: "/api/v1/creators/\(id)/latest-content")
+        )
+    }
+
     func setFinished(id: String, isFinished: Bool) async throws -> FinishedStateResponse.FinishedBookmark {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)"))
         request.httpMethod = "PATCH"
