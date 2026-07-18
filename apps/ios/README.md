@@ -22,6 +22,16 @@ The API defaults to `https://api.myzine.app`. Override
 Open `ZineNative.xcodeproj`, select the `ZineNative` scheme, and run it on an
 iOS 18 or newer simulator or device.
 
-The first iteration intentionally contains only authentication and the Library
-vertical slice: list, pagination, refresh, search, filters, detail, and finished
-state. It does not replace or modify the React Native app.
+The native app is additive and does not replace or modify the React Native app.
+
+## Share extension
+
+The `ZineShareExtension` target appears as Zine in the iOS share sheet for web
+links. It loads a bookmark preview from the production REST API and lets the
+user save the link to their Zine library without opening the full app.
+
+The app and extension share the Clerk session through the
+`app.zine.native` keychain access group. A user who is not signed in is prompted
+to open Zine and sign in before trying the share action again. The share modal
+loads the user’s existing tags and supports selecting or creating tags before
+saving the bookmark.
