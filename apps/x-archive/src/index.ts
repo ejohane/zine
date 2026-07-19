@@ -5,6 +5,8 @@ import {
   UploadXTimelineChunkSchema,
   X_ARCHIVE_SCHEMA_VERSION,
   type XPost,
+  type XPostLink,
+  XPostLinkSchema,
 } from '@zine/x-archive-schema';
 
 type Bindings = Env;
@@ -53,6 +55,7 @@ type PostRow = {
   profile_image_url: string | null;
   verified: number | null;
   media_json: string;
+  links_json: string;
   metrics_json: string;
   r2_key: string;
   content_hash: string;
@@ -61,6 +64,15 @@ type PostRow = {
   first_run_id: string;
   latest_run_id: string;
   schema_version: number;
+};
+
+type PostLinkOccurrenceRow = PostRow & {
+  link_url: string;
+  normalized_url: string;
+  display_url: string | null;
+  redirect_url: string | null;
+  link_source: string;
+  card_json: string | null;
 };
 
 async function sha256Hex(value: string): Promise<string> {
@@ -120,6 +132,45 @@ function decodeCursor(value: string | undefined): [number, string] | null {
   return null;
 }
 
+function parsePostLinks(value: string | null | undefined): XPostLink[] {
+  if (!value) return [];
+  try {
+    const parsed = XPostLinkSchema.array().safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergePostLinks(previous: XPostLink[], incoming: XPostLink[]): XPostLink[] {
+  const links = new Map(previous.map((link) => [link.normalizedUrl, link]));
+  for (const link of incoming) {
+    const stored = links.get(link.normalizedUrl);
+    if (!stored) {
+      links.set(link.normalizedUrl, link);
+      continue;
+    }
+    const card =
+      stored.card || link.card
+        ? {
+            title: link.card?.title ?? stored.card?.title ?? null,
+            description: link.card?.description ?? stored.card?.description ?? null,
+            domain: link.card?.domain ?? stored.card?.domain ?? null,
+            imageUrl: link.card?.imageUrl ?? stored.card?.imageUrl ?? null,
+          }
+        : null;
+    links.set(link.normalizedUrl, {
+      ...stored,
+      ...link,
+      displayUrl: link.displayUrl ?? stored.displayUrl ?? null,
+      redirectUrl: link.redirectUrl ?? stored.redirectUrl ?? null,
+      source: stored.source === 'CARD' || link.source === 'CARD' ? 'CARD' : 'TEXT',
+      card,
+    });
+  }
+  return [...links.values()];
+}
+
 function publicRun(row: RunRow) {
   return {
     id: row.id,
@@ -154,6 +205,7 @@ function publicPost(row: PostRow) {
       verified: row.verified === null ? null : Boolean(row.verified),
     },
     media: JSON.parse(row.media_json) as unknown,
+    links: parsePostLinks(row.links_json),
     metrics: JSON.parse(row.metrics_json) as unknown,
     archiveKey: row.r2_key,
     contentHash: row.content_hash,
@@ -311,7 +363,15 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
   if (!run) return c.json({ error: 'Run not found', code: 'NOT_FOUND' }, 404);
 
   const input = parsed.data;
-  const checksum = await sha256Hex(JSON.stringify(input));
+  const checksumInput = {
+    ...input,
+    posts: input.posts.map((post) => {
+      const { links, ...legacyPost } = post;
+      // Preserve v1 checksums for empty-link payloads so an in-flight run can retry after deploy.
+      return links.length > 0 ? post : legacyPost;
+    }),
+  };
+  const checksum = await sha256Hex(JSON.stringify(checksumInput));
   const priorChunk = await c.env.ARCHIVE_DB.prepare(
     'SELECT checksum, posts_received, timeline_items_received FROM x_ingest_chunks WHERE run_id = ? AND chunk_index = ?'
   )
@@ -335,18 +395,28 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
     return c.json({ error: 'Run is already finalized', code: 'RUN_FINALIZED' }, 409);
   }
 
-  const postsById = new Map(input.posts.map((post) => [post.tweetId, post]));
-  const postIds = [...postsById.keys()];
+  const inputPostsById = new Map(input.posts.map((post) => [post.tweetId, post]));
+  const postIds = [...inputPostsById.keys()];
   const placeholders = postIds.map(() => '?').join(', ');
   const existingRows = postIds.length
     ? await c.env.ARCHIVE_DB.prepare(
-        `SELECT tweet_id, content_hash FROM x_posts WHERE user_id = ? AND tweet_id IN (${placeholders})`
+        `SELECT tweet_id, content_hash, links_json
+         FROM x_posts WHERE user_id = ? AND tweet_id IN (${placeholders})`
       )
         .bind(userId, ...postIds)
-        .all<{ tweet_id: string; content_hash: string }>()
+        .all<{ tweet_id: string; content_hash: string; links_json: string }>()
     : { results: [] };
   const existingHashes = new Map(
     existingRows.results.map((row) => [row.tweet_id, row.content_hash])
+  );
+  const existingLinks = new Map(
+    existingRows.results.map((row) => [row.tweet_id, parsePostLinks(row.links_json)])
+  );
+  const postsById = new Map(
+    [...inputPostsById].map(([tweetId, post]) => [
+      tweetId,
+      { ...post, links: mergePostLinks(existingLinks.get(tweetId) ?? [], post.links) },
+    ])
   );
 
   const hashes = new Map<string, string>();
@@ -413,9 +483,10 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
     statements.push(
       c.env.ARCHIVE_DB.prepare(
         `INSERT INTO x_posts
-          (user_id, tweet_id, url, text, published_at, lang, kind, author_key, media_json, metrics_json,
-           r2_key, content_hash, first_seen_at, last_seen_at, first_run_id, latest_run_id, schema_version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (user_id, tweet_id, url, text, published_at, lang, kind, author_key, media_json, links_json,
+           metrics_json, r2_key, content_hash, first_seen_at, last_seen_at, first_run_id, latest_run_id,
+           schema_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, tweet_id) DO UPDATE SET
           url = excluded.url,
           text = excluded.text,
@@ -424,6 +495,7 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
           kind = excluded.kind,
           author_key = excluded.author_key,
           media_json = excluded.media_json,
+          links_json = excluded.links_json,
           metrics_json = excluded.metrics_json,
           r2_key = excluded.r2_key,
           content_hash = excluded.content_hash,
@@ -440,6 +512,7 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         post.kind,
         key,
         JSON.stringify(post.media),
+        JSON.stringify(post.links),
         JSON.stringify(post.metrics),
         postObjectKey(userId, post.tweetId),
         hashes.get(post.tweetId)!,
@@ -450,6 +523,29 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         X_ARCHIVE_SCHEMA_VERSION
       )
     );
+    statements.push(
+      c.env.ARCHIVE_DB.prepare(
+        'DELETE FROM x_post_links WHERE user_id = ? AND source_tweet_id = ?'
+      ).bind(userId, post.tweetId)
+    );
+    for (const link of post.links) {
+      statements.push(
+        c.env.ARCHIVE_DB.prepare(
+          `INSERT INTO x_post_links
+            (user_id, source_tweet_id, normalized_url, url, display_url, redirect_url, source, card_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          userId,
+          post.tweetId,
+          link.normalizedUrl,
+          link.url,
+          link.displayUrl ?? null,
+          link.redirectUrl ?? null,
+          link.source,
+          link.card ? JSON.stringify(link.card) : null
+        )
+      );
+    }
     statements.push(
       c.env.ARCHIVE_DB.prepare(
         'DELETE FROM x_post_relationships WHERE user_id = ? AND source_tweet_id = ?'
@@ -654,7 +750,7 @@ app.get('/api/v1/x-timeline/runs/:runId', async (c) => {
     `SELECT i.position, i.observed_at, i.presentation, i.reposted_by_json,
       p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind,
       p.author_key, a.username, a.name AS author_name, a.profile_url, a.profile_image_url, a.verified,
-      p.media_json, p.metrics_json, p.r2_key, p.content_hash, p.first_seen_at, p.last_seen_at,
+      p.media_json, p.links_json, p.metrics_json, p.r2_key, p.content_hash, p.first_seen_at, p.last_seen_at,
       p.first_run_id, p.latest_run_id, p.schema_version
      FROM x_timeline_run_items i
      JOIN x_posts p ON p.user_id = i.user_id AND p.tweet_id = i.tweet_id
@@ -678,6 +774,65 @@ app.get('/api/v1/x-timeline/runs/:runId', async (c) => {
       presentation: item.presentation,
       repostedBy: item.reposted_by_json ? (JSON.parse(item.reposted_by_json) as unknown) : null,
       post: publicPost(item),
+    })),
+  });
+});
+
+app.get('/api/v1/x-timeline/links', async (c) => {
+  const userId = c.get('userId');
+  const limit = parseLimit(c.req.query('limit'));
+  const normalizedUrl = c.req.query('normalizedUrl');
+  const runId = c.req.query('runId');
+  if (normalizedUrl) {
+    try {
+      const parsed = new URL(normalizedUrl);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error();
+    } catch {
+      return c.json({ error: 'Invalid normalizedUrl', code: 'INVALID_INPUT' }, 400);
+    }
+  }
+
+  const conditions = ['l.user_id = ?'];
+  const bindings: Array<string | number> = [userId];
+  if (normalizedUrl) {
+    conditions.push('l.normalized_url = ?');
+    bindings.push(normalizedUrl);
+  }
+  if (runId) {
+    conditions.push(
+      `EXISTS (
+        SELECT 1 FROM x_timeline_run_items i
+        WHERE i.user_id = l.user_id AND i.tweet_id = l.source_tweet_id AND i.run_id = ?
+      )`
+    );
+    bindings.push(runId);
+  }
+  bindings.push(limit);
+
+  const rows = await c.env.ARCHIVE_DB.prepare(
+    `SELECT
+      l.url AS link_url, l.normalized_url, l.display_url, l.redirect_url,
+      l.source AS link_source, l.card_json,
+      p.*, a.username, a.name AS author_name, a.profile_url, a.profile_image_url, a.verified
+     FROM x_post_links l
+     JOIN x_posts p ON p.user_id = l.user_id AND p.tweet_id = l.source_tweet_id
+     JOIN x_authors a ON a.user_id = p.user_id AND a.author_key = p.author_key
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY p.last_seen_at DESC, p.tweet_id DESC, l.normalized_url ASC
+     LIMIT ?`
+  )
+    .bind(...bindings)
+    .all<PostLinkOccurrenceRow>();
+
+  return c.json({
+    links: rows.results.map((row) => ({
+      url: row.link_url,
+      normalizedUrl: row.normalized_url,
+      displayUrl: row.display_url,
+      redirectUrl: row.redirect_url,
+      source: row.link_source,
+      card: row.card_json ? (JSON.parse(row.card_json) as unknown) : null,
+      post: publicPost(row),
     })),
   });
 });

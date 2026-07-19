@@ -102,12 +102,14 @@ struct ProviderLinkButton: View {
     let provider: Provider
     let destination: URL
     let title: String
+    var onOpen: () -> Void = {}
 
     private var action: ProviderOpenAction { provider.openAction }
 
     var body: some View {
         Button {
             ActionRowHaptics.play()
+            onOpen()
             openURL(destination)
         } label: {
             HStack(spacing: 8) {

@@ -1,8 +1,10 @@
 # Zine Native iOS
 
-This is an additive SwiftUI app that lives alongside `apps/mobile`. It uses the
-same Zine account and production data, but it has its own bundle identifier
-(`app.zine.native`) so both apps can remain installed.
+This is Zine's canonical, supported mobile client. It is a native SwiftUI app
+with the `app.zine.native` bundle identifier and uses the same Zine account and
+production data as the rest of the product. The former Expo client in
+`apps/mobile` is deprecated and retained only for legacy reference and
+compatibility coverage.
 
 ## Configure
 
@@ -22,7 +24,7 @@ The API defaults to `https://api.myzine.app`. Override
 Open `ZineNative.xcodeproj`, select the `ZineNative` scheme, and run it on an
 iOS 18 or newer simulator or device.
 
-The native app is additive and does not replace or modify the React Native app.
+All new iOS product work, verification, and deployment belongs in this project.
 
 ## Share extension
 

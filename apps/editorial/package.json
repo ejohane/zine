@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test src",
     "snapshot": "bun run src/cli.ts snapshot",
+    "rank": "bun run src/cli.ts rank",
+    "run:start": "bun run src/cli.ts run-start",
+    "run:fail": "bun run src/cli.ts run-fail",
     "validate": "bun run src/cli.ts validate",
     "render": "bun run src/cli.ts render",
     "publish": "bun run src/cli.ts publish"

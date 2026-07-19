@@ -15,7 +15,18 @@ describe('X browser extractor', () => {
             <span>Original Author</span><span>@original</span><a href="/original"></a>
           </div>
           <a href="/original/status/100"><time datetime="2026-07-11T12:00:00.000Z"></time></a>
-          <div data-testid="tweetText" lang="en">An original post</div>
+          <div data-testid="tweetText" lang="en">
+            An original post
+            <a href="https://t.co/story" data-expanded-url="https://example.com/story?utm_source=x#section">example.com/story</a>
+          </div>
+          <div data-testid="card.wrapper">
+            <a href="https://t.co/story" data-expanded-url="https://example.com/story?utm_source=x#section">
+              <div data-testid="card.layoutLarge.detail">
+                <span>example.com</span><span>A linked story</span><span>Story description</span>
+              </div>
+              <img src="https://example.com/card.jpg" />
+            </a>
+          </div>
           <button data-testid="like" aria-label="12 Likes"></button>
         </article>
 
@@ -36,7 +47,10 @@ describe('X browser extractor', () => {
           <div role="link">
             <div data-testid="User-Name"><span>Quoted</span><span>@quoted</span><a href="/quoted"></a></div>
             <a href="/quoted/status/301"><time datetime="2026-07-11T11:00:00.000Z"></time></a>
-            <div data-testid="tweetText">Quoted text</div>
+            <div data-testid="tweetText">
+              Quoted text
+              <a href="https://t.co/quoted" data-expanded-url="https://quoted.example/watch?utm_medium=x">watch this</a>
+            </div>
           </div>
         </article>
       </main>
@@ -54,6 +68,28 @@ describe('X browser extractor', () => {
       kind: 'QUOTE',
       relationships: [{ type: 'QUOTE_OF', tweetId: '301' }],
     });
+    expect(result.posts[0].links).toEqual([
+      {
+        url: 'https://example.com/story?utm_source=x#section',
+        normalizedUrl: 'https://example.com/story',
+        displayUrl: 'example.com',
+        redirectUrl: 'https://t.co/story',
+        source: 'CARD',
+        card: {
+          title: 'A linked story',
+          description: 'Story description',
+          domain: 'example.com',
+          imageUrl: 'https://example.com/card.jpg',
+        },
+      },
+    ]);
+    expect(result.posts[1].links).toEqual([]);
+    expect(result.posts[2].links).toMatchObject([
+      {
+        normalizedUrl: 'https://quoted.example/watch',
+        source: 'TEXT',
+      },
+    ]);
 
     const repeated = extractVisibleTimelineBatch(result.adKeys);
     expect(repeated.excludedAds).toBe(0);

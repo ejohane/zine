@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
-export const X_ARCHIVE_SCHEMA_VERSION = 1;
+export const X_ARCHIVE_SCHEMA_VERSION = 2;
 export const X_ARCHIVE_MAX_TIMELINE_ITEMS_PER_CHUNK = 25;
 export const X_ARCHIVE_MAX_POSTS_PER_CHUNK = 75;
 
 const OptionalUrlSchema = z.string().url().nullable().optional();
+const HttpUrlSchema = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), {
+    message: 'Expected an HTTP(S) URL',
+  });
+const OptionalHttpUrlSchema = HttpUrlSchema.nullable().optional();
 
 export const XPostKindSchema = z.enum(['POST', 'REPLY', 'REPOST', 'QUOTE']);
 export type XPostKind = z.infer<typeof XPostKindSchema>;
@@ -37,6 +44,35 @@ export const XMediaSchema = z
   .strict();
 export type XMedia = z.infer<typeof XMediaSchema>;
 
+export const XPostLinkSourceSchema = z.enum(['TEXT', 'CARD']);
+export type XPostLinkSource = z.infer<typeof XPostLinkSourceSchema>;
+
+export const XPostLinkCardSchema = z
+  .object({
+    title: z.string().trim().min(1).max(500).nullable().optional(),
+    description: z.string().trim().min(1).max(2_000).nullable().optional(),
+    domain: z.string().trim().min(1).max(253).nullable().optional(),
+    imageUrl: OptionalUrlSchema,
+  })
+  .strict();
+export type XPostLinkCard = z.infer<typeof XPostLinkCardSchema>;
+
+export const XPostLinkSchema = z
+  .object({
+    /** Best destination exposed by the rendered post DOM. May still be a t.co URL. */
+    url: HttpUrlSchema,
+    /** Stable comparison form with fragments and known tracking parameters removed. */
+    normalizedUrl: HttpUrlSchema,
+    /** Human-readable URL text rendered by X, when present. */
+    displayUrl: z.string().trim().min(1).max(1_000).nullable().optional(),
+    /** Redirect URL observed in the DOM when `url` could be expanded to a destination. */
+    redirectUrl: OptionalHttpUrlSchema,
+    source: XPostLinkSourceSchema.default('TEXT'),
+    card: XPostLinkCardSchema.nullable().optional(),
+  })
+  .strict();
+export type XPostLink = z.infer<typeof XPostLinkSchema>;
+
 export const XPostRelationshipSchema = z
   .object({
     type: XPostRelationshipTypeSchema,
@@ -66,11 +102,25 @@ export const XPostSchema = z
     kind: XPostKindSchema,
     author: XAuthorSchema,
     media: z.array(XMediaSchema).max(20).default([]),
+    links: z.array(XPostLinkSchema).max(50).default([]),
     relationships: z.array(XPostRelationshipSchema).max(20).default([]),
     metrics: XPostMetricsSchema.default({}),
     capturedAt: z.string().datetime(),
   })
-  .strict();
+  .strict()
+  .superRefine((post, ctx) => {
+    const normalizedUrls = new Set<string>();
+    for (const [index, link] of post.links.entries()) {
+      if (normalizedUrls.has(link.normalizedUrl)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['links', index, 'normalizedUrl'],
+          message: `Duplicate normalized outbound URL ${link.normalizedUrl}`,
+        });
+      }
+      normalizedUrls.add(link.normalizedUrl);
+    }
+  });
 export type XPost = z.infer<typeof XPostSchema>;
 
 export const XTimelineItemSchema = z

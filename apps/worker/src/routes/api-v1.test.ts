@@ -66,6 +66,10 @@ const {
   mockUserItemUpdateSet,
   mockConsumptionInsertValues,
   mockVerifyClerkRequestToken,
+  mockStartEditorialRun,
+  mockFailEditorialRun,
+  mockGetEditorialFeedbackProfile,
+  mockRecordEditorialFeedback,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -126,6 +130,10 @@ const {
   mockUserItemUpdateSet: vi.fn(),
   mockConsumptionInsertValues: vi.fn(),
   mockVerifyClerkRequestToken: vi.fn(),
+  mockStartEditorialRun: vi.fn(),
+  mockFailEditorialRun: vi.fn(),
+  mockGetEditorialFeedbackProfile: vi.fn(),
+  mockRecordEditorialFeedback: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -146,6 +154,30 @@ vi.mock('../middleware/auth', () => ({
   verifyClerkRequestToken: mockVerifyClerkRequestToken,
 }));
 
+vi.mock('../lib/editorial-runs', () => {
+  class EditorialRunConflictError extends Error {}
+  class EditorialRunNotFoundError extends Error {}
+  return {
+    EditorialRunConflictError,
+    EditorialRunNotFoundError,
+    startEditorialRun: mockStartEditorialRun,
+    failEditorialRun: mockFailEditorialRun,
+    assertEditorialRunCanPublish: vi.fn(),
+    completeEditorialRun: vi.fn(),
+  };
+});
+
+vi.mock('../lib/editorial-feedback', () => {
+  class EditorialFeedbackConflictError extends Error {}
+  class EditorialFeedbackTargetError extends Error {}
+  return {
+    EditorialFeedbackConflictError,
+    EditorialFeedbackTargetError,
+    getEditorialFeedbackProfile: mockGetEditorialFeedbackProfile,
+    recordEditorialFeedback: mockRecordEditorialFeedback,
+  };
+});
+
 vi.mock('../sync/service', async () => {
   class RateLimitError extends Error {
     constructor(message: string) {
@@ -165,6 +197,7 @@ vi.mock('../sync/service', async () => {
 
 import apiV1Routes from './api-v1';
 import { RateLimitError } from '../sync/service';
+import { EditorialRunConflictError, EditorialRunNotFoundError } from '../lib/editorial-runs';
 
 type JsonBody = Record<string, unknown>;
 
@@ -298,6 +331,37 @@ describe('apiV1Routes', () => {
       importedCount: 0,
       sync: null,
     });
+    mockStartEditorialRun.mockResolvedValue({
+      created: true,
+      run: {
+        id: 'run-1',
+        editionDate: '2026-07-19',
+        status: 'PREPARING',
+        editionId: null,
+      },
+    });
+    mockFailEditorialRun.mockResolvedValue({
+      duplicate: false,
+      run: {
+        id: 'run-1',
+        editionDate: '2026-07-19',
+        status: 'FAILED',
+        editionId: null,
+      },
+    });
+    mockGetEditorialFeedbackProfile.mockResolvedValue({
+      schemaVersion: 1,
+      generatedAt: '2026-07-19T12:00:00.000Z',
+      lookbackDays: 180,
+      halfLifeDays: 60,
+      maxEvents: 500,
+      eventCount: 0,
+      truncated: false,
+      topics: [],
+      creators: [],
+      canonicalUrls: [],
+      sourceIds: [],
+    });
     mockCreateCaller.mockReturnValue({
       items: {
         inbox: mockInbox,
@@ -389,6 +453,11 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/progress');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/article-content');
     expect(body.paths).toHaveProperty('/api/v1/tags');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/today');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/runs');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/runs/{id}/failure');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/feedback');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/feedback/profile');
     expect(body.paths).toHaveProperty('/api/v1/editorial/editions');
     expect(body.paths).toHaveProperty('/api/v1/editorial/editions/latest');
     expect(body.paths).toHaveProperty('/api/v1/editorial/editions/{id}');
@@ -410,6 +479,144 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/callback');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}/sync');
+  });
+
+  it('reads the bounded editorial tuning profile with read authentication', async () => {
+    const app = createTestApp();
+    mockDbToken(createTokenRecord(['bookmarks:read']));
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/feedback/profile', {
+        headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      profile: { eventCount: 0, lookbackDays: 180, maxEvents: 500 },
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+    expect(mockGetEditorialFeedbackProfile).toHaveBeenCalledWith(expect.anything(), 'user_123');
+  });
+
+  it('starts an idempotent editorial run with write authentication', async () => {
+    const app = createTestApp();
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/runs', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: 'run-1',
+          editionDate: '2026-07-19',
+          workflowVersion: 'x-led-v1',
+          promptVersion: 'daily-v1',
+          model: 'gpt-5.6',
+        }),
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({
+      created: true,
+      run: { id: 'run-1', status: 'PREPARING' },
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+    expect(mockStartEditorialRun).toHaveBeenCalledWith(
+      expect.anything(),
+      'user_123',
+      expect.objectContaining({ id: 'run-1' })
+    );
+  });
+
+  it('requires write scope and validates editorial run start bodies', async () => {
+    const app = createTestApp();
+    mockDbToken(createTokenRecord(['bookmarks:read']));
+    const forbidden = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/runs', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_ONLY_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }),
+      createMockEnv()
+    );
+    expect(forbidden.status).toBe(403);
+
+    mockDbToken(createTokenRecord(['bookmarks:write']));
+    const invalid = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/runs', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ editionDate: '2026-02-30' }),
+      }),
+      createMockEnv()
+    );
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({
+      code: 'INVALID_REQUEST_BODY',
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+  });
+
+  it('maps editorial run lifecycle conflicts and missing runs to stable errors', async () => {
+    const app = createTestApp();
+    mockStartEditorialRun.mockRejectedValueOnce(
+      new EditorialRunConflictError('Run metadata differs')
+    );
+    const startConflict = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/runs', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: 'run-1',
+          editionDate: '2026-07-19',
+          workflowVersion: 'x-led-v1',
+          promptVersion: 'daily-v1',
+          model: 'gpt-5.6',
+        }),
+      }),
+      createMockEnv()
+    );
+    expect(startConflict.status).toBe(409);
+    expect(await startConflict.json()).toMatchObject({
+      code: 'EDITORIAL_RUN_CONFLICT',
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+
+    mockFailEditorialRun.mockRejectedValueOnce(new EditorialRunNotFoundError('Run not found'));
+    const missing = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/runs/missing/failure', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ stage: 'VALIDATE', message: 'Grounding failed.' }),
+      }),
+      createMockEnv()
+    );
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toMatchObject({
+      code: 'NOT_FOUND',
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
   });
 
   it('returns creator profile, bookmarks, and latest content for a Clerk session', async () => {

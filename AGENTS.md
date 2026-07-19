@@ -7,10 +7,19 @@
 - Repo installs use a hoisted linker via `bunfig.toml`.
 - Node version is pinned to `22` in `.nvmrc`.
 - Workspace layout:
-  - `apps/mobile`: Expo React Native app
+  - `apps/ios`: supported native SwiftUI iOS app
+  - `apps/mobile`: deprecated Expo React Native app retained for legacy reference only
   - `apps/worker`: Cloudflare Worker backend
   - `packages/shared`: shared types/schemas/constants
   - `docs`: architecture and system docs
+
+## Supported Client Direction
+
+- `apps/ios` is the canonical and only supported mobile client.
+- `apps/mobile` is deprecated. Do not implement features, fixes, refactors, UI changes, auth changes, previews, or deployments there unless the user explicitly requests legacy Expo work.
+- Default all new mobile product work, verification, tests, and device deployments to `apps/ios/ZineNative.xcodeproj` and the `app.zine.native` bundle.
+- The native app uses Clerk-authenticated `/api/v1` REST endpoints. Reuse and extend that boundary instead of introducing tRPC or a parallel native-only API.
+- Existing Expo scripts and CI jobs may remain while deprecation cleanup is pending; their presence does not make `apps/mobile` a supported implementation target.
 
 ## Common Commands (Repo Root)
 
@@ -19,7 +28,7 @@
 - Start the web app only: `bun run dev:web`
 - Worktree-safe dev startup: `bun run dev:worktree`
 - Reset worktree state before re-seeding: `bun run dev:reset`
-- Run tests (mobile + worker + web unit/component): `bun run test`
+- Run repository tests (deprecated Expo compatibility + worker + web unit/component): `bun run test`
 - Run web unit/component tests: `bun run test:web`
 - Run Storybook browser checks: `bun run test:web:storybook`
 - Run web smoke tests: `bun run test:web:e2e`
@@ -36,6 +45,7 @@
   - `bun run --cwd apps/mobile test`
   - `bun run --cwd apps/worker test:run`
   - `bun run --cwd apps/web test`
+- The `apps/mobile` lane above is retained compatibility coverage for the deprecated client. New mobile behavior must be tested in the native Xcode project.
 - Worker CI/parity test subset:
   - `bun run test:worker:ci`
   - Excludes `**/user-do.test.ts` and `**/scheduler.test.ts`
@@ -58,6 +68,7 @@
   - Falls back to `localhost` when Tailscale is unavailable
   - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
   - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://<reachable-host>:<public-api-port>`
+- The Metro, Expo Go, and `apps/mobile/.env.local` behavior above is legacy support for the deprecated client. Do not use it as the default path for new mobile development or verification.
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
@@ -86,20 +97,21 @@
   - leave `VITE_CLERK_PUBLISHABLE_KEY` unset in `apps/web/.env.local` so `apps/web/src/lib/trpc.tsx` uses `development-bypass` on localhost
   - leave `CLERK_JWKS_URL` unset in local worker development so `apps/worker/src/middleware/auth.ts` uses `dev-user-001`
 - This bypass is the preferred path for `agent-browser` screenshots and UI checks on localhost because it exercises protected routes without needing an interactive Clerk login flow.
-- If `/bookmarks` or other protected pages load but show empty state unexpectedly, do not assume auth is broken; first follow **Empty Local Data Recovery** below to verify the worktree D1 file actually contains the expected local data for `dev-user-001`.
+- If `/bookmarks` or other protected pages load but show empty state unexpectedly, do not assume auth is broken; first follow **Local D1 Data Recovery** below to verify the worktree D1 file actually contains the expected local data for `dev-user-001`.
 
-### Mobile Auth Verification
+### Native iOS Auth Verification
 
-- Always start mobile verification with `bun run dev:worktree`.
-- If Expo Go lands on Clerk sign-in, use `ZINE_TEST_EMAIL` and `ZINE_TEST_PASSWORD` from `apps/mobile/.env.local`; do not print their values.
-- If credential login is blocked and the task is not auth-related, use the local Clerk-disabled bypass and call that out.
+- Configure the native app through `apps/ios/Configuration/Local.xcconfig`, copied from `Local.xcconfig.example` when a local override is needed.
+- Use ClerkKit authentication and the existing Clerk-authenticated `/api/v1` REST surface.
+- Build, run, and verify the `ZineNative` scheme from `apps/ios/ZineNative.xcodeproj` on an iOS Simulator or physical device. Do not use Expo Go for current mobile verification.
+- The API defaults to `https://api.myzine.app`; set `ZINE_API_BASE_URL` in `Local.xcconfig` when verification requires a local Worker.
 
-### Empty Local Data Recovery
+### Local D1 Data Recovery
 
-- Symptom: Expo Go loads, but Home/Inbox/Library are empty even though local test data should exist.
-- First verify which local worker the app is actually using:
-  - Check `apps/mobile/.env.local` for `EXPO_PUBLIC_API_URL`.
-  - Check Expo logs; Expo Go may still be talking to an older `exp://<host>:<port>` endpoint if another dev server is running.
+- Symptom: a local client loads, but Home/Inbox/Library are empty even though local test data should exist.
+- First verify which local Worker the client is actually using:
+  - For `apps/ios`, check `ZINE_API_BASE_URL` in `apps/ios/Configuration/Local.xcconfig`.
+  - For the web app, check `apps/web/.env.local`.
 - Then inspect the local D1 file behind that worker:
   - Path: `apps/worker/.wrangler/state/v3/d1/miniflare-D1DatabaseObject/2a13f10f1e768310d0250437a6253d204a8c839f02e306404fa5e52ca7ded965.sqlite`
   - Quick check:
@@ -113,6 +125,11 @@
     - the current worktree D1 path
     - the main worktree D1 path
   - Restart `wrangler dev` after the copy.
+
+#### Deprecated Expo-Specific Follow-up (Legacy Only)
+
+- Use these steps only when the user explicitly requests work on `apps/mobile`.
+- Check `apps/mobile/.env.local` for `EXPO_PUBLIC_API_URL` and confirm Expo Go is not talking to an older `exp://<host>:<port>` development server.
 - Expo Go cache gotcha:
   - After the DB is fixed, Expo Go can still show stale anonymous React Query results.
   - Cold restart Expo Go and reopen the project after restoring the DB.
@@ -141,12 +158,16 @@
 
 ## Additional Agent Context
 
-- Mobile-specific guidance lives in `apps/mobile/AGENTS.md`.
+- Native iOS setup and architecture guidance lives in `apps/ios/README.md`; its older additive-coexistence language is superseded by **Supported Client Direction** above.
+- `apps/mobile/AGENTS.md` applies only to explicitly requested legacy Expo work.
 - Web testing guidance lives in `docs/web/testing.md`.
 
 ## Design System Workflow
 
-- When editing shared mobile UI, read:
+- New mobile UI belongs in `apps/ios` and should follow the existing native SwiftUI component, navigation, typography, color, accessibility, and state-management patterns there.
+- The Expo-specific guidance below applies only to explicitly requested legacy `apps/mobile` work.
+
+- When editing deprecated Expo shared mobile UI, read:
   - `docs/mobile/design-system/principles.md`
   - `docs/mobile/design-system/foundations.md`
   - `docs/mobile/design-system/components.md`
