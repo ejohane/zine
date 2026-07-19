@@ -15,6 +15,17 @@ struct ProviderOpenAction {
 }
 
 extension Provider {
+    var creatorActionTitle: String {
+        switch self {
+        case .youtube, .spotify, .substack, .x, .web:
+            "View on \(title)"
+        case .gmail:
+            "View in Gmail"
+        case .rss:
+            "View feed"
+        }
+    }
+
     var openAction: ProviderOpenAction {
         switch self {
         case .youtube:
@@ -80,6 +91,64 @@ extension Provider {
                 logo: .system("dot.radiowaves.left.and.right"),
                 needsDarkModeBorder: false
             )
+        }
+    }
+}
+
+struct ProviderLinkButton: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
+
+    let provider: Provider
+    let destination: URL
+    let title: String
+
+    private var action: ProviderOpenAction { provider.openAction }
+
+    var body: some View {
+        Button {
+            ActionRowHaptics.play()
+            openURL(destination)
+        } label: {
+            HStack(spacing: 8) {
+                providerLogo
+                    .frame(width: 18, height: 18)
+
+                Text(title)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(action.foregroundColor)
+            .padding(.horizontal, 15)
+            .frame(minHeight: 44)
+            .background(action.backgroundColor, in: Capsule())
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .overlay {
+            if action.needsDarkModeBorder && colorScheme == .dark {
+                Capsule()
+                    .stroke(.white.opacity(0.22), lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
+        }
+        .accessibilityLabel(title)
+    }
+
+    @ViewBuilder
+    private var providerLogo: some View {
+        switch action.logo {
+        case let .asset(name):
+            Image(name)
+                .resizable()
+                .scaledToFit()
+        case let .system(name):
+            Image(systemName: name)
+                .resizable()
+                .scaledToFit()
+                .symbolRenderingMode(.monochrome)
         }
     }
 }

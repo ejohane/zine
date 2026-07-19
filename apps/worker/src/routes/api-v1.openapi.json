@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.5.0",
-    "description": "REST API for reading and managing Zine inbox items, bookmarks, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
+    "version": "1.6.0",
+    "description": "REST API for reading and managing Zine inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
     {
@@ -27,6 +27,10 @@
     {
       "name": "Bookmarks",
       "description": "Read, save, update, and remove bookmarked items."
+    },
+    {
+      "name": "Creators",
+      "description": "Read creator profiles, bookmarked content, and provider-backed latest content."
     },
     {
       "name": "Tags",
@@ -56,6 +60,98 @@
         "responses": {
           "200": {
             "description": "OpenAPI document for the Zine REST API."
+          }
+        }
+      }
+    },
+    "/api/v1/creators/{creatorId}": {
+      "get": {
+        "tags": ["Creators"],
+        "operationId": "getCreator",
+        "summary": "Get a creator profile",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/CreatorId" }],
+        "responses": {
+          "200": {
+            "description": "Creator profile.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreatorResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/creators/{creatorId}/bookmarks": {
+      "get": {
+        "tags": ["Creators"],
+        "operationId": "listCreatorBookmarks",
+        "summary": "List bookmarks from a creator",
+        "description": "Returns all content the authenticated user has bookmarked from this creator, newest bookmark first.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "$ref": "#/components/parameters/CreatorId" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "isFinished",
+            "in": "query",
+            "description": "Filter creator bookmarks by completion state. Omit to return all bookmarks.",
+            "schema": { "type": "boolean" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmarked content from the creator.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedItems" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/creators/{creatorId}/latest-content": {
+      "get": {
+        "tags": ["Creators"],
+        "operationId": "getCreatorLatestContent",
+        "summary": "Get a creator's latest content",
+        "description": "Returns recent content from the creator's provider or discoverable feed when that source is supported.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/CreatorId" }],
+        "responses": {
+          "200": {
+            "description": "Latest provider-backed content, or a reason it is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreatorLatestContentResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "429": {
+            "description": "The provider is temporarily rate limited.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Error" }
+              }
+            }
           }
         }
       }
@@ -1859,6 +1955,15 @@
         "schema": {
           "type": "string"
         }
+      },
+      "CreatorId": {
+        "name": "creatorId",
+        "in": "path",
+        "required": true,
+        "description": "Stable creator ID attached to an item.",
+        "schema": {
+          "type": "string"
+        }
       }
     },
     "responses": {
@@ -2012,6 +2117,94 @@
             "type": "string"
           }
         }
+      },
+      "Creator": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "imageUrl",
+          "provider",
+          "providerCreatorId",
+          "description",
+          "handle",
+          "externalUrl",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "imageUrl": { "type": ["string", "null"], "format": "uri" },
+          "provider": {
+            "type": "string",
+            "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
+          },
+          "providerCreatorId": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "handle": { "type": ["string", "null"] },
+          "externalUrl": { "type": ["string", "null"], "format": "uri" },
+          "createdAt": { "type": "integer" },
+          "updatedAt": { "type": "integer" }
+        }
+      },
+      "CreatorResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RequestMetadata" },
+          {
+            "type": "object",
+            "required": ["creator"],
+            "properties": {
+              "creator": { "$ref": "#/components/schemas/Creator" }
+            }
+          }
+        ]
+      },
+      "CreatorLatestContentItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "description",
+          "thumbnailUrl",
+          "publishedAt",
+          "externalUrl",
+          "duration",
+          "isBookmarked"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": ["string", "null"] },
+          "thumbnailUrl": { "type": ["string", "null"], "format": "uri" },
+          "publishedAt": { "type": "integer", "description": "Unix time in milliseconds." },
+          "externalUrl": { "type": "string", "format": "uri" },
+          "duration": { "type": ["integer", "null"], "minimum": 0 },
+          "itemId": { "type": ["string", "null"] },
+          "isBookmarked": { "type": "boolean" }
+        }
+      },
+      "CreatorLatestContentResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RequestMetadata" },
+          {
+            "type": "object",
+            "required": ["items", "provider"],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/CreatorLatestContentItem" }
+              },
+              "provider": { "type": "string" },
+              "cacheStatus": { "type": "string", "enum": ["HIT", "MISS"] },
+              "reason": {
+                "type": "string",
+                "enum": ["PROVIDER_NOT_SUPPORTED", "NOT_CONNECTED", "TOKEN_EXPIRED", "RATE_LIMITED"]
+              },
+              "connectUrl": { "type": "string", "format": "uri" }
+            }
+          }
+        ]
       },
       "Tag": {
         "type": "object",

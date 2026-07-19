@@ -9,6 +9,16 @@ struct BookmarkResponse: Decodable {
     let item: Bookmark
 }
 
+struct CreatorResponse: Decodable {
+    let creator: CreatorProfile
+}
+
+struct CreatorLatestContentResponse: Decodable {
+    let items: [CreatorContentItem]
+    let provider: Provider
+    let reason: String?
+}
+
 struct FinishedStateResponse: Decodable {
     struct FinishedBookmark: Decodable {
         let id: String

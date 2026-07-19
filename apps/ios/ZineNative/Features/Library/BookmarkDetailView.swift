@@ -226,7 +226,31 @@ struct BookmarkDetailView: View {
             .contentShape(Rectangle())
     }
 
+    @ViewBuilder
     private var creatorRow: some View {
+        if let creatorId = bookmark.creatorId {
+            NavigationLink {
+                CreatorView(
+                    creatorId: creatorId,
+                    fallbackName: bookmark.creator,
+                    fallbackImageUrl: bookmark.creatorImageUrl,
+                    fallbackProvider: bookmark.provider,
+                    client: client,
+                    onBookmarkUpdate: onUpdate,
+                    onBookmarkChange: onBookmarkChange,
+                    onBookmarkCommit: onBookmarkCommit
+                )
+            } label: {
+                creatorRowLabel(showsDisclosure: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("View \(bookmark.creator)")
+        } else {
+            creatorRowLabel(showsDisclosure: false)
+        }
+    }
+
+    private func creatorRowLabel(showsDisclosure: Bool) -> some View {
         HStack(spacing: 10) {
             CreatorAvatar(
                 imageUrl: bookmark.creatorImageUrl,
@@ -237,7 +261,13 @@ struct BookmarkDetailView: View {
 
             Text(bookmark.creator)
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
+
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -302,7 +332,7 @@ struct BookmarkDetailView: View {
             }
         }
         .font(.subheadline)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Color.primary.opacity(0.72))
     }
 
     private func toggleFinished() async {

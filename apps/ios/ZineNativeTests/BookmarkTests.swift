@@ -48,6 +48,35 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(Provider.rss.title, "RSS")
     }
 
+    func testDecodesCreatorProfileAndLatestContent() throws {
+        let creator = try JSONDecoder().decode(
+            CreatorResponse.self,
+            from: Data(
+                """
+                {"creator":{"id":"creator_1","name":"Creator One","imageUrl":null,
+                "provider":"YOUTUBE","providerCreatorId":"channel_1","description":"Videos",
+                "handle":"@creator","externalUrl":"https://youtube.com/@creator",
+                "createdAt":1,"updatedAt":2}}
+                """.utf8
+            )
+        )
+        let latest = try JSONDecoder().decode(
+            CreatorLatestContentResponse.self,
+            from: Data(
+                """
+                {"items":[{"id":"video_1","title":"New video","description":null,
+                "thumbnailUrl":null,"publishedAt":1752797600000,
+                "externalUrl":"https://youtube.com/watch?v=video_1","duration":600,
+                "itemId":null,"isBookmarked":false}],"provider":"YOUTUBE"}
+                """.utf8
+            )
+        )
+
+        XCTAssertEqual(creator.creator.provider, .youtube)
+        XCTAssertEqual(latest.items.first?.duration, 600)
+        XCTAssertEqual(latest.reason, nil)
+    }
+
     func testProviderOpenActionsMatchDestinationsAndBrandLogos() {
         XCTAssertEqual(Provider.youtube.openAction.title, "Open in YouTube")
         XCTAssertEqual(Provider.youtube.openAction.logo, .asset("YouTubeLogo"))
@@ -59,5 +88,9 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(Provider.web.openAction.logo, .system("safari.fill"))
         XCTAssertEqual(Provider.x.openAction.title, "Open in X")
         XCTAssertEqual(Provider.x.openAction.logo, .asset("XLogo"))
+        XCTAssertEqual(Provider.youtube.creatorActionTitle, "View on YouTube")
+        XCTAssertEqual(Provider.spotify.creatorActionTitle, "View on Spotify")
+        XCTAssertEqual(Provider.substack.creatorActionTitle, "View on Substack")
+        XCTAssertEqual(Provider.x.creatorActionTitle, "View on X")
     }
 }
