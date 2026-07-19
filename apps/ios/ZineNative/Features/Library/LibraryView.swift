@@ -4,6 +4,8 @@ struct LibraryView: View {
     let client: APIClient
     let searchText: Binding<String>?
     let refreshRevision: Int
+    let onContentChanged: () -> Void
+    let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: LibraryStore
     @State private var showsFinished = false
@@ -15,12 +17,20 @@ struct LibraryView: View {
         client: APIClient,
         cache: LibraryCache,
         searchText: Binding<String>? = nil,
-        refreshRevision: Int = 0
+        refreshRevision: Int = 0,
+        onContentChanged: @escaping () -> Void = {},
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
         self.client = client
         self.searchText = searchText
         self.refreshRevision = refreshRevision
-        _store = State(initialValue: LibraryStore(client: client, cache: cache))
+        self.onContentChanged = onContentChanged
+        self.onExternalOpen = onExternalOpen
+        _store = State(initialValue: LibraryStore(
+            client: client,
+            cache: cache,
+            onContentChanged: onContentChanged
+        ))
     }
 
     private var search: String {
@@ -56,7 +66,8 @@ struct LibraryView: View {
                         onUpdate: { updated in store.update(updated) },
                         onBookmarkChange: { changed, isBookmarked, _ in
                             store.setBookmarked(changed, isBookmarked: isBookmarked)
-                        }
+                        },
+                        onExternalOpen: onExternalOpen
                     )
                     .navigationTransition(
                         .zoom(sourceID: bookmark.id, in: bookmarkTransition)

@@ -1367,6 +1367,17 @@ apiV1Routes.get('/inbox', apiAuth('bookmarks:read'), async (c) => {
   });
 });
 
+apiV1Routes.get('/home', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+  const result = await caller.items.home({});
+
+  return c.json({
+    ...result,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
 apiV1Routes.get('/creators/:creatorId', apiAuth('bookmarks:read'), async (c) => {
   const caller = appRouter.createCaller(await createContext(c));
 
@@ -1484,6 +1495,55 @@ apiV1Routes.get('/bookmarks', apiAuth('bookmarks:read'), async (c) => {
       contentType: parsedQuery.data.contentType,
       isFinished,
     },
+  });
+
+  return c.json({
+    items: result.items,
+    nextCursor: result.nextCursor,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
+apiV1Routes.get('/bookmarks/opened', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+  const cursor = c.req.query('cursor');
+  const result = await caller.items.recentlyOpened({
+    limit: parseLimit(c.req.query('limit')),
+    cursor: cursor && cursor.length > 0 ? cursor : undefined,
+  });
+
+  return c.json({
+    items: result.items,
+    nextCursor: result.nextCursor,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
+apiV1Routes.get('/bookmarks/quick-wins', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+  const cursor = c.req.query('cursor');
+  const result = await caller.items.quickWins({
+    limit: parseLimit(c.req.query('limit')),
+    cursor: cursor && cursor.length > 0 ? cursor : undefined,
+  });
+
+  return c.json({
+    items: result.items,
+    nextCursor: result.nextCursor,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
+apiV1Routes.get('/collections/:id/items', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+  const cursor = c.req.query('cursor');
+  const result = await caller.collections.items({
+    id: c.req.param('id'),
+    limit: parseLimit(c.req.query('limit')),
+    cursor: cursor && cursor.length > 0 ? cursor : undefined,
   });
 
   return c.json({

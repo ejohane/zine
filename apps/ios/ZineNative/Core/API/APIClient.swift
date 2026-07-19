@@ -35,6 +35,10 @@ struct APIClient {
     let tokenProvider: TokenProvider
     var session: URLSession = .shared
 
+    func getHome() async throws -> HomeResponse {
+        try await request(url: baseURL.appending(path: "/api/v1/home"))
+    }
+
     func listBookmarks(
         query: LibraryQuery,
         cursor: String? = nil,
@@ -57,6 +61,55 @@ struct APIClient {
         if let contentType = query.contentType {
             items.append(URLQueryItem(name: "contentType", value: contentType.rawValue))
         }
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = items
+        return try await request(url: components.url!)
+    }
+
+    func listOpenedBookmarks(
+        cursor: String? = nil,
+        limit: Int = 30
+    ) async throws -> PaginatedBookmarksResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/bookmarks/opened"),
+            resolvingAgainstBaseURL: false
+        )!
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = items
+        return try await request(url: components.url!)
+    }
+
+    func listQuickWinBookmarks(
+        cursor: String? = nil,
+        limit: Int = 30
+    ) async throws -> PaginatedBookmarksResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/bookmarks/quick-wins"),
+            resolvingAgainstBaseURL: false
+        )!
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let cursor {
+            items.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        components.queryItems = items
+        return try await request(url: components.url!)
+    }
+
+    func listCollectionItems(
+        id: String,
+        cursor: String? = nil,
+        limit: Int = 30
+    ) async throws -> PaginatedBookmarksResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/collections/\(id)/items"),
+            resolvingAgainstBaseURL: false
+        )!
+        var items = [URLQueryItem(name: "limit", value: String(limit))]
         if let cursor {
             items.append(URLQueryItem(name: "cursor", value: cursor))
         }

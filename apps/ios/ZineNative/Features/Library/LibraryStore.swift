@@ -13,12 +13,18 @@ final class LibraryStore {
 
     private let client: APIClient
     private let cache: LibraryCache
+    private let onContentChanged: () -> Void
     private var activeQuery = LibraryQuery()
     private var unbookmarkedIndices: [String: Int] = [:]
 
-    init(client: APIClient, cache: LibraryCache) {
+    init(
+        client: APIClient,
+        cache: LibraryCache,
+        onContentChanged: @escaping () -> Void = {}
+    ) {
         self.client = client
         self.cache = cache
+        self.onContentChanged = onContentChanged
     }
 
     func reset() {
@@ -104,6 +110,7 @@ final class LibraryStore {
                 items.remove(at: index)
             }
             persistCurrentState()
+            onContentChanged()
         }
     }
 
@@ -123,6 +130,7 @@ final class LibraryStore {
         }
 
         persistCurrentState()
+        onContentChanged()
     }
 
     func complete(_ bookmark: Bookmark) async {
@@ -132,6 +140,7 @@ final class LibraryStore {
 
         do {
             _ = try await client.setFinished(id: bookmark.id, isFinished: true)
+            onContentChanged()
         } catch {
             restore(removal, message: "The bookmark couldn’t be completed. Please try again.")
         }
@@ -142,6 +151,7 @@ final class LibraryStore {
 
         do {
             try await client.archiveBookmark(id: bookmark.id)
+            onContentChanged()
         } catch {
             restore(removal, message: "The bookmark couldn’t be archived. Please try again.")
         }
