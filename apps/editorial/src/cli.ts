@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import {
   DailyEditionSchema,
+  EditorialCandidateArtifactSchema,
   EditorialSnapshotSchema,
   EditorialValidationReportSchema,
   PublishEditorialEditionSchema,
@@ -9,20 +10,20 @@ import {
 import { parseArgs, requiredArg } from './args';
 import { renderEditionMarkdown } from './render';
 import { buildEditorialSnapshot } from './snapshot';
+import { buildEditorialCandidateArtifact } from './candidates';
+import {
+  editorialApiUrlFromArgs,
+  failEditorialRunFromArgs,
+  postEditorialRequest,
+  startEditorialRunFromArgs,
+} from './editorial-client';
+import { EDITORIAL_HELP_TEXT } from './help';
 
 const command = process.argv[2];
 const args = parseArgs(process.argv.slice(3));
 
 function help(): never {
-  console.error(`Usage:
-  editorial snapshot --output <snapshot.json> [--date YYYY-MM-DD] [--timezone America/Chicago]
-  editorial validate --file <draft.json> --output <edition.json> --report <validation.json>
-  editorial render --file <edition.json> --output <edition.md>
-  editorial publish --edition <edition.json> --snapshot <snapshot.json> --validation <validation.json> --markdown <edition.md>
-
-Environment:
-  ZINE_ACCESS_TOKEN       PAT used for Zine reads and editorial persistence
-  ZINE_X_ARCHIVE_TOKEN    optional PAT override for X archive reads`);
+  console.error(EDITORIAL_HELP_TEXT);
   process.exit(1);
 }
 
@@ -88,6 +89,38 @@ async function main() {
     return;
   }
 
+  if (command === 'rank') {
+    const file = requiredArg(args, 'file');
+    const output = requiredArg(args, 'output');
+    const artifact = buildEditorialCandidateArtifact(await readJson(file));
+    await writeJson(output, artifact);
+    console.log(
+      JSON.stringify({
+        output,
+        artifactId: artifact.id,
+        candidates: artifact.candidates.length,
+        clusters: artifact.clusters.length,
+      })
+    );
+    return;
+  }
+
+  if (command === 'run-start') {
+    console.log(
+      JSON.stringify(
+        await startEditorialRunFromArgs(args, { token: process.env.ZINE_ACCESS_TOKEN })
+      )
+    );
+    return;
+  }
+
+  if (command === 'run-fail') {
+    console.log(
+      JSON.stringify(await failEditorialRunFromArgs(args, { token: process.env.ZINE_ACCESS_TOKEN }))
+    );
+    return;
+  }
+
   if (command === 'render') {
     const file = requiredArg(args, 'file');
     const output = requiredArg(args, 'output');
@@ -106,19 +139,24 @@ async function main() {
       await readJson(requiredArg(args, 'validation'))
     );
     const markdown = await Bun.file(requiredArg(args, 'markdown')).text();
-    const body = PublishEditorialEditionSchema.parse({ edition, snapshot, validation, markdown });
-    const token = process.env.ZINE_ACCESS_TOKEN;
-    if (!token) throw new Error('ZINE_ACCESS_TOKEN is required');
-    const apiUrl = typeof args['api-url'] === 'string' ? args['api-url'] : 'https://api.myzine.app';
-    const response = await fetch(`${apiUrl}/api/v1/editorial/editions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const candidateArtifact = EditorialCandidateArtifactSchema.parse(
+      await readJson(requiredArg(args, 'candidates'))
+    );
+    const body = PublishEditorialEditionSchema.parse({
+      edition,
+      snapshot,
+      validation,
+      markdown,
+      candidateArtifact,
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok)
-      throw new Error(`Editorial publish failed (${response.status}): ${JSON.stringify(result)}`);
-    console.log(JSON.stringify(result));
+    console.log(
+      JSON.stringify(
+        await postEditorialRequest('/api/v1/editorial/editions', body, {
+          token: process.env.ZINE_ACCESS_TOKEN,
+          apiUrl: editorialApiUrlFromArgs(args),
+        })
+      )
+    );
     return;
   }
 

@@ -21,6 +21,9 @@ import {
   providerItemsSeen,
   xBookmarkItems,
   xBookmarkSyncs,
+  editorialFeedbackEvents,
+  editorialRuns,
+  dailyEditions,
 } from '../db/schema';
 import { webhookLogger } from '../lib/logger';
 
@@ -56,6 +59,38 @@ interface ClerkWebhookEvent {
  * Clerk recommends storing svix-id for at least 5 days
  */
 const IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+async function deleteEditorialArtifacts(bucket: R2Bucket, userId: string): Promise<void> {
+  const prefix = `editorial/users/${encodeURIComponent(userId)}/`;
+  let cursor: string | undefined;
+  while (true) {
+    const options: R2ListOptions = { prefix, limit: 1_000 };
+    if (cursor) options.cursor = cursor;
+    const page = await bucket.list(options);
+    const keys = page.objects.map((object) => object.key);
+    if (keys.length > 0) await bucket.delete(keys);
+    if (!page.truncated) return;
+    if (!page.cursor || page.cursor === cursor) {
+      throw new Error('Editorial artifact listing was truncated without a new cursor');
+    }
+    cursor = page.cursor;
+  }
+}
+
+async function deleteUserData(env: Bindings, userId: string): Promise<void> {
+  await deleteEditorialArtifacts(env.ARTICLE_CONTENT, userId);
+
+  const db = createDb(env.DB);
+  await db.delete(editorialFeedbackEvents).where(eq(editorialFeedbackEvents.userId, userId));
+  await db.delete(editorialRuns).where(eq(editorialRuns.userId, userId));
+  await db.delete(dailyEditions).where(eq(dailyEditions.userId, userId));
+  await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
+  await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, userId));
+  await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, userId));
+  await db.delete(userItems).where(eq(userItems.userId, userId));
+  await db.delete(sources).where(eq(sources.userId, userId));
+  await db.delete(users).where(eq(users.id, userId));
+}
 
 // Webhook Route (unauthenticated - uses Svix verification)
 
@@ -242,20 +277,7 @@ async function handleUserDeleted(
 ): Promise<void> {
   webhookLogger.info('user.deleted', { userId: user.id });
 
-  const db = createDb(env.DB);
-
-  // Delete user data in order respecting foreign key constraints:
-  // 1. Delete provider items seen (references user)
-  // 2. Delete user items (references user)
-  // 3. Delete sources (references user)
-  // 4. Delete user record
-
-  await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, user.id));
-  await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, user.id));
-  await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, user.id));
-  await db.delete(userItems).where(eq(userItems.userId, user.id));
-  await db.delete(sources).where(eq(sources.userId, user.id));
-  await db.delete(users).where(eq(users.id, user.id));
+  await deleteUserData(env, user.id);
 
   webhookLogger.info('User data deleted from D1', { userId: user.id, requestId });
 }
@@ -313,20 +335,7 @@ auth.delete('/account', async (c) => {
     return c.json({ error: 'Authentication required', code: 'UNAUTHORIZED', requestId }, 401);
   }
 
-  const db = createDb(c.env.DB);
-
-  // Delete user data in order respecting foreign key constraints:
-  // 1. Delete provider items seen (references user)
-  // 2. Delete user items (references user)
-  // 3. Delete sources (references user)
-  // 4. Delete user record
-
-  await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
-  await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, userId));
-  await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, userId));
-  await db.delete(userItems).where(eq(userItems.userId, userId));
-  await db.delete(sources).where(eq(sources.userId, userId));
-  await db.delete(users).where(eq(users.id, userId));
+  await deleteUserData(c.env, userId);
 
   return c.json({
     message: 'Account data deleted successfully',

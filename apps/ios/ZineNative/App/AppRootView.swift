@@ -37,7 +37,7 @@ private struct AuthenticatedAppView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private let client: APIClient
-    private let homeCache: HomeCache
+    private let editorialCache: EditorialIssueCache
     private let libraryCache: LibraryCache
     private let inboxCache: InboxCache
 
@@ -57,19 +57,18 @@ private struct AuthenticatedAppView: View {
                 return token
             }
         )
-        homeCache = HomeCache(userID: userID)
+        editorialCache = EditorialIssueCache(userID: userID)
         libraryCache = LibraryCache(userID: userID)
         inboxCache = InboxCache(userID: userID)
     }
 
     var body: some View {
         TabView {
-            Tab("Home", systemImage: "house") {
-                HomeView(
+            Tab("Today", systemImage: "newspaper") {
+                TodayView(
                     client: client,
-                    cache: homeCache,
+                    cache: editorialCache,
                     refreshRevision: homeRevision,
-                    externalOpenEvent: externalOpenEvent,
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen
                 )

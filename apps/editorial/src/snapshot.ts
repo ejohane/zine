@@ -1,12 +1,16 @@
 import {
   EDITORIAL_SCHEMA_VERSION,
+  EditorialFeedbackProfileSchema,
   EditorialSnapshotSchema,
+  type EditorialFeedbackProfile,
   type EditorialSnapshot,
   type EditorialSnapshotDocument,
   type SourceReference,
 } from '@zine/editorial-schema';
 
 type JsonRecord = Record<string, unknown>;
+
+const MAX_CONTEXTUAL_BOOKMARKS = 200;
 
 export type SnapshotOptions = {
   token: string;
@@ -32,6 +36,11 @@ function valueNumber(value: unknown): number | null {
 function timestamp(value: unknown, fallback: string): string {
   const parsed = valueString(value);
   return parsed && !Number.isNaN(Date.parse(parsed)) ? new Date(parsed).toISOString() : fallback;
+}
+
+function timestampMs(value: unknown): number {
+  const parsed = Date.parse(valueString(value) ?? '');
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 async function getJson(url: string, token: string): Promise<JsonRecord> {
@@ -95,6 +104,9 @@ function zineSource(item: JsonRecord): SourceReference | null {
     zineUserItemId: userItemId,
     contentType,
     userState,
+    provider: valueString(item.provider),
+    imageUrl: valueString(item.thumbnailUrl),
+    excerpt: valueString(item.summary),
   };
 }
 
@@ -116,6 +128,7 @@ function zineDocument(item: JsonRecord, now: string): EditorialSnapshotDocument 
     summary: valueString(item.summary),
     timelinePosition: null,
     engagement: null,
+    links: [],
     signals: {
       ingestedAt,
       bookmarkedAt,
@@ -135,6 +148,31 @@ function xDocument(item: JsonRecord, runId: string, now: string): EditorialSnaps
   const author = post.author && typeof post.author === 'object' ? (post.author as JsonRecord) : {};
   const metrics =
     post.metrics && typeof post.metrics === 'object' ? (post.metrics as JsonRecord) : {};
+  const links = (Array.isArray(post.links) ? post.links : [])
+    .filter((link): link is JsonRecord => Boolean(link && typeof link === 'object'))
+    .map((link) => {
+      const url = valueString(link.url);
+      const normalizedUrl = valueString(link.normalizedUrl) ?? url;
+      if (!url || !normalizedUrl) return null;
+      const card = link.card && typeof link.card === 'object' ? (link.card as JsonRecord) : null;
+      return {
+        url,
+        normalizedUrl,
+        displayUrl: valueString(link.displayUrl),
+        redirectUrl: valueString(link.redirectUrl),
+        source: valueString(link.source) === 'CARD' ? ('CARD' as const) : ('TEXT' as const),
+        card: card
+          ? {
+              title: valueString(card.title),
+              description: valueString(card.description),
+              domain: valueString(card.domain),
+              imageUrl: valueString(card.imageUrl),
+            }
+          : null,
+      };
+    })
+    .filter((link): link is NonNullable<typeof link> => Boolean(link));
+  const firstCard = links.find((link) => link.card)?.card;
   const observedAt = timestamp(item.observedAt, now);
   return {
     source: {
@@ -151,6 +189,9 @@ function xDocument(item: JsonRecord, runId: string, now: string): EditorialSnaps
       zineUserItemId: null,
       contentType: 'POST',
       userState: null,
+      provider: 'X',
+      imageUrl: firstCard?.imageUrl ?? null,
+      excerpt: valueString(post.text),
     },
     observedAt,
     firstSeenAt: timestamp(post.firstSeenAt, observedAt),
@@ -163,12 +204,48 @@ function xDocument(item: JsonRecord, runId: string, now: string): EditorialSnaps
       likes: valueNumber(metrics.likes),
       views: valueNumber(metrics.views),
     },
+    links,
     signals: {
       ingestedAt: null,
       bookmarkedAt: null,
       lastOpenedAt: null,
       isFinished: false,
       tags: [`x-run:${runId}`],
+    },
+  };
+}
+
+function mergeXDocuments(
+  left: EditorialSnapshotDocument,
+  right: EditorialSnapshotDocument
+): EditorialSnapshotDocument {
+  const leftObservedAt = timestampMs(left.observedAt);
+  const rightObservedAt = timestampMs(right.observedAt);
+  const latest = rightObservedAt >= leftObservedAt ? right : left;
+  const earliestFirstSeenAt =
+    timestampMs(left.firstSeenAt) <= timestampMs(right.firstSeenAt)
+      ? left.firstSeenAt
+      : right.firstSeenAt;
+  const links = new Map<string, EditorialSnapshotDocument['links'][number]>();
+  for (const link of [...left.links, ...right.links]) {
+    links.set(link.normalizedUrl ?? link.redirectUrl ?? link.url, link);
+  }
+  const metric = (key: 'replies' | 'reposts' | 'likes' | 'views') =>
+    Math.max(left.engagement?.[key] ?? 0, right.engagement?.[key] ?? 0);
+
+  return {
+    ...latest,
+    firstSeenAt: earliestFirstSeenAt,
+    links: [...links.values()],
+    engagement: {
+      replies: metric('replies'),
+      reposts: metric('reposts'),
+      likes: metric('likes'),
+      views: metric('views'),
+    },
+    signals: {
+      ...latest.signals,
+      tags: [...new Set([...left.signals.tags, ...right.signals.tags])].sort(),
     },
   };
 }
@@ -203,6 +280,24 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
     fallbackWindowUsed,
   };
 
+  let feedbackProfile: EditorialFeedbackProfile | undefined;
+  try {
+    const response = await getJson(
+      `${options.apiUrl}/api/v1/editorial/feedback/profile`,
+      options.token
+    );
+    const parsed = EditorialFeedbackProfileSchema.safeParse(response.profile);
+    if (parsed.success) {
+      feedbackProfile = parsed.data;
+    } else {
+      warnings.push('Editorial feedback profile was invalid and was excluded from this snapshot.');
+    }
+  } catch (error) {
+    warnings.push(
+      `Editorial feedback profile collection failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+
   let inbox: JsonRecord[] = [];
   let bookmarks: JsonRecord[] = [];
   let zineInboxStatus: 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE' = 'COMPLETE';
@@ -230,14 +325,36 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
   const recentBookmarks = bookmarks.filter(
     (item) => Date.parse(valueString(item.bookmarkedAt) ?? '') > Date.parse(newContentAfter)
   );
-  const contextualBookmarks = bookmarks.filter((item) => {
-    const bookmarkedAt = Date.parse(valueString(item.bookmarkedAt) ?? '');
-    return (
-      item.isFinished !== true &&
-      bookmarkedAt > Date.parse(comparisonAfter) &&
-      bookmarkedAt <= Date.parse(newContentAfter)
-    );
-  });
+  const recentBookmarkIds = new Set(
+    recentBookmarks.map((item) => valueString(item.id)).filter((id): id is string => Boolean(id))
+  );
+  const comparisonAfterMs = Date.parse(comparisonAfter);
+  const newContentAfterMs = Date.parse(newContentAfter);
+  const contextualBookmarks = bookmarks
+    .filter((item) => {
+      const id = valueString(item.id);
+      return !id || !recentBookmarkIds.has(id);
+    })
+    .filter((item) => {
+      const bookmarkedAt = timestampMs(item.bookmarkedAt);
+      return bookmarkedAt > 0 && bookmarkedAt <= newContentAfterMs;
+    })
+    .sort((left, right) => {
+      const leftBookmarkedAt = timestampMs(left.bookmarkedAt);
+      const rightBookmarkedAt = timestampMs(right.bookmarkedAt);
+      const leftIsActiveComparison =
+        left.isFinished !== true && leftBookmarkedAt > comparisonAfterMs;
+      const rightIsActiveComparison =
+        right.isFinished !== true && rightBookmarkedAt > comparisonAfterMs;
+      if (leftIsActiveComparison !== rightIsActiveComparison) {
+        return leftIsActiveComparison ? -1 : 1;
+      }
+      const leftLastTouchedAt = Math.max(timestampMs(left.lastOpenedAt), leftBookmarkedAt);
+      const rightLastTouchedAt = Math.max(timestampMs(right.lastOpenedAt), rightBookmarkedAt);
+      if (leftLastTouchedAt !== rightLastTouchedAt) return rightLastTouchedAt - leftLastTouchedAt;
+      return (valueString(left.id) ?? '').localeCompare(valueString(right.id) ?? '');
+    })
+    .slice(0, MAX_CONTEXTUAL_BOOKMARKS);
 
   let xArchiveStatus: 'COMPLETE' | 'PARTIAL' | 'UNAVAILABLE' = 'COMPLETE';
   const xRunIds: string[] = [];
@@ -256,21 +373,46 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
         Date.parse(valueString(run.completedAt) ?? valueString(run.startedAt) ?? '') >
         Date.parse(newContentAfter)
     );
-    if (selected.length === 0 && usable[0]) selected = [usable[0]];
+    if (selected.length === 0 && usable[0]) {
+      selected = [usable[0]];
+      xArchiveStatus = 'PARTIAL';
+      warnings.push(
+        `No X archive run completed after ${newContentAfter}; using ${valueString(usable[0].id) ?? 'the latest usable run'} as partial fallback coverage.`
+      );
+    } else if (selected.length === 0) {
+      xArchiveStatus = 'UNAVAILABLE';
+      warnings.push('No complete or partial X archive runs were available for this snapshot.');
+    }
+    let selectedRunCount = 0;
+    let successfulRunCount = 0;
     for (const run of selected) {
       const runId = valueString(run.id);
       if (!runId) continue;
-      xRunIds.push(runId);
-      if (valueString(run.status) === 'PARTIAL') xArchiveStatus = 'PARTIAL';
-      const detail = await getJson(
-        `${options.xApiUrl}/api/v1/x-timeline/runs/${encodeURIComponent(runId)}`,
-        options.archiveToken
-      );
-      const items = Array.isArray(detail.items) ? (detail.items as JsonRecord[]) : [];
-      for (const item of items) {
-        const document = xDocument(item, runId, now);
-        if (document) xDocuments.push(document);
+      selectedRunCount++;
+      try {
+        const detail = await getJson(
+          `${options.xApiUrl}/api/v1/x-timeline/runs/${encodeURIComponent(runId)}`,
+          options.archiveToken
+        );
+        successfulRunCount++;
+        xRunIds.push(runId);
+        if (valueString(run.status) === 'PARTIAL') xArchiveStatus = 'PARTIAL';
+        const items = Array.isArray(detail.items) ? (detail.items as JsonRecord[]) : [];
+        for (const item of items) {
+          const document = xDocument(item, runId, now);
+          if (document) xDocuments.push(document);
+        }
+      } catch (error) {
+        xArchiveStatus = 'PARTIAL';
+        warnings.push(
+          `X archive run ${runId} collection failed: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
+    }
+    if (selectedRunCount > 0 && successfulRunCount === 0) {
+      xArchiveStatus = 'UNAVAILABLE';
+    } else if (successfulRunCount < selectedRunCount) {
+      xArchiveStatus = 'PARTIAL';
     }
   } catch (error) {
     xArchiveStatus = 'UNAVAILABLE';
@@ -280,7 +422,13 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
   }
 
   const documentsBySourceId = new Map<string, EditorialSnapshotDocument>();
-  for (const document of xDocuments) documentsBySourceId.set(document.source.id, document);
+  for (const document of xDocuments) {
+    const existing = documentsBySourceId.get(document.source.id);
+    documentsBySourceId.set(
+      document.source.id,
+      existing ? mergeXDocuments(existing, document) : document
+    );
+  }
   for (const item of [...recentInbox, ...contextualBookmarks, ...recentBookmarks]) {
     const document = zineDocument(item, now);
     if (document) documentsBySourceId.set(document.source.id, document);
@@ -314,6 +462,7 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
       warnings,
     },
     documents,
+    ...(feedbackProfile ? { feedbackProfile } : {}),
   };
   return EditorialSnapshotSchema.parse(snapshot);
 }

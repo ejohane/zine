@@ -46,6 +46,7 @@ vi.mock('../db', () => ({
 
 // Import after mocking
 import authRoutes from './auth';
+import { dailyEditions, editorialFeedbackEvents, editorialRuns } from '../db/schema';
 
 // Test Helpers
 
@@ -97,6 +98,7 @@ function createMockEnv(): Env['Bindings'] {
       put: vi.fn().mockResolvedValue(undefined),
       delete: vi.fn().mockResolvedValue(undefined),
       head: vi.fn().mockResolvedValue(null),
+      list: vi.fn().mockResolvedValue({ objects: [], truncated: false }),
     } as unknown as R2Bucket,
     SPOTIFY_CACHE: {
       get: vi.fn().mockResolvedValue(null),
@@ -257,6 +259,47 @@ describe('POST /api/auth/webhook', () => {
 
     const body = (await res.json()) as JsonResponse;
     expect(body.eventType).toBe('user.deleted');
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledWith({
+      prefix: 'editorial/users/user_456/',
+      limit: 1_000,
+    });
+    expect(mockDelete.mock.calls.slice(0, 3).map(([table]) => table)).toEqual([
+      editorialFeedbackEvents,
+      editorialRuns,
+      dailyEditions,
+    ]);
+  });
+
+  it('releases webhook idempotency when editorial artifact deletion fails', async () => {
+    mockEnv.ARTICLE_CONTENT.list = vi.fn().mockRejectedValue(new Error('R2 unavailable'));
+    const req = new Request('http://localhost/api/auth/webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...createWebhookHeaders('msg_delete_failure'),
+      },
+      body: JSON.stringify({
+        type: 'user.deleted',
+        data: {
+          id: 'user_failed_delete',
+          email_addresses: [],
+          first_name: null,
+          last_name: null,
+          image_url: null,
+          created_at: Date.now(),
+          updated_at: Date.now(),
+        },
+        object: 'event',
+      }),
+    });
+
+    const res = await app.fetch(req, mockEnv);
+    expect(res.status).toBe(500);
+    expect(mockEnv.WEBHOOK_IDEMPOTENCY.delete).toHaveBeenCalledWith('svix:msg_delete_failure');
+    expect(mockDelete).not.toHaveBeenCalled();
+    expectLoggerErrorCalls([
+      ['Error processing webhook', { eventType: 'user.deleted', error: expect.any(Error) }],
+    ]);
   });
 
   it('logs but does not process user.updated events', async () => {
@@ -395,5 +438,74 @@ describe('DELETE /api/auth/account', () => {
     const body = (await res.json()) as JsonResponse;
     expect(body.message).toBe('Account data deleted successfully');
     expect(body.userId).toBe('user_to_delete');
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledWith({
+      prefix: 'editorial/users/user_to_delete/',
+      limit: 1_000,
+    });
+  });
+
+  it('deletes every page of editorial artifacts before D1 account data', async () => {
+    const authApp = new Hono<Env>();
+    authApp.use('*', async (c, next) => {
+      c.set('requestId', 'test-request-id');
+      c.set('userId', 'user_paginated');
+      await next();
+    });
+    authApp.route('/api/auth', authRoutes);
+    mockEnv.ARTICLE_CONTENT.list = vi
+      .fn()
+      .mockResolvedValueOnce({
+        objects: [{ key: 'editorial/users/user_paginated/one' }],
+        truncated: true,
+        cursor: 'editorial-page-2',
+      })
+      .mockResolvedValueOnce({
+        objects: [{ key: 'editorial/users/user_paginated/two' }],
+        truncated: false,
+      });
+
+    const res = await authApp.fetch(
+      new Request('http://localhost/api/auth/account', { method: 'DELETE' }),
+      mockEnv
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockEnv.ARTICLE_CONTENT.delete).toHaveBeenNthCalledWith(1, [
+      'editorial/users/user_paginated/one',
+    ]);
+    expect(mockEnv.ARTICLE_CONTENT.delete).toHaveBeenNthCalledWith(2, [
+      'editorial/users/user_paginated/two',
+    ]);
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenNthCalledWith(2, {
+      prefix: 'editorial/users/user_paginated/',
+      limit: 1_000,
+      cursor: 'editorial-page-2',
+    });
+    expect(mockDelete.mock.invocationCallOrder[0]).toBeGreaterThan(
+      (mockEnv.ARTICLE_CONTENT.delete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[1]!
+    );
+  });
+
+  it('does not delete D1 account data when a truncated artifact page has no new cursor', async () => {
+    const authApp = new Hono<Env>();
+    authApp.use('*', async (c, next) => {
+      c.set('requestId', 'test-request-id');
+      c.set('userId', 'user_stalled_cursor');
+      await next();
+    });
+    authApp.route('/api/auth', authRoutes);
+    mockEnv.ARTICLE_CONTENT.list = vi.fn().mockResolvedValue({
+      objects: [{ key: 'editorial/users/user_stalled_cursor/one' }],
+      truncated: true,
+    });
+
+    const res = await authApp.fetch(
+      new Request('http://localhost/api/auth/account', { method: 'DELETE' }),
+      mockEnv
+    );
+
+    expect(res.status).toBe(500);
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledTimes(1);
+    expect(mockDelete).not.toHaveBeenCalled();
   });
 });

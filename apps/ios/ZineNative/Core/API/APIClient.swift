@@ -39,6 +39,30 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/home"))
     }
 
+    func getEditorialToday() async throws -> EditorialTodayResponse {
+        try await request(url: baseURL.appending(path: "/api/v1/editorial/today"))
+    }
+
+    func sendEditorialFeedback(
+        _ feedback: EditorialFeedbackRequest
+    ) async throws -> EditorialFeedbackResponse {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/editorial/feedback"))
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(feedback)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await send(request)
+    }
+
+    func saveBookmark(url: URL) async throws -> EditorialBookmarkSaveResult {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks"))
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(
+            SaveEditorialBookmarkRequest(url: url.absoluteString, tags: [])
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await send(request)
+    }
+
     func listBookmarks(
         query: LibraryQuery,
         cursor: String? = nil,
@@ -470,6 +494,11 @@ private struct AddRssFeedRequest: Encodable {
 
 private struct UpdateXBookmarkSettingsRequest: Encodable {
     let dailySyncEnabled: Bool
+}
+
+private struct SaveEditorialBookmarkRequest: Encodable {
+    let url: String
+    let tags: [String]
 }
 
 private struct EmptyResponse: Decodable {}

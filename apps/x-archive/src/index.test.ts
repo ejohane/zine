@@ -37,6 +37,21 @@ function post(tweetId: string) {
       profileUrl: 'https://x.com/example',
     },
     media: [{ type: 'IMAGE', url: 'https://pbs.twimg.com/media/example.jpg' }],
+    links: [
+      {
+        url: 'https://example.com/story?utm_source=x',
+        normalizedUrl: 'https://example.com/story',
+        displayUrl: 'example.com/story',
+        redirectUrl: 'https://t.co/story',
+        source: 'CARD',
+        card: {
+          title: 'A linked story',
+          description: 'Story description',
+          domain: 'example.com',
+          imageUrl: 'https://example.com/card.jpg',
+        },
+      },
+    ],
     relationships: [],
     metrics: { likes: 10 },
     capturedAt: '2026-07-11T13:00:00.000Z',
@@ -46,7 +61,7 @@ function post(tweetId: string) {
 beforeEach(async () => {
   await testEnv.AUTH_DB.exec('DELETE FROM api_tokens;');
   await testEnv.ARCHIVE_DB.exec(
-    'DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_items; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
+    'DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_items; DELETE FROM x_post_links; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
   );
   await testEnv.AUTH_DB.prepare(
     `INSERT INTO api_tokens
@@ -128,10 +143,42 @@ describe('X archive worker', () => {
           position: 0,
           presentation: 'REPOST',
           repostedBy: { username: 'reposter' },
-          post: { tweetId: '100', text: 'Post 100' },
+          post: {
+            tweetId: '100',
+            text: 'Post 100',
+            links: [
+              {
+                normalizedUrl: 'https://example.com/story',
+                source: 'CARD',
+                card: { title: 'A linked story' },
+              },
+            ],
+          },
         },
       ],
     });
+
+    const links = await api(
+      `/api/v1/x-timeline/links?runId=run-00000001&normalizedUrl=${encodeURIComponent('https://example.com/story')}`
+    );
+    expect(await links.json()).toMatchObject({
+      links: [
+        {
+          normalizedUrl: 'https://example.com/story',
+          redirectUrl: 'https://t.co/story',
+          source: 'CARD',
+          card: { title: 'A linked story', domain: 'example.com' },
+          post: { tweetId: '100' },
+        },
+      ],
+    });
+
+    const indexedLinks = await testEnv.ARCHIVE_DB.prepare(
+      'SELECT COUNT(*) AS count FROM x_post_links WHERE normalized_url = ?'
+    )
+      .bind('https://example.com/story')
+      .first<{ count: number }>();
+    expect(indexedLinks?.count).toBe(1);
 
     expect(await testEnv.ARCHIVE_BUCKET.head('users/user_test/posts/100.json.gz')).not.toBeNull();
     const exported = await api('/api/v1/x-timeline/runs/run-00000001/export');
@@ -153,7 +200,7 @@ describe('X archive worker', () => {
       const response = await api(`/api/v1/x-timeline/runs/${runId}/chunks/0`, {
         method: 'PUT',
         body: JSON.stringify({
-          posts: [post('100')],
+          posts: [index === 0 ? post('100') : { ...post('100'), links: [] }],
           items: [
             {
               tweetId: '100',
@@ -175,6 +222,54 @@ describe('X archive worker', () => {
     ).first<{ count: number }>();
     expect(posts?.count).toBe(1);
     expect(pointers?.count).toBe(2);
+
+    const read = await api('/api/v1/x-timeline/posts/100');
+    expect(await read.json()).toMatchObject({
+      post: {
+        tweetId: '100',
+        links: [{ normalizedUrl: 'https://example.com/story', source: 'CARD' }],
+      },
+    });
+  });
+
+  it('accepts an empty-link chunk retry recorded with the version 1 checksum shape', async () => {
+    await api('/api/v1/x-timeline/runs', {
+      method: 'POST',
+      body: JSON.stringify({
+        runId: 'run-legacy-retry',
+        requestedCount: 1,
+        startedAt: '2026-07-11T13:00:00.000Z',
+        collectorVersion: 'browser-dom-v2',
+      }),
+    });
+    const legacyPost: Partial<ReturnType<typeof post>> = post('900');
+    delete legacyPost.links;
+    const legacyChunk = {
+      chunkIndex: 0,
+      posts: [legacyPost],
+      items: [
+        {
+          tweetId: '900',
+          position: 0,
+          observedAt: '2026-07-11T13:00:00.000Z',
+          presentation: 'POST',
+        },
+      ],
+    };
+    await testEnv.ARCHIVE_DB.prepare(
+      `INSERT INTO x_ingest_chunks
+        (run_id, chunk_index, checksum, posts_received, timeline_items_received, created_at)
+       VALUES (?, 0, ?, 1, 1, ?)`
+    )
+      .bind('run-legacy-retry', await tokenHash(JSON.stringify(legacyChunk)), Date.now())
+      .run();
+
+    const retry = await api('/api/v1/x-timeline/runs/run-legacy-retry/chunks/0', {
+      method: 'PUT',
+      body: JSON.stringify({ posts: legacyChunk.posts, items: legacyChunk.items }),
+    });
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toMatchObject({ duplicateChunk: true });
   });
 
   it('requires archive-specific token scopes', async () => {

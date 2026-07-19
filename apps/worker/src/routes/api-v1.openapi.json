@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.8.0",
+    "version": "1.10.0",
     "description": "REST API for reading and managing the Zine home dashboard, inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
@@ -39,6 +39,10 @@
     {
       "name": "Tags",
       "description": "List and replace bookmark tags."
+    },
+    {
+      "name": "Editorial",
+      "description": "Run, publish, read, and tune the daily X-led editorial."
     },
     {
       "name": "Reading",
@@ -977,6 +981,184 @@
         }
       }
     },
+    "/api/v1/editorial/today": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialToday",
+        "summary": "Get the current native Today issue",
+        "description": "Returns the latest issue, expected local edition date, generation/freshness state, and source presentation map. Returns 200 with a null issue before the first publication.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current or most recent Today state.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EditorialTodayResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/editorial/runs": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "startEditorialRun",
+        "summary": "Start an inspectable editorial generation run",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/StartEditorialRunRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Editorial run started.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StartEditorialRunResponse" }
+              }
+            }
+          },
+          "200": {
+            "description": "Identical run already existed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/StartEditorialRunResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": {
+            "description": "Run ID already contains different metadata.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/editorial/runs/{id}/failure": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "failEditorialRun",
+        "summary": "Record a terminal editorial generation failure",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FailEditorialRunRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Failure recorded or identical failure already existed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FailEditorialRunResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": {
+            "description": "Run is published or already contains a different failure.",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Error" } }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/editorial/feedback": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "createEditorialFeedback",
+        "summary": "Record idempotent Today feedback",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEditorialFeedbackRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Feedback created.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateEditorialFeedbackResponse" }
+              }
+            }
+          },
+          "200": {
+            "description": "Identical client event already existed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CreateEditorialFeedbackResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "clientEventId already contains different feedback." }
+        }
+      }
+    },
+    "/api/v1/editorial/feedback/profile": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialFeedbackProfile",
+        "summary": "Get the bounded editorial tuning profile",
+        "description": "Aggregates the last 180 days of explicit More like this, Less like this, Dismissed, and Already knew signals into normalized topic, creator, URL, and source preferences. Raw content is not returned.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Current deterministic editorial tuning profile.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/EditorialFeedbackProfileResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/api/v1/editorial/editions": {
       "get": {
         "tags": ["Editorial"],
@@ -1115,7 +1297,10 @@
             "name": "artifact",
             "in": "path",
             "required": true,
-            "schema": { "type": "string", "enum": ["markdown", "snapshot", "validation"] }
+            "schema": {
+              "type": "string",
+              "enum": ["markdown", "snapshot", "validation", "candidates"]
+            }
           }
         ],
         "responses": {
@@ -2180,6 +2365,334 @@
         "additionalProperties": true,
         "description": "Canonical versioned DailyEdition document defined by @zine/editorial-schema."
       },
+      "EditorialSourceStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["xArchive", "zineInbox", "zineBookmarks", "externalVerification"],
+        "properties": {
+          "xArchive": { "type": "string", "enum": ["COMPLETE", "PARTIAL", "UNAVAILABLE"] },
+          "zineInbox": { "type": "string", "enum": ["COMPLETE", "PARTIAL", "UNAVAILABLE"] },
+          "zineBookmarks": {
+            "type": "string",
+            "enum": ["COMPLETE", "PARTIAL", "UNAVAILABLE"]
+          },
+          "externalVerification": {
+            "type": "string",
+            "enum": ["COMPLETE", "PARTIAL", "NOT_RUN"]
+          }
+        }
+      },
+      "EditorialSourcePresentation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "subtitle",
+          "imageUrl",
+          "provider",
+          "excerpt",
+          "zineUserItemId",
+          "zineItemId",
+          "isSaved",
+          "isFinished"
+        ],
+        "properties": {
+          "title": { "type": ["string", "null"] },
+          "subtitle": { "type": ["string", "null"] },
+          "imageUrl": { "type": ["string", "null"], "format": "uri" },
+          "provider": {
+            "type": ["string", "null"]
+          },
+          "excerpt": { "type": ["string", "null"] },
+          "zineUserItemId": { "type": ["string", "null"] },
+          "zineItemId": { "type": ["string", "null"] },
+          "isSaved": { "type": "boolean" },
+          "isFinished": { "type": "boolean" }
+        }
+      },
+      "EditorialTodayResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issue",
+          "expectedEditionDate",
+          "generation",
+          "freshness",
+          "presentation",
+          "requestId",
+          "traceId"
+        ],
+        "properties": {
+          "issue": {
+            "oneOf": [{ "$ref": "#/components/schemas/EditorialEdition" }, { "type": "null" }]
+          },
+          "expectedEditionDate": { "type": "string", "format": "date" },
+          "generation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "latestEditionId", "message"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["PUBLISHED", "PREPARING", "STALE", "UNAVAILABLE"]
+              },
+              "latestEditionId": { "type": ["string", "null"] },
+              "message": { "type": ["string", "null"] }
+            }
+          },
+          "freshness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["isCurrent", "sourceStatus", "warnings"],
+            "properties": {
+              "isCurrent": { "type": "boolean" },
+              "sourceStatus": {
+                "oneOf": [
+                  { "$ref": "#/components/schemas/EditorialSourceStatus" },
+                  { "type": "null" }
+                ]
+              },
+              "warnings": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "presentation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sources"],
+            "properties": {
+              "sources": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/EditorialSourcePresentation"
+                }
+              }
+            }
+          },
+          "requestId": { "type": "string" },
+          "traceId": { "type": "string" }
+        }
+      },
+      "EditorialRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "editionDate",
+          "status",
+          "editionId",
+          "workflowVersion",
+          "promptVersion",
+          "model",
+          "xRunIds",
+          "failureStage",
+          "errorMessage",
+          "startedAt",
+          "completedAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "editionDate": { "type": "string", "format": "date" },
+          "status": { "type": "string", "enum": ["PREPARING", "PUBLISHED", "FAILED"] },
+          "editionId": { "type": ["string", "null"] },
+          "workflowVersion": { "type": "string" },
+          "promptVersion": { "type": "string" },
+          "model": { "type": "string" },
+          "xRunIds": { "type": "array", "items": { "type": "string" } },
+          "failureStage": {
+            "type": ["string", "null"],
+            "enum": [
+              "SNAPSHOT",
+              "RANK",
+              "RESEARCH",
+              "DRAFT",
+              "CRITIC",
+              "VALIDATE",
+              "RENDER",
+              "PUBLISH",
+              null
+            ]
+          },
+          "errorMessage": { "type": ["string", "null"] },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": ["string", "null"], "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "StartEditorialRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "editionDate", "workflowVersion", "promptVersion", "model"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "editionDate": { "type": "string", "format": "date" },
+          "workflowVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "promptVersion": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "model": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      },
+      "StartEditorialRunResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["run", "created", "requestId", "traceId"],
+        "properties": {
+          "run": { "$ref": "#/components/schemas/EditorialRun" },
+          "created": { "type": "boolean" },
+          "requestId": { "type": "string" },
+          "traceId": { "type": "string" }
+        }
+      },
+      "FailEditorialRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "message"],
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "SNAPSHOT",
+              "RANK",
+              "RESEARCH",
+              "DRAFT",
+              "CRITIC",
+              "VALIDATE",
+              "RENDER",
+              "PUBLISH"
+            ]
+          },
+          "message": { "type": "string", "minLength": 1, "maxLength": 5000 }
+        }
+      },
+      "FailEditorialRunResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["run", "duplicate", "requestId", "traceId"],
+        "properties": {
+          "run": { "$ref": "#/components/schemas/EditorialRun" },
+          "duplicate": { "type": "boolean" },
+          "requestId": { "type": "string" },
+          "traceId": { "type": "string" }
+        }
+      },
+      "CreateEditorialFeedbackRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["clientEventId", "editionId", "targetType", "targetId", "eventType"],
+        "properties": {
+          "clientEventId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "editionId": { "type": "string" },
+          "targetType": {
+            "type": "string",
+            "enum": ["EDITION", "STORY", "RECOMMENDATION", "SOURCE"]
+          },
+          "targetId": { "type": "string" },
+          "eventType": {
+            "type": "string",
+            "enum": [
+              "IMPRESSION",
+              "OPENED",
+              "SAVED",
+              "FINISHED",
+              "DISMISSED",
+              "MORE_LIKE_THIS",
+              "LESS_LIKE_THIS",
+              "ALREADY_KNEW"
+            ]
+          },
+          "occurredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateEditorialFeedbackResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accepted", "duplicate", "eventId", "requestId", "traceId"],
+        "properties": {
+          "accepted": { "type": "boolean", "const": true },
+          "duplicate": { "type": "boolean" },
+          "eventId": { "type": "string" },
+          "requestId": { "type": "string" },
+          "traceId": { "type": "string" }
+        }
+      },
+      "EditorialFeedbackSignalCounts": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["moreLikeThis", "lessLikeThis", "dismissed", "alreadyKnew"],
+        "properties": {
+          "moreLikeThis": { "type": "integer", "minimum": 0 },
+          "lessLikeThis": { "type": "integer", "minimum": 0 },
+          "dismissed": { "type": "integer", "minimum": 0 },
+          "alreadyKnew": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "EditorialFeedbackPreference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "affinity", "novelty", "signalCounts", "lastSignaledAt"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1, "maxLength": 2000 },
+          "affinity": { "type": "number", "minimum": -3, "maximum": 3 },
+          "novelty": { "type": "number", "minimum": -3, "maximum": 0 },
+          "signalCounts": { "$ref": "#/components/schemas/EditorialFeedbackSignalCounts" },
+          "lastSignaledAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "EditorialFeedbackProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schemaVersion",
+          "generatedAt",
+          "lookbackDays",
+          "halfLifeDays",
+          "maxEvents",
+          "eventCount",
+          "truncated",
+          "topics",
+          "creators",
+          "canonicalUrls",
+          "sourceIds"
+        ],
+        "properties": {
+          "schemaVersion": { "type": "integer", "const": 1 },
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "lookbackDays": { "type": "integer", "const": 180 },
+          "halfLifeDays": { "type": "integer", "const": 60 },
+          "maxEvents": { "type": "integer", "const": 500 },
+          "eventCount": { "type": "integer", "minimum": 0, "maximum": 500 },
+          "truncated": { "type": "boolean" },
+          "topics": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "#/components/schemas/EditorialFeedbackPreference" }
+          },
+          "creators": {
+            "type": "array",
+            "maxItems": 100,
+            "items": { "$ref": "#/components/schemas/EditorialFeedbackPreference" }
+          },
+          "canonicalUrls": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "#/components/schemas/EditorialFeedbackPreference" }
+          },
+          "sourceIds": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "#/components/schemas/EditorialFeedbackPreference" }
+          }
+        }
+      },
+      "EditorialFeedbackProfileResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["profile", "requestId", "traceId"],
+        "properties": {
+          "profile": { "$ref": "#/components/schemas/EditorialFeedbackProfile" },
+          "requestId": { "type": "string" },
+          "traceId": { "type": "string" }
+        }
+      },
       "PublishEditorialEditionRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -2188,7 +2701,8 @@
           "edition": { "$ref": "#/components/schemas/EditorialEdition" },
           "snapshot": { "type": "object", "additionalProperties": true },
           "validation": { "type": "object", "additionalProperties": true },
-          "markdown": { "type": "string" }
+          "markdown": { "type": "string" },
+          "candidateArtifact": { "type": "object", "additionalProperties": true }
         }
       },
       "Error": {

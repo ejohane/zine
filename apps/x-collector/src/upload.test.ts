@@ -9,6 +9,16 @@ function capture(count = 26) {
     kind: 'POST' as const,
     author: { username: 'example', name: 'Example' },
     media: [],
+    links:
+      index === 0
+        ? [
+            {
+              url: 'https://example.com/story?utm_source=x',
+              normalizedUrl: 'https://example.com/story',
+              source: 'TEXT' as const,
+            },
+          ]
+        : [],
     relationships: [],
     metrics: {},
     capturedAt: '2026-07-11T13:00:00.000Z',
@@ -38,6 +48,9 @@ describe('X collector uploader', () => {
     expect(chunks[0]?.items).toHaveLength(25);
     expect(chunks[1]?.items).toHaveLength(1);
     expect(chunks.flatMap((chunk) => chunk.posts)).toHaveLength(26);
+    expect(chunks[0]?.posts[0]?.links).toMatchObject([
+      { normalizedUrl: 'https://example.com/story' },
+    ]);
   });
 
   it('uploads and verifies a complete capture', async () => {

@@ -49,6 +49,15 @@ describe('local browser receiver', () => {
             kind: 'POST',
             author: { username: 'example', name: 'Example' },
             media: [],
+            links: [
+              {
+                url: 'https://example.com/story?utm_source=x',
+                normalizedUrl: 'https://example.com/story',
+                displayUrl: 'example.com/story',
+                redirectUrl: 'https://t.co/story',
+                source: 'TEXT',
+              },
+            ],
             relationships: [],
             metrics: {},
             capturedAt: '2026-07-11T13:00:00.000Z',
@@ -71,6 +80,26 @@ describe('local browser receiver', () => {
       canonicalPosts: 1,
       excludedAds: 1,
     });
+
+    const invalidLink = await fetch(`${receiver.url}/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        posts: [
+          {
+            tweetId: 'invalid-link',
+            url: 'https://x.com/example/status/invalid-link',
+            text: 'Invalid link',
+            kind: 'POST',
+            author: { username: 'example', name: 'Example' },
+            links: [{ url: 'https://example.com', normalizedUrl: 'not-a-url' }],
+            capturedAt: '2026-07-11T13:00:00.000Z',
+          },
+        ],
+        items: [],
+      }),
+    });
+    expect(invalidLink.status).toBe(400);
 
     const duplicateAd = await fetch(`${receiver.url}/batch`, {
       method: 'POST',

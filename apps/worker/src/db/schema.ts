@@ -57,6 +57,7 @@ export const dailyEditions = sqliteTable(
     snapshotKey: text('snapshot_key').notNull(),
     validationKey: text('validation_key').notNull(),
     contentHash: text('content_hash').notNull(),
+    bundleHash: text('bundle_hash'),
     qualityScore: real('quality_score').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -68,6 +69,73 @@ export const dailyEditions = sqliteTable(
       table.revision
     ),
     index('daily_editions_user_latest_idx').on(table.userId, table.windowEndAt, table.revision),
+  ]
+);
+
+// Inspectable generation metadata for each immutable daily edition run.
+// Large snapshot, candidate, validation, and edition documents remain in R2.
+export const editorialRuns = sqliteTable(
+  'editorial_runs',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    editionDate: text('edition_date').notNull(),
+    status: text('status').notNull(),
+    editionId: text('edition_id').references(() => dailyEditions.id, { onDelete: 'set null' }),
+    snapshotKey: text('snapshot_key'),
+    candidateArtifactKey: text('candidate_artifact_key'),
+    validationKey: text('validation_key'),
+    workflowVersion: text('workflow_version').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    model: text('model').notNull(),
+    xRunIdsJson: text('x_run_ids_json').notNull(),
+    failureStage: text('failure_stage'),
+    errorMessage: text('error_message'),
+    startedAt: integer('started_at').notNull(),
+    completedAt: integer('completed_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    index('editorial_runs_user_date_idx').on(table.userId, table.editionDate, table.updatedAt),
+    index('editorial_runs_user_status_idx').on(table.userId, table.status, table.updatedAt),
+  ]
+);
+
+// Immutable, idempotent feedback emitted from the native Today experience.
+export const editorialFeedbackEvents = sqliteTable(
+  'editorial_feedback_events',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    clientEventId: text('client_event_id').notNull(),
+    editionId: text('edition_id')
+      .notNull()
+      .references(() => dailyEditions.id, { onDelete: 'cascade' }),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id').notNull(),
+    eventType: text('event_type').notNull(),
+    targetTopicsJson: text('target_topics_json').notNull().default('[]'),
+    targetCreatorsJson: text('target_creators_json').notNull().default('[]'),
+    targetCanonicalUrlsJson: text('target_canonical_urls_json').notNull().default('[]'),
+    targetSourceIdsJson: text('target_source_ids_json').notNull().default('[]'),
+    occurredAt: integer('occurred_at').notNull(),
+    payloadHash: text('payload_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('editorial_feedback_user_client_event_idx').on(table.userId, table.clientEventId),
+    index('editorial_feedback_user_occurred_idx').on(table.userId, table.occurredAt),
+    index('editorial_feedback_edition_target_idx').on(
+      table.editionId,
+      table.targetType,
+      table.targetId,
+      table.occurredAt
+    ),
   ]
 );
 
