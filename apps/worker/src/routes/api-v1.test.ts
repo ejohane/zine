@@ -13,7 +13,11 @@ const {
   mockCreateContext,
   mockCreateCaller,
   mockInbox,
+  mockHome,
   mockLibrary,
+  mockRecentlyOpened,
+  mockQuickWins,
+  mockCollectionItems,
   mockGetItem,
   mockBookmarkInboxItem,
   mockArchiveInboxItem,
@@ -69,7 +73,11 @@ const {
   })),
   mockCreateCaller: vi.fn(),
   mockInbox: vi.fn(),
+  mockHome: vi.fn(),
   mockLibrary: vi.fn(),
+  mockRecentlyOpened: vi.fn(),
+  mockQuickWins: vi.fn(),
+  mockCollectionItems: vi.fn(),
   mockGetItem: vi.fn(),
   mockBookmarkInboxItem: vi.fn(),
   mockArchiveInboxItem: vi.fn(),
@@ -293,7 +301,10 @@ describe('apiV1Routes', () => {
     mockCreateCaller.mockReturnValue({
       items: {
         inbox: mockInbox,
+        home: mockHome,
         library: mockLibrary,
+        recentlyOpened: mockRecentlyOpened,
+        quickWins: mockQuickWins,
         get: mockGetItem,
         bookmark: mockBookmarkInboxItem,
         archive: mockArchiveInboxItem,
@@ -303,6 +314,9 @@ describe('apiV1Routes', () => {
         updateProgress: mockUpdateProgress,
         getArticleContent: mockGetArticleContent,
         listTags: mockListTags,
+      },
+      collections: {
+        items: mockCollectionItems,
       },
       bookmarks: {
         preview: mockPreview,
@@ -360,6 +374,7 @@ describe('apiV1Routes', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as JsonBody;
     expect(body.openapi).toBe('3.1.0');
+    expect(body.paths).toHaveProperty('/api/v1/home');
     expect(body.paths).toHaveProperty('/api/v1/inbox');
     expect(body.paths).toHaveProperty('/api/v1/inbox/{id}/bookmark');
     expect(body.paths).toHaveProperty('/api/v1/inbox/{id}/archive');
@@ -1360,6 +1375,38 @@ describe('apiV1Routes', () => {
     });
   });
 
+  it('returns the ordered Home dashboard for the token owner', async () => {
+    mockHome.mockResolvedValue({
+      recentBookmarks: [{ id: 'ui_recent', title: 'Recent bookmark' }],
+      jumpBackIn: [{ id: 'ui_opened', title: 'Opened bookmark' }],
+      byContentType: {
+        videos: [],
+        podcasts: [],
+        articles: [{ id: 'ui_recent', title: 'Recent bookmark' }],
+      },
+      customCollections: [],
+      sectionOrder: [{ kind: 'BUILT_IN', builtInSection: 'JUMP_BACK_IN' }],
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/home', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCreateCaller).toHaveBeenCalledWith({ userId: 'user_123' });
+    expect(mockHome).toHaveBeenCalledWith({});
+    expect((await res.json()) as JsonBody).toMatchObject({
+      recentBookmarks: [{ title: 'Recent bookmark' }],
+      jumpBackIn: [{ title: 'Opened bookmark' }],
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+  });
+
   it('rejects invalid inbox filters', async () => {
     const app = createTestApp();
 
@@ -1436,6 +1483,85 @@ describe('apiV1Routes', () => {
         contentType: ContentType.ARTICLE,
         isFinished: true,
       },
+    });
+  });
+
+  it('lists opened bookmarks newest first through the history caller', async () => {
+    mockRecentlyOpened.mockResolvedValue({
+      items: [{ id: 'ui_opened', title: 'Opened bookmark' }],
+      nextCursor: 'older-opened',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/opened?limit=20&cursor=opened-cursor', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRecentlyOpened).toHaveBeenCalledWith({
+      limit: 20,
+      cursor: 'opened-cursor',
+    });
+    expect((await res.json()) as JsonBody).toMatchObject({
+      items: [{ title: 'Opened bookmark' }],
+      nextCursor: 'older-opened',
+    });
+  });
+
+  it('lists quick-win bookmarks through the dedicated caller', async () => {
+    mockQuickWins.mockResolvedValue({
+      items: [{ id: 'ui_quick', title: 'Quick bookmark' }],
+      nextCursor: 'more-quick',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/quick-wins?limit=20&cursor=quick-cursor', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockQuickWins).toHaveBeenCalledWith({
+      limit: 20,
+      cursor: 'quick-cursor',
+    });
+    expect((await res.json()) as JsonBody).toMatchObject({
+      items: [{ title: 'Quick bookmark' }],
+      nextCursor: 'more-quick',
+    });
+  });
+
+  it('lists all items in a custom collection', async () => {
+    mockCollectionItems.mockResolvedValue({
+      items: [{ id: 'ui_collection', title: 'Collected bookmark' }],
+      nextCursor: 'more-collection',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request(
+        'http://localhost/api/v1/collections/collection_1/items?limit=20&cursor=collection-cursor',
+        {
+          headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+        }
+      ),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockCollectionItems).toHaveBeenCalledWith({
+      id: 'collection_1',
+      limit: 20,
+      cursor: 'collection-cursor',
+    });
+    expect((await res.json()) as JsonBody).toMatchObject({
+      items: [{ title: 'Collected bookmark' }],
+      nextCursor: 'more-collection',
     });
   });
 

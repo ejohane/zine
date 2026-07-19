@@ -13,6 +13,7 @@ struct CreatorView: View {
     let onBookmarkUpdate: (Bookmark) -> Void
     let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
     let onBookmarkCommit: (Bookmark, Bool) -> Void
+    let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: CreatorStore
     @State private var selectedSection: ContentSection = .bookmarked
@@ -26,7 +27,8 @@ struct CreatorView: View {
         client: APIClient,
         onBookmarkUpdate: @escaping (Bookmark) -> Void = { _ in },
         onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
-        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in }
+        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
         self.fallbackName = fallbackName
         self.fallbackImageUrl = fallbackImageUrl
@@ -35,6 +37,7 @@ struct CreatorView: View {
         self.onBookmarkUpdate = onBookmarkUpdate
         self.onBookmarkChange = onBookmarkChange
         self.onBookmarkCommit = onBookmarkCommit
+        self.onExternalOpen = onExternalOpen
         _store = State(initialValue: CreatorStore(creatorId: creatorId, client: client))
     }
 
@@ -242,7 +245,8 @@ struct CreatorView: View {
                         client: client,
                         onUpdate: onBookmarkUpdate,
                         onBookmarkChange: onBookmarkChange,
-                        onBookmarkCommit: onBookmarkCommit
+                        onBookmarkCommit: onBookmarkCommit,
+                        onExternalOpen: onExternalOpen
                     )
                 } label: {
                     creatorContentRow(

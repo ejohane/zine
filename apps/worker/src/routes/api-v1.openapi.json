@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.6.0",
-    "description": "REST API for reading and managing Zine inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
+    "version": "1.8.0",
+    "description": "REST API for reading and managing the Zine home dashboard, inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
     {
@@ -19,6 +19,10 @@
     {
       "name": "Metadata",
       "description": "API metadata and machine-readable documentation."
+    },
+    {
+      "name": "Home",
+      "description": "Read the ordered, personalized dashboard shelves."
     },
     {
       "name": "Inbox",
@@ -152,6 +156,39 @@
                 "schema": { "$ref": "#/components/schemas/Error" }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/home": {
+      "get": {
+        "tags": ["Home"],
+        "operationId": "getHome",
+        "summary": "Get the Home dashboard",
+        "description": "Returns recently opened and saved bookmarks, content-type shelves, custom collections, and the user's configured section order.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Ordered Home dashboard content.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -403,6 +440,94 @@
           "422": {
             "$ref": "#/components/responses/UnsupportedUrl"
           }
+        }
+      }
+    },
+    "/api/v1/bookmarks/opened": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "operationId": "listOpenedBookmarks",
+        "summary": "List opened bookmarks",
+        "description": "Returns unfinished bookmarked items the user has opened, sorted by most recently opened first.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Opened bookmarked items.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedItems" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/bookmarks/quick-wins": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "operationId": "listQuickWinBookmarks",
+        "summary": "List quick-win bookmarks",
+        "description": "Returns unfinished bookmarks that take ten minutes or less, sorted by most recently saved first.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Quick-win bookmarked items.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedItems" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/collections/{id}/items": {
+      "get": {
+        "tags": ["Bookmarks"],
+        "operationId": "listCollectionItems",
+        "summary": "List collection items",
+        "description": "Returns all bookmarks in a custom collection using the collection's configured sort order.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bookmarks in the collection.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedItems" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -2362,6 +2487,167 @@
             }
           }
         }
+      },
+      "HomeItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "itemId",
+          "title",
+          "thumbnailUrl",
+          "canonicalUrl",
+          "contentType",
+          "provider",
+          "creator",
+          "creatorImageUrl",
+          "creatorId",
+          "publisher",
+          "summary",
+          "duration",
+          "publishedAt",
+          "readingTimeMinutes",
+          "bookmarkedAt",
+          "lastOpenedAt",
+          "progress"
+        ],
+        "properties": {
+          "id": { "type": "string", "description": "User item ID." },
+          "itemId": { "type": "string", "description": "Canonical item ID." },
+          "title": { "type": "string" },
+          "thumbnailUrl": { "type": ["string", "null"], "format": "uri" },
+          "canonicalUrl": { "type": "string", "format": "uri" },
+          "contentType": {
+            "type": "string",
+            "enum": ["VIDEO", "PODCAST", "ARTICLE", "POST"]
+          },
+          "provider": {
+            "type": "string",
+            "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS", "SUBSTACK", "WEB", "X"]
+          },
+          "creator": { "type": "string" },
+          "creatorImageUrl": { "type": ["string", "null"], "format": "uri" },
+          "creatorId": { "type": ["string", "null"] },
+          "publisher": { "type": ["string", "null"] },
+          "summary": { "type": ["string", "null"] },
+          "duration": { "type": ["integer", "null"], "minimum": 0 },
+          "publishedAt": { "type": ["string", "null"], "format": "date-time" },
+          "readingTimeMinutes": { "type": ["integer", "null"], "minimum": 0 },
+          "bookmarkedAt": { "type": ["string", "null"], "format": "date-time" },
+          "lastOpenedAt": { "type": ["string", "null"], "format": "date-time" },
+          "progress": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["position", "duration", "percent"],
+                "properties": {
+                  "position": { "type": "number", "minimum": 0 },
+                  "duration": { "type": "number", "minimum": 0 },
+                  "percent": { "type": "number", "minimum": 0, "maximum": 100 }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "HomeCollection": {
+        "type": "object",
+        "required": ["collectionId", "title", "layout", "position", "count", "items"],
+        "properties": {
+          "collectionId": { "type": "string" },
+          "title": { "type": "string" },
+          "layout": {
+            "type": "string",
+            "enum": ["STACK_RAIL", "COVER_RAIL", "ROW_GRID", "COMPACT_LIST"]
+          },
+          "position": { "type": "integer", "minimum": 0 },
+          "count": { "type": "integer", "minimum": 0 },
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/HomeItem" }
+          }
+        }
+      },
+      "HomeLayoutSection": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["kind", "builtInSection"],
+            "properties": {
+              "kind": { "type": "string", "const": "BUILT_IN" },
+              "builtInSection": {
+                "type": "string",
+                "enum": [
+                  "JUMP_BACK_IN",
+                  "RECENTLY_BOOKMARKED",
+                  "INBOX",
+                  "PODCASTS",
+                  "ARTICLES",
+                  "VIDEOS"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["kind", "collectionId"],
+            "properties": {
+              "kind": { "type": "string", "const": "COLLECTION" },
+              "collectionId": { "type": "string" }
+            }
+          }
+        ]
+      },
+      "HomeResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RequestMetadata" },
+          {
+            "type": "object",
+            "required": [
+              "recentBookmarks",
+              "jumpBackIn",
+              "byContentType",
+              "customCollections",
+              "sectionOrder"
+            ],
+            "properties": {
+              "recentBookmarks": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HomeItem" }
+              },
+              "jumpBackIn": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HomeItem" }
+              },
+              "byContentType": {
+                "type": "object",
+                "required": ["videos", "podcasts", "articles"],
+                "properties": {
+                  "videos": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/HomeItem" }
+                  },
+                  "podcasts": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/HomeItem" }
+                  },
+                  "articles": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/HomeItem" }
+                  }
+                }
+              },
+              "customCollections": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HomeCollection" }
+              },
+              "sectionOrder": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/HomeLayoutSection" }
+              }
+            }
+          }
+        ]
       },
       "PaginatedItems": {
         "allOf": [

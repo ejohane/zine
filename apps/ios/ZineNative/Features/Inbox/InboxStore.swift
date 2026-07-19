@@ -14,6 +14,7 @@ final class InboxStore {
     private let client: APIClient
     private let cache: InboxCache
     private let onLibraryChanged: () -> Void
+    private let onInboxChanged: () -> Void
     private var activeQuery = InboxQuery()
     private var pendingItemIDs = Set<String>()
     private var detailRemovals: [String: InboxOptimisticRemoval] = [:]
@@ -21,11 +22,13 @@ final class InboxStore {
     init(
         client: APIClient,
         cache: InboxCache,
-        onLibraryChanged: @escaping () -> Void
+        onLibraryChanged: @escaping () -> Void,
+        onInboxChanged: @escaping () -> Void
     ) {
         self.client = client
         self.cache = cache
         self.onLibraryChanged = onLibraryChanged
+        self.onInboxChanged = onInboxChanged
     }
 
     func reload(query: InboxQuery) async {
@@ -98,6 +101,7 @@ final class InboxStore {
             await cache.remove(id: bookmark.id, query: removal.query)
             pendingItemIDs.remove(bookmark.id)
             onLibraryChanged()
+            onInboxChanged()
         } catch {
             restore(removal, message: "The item couldn’t be bookmarked. Please try again.")
         }
@@ -110,6 +114,7 @@ final class InboxStore {
             try await client.archiveInboxItem(id: bookmark.id)
             await cache.remove(id: bookmark.id, query: removal.query)
             pendingItemIDs.remove(bookmark.id)
+            onInboxChanged()
         } catch {
             restore(removal, message: "The item couldn’t be archived. Please try again.")
         }
@@ -141,6 +146,7 @@ final class InboxStore {
             Task { await cache.remove(id: id, query: removal.query) }
         }
         onLibraryChanged()
+        onInboxChanged()
     }
 
     func dismissActionError() {

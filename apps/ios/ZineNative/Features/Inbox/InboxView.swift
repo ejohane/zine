@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InboxView: View {
     let client: APIClient
+    let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: InboxStore
     @State private var provider: Provider?
@@ -11,13 +12,17 @@ struct InboxView: View {
     init(
         client: APIClient,
         cache: InboxCache,
-        onLibraryChanged: @escaping () -> Void
+        onLibraryChanged: @escaping () -> Void,
+        onInboxChanged: @escaping () -> Void,
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
         self.client = client
+        self.onExternalOpen = onExternalOpen
         _store = State(initialValue: InboxStore(
             client: client,
             cache: cache,
-            onLibraryChanged: onLibraryChanged
+            onLibraryChanged: onLibraryChanged,
+            onInboxChanged: onInboxChanged
         ))
     }
 
@@ -48,7 +53,8 @@ struct InboxView: View {
                         },
                         onBookmarkCommit: { changed, _ in
                             store.commitDetailBookmarkChange(id: changed.id)
-                        }
+                        },
+                        onExternalOpen: onExternalOpen
                     )
                     .navigationTransition(
                         .zoom(sourceID: bookmark.id, in: bookmarkTransition)

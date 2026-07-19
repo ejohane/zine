@@ -10,6 +10,8 @@ import {
   ne,
   or,
   lt,
+  gt,
+  lte,
   isNotNull,
   sql,
   inArray,
@@ -127,6 +129,7 @@ export type ItemView = {
 type HomeItemView = Pick<
   ItemView,
   | 'id'
+  | 'itemId'
   | 'title'
   | 'thumbnailUrl'
   | 'canonicalUrl'
@@ -134,11 +137,15 @@ type HomeItemView = Pick<
   | 'provider'
   | 'creator'
   | 'creatorImageUrl'
+  | 'creatorId'
   | 'publisher'
   | 'summary'
   | 'duration'
+  | 'publishedAt'
   | 'readingTimeMinutes'
+  | 'bookmarkedAt'
   | 'lastOpenedAt'
+  | 'progress'
 >;
 
 // Helper Functions
@@ -391,6 +398,7 @@ function toHomeItemViews(
 
     return {
       id: itemView.id,
+      itemId: itemView.itemId,
       title: itemView.title,
       thumbnailUrl: itemView.thumbnailUrl,
       canonicalUrl: itemView.canonicalUrl,
@@ -398,11 +406,15 @@ function toHomeItemViews(
       provider: itemView.provider,
       creator: itemView.creator,
       creatorImageUrl: itemView.creatorImageUrl,
+      creatorId: itemView.creatorId,
       publisher: itemView.publisher,
       summary: itemView.summary,
       duration: itemView.duration,
+      publishedAt: itemView.publishedAt,
       readingTimeMinutes: itemView.readingTimeMinutes,
+      bookmarkedAt: itemView.bookmarkedAt,
       lastOpenedAt: itemView.lastOpenedAt,
+      progress: itemView.progress,
     };
   });
 }
@@ -727,6 +739,115 @@ export const itemsRouter = router({
       nextCursor,
     };
   }),
+
+  /**
+   * Get unfinished bookmarks that the user has opened, newest open first.
+   * Uses cursor-based pagination sorted by lastOpenedAt DESC.
+   */
+  recentlyOpened: protectedProcedure
+    .input(PaginationSchema.pick({ cursor: true, limit: true }).optional())
+    .query(async ({ input, ctx }) => {
+      const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
+      const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
+      const conditions = [
+        eq(userItems.userId, ctx.userId),
+        eq(userItems.state, UserItemState.BOOKMARKED),
+        eq(userItems.isFinished, false),
+        isNotNull(userItems.lastOpenedAt),
+      ];
+
+      if (cursor) {
+        conditions.push(
+          or(
+            lt(userItems.lastOpenedAt, cursor.sortValue),
+            and(eq(userItems.lastOpenedAt, cursor.sortValue), lt(userItems.id, cursor.id))
+          )!
+        );
+      }
+
+      const results = await ctx.db
+        .select()
+        .from(userItems)
+        .innerJoin(items, eq(userItems.itemId, items.id))
+        .leftJoin(creators, eq(items.creatorId, creators.id))
+        .where(and(...conditions))
+        .orderBy(desc(userItems.lastOpenedAt), desc(userItems.id))
+        .limit(limit + 1);
+
+      const hasMore = results.length > limit;
+      const pageResults = hasMore ? results.slice(0, limit) : results;
+      const itemViews = await toItemViewsWithTags(ctx, pageResults);
+
+      let nextCursor: string | null = null;
+      if (hasMore && pageResults.length > 0) {
+        const lastResult = pageResults[pageResults.length - 1];
+        nextCursor = encodeCursor({
+          sortValue: lastResult.user_items.lastOpenedAt!,
+          id: lastResult.user_items.id,
+        });
+      }
+
+      return {
+        items: itemViews,
+        nextCursor,
+      };
+    }),
+
+  /**
+   * Get unfinished bookmarks that take ten minutes or less, newest save first.
+   */
+  quickWins: protectedProcedure
+    .input(PaginationSchema.pick({ cursor: true, limit: true }).optional())
+    .query(async ({ input, ctx }) => {
+      const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
+      const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
+      const sortField = sql`COALESCE(${userItems.bookmarkedAt}, ${userItems.ingestedAt})`;
+      const conditions = [
+        eq(userItems.userId, ctx.userId),
+        eq(userItems.state, UserItemState.BOOKMARKED),
+        eq(userItems.isFinished, false),
+        or(
+          and(gt(items.readingTimeMinutes, 0), lte(items.readingTimeMinutes, 10)),
+          and(gt(items.duration, 0), lte(items.duration, 10 * 60))
+        )!,
+      ];
+
+      if (cursor) {
+        conditions.push(
+          or(
+            sql`${sortField} < ${cursor.sortValue}`,
+            and(sql`${sortField} = ${cursor.sortValue}`, lt(userItems.id, cursor.id))
+          )!
+        );
+      }
+
+      const results = await ctx.db
+        .select()
+        .from(userItems)
+        .innerJoin(items, eq(userItems.itemId, items.id))
+        .leftJoin(creators, eq(items.creatorId, creators.id))
+        .where(and(...conditions))
+        .orderBy(sql`${sortField} DESC`, desc(userItems.id))
+        .limit(limit + 1);
+
+      const hasMore = results.length > limit;
+      const pageResults = hasMore ? results.slice(0, limit) : results;
+      const itemViews = await toItemViewsWithTags(ctx, pageResults);
+
+      let nextCursor: string | null = null;
+      if (hasMore && pageResults.length > 0) {
+        const lastResult = pageResults[pageResults.length - 1];
+        nextCursor = encodeCursor({
+          sortValue: lastResult.user_items.bookmarkedAt ?? lastResult.user_items.ingestedAt,
+          id: lastResult.user_items.id,
+        });
+      }
+
+      return {
+        items: itemViews,
+        nextCursor,
+      };
+    }),
 
   /**
    * Get curated home sections.

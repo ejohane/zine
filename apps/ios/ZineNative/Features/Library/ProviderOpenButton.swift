@@ -155,14 +155,29 @@ struct ProviderLinkButton: View {
 
 struct ProviderOpenButton: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openURL) private var openURL
 
     let provider: Provider
     let destination: URL
+    let onOpen: () -> Void
+
+    init(
+        provider: Provider,
+        destination: URL,
+        onOpen: @escaping () -> Void = {}
+    ) {
+        self.provider = provider
+        self.destination = destination
+        self.onOpen = onOpen
+    }
 
     private var action: ProviderOpenAction { provider.openAction }
 
     var body: some View {
-        Link(destination: destination) {
+        Button {
+            onOpen()
+            openURL(destination)
+        } label: {
             providerLogo
                 .frame(width: 27, height: 27)
                 .frame(width: 56, height: 56)

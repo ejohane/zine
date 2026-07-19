@@ -20,13 +20,15 @@ struct BookmarkDetailView: View {
     let onUpdate: (Bookmark) -> Void
     let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
     let onBookmarkCommit: (Bookmark, Bool) -> Void
+    let onExternalOpen: (Bookmark) -> Void
 
     init(
         bookmark: Bookmark,
         client: APIClient,
         onUpdate: @escaping (Bookmark) -> Void,
         onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
-        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in }
+        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
         _bookmark = State(initialValue: bookmark)
         _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
@@ -34,6 +36,7 @@ struct BookmarkDetailView: View {
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
         self.onBookmarkCommit = onBookmarkCommit
+        self.onExternalOpen = onExternalOpen
     }
 
     var body: some View {
@@ -62,7 +65,6 @@ struct BookmarkDetailView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
-            try? await client.markOpened(id: bookmark.id)
             if let refreshed = try? await client.getBookmark(id: bookmark.id) {
                 bookmark = refreshed
                 if !hasToggledBookmark {
@@ -140,7 +142,11 @@ struct BookmarkDetailView: View {
 
             Spacer(minLength: 0)
 
-            ProviderOpenButton(provider: bookmark.provider, destination: bookmark.canonicalUrl)
+            ProviderOpenButton(
+                provider: bookmark.provider,
+                destination: bookmark.canonicalUrl,
+                onOpen: { onExternalOpen(bookmark) }
+            )
                 .padding(.trailing, 8)
         }
     }
@@ -238,7 +244,8 @@ struct BookmarkDetailView: View {
                     client: client,
                     onBookmarkUpdate: onUpdate,
                     onBookmarkChange: onBookmarkChange,
-                    onBookmarkCommit: onBookmarkCommit
+                    onBookmarkCommit: onBookmarkCommit,
+                    onExternalOpen: onExternalOpen
                 )
             } label: {
                 creatorRowLabel(showsDisclosure: true)
