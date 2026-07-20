@@ -116,6 +116,7 @@ struct InboxView: View {
                     } label: {
                         Label("Archive", systemImage: "archivebox.fill")
                     }
+                    .tint(.red)
                     .accessibilityLabel("Archive inbox item")
                 }
                 .task {

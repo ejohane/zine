@@ -13,6 +13,7 @@ final class HomeSectionListStore {
     private let route: HomeSectionRoute
     private let client: APIClient
     private var removedIndices: [String: Int] = [:]
+    private var pendingInboxItemIDs: Set<String> = []
 
     init(route: HomeSectionRoute, client: APIClient) {
         self.route = route
@@ -80,6 +81,59 @@ final class HomeSectionListStore {
             removedIndices[bookmark.id] = index
             items.remove(at: index)
         }
+    }
+
+    func bookmarkInboxItem(_ bookmark: Bookmark) async -> Bool {
+        await updateInboxItem(
+            bookmark,
+            request: { try await client.bookmarkItem(id: bookmark.id) },
+            errorMessage: "The item couldn’t be bookmarked. Please try again."
+        )
+    }
+
+    func archiveInboxItem(_ bookmark: Bookmark) async -> Bool {
+        await updateInboxItem(
+            bookmark,
+            request: { try await client.archiveInboxItem(id: bookmark.id) },
+            errorMessage: "The item couldn’t be archived. Please try again."
+        )
+    }
+
+    func dismissError() {
+        errorMessage = nil
+    }
+
+    private func updateInboxItem(
+        _ bookmark: Bookmark,
+        request: () async throws -> Void,
+        errorMessage: String
+    ) async -> Bool {
+        guard route == .inbox,
+              !pendingInboxItemIDs.contains(bookmark.id),
+              let index = items.firstIndex(where: { $0.id == bookmark.id })
+        else { return false }
+
+        pendingInboxItemIDs.insert(bookmark.id)
+        items.remove(at: index)
+
+        do {
+            try await request()
+            pendingInboxItemIDs.remove(bookmark.id)
+            return true
+        } catch is CancellationError {
+            restoreInboxItem(bookmark, at: index)
+            return false
+        } catch {
+            restoreInboxItem(bookmark, at: index)
+            self.errorMessage = errorMessage
+            return false
+        }
+    }
+
+    private func restoreInboxItem(_ bookmark: Bookmark, at index: Int) {
+        pendingInboxItemIDs.remove(bookmark.id)
+        guard !items.contains(where: { $0.id == bookmark.id }) else { return }
+        items.insert(bookmark, at: min(index, items.endIndex))
     }
 
     private func request(cursor: String? = nil) async throws -> PaginatedBookmarksResponse {
