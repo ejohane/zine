@@ -149,6 +149,7 @@ struct LibraryView: View {
                     } label: {
                         Label("Archive", systemImage: "archivebox.fill")
                     }
+                    .tint(.red)
                     .accessibilityLabel("Archive bookmark")
                 }
                 .task {

@@ -38,8 +38,8 @@ private struct AuthenticatedAppView: View {
 
     private let client: APIClient
     private let editorialCache: EditorialIssueCache
+    private let homeCache: HomeCache
     private let libraryCache: LibraryCache
-    private let inboxCache: InboxCache
 
     @State private var search = ""
     @State private var homeRevision = 0
@@ -58,8 +58,8 @@ private struct AuthenticatedAppView: View {
             }
         )
         editorialCache = EditorialIssueCache(userID: userID)
+        homeCache = HomeCache(userID: userID)
         libraryCache = LibraryCache(userID: userID)
-        inboxCache = InboxCache(userID: userID)
     }
 
     var body: some View {
@@ -75,12 +75,13 @@ private struct AuthenticatedAppView: View {
                 .tint(Color.accentColor)
             }
 
-            Tab("Inbox", systemImage: "tray") {
-                InboxView(
+            Tab("Home", systemImage: "house") {
+                HomeView(
                     client: client,
-                    cache: inboxCache,
-                    onLibraryChanged: markLibraryChanged,
-                    onInboxChanged: markHomeChanged,
+                    cache: homeCache,
+                    refreshRevision: homeRevision,
+                    externalOpenEvent: externalOpenEvent,
+                    onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen
                 )
                 .tint(Color.accentColor)
@@ -129,10 +130,6 @@ private struct AuthenticatedAppView: View {
         } message: {
             Text(externalOpenError ?? "Please try again.")
         }
-    }
-
-    private func markLibraryChanged() {
-        libraryRevision += 1
     }
 
     private func markHomeChanged() {

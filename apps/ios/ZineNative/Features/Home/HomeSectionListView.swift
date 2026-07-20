@@ -48,6 +48,13 @@ struct HomeSectionListView: View {
             .task {
                 await store.reload()
             }
+            .alert("Couldn’t update inbox", isPresented: actionErrorBinding) {
+                Button("OK", role: .cancel) {
+                    store.dismissError()
+                }
+            } message: {
+                Text(store.errorMessage ?? "Please try again.")
+            }
     }
 
     @ViewBuilder
@@ -78,6 +85,28 @@ struct HomeSectionListView: View {
                 .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
                 .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if route == .inbox {
+                        Button {
+                            bookmarkInboxItem(bookmark)
+                        } label: {
+                            Label("Bookmark", systemImage: "bookmark.fill")
+                        }
+                        .tint(.green)
+                        .accessibilityLabel("Bookmark inbox item")
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    if route == .inbox {
+                        Button(role: .destructive) {
+                            archiveInboxItem(bookmark)
+                        } label: {
+                            Label("Archive", systemImage: "archivebox.fill")
+                        }
+                        .tint(.red)
+                        .accessibilityLabel("Archive inbox item")
+                    }
+                }
                 .task {
                     await store.loadMoreIfNeeded(current: bookmark)
                 }
@@ -91,6 +120,29 @@ struct HomeSectionListView: View {
                     ProgressView()
                         .padding()
                 }
+            }
+        }
+    }
+
+    private var actionErrorBinding: Binding<Bool> {
+        Binding(
+            get: { store.errorMessage != nil && !store.items.isEmpty },
+            set: { if !$0 { store.dismissError() } }
+        )
+    }
+
+    private func bookmarkInboxItem(_ bookmark: Bookmark) {
+        Task {
+            if await store.bookmarkInboxItem(bookmark) {
+                onContentChanged()
+            }
+        }
+    }
+
+    private func archiveInboxItem(_ bookmark: Bookmark) {
+        Task {
+            if await store.archiveInboxItem(bookmark) {
+                onContentChanged()
             }
         }
     }
