@@ -197,64 +197,40 @@ private struct EditorialSourceDestination: View {
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
 
-    @State private var bookmark: Bookmark?
-    @State private var errorMessage: String?
-    @State private var isLoadingBookmark = false
-
     var body: some View {
         Group {
-            if let userItemID {
-                bookmarkDestination(userItemID: userItemID)
+            if let userItemID, let source {
+                BookmarkDetailView(
+                    source: source,
+                    presentation: presentation,
+                    userItemID: userItemID,
+                    client: client,
+                    onUpdate: { updated in
+                        store.setSourceFinished(id: sourceID, isFinished: updated.isFinished)
+                        onContentChanged()
+                    },
+                    onBookmarkChange: { _, isBookmarked, _ in
+                        store.setSourceSaved(id: sourceID, isSaved: isBookmarked)
+                    },
+                    onBookmarkCommit: { _, _ in onContentChanged() },
+                    onExternalOpen: { bookmark in
+                        if let bookmark {
+                            onExternalOpen(bookmark)
+                            Task {
+                                await store.recordAction(
+                                    targetType: .source,
+                                    targetID: sourceID,
+                                    eventType: .opened
+                                )
+                            }
+                        } else {
+                            Task { await store.sourceOpened(id: sourceID) }
+                        }
+                    }
+                )
             } else {
                 EditorialExternalSourceView(sourceID: sourceID, store: store)
             }
-        }
-        .task(id: userItemID) {
-            guard let userItemID else { return }
-            await loadBookmark(id: userItemID)
-        }
-    }
-
-    @ViewBuilder
-    private func bookmarkDestination(userItemID: String) -> some View {
-        if let bookmark {
-            BookmarkDetailView(
-                bookmark: bookmark,
-                client: client,
-                onUpdate: { updated in
-                    self.bookmark = updated
-                    store.setSourceFinished(id: sourceID, isFinished: updated.isFinished)
-                    onContentChanged()
-                },
-                onBookmarkChange: { _, isBookmarked, _ in
-                    store.setSourceSaved(id: sourceID, isSaved: isBookmarked)
-                },
-                onBookmarkCommit: { _, _ in onContentChanged() },
-                onExternalOpen: { opened in
-                    onExternalOpen(opened)
-                    Task {
-                        await store.recordAction(
-                            targetType: .source,
-                            targetID: sourceID,
-                            eventType: .opened
-                        )
-                    }
-                }
-            )
-        } else if let errorMessage {
-            ContentUnavailableView {
-                Label("Source unavailable", systemImage: "exclamationmark.triangle")
-            } description: {
-                Text(errorMessage)
-            } actions: {
-                Button("Try again") {
-                    Task { await loadBookmark(id: userItemID) }
-                }
-            }
-        } else if isLoadingBookmark {
-            ProgressView("Loading source…")
-        } else {
-            ProgressView("Loading source…")
         }
     }
 
@@ -263,18 +239,8 @@ private struct EditorialSourceDestination: View {
             ?? store.source(id: sourceID)?.zineUserItemId
     }
 
-    private func loadBookmark(id: String) async {
-        isLoadingBookmark = true
-        errorMessage = nil
-        defer { isLoadingBookmark = false }
-        do {
-            bookmark = try await client.getBookmark(id: id)
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
+    private var source: EditorialSource? { store.source(id: sourceID) }
+    private var presentation: EditorialSourcePresentation? { store.presentation(for: sourceID) }
 }
 
 private struct EditorialExternalSourceView: View {

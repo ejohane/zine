@@ -77,6 +77,49 @@ final class EditorialTests: XCTestCase {
         XCTAssertFalse(source.isFinished)
     }
 
+    func testEditorialSourceProvidesImmediateBookmarkDetailContent() {
+        let source = EditorialSource(
+            id: "source-1",
+            origin: .zine,
+            role: .analysis,
+            canonicalUrl: URL(string: "https://example.com/story")!,
+            title: "Fallback title",
+            creator: "Fallback creator",
+            publisher: "Example",
+            publishedAt: nil,
+            xTweetId: nil,
+            zineItemId: "item-1",
+            zineUserItemId: "user-item-1",
+            contentType: "ARTICLE",
+            userState: "BOOKMARKED"
+        )
+        let presentation = EditorialSourcePresentation(
+            title: "Presented title",
+            subtitle: "Presented creator",
+            imageUrl: "https://example.com/image.jpg",
+            provider: "RSS",
+            excerpt: "Useful context.",
+            zineUserItemId: "user-item-1",
+            zineItemId: "item-1",
+            isSaved: true,
+            isFinished: false
+        )
+
+        let content = BookmarkDetailContent(
+            source: source,
+            presentation: presentation,
+            userItemID: "user-item-1"
+        )
+
+        XCTAssertEqual(content.id, "user-item-1")
+        XCTAssertEqual(content.title, "Presented title")
+        XCTAssertEqual(content.creator, "Presented creator")
+        XCTAssertEqual(content.provider, .rss)
+        XCTAssertEqual(content.contentType, .article)
+        XCTAssertEqual(content.summary, "Useful context.")
+        XCTAssertEqual(content.thumbnailUrl, URL(string: "https://example.com/image.jpg"))
+    }
+
     func testDecodesWhyTodayXVoicesAndZineConnections() throws {
         let story = try JSONDecoder().decode(
             EditorialStory.self,

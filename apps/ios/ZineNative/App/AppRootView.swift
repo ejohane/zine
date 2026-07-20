@@ -82,7 +82,8 @@ private struct AuthenticatedAppView: View {
                     refreshRevision: homeRevision,
                     externalOpenEvent: externalOpenEvent,
                     onContentChanged: markBookmarkContentChanged,
-                    onExternalOpen: handleExternalOpen
+                    onExternalOpen: handleExternalOpen,
+                    onHomeItemExternalOpen: handleHomeItemExternalOpen
                 )
                 .tint(Color.accentColor)
             }
@@ -154,6 +155,32 @@ private struct AuthenticatedAppView: View {
         Task {
             await persistExternalOpen(bookmark, openedAt: openedAt)
         }
+    }
+
+    private func handleHomeItemExternalOpen(_ item: HomeItem) {
+        Task {
+            await persistHomeItemExternalOpen(item)
+        }
+    }
+
+    private func persistHomeItemExternalOpen(_ item: HomeItem) async {
+        do {
+            try await client.markOpened(id: item.id)
+        } catch is CancellationError {
+            return
+        } catch {
+            do {
+                try await Task.sleep(for: .milliseconds(500))
+                try await client.markOpened(id: item.id)
+            } catch is CancellationError {
+                return
+            } catch {
+                externalOpenError = "Zine couldn’t save that open after retrying."
+                return
+            }
+        }
+
+        homeRevision += 1
     }
 
     private func persistExternalOpen(_ bookmark: Bookmark, openedAt: Date) async {

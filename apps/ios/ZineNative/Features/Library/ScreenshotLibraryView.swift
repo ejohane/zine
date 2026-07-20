@@ -39,6 +39,10 @@ struct ScreenshotBookmarkDetailView: View {
         tokenProvider: { "screenshot-fixture" }
     )
 
+    private var colorScheme: ColorScheme {
+        ProcessInfo.processInfo.arguments.contains("-screenshot-light-mode") ? .light : .dark
+    }
+
     var body: some View {
         NavigationStack {
             BookmarkDetailView(
@@ -47,8 +51,8 @@ struct ScreenshotBookmarkDetailView: View {
                 onUpdate: { _ in }
             )
         }
-        .environment(\.colorScheme, .dark)
-        .preferredColorScheme(.dark)
+        .environment(\.colorScheme, colorScheme)
+        .preferredColorScheme(colorScheme)
     }
 }
 
