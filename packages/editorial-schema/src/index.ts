@@ -4,7 +4,7 @@ export const EDITORIAL_SCHEMA_VERSION = 1;
 export const EDITORIAL_MAX_STORIES = 8;
 export const EDITORIAL_MAX_RECOMMENDATIONS = 7;
 export const EDITORIAL_MAX_EMERGING_SIGNALS = 4;
-export const EDITORIAL_CANDIDATE_SCHEMA_VERSION = 1;
+export const EDITORIAL_CANDIDATE_SCHEMA_VERSION = 2;
 
 const IdSchema = z.string().trim().min(1).max(200);
 const TimestampSchema = z.string().datetime();
@@ -315,6 +315,7 @@ export const EditionProvenanceSchema = z
         recentBookmarks: z.number().int().nonnegative(),
         contextualBookmarks: z.number().int().nonnegative(),
         externalVerificationSources: z.number().int().nonnegative(),
+        externalDiscoverySources: z.number().int().nonnegative().optional(),
       })
       .strict(),
     sourceStatus: z
@@ -323,6 +324,7 @@ export const EditionProvenanceSchema = z
         zineInbox: z.enum(['COMPLETE', 'PARTIAL', 'UNAVAILABLE']),
         zineBookmarks: z.enum(['COMPLETE', 'PARTIAL', 'UNAVAILABLE']),
         externalVerification: z.enum(['COMPLETE', 'PARTIAL', 'NOT_RUN']),
+        externalDiscovery: z.enum(['COMPLETE', 'PARTIAL', 'NOT_RUN']).optional(),
       })
       .strict(),
     snapshotKey: z.string().trim().min(1).max(1_000),
@@ -473,6 +475,48 @@ export const EditorialSnapshotDocumentSchema = z
   .strict();
 export type EditorialSnapshotDocument = z.infer<typeof EditorialSnapshotDocumentSchema>;
 
+export const EditorialExternalDiscoveryArtifactSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    generatedAt: TimestampSchema,
+    documents: z
+      .array(
+        EditorialSnapshotDocumentSchema.refine(
+          (document) => document.source.origin === 'EXTERNAL',
+          'External discovery documents must use EXTERNAL source origin'
+        ).refine(
+          (document) => ['PRIMARY', 'REPORTING', 'ANALYSIS'].includes(document.source.role),
+          'External discovery documents must be primary, reporting, or analysis sources'
+        )
+      )
+      .max(500),
+    coverageNotes: z.array(z.string().trim().min(1).max(2_000)).max(100).default([]),
+  })
+  .strict();
+export type EditorialExternalDiscoveryArtifact = z.infer<
+  typeof EditorialExternalDiscoveryArtifactSchema
+>;
+
+export const EditorialHistoryStorySchema = z
+  .object({
+    editionId: IdSchema,
+    editionDate: EditorialDateSchema,
+    storyId: IdSchema,
+    title: z.string().trim().min(1).max(500),
+    topics: z.array(z.string().trim().min(1).max(100)).max(20),
+    canonicalUrls: z.array(z.string().url()).max(100),
+  })
+  .strict();
+
+export const EditorialHistorySchema = z
+  .object({
+    lookbackDays: z.number().int().min(1).max(30),
+    editionIds: z.array(IdSchema).max(30),
+    stories: z.array(EditorialHistoryStorySchema).max(240),
+  })
+  .strict();
+export type EditorialHistory = z.infer<typeof EditorialHistorySchema>;
+
 export const EditorialFeedbackSignalCountsSchema = z
   .object({
     moreLikeThis: z.number().int().nonnegative(),
@@ -521,6 +565,7 @@ export const EditorialSnapshotSchema = z
     provenance: EditionProvenanceSchema,
     documents: z.array(EditorialSnapshotDocumentSchema).max(10_000),
     feedbackProfile: EditorialFeedbackProfileSchema.optional(),
+    history: EditorialHistorySchema.optional(),
   })
   .strict();
 export type EditorialSnapshot = z.infer<typeof EditorialSnapshotSchema>;
@@ -606,9 +651,9 @@ export const EditorialCandidateSchema = z
   .strict();
 export type EditorialCandidate = z.infer<typeof EditorialCandidateSchema>;
 
-export const EditorialCandidateArtifactSchema = z
+export const EditorialCandidateArtifactV1Schema = z
   .object({
-    schemaVersion: z.literal(EDITORIAL_CANDIDATE_SCHEMA_VERSION),
+    schemaVersion: z.literal(1),
     id: IdSchema,
     snapshotId: IdSchema,
     editionDate: EditorialDateSchema,
@@ -631,6 +676,184 @@ export const EditorialCandidateArtifactSchema = z
     coverageNotes: z.array(z.string().max(2_000)).max(100),
   })
   .strict();
+
+export const EditorialCandidateScoreV2Schema = z
+  .object({
+    conversationBreadth: z.number().min(0).max(100),
+    attention: z.number().min(0).max(100),
+    recommendationStrength: z.number().min(0).max(100),
+    momentum: z.number().min(0).max(100),
+    freshness: z.number().min(0).max(100),
+    personalRelevance: z.number().min(0).max(100),
+    evidenceQuality: z.number().min(0).max(100),
+    crossSource: z.number().min(0).max(100),
+    historicalNovelty: z.number().min(0).max(100),
+    serendipity: z.number().min(0).max(100),
+    penalties: z.number().min(0).max(100),
+    feedbackAdjustment: z.number().min(-8).max(8).default(0),
+    total: z.number().min(0).max(100),
+  })
+  .strict();
+export type EditorialCandidateScoreV2 = z.infer<typeof EditorialCandidateScoreV2Schema>;
+
+export const EditorialCandidateFramingSchema = z
+  .object({
+    model: z.literal('EXTRACTIVE_EDITORIAL_V1'),
+    headlineMethod: z.enum([
+      'SOURCE_TITLE',
+      'LINK_CARD_TITLE',
+      'EXTRACTIVE_POST',
+      'DOMAIN_FALLBACK',
+    ]),
+    summaryMethod: z.enum([
+      'SOURCE_SUMMARY',
+      'LINK_CARD_DESCRIPTION',
+      'EXTRACTIVE_CONTEXT',
+      'EVIDENCE_FALLBACK',
+    ]),
+    headlineSourceIds: z.array(IdSchema).min(1).max(5),
+    summarySourceIds: z.array(IdSchema).min(1).max(5),
+  })
+  .strict();
+export type EditorialCandidateFraming = z.infer<typeof EditorialCandidateFramingSchema>;
+
+export const EditorialStoryClusterV2Schema = z
+  .object({
+    id: IdSchema,
+    key: z.string().trim().min(1).max(1_000),
+    title: z.string().trim().min(1).max(500),
+    firstSeenAt: TimestampSchema,
+    lastSeenAt: TimestampSchema,
+    topics: z.array(z.string().trim().min(1).max(100)).max(30),
+    canonicalUrls: z.array(z.string().url()).max(100),
+    sourceIds: z.array(IdSchema).min(1).max(1_000),
+    xSourceIds: z.array(IdSchema).max(500),
+    zineSourceIds: z.array(IdSchema).max(500),
+    externalSourceIds: z.array(IdSchema).max(500),
+    featureModel: z.literal('CORPUS_TFIDF_V1'),
+  })
+  .strict();
+export type EditorialStoryClusterV2 = z.infer<typeof EditorialStoryClusterV2Schema>;
+
+export const EditorialCandidateV2Schema = z
+  .object({
+    id: IdSchema,
+    clusterId: IdSchema,
+    rank: z.number().int().positive(),
+    title: z.string().trim().min(1).max(500),
+    summary: z.string().trim().min(1).max(2_000),
+    canonicalUrl: z.string().url().nullable(),
+    sourceIds: z.array(IdSchema).min(1).max(1_000),
+    representativeSourceIds: z.array(IdSchema).min(1).max(5),
+    xSourceIds: z.array(IdSchema).max(500),
+    zineSourceIds: z.array(IdSchema).max(500),
+    externalSourceIds: z.array(IdSchema).max(500),
+    zineMatches: z.array(EditorialCandidateZineMatchSchema).max(100),
+    independentVoiceCount: z.number().int().nonnegative(),
+    sourceCount: z.number().int().positive(),
+    xPostCount: z.number().int().nonnegative(),
+    xRunCount: z.number().int().nonnegative(),
+    explicitRecommendationCount: z.number().int().nonnegative(),
+    linkedSourceCount: z.number().int().nonnegative(),
+    historicalSimilarity: z.number().min(0).max(1),
+    score: EditorialCandidateScoreV2Schema,
+    scoreReasons: z.array(z.string().trim().min(1).max(1_000)).max(30),
+    framing: EditorialCandidateFramingSchema.optional(),
+    feedbackImpact: EditorialCandidateFeedbackImpactSchema.optional(),
+  })
+  .strict();
+export type EditorialCandidateV2 = z.infer<typeof EditorialCandidateV2Schema>;
+
+export const EditorialPortfolioDecisionSchema = z
+  .object({
+    candidateId: IdSchema,
+    selected: z.boolean(),
+    portfolioRank: z.number().int().positive().max(8).nullable(),
+    selectionScore: z.number().min(-100).max(100),
+    redundancyPenalty: z.number().min(0).max(100),
+    sourceConcentrationPenalty: z.number().min(0).max(100),
+    historicalRepeatPenalty: z.number().min(0).max(100),
+    reason: z.string().trim().min(1).max(1_000),
+  })
+  .strict();
+
+export const EditorialPortfolioDiagnosticsSchema = z
+  .object({
+    selectedCount: z.number().int().nonnegative().max(8),
+    meanPairwiseSimilarity: z.number().min(0).max(1),
+    maxPairwiseSimilarity: z.number().min(0).max(1),
+    corpusTopicConcentration: z.number().min(0).max(1),
+    selectedTopicConcentration: z.number().min(0).max(1),
+    uniqueCreators: z.number().int().nonnegative(),
+    uniqueDomains: z.number().int().nonnegative(),
+    historicalRepeatRiskCount: z.number().int().nonnegative(),
+    originCounts: z
+      .object({
+        x: z.number().int().nonnegative(),
+        zine: z.number().int().nonnegative(),
+        external: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const EditorialPortfolioSelectionSchema = z
+  .object({
+    algorithm: z.enum(['MMR_PORTFOLIO_V1', 'MMR_PORTFOLIO_V2']),
+    targetSize: z.number().int().min(1).max(8),
+    selectedCandidateIds: z.array(IdSchema).max(8),
+    decisions: z.array(EditorialPortfolioDecisionSchema).max(2_000),
+    editorialOverrides: z
+      .array(
+        z
+          .object({
+            candidateId: IdSchema,
+            action: z.enum(['INCLUDE', 'EXCLUDE']),
+            reason: z.string().trim().min(1).max(1_000),
+          })
+          .strict()
+      )
+      .max(20)
+      .default([]),
+    diagnostics: EditorialPortfolioDiagnosticsSchema,
+  })
+  .strict();
+
+export const EditorialCandidateArtifactV2Schema = z
+  .object({
+    schemaVersion: z.literal(2),
+    id: IdSchema,
+    snapshotId: IdSchema,
+    editionDate: EditorialDateSchema,
+    generatedAt: TimestampSchema,
+    strategy: z.literal('EDITORIAL_V2'),
+    featureModel: z.literal('CORPUS_TFIDF_V1'),
+    weights: z
+      .object({
+        conversationBreadth: z.number().min(0).max(1),
+        attention: z.number().min(0).max(1),
+        recommendationStrength: z.number().min(0).max(1),
+        momentum: z.number().min(0).max(1),
+        freshness: z.number().min(0).max(1),
+        personalRelevance: z.number().min(0).max(1),
+        evidenceQuality: z.number().min(0).max(1),
+        crossSource: z.number().min(0).max(1),
+        historicalNovelty: z.number().min(0).max(1),
+        serendipity: z.number().min(0).max(1),
+      })
+      .strict(),
+    provenance: EditionProvenanceSchema,
+    clusters: z.array(EditorialStoryClusterV2Schema).max(2_000),
+    candidates: z.array(EditorialCandidateV2Schema).max(2_000),
+    portfolio: EditorialPortfolioSelectionSchema,
+    coverageNotes: z.array(z.string().max(2_000)).max(100),
+  })
+  .strict();
+
+export const EditorialCandidateArtifactSchema = z.union([
+  EditorialCandidateArtifactV1Schema,
+  EditorialCandidateArtifactV2Schema,
+]);
 export type EditorialCandidateArtifact = z.infer<typeof EditorialCandidateArtifactSchema>;
 
 export const EditorialFeedbackEventTypeSchema = z.enum([
@@ -752,40 +975,131 @@ export const PublishEditorialEditionSchema = z
     const clusterIds = new Set(candidate.clusters.map((cluster) => cluster.id));
     const checkSource = (
       sourceId: string,
-      expectedOrigin: 'X' | 'ZINE',
+      expectedOrigin: 'X' | 'ZINE' | 'EXTERNAL' | null,
       path: (string | number)[]
     ) => {
       const origin = sources.get(sourceId);
-      if (origin !== expectedOrigin) {
+      if (!origin || (expectedOrigin && origin !== expectedOrigin)) {
         context.addIssue({
           code: 'custom',
           path,
-          message: `Must reference a ${expectedOrigin} source in the supplied snapshot`,
+          message: expectedOrigin
+            ? `Must reference a ${expectedOrigin} source in the supplied snapshot`
+            : 'Must reference a source in the supplied snapshot',
         });
       }
     };
 
-    for (const [index, cluster] of candidate.clusters.entries()) {
-      for (const [sourceIndex, sourceId] of cluster.xSourceIds.entries()) {
-        checkSource(sourceId, 'X', [
-          'candidateArtifact',
-          'clusters',
-          index,
-          'xSourceIds',
-          sourceIndex,
-        ]);
+    if (candidate.strategy === 'X_LED_V1') {
+      for (const [index, cluster] of candidate.clusters.entries()) {
+        for (const [sourceIndex, sourceId] of cluster.xSourceIds.entries()) {
+          checkSource(sourceId, 'X', [
+            'candidateArtifact',
+            'clusters',
+            index,
+            'xSourceIds',
+            sourceIndex,
+          ]);
+        }
+        for (const [sourceIndex, sourceId] of cluster.zineSourceIds.entries()) {
+          checkSource(sourceId, 'ZINE', [
+            'candidateArtifact',
+            'clusters',
+            index,
+            'zineSourceIds',
+            sourceIndex,
+          ]);
+        }
       }
-      for (const [sourceIndex, sourceId] of cluster.zineSourceIds.entries()) {
-        checkSource(sourceId, 'ZINE', [
-          'candidateArtifact',
-          'clusters',
-          index,
-          'zineSourceIds',
-          sourceIndex,
-        ]);
+      for (const [index, value] of candidate.candidates.entries()) {
+        if (!clusterIds.has(value.clusterId)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['candidateArtifact', 'candidates', index, 'clusterId'],
+            message: 'Candidate must reference a cluster in the artifact',
+          });
+        }
+        const candidateXSourceIds = new Set(value.xSourceIds);
+        for (const [sourceIndex, sourceId] of value.xSourceIds.entries()) {
+          checkSource(sourceId, 'X', [
+            'candidateArtifact',
+            'candidates',
+            index,
+            'xSourceIds',
+            sourceIndex,
+          ]);
+        }
+        for (const [sourceIndex, sourceId] of value.representativeXSourceIds.entries()) {
+          checkSource(sourceId, 'X', [
+            'candidateArtifact',
+            'candidates',
+            index,
+            'representativeXSourceIds',
+            sourceIndex,
+          ]);
+          if (!candidateXSourceIds.has(sourceId)) {
+            context.addIssue({
+              code: 'custom',
+              path: [
+                'candidateArtifact',
+                'candidates',
+                index,
+                'representativeXSourceIds',
+                sourceIndex,
+              ],
+              message: 'Representative X source must also be a candidate X source',
+            });
+          }
+        }
+        for (const [matchIndex, match] of value.zineMatches.entries()) {
+          checkSource(match.sourceId, 'ZINE', [
+            'candidateArtifact',
+            'candidates',
+            index,
+            'zineMatches',
+            matchIndex,
+            'sourceId',
+          ]);
+        }
       }
+      return;
     }
 
+    const candidateIds = new Set(candidate.candidates.map((value) => value.id));
+    for (const [index, cluster] of candidate.clusters.entries()) {
+      const clusterSourceIds = new Set(cluster.sourceIds);
+      for (const [sourceIndex, sourceId] of cluster.sourceIds.entries()) {
+        checkSource(sourceId, null, [
+          'candidateArtifact',
+          'clusters',
+          index,
+          'sourceIds',
+          sourceIndex,
+        ]);
+      }
+      for (const [field, expectedOrigin] of [
+        ['xSourceIds', 'X'],
+        ['zineSourceIds', 'ZINE'],
+        ['externalSourceIds', 'EXTERNAL'],
+      ] as const) {
+        for (const [sourceIndex, sourceId] of cluster[field].entries()) {
+          checkSource(sourceId, expectedOrigin, [
+            'candidateArtifact',
+            'clusters',
+            index,
+            field,
+            sourceIndex,
+          ]);
+          if (!clusterSourceIds.has(sourceId)) {
+            context.addIssue({
+              code: 'custom',
+              path: ['candidateArtifact', 'clusters', index, field, sourceIndex],
+              message: 'Origin-specific source must also appear in cluster sourceIds',
+            });
+          }
+        }
+      }
+    }
     for (const [index, value] of candidate.candidates.entries()) {
       if (!clusterIds.has(value.clusterId)) {
         context.addIssue({
@@ -794,36 +1108,45 @@ export const PublishEditorialEditionSchema = z
           message: 'Candidate must reference a cluster in the artifact',
         });
       }
-      const candidateXSourceIds = new Set(value.xSourceIds);
-      for (const [sourceIndex, sourceId] of value.xSourceIds.entries()) {
-        checkSource(sourceId, 'X', [
+      const candidateSourceIds = new Set(value.sourceIds);
+      for (const [sourceIndex, sourceId] of value.sourceIds.entries()) {
+        checkSource(sourceId, null, [
           'candidateArtifact',
           'candidates',
           index,
-          'xSourceIds',
+          'sourceIds',
           sourceIndex,
         ]);
       }
-      for (const [sourceIndex, sourceId] of value.representativeXSourceIds.entries()) {
-        checkSource(sourceId, 'X', [
-          'candidateArtifact',
-          'candidates',
-          index,
-          'representativeXSourceIds',
-          sourceIndex,
-        ]);
-        if (!candidateXSourceIds.has(sourceId)) {
+      for (const [sourceIndex, sourceId] of value.representativeSourceIds.entries()) {
+        if (!candidateSourceIds.has(sourceId)) {
           context.addIssue({
             code: 'custom',
             path: [
               'candidateArtifact',
               'candidates',
               index,
-              'representativeXSourceIds',
+              'representativeSourceIds',
               sourceIndex,
             ],
-            message: 'Representative X source must also be a candidate X source',
+            message: 'Representative source must also be a candidate source',
           });
+        }
+      }
+      if (value.framing) {
+        for (const [field, framingSourceIds] of [
+          ['headlineSourceIds', value.framing.headlineSourceIds],
+          ['summarySourceIds', value.framing.summarySourceIds],
+        ] as const) {
+          for (const [sourceIndex, sourceId] of framingSourceIds.entries()) {
+            if (!candidateSourceIds.has(sourceId)) {
+              context.addIssue({
+                code: 'custom',
+                path: ['candidateArtifact', 'candidates', index, 'framing', field, sourceIndex],
+                message: 'Framing source must also appear in candidate sourceIds',
+              });
+            }
+          }
         }
       }
       for (const [matchIndex, match] of value.zineMatches.entries()) {
@@ -837,8 +1160,167 @@ export const PublishEditorialEditionSchema = z
         ]);
       }
     }
+    for (const [index, id] of candidate.portfolio.selectedCandidateIds.entries()) {
+      if (!candidateIds.has(id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['candidateArtifact', 'portfolio', 'selectedCandidateIds', index],
+          message: 'Selected portfolio candidate must exist in the artifact',
+        });
+      }
+    }
+    for (const [index, override] of candidate.portfolio.editorialOverrides.entries()) {
+      if (!candidateIds.has(override.candidateId)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['candidateArtifact', 'portfolio', 'editorialOverrides', index, 'candidateId'],
+          message: 'Editorial override candidate must exist in the artifact',
+        });
+      }
+    }
   });
 export type PublishEditorialEdition = z.infer<typeof PublishEditorialEditionSchema>;
+
+export const EditorialExperimentStatusSchema = z.enum([
+  'DRAFT',
+  'LOCKED',
+  'BUILDING',
+  'READY_FOR_REVIEW',
+  'DECIDED',
+  'PROMOTED',
+  'FAILED',
+  'ABANDONED',
+]);
+export type EditorialExperimentStatus = z.infer<typeof EditorialExperimentStatusSchema>;
+
+export const EditorialExperimentVariantLabelSchema = z.enum(['A', 'B']);
+export type EditorialExperimentVariantLabel = z.infer<typeof EditorialExperimentVariantLabelSchema>;
+
+export const EditorialExperimentPreferenceSchema = z.enum(['A', 'B', 'NEITHER']);
+export type EditorialExperimentPreference = z.infer<typeof EditorialExperimentPreferenceSchema>;
+
+const EditorialExperimentDesiredOutcomesSchema = z
+  .array(z.string().trim().min(1).max(1_000))
+  .min(1)
+  .max(20);
+const EditorialExperimentGuardrailsSchema = z.array(z.string().trim().min(1).max(1_000)).max(20);
+
+export const CreateEditorialExperimentSchema = z
+  .object({
+    id: IdSchema,
+    title: z.string().trim().min(1).max(300),
+    editionDate: EditorialDateSchema,
+    hypothesis: z.string().trim().min(1).max(5_000),
+    changeSummary: z.string().trim().min(1).max(5_000),
+    desiredOutcomes: EditorialExperimentDesiredOutcomesSchema,
+    guardrails: EditorialExperimentGuardrailsSchema,
+  })
+  .strict();
+export type CreateEditorialExperiment = z.infer<typeof CreateEditorialExperimentSchema>;
+
+export const UpdateEditorialExperimentSchema = CreateEditorialExperimentSchema.omit({
+  id: true,
+  editionDate: true,
+}).partial();
+export type UpdateEditorialExperiment = z.infer<typeof UpdateEditorialExperimentSchema>;
+
+export const PublishEditorialExperimentVariantSchema = z
+  .object({
+    id: IdSchema,
+    label: EditorialExperimentVariantLabelSchema,
+    name: z.string().trim().min(1).max(300),
+    description: z.string().trim().min(1).max(2_000),
+    bundle: PublishEditorialEditionSchema,
+  })
+  .strict();
+export type PublishEditorialExperimentVariant = z.infer<
+  typeof PublishEditorialExperimentVariantSchema
+>;
+
+export const ReviewEditorialExperimentSchema = z
+  .object({
+    clientEventId: IdSchema,
+    preference: EditorialExperimentPreferenceSchema,
+    notes: z.string().trim().max(10_000),
+  })
+  .strict();
+export type ReviewEditorialExperiment = z.infer<typeof ReviewEditorialExperimentSchema>;
+
+export const PromoteEditorialExperimentSchema = z
+  .object({
+    variantId: IdSchema,
+  })
+  .strict();
+export type PromoteEditorialExperiment = z.infer<typeof PromoteEditorialExperimentSchema>;
+
+export const FailEditorialExperimentSchema = z
+  .object({
+    message: z.string().trim().min(1).max(2_000),
+  })
+  .strict();
+export type FailEditorialExperiment = z.infer<typeof FailEditorialExperimentSchema>;
+
+export const AbandonEditorialExperimentSchema = z
+  .object({
+    reason: z.string().trim().max(2_000),
+  })
+  .strict();
+export type AbandonEditorialExperiment = z.infer<typeof AbandonEditorialExperimentSchema>;
+
+export const EditorialExperimentVariantSummarySchema = z
+  .object({
+    id: IdSchema,
+    label: EditorialExperimentVariantLabelSchema,
+    name: z.string(),
+    description: z.string(),
+    editionId: IdSchema,
+    headline: z.string(),
+    qualityScore: z.number().min(0).max(100),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+    createdAt: TimestampSchema,
+  })
+  .strict();
+export type EditorialExperimentVariantSummary = z.infer<
+  typeof EditorialExperimentVariantSummarySchema
+>;
+
+export const EditorialExperimentReviewSummarySchema = z
+  .object({
+    id: IdSchema,
+    preference: EditorialExperimentPreferenceSchema,
+    notes: z.string(),
+    createdAt: TimestampSchema,
+  })
+  .strict();
+export type EditorialExperimentReviewSummary = z.infer<
+  typeof EditorialExperimentReviewSummarySchema
+>;
+
+export const EditorialExperimentSchema = z
+  .object({
+    id: IdSchema,
+    title: z.string(),
+    editionDate: EditorialDateSchema,
+    status: EditorialExperimentStatusSchema,
+    hypothesis: z.string(),
+    changeSummary: z.string(),
+    desiredOutcomes: EditorialExperimentDesiredOutcomesSchema,
+    guardrails: EditorialExperimentGuardrailsSchema,
+    variants: z.array(EditorialExperimentVariantSummarySchema).max(2),
+    latestReview: EditorialExperimentReviewSummarySchema.nullable(),
+    winningVariantId: IdSchema.nullable(),
+    promotedEditionId: IdSchema.nullable(),
+    failureMessage: z.string().nullable(),
+    abandonmentReason: z.string().nullable(),
+    lockedAt: NullableTimestampSchema,
+    decidedAt: NullableTimestampSchema,
+    promotedAt: NullableTimestampSchema,
+    createdAt: TimestampSchema,
+    updatedAt: TimestampSchema,
+    nextAction: z.string().trim().min(1).max(1_000),
+  })
+  .strict();
+export type EditorialExperiment = z.infer<typeof EditorialExperimentSchema>;
 
 export function calculateQualityScore(scores: z.infer<typeof QualityScoresSchema>): number {
   const value =

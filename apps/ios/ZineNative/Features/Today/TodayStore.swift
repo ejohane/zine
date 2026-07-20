@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class TodayStore {
     private(set) var response: EditorialTodayResponse?
+    private(set) var previewExperiment: EditorialExperiment?
+    private(set) var previewVariant: EditorialExperimentVariant?
     private(set) var isLoading = false
     private(set) var isRefreshing = false
     private(set) var isShowingCachedIssue = false
@@ -17,6 +19,7 @@ final class TodayStore {
     private let cache: EditorialIssueCache
     private let onContentChanged: () -> Void
     private var recordedImpressions = Set<String>()
+    private var liveResponse: EditorialTodayResponse?
 
     init(
         client: APIClient,
@@ -36,6 +39,7 @@ final class TodayStore {
 
         if response == nil, let cached = await cache.loadLatest() {
             response = cached.response
+            liveResponse = cached.response
             cachedAt = cached.savedAt
             isShowingCachedIssue = true
         }
@@ -49,13 +53,16 @@ final class TodayStore {
 
         do {
             let remote = try await client.getEditorialToday()
-            if remote.issue == nil, response?.issue != nil {
-                response = responseKeepingCachedIssue(remote)
+            if remote.issue == nil, liveResponse?.issue != nil {
+                liveResponse = responseKeepingCachedIssue(remote, cached: liveResponse)
                 isShowingCachedIssue = true
             } else {
-                response = remote
+                liveResponse = remote
                 isShowingCachedIssue = false
                 cachedAt = nil
+            }
+            if previewVariant == nil {
+                response = liveResponse
             }
             if remote.issue != nil {
                 await cache.save(remote)
@@ -70,6 +77,25 @@ final class TodayStore {
                 isShowingCachedIssue = true
             }
         }
+    }
+
+    func showPreview(_ preview: EditorialExperimentPreviewResponse) {
+        if previewVariant == nil {
+            liveResponse = response
+        }
+        previewExperiment = preview.experiment
+        previewVariant = preview.variant
+        response = preview.todayResponse
+        refreshErrorMessage = nil
+        errorMessage = nil
+        recordedImpressions.removeAll()
+    }
+
+    func returnToLiveEdition() {
+        previewExperiment = nil
+        previewVariant = nil
+        response = liveResponse
+        recordedImpressions.removeAll()
     }
 
     func source(id: String) -> EditorialSource? {
@@ -190,10 +216,11 @@ final class TodayStore {
     }
 
     private func responseKeepingCachedIssue(
-        _ remote: EditorialTodayResponse
+        _ remote: EditorialTodayResponse,
+        cached: EditorialTodayResponse?
     ) -> EditorialTodayResponse {
-        guard let cachedIssue = response?.issue,
-              let cachedPresentation = response?.presentation
+        guard let cachedIssue = cached?.issue,
+              let cachedPresentation = cached?.presentation
         else { return remote }
 
         return EditorialTodayResponse(
@@ -226,6 +253,7 @@ final class TodayStore {
         eventType: EditorialFeedbackEventType,
         reportsFailure: Bool = false
     ) async {
+        guard previewVariant == nil else { return }
         let feedback = EditorialFeedbackRequest(
             clientEventId: UUID().uuidString,
             editionId: editionID,

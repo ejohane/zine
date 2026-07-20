@@ -1,11 +1,11 @@
 ---
 name: zine-daily-editorial
-description: Build, rank, validate, render, publish, and verify Zine's daily X-led editorial from the X Following archive, Zine inbox, and Zine bookmarks. Use when the user asks to generate, run, produce, or test the daily Zine editorial or morning edition.
+description: Build, rank, validate, render, publish, and verify Zine's topic-neutral daily editorial from the X Following archive, current Zine material, bounded outside-lens discovery, and retained edition history. Use when the user asks to generate, run, produce, or test the daily Zine editorial or morning edition.
 ---
 
 # Zine Daily Editorial
 
-Act as a selective, evidence-driven editor. Do not produce a generic feed summary.
+Act as a selective, evidence-driven editor. Do not produce a generic feed summary or force the day into predefined topics.
 
 ## Requirements
 
@@ -13,6 +13,7 @@ Act as a selective, evidence-driven editor. Do not produce a generic feed summar
 - Require `ZINE_ACCESS_TOKEN`; never print it.
 - Read `docs/daily-editorial.md` and `packages/editorial-schema/src/index.ts` before drafting.
 - Use the current local date in `America/Chicago` unless the user requests another edition date.
+- Use `editorial-v2` and `daily-editorial-v2` for new runs. Retained `X_LED_V1` artifacts remain readable if the application deployment is rolled back.
 
 ## Workflow
 
@@ -22,19 +23,25 @@ Act as a selective, evidence-driven editor. Do not produce a generic feed summar
    bun run editorial:run:start -- \
      --run-id <run-id> \
      --date <YYYY-MM-DD> \
-     --workflow-version x-led-v1 \
-     --prompt-version daily-editorial-v1 \
+     --workflow-version editorial-v2 \
+     --prompt-version daily-editorial-v2 \
      --model <model>
    ```
 
-2. Create `.local-data/editorial/<YYYY-MM-DD>/` and build the production snapshot:
+2. Create `.local-data/editorial/<YYYY-MM-DD>/external-discovery.json` as a bounded outside-timeline lens. Scan a modest set of trusted primary/reporting sources across their current output without using topic queries, product keywords, or category quotas. The artifact must match `EditorialExternalDiscoveryArtifactSchema`, use `EXTERNAL` origin, preserve canonical URLs and provenance, summarize rather than copy source text, and record coverage gaps. Trusted-source selection is a quality boundary, not a subject bundle.
+
+3. Build the production snapshot. Omit `--discovery` only when outside-lens collection genuinely failed, and disclose that absence.
 
    ```bash
-   bun run editorial:snapshot -- --date <YYYY-MM-DD> --output .local-data/editorial/<YYYY-MM-DD>/snapshot.json
+   bun run editorial:snapshot -- \
+     --date <YYYY-MM-DD> \
+     --discovery .local-data/editorial/<YYYY-MM-DD>/external-discovery.json \
+     --output .local-data/editorial/<YYYY-MM-DD>/snapshot.json
    ```
 
-3. Inspect snapshot provenance before analysis. If all primary sources are unavailable, fail the run at `SNAPSHOT`. If one is partial or unavailable, continue only when the remaining corpus is useful and disclose the gap in `coverageNotes`.
-4. Build the deterministic X-led candidate artifact:
+4. Inspect snapshot provenance before analysis. The snapshot should include X, current Zine Inbox/bookmarks, the bounded outside lens, a capped feedback profile, and up to 14 prior editions of story history. If all current discovery sources are unavailable, fail at `SNAPSHOT`. When one source is partial or unavailable, continue only when the remaining corpus is useful and disclose the gap.
+
+5. Build the deterministic topic-neutral candidate and portfolio artifact:
 
    ```bash
    bun run editorial:rank -- \
@@ -42,38 +49,51 @@ Act as a selective, evidence-driven editor. Do not produce a generic feed summar
      --output .local-data/editorial/<YYYY-MM-DD>/candidates.json
    ```
 
-   Inspect the highest-ranked clusters, their X-led base scores, bounded feedback adjustments, component scores, score reasons, representative X sources, canonical links, and Zine matches. Rankings are attention and relevance hypotheses, not factual verification. Keep lower-ranked candidates when editorial judgment shows that they are more consequential, and record why.
+   Inspect all discovered clusters, corpus-relative component scores, capped feedback adjustments, source origins, recent-edition similarity, the selected portfolio, omitted-finalist reasons, creator/domain diversity, pairwise similarity, concentration, coverage notes, and extractive framing. Confirm selected candidates have a recoverable editorial subject or canonical artifact, X-only clusters do not receive cross-source corroboration credit, near-semantic duplicates do not take separate portfolio slots, and headlines/summaries are concise and self-contained without obscuring thin evidence. Each new v2 candidate must retain `EXTRACTIVE_EDITORIAL_V1` methods and exact framing source IDs. The ranker has no named subject bundles or category slots. Engagement is an attention signal, never factual verification.
 
-5. Analyze hierarchically rather than treating every item as an independent story:
-   - canonicalize the subject behind repeated X reactions and Zine links
-   - identify candidate events, conversations, trends, and analysis
-   - use engagement as an attention signal, never as factual verification
-   - use bookmarks as personal-relevance signals, never as factual verification
-   - compare the primary window with the seven-day context
-6. Research the most important candidate stories against primary or reliable external sources. Only add an external source when it verifies or materially contextualizes a story already present in the snapshot. Add each external source to the snapshot document catalog, increment the provenance count, and set external verification status accurately. When research changes the snapshot or its provenance, rerun `editorial:rank` so the final candidate artifact references the exact snapshot that will be published.
-7. Write `.local-data/editorial/<YYYY-MM-DD>/draft.json` matching `DailyEditionSchema`:
-   - target 5–8 stories, 3–7 recommendations, and no more than 4 emerging signals when the corpus supports them
-   - target a 10-minute edition; omission is an editorial act
-   - lead with what the X conversation says is happening now, then connect it to saved, unfinished, or previously finished Zine material when the match is real
-   - populate `whyToday`, `representativeXVoices`, and `zineConnections` when the evidence supports them
-   - distinguish FACT, INFERENCE, OPINION, RUMOR, PREDICTION, and JOKE_OR_SATIRE
-   - preserve exact source and claim references
-   - set `generation.generatorRunId` to the registered run ID and keep its workflow, prompt, and model metadata identical to `editorial:run:start`
-   - prefer original artifacts in recommendations
-   - do not recommend the same canonical source twice
-8. Perform a separate critic pass. Score the six rubric categories skeptically and revise the draft for unsupported claims, false synthesis, repetition, weak recommendations, and generic analysis.
-9. Validate and finalize:
+6. Treat the portfolio as the default editorial shortlist. If editorial judgment includes or excludes a different candidate, record the override before drafting:
 
    ```bash
-   bun run editorial:validate -- \
-     --file .local-data/editorial/<YYYY-MM-DD>/draft.json \
-     --output .local-data/editorial/<YYYY-MM-DD>/edition.json \
-     --report .local-data/editorial/<YYYY-MM-DD>/validation.json
+   bun run editorial:portfolio:override -- \
+     --file .local-data/editorial/<YYYY-MM-DD>/candidates.json \
+     --output .local-data/editorial/<YYYY-MM-DD>/candidates.json \
+     --candidate-id <candidate-id> \
+     --action <include|exclude> \
+     --reason "<concise evidence-based reason>"
    ```
 
-   Fix validation failures and repeat. Do not bypass the validator.
+7. Analyze hierarchically rather than treating every source as an independent story:
+   - canonicalize repeated reactions and reports about the same artifact or event
+   - compare X attention, Zine relevance, and outside-lens consequence without making one source the automatic agenda
+   - compare the primary window with both seven-day context and retained edition history
+   - preserve a concentrated edition when evidence truly warrants it; do not manufacture breadth
+   - use personal relevance as a bounded utility signal and retain high-quality serendipity
 
-10. Render Markdown and review it as a reader:
+8. Verify the most important candidate stories against primary or reliable sources. Research may verify or materially contextualize an existing candidate. If research reveals a genuinely new story, add it as a validated `EXTERNAL` discovery document, rebuild the snapshot, and rerun ranking before drafting. Never introduce an unranked story silently.
+
+9. Write `.local-data/editorial/<YYYY-MM-DD>/draft.json` matching `DailyEditionSchema`:
+   - target 5–8 stories, 3–7 recommendations, and no more than 4 emerging signals when the corpus supports them
+   - target a 10-minute edition; omission is an editorial act
+   - let the strongest grounded developments lead, regardless of subject
+   - explain what X is discussing, what current/traditional Zine material adds, and what the outside lens contributes when each is relevant
+   - populate `whyToday`, `representativeXVoices`, and `zineConnections` only when evidence supports them
+   - distinguish FACT, INFERENCE, OPINION, RUMOR, PREDICTION, and JOKE_OR_SATIRE
+   - preserve exact source and claim references
+   - set generation metadata exactly equal to the registered run
+   - prefer original artifacts in recommendations and never recommend one canonical source twice
+
+10. Perform a separate critic pass. Score the six rubric categories skeptically and revise for unsupported claims, false synthesis, repetition, source concentration, weak recommendations, missing outside context, and unexplained portfolio overrides.
+
+11. Validate and finalize. Fix validation failures and repeat; never bypass the validator.
+
+```bash
+bun run editorial:validate -- \
+  --file .local-data/editorial/<YYYY-MM-DD>/draft.json \
+  --output .local-data/editorial/<YYYY-MM-DD>/edition.json \
+  --report .local-data/editorial/<YYYY-MM-DD>/validation.json
+```
+
+12. Render Markdown and review it as a reader.
 
 ```bash
 bun run editorial:render -- \
@@ -81,7 +101,7 @@ bun run editorial:render -- \
   --output .local-data/editorial/<YYYY-MM-DD>/edition.md
 ```
 
-11. Publish the validated bundle, including the candidate artifact that informed the edition:
+13. Publish the validated bundle, including the exact candidate/portfolio artifact that informed the edition.
 
 ```bash
 bun run editorial:publish -- \
@@ -92,9 +112,9 @@ bun run editorial:publish -- \
   --markdown .local-data/editorial/<YYYY-MM-DD>/edition.md
 ```
 
-12. Read the published edition back from both `/api/v1/editorial/editions/<edition-id>` and `/api/v1/editorial/today`. Require matching ID, revision, headline, source count, quality score, and current-date freshness before reporting success. A readback failure after successful publication is a verification failure, not a generation failure; do not downgrade the already-published run.
+14. Read the published edition back from both `/api/v1/editorial/editions/<edition-id>` and `/api/v1/editorial/today`. Require matching ID, revision, headline, source count, quality score, workflow version, and current-date freshness. A readback failure after successful publication is a verification failure, not a generation failure; do not downgrade the already-published run.
 
-On any failure before publication, record the terminal stage with a concise, sanitized message before reporting the run unsuccessful:
+On any failure before publication, record the terminal stage with a concise, sanitized message:
 
 ```bash
 bun run editorial:run:fail -- \
@@ -105,12 +125,14 @@ bun run editorial:run:fail -- \
 
 ## Editorial invariants
 
-- Every story originates in the captured X/Zine corpus.
-- X determines the initial agenda; Zine history adds personal relevance when it genuinely matches.
-- X can prove that people are talking; it cannot by itself prove the underlying claim.
+- Every story originates in the captured X, current Zine, or bounded external-discovery corpus.
+- No subject, product, company, creator, or industry has a hand-authored ranking bundle.
+- X proves that people are talking; it cannot by itself prove the underlying claim.
+- Zine supplies current discovery and personal context; affinity never automatically outranks stronger evidence.
 - Multiple reactions to one artifact form one story, not multiple stories.
+- The portfolio controls semantic, creator, domain, and historical repetition without category quotas.
 - A ranking score is a traceable selection aid, not an editorial verdict.
+- Editorial departures from the portfolio require retained override reasons.
 - Clearly label uncertainty and disagreement.
-- Do not let bookmarks crowd out unexpected high-signal material.
 - Do not hide partial inputs, failed verification, validation errors, or upload failures.
-- Retain source pointers and metadata; do not duplicate source content into the edition.
+- Retain source pointers and metadata; do not duplicate full source content into the edition.

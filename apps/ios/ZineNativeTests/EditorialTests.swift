@@ -163,6 +163,58 @@ final class EditorialTests: XCTestCase {
         XCTAssertEqual(story.zineConnections?.first?.relationship, .unfinishedContext)
     }
 
+    func testDecodesResumableEditorialExperimentContract() throws {
+        let response = try JSONDecoder().decode(
+            EditorialExperimentListResponse.self,
+            from: Data(
+                """
+                {
+                  "experiments":[{
+                    "id":"experiment-1",
+                    "title":"Breadth versus engagement",
+                    "editionDate":"2026-07-19",
+                    "status":"READY_FOR_REVIEW",
+                    "hypothesis":"A broader portfolio will make Today more useful.",
+                    "changeSummary":"Reduce the influence of raw engagement.",
+                    "desiredOutcomes":["A non-technology story can lead."],
+                    "guardrails":["Do not weaken source verification."],
+                    "variants":[{
+                      "id":"variant-a",
+                      "label":"A",
+                      "name":"Control",
+                      "description":"Engagement-led control.",
+                      "editionId":"edition-a",
+                      "headline":"Control headline",
+                      "qualityScore":84.5,
+                      "contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                      "createdAt":"2026-07-19T10:10:00.000Z"
+                    }],
+                    "latestReview":null,
+                    "winningVariantId":null,
+                    "promotedEditionId":null,
+                    "failureMessage":null,
+                    "abandonmentReason":null,
+                    "lockedAt":"2026-07-19T10:05:00.000Z",
+                    "decidedAt":null,
+                    "promotedAt":null,
+                    "createdAt":"2026-07-19T10:00:00.000Z",
+                    "updatedAt":"2026-07-19T10:10:00.000Z",
+                    "nextAction":"Review both variants on the native Today page and submit a decision."
+                  }],
+                  "requestId":"request-1",
+                  "traceId":"trace-1"
+                }
+                """.utf8
+            )
+        )
+
+        let experiment = try XCTUnwrap(response.experiments.first)
+        XCTAssertEqual(experiment.status, .readyForReview)
+        XCTAssertEqual(experiment.variants.first?.label, .a)
+        XCTAssertTrue(experiment.isReviewable)
+        XCTAssertEqual(experiment.nextAction, "Review both variants on the native Today page and submit a decision.")
+    }
+
     func testEditorialCacheKeepsAnExistingRevisionImmutable() async throws {
         let directory = temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

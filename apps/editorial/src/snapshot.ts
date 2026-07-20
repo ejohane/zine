@@ -1,8 +1,12 @@
 import {
   EDITORIAL_SCHEMA_VERSION,
+  DailyEditionSchema,
+  EditorialExternalDiscoveryArtifactSchema,
   EditorialFeedbackProfileSchema,
   EditorialSnapshotSchema,
+  type EditorialExternalDiscoveryArtifact,
   type EditorialFeedbackProfile,
+  type EditorialHistory,
   type EditorialSnapshot,
   type EditorialSnapshotDocument,
   type SourceReference,
@@ -21,10 +25,16 @@ export type SnapshotOptions = {
   timezone: string;
   editionDate: string;
   snapshotKey: string;
+  externalDiscovery?: EditorialExternalDiscoveryArtifact;
 };
 
 function valueString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function valueStringMax(value: unknown, maxLength: number): string | null {
+  const parsed = valueString(value);
+  return parsed ? parsed.slice(0, maxLength) : null;
 }
 
 function valueNumber(value: unknown): number | null {
@@ -106,7 +116,7 @@ function zineSource(item: JsonRecord): SourceReference | null {
     userState,
     provider: valueString(item.provider),
     imageUrl: valueString(item.thumbnailUrl),
-    excerpt: valueString(item.summary),
+    excerpt: valueStringMax(item.summary, 2_000),
   };
 }
 
@@ -191,7 +201,7 @@ function xDocument(item: JsonRecord, runId: string, now: string): EditorialSnaps
       userState: null,
       provider: 'X',
       imageUrl: firstCard?.imageUrl ?? null,
-      excerpt: valueString(post.text),
+      excerpt: valueStringMax(post.text, 2_000),
     },
     observedAt,
     firstSeenAt: timestamp(post.firstSeenAt, observedAt),
@@ -250,6 +260,48 @@ function mergeXDocuments(
   };
 }
 
+async function collectEditorialHistory(
+  apiUrl: string,
+  token: string,
+  editionDate: string
+): Promise<EditorialHistory> {
+  const response = await getJson(`${apiUrl}/api/v1/editorial/editions?limit=14`, token);
+  const summaries = Array.isArray(response.editions) ? (response.editions as JsonRecord[]) : [];
+  const editionIds: string[] = [];
+  const stories: EditorialHistory['stories'] = [];
+  for (const summary of summaries) {
+    const id = valueString(summary.id);
+    if (!id || valueString(summary.editionDate) === editionDate) continue;
+    const detail = await getJson(
+      `${apiUrl}/api/v1/editorial/editions/${encodeURIComponent(id)}`,
+      token
+    );
+    const parsed = DailyEditionSchema.safeParse(detail.edition);
+    if (!parsed.success) continue;
+    editionIds.push(id);
+    const sourceUrls = new Map(
+      parsed.data.sources.map((source) => [source.id, source.canonicalUrl])
+    );
+    for (const story of parsed.data.stories) {
+      stories.push({
+        editionId: id,
+        editionDate: parsed.data.editionDate,
+        storyId: story.id,
+        title: story.title,
+        topics: story.topics,
+        canonicalUrls: [
+          ...new Set(
+            story.sourceIds
+              .map((sourceId) => sourceUrls.get(sourceId))
+              .filter((url): url is string => Boolean(url))
+          ),
+        ],
+      });
+    }
+  }
+  return { lookbackDays: 14, editionIds, stories };
+}
+
 export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<EditorialSnapshot> {
   const now = options.now.toISOString();
   const warnings: string[] = [];
@@ -279,6 +331,15 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
     previousEditionId: valueString(previous?.id),
     fallbackWindowUsed,
   };
+
+  let history: EditorialHistory | undefined;
+  try {
+    history = await collectEditorialHistory(options.apiUrl, options.token, options.editionDate);
+  } catch (error) {
+    warnings.push(
+      `Editorial history collection failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 
   let feedbackProfile: EditorialFeedbackProfile | undefined;
   try {
@@ -433,6 +494,13 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
     const document = zineDocument(item, now);
     if (document) documentsBySourceId.set(document.source.id, document);
   }
+  const externalDiscovery = options.externalDiscovery
+    ? EditorialExternalDiscoveryArtifactSchema.parse(options.externalDiscovery)
+    : undefined;
+  for (const document of externalDiscovery?.documents ?? []) {
+    documentsBySourceId.set(document.source.id, document);
+  }
+  if (externalDiscovery) warnings.push(...externalDiscovery.coverageNotes);
   const documents = [...documentsBySourceId.values()];
 
   const snapshot = {
@@ -451,18 +519,21 @@ export async function buildEditorialSnapshot(options: SnapshotOptions): Promise<
         recentBookmarks: recentBookmarks.length,
         contextualBookmarks: contextualBookmarks.length,
         externalVerificationSources: 0,
+        externalDiscoverySources: externalDiscovery?.documents.length ?? 0,
       },
       sourceStatus: {
         xArchive: xArchiveStatus,
         zineInbox: zineInboxStatus,
         zineBookmarks: zineBookmarksStatus,
         externalVerification: 'NOT_RUN' as const,
+        externalDiscovery: externalDiscovery ? ('COMPLETE' as const) : ('NOT_RUN' as const),
       },
       snapshotKey: options.snapshotKey,
       warnings,
     },
     documents,
     ...(feedbackProfile ? { feedbackProfile } : {}),
+    ...(history ? { history } : {}),
   };
   return EditorialSnapshotSchema.parse(snapshot);
 }

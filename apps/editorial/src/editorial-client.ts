@@ -87,6 +87,61 @@ export async function postEditorialRequest(
   return result;
 }
 
+export async function getEditorialRequest(
+  path: string,
+  options: EditorialRequestOptions
+): Promise<unknown> {
+  const token = options.token;
+  if (!token) throw new Error('ZINE_ACCESS_TOKEN is required');
+  const apiUrl = (options.apiUrl ?? DEFAULT_EDITORIAL_API_URL).replace(/\/+$/, '');
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let response: Response;
+  try {
+    response = await fetchImpl(`${apiUrl}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+  } catch (error) {
+    throw new EditorialRequestError(`Editorial request failed: ${errorMessage(error, token)}`);
+  }
+  const result = redactSecret(await response.json().catch(() => ({})), token);
+  if (!response.ok) {
+    throw new EditorialRequestError(
+      `Editorial request failed (${response.status}): ${JSON.stringify(result)}`,
+      response.status
+    );
+  }
+  return result;
+}
+
+export async function patchEditorialRequest(
+  path: string,
+  body: unknown,
+  options: EditorialRequestOptions
+): Promise<unknown> {
+  const token = options.token;
+  if (!token) throw new Error('ZINE_ACCESS_TOKEN is required');
+  const apiUrl = (options.apiUrl ?? DEFAULT_EDITORIAL_API_URL).replace(/\/+$/, '');
+  const fetchImpl = options.fetchImpl ?? fetch;
+  let response: Response;
+  try {
+    response = await fetchImpl(`${apiUrl}${path}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new EditorialRequestError(`Editorial request failed: ${errorMessage(error, token)}`);
+  }
+  const result = redactSecret(await response.json().catch(() => ({})), token);
+  if (!response.ok) {
+    throw new EditorialRequestError(
+      `Editorial request failed (${response.status}): ${JSON.stringify(result)}`,
+      response.status
+    );
+  }
+  return result;
+}
+
 export function startEditorialRunFromArgs(
   args: CliArgs,
   options: EditorialCliRequestOptions

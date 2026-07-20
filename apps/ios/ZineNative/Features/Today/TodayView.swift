@@ -7,6 +7,8 @@ struct TodayView: View {
     let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: TodayStore
+    @State private var labStore: EditorialLabStore
+    @State private var isShowingLab = false
 
     init(
         client: APIClient,
@@ -24,6 +26,7 @@ struct TodayView: View {
             cache: cache,
             onContentChanged: onContentChanged
         ))
+        _labStore = State(initialValue: EditorialLabStore(client: client))
     }
 
     var body: some View {
@@ -33,10 +36,31 @@ struct TodayView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     if store.isRefreshing {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .topBarLeading) {
                             ProgressView()
                                 .accessibilityLabel("Refreshing today’s issue")
                         }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            isShowingLab = true
+                        } label: {
+                            Image(systemName: "flask")
+                                .overlay(alignment: .topTrailing) {
+                                    if labStore.readyExperimentCount > 0 {
+                                        Circle()
+                                            .fill(Color.accentColor)
+                                            .frame(width: 7, height: 7)
+                                            .offset(x: 3, y: -2)
+                                    }
+                                }
+                        }
+                        .accessibilityLabel("Open Editorial Lab")
+                        .accessibilityValue(
+                            labStore.readyExperimentCount > 0
+                                ? "\(labStore.readyExperimentCount) ready for review"
+                                : "No experiments ready for review"
+                        )
                     }
                 }
                 .navigationDestination(for: TodayNavigationRoute.self) { route in
@@ -44,7 +68,17 @@ struct TodayView: View {
                 }
         }
         .task(id: refreshRevision) {
-            await store.reload()
+            async let today: Void = store.reload()
+            async let experiments: Void = labStore.load()
+            _ = await (today, experiments)
+        }
+        .sheet(isPresented: $isShowingLab) {
+            EditorialLabView(
+                store: labStore,
+                onPreview: store.showPreview
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .alert("Couldn’t update Today", isPresented: actionErrorBinding) {
             Button("OK", role: .cancel) {
@@ -70,41 +104,48 @@ struct TodayView: View {
                 }
             }
         } else if let response = store.response, response.issue != nil {
-            TodayEditionView(
-                response: response,
-                isShowingCachedIssue: store.isShowingCachedIssue,
-                refreshErrorMessage: store.refreshErrorMessage,
-                onSaveSource: { sourceID in
-                    Task {
-                        guard await store.saveSource(id: sourceID) else { return }
-                        for recommendation in store.issue?.recommendations
-                            .filter({ $0.sourceId == sourceID }) ?? []
-                        {
-                            await store.recordAction(
-                                targetType: .recommendation,
-                                targetID: recommendation.id,
-                                eventType: .saved
-                            )
-                        }
-                    }
-                },
-                onFeedback: { targetType, targetID, eventType in
-                    Task {
-                        if eventType == .impression {
-                            await store.recordImpression(
-                                targetType: targetType,
-                                targetID: targetID
-                            )
-                        } else {
-                            await store.recordAction(
-                                targetType: targetType,
-                                targetID: targetID,
-                                eventType: eventType
-                            )
-                        }
-                    }
+            VStack(spacing: 0) {
+                if let experiment = store.previewExperiment,
+                   let variant = store.previewVariant
+                {
+                    previewBanner(experiment: experiment, variant: variant)
                 }
-            )
+                TodayEditionView(
+                    response: response,
+                    isShowingCachedIssue: store.previewVariant == nil && store.isShowingCachedIssue,
+                    refreshErrorMessage: store.previewVariant == nil ? store.refreshErrorMessage : nil,
+                    onSaveSource: { sourceID in
+                        Task {
+                            guard await store.saveSource(id: sourceID) else { return }
+                            for recommendation in store.issue?.recommendations
+                                .filter({ $0.sourceId == sourceID }) ?? []
+                            {
+                                await store.recordAction(
+                                    targetType: .recommendation,
+                                    targetID: recommendation.id,
+                                    eventType: .saved
+                                )
+                            }
+                        }
+                    },
+                    onFeedback: { targetType, targetID, eventType in
+                        Task {
+                            if eventType == .impression {
+                                await store.recordImpression(
+                                    targetType: targetType,
+                                    targetID: targetID
+                                )
+                            } else {
+                                await store.recordAction(
+                                    targetType: targetType,
+                                    targetID: targetID,
+                                    eventType: eventType
+                                )
+                            }
+                        }
+                    }
+                )
+            }
             .refreshable {
                 await store.reload()
             }
@@ -117,6 +158,35 @@ struct TodayView: View {
         } else {
             TodayLoadingView()
         }
+    }
+
+    private func previewBanner(
+        experiment: EditorialExperiment,
+        variant: EditorialExperimentVariant
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "flask.fill")
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PREVIEWING VARIANT \(variant.label.rawValue)")
+                    .font(.caption2.bold())
+                    .tracking(0.8)
+                Text(experiment.title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Live Today") {
+                store.returnToLiveEdition()
+            }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.bordered)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .background(.thinMaterial)
+        .accessibilityElement(children: .combine)
     }
 
     @ViewBuilder

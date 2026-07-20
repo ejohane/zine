@@ -158,7 +158,7 @@ function basePresentation(source: SourceReference): EditorialSourcePresentation 
   };
 }
 
-async function buildPresentation(
+export async function buildEditorialPresentation(
   db: D1Database,
   userId: string,
   edition: DailyEdition
@@ -248,7 +248,7 @@ export async function getEditorialToday(
       ],
     },
     presentation: {
-      sources: issue ? await buildPresentation(db, userId, issue) : {},
+      sources: issue ? await buildEditorialPresentation(db, userId, issue) : {},
     },
   };
 }

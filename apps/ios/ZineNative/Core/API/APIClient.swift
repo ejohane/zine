@@ -43,6 +43,47 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/editorial/today"))
     }
 
+    func listEditorialExperiments(limit: Int = 20) async throws -> EditorialExperimentListResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/editorial/experiments"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+        return try await request(url: components.url!)
+    }
+
+    func getEditorialExperimentPreview(
+        experimentID: String,
+        variantID: String
+    ) async throws -> EditorialExperimentPreviewResponse {
+        try await request(
+            url: baseURL.appending(
+                path: "/api/v1/editorial/experiments/\(experimentID)/variants/\(variantID)"
+            )
+        )
+    }
+
+    func submitEditorialExperimentDecision(
+        experimentID: String,
+        preference: EditorialExperimentPreference,
+        notes: String,
+        clientEventID: String
+    ) async throws -> EditorialExperimentDecisionResponse {
+        var request = URLRequest(
+            url: baseURL.appending(path: "/api/v1/editorial/experiments/\(experimentID)/decision")
+        )
+        request.httpMethod = "POST"
+        request.httpBody = try JSONEncoder().encode(
+            EditorialExperimentDecisionRequest(
+                clientEventId: clientEventID,
+                preference: preference,
+                notes: notes
+            )
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return try await send(request)
+    }
+
     func sendEditorialFeedback(
         _ feedback: EditorialFeedbackRequest
     ) async throws -> EditorialFeedbackResponse {
