@@ -33,16 +33,38 @@ struct ScreenshotLibraryView: View {
     }
 }
 
+struct ScreenshotBookmarkDetailView: View {
+    private let client = APIClient(
+        baseURL: URL(string: "https://example.invalid")!,
+        tokenProvider: { "screenshot-fixture" }
+    )
+
+    var body: some View {
+        NavigationStack {
+            BookmarkDetailView(
+                bookmark: ScreenshotFixtures.bookmarks[0],
+                client: client,
+                onUpdate: { _ in }
+            )
+        }
+        .environment(\.colorScheme, .dark)
+        .preferredColorScheme(.dark)
+    }
+}
+
 private enum ScreenshotFixtures {
     static let bookmarks: [Bookmark] = [
         make(
             id: "1",
-            title: "Joy & Curiosity #91",
-            creator: "Thorsten Ball",
-            provider: .substack,
-            contentType: .article,
-            readingTime: 8,
-            summary: "Notes on software, craft, curiosity, and the ideas worth returning to."
+            title: "True sight (Prompt responsibly)",
+            creator: "Notes On Work - by Caleb Porzio",
+            provider: .spotify,
+            contentType: .podcast,
+            thumbnailUrl: URL(
+                string: "https://i.scdn.co/image/ab6765630000ba8a116b917b6fbd4a810de9a368"
+            ),
+            duration: 2_846,
+            summary: "A conversation about building, taste, and using AI without losing the thread."
         ),
         make(
             id: "2",
@@ -88,6 +110,7 @@ private enum ScreenshotFixtures {
         creator: String,
         provider: Provider,
         contentType: ContentType,
+        thumbnailUrl: URL? = nil,
         duration: Int? = nil,
         readingTime: Int? = nil,
         summary: String
@@ -96,7 +119,7 @@ private enum ScreenshotFixtures {
             id: id,
             itemId: "item_\(id)",
             title: title,
-            thumbnailUrl: nil,
+            thumbnailUrl: thumbnailUrl,
             canonicalUrl: URL(string: "https://example.com/items/\(id)")!,
             contentType: contentType,
             provider: provider,

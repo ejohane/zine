@@ -8,6 +8,7 @@ enum BookmarkChangePhase {
 
 struct BookmarkDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.displayScale) private var displayScale
 
     @State private var bookmark: Bookmark
     @State private var isBookmarked: Bool
@@ -55,6 +56,7 @@ struct BookmarkDetailView: View {
                                 minHeight: max(viewport.size.height - heroHeight, 0),
                                 alignment: .top
                             )
+                            .background(Color(uiColor: .systemBackground))
                     }
                 }
                 .coordinateSpace(name: "bookmarkDetailScroll")
@@ -283,9 +285,13 @@ struct BookmarkDetailView: View {
         GeometryReader { geometry in
             let offset = geometry.frame(in: .named("bookmarkDetailScroll")).minY
             let stretch = max(offset, 0)
+            let renderedHeight = alignedToDisplayPixel(height + stretch)
+            let parallaxOffset = alignedToDisplayPixel(
+                offset > 0 ? -offset : -offset * 0.35
+            )
 
-            heroImage
-                .frame(width: geometry.size.width, height: height + stretch)
+            heroBase
+                .frame(width: geometry.size.width, height: renderedHeight)
                 .clipped()
                 .overlay(alignment: .bottom) {
                     if colorScheme == .dark {
@@ -294,22 +300,29 @@ struct BookmarkDetailView: View {
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 200)
+                        .frame(height: 200 + displayPixel)
                     }
                 }
-                .offset(y: offset > 0 ? -offset : -offset * 0.35)
+                .offset(y: parallaxOffset)
         }
         .frame(height: height)
     }
 
-    private var heroFadeStops: [Gradient.Stop] {
-        let background = Color(uiColor: .systemBackground)
+    private var heroBase: some View {
+        ZStack {
+            Color(uiColor: .systemBackground)
 
+            heroImage
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private var heroFadeStops: [Gradient.Stop] {
         return [
             .init(color: .clear, location: 0),
-            .init(color: background.opacity(0.28), location: 0.35),
-            .init(color: background.opacity(0.72), location: 0.72),
-            .init(color: background, location: 1),
+            .init(color: Color.black.opacity(0.28), location: 0.35),
+            .init(color: Color.black.opacity(0.72), location: 0.72),
+            .init(color: .black, location: 1),
         ]
     }
 
@@ -328,7 +341,16 @@ struct BookmarkDetailView: View {
     }
 
     private func heroHeight(in viewport: CGSize) -> CGFloat {
-        min(max(viewport.height * 0.33, 240), 320)
+        alignedToDisplayPixel(min(max(viewport.height * 0.33, 240), 320))
+    }
+
+    private func alignedToDisplayPixel(_ value: CGFloat) -> CGFloat {
+        guard displayScale > 0 else { return value }
+        return (value * displayScale).rounded() / displayScale
+    }
+
+    private var displayPixel: CGFloat {
+        displayScale > 0 ? 1 / displayScale : 1
     }
 
     private var metadata: some View {
