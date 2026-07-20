@@ -161,6 +161,19 @@ final class HomeTests: XCTestCase {
         )
     }
 
+    func testHomeItemProvidesImmediateBookmarkDetailContent() {
+        let item = makeHomeItem(id: "instant", minutes: 12)
+        let content = BookmarkDetailContent(item: item)
+
+        XCTAssertEqual(content.id, item.id)
+        XCTAssertEqual(content.title, item.title)
+        XCTAssertEqual(content.canonicalUrl, item.canonicalUrl)
+        XCTAssertEqual(content.provider, item.provider)
+        XCTAssertEqual(content.creator, item.creator)
+        XCTAssertEqual(content.consumptionLabel, "12 min read")
+        XCTAssertTrue(content.tags.isEmpty)
+    }
+
     func testHomeCacheKeepsOnlyFourInboxItems() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)

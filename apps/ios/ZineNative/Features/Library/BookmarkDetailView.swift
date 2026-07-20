@@ -6,22 +6,110 @@ enum BookmarkChangePhase {
     case rollback
 }
 
+struct BookmarkDetailContent: Equatable {
+    let id: String
+    let title: String
+    let thumbnailUrl: URL?
+    let canonicalUrl: URL
+    let contentType: ContentType
+    let provider: Provider
+    let creator: String
+    let creatorImageUrl: URL?
+    let creatorId: String?
+    let summary: String?
+    let duration: Int?
+    let readingTimeMinutes: Int?
+    let tags: [BookmarkTag]
+
+    init(bookmark: Bookmark) {
+        id = bookmark.id
+        title = bookmark.title
+        thumbnailUrl = bookmark.thumbnailUrl
+        canonicalUrl = bookmark.canonicalUrl
+        contentType = bookmark.contentType
+        provider = bookmark.provider
+        creator = bookmark.creator
+        creatorImageUrl = bookmark.creatorImageUrl
+        creatorId = bookmark.creatorId
+        summary = bookmark.summary
+        duration = bookmark.duration
+        readingTimeMinutes = bookmark.readingTimeMinutes
+        tags = bookmark.tags
+    }
+
+    init(item: HomeItem) {
+        id = item.id
+        title = item.title
+        thumbnailUrl = item.thumbnailUrl
+        canonicalUrl = item.canonicalUrl
+        contentType = item.contentType
+        provider = item.provider
+        creator = item.creator
+        creatorImageUrl = item.creatorImageUrl
+        creatorId = item.creatorId
+        summary = item.summary
+        duration = item.duration
+        readingTimeMinutes = item.readingTimeMinutes
+        tags = []
+    }
+
+    init(
+        source: EditorialSource,
+        presentation: EditorialSourcePresentation?,
+        userItemID: String
+    ) {
+        let provider = presentation?.zineProvider ?? (source.origin == .x ? .x : .web)
+        let creator = presentation?.subtitle
+            ?? source.creator
+            ?? source.publisher
+            ?? provider.title
+
+        id = userItemID
+        title = presentation?.title ?? source.title ?? creator
+        thumbnailUrl = presentation?.imageURL
+        canonicalUrl = source.canonicalUrl
+        contentType = ContentType(rawValue: source.contentType)
+            ?? (source.origin == .x ? .post : .article)
+        self.provider = provider
+        self.creator = creator
+        creatorImageUrl = nil
+        creatorId = nil
+        summary = presentation?.excerpt
+        duration = nil
+        readingTimeMinutes = nil
+        tags = []
+    }
+
+    var consumptionLabel: String? {
+        if let readingTimeMinutes {
+            return "\(readingTimeMinutes) min read"
+        }
+        guard let duration else { return nil }
+        let minutes = max(1, duration / 60)
+        if minutes < 60 { return "\(minutes) min" }
+        return "\(minutes / 60) hr \(minutes % 60) min"
+    }
+}
+
 struct BookmarkDetailView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
 
-    @State private var bookmark: Bookmark
+    @State private var bookmark: Bookmark?
     @State private var isBookmarked: Bool
     @State private var hasToggledBookmark = false
     @State private var isSavingBookmark = false
     @State private var isSaving = false
+    @State private var isHydrating = false
+    @State private var hydrationFailed = false
     @State private var errorMessage: String?
 
+    private let initialContent: BookmarkDetailContent
     let client: APIClient
     let onUpdate: (Bookmark) -> Void
     let onBookmarkChange: (Bookmark, Bool, BookmarkChangePhase) -> Void
     let onBookmarkCommit: (Bookmark, Bool) -> Void
-    let onExternalOpen: (Bookmark) -> Void
+    private let onExternalOpen: (Bookmark?) -> Void
 
     init(
         bookmark: Bookmark,
@@ -31,13 +119,65 @@ struct BookmarkDetailView: View {
         onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
     ) {
-        _bookmark = State(initialValue: bookmark)
+        initialContent = BookmarkDetailContent(bookmark: bookmark)
+        _bookmark = State(initialValue: .some(bookmark))
         _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
+        _isHydrating = State(initialValue: false)
+        self.client = client
+        self.onUpdate = onUpdate
+        self.onBookmarkChange = onBookmarkChange
+        self.onBookmarkCommit = onBookmarkCommit
+        self.onExternalOpen = { refreshed in
+            onExternalOpen(refreshed ?? bookmark)
+        }
+    }
+
+    init(
+        item: HomeItem,
+        client: APIClient,
+        onUpdate: @escaping (Bookmark) -> Void,
+        onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
+        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
+        onExternalOpen: @escaping (Bookmark?, HomeItem) -> Void = { _, _ in }
+    ) {
+        initialContent = BookmarkDetailContent(item: item)
+        _bookmark = State(initialValue: nil)
+        _isBookmarked = State(initialValue: true)
+        _isHydrating = State(initialValue: true)
+        self.client = client
+        self.onUpdate = onUpdate
+        self.onBookmarkChange = onBookmarkChange
+        self.onBookmarkCommit = onBookmarkCommit
+        self.onExternalOpen = { bookmark in onExternalOpen(bookmark, item) }
+    }
+
+    init(
+        source: EditorialSource,
+        presentation: EditorialSourcePresentation?,
+        userItemID: String,
+        client: APIClient,
+        onUpdate: @escaping (Bookmark) -> Void,
+        onBookmarkChange: @escaping (Bookmark, Bool, BookmarkChangePhase) -> Void = { _, _, _ in },
+        onBookmarkCommit: @escaping (Bookmark, Bool) -> Void = { _, _ in },
+        onExternalOpen: @escaping (Bookmark?) -> Void = { _ in }
+    ) {
+        initialContent = BookmarkDetailContent(
+            source: source,
+            presentation: presentation,
+            userItemID: userItemID
+        )
+        _bookmark = State(initialValue: nil)
+        _isBookmarked = State(initialValue: presentation?.isSaved ?? true)
+        _isHydrating = State(initialValue: true)
         self.client = client
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
         self.onBookmarkCommit = onBookmarkCommit
         self.onExternalOpen = onExternalOpen
+    }
+
+    private var content: BookmarkDetailContent {
+        bookmark.map { BookmarkDetailContent(bookmark: $0) } ?? initialContent
     }
 
     var body: some View {
@@ -66,13 +206,8 @@ struct BookmarkDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .task {
-            if let refreshed = try? await client.getBookmark(id: bookmark.id) {
-                bookmark = refreshed
-                if !hasToggledBookmark {
-                    isBookmarked = refreshed.state == "BOOKMARKED"
-                }
-            }
+        .task(id: content.id) {
+            await hydrateBookmark()
         }
         .alert("Couldn’t update bookmark", isPresented: Binding(
             get: { errorMessage != nil },
@@ -87,7 +222,7 @@ struct BookmarkDetailView: View {
     private var details: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(bookmark.title)
+                Text(content.title)
                     .font(.title2.bold())
                 creatorRow
                 metadata
@@ -95,16 +230,16 @@ struct BookmarkDetailView: View {
 
             actionRow
 
-            if let summary = bookmark.summary, !summary.isEmpty {
+            if let summary = content.summary, !summary.isEmpty {
                 Text(summary)
                     .font(.body)
                     .foregroundStyle(.secondary)
             }
 
-            if !bookmark.tags.isEmpty {
+            if !content.tags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack {
-                        ForEach(bookmark.tags) { tag in
+                        ForEach(content.tags) { tag in
                             Text(tag.name)
                                 .font(.caption)
                                 .padding(.horizontal, 10)
@@ -125,14 +260,9 @@ struct BookmarkDetailView: View {
     private var actionRow: some View {
         HStack(spacing: 12) {
             HStack(spacing: 5) {
-                bookmarkButton
+                bookmarkActions
 
-                if isBookmarked {
-                    completionButton
-                }
-                tagsMenu
-
-                ShareLink(item: bookmark.canonicalUrl) {
+                ShareLink(item: content.canonicalUrl) {
                     actionIcon(systemName: "square.and.arrow.up")
                 }
                 .buttonStyle(.plain)
@@ -145,11 +275,43 @@ struct BookmarkDetailView: View {
             Spacer(minLength: 0)
 
             ProviderOpenButton(
-                provider: bookmark.provider,
-                destination: bookmark.canonicalUrl,
+                provider: content.provider,
+                destination: content.canonicalUrl,
                 onOpen: { onExternalOpen(bookmark) }
             )
                 .padding(.trailing, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var bookmarkActions: some View {
+        if bookmark != nil {
+            bookmarkButton
+
+            if isBookmarked {
+                completionButton
+            }
+            tagsMenu
+        } else {
+            actionIcon(systemName: "bookmark.fill", color: .primary.opacity(0.55))
+                .accessibilityHidden(true)
+
+            if isHydrating {
+                ProgressView()
+                    .frame(width: 42, height: 44)
+                    .accessibilityLabel("Loading bookmark actions")
+            } else if hydrationFailed {
+                Button {
+                    Task { await hydrateBookmark() }
+                } label: {
+                    actionIcon(systemName: "arrow.clockwise")
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Retry loading bookmark actions")
+            }
+
+            actionIcon(systemName: "tag", color: .secondary.opacity(0.45))
+                .accessibilityHidden(true)
         }
     }
 
@@ -159,40 +321,44 @@ struct BookmarkDetailView: View {
         } label: {
             actionIcon(
                 systemName: isBookmarked ? "bookmark.fill" : "bookmark",
-                color: isBookmarked ? .white : .secondary
+                color: isBookmarked ? .primary : .secondary
             )
             .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
-        .disabled(isSavingBookmark)
+        .allowsHitTesting(!isSavingBookmark)
         .accessibilityLabel(isBookmarked ? "Remove bookmark" : "Bookmark")
         .actionRowHaptic()
     }
 
     private var completionButton: some View {
-        Button {
+        let isFinished = bookmark?.isFinished ?? false
+
+        return Button {
             Task { await toggleFinished() }
         } label: {
             actionIcon(
-                systemName: bookmark.isFinished
+                systemName: isFinished
                     ? "checkmark.circle.fill"
                     : "checkmark.circle",
-                color: bookmark.isFinished ? .green : .secondary
+                color: isFinished ? .green : .secondary
             )
         }
         .buttonStyle(.plain)
         .disabled(isSaving)
-        .accessibilityLabel(bookmark.isFinished ? "Mark unfinished" : "Mark complete")
+        .accessibilityLabel(isFinished ? "Mark unfinished" : "Mark complete")
         .actionRowHaptic()
     }
 
     private var tagsMenu: some View {
-        Menu {
-            if bookmark.tags.isEmpty {
+        let tags = bookmark?.tags ?? []
+
+        return Menu {
+            if tags.isEmpty {
                 Button("No tags") {}
                     .disabled(true)
             } else {
-                ForEach(bookmark.tags) { tag in
+                ForEach(tags) { tag in
                     Button(tag.name) {}
                         .disabled(true)
                 }
@@ -200,18 +366,18 @@ struct BookmarkDetailView: View {
         } label: {
             actionIcon(systemName: "tag")
         }
-        .accessibilityLabel(bookmark.tags.isEmpty ? "No tags" : "View tags")
+        .accessibilityLabel(tags.isEmpty ? "No tags" : "View tags")
         .actionRowHaptic()
     }
 
     private var moreMenu: some View {
         Menu {
-            Link(destination: bookmark.canonicalUrl) {
+            Link(destination: content.canonicalUrl) {
                 Label("Open Original", systemImage: "arrow.up.forward.app")
             }
 
             Button {
-                UIPasteboard.general.url = bookmark.canonicalUrl
+                UIPasteboard.general.url = content.canonicalUrl
             } label: {
                 Label("Copy Link", systemImage: "doc.on.doc")
             }
@@ -236,24 +402,24 @@ struct BookmarkDetailView: View {
 
     @ViewBuilder
     private var creatorRow: some View {
-        if let creatorId = bookmark.creatorId {
+        if let creatorId = content.creatorId {
             NavigationLink {
                 CreatorView(
                     creatorId: creatorId,
-                    fallbackName: bookmark.creator,
-                    fallbackImageUrl: bookmark.creatorImageUrl,
-                    fallbackProvider: bookmark.provider,
+                    fallbackName: content.creator,
+                    fallbackImageUrl: content.creatorImageUrl,
+                    fallbackProvider: content.provider,
                     client: client,
                     onBookmarkUpdate: onUpdate,
                     onBookmarkChange: onBookmarkChange,
                     onBookmarkCommit: onBookmarkCommit,
-                    onExternalOpen: onExternalOpen
+                    onExternalOpen: { opened in onExternalOpen(opened) }
                 )
             } label: {
                 creatorRowLabel(showsDisclosure: true)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("View \(bookmark.creator)")
+            .accessibilityLabel("View \(content.creator)")
         } else {
             creatorRowLabel(showsDisclosure: false)
         }
@@ -262,13 +428,13 @@ struct BookmarkDetailView: View {
     private func creatorRowLabel(showsDisclosure: Bool) -> some View {
         HStack(spacing: 10) {
             CreatorAvatar(
-                imageUrl: bookmark.creatorImageUrl,
-                creator: bookmark.creator,
-                contentType: bookmark.contentType,
+                imageUrl: content.creatorImageUrl,
+                creator: content.creator,
+                contentType: content.contentType,
                 size: 32
             )
 
-            Text(bookmark.creator)
+            Text(content.creator)
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -328,12 +494,12 @@ struct BookmarkDetailView: View {
 
     private var heroImage: some View {
         CachedRemoteImage(
-            url: bookmark.thumbnailUrl,
+            url: content.thumbnailUrl,
             targetSize: CGSize(width: 430, height: 320)
         ) {
             ZStack {
                 Color.secondary.opacity(0.12)
-                Image(systemName: bookmark.contentType.systemImage)
+                Image(systemName: content.contentType.systemImage)
                     .font(.system(size: 48))
                     .foregroundStyle(.secondary)
             }
@@ -355,8 +521,8 @@ struct BookmarkDetailView: View {
 
     private var metadata: some View {
         HStack(spacing: 10) {
-            Label(bookmark.provider.title, systemImage: bookmark.contentType.systemImage)
-            if let label = bookmark.consumptionLabel {
+            Label(content.provider.title, systemImage: content.contentType.systemImage)
+            if let label = content.consumptionLabel {
                 Text(label)
             }
         }
@@ -364,7 +530,34 @@ struct BookmarkDetailView: View {
         .foregroundStyle(Color.primary.opacity(0.72))
     }
 
+    private func hydrateBookmark() async {
+        let needsInitialBookmark = bookmark == nil
+        if needsInitialBookmark {
+            isHydrating = true
+            hydrationFailed = false
+        }
+
+        do {
+            let refreshed = try await client.getBookmark(id: content.id)
+            guard !Task.isCancelled else { return }
+            bookmark = refreshed
+            isHydrating = false
+            hydrationFailed = false
+            if !hasToggledBookmark {
+                isBookmarked = refreshed.state == "BOOKMARKED"
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard needsInitialBookmark else { return }
+            isHydrating = false
+            hydrationFailed = true
+        }
+    }
+
     private func toggleFinished() async {
+        guard var bookmark else { return }
+
         isSaving = true
         defer { isSaving = false }
 
@@ -375,6 +568,7 @@ struct BookmarkDetailView: View {
             )
             bookmark.isFinished = result.isFinished
             bookmark.finishedAt = result.finishedAt
+            self.bookmark = bookmark
             onUpdate(bookmark)
         } catch {
             errorMessage = error.localizedDescription
@@ -382,7 +576,7 @@ struct BookmarkDetailView: View {
     }
 
     private func toggleBookmark() async {
-        guard !isSavingBookmark else { return }
+        guard let bookmark, !isSavingBookmark else { return }
 
         let previousValue = isBookmarked
         let newValue = !previousValue
