@@ -139,7 +139,7 @@ describe('buildEditorialSnapshot', () => {
               post: {
                 tweetId: 'tweet-1',
                 url: 'https://x.com/user/status/tweet-1',
-                text: 'A post',
+                text: 'x'.repeat(2_500),
                 publishedAt: '2026-07-11T09:00:00.000Z',
                 firstSeenAt: '2026-07-11T10:00:00.000Z',
                 author: { username: 'user', name: 'User' },
@@ -174,9 +174,47 @@ describe('buildEditorialSnapshot', () => {
       timezone: 'America/Chicago',
       editionDate: '2026-07-11',
       snapshotKey: 'snapshot.json',
+      externalDiscovery: {
+        schemaVersion: 1,
+        generatedAt: '2026-07-11T11:45:00.000Z',
+        coverageNotes: ['Outside lens used two trusted desks and yielded one candidate source.'],
+        documents: [
+          {
+            source: {
+              id: 'external:story-1',
+              origin: 'EXTERNAL',
+              role: 'REPORTING',
+              canonicalUrl: 'https://outside.example/story',
+              title: 'Outside-lens story',
+              creator: 'Outside Desk',
+              publisher: 'Outside',
+              publishedAt: '2026-07-11T10:45:00.000Z',
+              xTweetId: null,
+              zineItemId: null,
+              zineUserItemId: null,
+              contentType: 'ARTICLE',
+              userState: null,
+            },
+            observedAt: '2026-07-11T11:45:00.000Z',
+            firstSeenAt: '2026-07-11T11:45:00.000Z',
+            text: null,
+            summary: 'A consequential story outside the captured timeline.',
+            timelinePosition: null,
+            engagement: null,
+            links: [],
+            signals: {
+              ingestedAt: null,
+              bookmarkedAt: null,
+              lastOpenedAt: null,
+              isFinished: false,
+              tags: [],
+            },
+          },
+        ],
+      },
     });
 
-    expect(snapshot.documents).toHaveLength(3);
+    expect(snapshot.documents).toHaveLength(4);
     expect(
       snapshot.documents.find((document) => document.source.id === 'zine:item-1')
     ).toMatchObject({
@@ -189,7 +227,12 @@ describe('buildEditorialSnapshot', () => {
       inboxItems: 1,
       recentBookmarks: 1,
       contextualBookmarks: 1,
+      externalDiscoverySources: 1,
     });
+    expect(snapshot.provenance.sourceStatus.externalDiscovery).toBe('COMPLETE');
+    expect(snapshot.provenance.warnings).toContain(
+      'Outside lens used two trusted desks and yielded one candidate source.'
+    );
     expect(snapshot.feedbackProfile).toMatchObject({
       eventCount: 1,
       topics: [{ key: 'agent', affinity: 1 }],
@@ -215,6 +258,9 @@ describe('buildEditorialSnapshot', () => {
         ],
       }
     );
+    const xDocument = snapshot.documents.find((document) => document.source.id === 'x:tweet-1');
+    expect(xDocument?.source.excerpt).toHaveLength(2_000);
+    expect(xDocument?.text).toHaveLength(2_500);
   });
 
   it('continues after one X run fails and only records successfully fetched run provenance', async () => {

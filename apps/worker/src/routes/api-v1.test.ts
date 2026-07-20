@@ -70,6 +70,17 @@ const {
   mockFailEditorialRun,
   mockGetEditorialFeedbackProfile,
   mockRecordEditorialFeedback,
+  mockCreateEditorialExperiment,
+  mockGetEditorialExperiment,
+  mockListEditorialExperiments,
+  mockUpdateEditorialExperiment,
+  mockLockEditorialExperiment,
+  mockFailEditorialExperiment,
+  mockAbandonEditorialExperiment,
+  mockPublishEditorialExperimentVariant,
+  mockGetEditorialExperimentVariantPreview,
+  mockReviewEditorialExperiment,
+  mockPromoteEditorialExperiment,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -134,6 +145,17 @@ const {
   mockFailEditorialRun: vi.fn(),
   mockGetEditorialFeedbackProfile: vi.fn(),
   mockRecordEditorialFeedback: vi.fn(),
+  mockCreateEditorialExperiment: vi.fn(),
+  mockGetEditorialExperiment: vi.fn(),
+  mockListEditorialExperiments: vi.fn(),
+  mockUpdateEditorialExperiment: vi.fn(),
+  mockLockEditorialExperiment: vi.fn(),
+  mockFailEditorialExperiment: vi.fn(),
+  mockAbandonEditorialExperiment: vi.fn(),
+  mockPublishEditorialExperimentVariant: vi.fn(),
+  mockGetEditorialExperimentVariantPreview: vi.fn(),
+  mockReviewEditorialExperiment: vi.fn(),
+  mockPromoteEditorialExperiment: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -175,6 +197,30 @@ vi.mock('../lib/editorial-feedback', () => {
     EditorialFeedbackTargetError,
     getEditorialFeedbackProfile: mockGetEditorialFeedbackProfile,
     recordEditorialFeedback: mockRecordEditorialFeedback,
+  };
+});
+
+vi.mock('../lib/editorial-experiments', () => {
+  class EditorialExperimentConflictError extends Error {}
+  class EditorialExperimentNotFoundError extends Error {}
+  class EditorialExperimentTransitionError extends Error {}
+  class EditorialExperimentValidationError extends Error {}
+  return {
+    EditorialExperimentConflictError,
+    EditorialExperimentNotFoundError,
+    EditorialExperimentTransitionError,
+    EditorialExperimentValidationError,
+    createEditorialExperiment: mockCreateEditorialExperiment,
+    getEditorialExperiment: mockGetEditorialExperiment,
+    listEditorialExperiments: mockListEditorialExperiments,
+    updateEditorialExperiment: mockUpdateEditorialExperiment,
+    lockEditorialExperiment: mockLockEditorialExperiment,
+    failEditorialExperiment: mockFailEditorialExperiment,
+    abandonEditorialExperiment: mockAbandonEditorialExperiment,
+    publishEditorialExperimentVariant: mockPublishEditorialExperimentVariant,
+    getEditorialExperimentVariantPreview: mockGetEditorialExperimentVariantPreview,
+    reviewEditorialExperiment: mockReviewEditorialExperiment,
+    promoteEditorialExperiment: mockPromoteEditorialExperiment,
   };
 });
 
@@ -289,6 +335,32 @@ function createBookmarkRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function editorialExperimentFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'experiment-1',
+    title: 'Breadth versus engagement',
+    editionDate: '2026-07-19',
+    status: 'DRAFT',
+    hypothesis: 'A broader portfolio will make Today more useful.',
+    changeSummary: 'Reduce the influence of raw engagement.',
+    desiredOutcomes: ['A non-technology story can lead.'],
+    guardrails: ['Do not weaken source verification.'],
+    variants: [],
+    latestReview: null,
+    winningVariantId: null,
+    promotedEditionId: null,
+    failureMessage: null,
+    abandonmentReason: null,
+    lockedAt: null,
+    decidedAt: null,
+    promotedAt: null,
+    createdAt: '2026-07-19T10:00:00.000Z',
+    updatedAt: '2026-07-19T10:00:00.000Z',
+    nextAction: 'Review the experiment brief, then lock it.',
+    ...overrides,
+  };
+}
+
 describe('apiV1Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -362,6 +434,16 @@ describe('apiV1Routes', () => {
       canonicalUrls: [],
       sourceIds: [],
     });
+    mockListEditorialExperiments.mockResolvedValue([]);
+    mockCreateEditorialExperiment.mockResolvedValue({
+      experiment: editorialExperimentFixture(),
+      created: true,
+    });
+    mockGetEditorialExperiment.mockResolvedValue(editorialExperimentFixture());
+    mockUpdateEditorialExperiment.mockResolvedValue(editorialExperimentFixture());
+    mockLockEditorialExperiment.mockResolvedValue(
+      editorialExperimentFixture({ status: 'LOCKED', lockedAt: '2026-07-19T10:05:00.000Z' })
+    );
     mockCreateCaller.mockReturnValue({
       items: {
         inbox: mockInbox,
@@ -454,6 +536,15 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/article-content');
     expect(body.paths).toHaveProperty('/api/v1/tags');
     expect(body.paths).toHaveProperty('/api/v1/editorial/today');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/lock');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/failure');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/abandon');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/variants');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/variants/{variantId}');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/decision');
+    expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/promote');
     expect(body.paths).toHaveProperty('/api/v1/editorial/runs');
     expect(body.paths).toHaveProperty('/api/v1/editorial/runs/{id}/failure');
     expect(body.paths).toHaveProperty('/api/v1/editorial/feedback');
@@ -498,6 +589,88 @@ describe('apiV1Routes', () => {
       traceId: 'test-trace-id',
     });
     expect(mockGetEditorialFeedbackProfile).toHaveBeenCalledWith(expect.anything(), 'user_123');
+  });
+
+  it('creates and resumes durable editorial experiments through REST', async () => {
+    const app = createTestApp();
+    const createBody = {
+      id: 'experiment-1',
+      title: 'Breadth versus engagement',
+      editionDate: '2026-07-19',
+      hypothesis: 'A broader portfolio will make Today more useful.',
+      changeSummary: 'Reduce the influence of raw engagement.',
+      desiredOutcomes: ['A non-technology story can lead.'],
+      guardrails: ['Do not weaken source verification.'],
+    };
+    const created = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/experiments', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createBody),
+      }),
+      createMockEnv()
+    );
+
+    expect(created.status).toBe(201);
+    expect(await created.json()).toMatchObject({
+      created: true,
+      experiment: { id: 'experiment-1', status: 'DRAFT' },
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+    expect(mockCreateEditorialExperiment).toHaveBeenCalledWith(
+      expect.anything(),
+      'user_123',
+      createBody
+    );
+
+    mockListEditorialExperiments.mockResolvedValueOnce([editorialExperimentFixture()]);
+    const resumed = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/experiments?limit=10', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+    expect(resumed.status).toBe(200);
+    expect(await resumed.json()).toMatchObject({
+      experiments: [{ id: 'experiment-1', nextAction: expect.any(String) }],
+    });
+    expect(mockListEditorialExperiments).toHaveBeenCalledWith(expect.anything(), 'user_123', 10);
+  });
+
+  it('requires write scope and validates experiment briefs', async () => {
+    const app = createTestApp();
+    mockDbToken(createTokenRecord(['bookmarks:read']));
+    const forbidden = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/experiments', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_ONLY_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      }),
+      createMockEnv()
+    );
+    expect(forbidden.status).toBe(403);
+
+    mockDbToken(createTokenRecord(['bookmarks:write']));
+    const invalid = await app.fetch(
+      new Request('http://localhost/api/v1/editorial/experiments', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: 'Missing its durable identity and brief.' }),
+      }),
+      createMockEnv()
+    );
+    expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({ code: 'INVALID_REQUEST_BODY' });
   });
 
   it('starts an idempotent editorial run with write authentication', async () => {

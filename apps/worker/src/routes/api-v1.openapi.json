@@ -1004,6 +1004,298 @@
         }
       }
     },
+    "/api/v1/editorial/experiments": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "listEditorialExperiments",
+        "summary": "List resumable editorial experiments",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": {
+            "description": "Editorial experiments and their current workflow state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["experiments", "requestId", "traceId"],
+                  "properties": {
+                    "experiments": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/EditorialExperiment" }
+                    },
+                    "requestId": { "type": "string" },
+                    "traceId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "createEditorialExperiment",
+        "summary": "Create an editable editorial experiment brief",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateEditorialExperimentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Experiment created." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialExperiment",
+        "summary": "Get one experiment, variants, review, and exact next action",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "responses": {
+          "200": {
+            "description": "Current durable experiment state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["experiment", "requestId", "traceId"],
+                  "properties": {
+                    "experiment": { "$ref": "#/components/schemas/EditorialExperiment" },
+                    "requestId": { "type": "string" },
+                    "traceId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Editorial"],
+        "operationId": "updateEditorialExperiment",
+        "summary": "Edit an unlocked experiment brief",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "type": "object", "additionalProperties": false } }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated experiment." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/lock": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "lockEditorialExperiment",
+        "summary": "Lock the experiment brief before variants are generated",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "responses": {
+          "200": { "description": "Locked experiment." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/failure": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "failEditorialExperiment",
+        "summary": "Retain a terminal experiment failure",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["message"],
+                "additionalProperties": false,
+                "properties": { "message": { "type": "string", "minLength": 1, "maxLength": 2000 } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Experiment marked failed with its diagnostic retained." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/abandon": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "abandonEditorialExperiment",
+        "summary": "Abandon an experiment without deleting its history",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["reason"],
+                "additionalProperties": false,
+                "properties": { "reason": { "type": "string", "maxLength": 2000 } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Experiment abandoned with all artifacts retained." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/variants": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "publishEditorialExperimentVariant",
+        "summary": "Retain an immutable validated variant bundle for phone review",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "responses": {
+          "201": { "description": "Variant retained outside the Today index." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/variants/{variantId}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getEditorialExperimentVariant",
+        "summary": "Get a variant through the native Today read model",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "$ref": "#/components/parameters/EditorialExperimentId" },
+          {
+            "name": "variantId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Experiment metadata plus an EditorialTodayResponse preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["experiment", "variant", "preview", "requestId", "traceId"],
+                  "properties": {
+                    "experiment": { "$ref": "#/components/schemas/EditorialExperiment" },
+                    "variant": { "$ref": "#/components/schemas/EditorialExperimentVariant" },
+                    "preview": { "$ref": "#/components/schemas/EditorialTodayResponse" },
+                    "requestId": { "type": "string" },
+                    "traceId": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/decision": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "reviewEditorialExperiment",
+        "summary": "Record an idempotent A, B, or Neither phone review",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReviewEditorialExperimentRequest" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Review recorded; no edition was published." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/api/v1/editorial/experiments/{id}/promote": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "promoteEditorialExperiment",
+        "summary": "Publish only the explicitly reviewed winning variant",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/EditorialExperimentId" }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["variantId"],
+                "properties": { "variantId": { "type": "string" } },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Winning variant promoted or confirmed idempotently." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
     "/api/v1/editorial/runs": {
       "post": {
         "tags": ["Editorial"],
@@ -2198,6 +2490,12 @@
       }
     },
     "parameters": {
+      "EditorialExperimentId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string" }
+      },
       "SubscriptionId": {
         "name": "subscriptionId",
         "in": "path",
@@ -2348,6 +2646,153 @@
       }
     },
     "schemas": {
+      "CreateEditorialExperimentRequest": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "editionDate",
+          "hypothesis",
+          "changeSummary",
+          "desiredOutcomes",
+          "guardrails"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "editionDate": { "type": "string", "format": "date" },
+          "hypothesis": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "changeSummary": { "type": "string", "minLength": 1, "maxLength": 5000 },
+          "desiredOutcomes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": { "type": "string" }
+          },
+          "guardrails": {
+            "type": "array",
+            "maxItems": 20,
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "ReviewEditorialExperimentRequest": {
+        "type": "object",
+        "required": ["clientEventId", "preference", "notes"],
+        "additionalProperties": false,
+        "properties": {
+          "clientEventId": { "type": "string" },
+          "preference": { "type": "string", "enum": ["A", "B", "NEITHER"] },
+          "notes": { "type": "string", "maxLength": 10000 }
+        }
+      },
+      "EditorialExperimentVariant": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "name",
+          "description",
+          "editionId",
+          "headline",
+          "qualityScore",
+          "contentHash",
+          "createdAt"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "label": { "type": "string", "enum": ["A", "B"] },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "editionId": { "type": "string" },
+          "headline": { "type": "string" },
+          "qualityScore": { "type": "number", "minimum": 0, "maximum": 100 },
+          "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "EditorialExperimentReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "preference", "notes", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "preference": { "type": "string", "enum": ["A", "B", "NEITHER"] },
+          "notes": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "EditorialExperiment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "editionDate",
+          "status",
+          "hypothesis",
+          "changeSummary",
+          "desiredOutcomes",
+          "guardrails",
+          "variants",
+          "latestReview",
+          "winningVariantId",
+          "promotedEditionId",
+          "failureMessage",
+          "abandonmentReason",
+          "lockedAt",
+          "decidedAt",
+          "promotedAt",
+          "createdAt",
+          "updatedAt",
+          "nextAction"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "editionDate": { "type": "string", "format": "date" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "LOCKED",
+              "BUILDING",
+              "READY_FOR_REVIEW",
+              "DECIDED",
+              "PROMOTED",
+              "FAILED",
+              "ABANDONED"
+            ]
+          },
+          "hypothesis": { "type": "string" },
+          "changeSummary": { "type": "string" },
+          "desiredOutcomes": { "type": "array", "items": { "type": "string" } },
+          "guardrails": { "type": "array", "items": { "type": "string" } },
+          "variants": {
+            "type": "array",
+            "maxItems": 2,
+            "items": { "$ref": "#/components/schemas/EditorialExperimentVariant" }
+          },
+          "latestReview": {
+            "oneOf": [
+              { "$ref": "#/components/schemas/EditorialExperimentReview" },
+              { "type": "null" }
+            ]
+          },
+          "winningVariantId": { "type": ["string", "null"] },
+          "promotedEditionId": { "type": ["string", "null"] },
+          "failureMessage": { "type": ["string", "null"] },
+          "abandonmentReason": { "type": ["string", "null"] },
+          "lockedAt": { "type": ["string", "null"], "format": "date-time" },
+          "decidedAt": { "type": ["string", "null"], "format": "date-time" },
+          "promotedAt": { "type": ["string", "null"], "format": "date-time" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "nextAction": { "type": "string" }
+        }
+      },
       "EditorialEditionSummary": {
         "type": "object",
         "required": ["id", "editionDate", "revision", "status", "headline", "qualityScore"],

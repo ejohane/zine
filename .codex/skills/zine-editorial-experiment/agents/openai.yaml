@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Zine Editorial Experiment'
+  short_description: 'Run durable A/B tests for Zine Today'
+  default_prompt: 'Use $zine-editorial-experiment to create, run, review, and safely promote a Zine Today experiment.'

@@ -328,3 +328,126 @@ struct EditorialBookmarkSaveResult: Decodable {
 
     let bookmark: BookmarkResult
 }
+
+enum EditorialExperimentStatus: String, Codable, Hashable {
+    case draft = "DRAFT"
+    case locked = "LOCKED"
+    case building = "BUILDING"
+    case readyForReview = "READY_FOR_REVIEW"
+    case decided = "DECIDED"
+    case promoted = "PROMOTED"
+    case failed = "FAILED"
+    case abandoned = "ABANDONED"
+
+    var title: String {
+        switch self {
+        case .draft: "Draft"
+        case .locked: "Locked"
+        case .building: "Building"
+        case .readyForReview: "Ready for review"
+        case .decided: "Decision recorded"
+        case .promoted: "Promoted"
+        case .failed: "Failed"
+        case .abandoned: "Abandoned"
+        }
+    }
+}
+
+enum EditorialExperimentVariantLabel: String, Codable, Hashable, CaseIterable, Identifiable {
+    case a = "A"
+    case b = "B"
+
+    var id: String { rawValue }
+}
+
+enum EditorialExperimentPreference: String, Codable, Hashable, CaseIterable, Identifiable {
+    case a = "A"
+    case b = "B"
+    case neither = "NEITHER"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .a: "A"
+        case .b: "B"
+        case .neither: "Neither"
+        }
+    }
+}
+
+struct EditorialExperimentVariant: Codable, Hashable, Identifiable {
+    let id: String
+    let label: EditorialExperimentVariantLabel
+    let name: String
+    let description: String
+    let editionId: String
+    let headline: String
+    let qualityScore: Double
+    let contentHash: String
+    let createdAt: String
+}
+
+struct EditorialExperimentReview: Codable, Hashable, Identifiable {
+    let id: String
+    let preference: EditorialExperimentPreference
+    let notes: String
+    let createdAt: String
+}
+
+struct EditorialExperiment: Codable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let editionDate: String
+    let status: EditorialExperimentStatus
+    let hypothesis: String
+    let changeSummary: String
+    let desiredOutcomes: [String]
+    let guardrails: [String]
+    let variants: [EditorialExperimentVariant]
+    let latestReview: EditorialExperimentReview?
+    let winningVariantId: String?
+    let promotedEditionId: String?
+    let failureMessage: String?
+    let abandonmentReason: String?
+    let lockedAt: String?
+    let decidedAt: String?
+    let promotedAt: String?
+    let createdAt: String
+    let updatedAt: String
+    let nextAction: String
+
+    var isReviewable: Bool {
+        status == .readyForReview || status == .decided
+    }
+}
+
+struct EditorialExperimentListResponse: Decodable {
+    let experiments: [EditorialExperiment]
+    let requestId: String
+    let traceId: String
+}
+
+struct EditorialExperimentPreviewResponse: Decodable {
+    let experiment: EditorialExperiment
+    let variant: EditorialExperimentVariant
+    let preview: EditorialTodayResponse
+    let requestId: String
+    let traceId: String
+
+    var todayResponse: EditorialTodayResponse { preview }
+}
+
+struct EditorialExperimentDecisionRequest: Encodable {
+    let clientEventId: String
+    let preference: EditorialExperimentPreference
+    let notes: String
+}
+
+struct EditorialExperimentDecisionResponse: Decodable {
+    let experiment: EditorialExperiment
+    let review: EditorialExperimentReview?
+    let duplicate: Bool
+    let requestId: String
+    let traceId: String
+}

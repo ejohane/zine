@@ -139,6 +139,107 @@ export const editorialFeedbackEvents = sqliteTable(
   ]
 );
 
+// Durable, resumable editorial A/B experiments. Variant bundles live in R2 and never
+// participate in the published Today index until an explicit promotion succeeds.
+export const editorialExperiments = sqliteTable(
+  'editorial_experiments',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    title: text('title').notNull(),
+    editionDate: text('edition_date').notNull(),
+    status: text('status').notNull(),
+    hypothesis: text('hypothesis').notNull(),
+    changeSummary: text('change_summary').notNull(),
+    desiredOutcomesJson: text('desired_outcomes_json').notNull(),
+    guardrailsJson: text('guardrails_json').notNull(),
+    winningVariantId: text('winning_variant_id'),
+    promotedEditionId: text('promoted_edition_id').references(() => dailyEditions.id, {
+      onDelete: 'set null',
+    }),
+    failureMessage: text('failure_message'),
+    abandonmentReason: text('abandonment_reason'),
+    lockedAt: integer('locked_at'),
+    decidedAt: integer('decided_at'),
+    promotedAt: integer('promoted_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    index('editorial_experiments_user_status_idx').on(table.userId, table.status, table.updatedAt),
+    index('editorial_experiments_user_date_idx').on(
+      table.userId,
+      table.editionDate,
+      table.updatedAt
+    ),
+  ]
+);
+
+export const editorialExperimentVariants = sqliteTable(
+  'editorial_experiment_variants',
+  {
+    id: text('id').primaryKey(),
+    experimentId: text('experiment_id')
+      .notNull()
+      .references(() => editorialExperiments.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    label: text('label').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    bundleKey: text('bundle_key').notNull(),
+    contentHash: text('content_hash').notNull(),
+    snapshotId: text('snapshot_id').notNull(),
+    editionId: text('edition_id').notNull(),
+    headline: text('headline').notNull(),
+    qualityScore: real('quality_score').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('editorial_experiment_variants_experiment_label_idx').on(
+      table.experimentId,
+      table.label
+    ),
+    index('editorial_experiment_variants_user_experiment_idx').on(
+      table.userId,
+      table.experimentId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const editorialExperimentReviews = sqliteTable(
+  'editorial_experiment_reviews',
+  {
+    id: text('id').primaryKey(),
+    experimentId: text('experiment_id')
+      .notNull()
+      .references(() => editorialExperiments.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    clientEventId: text('client_event_id').notNull(),
+    preference: text('preference').notNull(),
+    notes: text('notes').notNull(),
+    payloadHash: text('payload_hash').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('editorial_experiment_reviews_user_client_event_idx').on(
+      table.userId,
+      table.clientEventId
+    ),
+    index('editorial_experiment_reviews_experiment_created_idx').on(
+      table.experimentId,
+      table.createdAt
+    ),
+  ]
+);
+
 // Items (Canonical Content)
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.

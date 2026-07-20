@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CreateEditorialExperimentSchema,
+  EditorialCandidateFramingSchema,
+  EditorialExperimentSchema,
   FailEditorialRunSchema,
   EditorialFeedbackProfileSchema,
+  ReviewEditorialExperimentSchema,
   PublishEditorialEditionSchema,
   StartEditorialRunSchema,
   calculateQualityScore,
@@ -11,6 +15,93 @@ import {
   normalizeEditorialFeedbackTopicTokens,
   validateDailyEdition,
 } from './index';
+
+describe('editorial experiment contracts', () => {
+  it('requires a concrete brief before an experiment can be created', () => {
+    const brief = {
+      id: 'experiment-1',
+      title: 'Breadth versus engagement',
+      editionDate: '2026-07-19',
+      hypothesis: 'A broader portfolio will make the front page more useful.',
+      changeSummary: 'Reduce the influence of raw X engagement.',
+      desiredOutcomes: ['A non-technology story can lead when evidence supports it.'],
+      guardrails: ['Do not weaken source verification.'],
+    };
+    expect(CreateEditorialExperimentSchema.safeParse(brief).success).toBe(true);
+    expect(
+      CreateEditorialExperimentSchema.safeParse({ ...brief, desiredOutcomes: [] }).success
+    ).toBe(false);
+  });
+
+  it('accepts an immutable phone review and a resumable experiment read model', () => {
+    expect(
+      ReviewEditorialExperimentSchema.safeParse({
+        clientEventId: 'review-1',
+        preference: 'B',
+        notes: 'The lead and recommendation mix are stronger.',
+      }).success
+    ).toBe(true);
+    expect(
+      EditorialExperimentSchema.safeParse({
+        id: 'experiment-1',
+        title: 'Breadth versus engagement',
+        editionDate: '2026-07-19',
+        status: 'READY_FOR_REVIEW',
+        hypothesis: 'A broader portfolio will make the front page more useful.',
+        changeSummary: 'Reduce the influence of raw X engagement.',
+        desiredOutcomes: ['A non-technology story can lead when evidence supports it.'],
+        guardrails: ['Do not weaken source verification.'],
+        variants: [
+          {
+            id: 'variant-a',
+            label: 'A',
+            name: 'Control',
+            description: 'Current production behavior.',
+            editionId: 'edition-a',
+            headline: 'Control edition',
+            qualityScore: 84,
+            contentHash: 'a'.repeat(64),
+            createdAt: '2026-07-19T12:00:00.000Z',
+          },
+        ],
+        latestReview: null,
+        winningVariantId: null,
+        promotedEditionId: null,
+        failureMessage: null,
+        abandonmentReason: null,
+        lockedAt: '2026-07-19T11:00:00.000Z',
+        decidedAt: null,
+        promotedAt: null,
+        createdAt: '2026-07-19T10:00:00.000Z',
+        updatedAt: '2026-07-19T12:00:00.000Z',
+        nextAction: 'Review both variants on the phone.',
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('editorial candidate framing', () => {
+  it('retains the extractive methods and exact source pointers', () => {
+    expect(
+      EditorialCandidateFramingSchema.safeParse({
+        model: 'EXTRACTIVE_EDITORIAL_V1',
+        headlineMethod: 'EXTRACTIVE_POST',
+        summaryMethod: 'EXTRACTIVE_CONTEXT',
+        headlineSourceIds: ['x:1'],
+        summarySourceIds: ['x:1'],
+      }).success
+    ).toBe(true);
+    expect(
+      EditorialCandidateFramingSchema.safeParse({
+        model: 'EXTRACTIVE_EDITORIAL_V1',
+        headlineMethod: 'GENERATED',
+        summaryMethod: 'EXTRACTIVE_CONTEXT',
+        headlineSourceIds: [],
+        summarySourceIds: ['x:1'],
+      }).success
+    ).toBe(false);
+  });
+});
 
 function editionFixture() {
   const now = '2026-07-11T12:00:00.000Z';
@@ -308,6 +399,118 @@ describe('editorial validation', () => {
         snapshot: { ...snapshot, editionDate: '2026-07-12' },
       }).success
     ).toBe(false);
+    expect(
+      PublishEditorialEditionSchema.safeParse({
+        ...body,
+        candidateArtifact: {
+          schemaVersion: 2,
+          id: 'candidates-v2',
+          snapshotId: snapshot.id,
+          editionDate: snapshot.editionDate,
+          generatedAt: edition.generatedAt,
+          strategy: 'EDITORIAL_V2',
+          featureModel: 'CORPUS_TFIDF_V1',
+          weights: {
+            conversationBreadth: 0.16,
+            attention: 0.12,
+            recommendationStrength: 0.08,
+            momentum: 0.1,
+            freshness: 0.1,
+            personalRelevance: 0.12,
+            evidenceQuality: 0.12,
+            crossSource: 0.08,
+            historicalNovelty: 0.08,
+            serendipity: 0.04,
+          },
+          provenance: snapshot.provenance,
+          clusters: [
+            {
+              id: 'cluster-v2',
+              key: 'url:https://example.com/source',
+              title: 'Source',
+              firstSeenAt: edition.generatedAt,
+              lastSeenAt: edition.generatedAt,
+              topics: ['source'],
+              canonicalUrls: ['https://example.com/source'],
+              sourceIds: ['source-1'],
+              xSourceIds: [],
+              zineSourceIds: [],
+              externalSourceIds: ['source-1'],
+              featureModel: 'CORPUS_TFIDF_V1',
+            },
+          ],
+          candidates: [
+            {
+              id: 'candidate-v2',
+              clusterId: 'cluster-v2',
+              rank: 1,
+              title: 'Source',
+              summary: 'One outside-lens source formed this candidate.',
+              canonicalUrl: 'https://example.com/source',
+              sourceIds: ['source-1'],
+              representativeSourceIds: ['source-1'],
+              xSourceIds: [],
+              zineSourceIds: [],
+              externalSourceIds: ['source-1'],
+              zineMatches: [],
+              independentVoiceCount: 1,
+              sourceCount: 1,
+              xPostCount: 0,
+              xRunCount: 0,
+              explicitRecommendationCount: 0,
+              linkedSourceCount: 1,
+              historicalSimilarity: 0,
+              score: {
+                conversationBreadth: 50,
+                attention: 0,
+                recommendationStrength: 50,
+                momentum: 0,
+                freshness: 50,
+                personalRelevance: 0,
+                evidenceQuality: 50,
+                crossSource: 50,
+                historicalNovelty: 100,
+                serendipity: 50,
+                penalties: 0,
+                feedbackAdjustment: 0,
+                total: 50,
+              },
+              scoreReasons: ['Topic-neutral evidence formed this candidate.'],
+            },
+          ],
+          portfolio: {
+            algorithm: 'MMR_PORTFOLIO_V1',
+            targetSize: 1,
+            selectedCandidateIds: ['candidate-v2'],
+            decisions: [
+              {
+                candidateId: 'candidate-v2',
+                selected: true,
+                portfolioRank: 1,
+                selectionScore: 50,
+                redundancyPenalty: 0,
+                sourceConcentrationPenalty: 0,
+                historicalRepeatPenalty: 0,
+                reason: 'Selected on evidence strength.',
+              },
+            ],
+            editorialOverrides: [],
+            diagnostics: {
+              selectedCount: 1,
+              meanPairwiseSimilarity: 0,
+              maxPairwiseSimilarity: 0,
+              corpusTopicConcentration: 1,
+              selectedTopicConcentration: 1,
+              uniqueCreators: 1,
+              uniqueDomains: 1,
+              historicalRepeatRiskCount: 0,
+              originCounts: { x: 0, zine: 0, external: 1 },
+            },
+          },
+          coverageNotes: [],
+        },
+      }).success
+    ).toBe(true);
     expect(
       PublishEditorialEditionSchema.safeParse({
         ...body,
