@@ -60,7 +60,9 @@ struct ZineNativeApp: App {
     @ViewBuilder
     private var rootView: some View {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-screenshot-today-story-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-fixture") {
+            ScreenshotBookmarkDetailView()
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-story-fixture") {
             ScreenshotTodayStoryView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-fixtures") {
             ScreenshotTodayView()
