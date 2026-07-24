@@ -58,6 +58,10 @@ describe('article-body diagnostics', () => {
       failureCodes: [{ code: 'NOT_READERABLE', count: 1 }],
       dlqCount: 1,
     });
+    expect(prepare).toHaveBeenNthCalledWith(
+      2,
+      'SELECT COUNT(*) AS count FROM article_body_dlq_events WHERE resolved_at IS NULL'
+    );
     expect(JSON.stringify(result)).not.toContain('item_');
   });
 

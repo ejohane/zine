@@ -183,6 +183,13 @@
       "when": 1784891400000,
       "tag": "0025_add_article_body_enrollment_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784899320000,
+      "tag": "0026_add_article_body_dlq_resolution",
+      "breakpoints": true
     }
   ]
 }

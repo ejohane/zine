@@ -360,10 +360,12 @@ export const articleBodyDlqEvents = sqliteTable(
     attempts: integer('attempts').notNull(),
     errorCode: text('error_code'),
     deadLetteredAt: integer('dead_lettered_at').notNull(),
+    resolvedAt: integer('resolved_at'),
   },
   (table) => [
     index('article_body_dlq_events_dead_lettered_idx').on(table.deadLetteredAt),
     index('article_body_dlq_events_item_idx').on(table.itemId, table.deadLetteredAt),
+    index('article_body_dlq_events_resolved_idx').on(table.resolvedAt, table.deadLetteredAt),
   ]
 );
 
