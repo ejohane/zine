@@ -7,6 +7,7 @@ import type { Bindings } from '../types';
 import { processArticleBodyQueueMessage, RetryableArticleBodyError } from './processor';
 import { ArticleBodyQueueMessageSchema } from './schema';
 import {
+  getArticleBodyStatus,
   isArticleBodyPipelineEnabled,
   markArticleBodyProcessing,
   markArticleBodyRetryScheduled,
@@ -52,6 +53,20 @@ export async function handleArticleBodyQueue(
         event: 'article_body.queue.disabled',
         messageId: message.id,
         itemId: parsed.data.itemId,
+      });
+      message.ack();
+      continue;
+    }
+
+    const current = await getArticleBodyStatus(db, parsed.data.itemId);
+    if (current && current.targetExtractorVersion > parsed.data.extractorVersion) {
+      articleBodyLogger.info('Stale article-body queue message acknowledged', {
+        operation: 'article_body.queue',
+        event: 'article_body.queue.stale',
+        messageId: message.id,
+        itemId: parsed.data.itemId,
+        messageExtractorVersion: parsed.data.extractorVersion,
+        targetExtractorVersion: current.targetExtractorVersion,
       });
       message.ack();
       continue;

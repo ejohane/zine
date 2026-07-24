@@ -8,6 +8,7 @@ const {
   markArticleBodyProcessing,
   markArticleBodyRetryScheduled,
   markArticleBodyUnavailable,
+  getArticleBodyStatus,
   dlqValues,
   findItem,
 } = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const {
   markArticleBodyProcessing: vi.fn(),
   markArticleBodyRetryScheduled: vi.fn(),
   markArticleBodyUnavailable: vi.fn(),
+  getArticleBodyStatus: vi.fn(),
   dlqValues: vi.fn(),
   findItem: vi.fn(),
 }));
@@ -26,6 +28,7 @@ vi.mock('./service', () => ({
   markArticleBodyProcessing,
   markArticleBodyRetryScheduled,
   markArticleBodyUnavailable,
+  getArticleBodyStatus,
 }));
 
 import { handleArticleBodyDLQ, handleArticleBodyQueue } from './consumer';
@@ -63,6 +66,7 @@ function batch(message: ReturnType<typeof queueMessage>, queue = 'zine-article-b
 describe('article-body queue consumers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getArticleBodyStatus.mockResolvedValue(null);
     createDb.mockReturnValue({
       query: { items: { findFirst: findItem } },
       insert: vi.fn().mockReturnValue({ values: dlqValues }),
@@ -112,6 +116,22 @@ describe('article-body queue consumers', () => {
     expect(processor).toHaveBeenCalledWith(body(), expect.anything(), env);
     expect(message.ack).toHaveBeenCalledOnce();
     expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('acks an older extractor job without overwriting newer lifecycle state', async () => {
+    const message = queueMessage();
+    const processor = vi.fn();
+    getArticleBodyStatus.mockResolvedValue({ targetExtractorVersion: 2 });
+
+    await handleArticleBodyQueue(
+      batch(message),
+      { DB: {}, ARTICLE_BODY_PIPELINE_ENABLED: 'true' } as never,
+      processor
+    );
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(markArticleBodyProcessing).not.toHaveBeenCalled();
+    expect(processor).not.toHaveBeenCalled();
   });
 
   it('retries processor failures with bounded backoff', async () => {
