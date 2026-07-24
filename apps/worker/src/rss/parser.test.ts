@@ -62,6 +62,36 @@ describe('parseRssFeedXml', () => {
     expect(parsed.entries[0].creator).toBe('Atom Author');
     expect(parsed.entries[0].canonicalUrl).toBe('https://atom.example.com/post-1');
     expect(parsed.entries[0].imageUrl).toBe('https://cdn.atom.example.com/post-1.jpg');
+    expect(parsed.entries[0].articleBodyCandidate).toMatchObject({
+      sourceKind: 'ATOM_FULL',
+      sourceUrl: 'https://atom.example.com/feed.xml',
+      html: expect.stringContaining('<p>Atom summary</p>'),
+    });
+  });
+
+  it('retains richer RSS content separately from the display summary', () => {
+    const richBody = `<p>${'Full article paragraph with meaningful reporting. '.repeat(30)}</p>`;
+    const xml = `<?xml version="1.0"?>
+      <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+        <channel>
+          <title>Rich Feed</title>
+          <item>
+            <title>Full story</title>
+            <link>https://example.com/full-story</link>
+            <description><![CDATA[Short display summary]]></description>
+            <content:encoded><![CDATA[${richBody}]]></content:encoded>
+          </item>
+        </channel>
+      </rss>`;
+
+    const entry = parseRssFeedXml(xml, 'https://example.com/feed.xml').entries[0];
+
+    expect(entry.summary).toBe('Short display summary');
+    expect(entry.articleBodyCandidate).toEqual({
+      html: richBody,
+      sourceKind: 'RSS_FULL',
+      sourceUrl: 'https://example.com/feed.xml',
+    });
   });
 
   it('falls back to hash identity when link/guid are missing', () => {

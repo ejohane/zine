@@ -7,6 +7,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { trpcServer } from '@hono/trpc-server';
+import { handleArticleBodyDLQ, handleArticleBodyQueue } from './article-body/consumer';
+import type { ArticleBodyQueueMessage } from './article-body/types';
 import {
   ZINE_VERSION,
   TELEMETRY_CLIENT_REQUEST_HEADER,
@@ -33,6 +35,7 @@ import { appRouter } from './trpc/router';
 import { createContext } from './trpc/context';
 import { getDependencyHealth, getQueueHealth } from './diagnostics/health';
 import { backfillBookmarkEnrichment } from './admin/enrichment-backfill';
+import { backfillArticleBodies } from './admin/article-body-backfill';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -209,6 +212,49 @@ app.post('/admin/enrichment/backfill', async (c) => {
   });
 });
 
+app.post('/admin/article-bodies/backfill', async (c) => {
+  const configuredSecret = c.env.ARTICLE_BODY_BACKFILL_SECRET;
+  if (!configuredSecret) {
+    return c.json(
+      {
+        error: 'Article-body backfill is not configured',
+        code: 'BACKFILL_NOT_CONFIGURED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      503
+    );
+  }
+
+  const authHeader = c.req.header('Authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token || token !== configuredSecret) {
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      401
+    );
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const result = await backfillArticleBodies(c.env, {
+    dryRun: typeof body.dryRun === 'boolean' ? body.dryRun : true,
+    limit: typeof body.limit === 'number' ? body.limit : undefined,
+    cursor: typeof body.cursor === 'string' && body.cursor.length > 0 ? body.cursor : null,
+    traceId: c.get('traceId'),
+  });
+
+  return c.json({
+    ...result,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  });
+});
+
 // tRPC Routes
 
 // Apply auth middleware to tRPC routes (required for protected procedures)
@@ -322,7 +368,7 @@ export default {
   /**
    * Queue handler for async jobs and DLQ monitoring.
    *
-   * Handles four queues:
+   * Handles six queues:
    * 1. SYNC_QUEUE: Primary sync queue for processing subscriptions
    *    - Non-blocking pull-to-refresh (< 500ms response time)
    *    - Error isolation (one subscription failing doesn't affect others)
@@ -331,9 +377,11 @@ export default {
    * 2. SYNC_DLQ: Dead Letter Queue for failed sync messages
    * 3. ENRICHMENT_QUEUE: Bookmark enrichment and embedding generation
    * 4. ENRICHMENT_DLQ: Dead Letter Queue for failed enrichment messages
+   * 5. ARTICLE_BODY_QUEUE: Versioned article-body acquisition jobs
+   * 6. ARTICLE_BODY_DLQ: Durable audit of exhausted article-body jobs
    *    - Captures messages that exhausted all retries
    *    - Logs at ERROR level for Cloudflare dashboard alerts
-   *    - Stores entries in KV for investigation and potential replay
+   *    - Stores aggregate-safe events in D1 for investigation and potential replay
    *
    * The queue name is available in batch.queue to differentiate handlers.
    *
@@ -341,10 +389,20 @@ export default {
    * @see zine-m2oq: Task: Add monitoring/alerting for sync queue DLQ
    */
   async queue(
-    batch: MessageBatch<SyncQueueMessage | EnrichmentQueueMessage>,
+    batch: MessageBatch<SyncQueueMessage | EnrichmentQueueMessage | ArticleBodyQueueMessage>,
     env: Bindings,
     _ctx: ExecutionContext
   ): Promise<void> {
+    if (batch.queue.includes('article-body-dlq')) {
+      await handleArticleBodyDLQ(batch as MessageBatch<ArticleBodyQueueMessage>, env);
+      return;
+    }
+
+    if (batch.queue.includes('article-body')) {
+      await handleArticleBodyQueue(batch as MessageBatch<ArticleBodyQueueMessage>, env);
+      return;
+    }
+
     if (batch.queue.includes('enrichment-dlq')) {
       await handleEnrichmentDLQ(batch as MessageBatch<EnrichmentQueueMessage>, env);
       return;

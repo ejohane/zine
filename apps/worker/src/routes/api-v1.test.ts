@@ -29,6 +29,8 @@ const {
   mockMarkOpened,
   mockUpdateProgress,
   mockGetArticleContent,
+  mockGetArticleBodyStatus,
+  mockGetArticleBodyArtifact,
   mockListTags,
   mockPreview,
   mockSave,
@@ -104,6 +106,8 @@ const {
   mockMarkOpened: vi.fn(),
   mockUpdateProgress: vi.fn(),
   mockGetArticleContent: vi.fn(),
+  mockGetArticleBodyStatus: vi.fn(),
+  mockGetArticleBodyArtifact: vi.fn(),
   mockListTags: vi.fn(),
   mockPreview: vi.fn(),
   mockSave: vi.fn(),
@@ -160,6 +164,18 @@ const {
 
 vi.mock('../db', () => ({
   createDb: mockCreateDb,
+}));
+
+vi.mock('../article-body/service', async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
+  return {
+    ...actual,
+    getArticleBodyStatus: mockGetArticleBodyStatus,
+  };
+});
+
+vi.mock('../article-body/storage', () => ({
+  getArticleBodyArtifact: mockGetArticleBodyArtifact,
 }));
 
 vi.mock('../trpc/context', () => ({
@@ -370,6 +386,8 @@ describe('apiV1Routes', () => {
       userId: 'clerk_user_123',
       payload: { sub: 'clerk_user_123' },
     });
+    mockGetArticleBodyStatus.mockResolvedValue(null);
+    mockGetArticleBodyArtifact.mockResolvedValue(null);
     mockConnectionsList.mockResolvedValue({
       YOUTUBE: null,
       SPOTIFY: null,
@@ -2443,6 +2461,131 @@ describe('apiV1Routes', () => {
     expect(mockGetArticleContent).toHaveBeenCalledWith({ itemId: 'item_1' });
     expect((await res.json()) as JsonBody).toMatchObject({
       content: '<article>Body</article>',
+      articleBody: {
+        availability: 'AVAILABLE',
+        pipelineStatus: 'LEGACY',
+        sourceKind: 'LEGACY',
+        qualityWarnings: ['LEGACY_UNNORMALIZED'],
+      },
+    });
+  });
+
+  it('reports unavailable when no article body has been requested or stored', async () => {
+    mockGetItem.mockResolvedValue({ id: 'ui_1', itemId: 'item_1', title: 'Article' });
+    mockGetArticleContent.mockResolvedValue({ content: null });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: null,
+      articleBody: {
+        availability: 'UNAVAILABLE',
+        pipelineStatus: 'NOT_REQUESTED',
+      },
+    });
+  });
+
+  it('serves the current versioned artifact with its availability metadata', async () => {
+    mockGetItem.mockResolvedValue({ id: 'ui_1', itemId: 'item_1', title: 'Article' });
+    mockGetArticleContent.mockResolvedValue({ content: '<article>Legacy</article>' });
+    mockGetArticleBodyStatus.mockResolvedValue({
+      status: 'AVAILABLE',
+      targetExtractorVersion: 1,
+      attemptCount: 1,
+      lastErrorCode: null,
+      lastHttpStatus: 200,
+      lastAttemptAt: 1700000000000,
+      nextAttemptAt: null,
+      updatedAt: 1700000000000,
+      versionId: 'version_1',
+      schemaVersion: 1,
+      extractorVersion: 1,
+      sourceKind: 'RSS_FULL',
+      contentHash: `sha256:${'a'.repeat(64)}`,
+      r2Key: 'articles/v2/item_1/hash.json',
+      wordCount: 500,
+      readingTimeMinutes: 3,
+      qualityScore: 0.98,
+      qualityWarningsJson: '[]',
+    });
+    mockGetArticleBodyArtifact.mockResolvedValue({
+      sanitizedHtml: '<article>Versioned</article>',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockGetArticleBodyArtifact).toHaveBeenCalledWith(
+      expect.anything(),
+      'articles/v2/item_1/hash.json'
+    );
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: '<article>Versioned</article>',
+      articleBody: {
+        availability: 'AVAILABLE',
+        pipelineStatus: 'AVAILABLE',
+        sourceKind: 'RSS_FULL',
+        wordCount: 500,
+      },
+    });
+  });
+
+  it('serves legacy content as degraded when the current immutable artifact is missing', async () => {
+    mockGetItem.mockResolvedValue({ id: 'ui_1', itemId: 'item_1', title: 'Article' });
+    mockGetArticleContent.mockResolvedValue({ content: '<article>Legacy fallback</article>' });
+    mockGetArticleBodyStatus.mockResolvedValue({
+      status: 'AVAILABLE',
+      targetExtractorVersion: 1,
+      attemptCount: 1,
+      lastErrorCode: null,
+      lastHttpStatus: 200,
+      lastAttemptAt: 1700000000000,
+      nextAttemptAt: null,
+      updatedAt: 1700000000000,
+      versionId: 'version_1',
+      schemaVersion: 1,
+      extractorVersion: 1,
+      sourceKind: 'PUBLIC_WEB',
+      contentHash: `sha256:${'b'.repeat(64)}`,
+      r2Key: 'articles/v2/item_1/missing.json',
+      wordCount: 100,
+      readingTimeMinutes: 1,
+      qualityScore: 0.9,
+      qualityWarningsJson: '[]',
+    });
+    mockGetArticleBodyArtifact.mockResolvedValue(null);
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: '<article>Legacy fallback</article>',
+      articleBody: {
+        availability: 'DEGRADED',
+        pipelineStatus: 'AVAILABLE',
+        sourceKind: 'LEGACY',
+        lastErrorCode: 'ARTIFACT_MISSING',
+        qualityWarnings: ['MISSING_CURRENT_VERSION', 'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY'],
+      },
     });
   });
 

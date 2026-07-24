@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDependencyHealth, getQueueHealth } from './health';
 
-const { getDLQSummary } = vi.hoisted(() => ({
+const { getDLQSummary, getArticleBodyHealth } = vi.hoisted(() => ({
   getDLQSummary: vi.fn(),
+  getArticleBodyHealth: vi.fn(),
 }));
 
 vi.mock('../sync/dlq-consumer', () => ({
   getDLQSummary,
+}));
+
+vi.mock('../article-body/diagnostics', () => ({
+  getArticleBodyHealth,
 }));
 
 describe('getDependencyHealth', () => {
@@ -31,6 +36,19 @@ describe('getDependencyHealth', () => {
 describe('getQueueHealth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getArticleBodyHealth.mockResolvedValue({
+      status: 'ok',
+      enabled: false,
+      configured: true,
+      states: {
+        PENDING: 0,
+        PROCESSING: 0,
+        AVAILABLE: 10,
+        DEGRADED: 1,
+        UNAVAILABLE: 2,
+      },
+      dlqCount: 0,
+    });
   });
 
   it('returns safe DLQ summaries without correlation identifiers', async () => {
@@ -83,5 +101,31 @@ describe('getQueueHealth', () => {
         },
       },
     ]);
+    expect(result.queues.articleBody).toMatchObject({
+      enabled: false,
+      configured: true,
+      states: { AVAILABLE: 10, DEGRADED: 1, UNAVAILABLE: 2 },
+      dlqCount: 0,
+    });
+  });
+
+  it('degrades when article-body DLQ events exist', async () => {
+    getDLQSummary.mockResolvedValue({
+      count: 0,
+      oldestAt: null,
+      newestAt: null,
+      recent: [],
+    });
+    getArticleBodyHealth.mockResolvedValue({
+      status: 'ok',
+      enabled: false,
+      configured: true,
+      states: {},
+      dlqCount: 1,
+    });
+
+    const result = await getQueueHealth({ OAUTH_STATE_KV: {} } as never);
+
+    expect(result.status).toBe('degraded');
   });
 });
