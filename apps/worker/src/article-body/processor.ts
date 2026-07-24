@@ -5,7 +5,11 @@ import { creators, items } from '../db/schema';
 import { logger } from '../lib/logger';
 import type { Bindings } from '../types';
 import { acquireArticleBody } from './acquisition';
-import { markArticleBodyUnavailable, publishArticleBodyArtifact } from './service';
+import {
+  markArticleBodyUnavailable,
+  publishArticleBodyArtifact,
+  resolveArticleBodyDlqEvents,
+} from './service';
 import type { ArticleBodyQueueMessage } from './types';
 
 const processorLogger = logger.child('article-body-processor');
@@ -89,6 +93,7 @@ export async function processArticleBodyQueueMessage(
     await markArticleBodyUnavailable(db, item.id, result.errorCode ?? 'NO_ACCEPTABLE_BODY', {
       httpStatus: result.lastHttpStatus,
     });
+    await resolveArticleBodyDlqEvents(db, item.id, message.extractorVersion);
     return;
   }
 

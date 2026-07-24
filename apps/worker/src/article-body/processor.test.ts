@@ -1,15 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { acquireArticleBody, markArticleBodyUnavailable, publishArticleBodyArtifact } = vi.hoisted(
-  () => ({
-    acquireArticleBody: vi.fn(),
-    markArticleBodyUnavailable: vi.fn(),
-    publishArticleBodyArtifact: vi.fn(),
-  })
-);
+const {
+  acquireArticleBody,
+  markArticleBodyUnavailable,
+  publishArticleBodyArtifact,
+  resolveArticleBodyDlqEvents,
+} = vi.hoisted(() => ({
+  acquireArticleBody: vi.fn(),
+  markArticleBodyUnavailable: vi.fn(),
+  publishArticleBodyArtifact: vi.fn(),
+  resolveArticleBodyDlqEvents: vi.fn(),
+}));
 
 vi.mock('./acquisition', () => ({ acquireArticleBody }));
-vi.mock('./service', () => ({ markArticleBodyUnavailable, publishArticleBodyArtifact }));
+vi.mock('./service', () => ({
+  markArticleBodyUnavailable,
+  publishArticleBodyArtifact,
+  resolveArticleBodyDlqEvents,
+}));
 
 import { articleBodyProcessorInternals, processArticleBodyQueueMessage } from './processor';
 import type { RetryableArticleBodyError } from './processor';
@@ -120,6 +128,7 @@ describe('article-body processor', () => {
     expect(markArticleBodyUnavailable).toHaveBeenCalledWith(db, 'item_1', 'NOT_READERABLE', {
       httpStatus: 200,
     });
+    expect(resolveArticleBodyDlqEvents).toHaveBeenCalledWith(db, 'item_1', 1);
   });
 
   it('throws a typed error for transient acquisition failures', async () => {
