@@ -17,6 +17,8 @@ import {
   type ArticleBodyTrigger,
 } from './types';
 
+const ARTICLE_BODY_PENDING_RECOVERY_GRACE_MS = 10 * 60 * 1_000;
+
 export interface ArticleBodyStatusRecord {
   status: ArticleBodyStatus;
   targetExtractorVersion: number;
@@ -429,10 +431,16 @@ export async function enqueueArticleBody(
   const now = input.now ?? Date.now();
   const extractorVersion = input.extractorVersion ?? ARTICLE_BODY_EXTRACTOR_VERSION;
   const current = await getArticleBodyStatus(db, input.itemId);
+  const canRecoverOverduePending =
+    current?.status === 'PENDING' &&
+    current.nextAttemptAt !== null &&
+    current.nextAttemptAt <= now - ARTICLE_BODY_PENDING_RECOVERY_GRACE_MS &&
+    (input.trigger === 'reader_open' || input.trigger === 'repair');
   if (
     current &&
     (current.status === 'PENDING' || current.status === 'PROCESSING') &&
-    current.targetExtractorVersion >= extractorVersion
+    current.targetExtractorVersion >= extractorVersion &&
+    !canRecoverOverduePending
   ) {
     return { queued: false, reason: 'already_queued' };
   }

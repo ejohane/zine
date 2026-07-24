@@ -55,6 +55,25 @@ describe('article-body enqueue', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('allows reader demand to recover a retry that remains pending past its grace window', async () => {
+    const now = 1_700_001_000_000;
+    const db = createDb(
+      status({
+        status: 'PENDING',
+        nextAttemptAt: now - 10 * 60 * 1_000,
+      })
+    );
+    const send = vi.fn().mockResolvedValue(undefined);
+    const result = await enqueueArticleBody(
+      db as never,
+      { ARTICLE_BODY_PIPELINE_ENABLED: 'true', ARTICLE_BODY_QUEUE: { send } as never },
+      { itemId: 'item_1', trigger: 'reader_open', now }
+    );
+
+    expect(result).toMatchObject({ queued: true });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
   it('does not replace a current artifact outside an explicit repair', async () => {
     const db = createDb(
       status({
