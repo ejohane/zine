@@ -63,6 +63,8 @@ const WORD_PATTERN = /[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu;
 const TRAILING_BOILERPLATE_PATTERNS = [
   /^(?:blog )?comments powered by disqus$/i,
   /^powered by disqus$/i,
+  /^copy as\s*\/\s*view markdown$/i,
+  /^this page respects your privacy by not using cookies or similar technologies\b/i,
 ];
 
 export interface ArticleBodyNormalizationDiagnostics {

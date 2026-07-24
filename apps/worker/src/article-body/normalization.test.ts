@@ -46,6 +46,18 @@ describe('normalizeArticleBodyHtml', () => {
     expect(normalized.diagnostics.droppedElements).toBe(1);
   });
 
+  it('removes stacked site controls and privacy copy from the article tail', () => {
+    const normalized = normalizeArticleBodyHtml(
+      '<p>A complete article conclusion.</p><p>copy as / view markdown</p><p>This page respects your privacy by not using cookies or similar technologies and by not collecting personally identifiable information.</p>',
+      'https://example.com/story'
+    );
+
+    expect(normalized.plainText).toBe('A complete article conclusion.');
+    expect(normalized.sanitizedHtml).not.toContain('view markdown');
+    expect(normalized.sanitizedHtml).not.toContain('respects your privacy');
+    expect(normalized.diagnostics.droppedElements).toBe(2);
+  });
+
   it('recovers long prose wrapped in a pre element without rewriting code blocks', () => {
     const proseParagraph =
       'This is a complete prose sentence about dependable reading systems and careful product decisions.';
