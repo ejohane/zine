@@ -134,6 +134,27 @@ describe('article-body queue consumers', () => {
     expect(processor).not.toHaveBeenCalled();
   });
 
+  it('acks a late duplicate after the same extractor version has already published', async () => {
+    const message = queueMessage();
+    const processor = vi.fn();
+    getArticleBodyStatus.mockResolvedValue({
+      status: 'AVAILABLE',
+      targetExtractorVersion: 1,
+      extractorVersion: 1,
+      versionId: 'version_1',
+    });
+
+    await handleArticleBodyQueue(
+      batch(message),
+      { DB: {}, ARTICLE_BODY_PIPELINE_ENABLED: 'true' } as never,
+      processor
+    );
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(markArticleBodyProcessing).not.toHaveBeenCalled();
+    expect(processor).not.toHaveBeenCalled();
+  });
+
   it('retries processor failures with bounded backoff', async () => {
     const message = queueMessage(body(), 2);
     const processor = vi.fn().mockRejectedValue(new Error('not installed'));

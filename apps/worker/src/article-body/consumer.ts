@@ -71,6 +71,22 @@ export async function handleArticleBodyQueue(
       message.ack();
       continue;
     }
+    if (
+      current?.versionId &&
+      (current.status === 'AVAILABLE' || current.status === 'DEGRADED') &&
+      (current.extractorVersion ?? 0) >= parsed.data.extractorVersion
+    ) {
+      articleBodyLogger.info('Completed article-body queue message acknowledged', {
+        operation: 'article_body.queue',
+        event: 'article_body.queue.completed',
+        messageId: message.id,
+        itemId: parsed.data.itemId,
+        messageExtractorVersion: parsed.data.extractorVersion,
+        currentExtractorVersion: current.extractorVersion,
+      });
+      message.ack();
+      continue;
+    }
 
     try {
       await markArticleBodyProcessing(db, parsed.data.itemId, message.attempts);
