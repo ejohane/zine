@@ -45,4 +45,17 @@ describe('normalizeArticleBodyHtml', () => {
     expect(normalized.sanitizedHtml).not.toContain('blog comments powered by Disqus');
     expect(normalized.diagnostics.droppedElements).toBe(1);
   });
+
+  it('recovers long prose wrapped in a pre element without rewriting code blocks', () => {
+    const proseParagraph =
+      'This is a complete prose sentence about dependable reading systems and careful product decisions.';
+    const normalized = normalizeArticleBodyHtml(
+      `<pre>${Array.from({ length: 12 }, (_, index) => `${proseParagraph} Paragraph ${index + 1}.`).join('\n\n')}</pre><pre>function keepAsCode() {\n  return true;\n}</pre>`,
+      'https://example.com/story'
+    );
+
+    expect(normalized.blocks.filter((block) => block.kind === 'paragraph')).toHaveLength(12);
+    expect(normalized.sanitizedHtml).toContain('<p>This is a complete prose sentence');
+    expect(normalized.sanitizedHtml).toContain('<pre>function keepAsCode()');
+  });
 });

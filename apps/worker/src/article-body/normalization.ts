@@ -116,6 +116,31 @@ function blockKind(element: Element): string {
   return 'paragraph';
 }
 
+function recoverProsePreBlocks(root: Element): void {
+  const document = root.ownerDocument;
+  if (!document) return;
+
+  for (const pre of Array.from(root.querySelectorAll('pre'))) {
+    const rawText = (pre.textContent ?? '').replace(/\r\n?/g, '\n').trim();
+    const wordCount = rawText.match(WORD_PATTERN)?.length ?? 0;
+    const paragraphTexts = rawText
+      .split(/\n\s*\n+/)
+      .map(normalizeWhitespace)
+      .filter(Boolean);
+    const sentenceCount = rawText.match(/[.!?](?:\s|$)/g)?.length ?? 0;
+
+    if (wordCount < 120 || paragraphTexts.length < 3 || sentenceCount < 5) continue;
+
+    const replacement = document.createElement('div');
+    for (const text of paragraphTexts) {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = text;
+      replacement.appendChild(paragraph);
+    }
+    pre.replaceWith(replacement);
+  }
+}
+
 function dropKnownTrailingBoilerplate(
   root: Element,
   diagnostics: ArticleBodyNormalizationDiagnostics
@@ -202,6 +227,7 @@ export function normalizeArticleBodyHtml(rawHtml: string, baseUrl: string): Norm
     }
   }
 
+  recoverProsePreBlocks(root);
   dropKnownTrailingBoilerplate(root, diagnostics);
 
   const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR))
