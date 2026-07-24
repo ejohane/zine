@@ -12,6 +12,7 @@ Phase 3 turns the article-body foundation into a user-facing native reading expe
 - The protected cache is isolated by authenticated user, stores only readable responses, and retains at most 50 immutable article documents.
 - Enrollment is staged independently from queue processing with `ARTICLE_BODY_ENROLLMENT_MODE=off|reader|saved|all`. Terminal failures at the current extractor version are not repeatedly enqueued by ordinary product triggers; repair jobs and extractor upgrades remain available.
 - Bookmark and RSS enrollment are best effort and never make the primary save or ingestion operation fail.
+- Article acquisition is intentionally serialized in one-message queue batches so a bounded cohort cannot create a burst of requests that trips publisher rate limits.
 - `/health/queues` reports safe aggregate enrollment outcomes, source mix, latency, failure codes, pending age, and DLQ count without exposing item or user identifiers.
 - The production rollout passes the reader-demand, saved-item, and new-RSS-entry stages; the reviewed production cohort meets the extraction quality gate; the native app is built, installed, launched, and manually checked on a physical iPhone.
 - The merged `main` Worker deployment is verified by release SHA and production health/API readback.

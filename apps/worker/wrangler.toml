@@ -92,9 +92,10 @@ max_batch_timeout = 30
 
 [[queues.consumers]]
 queue = "zine-article-body-queue-dev"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-dev"
 
 [[queues.consumers]]
@@ -193,9 +194,10 @@ max_batch_size = 5
 max_batch_timeout = 30
 [[env.staging.queues.consumers]]
 queue = "zine-article-body-queue-staging"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-staging"
 [[env.staging.queues.consumers]]
 queue = "zine-article-body-dlq-staging"
@@ -283,9 +285,10 @@ max_batch_size = 5
 max_batch_timeout = 30
 [[env.production.queues.consumers]]
 queue = "zine-article-body-queue-prod"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-prod"
 [[env.production.queues.consumers]]
 queue = "zine-article-body-dlq-prod"
