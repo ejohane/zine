@@ -15,6 +15,7 @@ Phase 3 turns the article-body foundation into a user-facing native reading expe
 - Article acquisition is intentionally serialized in one-message queue batches so a bounded cohort cannot create a burst of requests that trips publisher rate limits.
 - If a public Substack page and its public post JSON endpoint are both throttled, acquisition may use Jina Reader's unauthenticated, rate-limited HTML rendering endpoint for that same public URL. The result still passes Zine's normal extraction, sanitization, provenance, and quality gates.
 - `/health/queues` reports safe aggregate enrollment outcomes, source mix, latency, failure codes, pending age, and DLQ count without exposing item or user identifiers.
+- Dead-letter audit rows remain durable, but a later successful repair marks matching item/version events resolved so queue health reflects the actionable backlog rather than permanent history.
 - The production rollout passes the reader-demand, saved-item, and new-RSS-entry stages; the reviewed production cohort meets the extraction quality gate; the native app is built, installed, launched, and manually checked on a physical iPhone.
 - The merged `main` Worker deployment is verified by release SHA and production health/API readback.
 

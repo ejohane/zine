@@ -1,8 +1,8 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull, lte } from 'drizzle-orm';
 import { ulid } from 'ulid';
 
 import type { Database } from '../db';
-import { articleBodyStates, articleBodyVersions } from '../db/schema';
+import { articleBodyDlqEvents, articleBodyStates, articleBodyVersions } from '../db/schema';
 import type { Bindings } from '../types';
 import { ArticleBodyQueueMessageSchema } from './schema';
 import { putArticleBodyArtifact } from './storage';
@@ -383,7 +383,27 @@ export async function publishArticleBodyArtifact(
       },
     });
 
+  await resolveArticleBodyDlqEvents(db, artifact.itemId, artifact.extractorVersion, now);
+
   return { versionId, r2Key: stored.key, created: stored.created };
+}
+
+export async function resolveArticleBodyDlqEvents(
+  db: Database,
+  itemId: string,
+  extractorVersion: number,
+  now: number = Date.now()
+): Promise<void> {
+  await db
+    .update(articleBodyDlqEvents)
+    .set({ resolvedAt: now })
+    .where(
+      and(
+        eq(articleBodyDlqEvents.itemId, itemId),
+        lte(articleBodyDlqEvents.extractorVersion, extractorVersion),
+        isNull(articleBodyDlqEvents.resolvedAt)
+      )
+    );
 }
 
 export async function enqueueArticleBody(

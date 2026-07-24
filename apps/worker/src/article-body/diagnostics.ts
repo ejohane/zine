@@ -66,7 +66,9 @@ export async function getArticleBodyHealth(env: Bindings): Promise<ArticleBodyHe
       env.DB.prepare(
         'SELECT status, COUNT(*) AS count FROM article_body_states GROUP BY status'
       ).all<{ status: ArticleBodyStatus; count: number }>(),
-      env.DB.prepare('SELECT COUNT(*) AS count FROM article_body_dlq_events').first<{
+      env.DB.prepare(
+        'SELECT COUNT(*) AS count FROM article_body_dlq_events WHERE resolved_at IS NULL'
+      ).first<{
         count: number;
       }>(),
       env.DB.prepare(
