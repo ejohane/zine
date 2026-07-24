@@ -1,4 +1,5 @@
 import { extractArticleFromHtml } from '../lib/article-extractor';
+import { parseRssFeedXml } from '../rss/parser';
 import { buildArticleBodyArtifact } from './artifact';
 import { normalizeArticleBodyHtml, type NormalizedArticleBody } from './normalization';
 import {
@@ -16,7 +17,7 @@ import { isSafePublicArticleUrl } from './url-safety';
 
 export { isSafePublicArticleUrl } from './url-safety';
 
-const ARTICLE_FETCH_TIMEOUT_MS = 12_000;
+const ARTICLE_FETCH_TIMEOUT_MS = 20_000;
 const MAX_ARTICLE_HTML_BYTES = 5 * 1024 * 1024;
 const MAX_ARTICLE_REDIRECTS = 5;
 
@@ -77,6 +78,22 @@ interface EvaluatedCandidate {
   assessment: ArticleBodyQualityAssessment;
   normalized: NormalizedArticleBody;
   attempt: ArticleBodyAcquisitionAttempt;
+}
+
+interface SubstackApiCandidateResult {
+  evaluated: EvaluatedCandidate | null;
+  httpStatus: number | null;
+}
+
+interface NewsletterFallbackResult {
+  evaluated: EvaluatedCandidate | null;
+  errorCode: string | null;
+  httpStatus: number | null;
+}
+
+interface SubstackFeedCandidateResult {
+  evaluated: EvaluatedCandidate | null;
+  publicationArticleUrl: string | null;
 }
 
 async function evaluateCandidate(
@@ -161,9 +178,11 @@ async function fetchSubstackApiCandidate(
   extractedAt: number,
   extractorVersion: number,
   signal: AbortSignal
-): Promise<EvaluatedCandidate | null> {
+): Promise<SubstackApiCandidateResult> {
   const apiUrl = resolveSubstackPostApiUrl(articleUrl);
-  if (!apiUrl || !isSafePublicArticleUrl(apiUrl)) return null;
+  if (!apiUrl || !isSafePublicArticleUrl(apiUrl)) {
+    return { evaluated: null, httpStatus: null };
+  }
 
   let responseUrl = apiUrl;
   let response: Response | null = null;
@@ -179,41 +198,143 @@ async function fetchSubstackApiCandidate(
     if (response.status < 300 || response.status >= 400) break;
 
     const location = response.headers.get('location');
-    if (!location || redirects === MAX_ARTICLE_REDIRECTS) return null;
+    if (!location || redirects === MAX_ARTICLE_REDIRECTS) {
+      return { evaluated: null, httpStatus: response.status };
+    }
     const nextUrl = new URL(location, responseUrl).href;
-    if (!isSafePublicArticleUrl(nextUrl)) return null;
+    if (!isSafePublicArticleUrl(nextUrl)) {
+      return { evaluated: null, httpStatus: response.status };
+    }
     responseUrl = nextUrl;
   }
 
-  if (!response?.ok) return null;
+  if (!response?.ok) {
+    return { evaluated: null, httpStatus: response?.status ?? null };
+  }
   const contentLength = Number(response.headers.get('content-length') ?? 0);
-  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) return null;
+  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) {
+    return { evaluated: null, httpStatus: response.status };
+  }
   const raw = await response.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_ARTICLE_HTML_BYTES) return null;
+  if (new TextEncoder().encode(raw).byteLength > MAX_ARTICLE_HTML_BYTES) {
+    return { evaluated: null, httpStatus: response.status };
+  }
 
   let payload: unknown;
   try {
     payload = JSON.parse(raw);
   } catch {
-    return null;
+    return { evaluated: null, httpStatus: response.status };
   }
-  if (!payload || typeof payload !== 'object') return null;
+  if (!payload || typeof payload !== 'object') {
+    return { evaluated: null, httpStatus: response.status };
+  }
   const post = payload as Record<string, unknown>;
-  if (typeof post.body_html !== 'string' || post.body_html.trim().length === 0) return null;
+  if (typeof post.body_html !== 'string' || post.body_html.trim().length === 0) {
+    return { evaluated: null, httpStatus: response.status };
+  }
 
-  return evaluateCandidate(
-    input,
-    {
-      html: post.body_html,
-      sourceKind: 'PUBLIC_NEWSLETTER',
-      sourceUrl: responseUrl,
-      extractedTitle: typeof post.title === 'string' ? post.title : null,
-      publishedAt: typeof post.post_date === 'string' ? post.post_date : null,
-      httpStatus: response.status,
-    },
-    extractedAt,
-    extractorVersion
-  );
+  return {
+    evaluated: await evaluateCandidate(
+      input,
+      {
+        html: post.body_html,
+        sourceKind: 'PUBLIC_NEWSLETTER',
+        sourceUrl: responseUrl,
+        extractedTitle: typeof post.title === 'string' ? post.title : null,
+        publishedAt: typeof post.post_date === 'string' ? post.post_date : null,
+        httpStatus: response.status,
+      },
+      extractedAt,
+      extractorVersion
+    ),
+    httpStatus: response.status,
+  };
+}
+
+async function fetchSubstackFeedCandidate(
+  input: ArticleBodyAcquisitionInput,
+  articleUrl: string,
+  fetchImplementation: typeof fetch,
+  extractedAt: number,
+  extractorVersion: number,
+  signal: AbortSignal
+): Promise<SubstackFeedCandidateResult> {
+  const postUrl = resolveSubstackPostApiUrl(articleUrl);
+  if (!postUrl) return { evaluated: null, publicationArticleUrl: null };
+
+  const articlePath = new URL(articleUrl).pathname.replace(/\/$/, '');
+  let responseUrl = new URL('/feed', articleUrl).href;
+  let response: Response | null = null;
+  for (let redirects = 0; redirects <= MAX_ARTICLE_REDIRECTS; redirects += 1) {
+    response = await fetchImplementation(responseUrl, {
+      redirect: 'manual',
+      signal,
+      headers: {
+        'User-Agent': 'ZineBot/2.0 (+https://zine.app/bot)',
+        Accept: 'application/rss+xml,application/atom+xml,application/xml,text/xml',
+      },
+    });
+    if (response.status < 300 || response.status >= 400) break;
+
+    const location = response.headers.get('location');
+    if (!location || redirects === MAX_ARTICLE_REDIRECTS) {
+      return { evaluated: null, publicationArticleUrl: null };
+    }
+    const nextUrl = new URL(location, responseUrl).href;
+    if (!isSafePublicArticleUrl(nextUrl)) {
+      return { evaluated: null, publicationArticleUrl: null };
+    }
+    responseUrl = nextUrl;
+  }
+
+  if (!response?.ok) return { evaluated: null, publicationArticleUrl: null };
+  const publicationArticleUrl = new URL(articlePath, responseUrl).href;
+  const contentLength = Number(response.headers.get('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) {
+    return { evaluated: null, publicationArticleUrl };
+  }
+  const xml = await response.text();
+  if (new TextEncoder().encode(xml).byteLength > MAX_ARTICLE_HTML_BYTES) {
+    return { evaluated: null, publicationArticleUrl };
+  }
+
+  let feed;
+  try {
+    feed = parseRssFeedXml(xml, responseUrl);
+  } catch {
+    return { evaluated: null, publicationArticleUrl };
+  }
+  const normalizedTitle = input.title.trim().toLocaleLowerCase();
+  const entry = feed.entries.find((candidate) => {
+    let candidatePath = '';
+    try {
+      candidatePath = new URL(candidate.canonicalUrl).pathname.replace(/\/$/, '');
+    } catch {
+      candidatePath = '';
+    }
+    return (
+      candidatePath === articlePath ||
+      candidate.title.trim().toLocaleLowerCase() === normalizedTitle
+    );
+  });
+  if (!entry?.articleBodyCandidate) return { evaluated: null, publicationArticleUrl };
+
+  return {
+    evaluated: await evaluateCandidate(
+      input,
+      {
+        ...entry.articleBodyCandidate,
+        extractedTitle: entry.title,
+        byline: entry.creator,
+        publishedAt: entry.publishedAt ? new Date(entry.publishedAt).toISOString() : null,
+        httpStatus: response.status,
+      },
+      extractedAt,
+      extractorVersion
+    ),
+    publicationArticleUrl,
+  };
 }
 
 async function fetchReaderProxyCandidate(
@@ -278,6 +399,84 @@ async function fetchReaderProxyCandidate(
   );
 }
 
+async function fetchNewsletterFallbackCandidate(
+  input: ArticleBodyAcquisitionInput,
+  articleUrl: string,
+  fetchImplementation: typeof fetch,
+  extractedAt: number,
+  extractorVersion: number,
+  signal: AbortSignal
+): Promise<NewsletterFallbackResult> {
+  if (!resolveSubstackPostApiUrl(articleUrl)) {
+    return { evaluated: null, errorCode: null, httpStatus: null };
+  }
+
+  const apiResult = await fetchSubstackApiCandidate(
+    input,
+    articleUrl,
+    fetchImplementation,
+    extractedAt,
+    extractorVersion,
+    signal
+  );
+  if (apiResult.evaluated?.artifact) {
+    return { evaluated: apiResult.evaluated, errorCode: null, httpStatus: apiResult.httpStatus };
+  }
+
+  const feedResult = await fetchSubstackFeedCandidate(
+    input,
+    articleUrl,
+    fetchImplementation,
+    extractedAt,
+    extractorVersion,
+    signal
+  );
+  if (feedResult.evaluated?.artifact) {
+    return { evaluated: feedResult.evaluated, errorCode: null, httpStatus: 200 };
+  }
+
+  let migratedApiResult: SubstackApiCandidateResult | null = null;
+  if (feedResult.publicationArticleUrl && feedResult.publicationArticleUrl !== articleUrl) {
+    migratedApiResult = await fetchSubstackApiCandidate(
+      input,
+      feedResult.publicationArticleUrl,
+      fetchImplementation,
+      extractedAt,
+      extractorVersion,
+      signal
+    );
+    if (migratedApiResult.evaluated?.artifact) {
+      return {
+        evaluated: migratedApiResult.evaluated,
+        errorCode: null,
+        httpStatus: migratedApiResult.httpStatus,
+      };
+    }
+  }
+
+  const readerCandidate = await fetchReaderProxyCandidate(
+    input,
+    articleUrl,
+    fetchImplementation,
+    extractedAt,
+    extractorVersion,
+    signal
+  );
+  if (readerCandidate?.artifact) {
+    return { evaluated: readerCandidate, errorCode: null, httpStatus: 200 };
+  }
+
+  const authoritativeStatus = [migratedApiResult?.httpStatus, apiResult.httpStatus].find(
+    (status) => status === 404 || status === 410
+  );
+  const authoritativeMissing = authoritativeStatus !== undefined;
+  return {
+    evaluated: null,
+    errorCode: authoritativeMissing ? `HTTP_${authoritativeStatus}` : null,
+    httpStatus: authoritativeMissing ? authoritativeStatus : null,
+  };
+}
+
 async function fetchPublicCandidate(
   input: ArticleBodyAcquisitionInput,
   fetchImplementation: typeof fetch,
@@ -292,7 +491,8 @@ async function fetchPublicCandidate(
   const timeout = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT_MS);
   try {
     let response: Response | null = null;
-    let responseUrl = resolvePublicArticleFetchUrl(input.canonicalUrl);
+    const publicArticleUrl = resolvePublicArticleFetchUrl(input.canonicalUrl);
+    let responseUrl = publicArticleUrl;
     for (let redirects = 0; redirects <= MAX_ARTICLE_REDIRECTS; redirects += 1) {
       response = await fetchImplementation(responseUrl, {
         redirect: 'manual',
@@ -337,33 +537,22 @@ async function fetchPublicCandidate(
     }
     if (!response) throw new Error('Article fetch returned no response');
     if (!response.ok) {
-      const substackCandidate = await fetchSubstackApiCandidate(
+      const fallback = await fetchNewsletterFallbackCandidate(
         input,
-        responseUrl,
+        publicArticleUrl,
         fetchImplementation,
         extractedAt,
         extractorVersion,
         controller.signal
       );
-      if (substackCandidate) {
-        return { evaluated: substackCandidate, attempt: substackCandidate.attempt };
-      }
-      const readerCandidate = await fetchReaderProxyCandidate(
-        input,
-        responseUrl,
-        fetchImplementation,
-        extractedAt,
-        extractorVersion,
-        controller.signal
-      );
-      if (readerCandidate) {
-        return { evaluated: readerCandidate, attempt: readerCandidate.attempt };
+      if (fallback.evaluated?.artifact) {
+        return { evaluated: fallback.evaluated, attempt: fallback.evaluated.attempt };
       }
       return {
         evaluated: null,
-        attempt: failedAttempt(input, `HTTP_${response.status}`, {
-          httpStatus: response.status,
-          sourceUrl: responseUrl,
+        attempt: failedAttempt(input, fallback.errorCode ?? `HTTP_${response.status}`, {
+          httpStatus: fallback.httpStatus ?? response.status,
+          sourceUrl: fallback.errorCode ? publicArticleUrl : responseUrl,
         }),
       };
     }
@@ -401,6 +590,17 @@ async function fetchPublicCandidate(
     }
     const extracted = extractArticleFromHtml(html, responseUrl);
     if (!extracted?.isArticle || !extracted.content) {
+      const fallback = await fetchNewsletterFallbackCandidate(
+        input,
+        publicArticleUrl,
+        fetchImplementation,
+        extractedAt,
+        extractorVersion,
+        controller.signal
+      );
+      if (fallback.evaluated?.artifact) {
+        return { evaluated: fallback.evaluated, attempt: fallback.evaluated.attempt };
+      }
       return {
         evaluated: null,
         attempt: failedAttempt(input, 'NOT_READERABLE', {
@@ -425,6 +625,19 @@ async function fetchPublicCandidate(
       extractedAt,
       extractorVersion
     );
+    if (!evaluated.artifact) {
+      const fallback = await fetchNewsletterFallbackCandidate(
+        input,
+        publicArticleUrl,
+        fetchImplementation,
+        extractedAt,
+        extractorVersion,
+        controller.signal
+      );
+      if (fallback.evaluated?.artifact) {
+        return { evaluated: fallback.evaluated, attempt: fallback.evaluated.attempt };
+      }
+    }
     return { evaluated, attempt: evaluated.attempt };
   } catch {
     const errorCode = controller.signal.aborted ? 'FETCH_TIMEOUT' : 'FETCH_FAILED';

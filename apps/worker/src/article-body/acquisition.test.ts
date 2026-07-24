@@ -16,6 +16,10 @@ function page(title = 'A dependable article', sentences = 40): string {
   return `<!doctype html><html><head><title>${title}</title></head><body><article><h1>${title}</h1><p>${articleText(sentences)}</p><p>${articleText(sentences)}</p></article></body></html>`;
 }
 
+function substackFeed(title: string, url: string): string {
+  return `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Example</title><item><title>${title}</title><link>${url}</link><guid>${url}</guid><content:encoded><![CDATA[<p>${articleText(40)}</p><p>${articleText(40)}</p>]]></content:encoded></item></channel></rss>`;
+}
+
 function input() {
   return {
     itemId: 'item_1',
@@ -204,6 +208,7 @@ describe('acquireArticleBody', () => {
       .fn()
       .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
       .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('not found', { status: 404 }))
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
@@ -233,13 +238,111 @@ describe('acquireArticleBody', () => {
       title: 'Text is king',
     });
     expect(fetch).toHaveBeenNthCalledWith(
-      3,
+      4,
       'https://r.jina.ai/https://experimentalhistory.substack.com/p/text-is-king',
       expect.objectContaining({
         redirect: 'manual',
         headers: expect.objectContaining({ 'X-Return-Format': 'html' }),
       })
     );
+  });
+
+  it('uses the publication feed when Substack page and post APIs are rate limited', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          substackFeed('Text is king', 'https://experimentalhistory.substack.com/p/text-is-king'),
+          { headers: { 'content-type': 'application/rss+xml' } }
+        )
+      );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl: 'https://experimentalhistory.substack.com/p/text-is-king',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({ status: 'AVAILABLE', errorCode: null });
+    expect(result.artifact).toMatchObject({ sourceKind: 'RSS_FULL', title: 'Text is king' });
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'https://experimentalhistory.substack.com/feed',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
+
+  it('uses the feed redirect to recover a migrated Substack publication API', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 301,
+          headers: { location: 'https://newsletter.example.com/feed' },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response('<?xml version="1.0"?><rss><channel><title>Recent</title></channel></rss>')
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: 'Text is king',
+            body_html: `<p>${articleText(40)}</p><p>${articleText(40)}</p>`,
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl: 'https://old-publication.substack.com/p/text-is-king',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({ status: 'AVAILABLE', errorCode: null });
+    expect(result.artifact).toMatchObject({ sourceKind: 'PUBLIC_NEWSLETTER' });
+    expect(fetch).toHaveBeenNthCalledWith(
+      5,
+      'https://newsletter.example.com/api/v1/posts/text-is-king',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
+
+  it('preserves an authoritative Substack 404 when fallback sources cannot recover it', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('missing', { status: 404 }))
+      .mockResolvedValueOnce(
+        new Response('<?xml version="1.0"?><rss><channel><title>Empty</title></channel></rss>')
+      )
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }));
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl: 'https://example.substack.com/p/deleted-post',
+        title: 'Deleted post',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({
+      status: 'UNAVAILABLE',
+      errorCode: 'HTTP_404',
+      lastHttpStatus: 404,
+    });
   });
 });
 
