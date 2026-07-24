@@ -76,7 +76,7 @@ struct Bookmark: Codable, Hashable, Identifiable {
     let ingestedAt: String
     let bookmarkedAt: String?
     let lastOpenedAt: String?
-    let progress: BookmarkProgress?
+    var progress: BookmarkProgress?
     var isFinished: Bool
     var finishedAt: String?
     let tags: [BookmarkTag]

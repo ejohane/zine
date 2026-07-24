@@ -117,6 +117,7 @@ ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -155,6 +156,7 @@ ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
@@ -244,6 +246,7 @@ ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]

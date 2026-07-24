@@ -87,6 +87,8 @@ export interface Bindings {
   ARTICLE_BODY_BACKFILL_SECRET?: string;
   /** Opt-in switch for article-body queue production and consumption. */
   ARTICLE_BODY_PIPELINE_ENABLED?: string;
+  /** Controlled automatic article-body enrollment: off, reader, saved, or all. */
+  ARTICLE_BODY_ENROLLMENT_MODE?: string;
   /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
   SYNC_QUEUE?: Queue<SyncQueueMessage>;
   /** Queue for async bookmark enrichment (optional - not available in all envs) */

@@ -16,9 +16,12 @@ struct BookmarkDetailContent: Equatable {
     let creator: String
     let creatorImageUrl: URL?
     let creatorId: String?
+    let publisher: String?
     let summary: String?
     let duration: Int?
     let readingTimeMinutes: Int?
+    let progress: BookmarkProgress?
+    let isFinished: Bool
     let tags: [BookmarkTag]
 
     init(bookmark: Bookmark) {
@@ -31,9 +34,12 @@ struct BookmarkDetailContent: Equatable {
         creator = bookmark.creator
         creatorImageUrl = bookmark.creatorImageUrl
         creatorId = bookmark.creatorId
+        publisher = bookmark.publisher
         summary = bookmark.summary
         duration = bookmark.duration
         readingTimeMinutes = bookmark.readingTimeMinutes
+        progress = bookmark.progress
+        isFinished = bookmark.isFinished
         tags = bookmark.tags
     }
 
@@ -47,9 +53,12 @@ struct BookmarkDetailContent: Equatable {
         creator = item.creator
         creatorImageUrl = item.creatorImageUrl
         creatorId = item.creatorId
+        publisher = item.publisher
         summary = item.summary
         duration = item.duration
         readingTimeMinutes = item.readingTimeMinutes
+        progress = item.progress
+        isFinished = false
         tags = []
     }
 
@@ -74,9 +83,12 @@ struct BookmarkDetailContent: Equatable {
         self.creator = creator
         creatorImageUrl = nil
         creatorId = nil
+        publisher = source.publisher
         summary = presentation?.excerpt
         duration = nil
         readingTimeMinutes = nil
+        progress = nil
+        isFinished = false
         tags = []
     }
 
@@ -274,12 +286,43 @@ struct BookmarkDetailView: View {
 
             Spacer(minLength: 0)
 
-            ProviderOpenButton(
-                provider: content.provider,
-                destination: content.canonicalUrl,
-                onOpen: { onExternalOpen(bookmark) }
-            )
+            if content.contentType == .article {
+                NavigationLink {
+                    ArticleReaderView(
+                        metadata: ArticleReaderMetadata(
+                            bookmarkID: content.id,
+                            title: content.title,
+                            creator: content.creator,
+                            canonicalURL: content.canonicalUrl,
+                            readingTimeMinutes: content.readingTimeMinutes,
+                            initialProgress: content.progress,
+                            isFinished: content.isFinished
+                        ),
+                        client: client,
+                        onRead: { onExternalOpen(bookmark) },
+                        onProgressSaved: updateReadingProgress,
+                        onFinishedChanged: updateFinishedState
+                    )
+                } label: {
+                    Label("Read", systemImage: "book.pages")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 48)
+                        .background(Color.accentColor, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Read in Zine")
+                .actionRowHaptic()
                 .padding(.trailing, 8)
+            } else {
+                ProviderOpenButton(
+                    provider: content.provider,
+                    destination: content.canonicalUrl,
+                    onOpen: { onExternalOpen(bookmark) }
+                )
+                    .padding(.trailing, 8)
+            }
         }
     }
 
@@ -599,5 +642,20 @@ struct BookmarkDetailView: View {
             onBookmarkChange(bookmark, previousValue, .rollback)
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func updateReadingProgress(_ progress: BookmarkProgress) {
+        guard var bookmark else { return }
+        bookmark.progress = progress
+        self.bookmark = bookmark
+        onUpdate(bookmark)
+    }
+
+    private func updateFinishedState(_ isFinished: Bool) {
+        guard var bookmark else { return }
+        bookmark.isFinished = isFinished
+        bookmark.finishedAt = isFinished ? Date().formatted(.iso8601) : nil
+        self.bookmark = bookmark
+        onUpdate(bookmark)
     }
 }

@@ -55,7 +55,8 @@ private struct AuthenticatedAppView: View {
                     throw APIError.missingSession
                 }
                 return token
-            }
+            },
+            articleBodyCache: ArticleBodyCache(userID: userID)
         )
         editorialCache = EditorialIssueCache(userID: userID)
         homeCache = HomeCache(userID: userID)

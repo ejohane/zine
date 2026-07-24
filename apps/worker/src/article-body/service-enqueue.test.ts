@@ -69,6 +69,36 @@ describe('article-body enqueue', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('does not repeat a terminal failure at the current extractor version', async () => {
+    const db = createDb(
+      status({ status: 'UNAVAILABLE', lastErrorCode: 'NOT_READERABLE', targetExtractorVersion: 1 })
+    );
+    const send = vi.fn();
+    const result = await enqueueArticleBody(
+      db as never,
+      { ARTICLE_BODY_PIPELINE_ENABLED: 'true', ARTICLE_BODY_QUEUE: { send } as never },
+      { itemId: 'item_1', trigger: 'reader_open' }
+    );
+
+    expect(result).toEqual({ queued: false, reason: 'terminal' });
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('allows a reader request to retry a transient stored failure', async () => {
+    const db = createDb(
+      status({ status: 'UNAVAILABLE', lastErrorCode: 'HTTP_503', targetExtractorVersion: 1 })
+    );
+    const send = vi.fn().mockResolvedValue(undefined);
+    const result = await enqueueArticleBody(
+      db as never,
+      { ARTICLE_BODY_PIPELINE_ENABLED: 'true', ARTICLE_BODY_QUEUE: { send } as never },
+      { itemId: 'item_1', trigger: 'reader_open' }
+    );
+
+    expect(result).toMatchObject({ queued: true });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
   it('includes a bounded embedded candidate in the queue job', async () => {
     const db = createDb(null);
     const send = vi.fn().mockResolvedValue(undefined);

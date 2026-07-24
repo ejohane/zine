@@ -15,6 +15,8 @@ export type ArticleBodySourceKind =
 
 export type ArticleBodyTrigger = 'ingestion' | 'bookmark' | 'reader_open' | 'backfill' | 'repair';
 
+export type ArticleBodyEnrollmentMode = 'off' | 'reader' | 'saved' | 'all';
+
 export interface ArticleBodyBlock {
   id: string;
   kind: string;

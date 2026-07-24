@@ -1,6 +1,6 @@
 # Article-body extraction quality (phase 2a)
 
-Phase 2a supplies and measures article-body acquisition without enrolling production items. The phase-one queue remains disabled and no ingestion, bookmark, reader-open, or backfill path calls `enqueueArticleBody`.
+Phase 2a supplied and measured article-body acquisition without automatically enrolling production items. Phase 2b subsequently added the protected bounded backfill, and Phase 3 adds the independently controlled product enrollment ladder documented in [Native article reader beta](./article-reader-beta.md).
 
 ## Acquisition cascade
 
@@ -46,4 +46,4 @@ The Markdown report includes beginning, middle, and ending samples for human che
 
 ## Phase boundary
 
-This phase did not publish artifacts, create queues remotely, apply production migrations, or change live extraction behavior. Phase 2b now adapts this function into the queue processor and provides a dry-run-first bounded cohort endpoint. No automatic feed, bookmark, or reader-open enrollment has been added; the staged production burn remains a separate operational step.
+Phase 2a did not publish artifacts, create queues remotely, apply production migrations, or change live extraction behavior. Phase 2b adapted this function into the queue processor and provided a dry-run-first bounded cohort endpoint. Phase 3 adds native reader demand, saved-bookmark, and new-RSS-entry enrollment behind an explicit staged mode; historical bulk enrollment remains outside that product path.

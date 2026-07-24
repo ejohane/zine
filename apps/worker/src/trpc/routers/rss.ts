@@ -152,6 +152,7 @@ export const rssRouter = router({
       const seedResult = await syncRssFeed(ctx.db, feed, {
         maxEntries: seedMode === 'none' ? 0 : 1,
         useConditional: false,
+        articleBodyEnv: ctx.env,
       });
 
       const refreshedFeed = await ctx.db.query.rssFeeds.findFirst({
@@ -309,6 +310,7 @@ export const rssRouter = router({
         maxEntries: 20,
         // Manual sync is user-initiated and should always attempt metadata repair/backfill.
         useConditional: false,
+        articleBodyEnv: ctx.env,
       });
 
       return {

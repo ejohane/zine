@@ -333,12 +333,17 @@ export const articleBodyStates = sqliteTable(
     lastHttpStatus: integer('last_http_status'),
     lastAttemptAt: integer('last_attempt_at'),
     nextAttemptAt: integer('next_attempt_at'),
+    enrollmentTrigger: text('enrollment_trigger'),
+    requestedAt: integer('requested_at'),
+    terminalAt: integer('terminal_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
     index('article_body_states_status_next_attempt_idx').on(table.status, table.nextAttemptAt),
     index('article_body_states_updated_idx').on(table.updatedAt),
+    index('article_body_states_trigger_status_idx').on(table.enrollmentTrigger, table.status),
+    index('article_body_states_requested_idx').on(table.requestedAt),
   ]
 );
 
