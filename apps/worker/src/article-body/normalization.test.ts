@@ -32,4 +32,17 @@ describe('normalizeArticleBodyHtml', () => {
     expect(normalized.wordCount).toBe(7);
     expect(normalized.readingTimeMinutes).toBe(1);
   });
+
+  it('removes a known comments widget footer only when it trails the article', () => {
+    const normalized = normalizeArticleBodyHtml(
+      '<p>The article discusses comments powered by Disqus as part of its analysis.</p><p>A complete conclusion.</p><p>blog comments powered by Disqus</p>',
+      'https://example.com/story'
+    );
+
+    expect(normalized.plainText).toBe(
+      'The article discusses comments powered by Disqus as part of its analysis.\n\nA complete conclusion.'
+    );
+    expect(normalized.sanitizedHtml).not.toContain('blog comments powered by Disqus');
+    expect(normalized.diagnostics.droppedElements).toBe(1);
+  });
 });

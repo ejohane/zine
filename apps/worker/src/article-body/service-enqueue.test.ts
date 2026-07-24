@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ARTICLE_BODY_QUEUE_CANDIDATE_MAX_BYTES } from './schema';
 import { enqueueArticleBody } from './service';
 import type { ArticleBodyStatusRecord } from './service';
+import { ARTICLE_BODY_EXTRACTOR_VERSION } from './types';
 
 function createDb(status: ArticleBodyStatusRecord | null) {
   const limit = vi.fn().mockResolvedValue(status ? [status] : []);
@@ -19,7 +20,7 @@ function createDb(status: ArticleBodyStatusRecord | null) {
 function status(overrides: Partial<ArticleBodyStatusRecord> = {}): ArticleBodyStatusRecord {
   return {
     status: 'PENDING',
-    targetExtractorVersion: 1,
+    targetExtractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
     attemptCount: 0,
     lastErrorCode: null,
     lastHttpStatus: null,
@@ -56,7 +57,11 @@ describe('article-body enqueue', () => {
 
   it('does not replace a current artifact outside an explicit repair', async () => {
     const db = createDb(
-      status({ status: 'AVAILABLE', versionId: 'version_1', extractorVersion: 1 })
+      status({
+        status: 'AVAILABLE',
+        versionId: 'version_1',
+        extractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
+      })
     );
     const send = vi.fn();
     const result = await enqueueArticleBody(
@@ -71,7 +76,11 @@ describe('article-body enqueue', () => {
 
   it('does not repeat a terminal failure at the current extractor version', async () => {
     const db = createDb(
-      status({ status: 'UNAVAILABLE', lastErrorCode: 'NOT_READERABLE', targetExtractorVersion: 1 })
+      status({
+        status: 'UNAVAILABLE',
+        lastErrorCode: 'NOT_READERABLE',
+        targetExtractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
+      })
     );
     const send = vi.fn();
     const result = await enqueueArticleBody(
@@ -86,7 +95,11 @@ describe('article-body enqueue', () => {
 
   it('allows a reader request to retry a transient stored failure', async () => {
     const db = createDb(
-      status({ status: 'UNAVAILABLE', lastErrorCode: 'HTTP_503', targetExtractorVersion: 1 })
+      status({
+        status: 'UNAVAILABLE',
+        lastErrorCode: 'HTTP_503',
+        targetExtractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
+      })
     );
     const send = vi.fn().mockResolvedValue(undefined);
     const result = await enqueueArticleBody(

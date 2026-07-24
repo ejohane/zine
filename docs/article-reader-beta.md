@@ -22,7 +22,7 @@ Phase 3 turns the article-body foundation into a user-facing native reading expe
 
 `POST /api/v1/bookmarks/:id/article-content` is the reader-demand request. It verifies that the user owns the bookmark and that the canonical item is an article, attempts idempotent enrollment when reader enrollment is enabled, and returns the same content/status envelope plus a `request` result. A newly queued or already-active request returns `202`; current, terminal, disabled, or otherwise non-queued results return `200`. Non-article items return `422`.
 
-The iOS client performs GET first, POSTs only when no readable body exists, and polls the GET endpoint for at most 20 seconds. A terminal acquisition result becomes an explicit unavailable state. A polling timeout or transport failure is retryable and never substitutes partial page text.
+The iOS client performs GET first, POSTs only when no readable body exists, and polls the GET endpoint for at most 45 seconds. A terminal acquisition result becomes an explicit unavailable state. A polling timeout or transport failure is retryable and never substitutes partial page text.
 
 ## Enrollment ladder
 

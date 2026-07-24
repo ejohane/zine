@@ -60,6 +60,10 @@ const ALLOWED_TAGS = new Set([
 
 const BLOCK_SELECTOR = 'h1,h2,h3,h4,h5,h6,p,blockquote,pre,li,figcaption,th,td';
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu;
+const TRAILING_BOILERPLATE_PATTERNS = [
+  /^(?:blog )?comments powered by disqus$/i,
+  /^powered by disqus$/i,
+];
 
 export interface ArticleBodyNormalizationDiagnostics {
   droppedElements: number;
@@ -110,6 +114,21 @@ function blockKind(element: Element): string {
   if (tag === 'figcaption') return 'caption';
   if (tag === 'th' || tag === 'td') return 'table_cell';
   return 'paragraph';
+}
+
+function dropKnownTrailingBoilerplate(
+  root: Element,
+  diagnostics: ArticleBodyNormalizationDiagnostics
+): void {
+  const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR));
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    const block = blocks[index];
+    const text = normalizeWhitespace(block.textContent ?? '');
+    if (!text) continue;
+    if (!TRAILING_BOILERPLATE_PATTERNS.some((pattern) => pattern.test(text))) return;
+    block.remove();
+    diagnostics.droppedElements += 1;
+  }
 }
 
 export function normalizeArticleBodyHtml(rawHtml: string, baseUrl: string): NormalizedArticleBody {
@@ -182,6 +201,8 @@ export function normalizeArticleBodyHtml(rawHtml: string, baseUrl: string): Norm
       }
     }
   }
+
+  dropKnownTrailingBoilerplate(root, diagnostics);
 
   const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR))
     .map((element, index) => ({

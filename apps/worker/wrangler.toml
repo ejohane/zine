@@ -245,8 +245,8 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
-ARTICLE_BODY_PIPELINE_ENABLED = "false"
-ARTICLE_BODY_ENROLLMENT_MODE = "off"
+ARTICLE_BODY_PIPELINE_ENABLED = "true"
+ARTICLE_BODY_ENROLLMENT_MODE = "reader"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
