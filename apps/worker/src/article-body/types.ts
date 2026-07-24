@@ -1,5 +1,5 @@
 export const ARTICLE_BODY_SCHEMA_VERSION = 1;
-export const ARTICLE_BODY_EXTRACTOR_VERSION = 4;
+export const ARTICLE_BODY_EXTRACTOR_VERSION = 5;
 
 export type ArticleBodyStatus = 'PENDING' | 'PROCESSING' | 'AVAILABLE' | 'DEGRADED' | 'UNAVAILABLE';
 

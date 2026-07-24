@@ -94,6 +94,33 @@ describe('parseRssFeedXml', () => {
     });
   });
 
+  it('preserves escaped markup examples inside a CDATA article body', () => {
+    const xml = `<?xml version="1.0" encoding="utf-8"?>
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <title>Code Feed</title>
+        <entry>
+          <id>code-example</id>
+          <title>Markup examples</title>
+          <link href="https://example.com/code-example" rel="alternate" />
+          <updated>2026-07-24T10:00:00Z</updated>
+          <content type="html"><![CDATA[
+            <p>Before the example.</p>
+            <p>Use a <code>&lt;script&gt;</code> tag when embedding JSON.</p>
+            <h2>The final section</h2>
+            <p>This tail must remain part of the candidate.</p>
+          ]]></content>
+        </entry>
+      </feed>`;
+
+    const entry = parseRssFeedXml(xml, 'https://example.com/atom.xml').entries[0];
+
+    expect(entry.articleBodyCandidate?.html).toContain('<code>&lt;script&gt;</code>');
+    expect(entry.articleBodyCandidate?.html).toContain('<h2>The final section</h2>');
+    expect(entry.articleBodyCandidate?.html).toContain(
+      '<p>This tail must remain part of the candidate.</p>'
+    );
+  });
+
   it('falls back to hash identity when link/guid are missing', () => {
     const xml = `<?xml version="1.0"?>
       <rss version="2.0">

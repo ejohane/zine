@@ -97,9 +97,16 @@ function decodeCommonHtmlEntities(input: string): string {
 
 function normalizeEmbeddedHtmlCandidate(value: string | null): string | null {
   if (!value) return null;
-  const decoded = /&(?:lt|gt|quot|apos|amp|#39);/i.test(value)
-    ? decodeCommonHtmlEntities(value)
-    : value;
+  // XML parsers can leave a fully entity-escaped HTML fragment encoded, but
+  // CDATA feed bodies already contain real markup alongside escaped prose.
+  // Decoding the latter wholesale can turn examples such as
+  // `&lt;script&gt;` into active markup and make the HTML parser consume the
+  // remainder of the article as an unterminated element.
+  const hasHtmlMarkup = /<\/?[a-z][^>]*>/i.test(value);
+  const decoded =
+    !hasHtmlMarkup && /&(?:lt|gt|quot|apos|amp|#39);/i.test(value)
+      ? decodeCommonHtmlEntities(value)
+      : value;
   return decoded.trim() || null;
 }
 
