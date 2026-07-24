@@ -116,6 +116,15 @@ function blockKind(element: Element): string {
   return 'paragraph';
 }
 
+function hasSelectedBlockAncestor(element: Element, root: Element): boolean {
+  let ancestor = element.parentElement;
+  while (ancestor && ancestor !== root) {
+    if (ancestor.matches(BLOCK_SELECTOR)) return true;
+    ancestor = ancestor.parentElement;
+  }
+  return false;
+}
+
 function recoverProsePreBlocks(root: Element): void {
   const document = root.ownerDocument;
   if (!document) return;
@@ -152,6 +161,22 @@ function dropKnownTrailingBoilerplate(
     if (!text) continue;
     if (!TRAILING_BOILERPLATE_PATTERNS.some((pattern) => pattern.test(text))) return;
     block.remove();
+    diagnostics.droppedElements += 1;
+  }
+}
+
+function dropTrailingConsecutiveDuplicateBlocks(
+  root: Element,
+  diagnostics: ArticleBodyNormalizationDiagnostics
+): void {
+  const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR));
+  if (blocks.length < 5) return;
+  const firstTailIndex = Math.max(1, blocks.length - 5);
+  for (let index = blocks.length - 1; index >= firstTailIndex; index -= 1) {
+    const text = normalizeWhitespace(blocks[index].textContent ?? '');
+    const previousText = normalizeWhitespace(blocks[index - 1].textContent ?? '');
+    if (text.length < 20 || text !== previousText) continue;
+    blocks[index].remove();
     diagnostics.droppedElements += 1;
   }
 }
@@ -228,9 +253,11 @@ export function normalizeArticleBodyHtml(rawHtml: string, baseUrl: string): Norm
   }
 
   recoverProsePreBlocks(root);
+  dropTrailingConsecutiveDuplicateBlocks(root, diagnostics);
   dropKnownTrailingBoilerplate(root, diagnostics);
 
   const blocks = Array.from(root.querySelectorAll(BLOCK_SELECTOR))
+    .filter((element) => !hasSelectedBlockAncestor(element, root))
     .map((element, index) => ({
       id: `b${index + 1}`,
       kind: blockKind(element),
