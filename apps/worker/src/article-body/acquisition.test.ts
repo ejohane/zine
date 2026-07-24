@@ -198,6 +198,49 @@ describe('acquireArticleBody', () => {
       expect.objectContaining({ redirect: 'manual' })
     );
   });
+
+  it('uses the bounded reader proxy when both Substack origins are rate limited', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              title: 'Text is king',
+              publishedTime: '2026-01-20T18:55:47.327Z',
+              html: page('Text is king'),
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl:
+          'https://open.substack.com/pub/experimentalhistory/p/text-is-king?r=share-token',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({ status: 'AVAILABLE', errorCode: null });
+    expect(result.artifact).toMatchObject({
+      sourceKind: 'BROWSER_RENDERED',
+      title: 'Text is king',
+    });
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'https://r.jina.ai/https://experimentalhistory.substack.com/p/text-is-king',
+      expect.objectContaining({
+        redirect: 'manual',
+        headers: expect.objectContaining({ 'X-Return-Format': 'html' }),
+      })
+    );
+  });
 });
 
 describe('isSafePublicArticleUrl', () => {

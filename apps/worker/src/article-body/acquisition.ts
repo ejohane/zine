@@ -216,6 +216,68 @@ async function fetchSubstackApiCandidate(
   );
 }
 
+async function fetchReaderProxyCandidate(
+  input: ArticleBodyAcquisitionInput,
+  articleUrl: string,
+  fetchImplementation: typeof fetch,
+  extractedAt: number,
+  extractorVersion: number,
+  signal: AbortSignal
+): Promise<EvaluatedCandidate | null> {
+  if (!resolveSubstackPostApiUrl(articleUrl)) return null;
+  const readerUrl = `https://r.jina.ai/${articleUrl}`;
+
+  const response = await fetchImplementation(readerUrl, {
+    redirect: 'manual',
+    signal,
+    headers: {
+      'User-Agent': 'ZineBot/2.0 (+https://zine.app/bot)',
+      Accept: 'application/json',
+      'X-Return-Format': 'html',
+      'X-Timeout': '10',
+    },
+  });
+  if (!response.ok) return null;
+  const contentLength = Number(response.headers.get('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) return null;
+  const raw = await response.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_ARTICLE_HTML_BYTES) return null;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return null;
+  const reader = data as Record<string, unknown>;
+  if (typeof reader.html !== 'string' || reader.html.trim().length === 0) return null;
+
+  const extracted = extractArticleFromHtml(reader.html, articleUrl);
+  if (!extracted?.isArticle || !extracted.content) return null;
+  return evaluateCandidate(
+    input,
+    {
+      html: extracted.content,
+      sourceKind: 'BROWSER_RENDERED',
+      sourceUrl: articleUrl,
+      extractedTitle:
+        typeof reader.title === 'string' && reader.title.trim().length > 0
+          ? reader.title
+          : extracted.title,
+      byline: extracted.author,
+      publisher: extracted.siteName,
+      publishedAt:
+        typeof reader.publishedTime === 'string' ? reader.publishedTime : extracted.publishedAt,
+      httpStatus: response.status,
+    },
+    extractedAt,
+    extractorVersion
+  );
+}
+
 async function fetchPublicCandidate(
   input: ArticleBodyAcquisitionInput,
   fetchImplementation: typeof fetch,
@@ -285,6 +347,17 @@ async function fetchPublicCandidate(
       );
       if (substackCandidate) {
         return { evaluated: substackCandidate, attempt: substackCandidate.attempt };
+      }
+      const readerCandidate = await fetchReaderProxyCandidate(
+        input,
+        responseUrl,
+        fetchImplementation,
+        extractedAt,
+        extractorVersion,
+        controller.signal
+      );
+      if (readerCandidate) {
+        return { evaluated: readerCandidate, attempt: readerCandidate.attempt };
       }
       return {
         evaluated: null,
