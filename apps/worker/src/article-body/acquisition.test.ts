@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { acquireArticleBody, isSafePublicArticleUrl } from './acquisition';
+import {
+  acquireArticleBody,
+  articleBodyAcquisitionInternals,
+  isSafePublicArticleUrl,
+} from './acquisition';
 
 function articleText(sentences = 40): string {
   return 'This reporting provides evidence, context, analysis, and useful conclusions. '.repeat(
@@ -133,6 +137,30 @@ describe('acquireArticleBody', () => {
       expect.objectContaining({ redirect: 'manual' })
     );
   });
+
+  it('fetches stable Substack publication URLs instead of rate-limited share redirects', async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(page('Text is king'), {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      })
+    );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl:
+          'https://open.substack.com/pub/experimentalhistory/p/text-is-king?r=share-token',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result.status).toBe('AVAILABLE');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://experimentalhistory.substack.com/p/text-is-king',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
 });
 
 describe('isSafePublicArticleUrl', () => {
@@ -142,5 +170,20 @@ describe('isSafePublicArticleUrl', () => {
     expect(isSafePublicArticleUrl('http://192.168.1.2/story')).toBe(false);
     expect(isSafePublicArticleUrl('https://user:pass@example.com/story')).toBe(false);
     expect(isSafePublicArticleUrl('file:///etc/passwd')).toBe(false);
+  });
+});
+
+describe('article-body public URL resolution', () => {
+  it('rewrites only recognized open.substack.com publication share paths', () => {
+    expect(
+      articleBodyAcquisitionInternals.resolvePublicArticleFetchUrl(
+        'https://open.substack.com/pub/experimentalhistory/p/text-is-king?r=share-token'
+      )
+    ).toBe('https://experimentalhistory.substack.com/p/text-is-king');
+    expect(
+      articleBodyAcquisitionInternals.resolvePublicArticleFetchUrl(
+        'https://open.substack.com/redirect?url=https://example.com'
+      )
+    ).toBe('https://open.substack.com/redirect?url=https://example.com');
   });
 });

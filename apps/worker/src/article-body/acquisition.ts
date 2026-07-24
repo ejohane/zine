@@ -20,6 +20,15 @@ const ARTICLE_FETCH_TIMEOUT_MS = 12_000;
 const MAX_ARTICLE_HTML_BYTES = 5 * 1024 * 1024;
 const MAX_ARTICLE_REDIRECTS = 5;
 
+function resolvePublicArticleFetchUrl(canonicalUrl: string): string {
+  const url = new URL(canonicalUrl);
+  if (url.hostname.toLowerCase() !== 'open.substack.com') return canonicalUrl;
+
+  const match = /^\/pub\/([a-z0-9-]+)\/p\/([a-z0-9-]+)\/?$/i.exec(url.pathname);
+  if (!match) return canonicalUrl;
+  return `https://${match[1]}.substack.com/p/${match[2]}`;
+}
+
 export interface ArticleBodyAcquisitionInput {
   itemId: string;
   canonicalUrl: string;
@@ -152,7 +161,7 @@ async function fetchPublicCandidate(
   const timeout = setTimeout(() => controller.abort(), ARTICLE_FETCH_TIMEOUT_MS);
   try {
     let response: Response | null = null;
-    let responseUrl = input.canonicalUrl;
+    let responseUrl = resolvePublicArticleFetchUrl(input.canonicalUrl);
     for (let redirects = 0; redirects <= MAX_ARTICLE_REDIRECTS; redirects += 1) {
       response = await fetchImplementation(responseUrl, {
         redirect: 'manual',
@@ -367,4 +376,8 @@ export const articleBodyAcquisitionLimits = {
   fetchTimeoutMs: ARTICLE_FETCH_TIMEOUT_MS,
   maxHtmlBytes: MAX_ARTICLE_HTML_BYTES,
   maxRedirects: MAX_ARTICLE_REDIRECTS,
+};
+
+export const articleBodyAcquisitionInternals = {
+  resolvePublicArticleFetchUrl,
 };
