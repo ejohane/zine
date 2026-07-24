@@ -59,6 +59,10 @@ binding = "SYNC_QUEUE"
 queue = "zine-enrichment-queue-dev"
 binding = "ENRICHMENT_QUEUE"
 
+[[queues.producers]]
+queue = "zine-article-body-queue-dev"
+binding = "ARTICLE_BODY_QUEUE"
+
 [[queues.consumers]]
 queue = "zine-sync-queue-dev"
 max_batch_size = 10
@@ -86,6 +90,18 @@ queue = "zine-enrichment-dlq-dev"
 max_batch_size = 5
 max_batch_timeout = 30
 
+[[queues.consumers]]
+queue = "zine-article-body-queue-dev"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-article-body-dlq-dev"
+
+[[queues.consumers]]
+queue = "zine-article-body-dlq-dev"
+max_batch_size = 5
+max_batch_timeout = 30
+
 # Observability settings
 [observability]
 [observability.logs]
@@ -100,6 +116,7 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
+ARTICLE_BODY_PIPELINE_ENABLED = "false"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -137,6 +154,7 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
+ARTICLE_BODY_PIPELINE_ENABLED = "false"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
@@ -146,6 +164,9 @@ binding = "SYNC_QUEUE"
 [[env.staging.queues.producers]]
 queue = "zine-enrichment-queue-staging"
 binding = "ENRICHMENT_QUEUE"
+[[env.staging.queues.producers]]
+queue = "zine-article-body-queue-staging"
+binding = "ARTICLE_BODY_QUEUE"
 [[env.staging.queues.consumers]]
 queue = "zine-sync-queue-staging"
 max_batch_size = 10
@@ -166,6 +187,16 @@ max_retries = 3
 dead_letter_queue = "zine-enrichment-dlq-staging"
 [[env.staging.queues.consumers]]
 queue = "zine-enrichment-dlq-staging"
+max_batch_size = 5
+max_batch_timeout = 30
+[[env.staging.queues.consumers]]
+queue = "zine-article-body-queue-staging"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-article-body-dlq-staging"
+[[env.staging.queues.consumers]]
+queue = "zine-article-body-dlq-staging"
 max_batch_size = 5
 max_batch_timeout = 30
 [env.staging.observability]
@@ -212,6 +243,7 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
+ARTICLE_BODY_PIPELINE_ENABLED = "false"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
@@ -221,6 +253,9 @@ binding = "SYNC_QUEUE"
 [[env.production.queues.producers]]
 queue = "zine-enrichment-queue-prod"
 binding = "ENRICHMENT_QUEUE"
+[[env.production.queues.producers]]
+queue = "zine-article-body-queue-prod"
+binding = "ARTICLE_BODY_QUEUE"
 [[env.production.queues.consumers]]
 queue = "zine-sync-queue-prod"
 max_batch_size = 10
@@ -243,6 +278,16 @@ dead_letter_queue = "zine-enrichment-dlq-prod"
 queue = "zine-enrichment-dlq-prod"
 max_batch_size = 5
 max_batch_timeout = 30
+[[env.production.queues.consumers]]
+queue = "zine-article-body-queue-prod"
+max_batch_size = 5
+max_batch_timeout = 30
+max_retries = 3
+dead_letter_queue = "zine-article-body-dlq-prod"
+[[env.production.queues.consumers]]
+queue = "zine-article-body-dlq-prod"
+max_batch_size = 5
+max_batch_timeout = 30
 [env.production.observability]
 [env.production.observability.logs]
 enabled = true
@@ -254,6 +299,7 @@ invocation_logs = true
 # ============================================================================
 # - CLERK_WEBHOOK_SECRET: Signing secret from Clerk Dashboard > Webhooks
 # - ENRICHMENT_BACKFILL_SECRET: Bearer token for admin enrichment backfill route
+# - ARTICLE_BODY_BACKFILL_SECRET: Bearer token for dry-run and bounded article-body cohorts
 # - X_BEARER_TOKEN: X API bearer token for inferred profile/avatar resolution
 #
 # Required KV Namespace (create via `wrangler kv:namespace create WEBHOOK_IDEMPOTENCY`)

@@ -17,6 +17,7 @@
     "dev:worktree": "./scripts/dev.sh",
     "data:prod:local": "bun run ./scripts/sync-prod-user-to-local.mjs",
     "data:people-names:prod": "bun run ./scripts/repair-prod-people-display-names.mjs",
+    "article-body:review": "bun run ./scripts/review-article-body-corpus.ts",
     "design-system:check": "node ./scripts/check-mobile-design-system.mjs",
     "storybook:mobile": "bun run --cwd apps/mobile storybook",
     "storybook:web": "bun run --cwd apps/web storybook",

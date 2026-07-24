@@ -1,4 +1,5 @@
 import { getDLQSummary } from '../sync/dlq-consumer';
+import { getArticleBodyHealth } from '../article-body/diagnostics';
 import type { Bindings } from '../types';
 
 type CheckStatus = 'ok' | 'error';
@@ -66,10 +67,16 @@ export async function getDependencyHealth(env: Bindings) {
 }
 
 export async function getQueueHealth(env: Bindings) {
-  const dlqSummary = await getDLQSummary(env.OAUTH_STATE_KV);
+  const [dlqSummary, articleBody] = await Promise.all([
+    getDLQSummary(env.OAUTH_STATE_KV),
+    getArticleBodyHealth(env),
+  ]);
+
+  const degraded =
+    dlqSummary.count > 0 || articleBody.status === 'error' || articleBody.dlqCount > 0;
 
   return {
-    status: dlqSummary.count > 0 ? 'degraded' : 'ok',
+    status: degraded ? 'degraded' : 'ok',
     queues: {
       sync: {
         configured: Boolean(env.SYNC_QUEUE),
@@ -85,6 +92,7 @@ export async function getQueueHealth(env: Bindings) {
           release: entry.message.meta?.release,
         })),
       },
+      articleBody,
     },
   };
 }

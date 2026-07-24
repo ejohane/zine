@@ -285,6 +285,83 @@ export const items = sqliteTable(
   ]
 );
 
+// Immutable, versioned article-body artifacts. The artifact bytes live in R2;
+// this table records the durable identity and quality metadata used by clients,
+// enrichment, and operational diagnostics.
+export const articleBodyVersions = sqliteTable(
+  'article_body_versions',
+  {
+    id: text('id').primaryKey(), // ULID
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    schemaVersion: integer('schema_version').notNull(),
+    extractorVersion: integer('extractor_version').notNull(),
+    sourceKind: text('source_kind').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    contentHash: text('content_hash').notNull(),
+    r2Key: text('r2_key').notNull(),
+    wordCount: integer('word_count').notNull(),
+    readingTimeMinutes: integer('reading_time_minutes').notNull(),
+    qualityScore: real('quality_score').notNull(),
+    qualityWarningsJson: text('quality_warnings_json').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('article_body_versions_item_hash_idx').on(table.itemId, table.contentHash),
+    uniqueIndex('article_body_versions_r2_key_idx').on(table.r2Key),
+    index('article_body_versions_item_created_idx').on(table.itemId, table.createdAt),
+  ]
+);
+
+// Mutable lifecycle state for one canonical item. This deliberately lives
+// outside user_items so one successful public extraction can serve every user
+// who owns the canonical item without duplicating work or content.
+export const articleBodyStates = sqliteTable(
+  'article_body_states',
+  {
+    itemId: text('item_id')
+      .primaryKey()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    currentVersionId: text('current_version_id').references(() => articleBodyVersions.id, {
+      onDelete: 'set null',
+    }),
+    targetExtractorVersion: integer('target_extractor_version').notNull(),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    lastErrorCode: text('last_error_code'),
+    lastHttpStatus: integer('last_http_status'),
+    lastAttemptAt: integer('last_attempt_at'),
+    nextAttemptAt: integer('next_attempt_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    index('article_body_states_status_next_attempt_idx').on(table.status, table.nextAttemptAt),
+    index('article_body_states_updated_idx').on(table.updatedAt),
+  ]
+);
+
+// Durable audit of messages that exhausted queue retries. Keeping this in D1
+// lets the public health probe report safe aggregate counts after DLQ messages
+// have been acknowledged and removed from Cloudflare Queues.
+export const articleBodyDlqEvents = sqliteTable(
+  'article_body_dlq_events',
+  {
+    id: text('id').primaryKey(), // ULID
+    itemId: text('item_id').references(() => items.id, { onDelete: 'set null' }),
+    extractorVersion: integer('extractor_version'),
+    trigger: text('trigger'),
+    attempts: integer('attempts').notNull(),
+    errorCode: text('error_code'),
+    deadLetteredAt: integer('dead_lettered_at').notNull(),
+  },
+  (table) => [
+    index('article_body_dlq_events_dead_lettered_idx').on(table.deadLetteredAt),
+    index('article_body_dlq_events_item_idx').on(table.itemId, table.deadLetteredAt),
+  ]
+);
+
 // User Items (User's relationship to content)
 // NOTE: Legacy table using ISO8601 TEXT timestamps. New tables should use Unix ms INTEGER.
 // See docs/zine-tech-stack.md for timestamp standard.

@@ -1,6 +1,13 @@
 import { XMLParser } from 'fast-xml-parser';
 
 import { deriveIdentityHash, normalizeContentUrl } from './url';
+import type { ArticleBodySourceKind } from '../article-body/types';
+
+export interface ParsedArticleBodyCandidate {
+  html: string;
+  sourceKind: Extract<ArticleBodySourceKind, 'RSS_FULL' | 'ATOM_FULL'>;
+  sourceUrl: string;
+}
 
 export interface ParsedRssEntry {
   entryId: string;
@@ -12,6 +19,7 @@ export interface ParsedRssEntry {
   creatorImageUrl?: string;
   publishedAt?: number;
   imageUrl?: string;
+  articleBodyCandidate?: ParsedArticleBodyCandidate;
 }
 
 export interface ParsedRssFeed {
@@ -87,6 +95,14 @@ function decodeCommonHtmlEntities(input: string): string {
     .replace(/&amp;/gi, '&');
 }
 
+function normalizeEmbeddedHtmlCandidate(value: string | null): string | null {
+  if (!value) return null;
+  const decoded = /&(?:lt|gt|quot|apos|amp|#39);/i.test(value)
+    ? decodeCommonHtmlEntities(value)
+    : value;
+  return decoded.trim() || null;
+}
+
 function extractImageFromHtmlSnippet(value: string): string | null {
   const extractFrom = (candidate: string): string | null => {
     const match = IMG_SRC_REGEX.exec(candidate);
@@ -148,6 +164,9 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
       const itemTitle = firstText(item, ['title']) ?? 'Untitled';
       const summary =
         firstText(item, ['description', 'content:encoded', 'content', 'summary']) ?? '';
+      const embeddedHtml = normalizeEmbeddedHtmlCandidate(
+        firstText(item, ['content:encoded', 'content', 'description'])
+      );
       const publishedAt = toTimestamp(
         firstText(item, ['pubDate', 'published', 'updated', 'dc:date'])
       );
@@ -183,6 +202,9 @@ function parseRssChannel(channel: Record<string, unknown>, feedUrl: string): Par
         creatorImageUrl: imageUrl,
         publishedAt,
         imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        articleBodyCandidate: embeddedHtml
+          ? { html: embeddedHtml, sourceKind: 'RSS_FULL', sourceUrl: feedUrl }
+          : undefined,
       } satisfies ParsedRssEntry;
     })
     .filter((entry) => entry.title && entry.providerId);
@@ -227,6 +249,9 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
             ?.href
         ) ?? textValue(entryLinks[0]?.href);
       const summary = firstText(entry, ['summary', 'content', 'description']) ?? '';
+      const embeddedHtml = normalizeEmbeddedHtmlCandidate(
+        firstText(entry, ['content', 'summary', 'description'])
+      );
       const publishedAt = toTimestamp(firstText(entry, ['published', 'updated']));
       const authorNode = (entry.author as Record<string, unknown> | undefined) ?? {};
       const creator =
@@ -262,6 +287,9 @@ function parseAtomFeed(feed: Record<string, unknown>, feedUrl: string): ParsedRs
         creatorImageUrl: iconUrl,
         publishedAt,
         imageUrl: normalizeContentUrl(imageCandidate, feedUrl) ?? undefined,
+        articleBodyCandidate: embeddedHtml
+          ? { html: embeddedHtml, sourceKind: 'ATOM_FULL', sourceUrl: feedUrl }
+          : undefined,
       } satisfies ParsedRssEntry;
     })
     .filter((entry) => entry.title && entry.providerId);

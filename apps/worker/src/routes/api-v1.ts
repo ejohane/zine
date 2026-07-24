@@ -26,6 +26,8 @@ import {
 } from '@zine/editorial-schema';
 import type { Env } from '../types';
 import { createDb } from '../db';
+import { getArticleBodyStatus, toArticleBodyPublicStatus } from '../article-body/service';
+import { getArticleBodyArtifact } from '../article-body/storage';
 import { apiTokens, userItemConsumptionEvents, userItems } from '../db/schema';
 import { appRouter } from '../trpc/router';
 import { createContext } from '../trpc/context';
@@ -1931,9 +1933,32 @@ apiV1Routes.get('/bookmarks/:id/article-content', apiAuth('bookmarks:read'), asy
 
   try {
     const item = await caller.items.get({ id: c.req.param('id') });
-    const result = await caller.items.getArticleContent({ itemId: item.itemId });
+    const legacy = await caller.items.getArticleContent({ itemId: item.itemId });
+    const record = await getArticleBodyStatus(createDb(c.env.DB), item.itemId);
+    const artifact = record?.r2Key
+      ? await getArticleBodyArtifact(c.env.ARTICLE_CONTENT, record.r2Key)
+      : null;
+    const artifactMissing = Boolean(record?.r2Key && !artifact);
+    const effectiveRecord = artifactMissing
+      ? { ...record!, versionId: null, r2Key: null, lastErrorCode: 'ARTIFACT_MISSING' }
+      : record;
+    let articleBody = toArticleBodyPublicStatus(effectiveRecord, Boolean(legacy.content));
+
+    if (artifactMissing && legacy.content) {
+      articleBody = {
+        ...articleBody,
+        availability: 'DEGRADED',
+        sourceKind: 'LEGACY',
+        qualityWarnings: [
+          ...articleBody.qualityWarnings,
+          'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY',
+        ],
+      };
+    }
+
     return c.json({
-      ...result,
+      content: artifact?.sanitizedHtml ?? legacy.content,
+      articleBody,
       requestId: c.get('requestId'),
       traceId: c.get('traceId'),
     });

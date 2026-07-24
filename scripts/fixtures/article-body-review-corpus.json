@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "cases": [
+    { "id": "feed-ajey-gore", "category": "feed", "url": "https://ajeygore.in/feed" },
+    { "id": "feed-sunil-pai", "category": "feed", "url": "https://sunilpai.dev/rss.xml" },
+    {
+      "id": "feed-mitchell-hashimoto",
+      "category": "feed",
+      "url": "https://mitchellh.com/feed.xml"
+    },
+    { "id": "feed-rands", "category": "feed", "url": "https://randsinrepose.com/rss" },
+    {
+      "id": "feed-simon-willison",
+      "category": "feed",
+      "url": "https://simonwillison.net/atom/everything"
+    },
+    {
+      "id": "feed-sean-goedecke",
+      "category": "feed",
+      "url": "https://www.seangoedecke.com/rss.xml"
+    },
+    {
+      "id": "feed-steve-yegge-medium",
+      "category": "feed",
+      "url": "https://steve-yegge.medium.com/feed"
+    },
+    { "id": "feed-steipete", "category": "feed", "url": "https://steipete.me/rss.xml" },
+    {
+      "id": "feed-armin-ronacher",
+      "category": "feed",
+      "url": "https://lucumr.pocoo.org/feed.atom"
+    },
+    { "id": "feed-boris-tane", "category": "feed", "url": "https://boristane.com/rss.xml" },
+    {
+      "id": "web-mitchell-simd",
+      "category": "web",
+      "url": "https://mitchellh.com/writing/everyone-should-know-simd",
+      "title": "Everyone Should Know SIMD"
+    },
+    {
+      "id": "web-sean-open-weight",
+      "category": "web",
+      "url": "https://seangoedecke.com/powerful-ais-might-escape-by-releasing-open-weight-models",
+      "title": "Powerful AIs might escape containment by releasing themselves as open-weight models"
+    },
+    {
+      "id": "web-sunil-document",
+      "category": "web",
+      "url": "https://sunilpai.dev/posts/one-document-two-hands",
+      "title": "one document, two hands"
+    },
+    {
+      "id": "web-simon-runaway-agent",
+      "category": "web",
+      "url": "https://simonwillison.net/2026/Jul/23/the-first-known-runaway-ai-agent",
+      "title": "The first known runaway AI agent or a very bad marketing stunt?"
+    },
+    {
+      "id": "substack-pragmatic-engineer",
+      "category": "substack",
+      "url": "https://pragmaticengineer.substack.com/p/pushing-software-engineering-limits",
+      "title": "Pushing software engineering limits with napkin math"
+    },
+    {
+      "id": "substack-john-cochrane",
+      "category": "substack",
+      "url": "https://johnhcochrane.substack.com/p/ai-regulation",
+      "title": "AI regulation"
+    },
+    {
+      "id": "substack-the-skip",
+      "category": "substack",
+      "url": "https://theskip.substack.com/p/inside-pm-at-stripe-what-comes-after",
+      "title": "Inside PM at Stripe: What Comes After Become a Builder?"
+    },
+    {
+      "id": "substack-tidy-first",
+      "category": "substack",
+      "url": "https://tidyfirst.substack.com/p/how-do-you-know-that",
+      "title": "How Do You Know That?"
+    },
+    {
+      "id": "substack-lenny-sabbatical",
+      "category": "substack",
+      "url": "https://lenny.substack.com/p/how-to-take-a-sabbatical",
+      "title": "Why a sabbatical can change everything"
+    },
+    {
+      "id": "substack-the-mack",
+      "category": "substack",
+      "url": "https://themack.substack.com/p/overthinking-hates-a-moving-target",
+      "title": "Overthinking hates a moving target"
+    }
+  ]
+}

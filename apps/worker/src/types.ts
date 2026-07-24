@@ -3,6 +3,7 @@
  */
 
 import type { Context } from 'hono';
+import type { ArticleBodyQueueMessage } from './article-body/types';
 import type { EnrichmentQueueMessage } from './enrichment/types';
 import type { SyncQueueMessage } from './sync/types';
 
@@ -82,10 +83,16 @@ export interface Bindings {
   RELEASE_RING?: string;
   /** Secret for privileged enrichment backfill operations */
   ENRICHMENT_BACKFILL_SECRET?: string;
+  /** Secret for privileged article-body cohort/backfill operations */
+  ARTICLE_BODY_BACKFILL_SECRET?: string;
+  /** Opt-in switch for article-body queue production and consumption. */
+  ARTICLE_BODY_PIPELINE_ENABLED?: string;
   /** Queue for async pull-to-refresh sync (optional - not available in all envs) */
   SYNC_QUEUE?: Queue<SyncQueueMessage>;
   /** Queue for async bookmark enrichment (optional - not available in all envs) */
   ENRICHMENT_QUEUE?: Queue<EnrichmentQueueMessage>;
+  /** Queue for durable article-body acquisition (optional - not available in all envs) */
+  ARTICLE_BODY_QUEUE?: Queue<ArticleBodyQueueMessage>;
 }
 
 /**

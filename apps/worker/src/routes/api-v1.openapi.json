@@ -911,8 +911,8 @@
       "get": {
         "tags": ["Reading"],
         "operationId": "getBookmarkArticleContent",
-        "summary": "Get stored article content",
-        "description": "REST equivalent of tRPC items.getArticleContent. Returns null content when no extracted article body is stored.",
+        "summary": "Get article content and availability",
+        "description": "Returns the current immutable article-body artifact when available, otherwise legacy stored HTML. Availability metadata distinguishes pending, degraded, unavailable, and legacy content.",
         "security": [
           {
             "bearerAuth": []
@@ -927,7 +927,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Stored article content.",
+            "description": "Article content with explicit availability and provenance.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3978,15 +3978,74 @@
           },
           {
             "type": "object",
-            "required": ["content"],
+            "required": ["content", "articleBody"],
             "properties": {
               "content": {
                 "type": ["string", "null"],
                 "description": "Stored article HTML or null."
+              },
+              "articleBody": {
+                "$ref": "#/components/schemas/ArticleBodyStatus"
               }
             }
           }
         ]
+      },
+      "ArticleBodyStatus": {
+        "type": "object",
+        "required": [
+          "availability",
+          "pipelineStatus",
+          "schemaVersion",
+          "extractorVersion",
+          "sourceKind",
+          "contentHash",
+          "wordCount",
+          "readingTimeMinutes",
+          "qualityScore",
+          "qualityWarnings",
+          "lastErrorCode",
+          "updatedAt"
+        ],
+        "properties": {
+          "availability": {
+            "type": "string",
+            "enum": ["PENDING", "AVAILABLE", "DEGRADED", "UNAVAILABLE"]
+          },
+          "pipelineStatus": {
+            "type": "string",
+            "enum": [
+              "NOT_REQUESTED",
+              "LEGACY",
+              "PENDING",
+              "PROCESSING",
+              "AVAILABLE",
+              "DEGRADED",
+              "UNAVAILABLE"
+            ]
+          },
+          "schemaVersion": { "type": ["integer", "null"] },
+          "extractorVersion": { "type": ["integer", "null"] },
+          "sourceKind": {
+            "type": ["string", "null"],
+            "enum": [
+              "LEGACY",
+              "RSS_FULL",
+              "ATOM_FULL",
+              "PUBLIC_WEB",
+              "PUBLIC_NEWSLETTER",
+              "BROWSER_RENDERED",
+              null
+            ]
+          },
+          "contentHash": { "type": ["string", "null"] },
+          "wordCount": { "type": ["integer", "null"] },
+          "readingTimeMinutes": { "type": ["integer", "null"] },
+          "qualityScore": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "qualityWarnings": { "type": "array", "items": { "type": "string" } },
+          "lastErrorCode": { "type": ["string", "null"] },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+        }
       },
       "YouTubeSubscription": {
         "type": "object",
