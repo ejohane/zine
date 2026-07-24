@@ -65,6 +65,7 @@ const TRAILING_BOILERPLATE_PATTERNS = [
   /^powered by disqus$/i,
   /^copy as\s*\/\s*view markdown$/i,
   /^this page respects your privacy by not using cookies or similar technologies\b/i,
+  /^no posts$/i,
 ];
 
 export interface ArticleBodyNormalizationDiagnostics {
