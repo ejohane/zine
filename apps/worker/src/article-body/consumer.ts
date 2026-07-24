@@ -8,6 +8,7 @@ import { processArticleBodyQueueMessage, RetryableArticleBodyError } from './pro
 import { ArticleBodyQueueMessageSchema } from './schema';
 import {
   getArticleBodyStatus,
+  isRetryableStoredFailure,
   isArticleBodyPipelineEnabled,
   markArticleBodyProcessing,
   markArticleBodyRetryScheduled,
@@ -83,6 +84,22 @@ export async function handleArticleBodyQueue(
         itemId: parsed.data.itemId,
         messageExtractorVersion: parsed.data.extractorVersion,
         currentExtractorVersion: current.extractorVersion,
+      });
+      message.ack();
+      continue;
+    }
+    if (
+      current?.status === 'UNAVAILABLE' &&
+      current.targetExtractorVersion >= parsed.data.extractorVersion &&
+      current.updatedAt >= parsed.data.enqueuedAt &&
+      !isRetryableStoredFailure(current.lastErrorCode)
+    ) {
+      articleBodyLogger.info('Terminal article-body queue message acknowledged', {
+        operation: 'article_body.queue',
+        event: 'article_body.queue.terminal',
+        messageId: message.id,
+        itemId: parsed.data.itemId,
+        errorCode: current.lastErrorCode,
       });
       message.ack();
       continue;

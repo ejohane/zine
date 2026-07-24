@@ -36,6 +36,11 @@ import { createContext } from './trpc/context';
 import { getDependencyHealth, getQueueHealth } from './diagnostics/health';
 import { backfillBookmarkEnrichment } from './admin/enrichment-backfill';
 import { backfillArticleBodies } from './admin/article-body-backfill';
+import {
+  ArticleBodyCandidateRepairError,
+  ArticleBodyCandidateRepairSchema,
+  repairArticleBodyFromCandidate,
+} from './admin/article-body-repair';
 
 // Create Hono app with typed environment
 const app = new Hono<Env>();
@@ -253,6 +258,71 @@ app.post('/admin/article-bodies/backfill', async (c) => {
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });
+});
+
+app.post('/admin/article-bodies/repair', async (c) => {
+  const configuredSecret = c.env.ARTICLE_BODY_REPAIR_SECRET;
+  if (!configuredSecret) {
+    return c.json(
+      {
+        error: 'Article-body repair is not configured',
+        code: 'REPAIR_NOT_CONFIGURED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      503
+    );
+  }
+
+  const authHeader = c.req.header('Authorization');
+  const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token || token !== configuredSecret) {
+    return c.json(
+      {
+        error: 'Unauthorized',
+        code: 'UNAUTHORIZED',
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      401
+    );
+  }
+
+  const parsed = ArticleBodyCandidateRepairSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid article-body repair request',
+        code: 'INVALID_REPAIR_REQUEST',
+        details: parsed.error.flatten(),
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
+  try {
+    const result = await repairArticleBodyFromCandidate(c.env, parsed.data);
+    return c.json({
+      ...result,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    if (error instanceof ArticleBodyCandidateRepairError) {
+      return c.json(
+        {
+          error: error.message,
+          code: error.code,
+          requestId: c.get('requestId'),
+          traceId: c.get('traceId'),
+        },
+        error.status
+      );
+    }
+    throw error;
+  }
 });
 
 // tRPC Routes

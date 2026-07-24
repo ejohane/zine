@@ -25,6 +25,8 @@ vi.mock('../db', () => ({ createDb }));
 vi.mock('./service', () => ({
   isArticleBodyPipelineEnabled: (env: { ARTICLE_BODY_PIPELINE_ENABLED?: string }) =>
     env.ARTICLE_BODY_PIPELINE_ENABLED?.trim().toLowerCase() === 'true',
+  isRetryableStoredFailure: (errorCode: string | null) =>
+    errorCode === 'QUEUE_RETRIES_EXHAUSTED' || errorCode === 'HTTP_429',
   markArticleBodyProcessing,
   markArticleBodyRetryScheduled,
   markArticleBodyUnavailable,
@@ -142,6 +144,27 @@ describe('article-body queue consumers', () => {
       targetExtractorVersion: 1,
       extractorVersion: 1,
       versionId: 'version_1',
+    });
+
+    await handleArticleBodyQueue(
+      batch(message),
+      { DB: {}, ARTICLE_BODY_PIPELINE_ENABLED: 'true' } as never,
+      processor
+    );
+
+    expect(message.ack).toHaveBeenCalledOnce();
+    expect(markArticleBodyProcessing).not.toHaveBeenCalled();
+    expect(processor).not.toHaveBeenCalled();
+  });
+
+  it('acks a late duplicate after a reviewed terminal repair', async () => {
+    const message = queueMessage();
+    const processor = vi.fn();
+    getArticleBodyStatus.mockResolvedValue({
+      status: 'UNAVAILABLE',
+      targetExtractorVersion: 1,
+      lastErrorCode: 'HTTP_404',
+      updatedAt: body().enqueuedAt + 1,
     });
 
     await handleArticleBodyQueue(

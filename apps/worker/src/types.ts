@@ -85,6 +85,7 @@ export interface Bindings {
   ENRICHMENT_BACKFILL_SECRET?: string;
   /** Secret for privileged article-body cohort/backfill operations */
   ARTICLE_BODY_BACKFILL_SECRET?: string;
+  ARTICLE_BODY_REPAIR_SECRET?: string;
   /** Opt-in switch for article-body queue production and consumption. */
   ARTICLE_BODY_PIPELINE_ENABLED?: string;
   /** Controlled automatic article-body enrollment: off, reader, saved, or all. */

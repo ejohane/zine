@@ -75,7 +75,7 @@ export function isArticleBodyEnrollmentEnabled(
   return mode === 'reader' && trigger === 'reader_open';
 }
 
-function isRetryableStoredFailure(errorCode: string | null): boolean {
+export function isRetryableStoredFailure(errorCode: string | null): boolean {
   if (!errorCode) return false;
   if (
     errorCode === 'QUEUE_SEND_FAILED' ||
