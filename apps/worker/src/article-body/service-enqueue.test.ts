@@ -112,6 +112,25 @@ describe('article-body enqueue', () => {
     expect(send).toHaveBeenCalledOnce();
   });
 
+  it('allows reader demand to repair a job after bounded queue retries are exhausted', async () => {
+    const db = createDb(
+      status({
+        status: 'UNAVAILABLE',
+        lastErrorCode: 'QUEUE_RETRIES_EXHAUSTED',
+        targetExtractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
+      })
+    );
+    const send = vi.fn().mockResolvedValue(undefined);
+    const result = await enqueueArticleBody(
+      db as never,
+      { ARTICLE_BODY_PIPELINE_ENABLED: 'true', ARTICLE_BODY_QUEUE: { send } as never },
+      { itemId: 'item_1', trigger: 'reader_open' }
+    );
+
+    expect(result).toMatchObject({ queued: true });
+    expect(send).toHaveBeenCalledOnce();
+  });
+
   it('includes a bounded embedded candidate in the queue job', async () => {
     const db = createDb(null);
     const send = vi.fn().mockResolvedValue(undefined);

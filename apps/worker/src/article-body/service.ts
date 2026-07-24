@@ -77,6 +77,7 @@ function isRetryableStoredFailure(errorCode: string | null): boolean {
   if (!errorCode) return false;
   if (
     errorCode === 'QUEUE_SEND_FAILED' ||
+    errorCode === 'QUEUE_RETRIES_EXHAUSTED' ||
     errorCode === 'FETCH_FAILED' ||
     errorCode === 'FETCH_TIMEOUT' ||
     errorCode === 'PUBLISH_FAILED'
