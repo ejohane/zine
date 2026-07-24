@@ -50,6 +50,8 @@ At every stage:
 
 Advance from `reader` to `saved`, and from `saved` to `all`, only after the preceding stage is terminal and correct. Return enrollment to `off` if pending age grows unexpectedly, the DLQ changes, acquisition quality misses the gate, primary save/ingestion regresses, or the client presents a misleading state.
 
+When every Worker egress path is blocked but a reviewer can retrieve the same public article, `POST /admin/article-bodies/repair` provides the bounded operational escape hatch. It uses the dedicated `ARTICLE_BODY_REPAIR_SECRET`, accepts only safe public source URLs and either a queue-sized source candidate or a reviewed terminal result, and defaults to `dryRun: true`. A candidate dry run returns the exact normalized content hash and quality metadata; publication requires resubmitting the unchanged candidate with `dryRun: false` and that hash as `confirmedContentHash`. A terminal dry run accepts only `HTTP_404`, `HTTP_410`, or `NOT_READERABLE`, and execution requires the same value as `confirmedTerminalCode`. Normal lifecycle and DLQ-resolution contracts still apply, and late queue duplicates cannot overwrite a newer reviewed terminal repair. Never use mailbox HTML, authenticated page content, or another user's private material as a repair candidate.
+
 ## Local verification
 
 - Run the worker article-body, RSS, REST, diagnostics, and OpenAPI tests.

@@ -306,6 +306,7 @@ invocation_logs = true
 # - CLERK_WEBHOOK_SECRET: Signing secret from Clerk Dashboard > Webhooks
 # - ENRICHMENT_BACKFILL_SECRET: Bearer token for admin enrichment backfill route
 # - ARTICLE_BODY_BACKFILL_SECRET: Bearer token for dry-run and bounded article-body cohorts
+# - ARTICLE_BODY_REPAIR_SECRET: Bearer token for dry-run-first reviewed public candidate repairs
 # - X_BEARER_TOKEN: X API bearer token for inferred profile/avatar resolution
 #
 # Required KV Namespace (create via `wrangler kv:namespace create WEBHOOK_IDEMPOTENCY`)
