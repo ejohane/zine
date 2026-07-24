@@ -1,5 +1,5 @@
 export const ARTICLE_BODY_SCHEMA_VERSION = 1;
-export const ARTICLE_BODY_EXTRACTOR_VERSION = 1;
+export const ARTICLE_BODY_EXTRACTOR_VERSION = 9;
 
 export type ArticleBodyStatus = 'PENDING' | 'PROCESSING' | 'AVAILABLE' | 'DEGRADED' | 'UNAVAILABLE';
 
@@ -14,6 +14,8 @@ export type ArticleBodySourceKind =
   | 'BROWSER_RENDERED';
 
 export type ArticleBodyTrigger = 'ingestion' | 'bookmark' | 'reader_open' | 'backfill' | 'repair';
+
+export type ArticleBodyEnrollmentMode = 'off' | 'reader' | 'saved' | 'all';
 
 export interface ArticleBodyBlock {
   id: string;

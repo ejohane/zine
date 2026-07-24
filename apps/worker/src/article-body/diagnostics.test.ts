@@ -4,25 +4,45 @@ import { getArticleBodyHealth } from './diagnostics';
 
 describe('article-body diagnostics', () => {
   it('returns aggregate lifecycle and DLQ counts without item identifiers', async () => {
-    const all = vi.fn().mockResolvedValue({
+    const statesAll = vi.fn().mockResolvedValue({
       results: [
         { status: 'AVAILABLE', count: 12 },
         { status: 'UNAVAILABLE', count: 2 },
         { status: 'UNKNOWN', count: 99 },
       ],
     });
-    const first = vi.fn().mockResolvedValue({ count: 1 });
-    const prepare = vi.fn().mockReturnValueOnce({ all }).mockReturnValueOnce({ first });
+    const triggerAll = vi.fn().mockResolvedValue({
+      results: [{ trigger: 'reader_open', status: 'AVAILABLE', count: 4 }],
+    });
+    const sourceAll = vi.fn().mockResolvedValue({
+      results: [{ sourceKind: 'PUBLIC_WEB', count: 9 }],
+    });
+    const failureAll = vi.fn().mockResolvedValue({
+      results: [{ code: 'NOT_READERABLE', count: 1 }],
+    });
+    const prepare = vi
+      .fn()
+      .mockReturnValueOnce({ all: statesAll })
+      .mockReturnValueOnce({ first: vi.fn().mockResolvedValue({ count: 1 }) })
+      .mockReturnValueOnce({ first: vi.fn().mockResolvedValue({ timestamp: 1_700_000_000_000 }) })
+      .mockReturnValueOnce({
+        first: vi.fn().mockResolvedValue({ count: 4, average: 1234.4, maximum: 3000 }),
+      })
+      .mockReturnValueOnce({ all: triggerAll })
+      .mockReturnValueOnce({ all: sourceAll })
+      .mockReturnValueOnce({ all: failureAll });
 
     const result = await getArticleBodyHealth({
       DB: { prepare },
       ARTICLE_BODY_QUEUE: {},
       ARTICLE_BODY_PIPELINE_ENABLED: 'false',
+      ARTICLE_BODY_ENROLLMENT_MODE: 'reader',
     } as never);
 
     expect(result).toEqual({
       status: 'ok',
       enabled: false,
+      enrollmentMode: 'reader',
       configured: true,
       states: {
         PENDING: 0,
@@ -31,6 +51,11 @@ describe('article-body diagnostics', () => {
         DEGRADED: 0,
         UNAVAILABLE: 2,
       },
+      oldestPendingAt: '2023-11-14T22:13:20.000Z',
+      terminalLatencyMs: { sampleCount: 4, average: 1234, maximum: 3000 },
+      outcomesByTrigger: { reader_open: { AVAILABLE: 4 } },
+      sourceKinds: { PUBLIC_WEB: 9 },
+      failureCodes: [{ code: 'NOT_READERABLE', count: 1 }],
       dlqCount: 1,
     });
     expect(JSON.stringify(result)).not.toContain('item_');

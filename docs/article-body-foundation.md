@@ -1,6 +1,6 @@
 # Article-body foundation (phase 1)
 
-Phase 1 makes article-body availability a durable, observable backend primitive without changing acquisition behavior. The phase 2b processor and cohort controls are now installed, but the pipeline remains disabled in every Wrangler environment until the staged activation checklist is completed.
+Phase 1 makes article-body availability a durable, observable backend primitive without changing acquisition behavior. Phase 2 installed and validated the processor and bounded cohort controls. Phase 3's native reader and staged enrollment contract are documented in [Native article reader beta](./article-reader-beta.md).
 
 The extraction and review implementation that builds on this contract is documented in [Article-body extraction quality](./article-body-extraction.md).
 

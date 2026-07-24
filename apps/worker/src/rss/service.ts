@@ -10,6 +10,7 @@ import { getOrCreateCreator } from '../ingestion/processor/creators';
 import { prepareItem } from '../ingestion/processor/prepare';
 import { fetchLinkPreview } from '../lib/link-preview';
 import { logger } from '../lib/logger';
+import { enqueueArticleBody, isArticleBodyEnrollmentEnabled } from '../article-body/service';
 import { releaseLock, tryAcquireLock } from '../lib/locks';
 import type { Bindings } from '../types';
 import { parseRssFeedXml, type ParsedRssEntry, type ParsedRssFeed } from './parser';
@@ -53,6 +54,10 @@ interface FetchFeedResult {
 interface SyncOptions {
   maxEntries?: number;
   useConditional?: boolean;
+  articleBodyEnv?: Pick<
+    Bindings,
+    'ARTICLE_BODY_PIPELINE_ENABLED' | 'ARTICLE_BODY_ENROLLMENT_MODE' | 'ARTICLE_BODY_QUEUE'
+  >;
 }
 
 async function fetchFeed(feed: RssFeedRow, useConditional: boolean): Promise<FetchFeedResult> {
@@ -221,8 +226,9 @@ async function ingestEntry(params: {
   userId: string;
   feedId: string;
   entry: ParsedRssEntry;
+  articleBodyEnv?: SyncOptions['articleBodyEnv'];
 }): Promise<boolean> {
-  const { db, userId, feedId, entry } = params;
+  const { db, userId, feedId, entry, articleBodyEnv } = params;
   const enrichedEntry = await enrichRssEntryMetadata(entry, feedId);
 
   const prepared = await prepareItem({
@@ -360,6 +366,24 @@ async function ingestEntry(params: {
   );
 
   await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
+
+  if (articleBodyEnv && isArticleBodyEnrollmentEnabled(articleBodyEnv, 'ingestion')) {
+    try {
+      await enqueueArticleBody(db, articleBodyEnv, {
+        itemId: prepared.item.canonicalItemId,
+        trigger: 'ingestion',
+        embeddedCandidates: enrichedEntry.articleBodyCandidate
+          ? [enrichedEntry.articleBodyCandidate]
+          : undefined,
+      });
+    } catch (error) {
+      rssLogger.warn('Article-body enrollment failed without blocking RSS ingestion', {
+        operation: 'article_body.enroll.ingestion',
+        feedId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   return true;
 }
 
@@ -369,6 +393,7 @@ async function ingestEntries(params: {
   feedId: string;
   entries: ParsedRssEntry[];
   maxEntries: number;
+  articleBodyEnv?: SyncOptions['articleBodyEnv'];
 }): Promise<{ newItems: number; processedEntries: number }> {
   const sortedEntries = sortEntriesByPublishDate(params.entries).slice(0, params.maxEntries);
   let newItems = 0;
@@ -380,6 +405,7 @@ async function ingestEntries(params: {
         userId: params.userId,
         feedId: params.feedId,
         entry,
+        articleBodyEnv: params.articleBodyEnv,
       });
       if (created) {
         newItems += 1;
@@ -504,6 +530,7 @@ export async function syncRssFeed(
       feedId: feed.id,
       entries: parsed.entries,
       maxEntries,
+      articleBodyEnv: options.articleBodyEnv,
     });
 
     await markFeedSuccess({
@@ -589,6 +616,7 @@ export async function pollRssFeeds(env: Bindings, _ctx: ExecutionContext): Promi
         const result = await syncRssFeed(db, feed, {
           maxEntries: MAX_ENTRIES_PER_SYNC,
           useConditional: true,
+          articleBodyEnv: env,
         });
         processedFeeds += 1;
         newItems += result.newItems;

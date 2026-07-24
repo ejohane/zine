@@ -10,6 +10,7 @@ import {
   ARTICLE_BODY_EXTRACTOR_VERSION,
   type ArticleBodyArtifact,
   type ArticleBodyEmbeddedCandidate,
+  type ArticleBodyEnrollmentMode,
   type ArticleBodyPublicStatus,
   type ArticleBodyQueueMessage,
   type ArticleBodyStatus,
@@ -53,6 +54,39 @@ export function isArticleBodyPipelineEnabled(
   env: Pick<Bindings, 'ARTICLE_BODY_PIPELINE_ENABLED'>
 ): boolean {
   return env.ARTICLE_BODY_PIPELINE_ENABLED?.trim().toLowerCase() === 'true';
+}
+
+export function getArticleBodyEnrollmentMode(
+  env: Pick<Bindings, 'ARTICLE_BODY_ENROLLMENT_MODE'>
+): ArticleBodyEnrollmentMode {
+  const value = env.ARTICLE_BODY_ENROLLMENT_MODE?.trim().toLowerCase();
+  return value === 'reader' || value === 'saved' || value === 'all' ? value : 'off';
+}
+
+export function isArticleBodyEnrollmentEnabled(
+  env: Pick<Bindings, 'ARTICLE_BODY_ENROLLMENT_MODE'>,
+  trigger: Extract<ArticleBodyTrigger, 'reader_open' | 'bookmark' | 'ingestion'>
+): boolean {
+  const mode = getArticleBodyEnrollmentMode(env);
+  if (mode === 'all') return true;
+  if (mode === 'saved') return trigger === 'reader_open' || trigger === 'bookmark';
+  return mode === 'reader' && trigger === 'reader_open';
+}
+
+function isRetryableStoredFailure(errorCode: string | null): boolean {
+  if (!errorCode) return false;
+  if (
+    errorCode === 'QUEUE_SEND_FAILED' ||
+    errorCode === 'FETCH_FAILED' ||
+    errorCode === 'FETCH_TIMEOUT' ||
+    errorCode === 'PUBLISH_FAILED'
+  ) {
+    return true;
+  }
+  const match = /^HTTP_(\d{3})$/.exec(errorCode);
+  if (!match) return false;
+  const status = Number(match[1]);
+  return status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
 export async function getArticleBodyStatus(
@@ -167,6 +201,7 @@ export async function markArticleBodyPending(
   db: Database,
   itemId: string,
   extractorVersion: number,
+  trigger: ArticleBodyTrigger,
   now: number = Date.now()
 ): Promise<void> {
   await db
@@ -181,6 +216,9 @@ export async function markArticleBodyPending(
       lastHttpStatus: null,
       lastAttemptAt: null,
       nextAttemptAt: null,
+      enrollmentTrigger: trigger,
+      requestedAt: now,
+      terminalAt: null,
       createdAt: now,
       updatedAt: now,
     })
@@ -192,6 +230,9 @@ export async function markArticleBodyPending(
         lastErrorCode: null,
         lastHttpStatus: null,
         nextAttemptAt: null,
+        enrollmentTrigger: trigger,
+        requestedAt: now,
+        terminalAt: null,
         updatedAt: now,
       },
     });
@@ -231,6 +272,7 @@ export async function markArticleBodyRetryScheduled(
       lastErrorCode: errorCode,
       lastAttemptAt: now,
       nextAttemptAt,
+      terminalAt: null,
       updatedAt: now,
     })
     .where(eq(articleBodyStates.itemId, itemId));
@@ -257,6 +299,7 @@ export async function markArticleBodyUnavailable(
       lastHttpStatus: options.httpStatus ?? null,
       lastAttemptAt: now,
       nextAttemptAt: options.nextAttemptAt ?? null,
+      terminalAt: now,
       updatedAt: now,
     })
     .where(eq(articleBodyStates.itemId, itemId));
@@ -321,6 +364,7 @@ export async function publishArticleBodyArtifact(
       lastHttpStatus: null,
       lastAttemptAt: now,
       nextAttemptAt: null,
+      terminalAt: now,
       createdAt: now,
       updatedAt: now,
     })
@@ -334,6 +378,7 @@ export async function publishArticleBodyArtifact(
         lastHttpStatus: null,
         lastAttemptAt: now,
         nextAttemptAt: null,
+        terminalAt: now,
         updatedAt: now,
       },
     });
@@ -354,7 +399,7 @@ export async function enqueueArticleBody(
   }
 ): Promise<{
   queued: boolean;
-  reason?: 'disabled' | 'queue_unavailable' | 'already_queued' | 'current';
+  reason?: 'disabled' | 'queue_unavailable' | 'already_queued' | 'current' | 'terminal';
   embeddedCandidatesIncluded?: boolean;
 }> {
   if (!isArticleBodyPipelineEnabled(env)) return { queued: false, reason: 'disabled' };
@@ -378,7 +423,15 @@ export async function enqueueArticleBody(
   ) {
     return { queued: false, reason: 'current' };
   }
-  await markArticleBodyPending(db, input.itemId, extractorVersion, now);
+  if (
+    input.trigger !== 'repair' &&
+    current?.status === 'UNAVAILABLE' &&
+    current.targetExtractorVersion >= extractorVersion &&
+    !isRetryableStoredFailure(current.lastErrorCode)
+  ) {
+    return { queued: false, reason: 'terminal' };
+  }
+  await markArticleBodyPending(db, input.itemId, extractorVersion, input.trigger, now);
 
   const baseMessage: ArticleBodyQueueMessage = {
     itemId: input.itemId,
@@ -404,3 +457,5 @@ export async function enqueueArticleBody(
     embeddedCandidatesIncluded: Boolean(message.embeddedCandidates?.length),
   };
 }
+
+export const articleBodyEnrollmentInternals = { isRetryableStoredFailure };

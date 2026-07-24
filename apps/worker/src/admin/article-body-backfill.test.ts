@@ -9,6 +9,7 @@ vi.mock('../db', () => ({ createDb }));
 vi.mock('../article-body/service', () => ({ enqueueArticleBody }));
 
 import { backfillArticleBodies } from './article-body-backfill';
+import { ARTICLE_BODY_EXTRACTOR_VERSION } from '../article-body/types';
 
 const rows = [
   {
@@ -48,7 +49,7 @@ describe('article-body backfill', () => {
 
     expect(result).toMatchObject({
       dryRun: true,
-      extractorVersion: 1,
+      extractorVersion: ARTICLE_BODY_EXTRACTOR_VERSION,
       limit: 2,
       nextCursor: 'item_002',
       scanned: 2,
@@ -83,7 +84,7 @@ describe('article-body backfill', () => {
     const { env, bind, prepare } = createEnv([]);
     await backfillArticleBodies(env as never, { cursor: 'item_099', limit: 7 });
 
-    expect(bind).toHaveBeenCalledWith(1, 'item_099', 7);
+    expect(bind).toHaveBeenCalledWith(ARTICLE_BODY_EXTRACTOR_VERSION, 'item_099', 7);
     const query = prepare.mock.calls[0][0] as string;
     expect(query).toContain("i.content_type = 'ARTICLE'");
     expect(query).toContain("abs.status NOT IN ('PENDING', 'PROCESSING')");

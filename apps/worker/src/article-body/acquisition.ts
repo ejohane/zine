@@ -29,6 +29,13 @@ function resolvePublicArticleFetchUrl(canonicalUrl: string): string {
   return `https://${match[1]}.substack.com/p/${match[2]}`;
 }
 
+function resolveSubstackPostApiUrl(articleUrl: string): string | null {
+  const url = new URL(articleUrl);
+  const match = /^\/p\/([a-z0-9-]+)\/?$/i.exec(url.pathname);
+  if (!match) return null;
+  return new URL(`/api/v1/posts/${match[1]}`, url.origin).href;
+}
+
 export interface ArticleBodyAcquisitionInput {
   itemId: string;
   canonicalUrl: string;
@@ -147,6 +154,130 @@ function failedAttempt(
   };
 }
 
+async function fetchSubstackApiCandidate(
+  input: ArticleBodyAcquisitionInput,
+  articleUrl: string,
+  fetchImplementation: typeof fetch,
+  extractedAt: number,
+  extractorVersion: number,
+  signal: AbortSignal
+): Promise<EvaluatedCandidate | null> {
+  const apiUrl = resolveSubstackPostApiUrl(articleUrl);
+  if (!apiUrl || !isSafePublicArticleUrl(apiUrl)) return null;
+
+  let responseUrl = apiUrl;
+  let response: Response | null = null;
+  for (let redirects = 0; redirects <= MAX_ARTICLE_REDIRECTS; redirects += 1) {
+    response = await fetchImplementation(responseUrl, {
+      redirect: 'manual',
+      signal,
+      headers: {
+        'User-Agent': 'ZineBot/2.0 (+https://zine.app/bot)',
+        Accept: 'application/json',
+      },
+    });
+    if (response.status < 300 || response.status >= 400) break;
+
+    const location = response.headers.get('location');
+    if (!location || redirects === MAX_ARTICLE_REDIRECTS) return null;
+    const nextUrl = new URL(location, responseUrl).href;
+    if (!isSafePublicArticleUrl(nextUrl)) return null;
+    responseUrl = nextUrl;
+  }
+
+  if (!response?.ok) return null;
+  const contentLength = Number(response.headers.get('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) return null;
+  const raw = await response.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_ARTICLE_HTML_BYTES) return null;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== 'object') return null;
+  const post = payload as Record<string, unknown>;
+  if (typeof post.body_html !== 'string' || post.body_html.trim().length === 0) return null;
+
+  return evaluateCandidate(
+    input,
+    {
+      html: post.body_html,
+      sourceKind: 'PUBLIC_NEWSLETTER',
+      sourceUrl: responseUrl,
+      extractedTitle: typeof post.title === 'string' ? post.title : null,
+      publishedAt: typeof post.post_date === 'string' ? post.post_date : null,
+      httpStatus: response.status,
+    },
+    extractedAt,
+    extractorVersion
+  );
+}
+
+async function fetchReaderProxyCandidate(
+  input: ArticleBodyAcquisitionInput,
+  articleUrl: string,
+  fetchImplementation: typeof fetch,
+  extractedAt: number,
+  extractorVersion: number,
+  signal: AbortSignal
+): Promise<EvaluatedCandidate | null> {
+  if (!resolveSubstackPostApiUrl(articleUrl)) return null;
+  const readerUrl = `https://r.jina.ai/${articleUrl}`;
+
+  const response = await fetchImplementation(readerUrl, {
+    redirect: 'manual',
+    signal,
+    headers: {
+      'User-Agent': 'ZineBot/2.0 (+https://zine.app/bot)',
+      Accept: 'application/json',
+      'X-Return-Format': 'html',
+      'X-Timeout': '10',
+    },
+  });
+  if (!response.ok) return null;
+  const contentLength = Number(response.headers.get('content-length') ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_ARTICLE_HTML_BYTES) return null;
+  const raw = await response.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_ARTICLE_HTML_BYTES) return null;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!payload || typeof payload !== 'object') return null;
+  const data = (payload as { data?: unknown }).data;
+  if (!data || typeof data !== 'object') return null;
+  const reader = data as Record<string, unknown>;
+  if (typeof reader.html !== 'string' || reader.html.trim().length === 0) return null;
+
+  const extracted = extractArticleFromHtml(reader.html, articleUrl);
+  if (!extracted?.isArticle || !extracted.content) return null;
+  return evaluateCandidate(
+    input,
+    {
+      html: extracted.content,
+      sourceKind: 'BROWSER_RENDERED',
+      sourceUrl: articleUrl,
+      extractedTitle:
+        typeof reader.title === 'string' && reader.title.trim().length > 0
+          ? reader.title
+          : extracted.title,
+      byline: extracted.author,
+      publisher: extracted.siteName,
+      publishedAt:
+        typeof reader.publishedTime === 'string' ? reader.publishedTime : extracted.publishedAt,
+      httpStatus: response.status,
+    },
+    extractedAt,
+    extractorVersion
+  );
+}
+
 async function fetchPublicCandidate(
   input: ArticleBodyAcquisitionInput,
   fetchImplementation: typeof fetch,
@@ -206,6 +337,28 @@ async function fetchPublicCandidate(
     }
     if (!response) throw new Error('Article fetch returned no response');
     if (!response.ok) {
+      const substackCandidate = await fetchSubstackApiCandidate(
+        input,
+        responseUrl,
+        fetchImplementation,
+        extractedAt,
+        extractorVersion,
+        controller.signal
+      );
+      if (substackCandidate) {
+        return { evaluated: substackCandidate, attempt: substackCandidate.attempt };
+      }
+      const readerCandidate = await fetchReaderProxyCandidate(
+        input,
+        responseUrl,
+        fetchImplementation,
+        extractedAt,
+        extractorVersion,
+        controller.signal
+      );
+      if (readerCandidate) {
+        return { evaluated: readerCandidate, attempt: readerCandidate.attempt };
+      }
       return {
         evaluated: null,
         attempt: failedAttempt(input, `HTTP_${response.status}`, {
@@ -380,4 +533,5 @@ export const articleBodyAcquisitionLimits = {
 
 export const articleBodyAcquisitionInternals = {
   resolvePublicArticleFetchUrl,
+  resolveSubstackPostApiUrl,
 };

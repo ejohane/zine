@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { isArticleBodyPipelineEnabled, toArticleBodyPublicStatus } from './service';
+import {
+  getArticleBodyEnrollmentMode,
+  isArticleBodyEnrollmentEnabled,
+  isArticleBodyPipelineEnabled,
+  toArticleBodyPublicStatus,
+} from './service';
 import type { ArticleBodyStatusRecord } from './service';
 
 function record(overrides: Partial<ArticleBodyStatusRecord> = {}): ArticleBodyStatusRecord {
@@ -32,6 +37,30 @@ describe('article-body public status', () => {
     expect(isArticleBodyPipelineEnabled({})).toBe(false);
     expect(isArticleBodyPipelineEnabled({ ARTICLE_BODY_PIPELINE_ENABLED: 'false' })).toBe(false);
     expect(isArticleBodyPipelineEnabled({ ARTICLE_BODY_PIPELINE_ENABLED: ' TRUE ' })).toBe(true);
+  });
+
+  it('uses progressive enrollment modes and treats unknown values as off', () => {
+    expect(getArticleBodyEnrollmentMode({})).toBe('off');
+    expect(getArticleBodyEnrollmentMode({ ARTICLE_BODY_ENROLLMENT_MODE: 'unexpected' })).toBe(
+      'off'
+    );
+    expect(getArticleBodyEnrollmentMode({ ARTICLE_BODY_ENROLLMENT_MODE: ' Saved ' })).toBe('saved');
+
+    expect(
+      isArticleBodyEnrollmentEnabled({ ARTICLE_BODY_ENROLLMENT_MODE: 'reader' }, 'reader_open')
+    ).toBe(true);
+    expect(
+      isArticleBodyEnrollmentEnabled({ ARTICLE_BODY_ENROLLMENT_MODE: 'reader' }, 'bookmark')
+    ).toBe(false);
+    expect(
+      isArticleBodyEnrollmentEnabled({ ARTICLE_BODY_ENROLLMENT_MODE: 'saved' }, 'bookmark')
+    ).toBe(true);
+    expect(
+      isArticleBodyEnrollmentEnabled({ ARTICLE_BODY_ENROLLMENT_MODE: 'saved' }, 'ingestion')
+    ).toBe(false);
+    expect(
+      isArticleBodyEnrollmentEnabled({ ARTICLE_BODY_ENROLLMENT_MODE: 'all' }, 'ingestion')
+    ).toBe(true);
   });
 
   it('represents legacy and absent content explicitly', () => {

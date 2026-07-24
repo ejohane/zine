@@ -9,6 +9,14 @@ import { items } from '../db/schema';
 const mockPrepareItem = vi.fn();
 const mockFetchLinkPreview = vi.fn();
 const mockGetOrCreateCreator = vi.fn();
+const { mockEnqueueArticleBody } = vi.hoisted(() => ({
+  mockEnqueueArticleBody: vi.fn(),
+}));
+
+vi.mock('../article-body/service', async (importOriginal) => {
+  const actual = (await importOriginal()) as object;
+  return { ...actual, enqueueArticleBody: mockEnqueueArticleBody };
+});
 
 vi.mock('../ingestion/processor/prepare', () => ({
   prepareItem: (...args: Parameters<typeof prepareItem>) => mockPrepareItem(...args),
@@ -137,6 +145,7 @@ describe('syncRssFeed', () => {
     mockPrepareItem.mockResolvedValue({ status: 'skipped' });
     mockFetchLinkPreview.mockResolvedValue(null);
     mockGetOrCreateCreator.mockResolvedValue(null);
+    mockEnqueueArticleBody.mockResolvedValue({ queued: true });
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(sampleAtom, {
         status: 200,
@@ -184,6 +193,56 @@ describe('syncRssFeed', () => {
 
     expect(result.processedEntries).toBe(2);
     expect(mockPrepareItem).toHaveBeenCalledTimes(2);
+  });
+
+  it('enrolls a new RSS article with its embedded Atom candidate in all mode', async () => {
+    mockPrepareItem.mockResolvedValue({
+      status: 'prepared',
+      item: {
+        newItem: {
+          id: 'new_item_123',
+          contentType: ContentType.ARTICLE,
+          provider: Provider.RSS,
+          providerId: 'https://example.com/posts/1',
+          canonicalUrl: 'https://example.com/posts/1',
+          title: 'Entry With Image',
+          description: 'Body',
+          creator: 'Example Feed',
+          publishedAt: Date.now(),
+          createdAt: Date.now(),
+        },
+        rawItem: {},
+        providerId: 'https://example.com/posts/1',
+        canonicalItemId: 'item_123',
+        canonicalItemExists: true,
+        userItemId: 'user_item_123',
+        creatorId: null,
+      },
+    });
+    const { db } = createMockDb();
+    const articleBodyEnv = {
+      ARTICLE_BODY_PIPELINE_ENABLED: 'true',
+      ARTICLE_BODY_ENROLLMENT_MODE: 'all',
+      ARTICLE_BODY_QUEUE: { send: vi.fn() },
+    } as never;
+
+    await syncRssFeed(db, feed as SyncFeed, {
+      maxEntries: 1,
+      useConditional: false,
+      articleBodyEnv,
+    });
+
+    expect(mockEnqueueArticleBody).toHaveBeenCalledWith(
+      db,
+      articleBodyEnv,
+      expect.objectContaining({
+        itemId: 'item_123',
+        trigger: 'ingestion',
+        embeddedCandidates: [
+          expect.objectContaining({ sourceKind: 'ATOM_FULL', sourceUrl: feed.feedUrl }),
+        ],
+      })
+    );
   });
 
   it('backfills thumbnail, summary, and creator for skipped RSS items', async () => {

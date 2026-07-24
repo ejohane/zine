@@ -26,7 +26,12 @@ import {
 } from '@zine/editorial-schema';
 import type { Env } from '../types';
 import { createDb } from '../db';
-import { getArticleBodyStatus, toArticleBodyPublicStatus } from '../article-body/service';
+import {
+  enqueueArticleBody,
+  getArticleBodyStatus,
+  isArticleBodyEnrollmentEnabled,
+  toArticleBodyPublicStatus,
+} from '../article-body/service';
 import { getArticleBodyArtifact } from '../article-body/storage';
 import { apiTokens, userItemConsumptionEvents, userItems } from '../db/schema';
 import { appRouter } from '../trpc/router';
@@ -55,6 +60,7 @@ import {
   storeEditorialEdition,
 } from '../lib/editorial-storage';
 import { verifyClerkRequestToken } from '../middleware/auth';
+import { logger } from '../lib/logger';
 import { getEditorialToday } from '../lib/editorial-today';
 import {
   EditorialFeedbackConflictError,
@@ -88,6 +94,61 @@ import {
 
 const DEFAULT_BOOKMARKS_LIMIT = 10;
 const MAX_BOOKMARKS_LIMIT = 50;
+const apiLogger = logger.child('api-v1');
+
+async function readArticleContent(
+  env: Env['Bindings'],
+  itemId: string,
+  legacyContent: string | null
+) {
+  const record = await getArticleBodyStatus(createDb(env.DB), itemId);
+  const artifact = record?.r2Key
+    ? await getArticleBodyArtifact(env.ARTICLE_CONTENT, record.r2Key)
+    : null;
+  const artifactMissing = Boolean(record?.r2Key && !artifact);
+  const effectiveRecord = artifactMissing
+    ? { ...record!, versionId: null, r2Key: null, lastErrorCode: 'ARTIFACT_MISSING' }
+    : record;
+  let articleBody = toArticleBodyPublicStatus(effectiveRecord, Boolean(legacyContent));
+
+  if (artifactMissing && legacyContent) {
+    articleBody = {
+      ...articleBody,
+      availability: 'DEGRADED' as const,
+      sourceKind: 'LEGACY' as const,
+      qualityWarnings: [...articleBody.qualityWarnings, 'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY'],
+    };
+  }
+
+  return {
+    content: artifact?.sanitizedHtml ?? legacyContent,
+    articleBody,
+  };
+}
+
+async function enrollSavedArticleBestEffort(
+  env: Env['Bindings'],
+  item: { itemId: string; contentType: string },
+  traceId: string
+): Promise<void> {
+  if (item.contentType !== 'ARTICLE' || !isArticleBodyEnrollmentEnabled(env, 'bookmark')) {
+    return;
+  }
+
+  try {
+    await enqueueArticleBody(createDb(env.DB), env, {
+      itemId: item.itemId,
+      trigger: 'bookmark',
+      traceId,
+    });
+  } catch (error) {
+    apiLogger.warn('Article-body bookmark enrollment failed without blocking the bookmark', {
+      operation: 'article_body.enroll.bookmark',
+      traceId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 const SaveBookmarkBodySchema = z.object({
   url: z.string().url('Invalid URL format'),
@@ -1507,7 +1568,9 @@ apiV1Routes.post('/inbox/:id/bookmark', apiAuth('bookmarks:write'), async (c) =>
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
+    const item = await caller.items.get({ id: c.req.param('id') });
     const result = await caller.items.bookmark({ id: c.req.param('id') });
+    await enrollSavedArticleBestEffort(c.env, item, c.get('traceId'));
     return c.json({
       ...result,
       requestId: c.get('requestId'),
@@ -1707,6 +1770,11 @@ apiV1Routes.post('/bookmarks', apiAuth('bookmarks:write'), async (c) => {
       url: parsedBody.data.url,
       tags: parsedBody.data.tags,
     });
+    await enrollSavedArticleBestEffort(
+      c.env,
+      { itemId: bookmark.itemId, contentType: preview.contentType },
+      c.get('traceId')
+    );
 
     return c.json({
       bookmark,
@@ -1934,34 +2002,54 @@ apiV1Routes.get('/bookmarks/:id/article-content', apiAuth('bookmarks:read'), asy
   try {
     const item = await caller.items.get({ id: c.req.param('id') });
     const legacy = await caller.items.getArticleContent({ itemId: item.itemId });
-    const record = await getArticleBodyStatus(createDb(c.env.DB), item.itemId);
-    const artifact = record?.r2Key
-      ? await getArticleBodyArtifact(c.env.ARTICLE_CONTENT, record.r2Key)
-      : null;
-    const artifactMissing = Boolean(record?.r2Key && !artifact);
-    const effectiveRecord = artifactMissing
-      ? { ...record!, versionId: null, r2Key: null, lastErrorCode: 'ARTIFACT_MISSING' }
-      : record;
-    let articleBody = toArticleBodyPublicStatus(effectiveRecord, Boolean(legacy.content));
-
-    if (artifactMissing && legacy.content) {
-      articleBody = {
-        ...articleBody,
-        availability: 'DEGRADED',
-        sourceKind: 'LEGACY',
-        qualityWarnings: [
-          ...articleBody.qualityWarnings,
-          'CURRENT_ARTIFACT_MISSING_FALLBACK_LEGACY',
-        ],
-      };
-    }
+    const result = await readArticleContent(c.env, item.itemId, legacy.content);
 
     return c.json({
-      content: artifact?.sanitizedHtml ?? legacy.content,
-      articleBody,
+      ...result,
       requestId: c.get('requestId'),
       traceId: c.get('traceId'),
     });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
+});
+
+apiV1Routes.post('/bookmarks/:id/article-content', apiAuth('bookmarks:write'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+
+  try {
+    const item = await caller.items.get({ id: c.req.param('id') });
+    if (item.contentType !== 'ARTICLE') {
+      return c.json(
+        {
+          error: 'Article reading is only available for article items',
+          code: 'ARTICLE_BODY_NOT_ELIGIBLE',
+          requestId: c.get('requestId'),
+          traceId: c.get('traceId'),
+        },
+        422
+      );
+    }
+
+    const requestResult = isArticleBodyEnrollmentEnabled(c.env, 'reader_open')
+      ? await enqueueArticleBody(createDb(c.env.DB), c.env, {
+          itemId: item.itemId,
+          trigger: 'reader_open',
+          traceId: c.get('traceId'),
+        })
+      : { queued: false as const, reason: 'enrollment_disabled' as const };
+    const legacy = await caller.items.getArticleContent({ itemId: item.itemId });
+    const result = await readArticleContent(c.env, item.itemId, legacy.content);
+    const response = {
+      ...result,
+      request: requestResult,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    };
+
+    return requestResult.queued || requestResult.reason === 'already_queued'
+      ? c.json(response, 202)
+      : c.json(response);
   } catch (error) {
     return trpcErrorResponse(c, error);
   }

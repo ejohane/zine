@@ -62,6 +62,10 @@ struct ZineNativeApp: App {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-screenshot-bookmark-detail-fixture") {
             ScreenshotBookmarkDetailView()
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-article-reader-fixture") {
+            ScreenshotArticleReaderView(unavailable: false)
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-article-reader-unavailable-fixture") {
+            ScreenshotArticleReaderView(unavailable: true)
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-story-fixture") {
             ScreenshotTodayStoryView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-fixtures") {

@@ -161,6 +161,86 @@ describe('acquireArticleBody', () => {
       expect.objectContaining({ redirect: 'manual' })
     );
   });
+
+  it('falls back to the public Substack post body when the HTML page is rate limited', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: 'Text is king',
+            post_date: '2026-01-20T18:55:47.327Z',
+            body_html: `<p>${articleText(40)}</p><p>${articleText(40)}</p>`,
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl:
+          'https://open.substack.com/pub/experimentalhistory/p/text-is-king?r=share-token',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({ status: 'AVAILABLE', errorCode: null });
+    expect(result.artifact).toMatchObject({
+      sourceKind: 'PUBLIC_NEWSLETTER',
+      title: 'Text is king',
+    });
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      'https://experimentalhistory.substack.com/api/v1/posts/text-is-king',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
+
+  it('uses the bounded reader proxy when both Substack origins are rate limited', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(new Response('rate limited', { status: 429 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              title: 'Text is king',
+              publishedTime: '2026-01-20T18:55:47.327Z',
+              html: page('Text is king'),
+            },
+          }),
+          { headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+    const result = await acquireArticleBody(
+      {
+        ...input(),
+        canonicalUrl:
+          'https://open.substack.com/pub/experimentalhistory/p/text-is-king?r=share-token',
+        title: 'Text is king',
+      },
+      { fetch: fetch as never }
+    );
+
+    expect(result).toMatchObject({ status: 'AVAILABLE', errorCode: null });
+    expect(result.artifact).toMatchObject({
+      sourceKind: 'BROWSER_RENDERED',
+      title: 'Text is king',
+    });
+    expect(fetch).toHaveBeenNthCalledWith(
+      3,
+      'https://r.jina.ai/https://experimentalhistory.substack.com/p/text-is-king',
+      expect.objectContaining({
+        redirect: 'manual',
+        headers: expect.objectContaining({ 'X-Return-Format': 'html' }),
+      })
+    );
+  });
 });
 
 describe('isSafePublicArticleUrl', () => {
@@ -185,5 +265,18 @@ describe('article-body public URL resolution', () => {
         'https://open.substack.com/redirect?url=https://example.com'
       )
     ).toBe('https://open.substack.com/redirect?url=https://example.com');
+  });
+
+  it('derives a same-origin public post endpoint only from post paths', () => {
+    expect(
+      articleBodyAcquisitionInternals.resolveSubstackPostApiUrl(
+        'https://newsletter.example.com/p/a-public-post?utm_source=share'
+      )
+    ).toBe('https://newsletter.example.com/api/v1/posts/a-public-post');
+    expect(
+      articleBodyAcquisitionInternals.resolveSubstackPostApiUrl(
+        'https://newsletter.example.com/archive'
+      )
+    ).toBeNull();
   });
 });

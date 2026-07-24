@@ -33,7 +33,20 @@ struct APIClient {
 
     let baseURL: URL
     let tokenProvider: TokenProvider
-    var session: URLSession = .shared
+    var session: URLSession
+    private let articleBodyCache: ArticleBodyCache?
+
+    init(
+        baseURL: URL,
+        tokenProvider: @escaping TokenProvider,
+        session: URLSession = .shared,
+        articleBodyCache: ArticleBodyCache? = nil
+    ) {
+        self.baseURL = baseURL
+        self.tokenProvider = tokenProvider
+        self.session = session
+        self.articleBodyCache = articleBodyCache
+    }
 
     func getHome() async throws -> HomeResponse {
         try await request(url: baseURL.appending(path: "/api/v1/home"))
@@ -276,6 +289,39 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
+    func getArticleContent(id: String) async throws -> ArticleContentResponse {
+        try await request(
+            url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/article-content")
+        )
+    }
+
+    func requestArticleContent(id: String) async throws -> ArticleContentResponse {
+        var request = URLRequest(
+            url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/article-content")
+        )
+        request.httpMethod = "POST"
+        return try await send(request)
+    }
+
+    func updateProgress(id: String, fraction: Double) async throws {
+        let clamped = min(max(fraction, 0), 1)
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/progress"))
+        request.httpMethod = "PUT"
+        request.httpBody = try JSONEncoder().encode(
+            ReadingProgressRequest(position: clamped, duration: 1)
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let _: EmptyResponse = try await send(request)
+    }
+
+    func cachedArticleContent(id: String) async -> ArticleContentResponse? {
+        await articleBodyCache?.load(bookmarkID: id)
+    }
+
+    func cacheArticleContent(_ response: ArticleContentResponse, id: String) async {
+        await articleBodyCache?.save(response, bookmarkID: id)
+    }
+
     func listSubscriptionSources() async throws -> SubscriptionsHubResponse {
         try await request(url: baseURL.appending(path: "/api/v1/subscriptions"))
     }
@@ -507,6 +553,11 @@ private struct AddProviderSubscriptionRequest: Encodable {
     let channelId: String
     let name: String
     let imageUrl: String?
+}
+
+private struct ReadingProgressRequest: Encodable {
+    let position: Double
+    let duration: Double
 }
 
 private struct RegisterOAuthStateRequest: Encodable {

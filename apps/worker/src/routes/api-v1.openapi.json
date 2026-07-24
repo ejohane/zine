@@ -946,6 +946,45 @@
             "$ref": "#/components/responses/NotFound"
           }
         }
+      },
+      "post": {
+        "tags": ["Reading"],
+        "operationId": "requestBookmarkArticleContent",
+        "summary": "Ensure article content is available",
+        "description": "Idempotently requests article-body acquisition for an article the token owner can access. Current and terminal results are returned without duplicate queue work.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/UserItemId" }],
+        "responses": {
+          "200": {
+            "description": "The article already has a current or terminal result.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ArticleContentRequestResponse" }
+              }
+            }
+          },
+          "202": {
+            "description": "Article acquisition was queued or is already processing.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ArticleContentRequestResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": {
+            "description": "The item is not an article.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/tags": {
@@ -3986,6 +4025,37 @@
               },
               "articleBody": {
                 "$ref": "#/components/schemas/ArticleBodyStatus"
+              }
+            }
+          }
+        ]
+      },
+      "ArticleContentRequestResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ArticleContentResponse"
+          },
+          {
+            "type": "object",
+            "required": ["request"],
+            "properties": {
+              "request": {
+                "type": "object",
+                "required": ["queued"],
+                "properties": {
+                  "queued": { "type": "boolean" },
+                  "reason": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "enrollment_disabled",
+                      "queue_unavailable",
+                      "already_queued",
+                      "current",
+                      "terminal"
+                    ]
+                  }
+                }
               }
             }
           }

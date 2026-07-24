@@ -31,6 +31,7 @@ const {
   mockGetArticleContent,
   mockGetArticleBodyStatus,
   mockGetArticleBodyArtifact,
+  mockEnqueueArticleBody,
   mockListTags,
   mockPreview,
   mockSave,
@@ -108,6 +109,7 @@ const {
   mockGetArticleContent: vi.fn(),
   mockGetArticleBodyStatus: vi.fn(),
   mockGetArticleBodyArtifact: vi.fn(),
+  mockEnqueueArticleBody: vi.fn(),
   mockListTags: vi.fn(),
   mockPreview: vi.fn(),
   mockSave: vi.fn(),
@@ -171,6 +173,7 @@ vi.mock('../article-body/service', async (importOriginal) => {
   return {
     ...actual,
     getArticleBodyStatus: mockGetArticleBodyStatus,
+    enqueueArticleBody: mockEnqueueArticleBody,
   };
 });
 
@@ -388,6 +391,7 @@ describe('apiV1Routes', () => {
     });
     mockGetArticleBodyStatus.mockResolvedValue(null);
     mockGetArticleBodyArtifact.mockResolvedValue(null);
+    mockEnqueueArticleBody.mockResolvedValue({ queued: false, reason: 'current' });
     mockConnectionsList.mockResolvedValue({
       YOUTUBE: null,
       SPOTIFY: null,
@@ -1981,19 +1985,34 @@ describe('apiV1Routes', () => {
   });
 
   it('moves an inbox item to bookmarks', async () => {
+    mockGetItem.mockResolvedValue({
+      id: 'ui_inbox_1',
+      itemId: 'item_1',
+      contentType: 'ARTICLE',
+    });
     mockBookmarkInboxItem.mockResolvedValue({ success: true });
     const app = createTestApp();
+    const env = {
+      ...createMockEnv(),
+      ARTICLE_BODY_PIPELINE_ENABLED: 'true',
+      ARTICLE_BODY_ENROLLMENT_MODE: 'saved',
+    } as Env['Bindings'];
 
     const res = await app.fetch(
       new Request('http://localhost/api/v1/inbox/ui_inbox_1/bookmark', {
         method: 'POST',
         headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
       }),
-      createMockEnv()
+      env
     );
 
     expect(res.status).toBe(200);
     expect(mockBookmarkInboxItem).toHaveBeenCalledWith({ id: 'ui_inbox_1' });
+    expect(mockEnqueueArticleBody).toHaveBeenCalledWith(
+      expect.anything(),
+      env,
+      expect.objectContaining({ itemId: 'item_1', trigger: 'bookmark' })
+    );
     expect((await res.json()) as JsonBody).toMatchObject({
       success: true,
       requestId: 'test-request-id',
@@ -2119,6 +2138,11 @@ describe('apiV1Routes', () => {
       status: 'created',
     });
     const app = createTestApp();
+    const env = {
+      ...createMockEnv(),
+      ARTICLE_BODY_PIPELINE_ENABLED: 'true',
+      ARTICLE_BODY_ENROLLMENT_MODE: 'saved',
+    } as Env['Bindings'];
 
     const res = await app.fetch(
       new Request('http://localhost/api/v1/bookmarks', {
@@ -2129,7 +2153,7 @@ describe('apiV1Routes', () => {
         },
         body: JSON.stringify({ url: 'https://example.com/article', tags: ['Design', ' api '] }),
       }),
-      createMockEnv()
+      env
     );
 
     expect(res.status).toBe(200);
@@ -2140,6 +2164,11 @@ describe('apiV1Routes', () => {
         title: 'Article title',
         tags: ['Design', ' api '],
       })
+    );
+    expect(mockEnqueueArticleBody).toHaveBeenCalledWith(
+      expect.anything(),
+      env,
+      expect.objectContaining({ itemId: 'item_1', trigger: 'bookmark' })
     );
     expect((await res.json()) as JsonBody).toMatchObject({
       bookmark: {
@@ -2490,6 +2519,128 @@ describe('apiV1Routes', () => {
         pipelineStatus: 'NOT_REQUESTED',
       },
     });
+  });
+
+  it('idempotently requests article content for an eligible reader open', async () => {
+    mockGetItem.mockResolvedValue({
+      id: 'ui_1',
+      itemId: 'item_1',
+      title: 'Article',
+      contentType: 'ARTICLE',
+    });
+    mockGetArticleContent.mockResolvedValue({ content: null });
+    mockEnqueueArticleBody.mockResolvedValue({ queued: true });
+    const app = createTestApp();
+    const env = {
+      ...createMockEnv(),
+      ARTICLE_BODY_PIPELINE_ENABLED: 'true',
+      ARTICLE_BODY_ENROLLMENT_MODE: 'reader',
+    } as Env['Bindings'];
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      env
+    );
+
+    expect(res.status).toBe(202);
+    expect(mockEnqueueArticleBody).toHaveBeenCalledWith(
+      expect.anything(),
+      env,
+      expect.objectContaining({
+        itemId: 'item_1',
+        trigger: 'reader_open',
+        traceId: 'test-trace-id',
+      })
+    );
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: null,
+      articleBody: { availability: 'UNAVAILABLE', pipelineStatus: 'NOT_REQUESTED' },
+      request: { queued: true },
+    });
+  });
+
+  it('returns a terminal reader result without requeueing it', async () => {
+    mockGetItem.mockResolvedValue({
+      id: 'ui_1',
+      itemId: 'item_1',
+      title: 'Interactive page',
+      contentType: 'ARTICLE',
+    });
+    mockGetArticleContent.mockResolvedValue({ content: null });
+    mockEnqueueArticleBody.mockResolvedValue({ queued: false, reason: 'terminal' });
+    mockGetArticleBodyStatus.mockResolvedValue({
+      status: 'UNAVAILABLE',
+      targetExtractorVersion: 1,
+      attemptCount: 1,
+      lastErrorCode: 'NOT_READERABLE',
+      lastHttpStatus: 200,
+      lastAttemptAt: 1700000000000,
+      nextAttemptAt: null,
+      updatedAt: 1700000000000,
+      versionId: null,
+      schemaVersion: null,
+      extractorVersion: null,
+      sourceKind: null,
+      contentHash: null,
+      r2Key: null,
+      wordCount: null,
+      readingTimeMinutes: null,
+      qualityScore: null,
+      qualityWarningsJson: null,
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      {
+        ...createMockEnv(),
+        ARTICLE_BODY_PIPELINE_ENABLED: 'true',
+        ARTICLE_BODY_ENROLLMENT_MODE: 'reader',
+      } as Env['Bindings']
+    );
+
+    expect(res.status).toBe(200);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      articleBody: {
+        availability: 'UNAVAILABLE',
+        pipelineStatus: 'UNAVAILABLE',
+        lastErrorCode: 'NOT_READERABLE',
+      },
+      request: { queued: false, reason: 'terminal' },
+    });
+  });
+
+  it('rejects reader requests for non-article content', async () => {
+    mockGetItem.mockResolvedValue({
+      id: 'ui_1',
+      itemId: 'item_1',
+      title: 'Video',
+      contentType: 'VIDEO',
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      {
+        ...createMockEnv(),
+        ARTICLE_BODY_ENROLLMENT_MODE: 'reader',
+      } as Env['Bindings']
+    );
+
+    expect(res.status).toBe(422);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      code: 'ARTICLE_BODY_NOT_ELIGIBLE',
+    });
+    expect(mockEnqueueArticleBody).not.toHaveBeenCalled();
   });
 
   it('serves the current versioned artifact with its availability metadata', async () => {

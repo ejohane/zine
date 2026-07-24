@@ -92,9 +92,10 @@ max_batch_timeout = 30
 
 [[queues.consumers]]
 queue = "zine-article-body-queue-dev"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-dev"
 
 [[queues.consumers]]
@@ -117,6 +118,7 @@ ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # CLERK_JWKS_URL = "https://clerk.your-domain.com/.well-known/jwks.json"
 # CLERK_WEBHOOK_SECRET = "whsec_..." # From Clerk Dashboard > Webhooks
 
@@ -155,6 +157,7 @@ ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
 ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
@@ -191,9 +194,10 @@ max_batch_size = 5
 max_batch_timeout = 30
 [[env.staging.queues.consumers]]
 queue = "zine-article-body-queue-staging"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-staging"
 [[env.staging.queues.consumers]]
 queue = "zine-article-body-dlq-staging"
@@ -243,7 +247,8 @@ SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"
-ARTICLE_BODY_PIPELINE_ENABLED = "false"
+ARTICLE_BODY_PIPELINE_ENABLED = "true"
+ARTICLE_BODY_ENROLLMENT_MODE = "all"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
 crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
@@ -280,9 +285,10 @@ max_batch_size = 5
 max_batch_timeout = 30
 [[env.production.queues.consumers]]
 queue = "zine-article-body-queue-prod"
-max_batch_size = 5
+max_batch_size = 1
 max_batch_timeout = 30
 max_retries = 3
+max_concurrency = 1
 dead_letter_queue = "zine-article-body-dlq-prod"
 [[env.production.queues.consumers]]
 queue = "zine-article-body-dlq-prod"
