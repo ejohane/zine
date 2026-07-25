@@ -91,10 +91,16 @@ const earlierAlice = postRow({
 });
 
 function fakeArchiveDb(
-  options: { configuredSources?: boolean; sourceCapturedAt?: number } = {}
+  options: {
+    configuredSources?: boolean;
+    sourceCapturedAt?: number;
+    postRows?: ReturnType<typeof postRow>[];
+    relationshipBindingCounts?: number[];
+  } = {}
 ): D1Database {
   const configuredSources = options.configuredSources ?? true;
   const sourceCapturedAt = options.sourceCapturedAt ?? NOW.getTime();
+  const rowsForRun = options.postRows ?? todayRows;
   return {
     prepare(sql: string) {
       let bindings: unknown[] = [];
@@ -121,9 +127,10 @@ function fakeArchiveDb(
             };
           }
           if (sql.includes('FROM x_timeline_run_items i')) {
-            return { results: todayRows };
+            return { results: rowsForRun };
           }
           if (sql.includes('FROM x_post_relationships r')) {
+            options.relationshipBindingCounts?.push(bindings.length);
             const sourceIds = new Set(bindings.slice(1));
             return {
               results: sourceIds.has('100')
@@ -238,6 +245,34 @@ describe('people-first daily feed', () => {
     expect(result.freshness.warnings).toContain(
       'Favorite/list membership was captured on a different day than the frozen post run.'
     );
+  });
+
+  it('batches relationship lookups below the production D1 bind-variable limit', async () => {
+    const relationshipBindingCounts: number[] = [];
+    const postRows = Array.from({ length: 205 }, (_, index) =>
+      postRow({
+        id: `bulk-${index}`,
+        authorKey: `id:bulk-${index}`,
+        username: `bulk${index}`,
+        name: `Bulk ${index}`,
+        text: `Bulk post ${index}`,
+        publishedAt: '2026-07-24T12:00:00.000Z',
+        position: index,
+      })
+    );
+
+    const result = await getDailyFeed(
+      fakeArchiveDb({
+        configuredSources: false,
+        postRows,
+        relationshipBindingCounts,
+      }),
+      USER_ID,
+      { now: NOW }
+    );
+
+    expect(result.posts).toHaveLength(205);
+    expect(relationshipBindingCounts).toEqual([91, 91, 26]);
   });
 
   it('returns all available author posts for today and the past week with context', async () => {
