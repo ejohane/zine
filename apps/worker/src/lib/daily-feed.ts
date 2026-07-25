@@ -96,6 +96,24 @@ function parseJson(value: string | null, fallback: unknown): unknown {
   }
 }
 
+function publicRepostAuthor(value: string | null) {
+  const parsed = parseJson(value, null);
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const author = parsed as Record<string, unknown>;
+  if (typeof author.username !== 'string' || typeof author.name !== 'string') return null;
+  const id = typeof author.id === 'string' && author.id ? author.id : null;
+
+  return {
+    key: id ? `id:${id}` : `username:${author.username.toLocaleLowerCase()}`,
+    username: author.username,
+    name: author.name,
+    profileUrl: typeof author.profileUrl === 'string' ? author.profileUrl : null,
+    profileImageUrl: typeof author.profileImageUrl === 'string' ? author.profileImageUrl : null,
+    verified: typeof author.verified === 'boolean' ? author.verified : null,
+  };
+}
+
 function localDate(value: Date, timezone = DEFAULT_TIMEZONE): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -143,7 +161,7 @@ function publicPost(
     metrics: parseJson(row.metrics_json, {}),
     relationships,
     presentation: row.presentation ?? row.kind,
-    repostedBy: parseJson(row.reposted_by_json, null),
+    repostedBy: publicRepostAuthor(row.reposted_by_json),
     sourceIds,
   };
 }

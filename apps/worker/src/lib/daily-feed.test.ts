@@ -15,6 +15,7 @@ function postRow(input: {
   position?: number | null;
   kind?: string;
   links?: unknown[];
+  repostedBy?: unknown;
 }) {
   const timestamp = Date.parse(input.publishedAt);
   return {
@@ -38,7 +39,7 @@ function postRow(input: {
     position: input.position ?? null,
     observed_at: Date.parse('2026-07-24T13:00:00.000Z'),
     presentation: 'POST',
-    reposted_by_json: null,
+    reposted_by_json: input.repostedBy ? JSON.stringify(input.repostedBy) : null,
   };
 }
 
@@ -59,6 +60,12 @@ const todayRows = [
         source: 'TEXT',
       },
     ],
+    repostedBy: {
+      username: 'reposter',
+      name: 'Reposter',
+      profileUrl: 'https://x.com/reposter',
+      profileImageUrl: null,
+    },
   }),
   postRow({
     id: '101',
@@ -200,6 +207,14 @@ describe('people-first daily feed', () => {
     expect(result.posts.map((post) => post.id)).toEqual(['100', '101']);
     expect(result.posts[0]).toMatchObject({
       author: { username: 'alice' },
+      repostedBy: {
+        key: 'username:reposter',
+        username: 'reposter',
+        name: 'Reposter',
+        profileUrl: 'https://x.com/reposter',
+        profileImageUrl: null,
+        verified: null,
+      },
       sourceIds: ['favorites'],
       relationships: [
         {
