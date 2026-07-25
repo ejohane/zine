@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { resolveCollectorSource } from './source-config';
+import { resolveCollectionConfig, resolveCollectorSource } from './source-config';
 
 describe('collector source configuration', () => {
   it('uses an explicit Following source by default', () => {
@@ -40,5 +40,47 @@ describe('collector source configuration', () => {
     expect(() =>
       resolveCollectorSource({ type: 'FAVORITES', url: 'https://example.com/i/lists/123' })
     ).toThrow('x.com/i/lists');
+  });
+
+  it('uses a count target for Following and a rolling 24-hour window for Favorites', () => {
+    const startedAt = '2026-07-25T18:00:00.000Z';
+    expect(
+      resolveCollectionConfig({
+        source: resolveCollectorSource({}),
+        count: '500',
+        startedAt,
+      })
+    ).toEqual({ requestedCount: 500, collectionPolicy: { mode: 'COUNT' } });
+
+    expect(
+      resolveCollectionConfig({
+        source: resolveCollectorSource({
+          type: 'FAVORITES',
+          url: 'https://x.com/i/lists/123',
+        }),
+        startedAt,
+      })
+    ).toEqual({
+      requestedCount: 5_000,
+      collectionPolicy: {
+        mode: 'ROLLING_WINDOW',
+        windowHours: 24,
+        cutoffAt: '2026-07-24T18:00:00.000Z',
+        boundaryEvidenceRequired: 3,
+      },
+    });
+  });
+
+  it('rejects a count-limited Favorites collection', () => {
+    expect(() =>
+      resolveCollectionConfig({
+        source: resolveCollectorSource({
+          type: 'FAVORITES',
+          url: 'https://x.com/i/lists/123',
+        }),
+        count: '500',
+        startedAt: '2026-07-25T18:00:00.000Z',
+      })
+    ).toThrow('uses --window-hours and --safety-limit');
   });
 });

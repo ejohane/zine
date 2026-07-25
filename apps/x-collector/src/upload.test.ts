@@ -30,6 +30,8 @@ function capture(count = 26) {
     completedAt: '2026-07-11T13:05:00.000Z',
     collectorVersion: 'test-v1',
     source: { type: 'FOLLOWING' as const, id: 'following', name: 'Following' },
+    collectionPolicy: { mode: 'COUNT' as const },
+    terminationReason: 'COUNT_REACHED' as const,
     excludedAds: 0,
     status: 'COMPLETE' as const,
     contextCoverage: {
@@ -39,6 +41,12 @@ function capture(count = 26) {
       truncated: 0,
       failed: 0,
       warnings: [],
+    },
+    windowCoverage: {
+      outsideWindow: 0,
+      missingPublishedAt: 0,
+      boundaryEvidenceRequired: 0,
+      boundaryReached: false,
     },
     posts,
     items: posts.map((post, position) => ({

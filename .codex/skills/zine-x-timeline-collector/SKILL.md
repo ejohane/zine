@@ -16,13 +16,14 @@ Collect top-to-bottom Following or configured-list timeline entries without expo
 
 ## Workflow
 
-1. Resolve the source and requested count. Default to `500`. Following uses source `FOLLOWING/following`; a configured Favorites list uses `FAVORITES/x-list:<id>` and its stable `https://x.com/i/lists/<id>` URL.
+1. Resolve the source and collection policy. Following is count-bounded and defaults to `500`. A configured Favorites list is time-bounded to the rolling previous `24` hours, uses `FAVORITES/x-list:<id>` and its stable `https://x.com/i/lists/<id>` URL, and defaults to a separate `5000`-post safety guard. The safety guard is not the Favorites target: reaching it before the time boundary makes the run partial.
 2. Start the local receiver in a PTY and keep the session alive:
 
    ```bash
-   bun run --cwd apps/x-collector receive --count <N> \
+   bun run --cwd apps/x-collector receive [--count <N>] \
      --source-type <FOLLOWING|FAVORITES|LIST> --source-id <id> \
-     --source-name <name> [--source-url <url>]
+     --source-name <name> [--source-url <url>] \
+     [--window-hours 24] [--safety-limit 5000]
    ```
 
    Wait for its one-line JSON readiness response. Record `receiverUrl` and `runId`.
@@ -35,7 +36,7 @@ Collect top-to-bottom Following or configured-list timeline entries without expo
    - Import `apps/x-collector/src/browser-extractor.mjs` and `apps/x-collector/src/browser-session.mjs` by absolute path.
    - GET `<receiverUrl>/checkpoint` and pass it to `createCollectionSession`. For a new receiver, the empty checkpoint starts positions at zero; after a browser-control restart, it restores accepted tweet IDs, accepted ad keys, and the next position.
    - Call `extractVisibleTimelineBatch` through the documented Playwright page-evaluation API, passing the session's accepted ad keys as its argument.
-   - Pass the result, session state, and N to `prepareTimelineBatch`. It removes accepted primary posts, assigns stable positions, keeps quoted canonical posts, and produces the exact receiver payload.
+   - Pass the result, session state, and the receiver's requested count/safety limit to `prepareTimelineBatch`. It removes accepted primary posts, assigns stable positions, keeps quoted canonical posts, excludes Favorites posts older than the persisted cutoff, and produces the exact receiver payload plus rolling-window completion state.
    - POST each non-empty prepared payload directly from the JavaScript session to `<receiverUrl>/batch`. Do not emit raw post bodies through `nodeRepl.write` or copy them into the conversation.
    - Scroll roughly one viewport, wait for X to settle, and repeat.
    - For Favorite posts marked as replies or quotes, use `reserveContextExpansion(state, tweetId, 40)` before opening their permalink. If allowed, call the same extractor on the focused thread, pass the result to `prepareContextBatch`, POST the payload to `/batch`, then call `finishContextExpansion` and POST its returned record to `/context-status`. Use `COMPLETE`, `TRUNCATED`, or `FAILED` honestly. If the 40-permalink budget is reached, POST the returned `TRUNCATED/context_budget_reached` record without opening another permalink. Context posts have no timeline item and never count toward N.
@@ -43,20 +44,25 @@ Collect top-to-bottom Following or configured-list timeline entries without expo
 6. Recover transient stalls without splitting the logical capture:
    - After five consecutive scrolls add no new primary entries, keep the receiver alive and perform one recovery cycle: wait three seconds, scroll up roughly one viewport, wait briefly, scroll down roughly two viewports, wait three seconds, then extract again.
    - If recovery adds an entry, reset the stall and failed-recovery counters and continue the same run.
-   - If recovery adds nothing, increment the failed-recovery counter and repeat the cycle. Finalize as `PARTIAL` with `timeline_stalled` only after three consecutive recovery cycles fail.
+   - If recovery adds nothing, increment the failed-recovery counter and repeat the cycle. Finalize as `PARTIAL` with `timeline_stalled` and termination reason `TIMELINE_STALLED` only after three consecutive recovery cycles fail.
    - If browser control disconnects, reconnect, GET `/checkpoint`, rebuild the browser session state, and continue the same receiver/run when possible.
 
 7. Stop when one of these occurs:
-   - N unique organic primary timeline entries have been accepted: complete as `COMPLETE`.
+   - Following: N unique organic primary timeline entries have been accepted; complete as `COMPLETE` with `COUNT_REACHED`.
+   - Favorites/List: three distinct primary entries older than the persisted 24-hour cutoff have been observed; complete as `COMPLETE` with `WINDOW_BOUNDARY_REACHED`. Those boundary-evidence posts are not uploaded.
+   - Favorites/List: the 5000-post safety guard is reached before the time boundary; complete as `PARTIAL` with `safety_limit_reached` and `SAFETY_LIMIT_REACHED`.
+   - Any rolling-window item lacks a publication timestamp: keep collecting, but the run cannot be complete; finalize as `PARTIAL` with the missing-timestamp count and `COLLECTOR_FAILED`.
    - Three stall-recovery cycles fail: complete as `PARTIAL` with `timeline_stalled`.
    - X blocks loading or the connection fails after supported recovery: complete as `PARTIAL` with a concise reason.
 
-8. POST the completion state to `<receiverUrl>/complete`. The receiver validates, chunks, uploads, finalizes the manifest, and reads the run back from the archive. Large uploads may outlive the browser request timeout; treat the receiver process result as authoritative.
+8. POST the completion state and explicit `terminationReason` to `<receiverUrl>/complete`. The receiver validates the termination against count/window coverage, chunks, uploads, finalizes the manifest, and reads the run back from the archive. Large uploads may outlive the browser request timeout; treat the receiver process result as authoritative.
 9. Wait for the receiver process to exit successfully. Report the run ID, requested count, collected count, excluded-ad count, recovery count, and verification result.
 
 ## Invariants
 
-- “Latest N” means the first N unique organic entries observed top-to-bottom in the verified source.
+- For Following, “Latest N” means the first N unique organic entries observed top-to-bottom in the verified source.
+- For Favorites, the product boundary is the persisted rolling 24-hour cutoff. The numeric safety guard must never be described as the requested Favorites count.
+- A repost card exposes the original post timestamp, not a reliable repost-event timestamp. Before the boundary is proven, retain reposts according to verified list activity order; never use an old reposted original as boundary evidence. Preserve the reposter provenance so the API can disclose this distinction.
 - Never collect from For You. A source verification failure stops or pauses extraction rather than silently changing provenance.
 - A Favorites run and its membership snapshot are primary Daily View inputs; Following remains a separate run and secondary context.
 - Context expansion is capped at 40 Favorite permalinks per run. Every attempted, failed, or budget-truncated expansion is recorded in run provenance.

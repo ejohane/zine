@@ -329,7 +329,7 @@ describe('X archive worker', () => {
       method: 'POST',
       body: JSON.stringify({
         runId: 'run-favorites-list',
-        requestedCount: 500,
+        requestedCount: 5_000,
         startedAt: '2026-07-11T13:00:00.000Z',
         collectorVersion: 'browser-dom-v4',
         source: {
@@ -337,6 +337,12 @@ describe('X archive worker', () => {
           id: 'x-list:123',
           name: 'Favorites',
           url: 'https://x.com/i/lists/123',
+        },
+        collectionPolicy: {
+          mode: 'ROLLING_WINDOW',
+          windowHours: 24,
+          cutoffAt: '2026-07-10T13:00:00.000Z',
+          boundaryEvidenceRequired: 3,
         },
       }),
     });
@@ -350,6 +356,52 @@ describe('X archive worker', () => {
           name: 'Favorites',
           url: 'https://x.com/i/lists/123',
         },
+        requestedCount: 5_000,
+        collectionPolicy: {
+          mode: 'ROLLING_WINDOW',
+          windowHours: 24,
+          cutoffAt: '2026-07-10T13:00:00.000Z',
+        },
+      },
+    });
+
+    const invalidCompletion = await api('/api/v1/x-timeline/runs/run-favorites-list/complete', {
+      method: 'POST',
+      body: JSON.stringify({
+        collectedCount: 0,
+        excludedAds: 0,
+        status: 'COMPLETE',
+        terminationReason: 'WINDOW_BOUNDARY_REACHED',
+        windowCoverage: {
+          outsideWindow: 0,
+          missingPublishedAt: 0,
+          boundaryEvidenceRequired: 3,
+          boundaryReached: false,
+        },
+      }),
+    });
+    expect(invalidCompletion.status).toBe(409);
+
+    const complete = await api('/api/v1/x-timeline/runs/run-favorites-list/complete', {
+      method: 'POST',
+      body: JSON.stringify({
+        collectedCount: 0,
+        excludedAds: 0,
+        status: 'COMPLETE',
+        terminationReason: 'WINDOW_BOUNDARY_REACHED',
+        windowCoverage: {
+          outsideWindow: 3,
+          missingPublishedAt: 0,
+          boundaryEvidenceRequired: 3,
+          boundaryReached: true,
+        },
+      }),
+    });
+    expect(complete.status).toBe(200);
+    expect(await complete.json()).toMatchObject({
+      run: {
+        terminationReason: 'WINDOW_BOUNDARY_REACHED',
+        windowCoverage: { boundaryReached: true, outsideWindow: 3 },
       },
     });
   });

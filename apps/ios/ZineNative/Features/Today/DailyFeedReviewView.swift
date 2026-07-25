@@ -254,7 +254,7 @@ private struct DailyCoverageNotice: View {
                 Text(statusTitle)
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Text("\(response.coverage.collectedCount)/\(response.coverage.requestedCount)")
+                Text(scopeSummary)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
@@ -285,6 +285,13 @@ private struct DailyCoverageNotice: View {
 
     private var statusIcon: String {
         response.coverage.status == .complete ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+    }
+
+    private var scopeSummary: String {
+        if let windowHours = response.coverage.windowHours {
+            return "Last \(windowHours)h · \(response.coverage.collectedCount) posts"
+        }
+        return "\(response.coverage.collectedCount)/\(response.coverage.requestedCount)"
     }
 
     private var statusColor: Color {

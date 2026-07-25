@@ -1,5 +1,5 @@
 const DEFAULT_TIMEZONE = 'America/Chicago';
-const MAX_RUN_POSTS = 500;
+const MAX_RUN_POSTS = 5_000;
 const RELATIONSHIP_QUERY_POST_LIMIT = 90;
 const MAX_AUTHOR_POSTS = 500;
 
@@ -17,6 +17,9 @@ type ArchiveRunRow = {
   source_name: string;
   source_url: string | null;
   context_coverage_json: string;
+  collection_policy_json: string;
+  termination_reason: string;
+  window_coverage_json: string;
 };
 
 type ContextCoverage = {
@@ -26,6 +29,22 @@ type ContextCoverage = {
   truncated: number;
   failed: number;
   warnings: string[];
+};
+
+type CollectionPolicy =
+  | { mode: 'COUNT' }
+  | {
+      mode: 'ROLLING_WINDOW';
+      windowHours: number;
+      cutoffAt: string;
+      boundaryEvidenceRequired: number;
+    };
+
+type WindowCoverage = {
+  outsideWindow: number;
+  missingPublishedAt: number;
+  boundaryEvidenceRequired: number;
+  boundaryReached: boolean;
 };
 
 type ArchivePostRow = {
@@ -198,7 +217,7 @@ async function archiveRuns(db: D1Database, userId: string): Promise<ArchiveRunRo
     .prepare(
       `SELECT id, requested_count, collected_count, status, started_at, completed_at,
         excluded_ads, failure_reason, source_type, source_id, source_name, source_url,
-        context_coverage_json
+        context_coverage_json, collection_policy_json, termination_reason, window_coverage_json
        FROM x_timeline_runs
        WHERE user_id = ? AND status IN ('COMPLETE', 'PARTIAL') AND completed_at IS NOT NULL
        ORDER BY completed_at DESC, id DESC LIMIT 60`
@@ -219,6 +238,21 @@ function contextCoverage(run: ArchiveRunRow): ContextCoverage {
     warnings: Array.isArray(parsed.warnings)
       ? parsed.warnings.filter((warning): warning is string => typeof warning === 'string')
       : [],
+  };
+}
+
+function collectionPolicy(run: ArchiveRunRow): CollectionPolicy {
+  const parsed = parseJson(run.collection_policy_json, { mode: 'COUNT' }) as CollectionPolicy;
+  return parsed.mode === 'ROLLING_WINDOW' ? parsed : { mode: 'COUNT' };
+}
+
+function windowCoverage(run: ArchiveRunRow): WindowCoverage {
+  const parsed = parseJson(run.window_coverage_json, {}) as Partial<WindowCoverage>;
+  return {
+    outsideWindow: parsed.outsideWindow ?? 0,
+    missingPublishedAt: parsed.missingPublishedAt ?? 0,
+    boundaryEvidenceRequired: parsed.boundaryEvidenceRequired ?? 0,
+    boundaryReached: parsed.boundaryReached ?? false,
   };
 }
 
@@ -734,7 +768,34 @@ export async function getDailyFeed(
 
   const frozenAt = new Date(primaryRun.completed_at ?? primaryRun.started_at);
   const date = localDate(frozenAt, timezone);
-  const favoriteRows = favoritesRun ? await postsForRun(db, userId, favoritesRun.id) : [];
+  const favoritePolicy = favoritesRun ? collectionPolicy(favoritesRun) : null;
+  const favoriteCutoff = favoritesRun
+    ? Date.parse(
+        favoritePolicy?.mode === 'ROLLING_WINDOW'
+          ? favoritePolicy.cutoffAt
+          : new Date(favoritesRun.started_at - 24 * 60 * 60 * 1_000).toISOString()
+      )
+    : null;
+  const rawFavoriteRows = favoritesRun ? await postsForRun(db, userId, favoritesRun.id) : [];
+  const favoriteRows = rawFavoriteRows.filter(
+    (row) =>
+      (favoritePolicy?.mode === 'ROLLING_WINDOW' && row.presentation === 'REPOST') ||
+      (row.published_at !== null && favoriteCutoff !== null && row.published_at >= favoriteCutoff)
+  );
+  const favoriteRowsWithoutTimestamp = rawFavoriteRows.filter(
+    (row) =>
+      row.published_at === null &&
+      !(favoritePolicy?.mode === 'ROLLING_WINDOW' && row.presentation === 'REPOST')
+  ).length;
+  const favoriteRowsOutsideWindow =
+    rawFavoriteRows.length - favoriteRows.length - favoriteRowsWithoutTimestamp;
+  const favoriteRepostsUsingTimelinePosition = favoriteRows.filter(
+    (row) =>
+      row.presentation === 'REPOST' &&
+      favoriteCutoff !== null &&
+      row.published_at !== null &&
+      row.published_at < favoriteCutoff
+  ).length;
   const followingRows = followingRun ? await postsForRun(db, userId, followingRun.id) : [];
   const contextRows = [
     ...(favoritesRun ? await contextPostsForRun(db, userId, favoritesRun.id) : []),
@@ -764,6 +825,26 @@ export async function getDailyFeed(
   });
   const warnings: string[] = [];
   if (sourceResult.warning) warnings.push(sourceResult.warning);
+  if (favoritesRun && favoritePolicy?.mode !== 'ROLLING_WINDOW') {
+    warnings.push(
+      'This Favorites run used a legacy count target; Daily View defensively limited it to the 24 hours before capture.'
+    );
+  }
+  if (favoriteRowsOutsideWindow > 0) {
+    warnings.push(
+      `${favoriteRowsOutsideWindow} Favorites post${favoriteRowsOutsideWindow === 1 ? ' was' : 's were'} outside the rolling 24-hour window and excluded.`
+    );
+  }
+  if (favoriteRowsWithoutTimestamp > 0) {
+    warnings.push(
+      `${favoriteRowsWithoutTimestamp} Favorites post${favoriteRowsWithoutTimestamp === 1 ? ' has' : 's have'} no publication timestamp and ${favoriteRowsWithoutTimestamp === 1 ? 'was' : 'were'} excluded.`
+    );
+  }
+  if (favoriteRepostsUsingTimelinePosition > 0) {
+    warnings.push(
+      `${favoriteRepostsUsingTimelinePosition} recent Favorite repost${favoriteRepostsUsingTimelinePosition === 1 ? '' : 's'} ${favoriteRepostsUsingTimelinePosition === 1 ? 'contains' : 'contain'} older original material; rolling-window inclusion follows the verified list activity order.`
+    );
+  }
   const membershipSource = favoritesRun
     ? (sourceResult.sources.find((source) => source.id === favoritesRun.source_id) ??
       sourceResult.sources.find((source) => source.type === 'FAVORITES'))
@@ -815,7 +896,19 @@ export async function getDailyFeed(
   );
   const posts = [...favoritePosts, ...followingPosts, ...contextPosts];
   const favoriteContextCoverage = favoritesRun ? contextCoverage(favoritesRun) : null;
+  const favoriteWindowCoverage = favoritesRun ? windowCoverage(favoritesRun) : null;
   const contextWarnings: string[] = [];
+  const missingWindowTimestampCount = favoriteWindowCoverage?.missingPublishedAt ?? 0;
+  if (missingWindowTimestampCount > 0) {
+    warnings.push(
+      `${missingWindowTimestampCount} Favorites timeline item${missingWindowTimestampCount === 1 ? '' : 's'} could not be classified into the rolling window because publication timestamps were missing.`
+    );
+  }
+  if (favoritesRun?.termination_reason === 'SAFETY_LIMIT_REACHED') {
+    warnings.push(
+      `Favorites collection hit its ${favoritesRun.requested_count}-post safety guard before reaching the 24-hour boundary.`
+    );
+  }
   if (favoriteContextCoverage?.truncated) {
     contextWarnings.push(
       `${favoriteContextCoverage.truncated} Favorite thread expansion${favoriteContextCoverage.truncated === 1 ? ' was' : 's were'} truncated.`
@@ -837,8 +930,20 @@ export async function getDailyFeed(
   const followingSectionIds = followingPosts
     .filter((post) => !conversationPostIds.has(post.id))
     .map((post) => post.id);
-  const runComplete = (run: ArchiveRunRow | null) =>
-    !run || (run.status === 'COMPLETE' && run.collected_count >= run.requested_count);
+  const runComplete = (run: ArchiveRunRow | null) => {
+    if (!run) return true;
+    const policy = collectionPolicy(run);
+    if (policy.mode === 'ROLLING_WINDOW') {
+      const coverage = windowCoverage(run);
+      return (
+        run.status === 'COMPLETE' &&
+        run.termination_reason === 'WINDOW_BOUNDARY_REACHED' &&
+        coverage.boundaryReached &&
+        coverage.missingPublishedAt === 0
+      );
+    }
+    return run.status === 'COMPLETE' && run.collected_count >= run.requested_count;
+  };
   const archiveComplete = runComplete(favoritesRun) && runComplete(followingRun);
   const contextComplete =
     !favoriteContextCoverage ||
@@ -847,8 +952,11 @@ export async function getDailyFeed(
   warnings.push(...contextWarnings);
   for (const run of [favoritesRun, followingRun].filter(Boolean) as ArchiveRunRow[]) {
     if (!runComplete(run)) {
+      const policy = collectionPolicy(run);
       warnings.push(
-        `X ${run.source_name} run ${run.id} is ${run.status.toLocaleLowerCase()} (${run.collected_count}/${run.requested_count} requested posts).`
+        policy.mode === 'ROLLING_WINDOW'
+          ? `X ${run.source_name} run ${run.id} did not prove complete ${policy.windowHours}-hour coverage (${run.termination_reason.toLocaleLowerCase()}).`
+          : `X ${run.source_name} run ${run.id} is ${run.status.toLocaleLowerCase()} (${run.collected_count}/${run.requested_count} requested posts).`
       );
     }
     if (run.failure_reason) warnings.push(run.failure_reason);
@@ -877,8 +985,13 @@ export async function getDailyFeed(
       collectedCount: primaryRun.collected_count,
       message:
         status === 'COMPLETE'
-          ? 'Frozen Favorites, Following, and membership coverage are complete for this review slice.'
+          ? `Frozen Favorites from the last ${favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritePolicy.windowHours : 24} hours, Following, and membership coverage are complete for this review slice.`
           : 'This review slice is usable with the coverage limits shown above.',
+      collectionMode: favoritePolicy?.mode ?? 'COUNT',
+      windowHours: favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritePolicy.windowHours : null,
+      safetyLimit: favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritesRun?.requested_count : null,
+      terminationReason:
+        favoritesRun?.termination_reason ?? followingRun?.termination_reason ?? null,
     },
     sources: [
       ...(favoritesRun
@@ -931,6 +1044,9 @@ export async function getDailyFeed(
             status: favoritesRun.status,
             requestedCount: favoritesRun.requested_count,
             collectedCount: favoritesRun.collected_count,
+            collectionPolicy: favoritePolicy,
+            terminationReason: favoritesRun.termination_reason,
+            windowCoverage: favoriteWindowCoverage,
             contextCoverage: favoriteContextCoverage,
             frozenAt: favoritesRun.completed_at
               ? new Date(favoritesRun.completed_at).toISOString()
@@ -946,6 +1062,9 @@ export async function getDailyFeed(
             status: followingRun.status,
             requestedCount: followingRun.requested_count,
             collectedCount: followingRun.collected_count,
+            collectionPolicy: collectionPolicy(followingRun),
+            terminationReason: followingRun.termination_reason,
+            windowCoverage: windowCoverage(followingRun),
             contextCoverage: contextCoverage(followingRun),
             frozenAt: followingRun.completed_at
               ? new Date(followingRun.completed_at).toISOString()

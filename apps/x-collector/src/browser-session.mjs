@@ -8,8 +8,20 @@ export function createCollectionSession(checkpoint = {}) {
   const contextRecords = new Map(
     (checkpoint.contextRecords || []).map((record) => [record.rootTweetId, record])
   );
+  const outsideWindowTweetIds = new Set(checkpoint.outsideWindowTweetIds || []);
+  const missingTimestampTweetIds = new Set(checkpoint.missingTimestampTweetIds || []);
+  const collectionPolicy = checkpoint.collectionPolicy || { mode: 'COUNT' };
 
-  return { acceptedTweetIds, acceptedPostIds, acceptedAdKeys, contextRecords, nextPosition };
+  return {
+    acceptedTweetIds,
+    acceptedPostIds,
+    acceptedAdKeys,
+    contextRecords,
+    outsideWindowTweetIds,
+    missingTimestampTweetIds,
+    collectionPolicy,
+    nextPosition,
+  };
 }
 
 export function reserveContextExpansion(state, rootTweetId, budget = 40) {
@@ -50,9 +62,30 @@ export function prepareTimelineBatch(rawBatch, state, requestedCount) {
     newAdKeys.push(adKey);
   }
 
+  const postsById = new Map((rawBatch.posts || []).map((post) => [post.tweetId, post]));
+  const newOutsideWindowTweetIds = [];
+  const newMissingTimestampTweetIds = [];
   const items = [];
   for (const item of rawBatch.items || []) {
-    if (items.length >= remaining || state.acceptedTweetIds.has(item.tweetId)) continue;
+    if (state.acceptedTweetIds.has(item.tweetId)) continue;
+    if (state.collectionPolicy.mode === 'ROLLING_WINDOW' && item.presentation !== 'REPOST') {
+      const publishedAt = Date.parse(postsById.get(item.tweetId)?.publishedAt || '');
+      if (!Number.isFinite(publishedAt)) {
+        if (!state.missingTimestampTweetIds.has(item.tweetId)) {
+          state.missingTimestampTweetIds.add(item.tweetId);
+          newMissingTimestampTweetIds.push(item.tweetId);
+        }
+        continue;
+      }
+      if (publishedAt < Date.parse(state.collectionPolicy.cutoffAt)) {
+        if (!state.outsideWindowTweetIds.has(item.tweetId)) {
+          state.outsideWindowTweetIds.add(item.tweetId);
+          newOutsideWindowTweetIds.push(item.tweetId);
+        }
+        continue;
+      }
+    }
+    if (items.length >= remaining) continue;
     state.acceptedTweetIds.add(item.tweetId);
     items.push({ ...item, position: state.nextPosition++ });
   }
@@ -74,10 +107,32 @@ export function prepareTimelineBatch(rawBatch, state, requestedCount) {
       items,
       adKeys: newAdKeys,
       excludedAds: hasStableAdKeys ? newAdKeys.length : rawBatch.excludedAds || 0,
+      windowEvidence: {
+        outsideWindowTweetIds: newOutsideWindowTweetIds,
+        missingTimestampTweetIds: newMissingTimestampTweetIds,
+      },
     },
     addedItems: items.length,
     totalAccepted: state.acceptedTweetIds.size,
-    complete: state.acceptedTweetIds.size >= requestedCount,
+    complete:
+      state.collectionPolicy.mode === 'ROLLING_WINDOW'
+        ? state.outsideWindowTweetIds.size >= state.collectionPolicy.boundaryEvidenceRequired
+        : state.acceptedTweetIds.size >= requestedCount,
+    safetyLimitReached:
+      state.collectionPolicy.mode === 'ROLLING_WINDOW' &&
+      state.acceptedTweetIds.size >= requestedCount &&
+      state.outsideWindowTweetIds.size < state.collectionPolicy.boundaryEvidenceRequired,
+    windowCoverage: {
+      outsideWindow: state.outsideWindowTweetIds.size,
+      missingPublishedAt: state.missingTimestampTweetIds.size,
+      boundaryEvidenceRequired:
+        state.collectionPolicy.mode === 'ROLLING_WINDOW'
+          ? state.collectionPolicy.boundaryEvidenceRequired
+          : 0,
+      boundaryReached:
+        state.collectionPolicy.mode === 'ROLLING_WINDOW' &&
+        state.outsideWindowTweetIds.size >= state.collectionPolicy.boundaryEvidenceRequired,
+    },
   };
 }
 
@@ -89,7 +144,13 @@ export function prepareContextBatch(rawBatch, state) {
     posts.push(post);
   }
   return {
-    payload: { posts, items: [], adKeys: [], excludedAds: 0 },
+    payload: {
+      posts,
+      items: [],
+      adKeys: [],
+      excludedAds: 0,
+      windowEvidence: { outsideWindowTweetIds: [], missingTimestampTweetIds: [] },
+    },
     addedPosts: posts.length,
   };
 }

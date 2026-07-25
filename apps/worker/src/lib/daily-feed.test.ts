@@ -16,6 +16,7 @@ function postRow(input: {
   kind?: string;
   links?: unknown[];
   repostedBy?: unknown;
+  presentation?: string;
 }) {
   const timestamp = Date.parse(input.publishedAt);
   return {
@@ -38,7 +39,7 @@ function postRow(input: {
     last_seen_at: timestamp,
     position: input.position ?? null,
     observed_at: Date.parse('2026-07-24T13:00:00.000Z'),
-    presentation: 'POST',
+    presentation: input.presentation ?? 'POST',
     reposted_by_json: input.repostedBy ? JSON.stringify(input.repostedBy) : null,
   };
 }
@@ -111,6 +112,9 @@ function fakeArchiveDb(
     favoritesRequestedCount?: number;
     favoritesCollectedCount?: number;
     favoritesContextCoverage?: Record<string, unknown>;
+    favoritesCollectionPolicy?: Record<string, unknown>;
+    favoritesTerminationReason?: string;
+    favoritesWindowCoverage?: Record<string, unknown>;
     sourceStatus?: 'COMPLETE' | 'PARTIAL';
     sourceFailureReason?: string | null;
     sourceUnresolvedUsernames?: string[];
@@ -137,7 +141,7 @@ function fakeArchiveDb(
                   ? [
                       {
                         id: 'favorites-run',
-                        requested_count: options.favoritesRequestedCount ?? 2,
+                        requested_count: options.favoritesRequestedCount ?? 5_000,
                         collected_count: options.favoritesCollectedCount ?? 2,
                         status: options.favoritesStatus ?? 'COMPLETE',
                         started_at: Date.parse('2026-07-24T12:30:00.000Z'),
@@ -156,6 +160,24 @@ function fakeArchiveDb(
                             truncated: 0,
                             failed: 0,
                             warnings: [],
+                          }
+                        ),
+                        collection_policy_json: JSON.stringify(
+                          options.favoritesCollectionPolicy ?? {
+                            mode: 'ROLLING_WINDOW',
+                            windowHours: 24,
+                            cutoffAt: '2026-07-23T12:30:00.000Z',
+                            boundaryEvidenceRequired: 3,
+                          }
+                        ),
+                        termination_reason:
+                          options.favoritesTerminationReason ?? 'WINDOW_BOUNDARY_REACHED',
+                        window_coverage_json: JSON.stringify(
+                          options.favoritesWindowCoverage ?? {
+                            outsideWindow: 3,
+                            missingPublishedAt: 0,
+                            boundaryEvidenceRequired: 3,
+                            boundaryReached: true,
                           }
                         ),
                       },
@@ -181,6 +203,14 @@ function fakeArchiveDb(
                     truncated: 0,
                     failed: 0,
                     warnings: [],
+                  }),
+                  collection_policy_json: JSON.stringify({ mode: 'COUNT' }),
+                  termination_reason: 'COUNT_REACHED',
+                  window_coverage_json: JSON.stringify({
+                    outsideWindow: 0,
+                    missingPublishedAt: 0,
+                    boundaryEvidenceRequired: 0,
+                    boundaryReached: false,
                   }),
                 },
               ],
@@ -612,8 +642,9 @@ describe('people-first daily feed', () => {
     const result = await getDailyFeed(
       fakeArchiveDb({
         favoritesStatus: 'PARTIAL',
-        favoritesRequestedCount: 500,
+        favoritesRequestedCount: 5_000,
         favoritesCollectedCount: 120,
+        favoritesTerminationReason: 'TIMELINE_STALLED',
         favoritesContextCoverage: {
           budget: 40,
           attempted: 40,
@@ -628,7 +659,9 @@ describe('people-first daily feed', () => {
     );
 
     expect(result.coverage.status).toBe('PARTIAL');
-    expect(result.freshness.warnings.join(' ')).toContain('120/500 requested posts');
+    expect(result.freshness.warnings.join(' ')).toContain(
+      'did not prove complete 24-hour coverage'
+    );
     expect(result.freshness.warnings).toContain('1 Favorite thread expansion was truncated.');
     expect(result.conversations[0]?.coverageWarnings).toContain('context_budget_reached');
     expect(result.inputs.favorites?.contextCoverage).toMatchObject({ truncated: 1, failed: 1 });
@@ -639,8 +672,9 @@ describe('people-first daily feed', () => {
       fakeArchiveDb({
         favoritePostRows: [],
         favoritesStatus: 'PARTIAL',
-        favoritesRequestedCount: 500,
+        favoritesRequestedCount: 5_000,
         favoritesCollectedCount: 0,
+        favoritesTerminationReason: 'TIMELINE_STALLED',
       }),
       USER_ID,
       { now: NOW }
@@ -650,6 +684,83 @@ describe('people-first daily feed', () => {
     expect(result.sections.favoritePostIds).toEqual([]);
     expect(result.sections.followingPostIds).toEqual(['100', '101', '102']);
     expect(result.coverage.selectionStatus).not.toBe('FALLBACK');
+  });
+
+  it('defensively excludes Favorites posts outside the rolling 24-hour window', async () => {
+    const inside = postRow({
+      id: 'inside-window',
+      authorKey: 'id:alice',
+      username: 'alice',
+      name: 'Alice',
+      text: 'Inside the window',
+      publishedAt: '2026-07-24T12:00:00.000Z',
+      position: 0,
+    });
+    const outside = postRow({
+      id: 'outside-window',
+      authorKey: 'id:bob',
+      username: 'bob',
+      name: 'Bob',
+      text: 'Outside the window',
+      publishedAt: '2026-07-23T12:00:00.000Z',
+      position: 1,
+    });
+    const recentRepostOfOlderMaterial = postRow({
+      id: 'recent-repost',
+      authorKey: 'id:carol',
+      username: 'carol',
+      name: 'Carol',
+      text: 'Older original, recently reposted by a Favorite',
+      publishedAt: '2025-01-01T12:00:00.000Z',
+      position: 1,
+      presentation: 'REPOST',
+    });
+    const result = await getDailyFeed(
+      fakeArchiveDb({
+        favoritePostRows: [inside, recentRepostOfOlderMaterial, outside],
+        postRows: [],
+      }),
+      USER_ID,
+      { now: NOW }
+    );
+
+    expect(result.posts.map((post) => post.id)).toEqual(['inside-window', 'recent-repost']);
+    expect(result.freshness.warnings.join(' ')).toContain(
+      'outside the rolling 24-hour window and excluded'
+    );
+    expect(result.freshness.warnings.join(' ')).toContain(
+      'rolling-window inclusion follows the verified list activity order'
+    );
+    expect(result.coverage).toMatchObject({
+      collectionMode: 'ROLLING_WINDOW',
+      windowHours: 24,
+      safetyLimit: 5_000,
+      terminationReason: 'WINDOW_BOUNDARY_REACHED',
+    });
+  });
+
+  it('reports the high numeric guard as partial instead of treating it as the Favorites target', async () => {
+    const result = await getDailyFeed(
+      fakeArchiveDb({
+        favoritesRequestedCount: 5_000,
+        favoritesCollectedCount: 5_000,
+        favoritesStatus: 'PARTIAL',
+        favoritesTerminationReason: 'SAFETY_LIMIT_REACHED',
+        favoritesWindowCoverage: {
+          outsideWindow: 0,
+          missingPublishedAt: 0,
+          boundaryEvidenceRequired: 3,
+          boundaryReached: false,
+        },
+      }),
+      USER_ID,
+      { now: NOW }
+    );
+
+    expect(result.coverage.status).toBe('PARTIAL');
+    expect(result.freshness.warnings.join(' ')).toContain(
+      '5000-post safety guard before reaching the 24-hour boundary'
+    );
   });
 
   it('returns all available author posts for today and the past week with context', async () => {

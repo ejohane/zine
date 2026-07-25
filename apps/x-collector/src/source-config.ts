@@ -5,6 +5,63 @@ export type CollectorSource = {
   url: string;
 };
 
+export type CollectorCollectionConfig = {
+  requestedCount: number;
+  collectionPolicy:
+    | { mode: 'COUNT' }
+    | {
+        mode: 'ROLLING_WINDOW';
+        windowHours: number;
+        cutoffAt: string;
+        boundaryEvidenceRequired: number;
+      };
+};
+
+function positiveInteger(value: string | undefined, fallback: number, label: string): number {
+  const parsed = value === undefined ? fallback : Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 100_000) {
+    throw new Error(`${label} must be between 1 and 100000`);
+  }
+  return parsed;
+}
+
+export function resolveCollectionConfig(input: {
+  source: CollectorSource;
+  count?: string;
+  safetyLimit?: string;
+  windowHours?: string;
+  startedAt: string;
+}): CollectorCollectionConfig {
+  if (input.source.type === 'FOLLOWING') {
+    if (input.safetyLimit !== undefined || input.windowHours !== undefined) {
+      throw new Error('Following collection uses --count, not rolling-window options');
+    }
+    return {
+      requestedCount: positiveInteger(input.count, 500, '--count'),
+      collectionPolicy: { mode: 'COUNT' },
+    };
+  }
+
+  if (input.count !== undefined) {
+    throw new Error(
+      'Favorites/List collection uses --window-hours and --safety-limit, not --count'
+    );
+  }
+  const windowHours = positiveInteger(input.windowHours, 24, '--window-hours');
+  if (windowHours > 168) throw new Error('--window-hours must be between 1 and 168');
+  const startedAt = Date.parse(input.startedAt);
+  if (!Number.isFinite(startedAt)) throw new Error('startedAt must be an ISO timestamp');
+  return {
+    requestedCount: positiveInteger(input.safetyLimit, 5_000, '--safety-limit'),
+    collectionPolicy: {
+      mode: 'ROLLING_WINDOW',
+      windowHours,
+      cutoffAt: new Date(startedAt - windowHours * 60 * 60 * 1_000).toISOString(),
+      boundaryEvidenceRequired: 3,
+    },
+  };
+}
+
 export function resolveCollectorSource(input: {
   type?: string;
   id?: string;

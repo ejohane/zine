@@ -46,6 +46,16 @@ Ask Codex to use the `zine-x-timeline-collector` skill, or start its receiver ex
 bun run x:archive:receive -- --count 500
 ```
 
+That command is for Following. A Favorites list uses a rolling window instead of a post target:
+
+```bash
+bun run --cwd apps/x-collector receive \
+  --source-type FAVORITES \
+  --source-url https://x.com/i/lists/<id> \
+  --window-hours 24 \
+  --safety-limit 5000
+```
+
 The receiver listens only on `127.0.0.1`, accepts small browser-extracted batches, and exposes a checkpoint that lets browser control reconnect without changing the run or item positions. The collector performs bounded up/down recovery after transient X stalls before falling back to a partial run. On completion, the receiver uploads chunks of at most 25 primary timeline entries, finalizes the R2 run manifest, then reads the run back for verification.
 
 For an existing capture JSON file:
@@ -55,7 +65,7 @@ bun run --cwd apps/x-collector validate --file capture.json
 bun run --cwd apps/x-collector upload --file capture.json
 ```
 
-Favorites-first Daily View collection uses two immutable runs: a `FAVORITES` run for the configured list and a separate `FOLLOWING` run for secondary context. The Favorites receiver also accepts list-member batches at `/source-members` and per-thread coverage records at `/context-status`; completion stores an immutable roster snapshot linked directly to its run. Roster status is finalized independently, so a complete timeline cannot hide a partial member capture. Run metadata records the exact source type, stable list ID, name, URL, and context coverage. Never substitute For You for either source.
+Favorites-first Daily View collection uses two immutable runs: a rolling-24-hour `FAVORITES` run for the configured list and a separate 500-post `FOLLOWING` run for secondary context. The Favorites receiver also accepts list-member batches at `/source-members`, rolling-window evidence with each `/batch`, and per-thread coverage records at `/context-status`; completion stores an immutable roster snapshot linked directly to its run. Roster status is finalized independently, so a complete timeline cannot hide a partial member capture. A Favorites run is complete only after it records enough older non-repost entries to prove the time boundary, with no missing publication timestamps. Reposts are retained according to their verified list activity position because X exposes the original post timestamp rather than a reliable repost-event timestamp; the reposter remains explicit. The numeric guard is recorded separately and produces partial coverage if reached first. Run metadata records the exact source type, stable list ID, name, URL, collection policy, termination reason, window coverage, and context coverage. Never substitute For You for either source.
 
 ## API
 

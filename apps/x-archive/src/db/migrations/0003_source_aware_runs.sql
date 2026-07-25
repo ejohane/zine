@@ -5,6 +5,9 @@ ALTER TABLE x_timeline_runs ADD COLUMN source_id TEXT NOT NULL DEFAULT 'followin
 ALTER TABLE x_timeline_runs ADD COLUMN source_name TEXT NOT NULL DEFAULT 'Following';
 ALTER TABLE x_timeline_runs ADD COLUMN source_url TEXT;
 ALTER TABLE x_timeline_runs ADD COLUMN context_coverage_json TEXT NOT NULL DEFAULT '{"budget":0,"attempted":0,"completed":0,"truncated":0,"failed":0,"warnings":[]}';
+ALTER TABLE x_timeline_runs ADD COLUMN collection_policy_json TEXT NOT NULL DEFAULT '{"mode":"COUNT"}';
+ALTER TABLE x_timeline_runs ADD COLUMN termination_reason TEXT NOT NULL DEFAULT 'COUNT_REACHED';
+ALTER TABLE x_timeline_runs ADD COLUMN window_coverage_json TEXT NOT NULL DEFAULT '{"outsideWindow":0,"missingPublishedAt":0,"boundaryEvidenceRequired":0,"boundaryReached":false}';
 
 CREATE INDEX IF NOT EXISTS x_timeline_runs_user_source_completed_idx
   ON x_timeline_runs(user_id, source_type, source_id, completed_at DESC, id DESC);

@@ -10,9 +10,13 @@
     "archiveStatus": "COMPLETE",
     "selectionStatus": "COMPLETE",
     "runId": "favorites-run",
-    "requestedCount": 500,
-    "collectedCount": 500,
-    "message": "Frozen Favorites, Following, and membership coverage are complete for this review slice."
+    "requestedCount": 5000,
+    "collectedCount": 2,
+    "message": "Frozen Favorites from the last 24 hours, Following, and membership coverage are complete for this review slice.",
+    "collectionMode": "ROLLING_WINDOW",
+    "windowHours": 24,
+    "safetyLimit": 5000,
+    "terminationReason": "WINDOW_BOUNDARY_REACHED"
   },
   "sources": [
     {
@@ -111,8 +115,21 @@
       "sourceName": "Favorites",
       "sourceUrl": "https://x.com/i/lists/123",
       "status": "COMPLETE",
-      "requestedCount": 500,
-      "collectedCount": 500,
+      "requestedCount": 5000,
+      "collectedCount": 2,
+      "collectionPolicy": {
+        "mode": "ROLLING_WINDOW",
+        "windowHours": 24,
+        "cutoffAt": "2026-07-24T10:15:00.000Z",
+        "boundaryEvidenceRequired": 3
+      },
+      "terminationReason": "WINDOW_BOUNDARY_REACHED",
+      "windowCoverage": {
+        "outsideWindow": 3,
+        "missingPublishedAt": 0,
+        "boundaryEvidenceRequired": 3,
+        "boundaryReached": true
+      },
       "contextCoverage": {
         "budget": 40,
         "attempted": 1,
@@ -131,6 +148,14 @@
       "status": "COMPLETE",
       "requestedCount": 500,
       "collectedCount": 500,
+      "collectionPolicy": { "mode": "COUNT" },
+      "terminationReason": "COUNT_REACHED",
+      "windowCoverage": {
+        "outsideWindow": 0,
+        "missingPublishedAt": 0,
+        "boundaryEvidenceRequired": 0,
+        "boundaryReached": false
+      },
       "contextCoverage": {
         "budget": 0,
         "attempted": 0,

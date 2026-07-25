@@ -65,6 +65,9 @@ type RunRow = {
   source_name: string;
   source_url: string | null;
   context_coverage_json: string;
+  collection_policy_json: string;
+  termination_reason: string;
+  window_coverage_json: string;
   created_at: number;
   updated_at: number;
 };
@@ -234,6 +237,14 @@ function publicRun(row: RunRow) {
       failed: 0,
       warnings: [],
     }),
+    collectionPolicy: parseJson(row.collection_policy_json, { mode: 'COUNT' }),
+    terminationReason: row.termination_reason ?? 'COUNT_REACHED',
+    windowCoverage: parseJson(row.window_coverage_json, {
+      outsideWindow: 0,
+      missingPublishedAt: 0,
+      boundaryEvidenceRequired: 0,
+      boundaryReached: false,
+    }),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -371,8 +382,8 @@ app.post('/api/v1/x-timeline/runs', async (c) => {
   await c.env.ARCHIVE_DB.prepare(
     `INSERT INTO x_timeline_runs
       (id, user_id, requested_count, status, started_at, collector_version, schema_version,
-       source_type, source_id, source_name, source_url, created_at, updated_at)
-     VALUES (?, ?, ?, 'CAPTURING', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       source_type, source_id, source_name, source_url, collection_policy_json, created_at, updated_at)
+     VALUES (?, ?, ?, 'CAPTURING', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       input.runId,
@@ -385,6 +396,7 @@ app.post('/api/v1/x-timeline/runs', async (c) => {
       input.source.id,
       input.source.name,
       input.source.url ?? null,
+      JSON.stringify(input.collectionPolicy),
       now,
       now
     )
@@ -697,6 +709,26 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
     .bind(runId, userId)
     .first<RunRow>();
   if (!run) return c.json({ error: 'Run not found', code: 'NOT_FOUND' }, 404);
+  const collectionPolicy = parseJson(run.collection_policy_json, { mode: 'COUNT' }) as {
+    mode?: string;
+  };
+  if (
+    parsed.data.status === 'COMPLETE' &&
+    ((collectionPolicy.mode === 'ROLLING_WINDOW' &&
+      (parsed.data.terminationReason !== 'WINDOW_BOUNDARY_REACHED' ||
+        !parsed.data.windowCoverage.boundaryReached ||
+        parsed.data.windowCoverage.missingPublishedAt > 0)) ||
+      (collectionPolicy.mode !== 'ROLLING_WINDOW' &&
+        parsed.data.terminationReason !== 'COUNT_REACHED'))
+  ) {
+    return c.json(
+      {
+        error: 'Completion reason does not satisfy the run collection policy',
+        code: 'COLLECTION_POLICY_INCOMPLETE',
+      },
+      409
+    );
+  }
 
   const items = await c.env.ARCHIVE_DB.prepare(
     `SELECT tweet_id, position, observed_at, presentation, reposted_by_json
@@ -736,6 +768,9 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       collectorVersion: run.collector_version,
       failureReason: parsed.data.failureReason ?? null,
       contextCoverage: parsed.data.contextCoverage,
+      collectionPolicy: parseJson(run.collection_policy_json, { mode: 'COUNT' }),
+      terminationReason: parsed.data.terminationReason,
+      windowCoverage: parsed.data.windowCoverage,
       items: items.results.map((item) => ({
         tweetId: item.tweet_id,
         position: item.position,
@@ -753,7 +788,8 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
   await c.env.ARCHIVE_DB.prepare(
     `UPDATE x_timeline_runs SET
       collected_count = ?, status = ?, completed_at = ?, excluded_ads = ?, manifest_key = ?,
-      failure_reason = ?, context_coverage_json = ?, updated_at = ?
+      failure_reason = ?, context_coverage_json = ?, termination_reason = ?,
+      window_coverage_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -764,6 +800,8 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       key,
       parsed.data.failureReason ?? null,
       JSON.stringify(parsed.data.contextCoverage),
+      parsed.data.terminationReason,
+      JSON.stringify(parsed.data.windowCoverage),
       Date.now(),
       runId,
       userId

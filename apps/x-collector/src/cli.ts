@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { XTimelineCaptureSchema } from '@zine/x-archive-schema';
 import { startReceiver } from './receiver';
-import { resolveCollectorSource } from './source-config';
+import { resolveCollectionConfig, resolveCollectorSource } from './source-config';
 import { uploadCapture } from './upload';
 
 type Args = { _: string[]; [key: string]: string | boolean | string[] };
@@ -37,8 +37,9 @@ function usage(): never {
   console.error(`Usage:
   bun run --cwd apps/x-collector validate [--file capture.json]
   bun run --cwd apps/x-collector upload [--file capture.json] [--api-url URL] [--token TOKEN]
-  bun run --cwd apps/x-collector receive --count 500 [--source-type FOLLOWING|FAVORITES|LIST]
+  bun run --cwd apps/x-collector receive [--count 500] [--source-type FOLLOWING|FAVORITES|LIST]
     [--source-id ID] [--source-name NAME] [--source-url URL]
+    [--window-hours 24] [--safety-limit 5000]
     [--port 4319] [--api-url URL] [--token TOKEN]
 
 Environment:
@@ -56,10 +57,6 @@ try {
     const token =
       (typeof args.token === 'string' ? args.token : undefined) ?? process.env.ZINE_X_ARCHIVE_TOKEN;
     if (!token) throw new Error('ZINE_X_ARCHIVE_TOKEN or --token is required');
-    const requestedCount = typeof args.count === 'string' ? Number.parseInt(args.count, 10) : 500;
-    if (!Number.isFinite(requestedCount) || requestedCount < 1 || requestedCount > 100_000) {
-      throw new Error('--count must be between 1 and 100000');
-    }
     const port = typeof args.port === 'string' ? Number.parseInt(args.port, 10) : 4319;
     const apiUrl =
       (typeof args['api-url'] === 'string' ? args['api-url'] : undefined) ??
@@ -71,20 +68,31 @@ try {
       name: typeof args['source-name'] === 'string' ? args['source-name'] : undefined,
       url: typeof args['source-url'] === 'string' ? args['source-url'] : undefined,
     });
+    const startedAt = new Date().toISOString();
+    const collection = resolveCollectionConfig({
+      source,
+      count: typeof args.count === 'string' ? args.count : undefined,
+      safetyLimit: typeof args['safety-limit'] === 'string' ? args['safety-limit'] : undefined,
+      windowHours: typeof args['window-hours'] === 'string' ? args['window-hours'] : undefined,
+      startedAt,
+    });
     const receiver = startReceiver({
-      requestedCount,
+      requestedCount: collection.requestedCount,
       apiUrl,
       token,
       port,
       collectorVersion: 'browser-dom-v4',
       source,
+      startedAt,
+      collectionPolicy: collection.collectionPolicy,
     });
     console.log(
       JSON.stringify({
         ready: true,
         receiverUrl: receiver.url,
         runId: receiver.runId,
-        requestedCount,
+        requestedCount: collection.requestedCount,
+        collectionPolicy: collection.collectionPolicy,
         source,
       })
     );

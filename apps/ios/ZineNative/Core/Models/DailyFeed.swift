@@ -53,6 +53,10 @@ struct DailyFeedCoverage: Decodable, Hashable {
     let requestedCount: Int
     let collectedCount: Int
     let message: String
+    let collectionMode: String?
+    let windowHours: Int?
+    let safetyLimit: Int?
+    let terminationReason: String?
 }
 
 struct DailyFeedSource: Decodable, Hashable, Identifiable {
@@ -116,8 +120,25 @@ struct DailyFeedInputRun: Decodable, Hashable {
     let status: String
     let requestedCount: Int
     let collectedCount: Int
+    let collectionPolicy: DailyCollectionPolicy?
+    let terminationReason: String?
+    let windowCoverage: DailyWindowCoverage?
     let contextCoverage: DailyContextCoverage?
     let frozenAt: String?
+}
+
+struct DailyCollectionPolicy: Decodable, Hashable {
+    let mode: String
+    let windowHours: Int?
+    let cutoffAt: String?
+    let boundaryEvidenceRequired: Int?
+}
+
+struct DailyWindowCoverage: Decodable, Hashable {
+    let outsideWindow: Int
+    let missingPublishedAt: Int
+    let boundaryEvidenceRequired: Int
+    let boundaryReached: Bool
 }
 
 struct DailyContextCoverage: Decodable, Hashable {

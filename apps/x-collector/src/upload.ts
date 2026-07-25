@@ -113,6 +113,7 @@ export async function uploadCapture(
         startedAt: capture.startedAt,
         collectorVersion: capture.collectorVersion,
         source: capture.source,
+        collectionPolicy: capture.collectionPolicy,
       }),
     },
     fetchImpl
@@ -147,6 +148,8 @@ export async function uploadCapture(
         status: capture.status,
         failureReason: capture.failureReason ?? null,
         contextCoverage: capture.contextCoverage,
+        windowCoverage: capture.windowCoverage,
+        terminationReason: capture.terminationReason,
       }),
     },
     fetchImpl
