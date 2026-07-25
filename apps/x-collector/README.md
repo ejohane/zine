@@ -1,7 +1,7 @@
 # X Collector
 
-The browser collector reads visible organic posts from the authenticated X Following timeline and
-sends validated batches to the local receiver. Collector version `browser-dom-v3` also captures
+The browser collector reads visible organic posts from the authenticated X Following timeline or a configured X List and
+sends validated batches to the local receiver. Collector version `browser-dom-v4` also captures source provenance, immutable run-linked list membership, and bounded context-only thread posts with explicit completion/truncation status. It retains
 outbound links from tweet text and X link cards.
 
 For each destination, the extractor prefers an expanded URL exposed by the DOM, preserves the

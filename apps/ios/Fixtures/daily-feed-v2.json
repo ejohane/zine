@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "variant": { "id": "people-first-v2", "mode": "REVIEW" },
+  "date": "2026-07-25",
+  "timezone": "America/Chicago",
+  "frozenAt": "2026-07-25T10:15:00.000Z",
+  "freshness": { "isCurrent": true, "status": "COMPLETE", "warnings": [] },
+  "coverage": {
+    "status": "COMPLETE",
+    "archiveStatus": "COMPLETE",
+    "selectionStatus": "COMPLETE",
+    "runId": "favorites-run",
+    "requestedCount": 500,
+    "collectedCount": 500,
+    "message": "Frozen Favorites, Following, and membership coverage are complete for this review slice."
+  },
+  "sources": [
+    {
+      "id": "x-list:123",
+      "type": "FAVORITES",
+      "name": "Favorites",
+      "selected": true,
+      "capturedAt": "2026-07-25T10:15:00.000Z",
+      "authorCount": 2,
+      "status": "COMPLETE",
+      "snapshotId": "snapshot-1",
+      "runId": "favorites-run",
+      "unresolvedCount": 0,
+      "failureReason": null
+    },
+    {
+      "id": "following",
+      "type": "FOLLOWING",
+      "name": "Following",
+      "selected": true,
+      "capturedAt": "2026-07-25T10:30:00.000Z",
+      "authorCount": 250
+    }
+  ],
+  "conversations": [
+    {
+      "id": "topic:1:2",
+      "evidenceType": "TOPIC_SIMILARITY",
+      "label": "Shared topic · swiftdata",
+      "evidence": "2 Favorite posts share multiple explicit terms.",
+      "postIds": ["1", "2"],
+      "authors": ["alice", "bob"],
+      "relationshipTypes": [],
+      "favoritePostIds": ["1"],
+      "contextPostIds": ["2"],
+      "favoriteAuthors": ["alice"],
+      "latestActivityAt": "2026-07-25T10:00:00.000Z",
+      "coverageWarnings": []
+    }
+  ],
+  "posts": [
+    {
+      "id": "1",
+      "url": "https://x.com/alice/status/1",
+      "text": "Favorite post",
+      "publishedAt": "2026-07-25T10:00:00.000Z",
+      "observedAt": "2026-07-25T10:01:00.000Z",
+      "kind": "POST",
+      "author": {
+        "key": "id:alice",
+        "username": "alice",
+        "name": "Alice",
+        "profileUrl": null,
+        "profileImageUrl": null,
+        "verified": false
+      },
+      "media": [],
+      "links": [],
+      "metrics": { "replies": 1, "reposts": 0, "likes": 2, "views": 10, "bookmarks": 0 },
+      "relationships": [],
+      "presentation": "POST",
+      "repostedBy": null,
+      "sourceIds": ["x-list:123"],
+      "sourcePosition": 0
+    },
+    {
+      "id": "2",
+      "url": "https://x.com/bob/status/2",
+      "text": "Following context",
+      "publishedAt": "2026-07-25T09:55:00.000Z",
+      "observedAt": "2026-07-25T10:02:00.000Z",
+      "kind": "REPLY",
+      "author": {
+        "key": "id:bob",
+        "username": "bob",
+        "name": "Bob",
+        "profileUrl": null,
+        "profileImageUrl": null,
+        "verified": false
+      },
+      "media": [],
+      "links": [],
+      "metrics": { "replies": 0, "reposts": 0, "likes": 1, "views": 5, "bookmarks": 0 },
+      "relationships": [],
+      "presentation": "POST",
+      "repostedBy": null,
+      "sourceIds": ["following"],
+      "sourcePosition": 0
+    }
+  ],
+  "sections": { "favoritePostIds": [], "followingPostIds": [] },
+  "inputs": {
+    "favorites": {
+      "runId": "favorites-run",
+      "sourceId": "x-list:123",
+      "sourceName": "Favorites",
+      "sourceUrl": "https://x.com/i/lists/123",
+      "status": "COMPLETE",
+      "requestedCount": 500,
+      "collectedCount": 500,
+      "contextCoverage": {
+        "budget": 40,
+        "attempted": 1,
+        "completed": 1,
+        "truncated": 0,
+        "failed": 0,
+        "warnings": []
+      },
+      "frozenAt": "2026-07-25T10:15:00.000Z"
+    },
+    "following": {
+      "runId": "following-run",
+      "sourceId": "following",
+      "sourceName": "Following",
+      "sourceUrl": "https://x.com/home",
+      "status": "COMPLETE",
+      "requestedCount": 500,
+      "collectedCount": 500,
+      "contextCoverage": {
+        "budget": 0,
+        "attempted": 0,
+        "completed": 0,
+        "truncated": 0,
+        "failed": 0,
+        "warnings": []
+      },
+      "frozenAt": "2026-07-25T10:30:00.000Z"
+    },
+    "membership": {
+      "snapshotId": "snapshot-1",
+      "runId": "favorites-run",
+      "sourceId": "x-list:123",
+      "capturedAt": "2026-07-25T10:15:00.000Z",
+      "status": "COMPLETE",
+      "resolvedCount": 2,
+      "unresolvedCount": 0,
+      "failureReason": null
+    }
+  },
+  "requestId": "fixture-request",
+  "traceId": "fixture-trace"
+}

@@ -3,6 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { XTimelineCaptureSchema } from '@zine/x-archive-schema';
 import { startReceiver } from './receiver';
+import { resolveCollectorSource } from './source-config';
 import { uploadCapture } from './upload';
 
 type Args = { _: string[]; [key: string]: string | boolean | string[] };
@@ -36,7 +37,9 @@ function usage(): never {
   console.error(`Usage:
   bun run --cwd apps/x-collector validate [--file capture.json]
   bun run --cwd apps/x-collector upload [--file capture.json] [--api-url URL] [--token TOKEN]
-  bun run --cwd apps/x-collector receive --count 500 [--port 4319] [--api-url URL] [--token TOKEN]
+  bun run --cwd apps/x-collector receive --count 500 [--source-type FOLLOWING|FAVORITES|LIST]
+    [--source-id ID] [--source-name NAME] [--source-url URL]
+    [--port 4319] [--api-url URL] [--token TOKEN]
 
 Environment:
   ZINE_X_ARCHIVE_API_URL   defaults to https://x-archive-api.myzine.app
@@ -62,13 +65,27 @@ try {
       (typeof args['api-url'] === 'string' ? args['api-url'] : undefined) ??
       process.env.ZINE_X_ARCHIVE_API_URL ??
       'https://x-archive-api.myzine.app';
-    const receiver = startReceiver({ requestedCount, apiUrl, token, port });
+    const source = resolveCollectorSource({
+      type: typeof args['source-type'] === 'string' ? args['source-type'] : undefined,
+      id: typeof args['source-id'] === 'string' ? args['source-id'] : undefined,
+      name: typeof args['source-name'] === 'string' ? args['source-name'] : undefined,
+      url: typeof args['source-url'] === 'string' ? args['source-url'] : undefined,
+    });
+    const receiver = startReceiver({
+      requestedCount,
+      apiUrl,
+      token,
+      port,
+      collectorVersion: 'browser-dom-v4',
+      source,
+    });
     console.log(
       JSON.stringify({
         ready: true,
         receiverUrl: receiver.url,
         runId: receiver.runId,
         requestedCount,
+        source,
       })
     );
     const result = await receiver.completed;

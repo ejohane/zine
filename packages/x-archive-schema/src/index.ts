@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const X_ARCHIVE_SCHEMA_VERSION = 2;
+export const X_ARCHIVE_SCHEMA_VERSION = 3;
 export const X_ARCHIVE_MAX_TIMELINE_ITEMS_PER_CHUNK = 25;
 export const X_ARCHIVE_MAX_POSTS_PER_CHUNK = 75;
 
@@ -15,6 +15,39 @@ const OptionalHttpUrlSchema = HttpUrlSchema.nullable().optional();
 
 export const XPostKindSchema = z.enum(['POST', 'REPLY', 'REPOST', 'QUOTE']);
 export type XPostKind = z.infer<typeof XPostKindSchema>;
+
+export const XTimelineSourceTypeSchema = z.enum(['FOLLOWING', 'FAVORITES', 'LIST']);
+export type XTimelineSourceType = z.infer<typeof XTimelineSourceTypeSchema>;
+
+export const XTimelineSourceSchema = z
+  .object({
+    type: XTimelineSourceTypeSchema.default('FOLLOWING'),
+    id: z.string().trim().min(1).max(120).default('following'),
+    name: z.string().trim().min(1).max(160).default('Following'),
+    url: HttpUrlSchema.nullable().optional(),
+  })
+  .strict();
+export type XTimelineSource = z.infer<typeof XTimelineSourceSchema>;
+
+export const XContextCoverageSchema = z
+  .object({
+    budget: z.number().int().nonnegative().default(0),
+    attempted: z.number().int().nonnegative().default(0),
+    completed: z.number().int().nonnegative().default(0),
+    truncated: z.number().int().nonnegative().default(0),
+    failed: z.number().int().nonnegative().default(0),
+    warnings: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+  })
+  .strict()
+  .superRefine((coverage, ctx) => {
+    if (coverage.completed + coverage.truncated + coverage.failed !== coverage.attempted) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Context outcome counts must equal attempted expansions',
+      });
+    }
+  });
+export type XContextCoverage = z.infer<typeof XContextCoverageSchema>;
 
 export const XPostRelationshipTypeSchema = z.enum(['REPLY_TO', 'REPOST_OF', 'QUOTE_OF']);
 export type XPostRelationshipType = z.infer<typeof XPostRelationshipTypeSchema>;
@@ -141,9 +174,15 @@ export const XTimelineCaptureSchema = z
     startedAt: z.string().datetime(),
     completedAt: z.string().datetime().nullable().optional(),
     collectorVersion: z.string().min(1).max(80),
+    source: XTimelineSourceSchema.default({
+      type: 'FOLLOWING',
+      id: 'following',
+      name: 'Following',
+    }),
     excludedAds: z.number().int().nonnegative().default(0),
     status: z.enum(['COMPLETE', 'PARTIAL']).default('COMPLETE'),
     failureReason: z.string().max(2_000).nullable().optional(),
+    contextCoverage: XContextCoverageSchema.default({}),
     posts: z.array(XPostSchema),
     items: z.array(XTimelineItemSchema),
   })
@@ -183,6 +222,11 @@ export const CreateXTimelineRunSchema = z
     requestedCount: z.number().int().positive().max(100_000),
     startedAt: z.string().datetime(),
     collectorVersion: z.string().min(1).max(80),
+    source: XTimelineSourceSchema.default({
+      type: 'FOLLOWING',
+      id: 'following',
+      name: 'Following',
+    }),
   })
   .strict();
 export type CreateXTimelineRun = z.infer<typeof CreateXTimelineRunSchema>;
@@ -214,6 +258,7 @@ export const CompleteXTimelineRunSchema = z
     status: z.enum(['COMPLETE', 'PARTIAL']),
     failureReason: z.string().max(2_000).nullable().optional(),
     collectedCount: z.number().int().nonnegative(),
+    contextCoverage: XContextCoverageSchema.default({}),
   })
   .strict();
 export type CompleteXTimelineRun = z.infer<typeof CompleteXTimelineRunSchema>;

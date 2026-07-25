@@ -66,6 +66,12 @@ async function insertCapturedRunForDailySources() {
       requestedCount: 1,
       startedAt: '2026-07-11T13:00:00.000Z',
       collectorVersion: 'test-v1',
+      source: {
+        type: 'FAVORITES',
+        id: 'favorites',
+        name: 'Favorites',
+        url: 'https://x.com/i/lists/123',
+      },
     }),
   });
   await api('/api/v1/x-timeline/runs/run-daily-sources/chunks/0', {
@@ -97,7 +103,7 @@ async function insertCapturedRunForDailySources() {
 beforeEach(async () => {
   await testEnv.AUTH_DB.exec('DELETE FROM api_tokens;');
   await testEnv.ARCHIVE_DB.exec(
-    'DELETE FROM x_daily_source_members; DELETE FROM x_daily_sources; DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_items; DELETE FROM x_post_links; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
+    'DELETE FROM x_daily_source_snapshot_members; DELETE FROM x_daily_source_snapshots; DELETE FROM x_daily_source_members; DELETE FROM x_daily_sources; DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_context_posts; DELETE FROM x_timeline_run_items; DELETE FROM x_post_links; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
   );
   await testEnv.AUTH_DB.prepare(
     `INSERT INTO api_tokens
@@ -128,9 +134,12 @@ describe('X archive worker', () => {
       }),
     });
     expect(create.status).toBe(201);
+    expect(await create.clone().json()).toMatchObject({
+      run: { source: { type: 'FOLLOWING', id: 'following', name: 'Following' } },
+    });
 
     const chunkBody = {
-      posts: [post('100')],
+      posts: [post('100'), { ...post('099'), links: [] }],
       items: [
         {
           tweetId: '100',
@@ -148,7 +157,7 @@ describe('X archive worker', () => {
     expect(chunk.status).toBe(200);
     expect(await chunk.json()).toMatchObject({
       duplicateChunk: false,
-      canonicalPosts: { created: 1, updated: 0, unchanged: 0 },
+      canonicalPosts: { created: 2, updated: 0, unchanged: 0 },
     });
 
     const retry = await api('/api/v1/x-timeline/runs/run-00000001/chunks/0', {
@@ -165,11 +174,25 @@ describe('X archive worker', () => {
         excludedAds: 2,
         status: 'COMPLETE',
         failureReason: null,
+        contextCoverage: {
+          budget: 40,
+          attempted: 1,
+          completed: 0,
+          truncated: 1,
+          failed: 0,
+          warnings: ['context_budget_reached'],
+        },
       }),
     });
     expect(complete.status).toBe(200);
     expect(await complete.json()).toMatchObject({
-      run: { id: 'run-00000001', collectedCount: 1, excludedAds: 2, status: 'COMPLETE' },
+      run: {
+        id: 'run-00000001',
+        collectedCount: 1,
+        excludedAds: 2,
+        status: 'COMPLETE',
+        contextCoverage: { attempted: 1, truncated: 1 },
+      },
     });
 
     const read = await api('/api/v1/x-timeline/runs/run-00000001');
@@ -216,6 +239,13 @@ describe('X archive worker', () => {
       .first<{ count: number }>();
     expect(indexedLinks?.count).toBe(1);
 
+    const contextPosts = await testEnv.ARCHIVE_DB.prepare(
+      'SELECT tweet_id FROM x_timeline_run_context_posts WHERE run_id = ?'
+    )
+      .bind('run-00000001')
+      .all<{ tweet_id: string }>();
+    expect(contextPosts.results).toEqual([{ tweet_id: '099' }]);
+
     expect(await testEnv.ARCHIVE_BUCKET.head('users/user_test/posts/100.json.gz')).not.toBeNull();
     const exported = await api('/api/v1/x-timeline/runs/run-00000001/export');
     expect(exported.status).toBe(200);
@@ -227,17 +257,28 @@ describe('X archive worker', () => {
     const put = await api('/api/v1/x-timeline/daily-sources/favorites', {
       method: 'PUT',
       body: JSON.stringify({
+        runId: 'run-daily-sources',
         sourceType: 'FAVORITES',
         name: 'Favorites',
         selected: true,
         capturedAt: '2026-07-11T13:02:00.000Z',
+        status: 'PARTIAL',
+        failureReason: 'membership_stalled',
         usernames: ['example', 'missing'],
       }),
     });
     expect(put.status).toBe(200);
     expect(await put.json()).toMatchObject({
-      source: { id: 'favorites', type: 'FAVORITES', authorCount: 1 },
+      source: {
+        id: 'favorites',
+        runId: 'run-daily-sources',
+        type: 'FAVORITES',
+        status: 'PARTIAL',
+        failureReason: 'membership_stalled',
+        authorCount: 1,
+      },
       unresolvedUsernames: ['missing'],
+      created: true,
     });
 
     const read = await api('/api/v1/x-timeline/daily-sources');
@@ -245,11 +286,71 @@ describe('X archive worker', () => {
       sources: [
         {
           id: 'favorites',
+          runId: 'run-daily-sources',
           type: 'FAVORITES',
           selected: true,
+          status: 'PARTIAL',
+          failureReason: 'membership_stalled',
+          suppliedCount: 2,
+          resolvedCount: 1,
+          unresolvedUsernames: ['missing'],
           authors: [{ username: 'example' }],
         },
       ],
+    });
+
+    const retry = await api('/api/v1/x-timeline/daily-sources/favorites', {
+      method: 'PUT',
+      body: JSON.stringify({
+        runId: 'run-daily-sources',
+        sourceType: 'FAVORITES',
+        name: 'Favorites',
+        selected: true,
+        capturedAt: '2026-07-11T13:02:00.000Z',
+        status: 'PARTIAL',
+        failureReason: 'membership_stalled',
+        usernames: ['example', 'missing'],
+      }),
+    });
+    expect(await retry.json()).toMatchObject({
+      source: { snapshotId: expect.any(String), runId: 'run-daily-sources' },
+      created: false,
+    });
+    const snapshotCount = await testEnv.ARCHIVE_DB.prepare(
+      'SELECT COUNT(*) AS count FROM x_daily_source_snapshots WHERE run_id = ?'
+    )
+      .bind('run-daily-sources')
+      .first<{ count: number }>();
+    expect(snapshotCount?.count).toBe(1);
+  });
+
+  it('stores source provenance on list timeline runs', async () => {
+    const create = await api('/api/v1/x-timeline/runs', {
+      method: 'POST',
+      body: JSON.stringify({
+        runId: 'run-favorites-list',
+        requestedCount: 500,
+        startedAt: '2026-07-11T13:00:00.000Z',
+        collectorVersion: 'browser-dom-v4',
+        source: {
+          type: 'FAVORITES',
+          id: 'x-list:123',
+          name: 'Favorites',
+          url: 'https://x.com/i/lists/123',
+        },
+      }),
+    });
+
+    expect(create.status).toBe(201);
+    expect(await create.json()).toMatchObject({
+      run: {
+        source: {
+          type: 'FAVORITES',
+          id: 'x-list:123',
+          name: 'Favorites',
+          url: 'https://x.com/i/lists/123',
+        },
+      },
     });
   });
 

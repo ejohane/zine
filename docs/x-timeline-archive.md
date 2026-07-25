@@ -2,7 +2,7 @@
 
 ## Scope
 
-The X archive captures a configurable number of organic entries from the authenticated X Following timeline. It retains posts, replies, repost presentations, quotes, ordering, authors, relationships, metrics, and media links. It excludes ads and does not download media.
+The X archive captures source-aware organic entries from the authenticated X Following timeline and configured X Lists. It retains posts, replies, repost presentations, quotes, ordering, authors, relationships, metrics, and media links. It excludes ads and does not download media.
 
 Collection is intentionally separate from Zine Inbox, bookmarks, enrichment, and analysis.
 
@@ -18,6 +18,8 @@ Collection is intentionally separate from Zine Inbox, bookmarks, enrichment, and
 ## Identity and deduplication
 
 Canonical post identity is `(Zine user ID, X tweet ID)`. Repeated collection updates `last_seen_at` and the single canonical payload; it does not create another post. Each run stores lightweight ordered pointers to canonical posts.
+
+Permalink-expanded thread posts are associated with the frozen run in a separate immutable context table. They never receive a primary timeline position or count toward the requested source total. Each run also stores bounded context coverage, including attempted, completed, truncated, and failed expansion counts.
 
 Reposts are modeled as run-item presentation metadata pointing to the original canonical tweet. Quote, reply, and repost relationships point to target tweet IDs instead of embedding duplicate post records.
 
@@ -53,6 +55,8 @@ bun run --cwd apps/x-collector validate --file capture.json
 bun run --cwd apps/x-collector upload --file capture.json
 ```
 
+Favorites-first Daily View collection uses two immutable runs: a `FAVORITES` run for the configured list and a separate `FOLLOWING` run for secondary context. The Favorites receiver also accepts list-member batches at `/source-members` and per-thread coverage records at `/context-status`; completion stores an immutable roster snapshot linked directly to its run. Roster status is finalized independently, so a complete timeline cannot hide a partial member capture. Run metadata records the exact source type, stable list ID, name, URL, and context coverage. Never substitute For You for either source.
+
 ## API
 
 All `/api/*` routes require a Zine PAT.
@@ -62,6 +66,7 @@ All `/api/*` routes require a Zine PAT.
 - `POST /api/v1/x-timeline/runs`
 - `PUT /api/v1/x-timeline/runs/{runId}/chunks/{chunkIndex}`
 - `POST /api/v1/x-timeline/runs/{runId}/complete`
+- `PUT /api/v1/x-timeline/daily-sources/{sourceId}`
 
 Chunk indexes are idempotent. Reusing an index with the same body succeeds; reusing it with different data returns `409`.
 
@@ -72,6 +77,7 @@ Chunk indexes are idempotent. Reusing an index with the same body succeeds; reus
 - `GET /api/v1/x-timeline/runs/{runId}/export`
 - `GET /api/v1/x-timeline/posts`
 - `GET /api/v1/x-timeline/posts/{tweetId}`
+- `GET /api/v1/x-timeline/daily-sources`
 
 Post listing uses an opaque keyset cursor.
 

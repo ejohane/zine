@@ -1048,7 +1048,7 @@
         "tags": ["Editorial"],
         "operationId": "getPeopleFirstDailyFeed",
         "summary": "Get the frozen people-first Today review feed",
-        "description": "Returns real X posts from Favorite and selected-list source snapshots, explicit relationship/shared-link conversation groups, and archive coverage. This review route does not replace the live editorial Today issue.",
+        "description": "Returns a frozen Favorites-list timeline first, evidence-backed reply/quote/shared-link/topic conversation groups, ungrouped Favorite posts, and a deduplicated secondary Following stream with immutable source, membership, run-context, and context-budget provenance. This review route does not replace the live editorial Today issue.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
         "x-api-status": "experimental",

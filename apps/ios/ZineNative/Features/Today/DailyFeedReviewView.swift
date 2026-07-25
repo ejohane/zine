@@ -9,7 +9,6 @@ struct DailyFeedReviewView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var store: DailyFeedStore
-    @State private var selectedSourceID: String?
 
     private let client: APIClient
 
@@ -59,10 +58,7 @@ struct DailyFeedReviewView: View {
                 Button("Try again") { Task { await store.load() } }
             }
         } else if let response = store.response {
-            DailyFeedContent(
-                response: response,
-                selectedSourceID: $selectedSourceID
-            )
+            DailyFeedContent(response: response)
             .refreshable { await store.load() }
         }
     }
@@ -70,28 +66,39 @@ struct DailyFeedReviewView: View {
 
 private struct DailyFeedContent: View {
     let response: DailyFeedResponse
-    @Binding var selectedSourceID: String?
 
-    private var filteredPosts: [DailyPost] {
-        guard let selectedSourceID else { return response.posts }
-        return response.posts.filter { $0.sourceIds.contains(selectedSourceID) }
+    private var postsByID: [String: DailyPost] {
+        Dictionary(uniqueKeysWithValues: response.posts.map { ($0.id, $0) })
     }
 
     private var sourceNames: [String: String] {
         Dictionary(uniqueKeysWithValues: response.sources.map { ($0.id, $0.name) })
     }
 
-    private var peopleSectionTitle: String {
-        switch response.coverage.selectionStatus {
-        case .complete:
-            return "Real posts from Favorites and lists"
-        case .stale:
-            return "Real posts; source membership may be stale"
-        case .fallback:
-            return "Real posts from an explicit Following fallback"
-        case .missing:
-            return "Real posts; source membership unavailable"
-        }
+    private var favoritePosts: [DailyPost] {
+        let ids = response.sections?.favoritePostIds
+            ?? response.posts.filter {
+                $0.sourceIds.contains(where: isFavoriteSource) && !conversationPostIDs.contains($0.id)
+            }.map(\.id)
+        return ids.compactMap { postsByID[$0] }
+    }
+
+    private var followingPosts: [DailyPost] {
+        let ids = response.sections?.followingPostIds
+            ?? response.posts.filter {
+                !$0.sourceIds.contains(where: isFavoriteSource) && !conversationPostIDs.contains($0.id)
+            }.map(\.id)
+        return ids.compactMap { postsByID[$0] }
+    }
+
+    private var conversationPostIDs: Set<String> {
+        Set(response.conversations.flatMap(\.postIds))
+    }
+
+    private func isFavoriteSource(_ sourceID: String) -> Bool {
+        response.sources.first(where: { $0.id == sourceID }).map {
+            $0.type == .favorites || $0.type == .list
+        } ?? false
     }
 
     var body: some View {
@@ -105,12 +112,12 @@ private struct DailyFeedContent: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 16)
 
-                sectionTitle("IN CONVERSATION", "Only what the posts show")
+                sectionTitle("FAVORITES", "Conversations from Favorites")
                     .padding(.horizontal, 18)
                     .padding(.top, 30)
 
                 if response.conversations.isEmpty {
-                    Text("No multi-author reply, quote, repost, or shared-link convergence was found in this slice.")
+                    Text("No evidence-backed Favorite conversations were found in this frozen slice.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 18)
@@ -121,7 +128,7 @@ private struct DailyFeedContent: View {
                             DailyConversationCard(
                                 conversation: conversation,
                                 posts: conversation.postIds.compactMap { id in
-                                    response.posts.first { $0.id == id }
+                                    postsByID[id]
                                 },
                                 date: response.date
                             )
@@ -131,26 +138,45 @@ private struct DailyFeedContent: View {
                     .padding(.top, 14)
                 }
 
-                sectionTitle("YOUR PEOPLE", peopleSectionTitle)
+                sectionTitle("FAVORITES", "More from Favorites")
                     .padding(.horizontal, 18)
                     .padding(.top, 34)
 
-                DailySourceFilter(
-                    sources: response.sources,
-                    selectedSourceID: $selectedSourceID
-                )
-                .padding(.top, 12)
-
-                if filteredPosts.isEmpty {
+                if favoritePosts.isEmpty {
                     ContentUnavailableView(
-                        "No posts in this source",
+                        "No additional Favorite posts",
                         systemImage: "person.2.slash",
-                        description: Text("The frozen run has no matching posts for this filter.")
+                        description: Text("Favorite posts in this slice are either grouped above or unavailable under the disclosed coverage.")
                     )
                     .padding(.top, 34)
                 } else {
                     LazyVStack(spacing: 14) {
-                        ForEach(filteredPosts) { post in
+                        ForEach(favoritePosts) { post in
+                            DailyFeedPostCard(
+                                post: post,
+                                sourceNames: sourceNames,
+                                authorDestinationDate: response.date
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
+                    .padding(.bottom, 38)
+                }
+
+                sectionTitle("FOLLOWING", "More from Following")
+                    .padding(.horizontal, 18)
+                    .padding(.top, 34)
+
+                if followingPosts.isEmpty {
+                    Text("No additional Following posts remain after conversation context and deduplication.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 10)
+                } else {
+                    LazyVStack(spacing: 14) {
+                        ForEach(followingPosts) { post in
                             DailyFeedPostCard(
                                 post: post,
                                 sourceNames: sourceNames,
@@ -266,60 +292,20 @@ private struct DailyCoverageNotice: View {
     }
 }
 
-private struct DailySourceFilter: View {
-    let sources: [DailyFeedSource]
-    @Binding var selectedSourceID: String?
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                filterButton(title: "All", sourceID: nil, count: nil)
-                ForEach(sources) { source in
-                    filterButton(
-                        title: source.name,
-                        sourceID: source.id,
-                        count: source.authorCount
-                    )
-                }
-            }
-            .padding(.horizontal, 18)
-        }
-    }
-
-    private func filterButton(title: String, sourceID: String?, count: Int?) -> some View {
-        let isSelected = selectedSourceID == sourceID
-        return Button {
-            selectedSourceID = sourceID
-        } label: {
-            HStack(spacing: 5) {
-                Text(title)
-                if let count {
-                    Text("\(count)")
-                        .foregroundStyle(isSelected ? .white.opacity(0.72) : .secondary)
-                }
-            }
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .foregroundStyle(isSelected ? Color.white : Color.primary)
-            .background(
-                isSelected ? Color.accentColor : Color.secondary.opacity(0.12),
-                in: Capsule()
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 private struct DailyConversationCard: View {
     let conversation: DailyConversation
     let posts: [DailyPost]
     let date: String
+    @State private var isExpanded = false
+
+    private var visiblePosts: [DailyPost] {
+        isExpanded ? posts : Array(posts.prefix(2))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: conversation.evidenceType == .directRelationship ? "arrow.triangle.branch" : "link")
+                Image(systemName: evidenceIcon)
                     .foregroundStyle(Color.accentColor)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(conversation.label)
@@ -327,12 +313,18 @@ private struct DailyConversationCard: View {
                     Text(conversation.evidence)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    ForEach(conversation.coverageWarnings ?? [], id: \.self) { warning in
+                        Label(warning, systemImage: "exclamationmark.circle")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
             Divider()
 
-            ForEach(posts) { post in
+            ForEach(visiblePosts) { post in
                 NavigationLink(value: DailyAuthorRoute(author: post.author, date: date)) {
                     HStack(alignment: .top, spacing: 9) {
                         DailyAuthorAvatar(author: post.author, size: 30)
@@ -345,15 +337,37 @@ private struct DailyConversationCard: View {
                                 .foregroundStyle(.primary)
                                 .lineLimit(3)
                                 .multilineTextAlignment(.leading)
+                            Text(isFavorite(post) ? "Favorite source" : "Conversation context")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(isFavorite(post) ? Color.accentColor : .secondary)
                         }
                         Spacer(minLength: 0)
                     }
                 }
                 .buttonStyle(.plain)
             }
+
+            if posts.count > 2 {
+                Button(isExpanded ? "Show less" : "Show all \(posts.count) posts") {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+                }
+                .font(.caption.weight(.semibold))
+            }
         }
         .padding(14)
         .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func isFavorite(_ post: DailyPost) -> Bool {
+        conversation.favoritePostIds?.contains(post.id) ?? false
+    }
+
+    private var evidenceIcon: String {
+        switch conversation.evidenceType {
+        case .directRelationship: "arrow.triangle.branch"
+        case .sharedLink: "link"
+        case .topicSimilarity: "text.magnifyingglass"
+        }
     }
 }
 
@@ -667,6 +681,7 @@ private extension DailyPost {
         relationships: [],
         presentation: "POST",
         repostedBy: nil,
-        sourceIds: ["favorites"]
+        sourceIds: ["favorites"],
+        sourcePosition: 0
     )
 }

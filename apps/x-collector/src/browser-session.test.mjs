@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'bun:test';
-import { createCollectionSession, prepareTimelineBatch } from './browser-session.mjs';
+import {
+  createCollectionSession,
+  finishContextExpansion,
+  prepareContextBatch,
+  prepareTimelineBatch,
+  reserveContextExpansion,
+} from './browser-session.mjs';
 
 describe('X browser collection session', () => {
   it('resumes positions and filters accepted posts and ads from a receiver checkpoint', () => {
@@ -47,6 +53,49 @@ describe('X browser collection session', () => {
       addedItems: 0,
       totalAccepted: 2,
       payload: { items: [], posts: [], adKeys: [], excludedAds: 0 },
+    });
+  });
+
+  it('prepares canonical thread context without manufacturing timeline items', () => {
+    const state = createCollectionSession({
+      acceptedTweetIds: ['100'],
+      acceptedPostIds: ['100'],
+    });
+    const prepared = prepareContextBatch(
+      {
+        posts: [
+          { tweetId: '100', text: 'already captured' },
+          { tweetId: '200', text: 'thread parent' },
+        ],
+      },
+      state
+    );
+
+    expect(prepared).toMatchObject({
+      addedPosts: 1,
+      payload: { posts: [{ tweetId: '200' }], items: [] },
+    });
+  });
+
+  it('enforces and resumes a bounded context expansion budget', () => {
+    const state = createCollectionSession({
+      contextRecords: [{ rootTweetId: '100', status: 'COMPLETE', reason: null }],
+    });
+
+    expect(reserveContextExpansion(state, '100', 2)).toMatchObject({
+      allowed: false,
+      duplicate: true,
+    });
+    expect(reserveContextExpansion(state, '200', 2)).toMatchObject({ allowed: true });
+    expect(finishContextExpansion(state, '200', 'FAILED', 'thread_unavailable')).toEqual({
+      rootTweetId: '200',
+      status: 'FAILED',
+      reason: 'thread_unavailable',
+    });
+    expect(reserveContextExpansion(state, '300', 2)).toMatchObject({
+      allowed: false,
+      duplicate: false,
+      status: { status: 'TRUNCATED', reason: 'context_budget_reached' },
     });
   });
 });

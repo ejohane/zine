@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildUploadChunks, uploadCapture } from './upload';
+import { buildUploadChunks, uploadCapture, uploadDailySourceSnapshot } from './upload';
 
 function capture(count = 26) {
   const posts = Array.from({ length: count }, (_, index) => ({
@@ -29,8 +29,17 @@ function capture(count = 26) {
     startedAt: '2026-07-11T13:00:00.000Z',
     completedAt: '2026-07-11T13:05:00.000Z',
     collectorVersion: 'test-v1',
+    source: { type: 'FOLLOWING' as const, id: 'following', name: 'Following' },
     excludedAds: 0,
     status: 'COMPLETE' as const,
+    contextCoverage: {
+      budget: 0,
+      attempted: 0,
+      completed: 0,
+      truncated: 0,
+      failed: 0,
+      warnings: [],
+    },
     posts,
     items: posts.map((post, position) => ({
       tweetId: post.tweetId,
@@ -81,5 +90,33 @@ describe('X collector uploader', () => {
       'POST',
       'GET',
     ]);
+  });
+
+  it('links an immutable membership snapshot to its Favorites run', async () => {
+    let requestBody: unknown;
+    const fetchImpl = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body));
+      return Response.json({ source: { snapshotId: 'snapshot-1' }, created: true });
+    }) as unknown as typeof fetch;
+
+    await uploadDailySourceSnapshot(
+      {
+        runId: 'favorites-run',
+        sourceId: 'x-list:123',
+        sourceType: 'FAVORITES',
+        name: 'Favorites',
+        selected: true,
+        capturedAt: '2026-07-25T10:15:00.000Z',
+        status: 'COMPLETE',
+        usernames: ['alice', 'bob'],
+      },
+      { apiUrl: 'https://archive.example.com', token: 'zine_pat_test', fetchImpl }
+    );
+
+    expect(requestBody).toMatchObject({
+      runId: 'favorites-run',
+      sourceType: 'FAVORITES',
+      usernames: ['alice', 'bob'],
+    });
   });
 });

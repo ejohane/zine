@@ -19,13 +19,25 @@ const MAX_PAGE_SIZE = 100;
 
 const DailySourceSnapshotSchema = z
   .object({
+    runId: z.string().trim().min(1).max(120),
     sourceType: z.enum(['FAVORITES', 'LIST']),
     name: z.string().trim().min(1).max(120),
     selected: z.boolean().default(true),
     capturedAt: z.string().datetime(),
+    status: z.enum(['COMPLETE', 'PARTIAL']).default('COMPLETE'),
+    failureReason: z.string().trim().min(1).max(500).nullable().optional(),
     usernames: z.array(z.string().trim().min(1).max(64)).max(5_000),
   })
-  .strict();
+  .strict()
+  .superRefine((snapshot, ctx) => {
+    if (snapshot.status === 'COMPLETE' && snapshot.failureReason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['failureReason'],
+        message: 'Complete membership snapshots cannot include a failure reason',
+      });
+    }
+  });
 
 type TokenRow = {
   id: string;
@@ -48,6 +60,11 @@ type RunRow = {
   schema_version: number;
   manifest_key: string | null;
   failure_reason: string | null;
+  source_type: 'FOLLOWING' | 'FAVORITES' | 'LIST';
+  source_id: string;
+  source_name: string;
+  source_url: string | null;
+  context_coverage_json: string;
   created_at: number;
   updated_at: number;
 };
@@ -153,6 +170,15 @@ function parsePostLinks(value: string | null | undefined): XPostLink[] {
   }
 }
 
+function parseJson(value: string | null | undefined, fallback: unknown): unknown {
+  if (!value) return fallback;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return fallback;
+  }
+}
+
 function mergePostLinks(previous: XPostLink[], incoming: XPostLink[]): XPostLink[] {
   const links = new Map(previous.map((link) => [link.normalizedUrl, link]));
   for (const link of incoming) {
@@ -194,6 +220,20 @@ function publicRun(row: RunRow) {
     collectorVersion: row.collector_version,
     schemaVersion: row.schema_version,
     failureReason: row.failure_reason,
+    source: {
+      type: row.source_type ?? 'FOLLOWING',
+      id: row.source_id ?? 'following',
+      name: row.source_name ?? 'Following',
+      url: row.source_url ?? null,
+    },
+    contextCoverage: parseJson(row.context_coverage_json, {
+      budget: 0,
+      attempted: 0,
+      completed: 0,
+      truncated: 0,
+      failed: 0,
+      warnings: [],
+    }),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -330,8 +370,9 @@ app.post('/api/v1/x-timeline/runs', async (c) => {
   const now = Date.now();
   await c.env.ARCHIVE_DB.prepare(
     `INSERT INTO x_timeline_runs
-      (id, user_id, requested_count, status, started_at, collector_version, schema_version, created_at, updated_at)
-     VALUES (?, ?, ?, 'CAPTURING', ?, ?, ?, ?, ?)`
+      (id, user_id, requested_count, status, started_at, collector_version, schema_version,
+       source_type, source_id, source_name, source_url, created_at, updated_at)
+     VALUES (?, ?, ?, 'CAPTURING', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
     .bind(
       input.runId,
@@ -340,6 +381,10 @@ app.post('/api/v1/x-timeline/runs', async (c) => {
       Date.parse(input.startedAt),
       input.collectorVersion,
       X_ARCHIVE_SCHEMA_VERSION,
+      input.source.type,
+      input.source.id,
+      input.source.name,
+      input.source.url ?? null,
       now,
       now
     )
@@ -458,6 +503,7 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
 
   const now = Date.now();
   const statements: D1PreparedStatement[] = [];
+  const primaryTweetIds = new Set(input.items.map((item) => item.tweetId));
   for (const post of postsById.values()) {
     const key = authorKey(post);
     const seenAt = Date.parse(post.capturedAt);
@@ -577,6 +623,16 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         )
       );
     }
+    if (!primaryTweetIds.has(post.tweetId)) {
+      statements.push(
+        c.env.ARCHIVE_DB.prepare(
+          `INSERT INTO x_timeline_run_context_posts (run_id, user_id, tweet_id, observed_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(run_id, tweet_id) DO UPDATE SET
+             observed_at = MIN(x_timeline_run_context_posts.observed_at, excluded.observed_at)`
+        ).bind(runId, userId, post.tweetId, seenAt)
+      );
+    }
   }
   for (const item of input.items) {
     statements.push(
@@ -679,6 +735,7 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       excludedAds: parsed.data.excludedAds,
       collectorVersion: run.collector_version,
       failureReason: parsed.data.failureReason ?? null,
+      contextCoverage: parsed.data.contextCoverage,
       items: items.results.map((item) => ({
         tweetId: item.tweet_id,
         position: item.position,
@@ -696,7 +753,7 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
   await c.env.ARCHIVE_DB.prepare(
     `UPDATE x_timeline_runs SET
       collected_count = ?, status = ?, completed_at = ?, excluded_ads = ?, manifest_key = ?,
-      failure_reason = ?, updated_at = ?
+      failure_reason = ?, context_coverage_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -706,6 +763,7 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       parsed.data.excludedAds,
       key,
       parsed.data.failureReason ?? null,
+      JSON.stringify(parsed.data.contextCoverage),
       Date.now(),
       runId,
       userId
@@ -732,23 +790,37 @@ app.get('/api/v1/x-timeline/runs', async (c) => {
 app.get('/api/v1/x-timeline/daily-sources', async (c) => {
   const userId = c.get('userId');
   const rows = await c.env.ARCHIVE_DB.prepare(
-    `SELECT s.source_id, s.source_type, s.name, s.is_selected, s.captured_at,
-      a.author_key, a.username, a.name AS author_name
-     FROM x_daily_sources s
-     LEFT JOIN x_daily_source_members m
-       ON m.user_id = s.user_id AND m.source_id = s.source_id
+    `WITH latest AS (
+       SELECT *, ROW_NUMBER() OVER (
+         PARTITION BY source_id ORDER BY captured_at DESC, id DESC
+       ) AS source_rank
+       FROM x_daily_source_snapshots WHERE user_id = ?
+     )
+     SELECT s.id AS snapshot_id, s.run_id, s.source_id, s.source_type, s.name, s.is_selected,
+       s.captured_at, s.status, s.failure_reason, s.supplied_count, s.resolved_count,
+       s.unresolved_usernames_json, a.author_key, a.username, a.name AS author_name
+     FROM latest s
+     LEFT JOIN x_daily_source_snapshot_members m
+       ON m.user_id = s.user_id AND m.snapshot_id = s.id
      LEFT JOIN x_authors a
        ON a.user_id = m.user_id AND a.author_key = m.author_key
-     WHERE s.user_id = ?
+     WHERE s.source_rank = 1
      ORDER BY CASE s.source_type WHEN 'FAVORITES' THEN 0 ELSE 1 END, s.name, a.username`
   )
     .bind(userId)
     .all<{
       source_id: string;
+      snapshot_id: string;
+      run_id: string;
       source_type: 'FAVORITES' | 'LIST';
       name: string;
       is_selected: number;
       captured_at: number;
+      status: 'COMPLETE' | 'PARTIAL';
+      failure_reason: string | null;
+      supplied_count: number;
+      resolved_count: number;
+      unresolved_usernames_json: string;
       author_key: string | null;
       username: string | null;
       author_name: string | null;
@@ -757,20 +829,34 @@ app.get('/api/v1/x-timeline/daily-sources', async (c) => {
     string,
     {
       id: string;
+      snapshotId: string;
+      runId: string;
       type: 'FAVORITES' | 'LIST';
       name: string;
       selected: boolean;
       capturedAt: string;
+      status: 'COMPLETE' | 'PARTIAL';
+      failureReason: string | null;
+      suppliedCount: number;
+      resolvedCount: number;
+      unresolvedUsernames: string[];
       authors: Array<{ key: string; username: string; name: string }>;
     }
   >();
   for (const row of rows.results) {
     const source = sources.get(row.source_id) ?? {
       id: row.source_id,
+      snapshotId: row.snapshot_id,
+      runId: row.run_id,
       type: row.source_type,
       name: row.name,
       selected: Boolean(row.is_selected),
       capturedAt: new Date(row.captured_at).toISOString(),
+      status: row.status,
+      failureReason: row.failure_reason,
+      suppliedCount: row.supplied_count,
+      resolvedCount: row.resolved_count,
+      unresolvedUsernames: JSON.parse(row.unresolved_usernames_json) as string[],
       authors: [],
     };
     if (row.author_key && row.username && row.author_name) {
@@ -804,6 +890,58 @@ app.put('/api/v1/x-timeline/daily-sources/:sourceId', async (c) => {
 
   const userId = c.get('userId');
   const input = parsed.data;
+  const run = await c.env.ARCHIVE_DB.prepare(
+    'SELECT * FROM x_timeline_runs WHERE id = ? AND user_id = ?'
+  )
+    .bind(input.runId, userId)
+    .first<RunRow>();
+  if (!run) return c.json({ error: 'Run not found', code: 'NOT_FOUND' }, 404);
+  if (
+    run.source_id !== sourceId ||
+    run.source_type !== input.sourceType ||
+    (run.status !== 'COMPLETE' && run.status !== 'PARTIAL')
+  ) {
+    return c.json(
+      { error: 'Snapshot provenance does not match a finalized source run', code: 'RUN_CONFLICT' },
+      409
+    );
+  }
+
+  const existingSnapshot = await c.env.ARCHIVE_DB.prepare(
+    `SELECT id, name, is_selected, captured_at, status, failure_reason, resolved_count,
+       unresolved_usernames_json
+     FROM x_daily_source_snapshots WHERE user_id = ? AND run_id = ?`
+  )
+    .bind(userId, input.runId)
+    .first<{
+      id: string;
+      name: string;
+      is_selected: number;
+      captured_at: number;
+      status: 'COMPLETE' | 'PARTIAL';
+      failure_reason: string | null;
+      resolved_count: number;
+      unresolved_usernames_json: string;
+    }>();
+  if (existingSnapshot) {
+    return c.json({
+      source: {
+        id: sourceId,
+        snapshotId: existingSnapshot.id,
+        runId: input.runId,
+        type: input.sourceType,
+        name: existingSnapshot.name,
+        selected: Boolean(existingSnapshot.is_selected),
+        capturedAt: new Date(existingSnapshot.captured_at).toISOString(),
+        status: existingSnapshot.status,
+        failureReason: existingSnapshot.failure_reason,
+        authorCount: existingSnapshot.resolved_count,
+      },
+      unresolvedUsernames: JSON.parse(existingSnapshot.unresolved_usernames_json) as string[],
+      created: false,
+    });
+  }
+
   const usernames = [...new Set(input.usernames.map((value) => value.toLocaleLowerCase()))];
   const placeholders = usernames.map(() => '?').join(',');
   const authors = usernames.length
@@ -816,6 +954,42 @@ app.put('/api/v1/x-timeline/daily-sources/:sourceId', async (c) => {
     : { results: [] as Array<{ author_key: string; username: string }> };
   const resolved = new Set(authors.results.map((author) => author.username.toLocaleLowerCase()));
   const now = Date.now();
+  const unresolvedUsernames = usernames.filter((username) => !resolved.has(username));
+  const snapshotId = crypto.randomUUID();
+
+  await c.env.ARCHIVE_DB.prepare(
+    `INSERT INTO x_daily_source_snapshots
+      (id, run_id, user_id, source_id, source_type, name, is_selected, captured_at, status,
+       failure_reason, supplied_count, resolved_count, unresolved_usernames_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(
+      snapshotId,
+      input.runId,
+      userId,
+      sourceId,
+      input.sourceType,
+      input.name,
+      input.selected ? 1 : 0,
+      Date.parse(input.capturedAt),
+      input.status,
+      input.failureReason ?? null,
+      usernames.length,
+      authors.results.length,
+      JSON.stringify(unresolvedUsernames),
+      now
+    )
+    .run();
+  if (authors.results.length > 0) {
+    await c.env.ARCHIVE_DB.batch(
+      authors.results.map((author) =>
+        c.env.ARCHIVE_DB.prepare(
+          `INSERT INTO x_daily_source_snapshot_members
+            (snapshot_id, user_id, author_key, created_at) VALUES (?, ?, ?, ?)`
+        ).bind(snapshotId, userId, author.author_key, now)
+      )
+    );
+  }
 
   await c.env.ARCHIVE_DB.prepare(
     `INSERT INTO x_daily_sources
@@ -857,13 +1031,18 @@ app.put('/api/v1/x-timeline/daily-sources/:sourceId', async (c) => {
   return c.json({
     source: {
       id: sourceId,
+      runId: input.runId,
       type: input.sourceType,
       name: input.name,
       selected: input.selected,
       capturedAt: input.capturedAt,
+      snapshotId,
+      status: input.status,
+      failureReason: input.failureReason ?? null,
       authorCount: authors.results.length,
     },
-    unresolvedUsernames: usernames.filter((username) => !resolved.has(username)),
+    unresolvedUsernames,
+    created: true,
   });
 });
 
