@@ -306,7 +306,9 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
     const knownAdKeys = new Set(Array.isArray(seenAdKeys) ? seenAdKeys : []);
     const adKeys = [];
 
-    for (const article of document.querySelectorAll('article[data-testid="tweet"]')) {
+    const articles = [...document.querySelectorAll('article[data-testid="tweet"]')];
+    const threadMode = /\/status\/\d+/.test(globalThis.location?.pathname || '');
+    for (const [articleIndex, article] of articles.entries()) {
       if (isPromoted(article)) {
         const adKey =
           article.querySelector('a[href*="/status/"]')?.getAttribute('href') ||
@@ -332,6 +334,18 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
       const relationships = [];
       if (quoted)
         relationships.push({ type: 'QUOTE_OF', tweetId: quoted.tweetId, url: quoted.url });
+      if (reply && threadMode && articleIndex > 0) {
+        const parentArticle = articles[articleIndex - 1];
+        const parentLink = parentArticle?.querySelector('a[href*="/status/"]:has(time)');
+        const parentIdentity = statusIdentity(parentLink?.getAttribute('href'));
+        if (parentIdentity && parentIdentity.tweetId !== identity.tweetId) {
+          relationships.push({
+            type: 'REPLY_TO',
+            tweetId: parentIdentity.tweetId,
+            url: parentIdentity.url,
+          });
+        }
+      }
       const post = {
         tweetId: identity.tweetId,
         url: identity.url,

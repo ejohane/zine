@@ -2,11 +2,13 @@ import {
   XPostSchema,
   XTimelineCaptureSchema,
   XTimelineItemSchema,
+  type XCollectionPolicy,
+  type XCollectionTerminationReason,
   type XPost,
   type XTimelineItem,
 } from '@zine/x-archive-schema';
 import { z } from 'zod';
-import { uploadCapture, type UploadResult } from './upload';
+import { uploadCapture, uploadDailySourceSnapshot, type UploadResult } from './upload';
 
 const BatchSchema = z
   .object({
@@ -14,6 +16,13 @@ const BatchSchema = z
     items: z.array(XTimelineItemSchema).max(100),
     adKeys: z.array(z.string().min(1).max(1_000)).max(200).default([]),
     excludedAds: z.number().int().nonnegative().default(0),
+    windowEvidence: z
+      .object({
+        outsideWindowTweetIds: z.array(z.string().min(1).max(64)).max(200).default([]),
+        missingTimestampTweetIds: z.array(z.string().min(1).max(64)).max(200).default([]),
+      })
+      .strict()
+      .default({}),
   })
   .strict();
 
@@ -21,6 +30,31 @@ const CompleteSchema = z
   .object({
     status: z.enum(['COMPLETE', 'PARTIAL']).default('COMPLETE'),
     failureReason: z.string().max(2_000).nullable().optional(),
+    terminationReason: z
+      .enum([
+        'COUNT_REACHED',
+        'WINDOW_BOUNDARY_REACHED',
+        'SAFETY_LIMIT_REACHED',
+        'TIMELINE_STALLED',
+        'COLLECTOR_FAILED',
+      ])
+      .optional(),
+  })
+  .strict();
+
+const SourceMembersSchema = z
+  .object({
+    usernames: z.array(z.string().trim().min(1).max(64)).max(500),
+    status: z.enum(['CAPTURING', 'COMPLETE', 'PARTIAL']).optional(),
+    failureReason: z.string().trim().min(1).max(500).nullable().optional(),
+  })
+  .strict();
+
+const ContextStatusSchema = z
+  .object({
+    rootTweetId: z.string().min(1).max(64),
+    status: z.enum(['COMPLETE', 'TRUNCATED', 'FAILED']),
+    reason: z.string().trim().min(1).max(500).nullable().optional(),
   })
   .strict();
 
@@ -32,6 +66,14 @@ export type ReceiverOptions = {
   collectorVersion?: string;
   runId?: string;
   startedAt?: string;
+  contextBudget?: number;
+  collectionPolicy?: XCollectionPolicy;
+  source?: {
+    type: 'FOLLOWING' | 'FAVORITES' | 'LIST';
+    id: string;
+    name: string;
+    url?: string | null;
+  };
 };
 
 export type ReceiverHandle = {
@@ -49,12 +91,72 @@ function corsHeaders() {
   };
 }
 
+function summarizeContextCoverage(
+  budget: number,
+  records: Map<string, { status: 'COMPLETE' | 'TRUNCATED' | 'FAILED'; reason: string | null }>
+) {
+  const values = [...records.values()];
+  return {
+    budget,
+    attempted: values.length,
+    completed: values.filter((record) => record.status === 'COMPLETE').length,
+    truncated: values.filter((record) => record.status === 'TRUNCATED').length,
+    failed: values.filter((record) => record.status === 'FAILED').length,
+    warnings: [
+      ...new Set(
+        values
+          .filter((record) => record.status !== 'COMPLETE')
+          .map(
+            (record) =>
+              record.reason ??
+              (record.status === 'TRUNCATED'
+                ? 'context_expansion_truncated'
+                : 'context_expansion_failed')
+          )
+      ),
+    ],
+  };
+}
+
+function summarizeWindowCoverage(
+  policy: XCollectionPolicy,
+  outsideWindowTweetIds: Set<string>,
+  missingTimestampTweetIds: Set<string>
+) {
+  const boundaryEvidenceRequired =
+    policy.mode === 'ROLLING_WINDOW' ? policy.boundaryEvidenceRequired : 0;
+  return {
+    outsideWindow: outsideWindowTweetIds.size,
+    missingPublishedAt: missingTimestampTweetIds.size,
+    boundaryEvidenceRequired,
+    boundaryReached:
+      policy.mode === 'ROLLING_WINDOW' && outsideWindowTweetIds.size >= boundaryEvidenceRequired,
+  };
+}
+
 export function startReceiver(options: ReceiverOptions): ReceiverHandle {
   const runId = options.runId ?? crypto.randomUUID();
   const startedAt = options.startedAt ?? new Date().toISOString();
   const posts = new Map<string, XPost>();
   const items = new Map<string, XTimelineItem>();
   const acceptedAdKeys = new Set<string>();
+  const sourceMembers = new Set<string>();
+  let sourceMembershipStatus: 'COMPLETE' | 'PARTIAL' =
+    options.source?.type === 'FAVORITES' || options.source?.type === 'LIST'
+      ? 'PARTIAL'
+      : 'COMPLETE';
+  let sourceMembershipFailureReason: string | null =
+    sourceMembershipStatus === 'PARTIAL' ? 'membership_not_finalized' : null;
+  const contextRecords = new Map<
+    string,
+    { status: 'COMPLETE' | 'TRUNCATED' | 'FAILED'; reason: string | null }
+  >();
+  const outsideWindowTweetIds = new Set<string>();
+  const missingTimestampTweetIds = new Set<string>();
+  const contextBudget =
+    options.contextBudget ??
+    (options.source?.type === 'FAVORITES' || options.source?.type === 'LIST' ? 40 : 0);
+  const collectionPolicy = options.collectionPolicy ?? { mode: 'COUNT' as const };
   let legacyExcludedAds = 0;
   let resolveCompleted!: (result: UploadResult) => void;
   let rejectCompleted!: (error: unknown) => void;
@@ -77,9 +179,20 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             startedAt,
             requestedCount: options.requestedCount,
             collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
+            collectionPolicy,
             posts: posts.size,
             items: items.size,
             excludedAds,
+            sourceMemberCount: sourceMembers.size,
+            sourceMembershipStatus,
+            sourceMembershipFailureReason,
+            contextCoverage: summarizeContextCoverage(contextBudget, contextRecords),
+            windowCoverage: summarizeWindowCoverage(
+              collectionPolicy,
+              outsideWindowTweetIds,
+              missingTimestampTweetIds
+            ),
             nextPosition:
               items.size === 0
                 ? 0
@@ -98,7 +211,10 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             startedAt,
             requestedCount: options.requestedCount,
             collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
+            collectionPolicy,
             acceptedTweetIds: orderedItems.map((item) => item.tweetId),
+            acceptedPostIds: [...posts.keys()],
             acceptedAdKeys: [...acceptedAdKeys],
             nextPosition:
               orderedItems.length === 0
@@ -106,6 +222,15 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
                 : Math.max(...orderedItems.map((item) => item.position)) + 1,
             canonicalPosts: posts.size,
             excludedAds,
+            sourceMembers: [...sourceMembers],
+            sourceMembershipStatus,
+            sourceMembershipFailureReason,
+            contextRecords: [...contextRecords].map(([rootTweetId, record]) => ({
+              rootTweetId,
+              ...record,
+            })),
+            outsideWindowTweetIds: [...outsideWindowTweetIds],
+            missingTimestampTweetIds: [...missingTimestampTweetIds],
           },
           { headers: corsHeaders() }
         );
@@ -127,6 +252,12 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
         } else {
           legacyExcludedAds += parsed.data.excludedAds;
         }
+        for (const tweetId of parsed.data.windowEvidence.outsideWindowTweetIds) {
+          outsideWindowTweetIds.add(tweetId);
+        }
+        for (const tweetId of parsed.data.windowEvidence.missingTimestampTweetIds) {
+          missingTimestampTweetIds.add(tweetId);
+        }
         const updatedExcludedAds = legacyExcludedAds + acceptedAdKeys.size;
         return Response.json(
           {
@@ -134,6 +265,59 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             canonicalPosts: posts.size,
             timelineItems: items.size,
             excludedAds: updatedExcludedAds,
+            windowCoverage: summarizeWindowCoverage(
+              collectionPolicy,
+              outsideWindowTweetIds,
+              missingTimestampTweetIds
+            ),
+          },
+          { headers: corsHeaders() }
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/source-members') {
+        const parsed = SourceMembersSchema.safeParse(await request.json().catch(() => null));
+        if (!parsed.success) {
+          return Response.json(
+            { error: 'Invalid source member batch', issues: parsed.error.issues },
+            { status: 400, headers: corsHeaders() }
+          );
+        }
+        for (const username of parsed.data.usernames) {
+          sourceMembers.add(username.toLocaleLowerCase());
+        }
+        if (parsed.data.status === 'COMPLETE') {
+          sourceMembershipStatus = 'COMPLETE';
+          sourceMembershipFailureReason = null;
+        } else if (parsed.data.status === 'PARTIAL') {
+          sourceMembershipStatus = 'PARTIAL';
+          sourceMembershipFailureReason = parsed.data.failureReason ?? 'membership_capture_partial';
+        }
+        return Response.json(
+          {
+            accepted: true,
+            sourceMemberCount: sourceMembers.size,
+            sourceMembershipStatus,
+            sourceMembershipFailureReason,
+          },
+          { headers: corsHeaders() }
+        );
+      }
+      if (request.method === 'POST' && url.pathname === '/context-status') {
+        const parsed = ContextStatusSchema.safeParse(await request.json().catch(() => null));
+        if (!parsed.success) {
+          return Response.json(
+            { error: 'Invalid context status', issues: parsed.error.issues },
+            { status: 400, headers: corsHeaders() }
+          );
+        }
+        contextRecords.set(parsed.data.rootTweetId, {
+          status: parsed.data.status,
+          reason: parsed.data.reason ?? null,
+        });
+        return Response.json(
+          {
+            accepted: true,
+            contextCoverage: summarizeContextCoverage(contextBudget, contextRecords),
           },
           { headers: corsHeaders() }
         );
@@ -147,15 +331,39 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
           );
         }
         try {
+          const terminationReason: XCollectionTerminationReason | null =
+            parsed.data.terminationReason ??
+            (collectionPolicy.mode === 'COUNT' && parsed.data.status === 'COMPLETE'
+              ? ('COUNT_REACHED' as const)
+              : null);
+          if (!terminationReason) {
+            return Response.json(
+              {
+                success: false,
+                error: 'terminationReason is required for rolling-window and partial runs',
+              },
+              { status: 400, headers: corsHeaders() }
+            );
+          }
+          const windowCoverage = summarizeWindowCoverage(
+            collectionPolicy,
+            outsideWindowTweetIds,
+            missingTimestampTweetIds
+          );
           const capture = XTimelineCaptureSchema.parse({
             runId,
             requestedCount: options.requestedCount,
             startedAt,
             completedAt: new Date().toISOString(),
             collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
+            collectionPolicy,
+            terminationReason,
             excludedAds: legacyExcludedAds + acceptedAdKeys.size,
             status: parsed.data.status,
             failureReason: parsed.data.failureReason ?? null,
+            contextCoverage: summarizeContextCoverage(contextBudget, contextRecords),
+            windowCoverage,
             posts: [...posts.values()],
             items: [...items.values()].sort((left, right) => left.position - right.position),
           });
@@ -164,6 +372,22 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             token: options.token,
             verify: true,
           });
+          if (options.source?.type === 'FAVORITES' || options.source?.type === 'LIST') {
+            await uploadDailySourceSnapshot(
+              {
+                runId,
+                sourceId: options.source.id,
+                sourceType: options.source.type,
+                name: options.source.name,
+                selected: true,
+                capturedAt: new Date().toISOString(),
+                status: sourceMembershipStatus,
+                failureReason: sourceMembershipFailureReason,
+                usernames: [...sourceMembers],
+              },
+              { apiUrl: options.apiUrl, token: options.token }
+            );
+          }
           resolveCompleted(result);
           setTimeout(() => server.stop(), 100);
           return Response.json({ success: true, ...result }, { headers: corsHeaders() });

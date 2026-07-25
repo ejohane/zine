@@ -13,17 +13,24 @@ afterEach(() => {
 
 describe('local browser receiver', () => {
   it('accumulates browser batches and performs a verified upload', async () => {
+    let completionBody: Record<string, unknown> | null = null;
+    let membershipBody: Record<string, unknown> | null = null;
     apiServer = Bun.serve({
       hostname: '127.0.0.1',
       port: 0,
-      fetch(request) {
+      async fetch(request) {
         const url = new URL(request.url);
         if (url.pathname.endsWith('/runs') && request.method === 'POST') {
           return Response.json({ run: { id: 'receiver-run-001' } }, { status: 201 });
         }
         if (url.pathname.includes('/chunks/')) return Response.json({ accepted: true });
         if (url.pathname.endsWith('/complete')) {
+          completionBody = (await request.json()) as Record<string, unknown>;
           return Response.json({ run: { id: 'receiver-run-001', collectedCount: 2 } });
+        }
+        if (url.pathname.includes('/daily-sources/')) {
+          membershipBody = (await request.json()) as Record<string, unknown>;
+          return Response.json({ source: { snapshotId: 'snapshot-1' }, created: true });
         }
         return Response.json({ run: { id: 'receiver-run-001', collectedCount: 2 } });
       },
@@ -35,6 +42,12 @@ describe('local browser receiver', () => {
       port: 0,
       runId: 'receiver-run-001',
       startedAt: '2026-07-11T13:00:00.000Z',
+      source: {
+        type: 'FAVORITES',
+        id: 'x-list:123',
+        name: 'Favorites',
+        url: 'https://x.com/i/lists/123',
+      },
     });
 
     const batch = await fetch(`${receiver.url}/batch`, {
@@ -149,6 +162,34 @@ describe('local browser receiver', () => {
     });
     expect(await resumedBatch.json()).toMatchObject({ timelineItems: 2, excludedAds: 2 });
 
+    const sourceMembers = await fetch(`${receiver.url}/source-members`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ usernames: ['example'], status: 'COMPLETE' }),
+    });
+    expect(await sourceMembers.json()).toMatchObject({
+      sourceMemberCount: 1,
+      sourceMembershipStatus: 'COMPLETE',
+      sourceMembershipFailureReason: null,
+    });
+
+    const contextStatus = await fetch(`${receiver.url}/context-status`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        rootTweetId: '100',
+        status: 'TRUNCATED',
+        reason: 'context_budget_reached',
+      }),
+    });
+    expect(await contextStatus.json()).toMatchObject({
+      contextCoverage: {
+        attempted: 1,
+        truncated: 1,
+        warnings: ['context_budget_reached'],
+      },
+    });
+
     const complete = await fetch(`${receiver.url}/complete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -159,6 +200,111 @@ describe('local browser receiver', () => {
       runId: 'receiver-run-001',
       timelineItemsSubmitted: 2,
       verified: true,
+    });
+    expect(completionBody).toMatchObject({
+      contextCoverage: {
+        attempted: 1,
+        completed: 0,
+        truncated: 1,
+        failed: 0,
+        warnings: ['context_budget_reached'],
+      },
+    });
+    expect(membershipBody).toMatchObject({
+      runId: 'receiver-run-001',
+      sourceType: 'FAVORITES',
+      status: 'COMPLETE',
+      failureReason: null,
+      usernames: ['example'],
+    });
+  });
+
+  it('requires persisted boundary evidence before completing a rolling-window run', async () => {
+    let completionBody: Record<string, unknown> | null = null;
+    apiServer = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        if (url.pathname.endsWith('/runs') && request.method === 'POST') {
+          return Response.json({ run: { id: 'receiver-window-001' } }, { status: 201 });
+        }
+        if (url.pathname.endsWith('/complete')) {
+          completionBody = (await request.json()) as Record<string, unknown>;
+          return Response.json({ run: { id: 'receiver-window-001', collectedCount: 0 } });
+        }
+        if (url.pathname.includes('/daily-sources/')) {
+          return Response.json({ source: { snapshotId: 'snapshot-window' }, created: true });
+        }
+        return Response.json({ run: { id: 'receiver-window-001', collectedCount: 0 } });
+      },
+    });
+    receiver = startReceiver({
+      requestedCount: 5_000,
+      apiUrl: `http://${apiServer.hostname}:${apiServer.port}`,
+      token: 'zine_pat_receiver-test',
+      port: 0,
+      runId: 'receiver-window-001',
+      startedAt: '2026-07-25T18:00:00.000Z',
+      source: {
+        type: 'FAVORITES',
+        id: 'x-list:123',
+        name: 'Favorites',
+        url: 'https://x.com/i/lists/123',
+      },
+      collectionPolicy: {
+        mode: 'ROLLING_WINDOW',
+        windowHours: 24,
+        cutoffAt: '2026-07-24T18:00:00.000Z',
+        boundaryEvidenceRequired: 3,
+      },
+    });
+
+    const missingReason = await fetch(`${receiver.url}/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'COMPLETE' }),
+    });
+    expect(missingReason.status).toBe(400);
+
+    await fetch(`${receiver.url}/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        posts: [],
+        items: [],
+        windowEvidence: {
+          outsideWindowTweetIds: ['old-1', 'old-2', 'old-3'],
+          missingTimestampTweetIds: [],
+        },
+      }),
+    });
+    const checkpoint = await fetch(`${receiver.url}/checkpoint`).then((response) =>
+      response.json()
+    );
+    expect(checkpoint).toMatchObject({
+      collectionPolicy: { mode: 'ROLLING_WINDOW', windowHours: 24 },
+      outsideWindowTweetIds: ['old-1', 'old-2', 'old-3'],
+    });
+
+    const complete = await fetch(`${receiver.url}/complete`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'COMPLETE',
+        terminationReason: 'WINDOW_BOUNDARY_REACHED',
+      }),
+    });
+    expect(complete.status).toBe(200);
+    await expect(receiver.completed).resolves.toMatchObject({ verified: true });
+    expect(completionBody).toMatchObject({
+      terminationReason: 'WINDOW_BOUNDARY_REACHED',
+      windowCoverage: {
+        outsideWindow: 3,
+        missingPublishedAt: 0,
+        boundaryEvidenceRequired: 3,
+        boundaryReached: true,
+      },
     });
   });
 });

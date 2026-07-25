@@ -1,5 +1,5 @@
 const DEFAULT_TIMEZONE = 'America/Chicago';
-const MAX_RUN_POSTS = 500;
+const MAX_RUN_POSTS = 5_000;
 const RELATIONSHIP_QUERY_POST_LIMIT = 90;
 const MAX_AUTHOR_POSTS = 500;
 
@@ -12,6 +12,39 @@ type ArchiveRunRow = {
   completed_at: number | null;
   excluded_ads: number;
   failure_reason: string | null;
+  source_type: 'FOLLOWING' | 'FAVORITES' | 'LIST';
+  source_id: string;
+  source_name: string;
+  source_url: string | null;
+  context_coverage_json: string;
+  collection_policy_json: string;
+  termination_reason: string;
+  window_coverage_json: string;
+};
+
+type ContextCoverage = {
+  budget: number;
+  attempted: number;
+  completed: number;
+  truncated: number;
+  failed: number;
+  warnings: string[];
+};
+
+type CollectionPolicy =
+  | { mode: 'COUNT' }
+  | {
+      mode: 'ROLLING_WINDOW';
+      windowHours: number;
+      cutoffAt: string;
+      boundaryEvidenceRequired: number;
+    };
+
+type WindowCoverage = {
+  outsideWindow: number;
+  missingPublishedAt: number;
+  boundaryEvidenceRequired: number;
+  boundaryReached: boolean;
 };
 
 type ArchivePostRow = {
@@ -51,21 +84,33 @@ type RelationshipRow = {
 };
 
 type DailySourceRow = {
+  snapshot_id: string;
+  run_id: string;
   source_id: string;
   source_type: 'FAVORITES' | 'LIST';
   name: string;
   is_selected: number;
   captured_at: number;
+  status: 'COMPLETE' | 'PARTIAL';
+  failure_reason: string | null;
+  supplied_count: number;
+  resolved_count: number;
+  unresolved_usernames_json: string;
   author_key: string | null;
 };
 
 type DailySource = {
   id: string;
-  type: 'FAVORITES' | 'LIST' | 'FOLLOWING_FALLBACK';
+  type: 'FAVORITES' | 'LIST' | 'FOLLOWING' | 'FOLLOWING_FALLBACK';
   name: string;
   selected: boolean;
   capturedAt: string | null;
   authorCount: number;
+  status?: 'COMPLETE' | 'PARTIAL';
+  snapshotId?: string | null;
+  runId?: string | null;
+  unresolvedCount?: number;
+  failureReason?: string | null;
 };
 
 type DailyRelationship = {
@@ -163,6 +208,7 @@ function publicPost(
     presentation: row.presentation ?? row.kind,
     repostedBy: publicRepostAuthor(row.reposted_by_json),
     sourceIds,
+    sourcePosition: row.position,
   };
 }
 
@@ -170,7 +216,8 @@ async function archiveRuns(db: D1Database, userId: string): Promise<ArchiveRunRo
   const rows = await db
     .prepare(
       `SELECT id, requested_count, collected_count, status, started_at, completed_at,
-        excluded_ads, failure_reason
+        excluded_ads, failure_reason, source_type, source_id, source_name, source_url,
+        context_coverage_json, collection_policy_json, termination_reason, window_coverage_json
        FROM x_timeline_runs
        WHERE user_id = ? AND status IN ('COMPLETE', 'PARTIAL') AND completed_at IS NOT NULL
        ORDER BY completed_at DESC, id DESC LIMIT 60`
@@ -180,16 +227,47 @@ async function archiveRuns(db: D1Database, userId: string): Promise<ArchiveRunRo
   return rows.results;
 }
 
+function contextCoverage(run: ArchiveRunRow): ContextCoverage {
+  const parsed = parseJson(run.context_coverage_json, {}) as Partial<ContextCoverage>;
+  return {
+    budget: parsed.budget ?? 0,
+    attempted: parsed.attempted ?? 0,
+    completed: parsed.completed ?? 0,
+    truncated: parsed.truncated ?? 0,
+    failed: parsed.failed ?? 0,
+    warnings: Array.isArray(parsed.warnings)
+      ? parsed.warnings.filter((warning): warning is string => typeof warning === 'string')
+      : [],
+  };
+}
+
+function collectionPolicy(run: ArchiveRunRow): CollectionPolicy {
+  const parsed = parseJson(run.collection_policy_json, { mode: 'COUNT' }) as CollectionPolicy;
+  return parsed.mode === 'ROLLING_WINDOW' ? parsed : { mode: 'COUNT' };
+}
+
+function windowCoverage(run: ArchiveRunRow): WindowCoverage {
+  const parsed = parseJson(run.window_coverage_json, {}) as Partial<WindowCoverage>;
+  return {
+    outsideWindow: parsed.outsideWindow ?? 0,
+    missingPublishedAt: parsed.missingPublishedAt ?? 0,
+    boundaryEvidenceRequired: parsed.boundaryEvidenceRequired ?? 0,
+    boundaryReached: parsed.boundaryReached ?? false,
+  };
+}
+
 async function selectRun(
   db: D1Database,
   userId: string,
   date: string | undefined,
-  timezone: string
+  timezone: string,
+  sourceTypes: ArchiveRunRow['source_type'][] = ['FOLLOWING']
 ): Promise<ArchiveRunRow | null> {
   const runs = await archiveRuns(db, userId);
-  if (!date) return runs[0] ?? null;
+  const eligible = runs.filter((run) => sourceTypes.includes(run.source_type ?? 'FOLLOWING'));
+  if (!date) return eligible[0] ?? null;
   return (
-    runs.find(
+    eligible.find(
       (run) => localDate(new Date(run.completed_at ?? run.started_at), timezone) === date
     ) ?? null
   );
@@ -211,6 +289,30 @@ async function postsForRun(
        JOIN x_authors a ON a.user_id = p.user_id AND a.author_key = p.author_key
        WHERE i.user_id = ? AND i.run_id = ?
        ORDER BY i.position ASC LIMIT ?`
+    )
+    .bind(userId, runId, MAX_RUN_POSTS)
+    .all<ArchivePostRow>();
+  return rows.results;
+}
+
+async function contextPostsForRun(
+  db: D1Database,
+  userId: string,
+  runId: string
+): Promise<ArchivePostRow[]> {
+  const rows = await db
+    .prepare(
+      `SELECT NULL AS position, c.observed_at, 'CONTEXT' AS presentation,
+        NULL AS reposted_by_json, p.tweet_id, p.url, p.text, p.published_at, p.lang,
+        p.kind, p.author_key, a.username, a.name AS author_name, a.profile_url,
+        a.profile_image_url, a.verified, p.media_json, p.links_json, p.metrics_json,
+        p.first_seen_at, p.last_seen_at
+       FROM x_timeline_run_context_posts c
+       JOIN x_posts p ON p.user_id = c.user_id AND p.tweet_id = c.tweet_id
+       JOIN x_authors a ON a.user_id = p.user_id AND a.author_key = p.author_key
+       WHERE c.user_id = ? AND c.run_id = ?
+       ORDER BY COALESCE(p.published_at, c.observed_at) ASC, p.tweet_id ASC
+       LIMIT ?`
     )
     .bind(userId, runId, MAX_RUN_POSTS)
     .all<ArchivePostRow>();
@@ -273,23 +375,43 @@ async function relationshipsForPosts(
 
 async function dailySources(
   db: D1Database,
-  userId: string
+  userId: string,
+  options: { runId?: string; referenceAt?: number } = {}
 ): Promise<{
   sources: DailySource[];
   authorsBySource: Map<string, Set<string>>;
   warning: string | null;
 }> {
   try {
+    const byRun = options.runId !== undefined;
     const rows = await db
       .prepare(
-        `SELECT s.source_id, s.source_type, s.name, s.is_selected, s.captured_at, m.author_key
-         FROM x_daily_sources s
-         LEFT JOIN x_daily_source_members m
-           ON m.user_id = s.user_id AND m.source_id = s.source_id
-         WHERE s.user_id = ? AND s.is_selected = 1
-         ORDER BY CASE s.source_type WHEN 'FAVORITES' THEN 0 ELSE 1 END, s.name`
+        byRun
+          ? `SELECT s.id AS snapshot_id, s.run_id, s.source_id, s.source_type, s.name,
+               s.is_selected, s.captured_at, s.status, s.failure_reason, s.supplied_count, s.resolved_count,
+               s.unresolved_usernames_json, m.author_key
+             FROM x_daily_source_snapshots s
+             LEFT JOIN x_daily_source_snapshot_members m
+               ON m.user_id = s.user_id AND m.snapshot_id = s.id
+             WHERE s.user_id = ? AND s.run_id = ? AND s.is_selected = 1
+             ORDER BY m.author_key`
+          : `WITH latest AS (
+               SELECT *, ROW_NUMBER() OVER (
+                 PARTITION BY source_id ORDER BY captured_at DESC, id DESC
+               ) AS source_rank
+               FROM x_daily_source_snapshots
+               WHERE user_id = ? AND is_selected = 1 AND captured_at <= ?
+             )
+             SELECT s.id AS snapshot_id, s.run_id, s.source_id, s.source_type, s.name,
+               s.is_selected, s.captured_at, s.status, s.failure_reason, s.supplied_count, s.resolved_count,
+               s.unresolved_usernames_json, m.author_key
+             FROM latest s
+             LEFT JOIN x_daily_source_snapshot_members m
+               ON m.user_id = s.user_id AND m.snapshot_id = s.id
+             WHERE s.source_rank = 1
+             ORDER BY CASE s.source_type WHEN 'FAVORITES' THEN 0 ELSE 1 END, s.name`
       )
-      .bind(userId)
+      .bind(userId, byRun ? options.runId : (options.referenceAt ?? Date.now()))
       .all<DailySourceRow>();
     const sourceMap = new Map<string, DailySource>();
     const authorsBySource = new Map<string, Set<string>>();
@@ -303,7 +425,12 @@ async function dailySources(
         name: row.name,
         selected: true,
         capturedAt: new Date(row.captured_at).toISOString(),
-        authorCount: authors.size,
+        authorCount: row.resolved_count,
+        status: row.status,
+        snapshotId: row.snapshot_id,
+        runId: row.run_id,
+        unresolvedCount: (parseJson(row.unresolved_usernames_json, []) as unknown[]).length,
+        failureReason: row.failure_reason,
       });
     }
     return { sources: [...sourceMap.values()], authorsBySource, warning: null };
@@ -332,8 +459,72 @@ function uniqueAuthors(posts: DailyPost[]): string[] {
   return [...new Set(posts.map((post) => post.author.username))];
 }
 
-function conversationGroups(posts: DailyPost[]) {
+function uniquePresentationAuthors(posts: DailyPost[]): string[] {
+  return [...new Set(posts.map((post) => post.repostedBy?.username ?? post.author.username))];
+}
+
+const TOPIC_STOP_WORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'also',
+  'because',
+  'before',
+  'being',
+  'from',
+  'have',
+  'into',
+  'just',
+  'more',
+  'that',
+  'their',
+  'there',
+  'these',
+  'they',
+  'this',
+  'those',
+  'through',
+  'what',
+  'when',
+  'where',
+  'which',
+  'while',
+  'with',
+  'would',
+  'your',
+  'https',
+  'http',
+]);
+
+function topicTokens(post: DailyPost): Set<string> {
+  const values = post.text.toLocaleLowerCase().match(/[#@]?[\p{L}\p{N}_-]{4,}/gu) ?? [];
+  return new Set(values.filter((value) => !TOPIC_STOP_WORDS.has(value)));
+}
+
+function sharedTopicTerms(leftTokens: Set<string>, rightTokens: Set<string>): string[] {
+  return [...leftTokens].filter((token) => rightTokens.has(token)).sort();
+}
+
+function dailyPostTimestamp(post: DailyPost): number {
+  return Date.parse(post.publishedAt ?? post.observedAt ?? '') || 0;
+}
+
+function conversationLatestActivity(posts: DailyPost[]): string | null {
+  const latest = Math.max(...posts.map(dailyPostTimestamp));
+  return latest > 0 ? new Date(latest).toISOString() : null;
+}
+
+function firstSourcePosition(posts: DailyPost[]): number {
+  return Math.min(...posts.map((post) => post.sourcePosition ?? Number.MAX_SAFE_INTEGER));
+}
+
+function conversationGroups(
+  posts: DailyPost[],
+  favoritePostIds = new Set(posts.map((post) => post.id)),
+  contextWarnings: string[] = []
+) {
   const postById = new Map(posts.map((post) => [post.id, post]));
+  const topicTokensByPost = new Map(posts.map((post) => [post.id, topicTokens(post)]));
   const parents = new Map(posts.map((post) => [post.id, post.id]));
   const find = (id: string): string => {
     const parent = parents.get(id) ?? id;
@@ -362,16 +553,31 @@ function conversationGroups(posts: DailyPost[]) {
 
   const candidates: Array<{
     id: string;
-    evidenceType: 'DIRECT_RELATIONSHIP' | 'SHARED_LINK';
+    evidenceType: 'DIRECT_RELATIONSHIP' | 'SHARED_LINK' | 'TOPIC_SIMILARITY';
     label: string;
     evidence: string;
     postIds: string[];
     authors: string[];
     relationshipTypes: string[];
+    favoritePostIds: string[];
+    contextPostIds: string[];
+    favoriteAuthors: string[];
+    latestActivityAt: string | null;
+    coverageWarnings: string[];
+    firstFavoritePosition: number;
   }> = [];
   for (const groupPosts of direct.values()) {
-    const authors = uniqueAuthors(groupPosts);
-    if (groupPosts.length < 2 || authors.length < 2) continue;
+    const orderedPosts = [...groupPosts].sort(
+      (left, right) => dailyPostTimestamp(left) - dailyPostTimestamp(right)
+    );
+    const selectedPosts = orderedPosts.slice(0, 8);
+    if (!selectedPosts.some((post) => favoritePostIds.has(post.id))) {
+      const favoriteAnchor = orderedPosts.find((post) => favoritePostIds.has(post.id));
+      if (favoriteAnchor) selectedPosts.splice(-1, 1, favoriteAnchor);
+    }
+    const authors = uniqueAuthors(selectedPosts);
+    const favoritePosts = selectedPosts.filter((post) => favoritePostIds.has(post.id));
+    if (groupPosts.length < 2 || favoritePosts.length === 0) continue;
     const relationshipTypes = [
       ...new Set(
         groupPosts.flatMap((post) =>
@@ -391,12 +597,20 @@ function conversationGroups(posts: DailyPost[]) {
         .slice(0, 3)
         .map((author) => `@${author}`)
         .join(', ')}`,
-      evidence: `${groupPosts.length} posts are connected by ${relationshipTypes
+      evidence: `${selectedPosts.length} posts are connected by ${relationshipTypes
         .map((type) => type.toLocaleLowerCase().replaceAll('_', ' '))
         .join(', ')} metadata.`,
-      postIds: groupPosts.slice(0, 4).map((post) => post.id),
+      postIds: selectedPosts.map((post) => post.id),
       authors,
       relationshipTypes,
+      favoritePostIds: favoritePosts.map((post) => post.id),
+      contextPostIds: selectedPosts
+        .filter((post) => !favoritePostIds.has(post.id))
+        .map((post) => post.id),
+      favoriteAuthors: uniquePresentationAuthors(favoritePosts),
+      latestActivityAt: conversationLatestActivity(selectedPosts),
+      coverageWarnings: contextWarnings,
+      firstFavoritePosition: firstSourcePosition(favoritePosts),
     });
   }
 
@@ -411,11 +625,18 @@ function conversationGroups(posts: DailyPost[]) {
     }
   }
   for (const [url, linkedPosts] of linkGroups) {
-    const uniquePosts = [...new Map(linkedPosts.map((post) => [post.id, post])).values()];
+    const uniquePosts = [...new Map(linkedPosts.map((post) => [post.id, post])).values()]
+      .filter((post) => !candidates.some((candidate) => candidate.postIds.includes(post.id)))
+      .sort(
+        (left, right) =>
+          firstSourcePosition([left]) - firstSourcePosition([right]) ||
+          dailyPostTimestamp(right) - dailyPostTimestamp(left)
+      )
+      .slice(0, 8);
     const authors = uniqueAuthors(uniquePosts);
-    if (uniquePosts.length < 2 || authors.length < 2) continue;
+    const favoritePosts = uniquePosts.filter((post) => favoritePostIds.has(post.id));
+    if (uniquePosts.length < 2 || authors.length < 2 || favoritePosts.length === 0) continue;
     const ids = uniquePosts.map((post) => post.id);
-    if (candidates.some((candidate) => ids.every((id) => candidate.postIds.includes(id)))) continue;
     let domain = url;
     try {
       domain = new URL(url).hostname.replace(/^www\./, '');
@@ -430,18 +651,72 @@ function conversationGroups(posts: DailyPost[]) {
       postIds: ids.slice(0, 4),
       authors,
       relationshipTypes: [],
+      favoritePostIds: favoritePosts.map((post) => post.id),
+      contextPostIds: uniquePosts
+        .filter((post) => !favoritePostIds.has(post.id))
+        .map((post) => post.id),
+      favoriteAuthors: uniquePresentationAuthors(favoritePosts),
+      latestActivityAt: conversationLatestActivity(uniquePosts),
+      coverageWarnings: [],
+      firstFavoritePosition: firstSourcePosition(favoritePosts),
+    });
+  }
+
+  const favoritePosts = posts.filter((post) => favoritePostIds.has(post.id));
+  for (let leftIndex = 0; leftIndex < favoritePosts.length; leftIndex++) {
+    const left = favoritePosts[leftIndex]!;
+    if (candidates.some((candidate) => candidate.postIds.includes(left.id))) continue;
+    const related = [left];
+    const evidenceTerms = new Set<string>();
+    for (let rightIndex = leftIndex + 1; rightIndex < favoritePosts.length; rightIndex++) {
+      const right = favoritePosts[rightIndex]!;
+      if (candidates.some((candidate) => candidate.postIds.includes(right.id))) continue;
+      const terms = sharedTopicTerms(
+        topicTokensByPost.get(left.id) ?? new Set(),
+        topicTokensByPost.get(right.id) ?? new Set()
+      );
+      const hasStrongMarker = terms.some((term) => term.startsWith('#') || term.startsWith('@'));
+      if (terms.length < 3 && !(hasStrongMarker && terms.length >= 2)) continue;
+      related.push(right);
+      terms.slice(0, 4).forEach((term) => evidenceTerms.add(term));
+      if (related.length === 4) break;
+    }
+    if (related.length < 2 || uniqueAuthors(related).length < 2) continue;
+    const terms = [...evidenceTerms].slice(0, 3);
+    candidates.push({
+      id: `topic:${related
+        .map((post) => post.id)
+        .sort()
+        .join(':')}`,
+      evidenceType: 'TOPIC_SIMILARITY',
+      label: `Shared topic · ${terms.join(' · ')}`,
+      evidence: `${related.length} Favorite posts share multiple explicit terms: ${terms.join(', ')}.`,
+      postIds: related.map((post) => post.id),
+      authors: uniqueAuthors(related),
+      relationshipTypes: [],
+      favoritePostIds: related.map((post) => post.id),
+      contextPostIds: [],
+      favoriteAuthors: uniquePresentationAuthors(related),
+      latestActivityAt: conversationLatestActivity(related),
+      coverageWarnings: [],
+      firstFavoritePosition: firstSourcePosition(related),
     });
   }
 
   return candidates
     .sort(
       (a, b) =>
-        (a.evidenceType === 'DIRECT_RELATIONSHIP' ? 0 : 1) -
-          (b.evidenceType === 'DIRECT_RELATIONSHIP' ? 0 : 1) ||
+        (({ DIRECT_RELATIONSHIP: 0, SHARED_LINK: 1, TOPIC_SIMILARITY: 2 })[a.evidenceType] ?? 3) -
+          ({ DIRECT_RELATIONSHIP: 0, SHARED_LINK: 1, TOPIC_SIMILARITY: 2 }[b.evidenceType] ?? 3) ||
+        b.favoriteAuthors.length - a.favoriteAuthors.length ||
+        b.favoritePostIds.length - a.favoritePostIds.length ||
         b.authors.length - a.authors.length ||
-        b.postIds.length - a.postIds.length
+        (Date.parse(b.latestActivityAt ?? '') || 0) - (Date.parse(a.latestActivityAt ?? '') || 0) ||
+        a.firstFavoritePosition - b.firstFavoritePosition ||
+        a.id.localeCompare(b.id)
     )
-    .slice(0, 3);
+    .slice(0, 3)
+    .map(({ firstFavoritePosition: _firstFavoritePosition, ...conversation }) => conversation);
 }
 
 export async function getDailyFeed(
@@ -452,11 +727,24 @@ export async function getDailyFeed(
   const timezone = options.timezone ?? DEFAULT_TIMEZONE;
   const now = options.now ?? new Date();
   const expectedDate = localDate(now, timezone);
-  const run = await selectRun(db, userId, options.date, timezone);
-  if (!run) {
+  const requestedDate = options.date ?? expectedDate;
+  let favoritesRun = await selectRun(db, userId, requestedDate, timezone, ['FAVORITES', 'LIST']);
+  let followingRun = await selectRun(db, userId, requestedDate, timezone, ['FOLLOWING']);
+  if (!options.date && !favoritesRun && !followingRun) {
+    favoritesRun = await selectRun(db, userId, undefined, timezone, ['FAVORITES', 'LIST']);
+    const fallbackDate = favoritesRun
+      ? localDate(new Date(favoritesRun.completed_at ?? favoritesRun.started_at), timezone)
+      : undefined;
+    followingRun = await selectRun(db, userId, fallbackDate, timezone, ['FOLLOWING']);
+    if (!favoritesRun && !followingRun) {
+      followingRun = await selectRun(db, userId, undefined, timezone, ['FOLLOWING']);
+    }
+  }
+  const primaryRun = favoritesRun ?? followingRun;
+  if (!primaryRun) {
     return {
       schemaVersion: 1,
-      variant: { id: 'people-first-v1', mode: 'REVIEW' as const },
+      variant: { id: 'people-first-v2', mode: 'REVIEW' as const },
       date: options.date ?? expectedDate,
       timezone,
       frozenAt: null,
@@ -473,88 +761,217 @@ export async function getDailyFeed(
       sources: [] as DailySource[],
       conversations: [] as ReturnType<typeof conversationGroups>,
       posts: [] as DailyPost[],
+      sections: { favoritePostIds: [], followingPostIds: [] },
+      inputs: { favorites: null, following: null, membership: null },
     };
   }
 
-  const frozenAt = new Date(run.completed_at ?? run.started_at);
+  const frozenAt = new Date(primaryRun.completed_at ?? primaryRun.started_at);
   const date = localDate(frozenAt, timezone);
-  const archivePosts = await postsForRun(db, userId, run.id);
+  const favoritePolicy = favoritesRun ? collectionPolicy(favoritesRun) : null;
+  const favoriteCutoff = favoritesRun
+    ? Date.parse(
+        favoritePolicy?.mode === 'ROLLING_WINDOW'
+          ? favoritePolicy.cutoffAt
+          : new Date(favoritesRun.started_at - 24 * 60 * 60 * 1_000).toISOString()
+      )
+    : null;
+  const rawFavoriteRows = favoritesRun ? await postsForRun(db, userId, favoritesRun.id) : [];
+  const favoriteRows = rawFavoriteRows.filter(
+    (row) =>
+      (favoritePolicy?.mode === 'ROLLING_WINDOW' && row.presentation === 'REPOST') ||
+      (row.published_at !== null && favoriteCutoff !== null && row.published_at >= favoriteCutoff)
+  );
+  const favoriteRowsWithoutTimestamp = rawFavoriteRows.filter(
+    (row) =>
+      row.published_at === null &&
+      !(favoritePolicy?.mode === 'ROLLING_WINDOW' && row.presentation === 'REPOST')
+  ).length;
+  const favoriteRowsOutsideWindow =
+    rawFavoriteRows.length - favoriteRows.length - favoriteRowsWithoutTimestamp;
+  const favoriteRepostsUsingTimelinePosition = favoriteRows.filter(
+    (row) =>
+      row.presentation === 'REPOST' &&
+      favoriteCutoff !== null &&
+      row.published_at !== null &&
+      row.published_at < favoriteCutoff
+  ).length;
+  const followingRows = followingRun ? await postsForRun(db, userId, followingRun.id) : [];
+  const contextRows = [
+    ...(favoritesRun ? await contextPostsForRun(db, userId, favoritesRun.id) : []),
+    ...(followingRun ? await contextPostsForRun(db, userId, followingRun.id) : []),
+  ];
+  const primaryRows = [
+    ...favoriteRows,
+    ...followingRows.filter(
+      (row) => !favoriteRows.some((favorite) => favorite.tweet_id === row.tweet_id)
+    ),
+  ];
+  const primaryIds = new Set(primaryRows.map((row) => row.tweet_id));
+  const uniqueContextRows = [
+    ...new Map(
+      contextRows.filter((row) => !primaryIds.has(row.tweet_id)).map((row) => [row.tweet_id, row])
+    ).values(),
+  ];
+  const archivePosts = [...primaryRows, ...uniqueContextRows];
   const relationships = await relationshipsForPosts(
     db,
     userId,
     archivePosts.map((post) => post.tweet_id)
   );
-  const sourceResult = await dailySources(db, userId);
-  let sources = sourceResult.sources;
-  let selectionStatus: 'COMPLETE' | 'STALE' | 'FALLBACK' | 'MISSING' =
-    sources.length > 0 ? 'COMPLETE' : 'MISSING';
-  let selectedRows = archivePosts
-    .map((row) => ({
-      row,
-      sourceIds: sourceIdsForAuthor(row.author_key, sources, sourceResult.authorsBySource),
-    }))
-    .filter((entry) => entry.sourceIds.length > 0);
+  const sourceResult = await dailySources(db, userId, {
+    runId: favoritesRun?.id,
+    referenceAt: frozenAt.getTime(),
+  });
   const warnings: string[] = [];
   if (sourceResult.warning) warnings.push(sourceResult.warning);
-  if (sources.length === 0 || selectedRows.length === 0) {
-    selectionStatus = 'FALLBACK';
-    sources = [
-      {
-        id: 'following-fallback',
-        type: 'FOLLOWING_FALLBACK',
-        name: 'Following',
-        selected: true,
-        capturedAt: frozenAt.toISOString(),
-        authorCount: new Set(archivePosts.map((post) => post.author_key)).size,
-      },
-    ];
-    selectedRows = archivePosts.map((row) => ({ row, sourceIds: ['following-fallback'] }));
+  if (favoritesRun && favoritePolicy?.mode !== 'ROLLING_WINDOW') {
     warnings.push(
-      sourceResult.sources.length === 0
-        ? 'Favorite and selected-list membership has not been captured; showing the frozen Following run.'
-        : 'No posts in the frozen run matched the selected Favorite/list sources; showing Following as an explicit fallback.'
+      'This Favorites run used a legacy count target; Daily View defensively limited it to the 24 hours before capture.'
+    );
+  }
+  if (favoriteRowsOutsideWindow > 0) {
+    warnings.push(
+      `${favoriteRowsOutsideWindow} Favorites post${favoriteRowsOutsideWindow === 1 ? ' was' : 's were'} outside the rolling 24-hour window and excluded.`
+    );
+  }
+  if (favoriteRowsWithoutTimestamp > 0) {
+    warnings.push(
+      `${favoriteRowsWithoutTimestamp} Favorites post${favoriteRowsWithoutTimestamp === 1 ? ' has' : 's have'} no publication timestamp and ${favoriteRowsWithoutTimestamp === 1 ? 'was' : 'were'} excluded.`
+    );
+  }
+  if (favoriteRepostsUsingTimelinePosition > 0) {
+    warnings.push(
+      `${favoriteRepostsUsingTimelinePosition} recent Favorite repost${favoriteRepostsUsingTimelinePosition === 1 ? '' : 's'} ${favoriteRepostsUsingTimelinePosition === 1 ? 'contains' : 'contain'} older original material; rolling-window inclusion follows the verified list activity order.`
+    );
+  }
+  const membershipSource = favoritesRun
+    ? (sourceResult.sources.find((source) => source.id === favoritesRun.source_id) ??
+      sourceResult.sources.find((source) => source.type === 'FAVORITES'))
+    : null;
+  let selectionStatus: 'COMPLETE' | 'STALE' | 'FALLBACK' | 'MISSING';
+  if (!favoritesRun) {
+    selectionStatus = 'FALLBACK';
+    warnings.push(
+      'No frozen Favorites list run is available; showing Following as an explicit fallback.'
+    );
+  } else if (!membershipSource) {
+    selectionStatus = 'MISSING';
+    warnings.push(
+      'The Favorites timeline was captured, but its membership snapshot is unavailable.'
     );
   } else if (
-    sources.some(
-      (source) => source.capturedAt && localDate(new Date(source.capturedAt), timezone) !== date
-    )
+    membershipSource.status !== 'COMPLETE' ||
+    (membershipSource.capturedAt &&
+      localDate(new Date(membershipSource.capturedAt), timezone) !== date)
   ) {
     selectionStatus = 'STALE';
     warnings.push(
-      'Favorite/list membership was captured on a different day than the frozen post run.'
+      membershipSource.status !== 'COMPLETE'
+        ? 'Favorites membership capture is partial.'
+        : 'Favorites membership was captured on a different day than the frozen post run.'
+    );
+  } else {
+    selectionStatus = 'COMPLETE';
+  }
+  if (membershipSource?.failureReason) warnings.push(membershipSource.failureReason);
+  const unresolvedMembershipCount = membershipSource?.unresolvedCount ?? 0;
+  if (unresolvedMembershipCount > 0) {
+    warnings.push(
+      `Favorites membership has ${unresolvedMembershipCount} unresolved username${unresolvedMembershipCount === 1 ? '' : 's'}.`
     );
   }
 
-  const sourceRank = new Map(
-    sources.map((source, index) => [source.id, source.type === 'FAVORITES' ? -1 : index])
+  const favoriteSourceId = favoritesRun?.source_id ?? 'favorites';
+  const followingSourceId = favoritesRun ? 'following' : 'following-fallback';
+  const favoritePosts = favoriteRows.map((row) =>
+    publicPost(row, [favoriteSourceId], relationships.get(row.tweet_id) ?? [])
   );
-  selectedRows.sort(
-    (a, b) =>
-      Math.min(...a.sourceIds.map((id) => sourceRank.get(id) ?? 100)) -
-        Math.min(...b.sourceIds.map((id) => sourceRank.get(id) ?? 100)) ||
-      (a.row.position ?? 10_000) - (b.row.position ?? 10_000)
+  const favoritePostIds = new Set(favoritePosts.map((post) => post.id));
+  const followingPosts = followingRows
+    .filter((row) => !favoritePostIds.has(row.tweet_id))
+    .map((row) => publicPost(row, [followingSourceId], relationships.get(row.tweet_id) ?? []));
+  const contextPosts = uniqueContextRows.map((row) =>
+    publicPost(row, [], relationships.get(row.tweet_id) ?? [])
   );
-  const posts = selectedRows.map(({ row, sourceIds }) =>
-    publicPost(row, sourceIds, relationships.get(row.tweet_id) ?? [])
-  );
-  const archiveComplete = run.status === 'COMPLETE' && run.collected_count >= run.requested_count;
-  if (!archiveComplete) {
+  const posts = [...favoritePosts, ...followingPosts, ...contextPosts];
+  const favoriteContextCoverage = favoritesRun ? contextCoverage(favoritesRun) : null;
+  const favoriteWindowCoverage = favoritesRun ? windowCoverage(favoritesRun) : null;
+  const contextWarnings: string[] = [];
+  const missingWindowTimestampCount = favoriteWindowCoverage?.missingPublishedAt ?? 0;
+  if (missingWindowTimestampCount > 0) {
     warnings.push(
-      `X run ${run.id} is ${run.status.toLocaleLowerCase()} (${run.collected_count}/${run.requested_count} requested posts).`
+      `${missingWindowTimestampCount} Favorites timeline item${missingWindowTimestampCount === 1 ? '' : 's'} could not be classified into the rolling window because publication timestamps were missing.`
     );
   }
-  if (run.failure_reason) warnings.push(run.failure_reason);
+  if (favoritesRun?.termination_reason === 'SAFETY_LIMIT_REACHED') {
+    warnings.push(
+      `Favorites collection hit its ${favoritesRun.requested_count}-post safety guard before reaching the 24-hour boundary.`
+    );
+  }
+  if (favoriteContextCoverage?.truncated) {
+    contextWarnings.push(
+      `${favoriteContextCoverage.truncated} Favorite thread expansion${favoriteContextCoverage.truncated === 1 ? ' was' : 's were'} truncated.`
+    );
+  }
+  if (favoriteContextCoverage?.failed) {
+    contextWarnings.push(
+      `${favoriteContextCoverage.failed} Favorite thread expansion${favoriteContextCoverage.failed === 1 ? '' : 's'} failed.`
+    );
+  }
+  contextWarnings.push(...(favoriteContextCoverage?.warnings ?? []));
+  const conversations = conversationGroups(posts, favoritePostIds, contextWarnings);
+  const conversationPostIds = new Set(
+    conversations.flatMap((conversation) => conversation.postIds)
+  );
+  const favoriteUngroupedIds = favoritePosts
+    .filter((post) => !conversationPostIds.has(post.id))
+    .map((post) => post.id);
+  const followingSectionIds = followingPosts
+    .filter((post) => !conversationPostIds.has(post.id))
+    .map((post) => post.id);
+  const runComplete = (run: ArchiveRunRow | null) => {
+    if (!run) return true;
+    const policy = collectionPolicy(run);
+    if (policy.mode === 'ROLLING_WINDOW') {
+      const coverage = windowCoverage(run);
+      return (
+        run.status === 'COMPLETE' &&
+        run.termination_reason === 'WINDOW_BOUNDARY_REACHED' &&
+        coverage.boundaryReached &&
+        coverage.missingPublishedAt === 0
+      );
+    }
+    return run.status === 'COMPLETE' && run.collected_count >= run.requested_count;
+  };
+  const archiveComplete = runComplete(favoritesRun) && runComplete(followingRun);
+  const contextComplete =
+    !favoriteContextCoverage ||
+    (favoriteContextCoverage.truncated === 0 && favoriteContextCoverage.failed === 0);
+  const membershipComplete = selectionStatus === 'COMPLETE' && unresolvedMembershipCount === 0;
+  warnings.push(...contextWarnings);
+  for (const run of [favoritesRun, followingRun].filter(Boolean) as ArchiveRunRow[]) {
+    if (!runComplete(run)) {
+      const policy = collectionPolicy(run);
+      warnings.push(
+        policy.mode === 'ROLLING_WINDOW'
+          ? `X ${run.source_name} run ${run.id} did not prove complete ${policy.windowHours}-hour coverage (${run.termination_reason.toLocaleLowerCase()}).`
+          : `X ${run.source_name} run ${run.id} is ${run.status.toLocaleLowerCase()} (${run.collected_count}/${run.requested_count} requested posts).`
+      );
+    }
+    if (run.failure_reason) warnings.push(run.failure_reason);
+  }
   if (date !== expectedDate) {
     warnings.push(`Frozen review data is from ${date}; the current local date is ${expectedDate}.`);
   }
   const status =
-    archiveComplete && selectionStatus === 'COMPLETE'
+    archiveComplete && contextComplete && favoritesRun && membershipComplete
       ? ('COMPLETE' as const)
       : ('PARTIAL' as const);
 
   return {
     schemaVersion: 1,
-    variant: { id: 'people-first-v1', mode: 'REVIEW' as const },
+    variant: { id: 'people-first-v2', mode: 'REVIEW' as const },
     date,
     timezone,
     frozenAt: frozenAt.toISOString(),
@@ -563,17 +980,110 @@ export async function getDailyFeed(
       status,
       archiveStatus: archiveComplete ? ('COMPLETE' as const) : ('PARTIAL' as const),
       selectionStatus,
-      runId: run.id,
-      requestedCount: run.requested_count,
-      collectedCount: run.collected_count,
+      runId: primaryRun.id,
+      requestedCount: primaryRun.requested_count,
+      collectedCount: primaryRun.collected_count,
       message:
         status === 'COMPLETE'
-          ? 'Frozen archive coverage and Favorite/list membership are complete for this review slice.'
+          ? `Frozen Favorites from the last ${favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritePolicy.windowHours : 24} hours, Following, and membership coverage are complete for this review slice.`
           : 'This review slice is usable with the coverage limits shown above.',
+      collectionMode: favoritePolicy?.mode ?? 'COUNT',
+      windowHours: favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritePolicy.windowHours : null,
+      safetyLimit: favoritePolicy?.mode === 'ROLLING_WINDOW' ? favoritesRun?.requested_count : null,
+      terminationReason:
+        favoritesRun?.termination_reason ?? followingRun?.termination_reason ?? null,
     },
-    sources,
-    conversations: conversationGroups(posts),
+    sources: [
+      ...(favoritesRun
+        ? [
+            membershipSource ?? {
+              id: favoriteSourceId,
+              type: favoritesRun.source_type as 'FAVORITES' | 'LIST',
+              name: favoritesRun.source_name,
+              selected: true,
+              capturedAt: favoritesRun.completed_at
+                ? new Date(favoritesRun.completed_at).toISOString()
+                : null,
+              authorCount: new Set(favoriteRows.map((row) => row.author_key)).size,
+              status: 'PARTIAL' as const,
+              snapshotId: null,
+              runId: favoritesRun.id,
+              unresolvedCount: 0,
+              failureReason: 'membership_snapshot_unavailable',
+            },
+          ]
+        : []),
+      ...(followingRun
+        ? [
+            {
+              id: followingSourceId,
+              type: favoritesRun ? ('FOLLOWING' as const) : ('FOLLOWING_FALLBACK' as const),
+              name: 'Following',
+              selected: true,
+              capturedAt: followingRun.completed_at
+                ? new Date(followingRun.completed_at).toISOString()
+                : null,
+              authorCount: new Set(followingRows.map((row) => row.author_key)).size,
+            },
+          ]
+        : []),
+    ],
+    conversations,
     posts,
+    sections: {
+      favoritePostIds: favoriteUngroupedIds,
+      followingPostIds: followingSectionIds,
+    },
+    inputs: {
+      favorites: favoritesRun
+        ? {
+            runId: favoritesRun.id,
+            sourceId: favoritesRun.source_id,
+            sourceName: favoritesRun.source_name,
+            sourceUrl: favoritesRun.source_url,
+            status: favoritesRun.status,
+            requestedCount: favoritesRun.requested_count,
+            collectedCount: favoritesRun.collected_count,
+            collectionPolicy: favoritePolicy,
+            terminationReason: favoritesRun.termination_reason,
+            windowCoverage: favoriteWindowCoverage,
+            contextCoverage: favoriteContextCoverage,
+            frozenAt: favoritesRun.completed_at
+              ? new Date(favoritesRun.completed_at).toISOString()
+              : null,
+          }
+        : null,
+      following: followingRun
+        ? {
+            runId: followingRun.id,
+            sourceId: followingRun.source_id,
+            sourceName: followingRun.source_name,
+            sourceUrl: followingRun.source_url,
+            status: followingRun.status,
+            requestedCount: followingRun.requested_count,
+            collectedCount: followingRun.collected_count,
+            collectionPolicy: collectionPolicy(followingRun),
+            terminationReason: followingRun.termination_reason,
+            windowCoverage: windowCoverage(followingRun),
+            contextCoverage: contextCoverage(followingRun),
+            frozenAt: followingRun.completed_at
+              ? new Date(followingRun.completed_at).toISOString()
+              : null,
+          }
+        : null,
+      membership: membershipSource
+        ? {
+            snapshotId: membershipSource.snapshotId ?? null,
+            runId: membershipSource.runId ?? favoritesRun?.id ?? null,
+            sourceId: membershipSource.id,
+            capturedAt: membershipSource.capturedAt,
+            status: membershipSource.status ?? 'PARTIAL',
+            resolvedCount: membershipSource.authorCount,
+            unresolvedCount: membershipSource.unresolvedCount ?? 0,
+            failureReason: membershipSource.failureReason ?? null,
+          }
+        : null,
+    },
   };
 }
 
@@ -622,7 +1132,14 @@ export async function getDailyAuthorActivity(
     userId,
     rows.map((row) => row.tweet_id)
   );
-  const sourceResult = await dailySources(db, userId);
+  const activityFavoritesRun = await selectRun(db, userId, options.date, timezone, [
+    'FAVORITES',
+    'LIST',
+  ]);
+  const sourceResult = await dailySources(db, userId, {
+    runId: activityFavoritesRun?.id,
+    referenceAt: Date.parse(`${options.date}T23:59:59.999Z`),
+  });
   const posts = rows.map((row) =>
     publicPost(
       row,
@@ -637,7 +1154,7 @@ export async function getDailyAuthorActivity(
     return runDate >= startDate && runDate <= options.date;
   });
   const warnings = [
-    'Shows every post available in the X Following archive, which is a sampled timeline rather than a complete author export.',
+    'Shows every post available in the frozen Favorites and Following archives, which are sampled timelines rather than a complete author export.',
   ];
   if (sourceResult.warning) warnings.push(sourceResult.warning);
   if (relevantRuns.some((run) => run.status !== 'COMPLETE')) {
@@ -646,7 +1163,7 @@ export async function getDailyAuthorActivity(
 
   return {
     schemaVersion: 1,
-    variant: { id: 'people-first-v1', mode: 'REVIEW' as const },
+    variant: { id: 'people-first-v2', mode: 'REVIEW' as const },
     date: options.date,
     range: options.range,
     startDate,

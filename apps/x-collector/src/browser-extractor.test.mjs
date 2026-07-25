@@ -4,6 +4,7 @@ import { extractVisibleTimelineBatch } from './browser-extractor.mjs';
 
 afterEach(() => {
   delete globalThis.document;
+  delete globalThis.location;
 });
 
 describe('X browser extractor', () => {
@@ -94,5 +95,30 @@ describe('X browser extractor', () => {
     const repeated = extractVisibleTimelineBatch(result.adKeys);
     expect(repeated.excludedAds).toBe(0);
     expect(repeated.adKeys).toEqual([]);
+  });
+
+  it('captures reply ancestry when extracting a focused thread', () => {
+    const { document } = parseHTML(`
+      <article data-testid="tweet">
+        <div data-testid="User-Name"><span>Parent</span><span>@parent</span><a href="/parent"></a></div>
+        <a href="/parent/status/400"><time datetime="2026-07-11T12:00:00.000Z"></time></a>
+        <div data-testid="tweetText">Parent post</div>
+      </article>
+      <article data-testid="tweet">
+        <div data-testid="User-Name"><span>Reply</span><span>@reply</span><a href="/reply"></a></div>
+        <a href="/reply/status/401"><time datetime="2026-07-11T12:01:00.000Z"></time></a>
+        <div>Replying to @parent</div>
+        <div data-testid="tweetText">Reply post</div>
+      </article>
+    `);
+    globalThis.document = document;
+    globalThis.location = { pathname: '/reply/status/401' };
+
+    const result = extractVisibleTimelineBatch();
+    expect(result.posts[1]).toMatchObject({
+      tweetId: '401',
+      kind: 'REPLY',
+      relationships: [{ type: 'REPLY_TO', tweetId: '400' }],
+    });
   });
 });

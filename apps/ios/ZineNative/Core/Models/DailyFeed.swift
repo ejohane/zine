@@ -11,6 +11,8 @@ struct DailyFeedResponse: Decodable, Hashable {
     let sources: [DailyFeedSource]
     let conversations: [DailyConversation]
     let posts: [DailyPost]
+    let sections: DailyFeedSections?
+    let inputs: DailyFeedInputs?
     let requestId: String
     let traceId: String
 }
@@ -51,12 +53,17 @@ struct DailyFeedCoverage: Decodable, Hashable {
     let requestedCount: Int
     let collectedCount: Int
     let message: String
+    let collectionMode: String?
+    let windowHours: Int?
+    let safetyLimit: Int?
+    let terminationReason: String?
 }
 
 struct DailyFeedSource: Decodable, Hashable, Identifiable {
     enum SourceType: String, Decodable, Hashable {
         case favorites = "FAVORITES"
         case list = "LIST"
+        case following = "FOLLOWING"
         case followingFallback = "FOLLOWING_FALLBACK"
     }
 
@@ -66,12 +73,18 @@ struct DailyFeedSource: Decodable, Hashable, Identifiable {
     let selected: Bool
     let capturedAt: String?
     let authorCount: Int
+    let status: DailyCoverageStatus?
+    let snapshotId: String?
+    let runId: String?
+    let unresolvedCount: Int?
+    let failureReason: String?
 }
 
 struct DailyConversation: Decodable, Hashable, Identifiable {
     enum EvidenceType: String, Decodable, Hashable {
         case directRelationship = "DIRECT_RELATIONSHIP"
         case sharedLink = "SHARED_LINK"
+        case topicSimilarity = "TOPIC_SIMILARITY"
     }
 
     let id: String
@@ -81,6 +94,71 @@ struct DailyConversation: Decodable, Hashable, Identifiable {
     let postIds: [String]
     let authors: [String]
     let relationshipTypes: [String]
+    let favoritePostIds: [String]?
+    let contextPostIds: [String]?
+    let favoriteAuthors: [String]?
+    let latestActivityAt: String?
+    let coverageWarnings: [String]?
+}
+
+struct DailyFeedSections: Decodable, Hashable {
+    let favoritePostIds: [String]
+    let followingPostIds: [String]
+}
+
+struct DailyFeedInputs: Decodable, Hashable {
+    let favorites: DailyFeedInputRun?
+    let following: DailyFeedInputRun?
+    let membership: DailyFeedMembershipInput?
+}
+
+struct DailyFeedInputRun: Decodable, Hashable {
+    let runId: String
+    let sourceId: String
+    let sourceName: String
+    let sourceUrl: String?
+    let status: String
+    let requestedCount: Int
+    let collectedCount: Int
+    let collectionPolicy: DailyCollectionPolicy?
+    let terminationReason: String?
+    let windowCoverage: DailyWindowCoverage?
+    let contextCoverage: DailyContextCoverage?
+    let frozenAt: String?
+}
+
+struct DailyCollectionPolicy: Decodable, Hashable {
+    let mode: String
+    let windowHours: Int?
+    let cutoffAt: String?
+    let boundaryEvidenceRequired: Int?
+}
+
+struct DailyWindowCoverage: Decodable, Hashable {
+    let outsideWindow: Int
+    let missingPublishedAt: Int
+    let boundaryEvidenceRequired: Int
+    let boundaryReached: Bool
+}
+
+struct DailyContextCoverage: Decodable, Hashable {
+    let budget: Int
+    let attempted: Int
+    let completed: Int
+    let truncated: Int
+    let failed: Int
+    let warnings: [String]
+}
+
+struct DailyFeedMembershipInput: Decodable, Hashable {
+    let snapshotId: String?
+    let runId: String?
+    let sourceId: String
+    let capturedAt: String?
+    let status: DailyCoverageStatus
+    let resolvedCount: Int
+    let unresolvedCount: Int
+    let failureReason: String?
 }
 
 struct DailyPost: Decodable, Hashable, Identifiable {
@@ -98,6 +176,7 @@ struct DailyPost: Decodable, Hashable, Identifiable {
     let presentation: String
     let repostedBy: DailyAuthor?
     let sourceIds: [String]
+    let sourcePosition: Int?
 
     var postURL: URL? { URL(string: url) }
 

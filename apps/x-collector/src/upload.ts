@@ -23,6 +23,18 @@ export type UploadResult = {
   run: unknown;
 };
 
+export type DailySourceSnapshotInput = {
+  runId: string;
+  sourceId: string;
+  sourceType: 'FAVORITES' | 'LIST';
+  name: string;
+  selected: boolean;
+  capturedAt: string;
+  status: 'COMPLETE' | 'PARTIAL';
+  failureReason?: string | null;
+  usernames: string[];
+};
+
 type Chunk = { posts: XPost[]; items: XTimelineItem[] };
 
 export function buildUploadChunks(capture: XTimelineCapture, requestedChunkSize = 25): Chunk[] {
@@ -100,6 +112,8 @@ export async function uploadCapture(
         requestedCount: capture.requestedCount,
         startedAt: capture.startedAt,
         collectorVersion: capture.collectorVersion,
+        source: capture.source,
+        collectionPolicy: capture.collectionPolicy,
       }),
     },
     fetchImpl
@@ -133,6 +147,9 @@ export async function uploadCapture(
         excludedAds: capture.excludedAds,
         status: capture.status,
         failureReason: capture.failureReason ?? null,
+        contextCoverage: capture.contextCoverage,
+        windowCoverage: capture.windowCoverage,
+        terminationReason: capture.terminationReason,
       }),
     },
     fetchImpl
@@ -165,4 +182,32 @@ export async function uploadCapture(
     verified,
     run: completed.run ?? create.run,
   };
+}
+
+export async function uploadDailySourceSnapshot(
+  input: DailySourceSnapshotInput,
+  options: Pick<UploadOptions, 'apiUrl' | 'token' | 'fetchImpl'>
+): Promise<unknown> {
+  const apiUrl = options.apiUrl.replace(/\/$/, '');
+  return requestJson(
+    `${apiUrl}/api/v1/x-timeline/daily-sources/${encodeURIComponent(input.sourceId)}`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${options.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        runId: input.runId,
+        sourceType: input.sourceType,
+        name: input.name,
+        selected: input.selected,
+        capturedAt: input.capturedAt,
+        status: input.status,
+        failureReason: input.failureReason ?? null,
+        usernames: input.usernames,
+      }),
+    },
+    options.fetchImpl ?? fetch
+  );
 }

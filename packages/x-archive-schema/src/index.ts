@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const X_ARCHIVE_SCHEMA_VERSION = 2;
+export const X_ARCHIVE_SCHEMA_VERSION = 3;
 export const X_ARCHIVE_MAX_TIMELINE_ITEMS_PER_CHUNK = 25;
 export const X_ARCHIVE_MAX_POSTS_PER_CHUNK = 75;
 
@@ -15,6 +15,75 @@ const OptionalHttpUrlSchema = HttpUrlSchema.nullable().optional();
 
 export const XPostKindSchema = z.enum(['POST', 'REPLY', 'REPOST', 'QUOTE']);
 export type XPostKind = z.infer<typeof XPostKindSchema>;
+
+export const XTimelineSourceTypeSchema = z.enum(['FOLLOWING', 'FAVORITES', 'LIST']);
+export type XTimelineSourceType = z.infer<typeof XTimelineSourceTypeSchema>;
+
+export const XTimelineSourceSchema = z
+  .object({
+    type: XTimelineSourceTypeSchema.default('FOLLOWING'),
+    id: z.string().trim().min(1).max(120).default('following'),
+    name: z.string().trim().min(1).max(160).default('Following'),
+    url: HttpUrlSchema.nullable().optional(),
+  })
+  .strict();
+export type XTimelineSource = z.infer<typeof XTimelineSourceSchema>;
+
+export const XCollectionPolicySchema = z.discriminatedUnion('mode', [
+  z
+    .object({
+      mode: z.literal('COUNT'),
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal('ROLLING_WINDOW'),
+      windowHours: z.number().int().positive().max(168),
+      cutoffAt: z.string().datetime(),
+      boundaryEvidenceRequired: z.number().int().positive().max(20).default(3),
+    })
+    .strict(),
+]);
+export type XCollectionPolicy = z.infer<typeof XCollectionPolicySchema>;
+
+export const XCollectionTerminationReasonSchema = z.enum([
+  'COUNT_REACHED',
+  'WINDOW_BOUNDARY_REACHED',
+  'SAFETY_LIMIT_REACHED',
+  'TIMELINE_STALLED',
+  'COLLECTOR_FAILED',
+]);
+export type XCollectionTerminationReason = z.infer<typeof XCollectionTerminationReasonSchema>;
+
+export const XContextCoverageSchema = z
+  .object({
+    budget: z.number().int().nonnegative().default(0),
+    attempted: z.number().int().nonnegative().default(0),
+    completed: z.number().int().nonnegative().default(0),
+    truncated: z.number().int().nonnegative().default(0),
+    failed: z.number().int().nonnegative().default(0),
+    warnings: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+  })
+  .strict()
+  .superRefine((coverage, ctx) => {
+    if (coverage.completed + coverage.truncated + coverage.failed !== coverage.attempted) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Context outcome counts must equal attempted expansions',
+      });
+    }
+  });
+export type XContextCoverage = z.infer<typeof XContextCoverageSchema>;
+
+export const XWindowCoverageSchema = z
+  .object({
+    outsideWindow: z.number().int().nonnegative().default(0),
+    missingPublishedAt: z.number().int().nonnegative().default(0),
+    boundaryEvidenceRequired: z.number().int().nonnegative().default(0),
+    boundaryReached: z.boolean().default(false),
+  })
+  .strict();
+export type XWindowCoverage = z.infer<typeof XWindowCoverageSchema>;
 
 export const XPostRelationshipTypeSchema = z.enum(['REPLY_TO', 'REPOST_OF', 'QUOTE_OF']);
 export type XPostRelationshipType = z.infer<typeof XPostRelationshipTypeSchema>;
@@ -141,14 +210,63 @@ export const XTimelineCaptureSchema = z
     startedAt: z.string().datetime(),
     completedAt: z.string().datetime().nullable().optional(),
     collectorVersion: z.string().min(1).max(80),
+    source: XTimelineSourceSchema.default({
+      type: 'FOLLOWING',
+      id: 'following',
+      name: 'Following',
+    }),
+    collectionPolicy: XCollectionPolicySchema.default({ mode: 'COUNT' }),
+    terminationReason: XCollectionTerminationReasonSchema.default('COUNT_REACHED'),
     excludedAds: z.number().int().nonnegative().default(0),
     status: z.enum(['COMPLETE', 'PARTIAL']).default('COMPLETE'),
     failureReason: z.string().max(2_000).nullable().optional(),
+    contextCoverage: XContextCoverageSchema.default({}),
+    windowCoverage: XWindowCoverageSchema.default({}),
     posts: z.array(XPostSchema),
     items: z.array(XTimelineItemSchema),
   })
   .strict()
   .superRefine((capture, ctx) => {
+    if (capture.collectionPolicy.mode === 'ROLLING_WINDOW' && capture.source.type === 'FOLLOWING') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['collectionPolicy'],
+        message: 'Rolling-window collection is only supported for configured X lists',
+      });
+    }
+    if (
+      capture.collectionPolicy.mode === 'ROLLING_WINDOW' &&
+      capture.status === 'COMPLETE' &&
+      capture.terminationReason !== 'WINDOW_BOUNDARY_REACHED'
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['terminationReason'],
+        message: 'A complete rolling-window run must reach the window boundary',
+      });
+    }
+    if (
+      capture.collectionPolicy.mode === 'ROLLING_WINDOW' &&
+      capture.status === 'COMPLETE' &&
+      (!capture.windowCoverage.boundaryReached || capture.windowCoverage.missingPublishedAt > 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['windowCoverage'],
+        message: 'A complete rolling-window run needs boundary evidence and no missing timestamps',
+      });
+    }
+    if (
+      capture.collectionPolicy.mode === 'COUNT' &&
+      capture.status === 'COMPLETE' &&
+      capture.terminationReason !== 'COUNT_REACHED'
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['terminationReason'],
+        message: 'A complete count-bounded run must reach its count target',
+      });
+    }
     const postIds = new Set(capture.posts.map((post) => post.tweetId));
     const itemIds = new Set<string>();
     const positions = new Set<number>();
@@ -183,6 +301,12 @@ export const CreateXTimelineRunSchema = z
     requestedCount: z.number().int().positive().max(100_000),
     startedAt: z.string().datetime(),
     collectorVersion: z.string().min(1).max(80),
+    source: XTimelineSourceSchema.default({
+      type: 'FOLLOWING',
+      id: 'following',
+      name: 'Following',
+    }),
+    collectionPolicy: XCollectionPolicySchema.default({ mode: 'COUNT' }),
   })
   .strict();
 export type CreateXTimelineRun = z.infer<typeof CreateXTimelineRunSchema>;
@@ -214,6 +338,9 @@ export const CompleteXTimelineRunSchema = z
     status: z.enum(['COMPLETE', 'PARTIAL']),
     failureReason: z.string().max(2_000).nullable().optional(),
     collectedCount: z.number().int().nonnegative(),
+    contextCoverage: XContextCoverageSchema.default({}),
+    windowCoverage: XWindowCoverageSchema.default({}),
+    terminationReason: XCollectionTerminationReasonSchema.default('COUNT_REACHED'),
   })
   .strict();
 export type CompleteXTimelineRun = z.infer<typeof CompleteXTimelineRunSchema>;
