@@ -56,6 +56,33 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/editorial/today"))
     }
 
+    func getDailyFeed(date: String? = nil) async throws -> DailyFeedResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/today/feed"),
+            resolvingAgainstBaseURL: false
+        )!
+        if let date {
+            components.queryItems = [URLQueryItem(name: "date", value: date)]
+        }
+        return try await request(url: components.url!)
+    }
+
+    func getDailyAuthorActivity(
+        authorKey: String,
+        date: String,
+        range: DailyAuthorRange
+    ) async throws -> DailyAuthorActivityResponse {
+        var components = URLComponents(
+            url: baseURL.appending(path: "/api/v1/today/authors/\(authorKey)"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "date", value: date),
+            URLQueryItem(name: "range", value: range.rawValue),
+        ]
+        return try await request(url: components.url!)
+    }
+
     func listEditorialExperiments(limit: Int = 20) async throws -> EditorialExperimentListResponse {
         var components = URLComponents(
             url: baseURL.appending(path: "/api/v1/editorial/experiments"),

@@ -1,0 +1,210 @@
+import Foundation
+
+struct DailyFeedResponse: Decodable, Hashable {
+    let schemaVersion: Int
+    let variant: DailyFeedVariant
+    let date: String
+    let timezone: String
+    let frozenAt: String?
+    let freshness: DailyFeedFreshness
+    let coverage: DailyFeedCoverage
+    let sources: [DailyFeedSource]
+    let conversations: [DailyConversation]
+    let posts: [DailyPost]
+    let requestId: String
+    let traceId: String
+}
+
+struct DailyFeedVariant: Decodable, Hashable {
+    enum Mode: String, Decodable, Hashable {
+        case review = "REVIEW"
+    }
+
+    let id: String
+    let mode: Mode
+}
+
+enum DailyCoverageStatus: String, Decodable, Hashable {
+    case complete = "COMPLETE"
+    case partial = "PARTIAL"
+    case unavailable = "UNAVAILABLE"
+}
+
+struct DailyFeedFreshness: Decodable, Hashable {
+    let isCurrent: Bool
+    let status: DailyCoverageStatus
+    let warnings: [String]
+}
+
+struct DailyFeedCoverage: Decodable, Hashable {
+    enum SelectionStatus: String, Decodable, Hashable {
+        case complete = "COMPLETE"
+        case stale = "STALE"
+        case fallback = "FALLBACK"
+        case missing = "MISSING"
+    }
+
+    let status: DailyCoverageStatus
+    let archiveStatus: DailyCoverageStatus
+    let selectionStatus: SelectionStatus
+    let runId: String?
+    let requestedCount: Int
+    let collectedCount: Int
+    let message: String
+}
+
+struct DailyFeedSource: Decodable, Hashable, Identifiable {
+    enum SourceType: String, Decodable, Hashable {
+        case favorites = "FAVORITES"
+        case list = "LIST"
+        case followingFallback = "FOLLOWING_FALLBACK"
+    }
+
+    let id: String
+    let type: SourceType
+    let name: String
+    let selected: Bool
+    let capturedAt: String?
+    let authorCount: Int
+}
+
+struct DailyConversation: Decodable, Hashable, Identifiable {
+    enum EvidenceType: String, Decodable, Hashable {
+        case directRelationship = "DIRECT_RELATIONSHIP"
+        case sharedLink = "SHARED_LINK"
+    }
+
+    let id: String
+    let evidenceType: EvidenceType
+    let label: String
+    let evidence: String
+    let postIds: [String]
+    let authors: [String]
+    let relationshipTypes: [String]
+}
+
+struct DailyPost: Decodable, Hashable, Identifiable {
+    let id: String
+    let url: String
+    let text: String
+    let publishedAt: String?
+    let observedAt: String?
+    let kind: String
+    let author: DailyAuthor
+    let media: [DailyPostMedia]
+    let links: [DailyPostLink]
+    let metrics: DailyPostMetrics
+    let relationships: [DailyPostRelationship]
+    let presentation: String
+    let repostedBy: DailyAuthor?
+    let sourceIds: [String]
+
+    var postURL: URL? { URL(string: url) }
+
+    var effectiveDate: Date? {
+        let value = publishedAt ?? observedAt
+        return value.flatMap { try? Date($0, strategy: .iso8601) }
+    }
+}
+
+struct DailyAuthor: Decodable, Hashable {
+    let key: String
+    let username: String
+    let name: String
+    let profileUrl: String?
+    let profileImageUrl: String?
+    let verified: Bool?
+
+    var profileURL: URL? { profileUrl.flatMap(URL.init(string:)) }
+    var profileImageURL: URL? { profileImageUrl.flatMap(URL.init(string:)) }
+}
+
+struct DailyPostMedia: Decodable, Hashable, Identifiable {
+    let type: String
+    let url: String
+    let previewUrl: String?
+    let altText: String?
+    let width: Int?
+    let height: Int?
+    let durationMs: Int?
+
+    var id: String { "\(type):\(url)" }
+    var displayURL: URL? { URL(string: previewUrl ?? url) }
+}
+
+struct DailyPostLink: Decodable, Hashable, Identifiable {
+    let url: String
+    let normalizedUrl: String
+    let displayUrl: String?
+    let redirectUrl: String?
+    let source: String
+    let card: DailyPostLinkCard?
+
+    var id: String { normalizedUrl }
+    var destinationURL: URL? { URL(string: normalizedUrl) ?? URL(string: url) }
+}
+
+struct DailyPostLinkCard: Decodable, Hashable {
+    let title: String?
+    let description: String?
+    let domain: String?
+    let imageUrl: String?
+}
+
+struct DailyPostMetrics: Decodable, Hashable {
+    let replies: Int?
+    let reposts: Int?
+    let likes: Int?
+    let views: Int?
+    let bookmarks: Int?
+}
+
+struct DailyPostRelationship: Decodable, Hashable, Identifiable {
+    let type: String
+    let tweetId: String
+    let url: String?
+    let target: DailyRelatedPost?
+
+    var id: String { "\(type):\(tweetId)" }
+}
+
+struct DailyRelatedPost: Decodable, Hashable {
+    let tweetId: String
+    let text: String
+    let url: String
+    let author: DailyAuthor
+}
+
+enum DailyAuthorRange: String, Codable, Hashable, CaseIterable, Identifiable {
+    case today = "TODAY"
+    case week = "WEEK"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .today: "Today"
+        case .week: "Past week"
+        }
+    }
+}
+
+struct DailyAuthorActivityResponse: Decodable, Hashable {
+    let schemaVersion: Int
+    let variant: DailyFeedVariant
+    let date: String
+    let range: DailyAuthorRange
+    let startDate: String
+    let timezone: String
+    let author: DailyAuthor?
+    let coverage: DailyAuthorCoverage
+    let posts: [DailyPost]
+    let requestId: String
+    let traceId: String
+}
+
+struct DailyAuthorCoverage: Decodable, Hashable {
+    let status: DailyCoverageStatus
+    let runIds: [String]
+    let warnings: [String]
+}

@@ -3,6 +3,92 @@ import XCTest
 @testable import ZineNative
 
 final class EditorialTests: XCTestCase {
+    func testDecodesPeopleFirstDailyFeedWithEvidenceAndPostContext() throws {
+        let response = try JSONDecoder().decode(
+            DailyFeedResponse.self,
+            from: Data(
+                """
+                {
+                  "schemaVersion":1,
+                  "variant":{"id":"people-first-v1","mode":"REVIEW"},
+                  "date":"2026-07-24",
+                  "timezone":"America/Chicago",
+                  "frozenAt":"2026-07-24T13:00:00.000Z",
+                  "freshness":{
+                    "isCurrent":true,
+                    "status":"PARTIAL",
+                    "warnings":["Favorite/list membership is partial."]
+                  },
+                  "coverage":{
+                    "status":"PARTIAL",
+                    "archiveStatus":"COMPLETE",
+                    "selectionStatus":"FALLBACK",
+                    "runId":"run-1",
+                    "requestedCount":500,
+                    "collectedCount":500,
+                    "message":"Usable with explicit limits."
+                  },
+                  "sources":[{
+                    "id":"following-fallback",
+                    "type":"FOLLOWING_FALLBACK",
+                    "name":"Following",
+                    "selected":true,
+                    "capturedAt":"2026-07-24T13:00:00.000Z",
+                    "authorCount":2
+                  }],
+                  "conversations":[{
+                    "id":"relationship:100:101",
+                    "evidenceType":"DIRECT_RELATIONSHIP",
+                    "label":"Direct conversation · @alice, @bob",
+                    "evidence":"2 posts are connected by reply metadata.",
+                    "postIds":["100","101"],
+                    "authors":["alice","bob"],
+                    "relationshipTypes":["REPLY_TO"]
+                  }],
+                  "posts":[{
+                    "id":"100",
+                    "url":"https://x.com/alice/status/100",
+                    "text":"A real reply.",
+                    "publishedAt":"2026-07-24T12:15:00.000Z",
+                    "observedAt":"2026-07-24T13:00:00.000Z",
+                    "kind":"REPLY",
+                    "author":{"key":"id:alice","username":"alice","name":"Alice"},
+                    "media":[],
+                    "links":[{
+                      "url":"https://example.com/story",
+                      "normalizedUrl":"https://example.com/story",
+                      "source":"TEXT"
+                    }],
+                    "metrics":{"likes":12},
+                    "relationships":[{
+                      "type":"REPLY_TO",
+                      "tweetId":"101",
+                      "url":"https://x.com/bob/status/101",
+                      "target":{
+                        "tweetId":"101",
+                        "text":"The post being answered.",
+                        "url":"https://x.com/bob/status/101",
+                        "author":{"key":"id:bob","username":"bob","name":"Bob"}
+                      }
+                    }],
+                    "presentation":"POST",
+                    "repostedBy":null,
+                    "sourceIds":["following-fallback"]
+                  }],
+                  "requestId":"request-1",
+                  "traceId":"trace-1"
+                }
+                """.utf8
+            )
+        )
+
+        XCTAssertEqual(response.variant.mode, .review)
+        XCTAssertEqual(response.coverage.selectionStatus, .fallback)
+        XCTAssertEqual(response.conversations.first?.evidenceType, .directRelationship)
+        XCTAssertEqual(response.posts.first?.relationships.first?.target?.author.username, "bob")
+        XCTAssertEqual(response.posts.first?.links.first?.destinationURL?.host(), "example.com")
+    }
+
     func testDecodesTodayContractWithoutAnIssue() throws {
         let response = try JSONDecoder().decode(
             EditorialTodayResponse.self,

@@ -8,6 +8,7 @@ import {
   type XPostLink,
   XPostLinkSchema,
 } from '@zine/x-archive-schema';
+import { z } from 'zod';
 
 type Bindings = Env;
 type Variables = { userId: string; requestId: string };
@@ -15,6 +16,16 @@ type AppEnv = { Bindings: Bindings; Variables: Variables };
 
 const API_TOKEN_PREFIX = 'zine_pat_';
 const MAX_PAGE_SIZE = 100;
+
+const DailySourceSnapshotSchema = z
+  .object({
+    sourceType: z.enum(['FAVORITES', 'LIST']),
+    name: z.string().trim().min(1).max(120),
+    selected: z.boolean().default(true),
+    capturedAt: z.string().datetime(),
+    usernames: z.array(z.string().trim().min(1).max(64)).max(5_000),
+  })
+  .strict();
 
 type TokenRow = {
   id: string;
@@ -716,6 +727,144 @@ app.get('/api/v1/x-timeline/runs', async (c) => {
     .bind(userId, limit)
     .all<RunRow>();
   return c.json({ runs: rows.results.map(publicRun) });
+});
+
+app.get('/api/v1/x-timeline/daily-sources', async (c) => {
+  const userId = c.get('userId');
+  const rows = await c.env.ARCHIVE_DB.prepare(
+    `SELECT s.source_id, s.source_type, s.name, s.is_selected, s.captured_at,
+      a.author_key, a.username, a.name AS author_name
+     FROM x_daily_sources s
+     LEFT JOIN x_daily_source_members m
+       ON m.user_id = s.user_id AND m.source_id = s.source_id
+     LEFT JOIN x_authors a
+       ON a.user_id = m.user_id AND a.author_key = m.author_key
+     WHERE s.user_id = ?
+     ORDER BY CASE s.source_type WHEN 'FAVORITES' THEN 0 ELSE 1 END, s.name, a.username`
+  )
+    .bind(userId)
+    .all<{
+      source_id: string;
+      source_type: 'FAVORITES' | 'LIST';
+      name: string;
+      is_selected: number;
+      captured_at: number;
+      author_key: string | null;
+      username: string | null;
+      author_name: string | null;
+    }>();
+  const sources = new Map<
+    string,
+    {
+      id: string;
+      type: 'FAVORITES' | 'LIST';
+      name: string;
+      selected: boolean;
+      capturedAt: string;
+      authors: Array<{ key: string; username: string; name: string }>;
+    }
+  >();
+  for (const row of rows.results) {
+    const source = sources.get(row.source_id) ?? {
+      id: row.source_id,
+      type: row.source_type,
+      name: row.name,
+      selected: Boolean(row.is_selected),
+      capturedAt: new Date(row.captured_at).toISOString(),
+      authors: [],
+    };
+    if (row.author_key && row.username && row.author_name) {
+      source.authors.push({
+        key: row.author_key,
+        username: row.username,
+        name: row.author_name,
+      });
+    }
+    sources.set(row.source_id, source);
+  }
+  return c.json({ sources: [...sources.values()] });
+});
+
+app.put('/api/v1/x-timeline/daily-sources/:sourceId', async (c) => {
+  const sourceId = c.req.param('sourceId');
+  if (!/^[A-Za-z0-9:_-]{1,120}$/.test(sourceId)) {
+    return c.json({ error: 'Invalid source id', code: 'INVALID_INPUT' }, 400);
+  }
+  const parsed = DailySourceSnapshotSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid daily source snapshot',
+        code: 'INVALID_INPUT',
+        issues: parsed.error.issues,
+      },
+      400
+    );
+  }
+
+  const userId = c.get('userId');
+  const input = parsed.data;
+  const usernames = [...new Set(input.usernames.map((value) => value.toLocaleLowerCase()))];
+  const placeholders = usernames.map(() => '?').join(',');
+  const authors = usernames.length
+    ? await c.env.ARCHIVE_DB.prepare(
+        `SELECT author_key, username FROM x_authors
+         WHERE user_id = ? AND lower(username) IN (${placeholders})`
+      )
+        .bind(userId, ...usernames)
+        .all<{ author_key: string; username: string }>()
+    : { results: [] as Array<{ author_key: string; username: string }> };
+  const resolved = new Set(authors.results.map((author) => author.username.toLocaleLowerCase()));
+  const now = Date.now();
+
+  await c.env.ARCHIVE_DB.prepare(
+    `INSERT INTO x_daily_sources
+      (user_id, source_id, source_type, name, is_selected, captured_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, source_id) DO UPDATE SET
+       source_type = excluded.source_type,
+       name = excluded.name,
+       is_selected = excluded.is_selected,
+       captured_at = excluded.captured_at,
+       updated_at = excluded.updated_at`
+  )
+    .bind(
+      userId,
+      sourceId,
+      input.sourceType,
+      input.name,
+      input.selected ? 1 : 0,
+      Date.parse(input.capturedAt),
+      now
+    )
+    .run();
+  await c.env.ARCHIVE_DB.prepare(
+    'DELETE FROM x_daily_source_members WHERE user_id = ? AND source_id = ?'
+  )
+    .bind(userId, sourceId)
+    .run();
+  if (authors.results.length > 0) {
+    await c.env.ARCHIVE_DB.batch(
+      authors.results.map((author) =>
+        c.env.ARCHIVE_DB.prepare(
+          `INSERT INTO x_daily_source_members (user_id, source_id, author_key, created_at)
+           VALUES (?, ?, ?, ?)`
+        ).bind(userId, sourceId, author.author_key, now)
+      )
+    );
+  }
+
+  return c.json({
+    source: {
+      id: sourceId,
+      type: input.sourceType,
+      name: input.name,
+      selected: input.selected,
+      capturedAt: input.capturedAt,
+      authorCount: authors.results.length,
+    },
+    unresolvedUsernames: usernames.filter((username) => !resolved.has(username)),
+  });
 });
 
 app.get('/api/v1/x-timeline/runs/:runId/export', async (c) => {

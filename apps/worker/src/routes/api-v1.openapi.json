@@ -1043,6 +1043,62 @@
         }
       }
     },
+    "/api/v1/today/feed": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getPeopleFirstDailyFeed",
+        "summary": "Get the frozen people-first Today review feed",
+        "description": "Returns real X posts from Favorite and selected-list source snapshots, explicit relationship/shared-link conversation groups, and archive coverage. This review route does not replace the live editorial Today issue.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "experimental",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": { "type": "string", "format": "date" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Frozen people-first review feed." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/authors/{authorKey}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getPeopleFirstAuthorActivity",
+        "summary": "Get all archived posts available for an author",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "experimental",
+        "parameters": [
+          { "name": "authorKey", "in": "path", "required": true, "schema": { "type": "string" } },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["TODAY", "WEEK"], "default": "TODAY" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every available archived post for the author in the selected range."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/api/v1/editorial/experiments": {
       "get": {
         "tags": ["Editorial"],

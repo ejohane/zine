@@ -83,6 +83,7 @@ function createMockEnv(): Env['Bindings'] {
     DB: {
       // Mock D1Database - not used directly since we mock createDb
     } as unknown as D1Database,
+    X_ARCHIVE_DB: {} as unknown as D1Database,
     WEBHOOK_IDEMPOTENCY: {
       get: vi.fn().mockResolvedValue(null),
       put: vi.fn().mockResolvedValue(undefined),
