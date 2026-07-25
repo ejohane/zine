@@ -1,5 +1,6 @@
 const DEFAULT_TIMEZONE = 'America/Chicago';
 const MAX_RUN_POSTS = 500;
+const RELATIONSHIP_QUERY_POST_LIMIT = 90;
 const MAX_AUTHOR_POSTS = 500;
 
 type ArchiveRunRow = {
@@ -204,45 +205,50 @@ async function relationshipsForPosts(
   tweetIds: string[]
 ): Promise<Map<string, DailyRelationship[]>> {
   if (tweetIds.length === 0) return new Map();
-  const placeholders = tweetIds.map(() => '?').join(',');
-  const rows = await db
-    .prepare(
-      `SELECT r.source_tweet_id, r.relationship_type, r.target_tweet_id, r.target_url,
-        target.text AS target_text, target.author_key AS target_author_key,
-        target_author.username AS target_username, target_author.name AS target_author_name,
-        target_author.profile_image_url AS target_profile_image_url
-       FROM x_post_relationships r
-       LEFT JOIN x_posts target
-         ON target.user_id = r.user_id AND target.tweet_id = r.target_tweet_id
-       LEFT JOIN x_authors target_author
-         ON target_author.user_id = target.user_id AND target_author.author_key = target.author_key
-       WHERE r.user_id = ? AND r.source_tweet_id IN (${placeholders})`
-    )
-    .bind(userId, ...tweetIds)
-    .all<RelationshipRow>();
   const result = new Map<string, DailyRelationship[]>();
-  for (const row of rows.results) {
-    const target =
-      row.target_text && row.target_author_key && row.target_username && row.target_author_name
-        ? {
-            tweetId: row.target_tweet_id,
-            text: row.target_text,
-            url: row.target_url ?? `https://x.com/i/status/${row.target_tweet_id}`,
-            author: {
-              key: row.target_author_key,
-              username: row.target_username,
-              name: row.target_author_name,
-              profileImageUrl: row.target_profile_image_url,
-            },
-          }
-        : null;
-    const relationship = {
-      type: row.relationship_type,
-      tweetId: row.target_tweet_id,
-      url: row.target_url,
-      target,
-    };
-    result.set(row.source_tweet_id, [...(result.get(row.source_tweet_id) ?? []), relationship]);
+
+  for (let offset = 0; offset < tweetIds.length; offset += RELATIONSHIP_QUERY_POST_LIMIT) {
+    const batch = tweetIds.slice(offset, offset + RELATIONSHIP_QUERY_POST_LIMIT);
+    const placeholders = batch.map(() => '?').join(',');
+    const rows = await db
+      .prepare(
+        `SELECT r.source_tweet_id, r.relationship_type, r.target_tweet_id, r.target_url,
+          target.text AS target_text, target.author_key AS target_author_key,
+          target_author.username AS target_username, target_author.name AS target_author_name,
+          target_author.profile_image_url AS target_profile_image_url
+         FROM x_post_relationships r
+         LEFT JOIN x_posts target
+           ON target.user_id = r.user_id AND target.tweet_id = r.target_tweet_id
+         LEFT JOIN x_authors target_author
+           ON target_author.user_id = target.user_id AND target_author.author_key = target.author_key
+         WHERE r.user_id = ? AND r.source_tweet_id IN (${placeholders})`
+      )
+      .bind(userId, ...batch)
+      .all<RelationshipRow>();
+
+    for (const row of rows.results) {
+      const target =
+        row.target_text && row.target_author_key && row.target_username && row.target_author_name
+          ? {
+              tweetId: row.target_tweet_id,
+              text: row.target_text,
+              url: row.target_url ?? `https://x.com/i/status/${row.target_tweet_id}`,
+              author: {
+                key: row.target_author_key,
+                username: row.target_username,
+                name: row.target_author_name,
+                profileImageUrl: row.target_profile_image_url,
+              },
+            }
+          : null;
+      const relationship = {
+        type: row.relationship_type,
+        tweetId: row.target_tweet_id,
+        url: row.target_url,
+        target,
+      };
+      result.set(row.source_tweet_id, [...(result.get(row.source_tweet_id) ?? []), relationship]);
+    }
   }
   return result;
 }
