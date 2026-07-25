@@ -84,6 +84,8 @@ const {
   mockGetEditorialExperimentVariantPreview,
   mockReviewEditorialExperiment,
   mockPromoteEditorialExperiment,
+  mockGetDailyFeed,
+  mockGetDailyAuthorActivity,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -162,6 +164,8 @@ const {
   mockGetEditorialExperimentVariantPreview: vi.fn(),
   mockReviewEditorialExperiment: vi.fn(),
   mockPromoteEditorialExperiment: vi.fn(),
+  mockGetDailyFeed: vi.fn(),
+  mockGetDailyAuthorActivity: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -243,6 +247,11 @@ vi.mock('../lib/editorial-experiments', () => {
   };
 });
 
+vi.mock('../lib/daily-feed', () => ({
+  getDailyFeed: mockGetDailyFeed,
+  getDailyAuthorActivity: mockGetDailyAuthorActivity,
+}));
+
 vi.mock('../sync/service', async () => {
   class RateLimitError extends Error {
     constructor(message: string) {
@@ -301,6 +310,7 @@ function createTestApp() {
 function createMockEnv(): Env['Bindings'] {
   return {
     DB: {} as D1Database,
+    X_ARCHIVE_DB: {} as D1Database,
     WEBHOOK_IDEMPOTENCY: {} as KVNamespace,
     OAUTH_STATE_KV: {} as KVNamespace,
     ARTICLE_CONTENT: {} as R2Bucket,
@@ -457,6 +467,37 @@ describe('apiV1Routes', () => {
       sourceIds: [],
     });
     mockListEditorialExperiments.mockResolvedValue([]);
+    mockGetDailyFeed.mockResolvedValue({
+      schemaVersion: 1,
+      variant: { id: 'people-first-v1', mode: 'REVIEW' },
+      date: '2026-07-24',
+      timezone: 'America/Chicago',
+      frozenAt: '2026-07-24T13:00:00.000Z',
+      freshness: { isCurrent: true, status: 'COMPLETE', warnings: [] },
+      coverage: {
+        status: 'COMPLETE',
+        archiveStatus: 'COMPLETE',
+        selectionStatus: 'COMPLETE',
+        runId: 'run-1',
+        requestedCount: 500,
+        collectedCount: 500,
+        message: 'Complete.',
+      },
+      sources: [],
+      conversations: [],
+      posts: [],
+    });
+    mockGetDailyAuthorActivity.mockResolvedValue({
+      schemaVersion: 1,
+      variant: { id: 'people-first-v1', mode: 'REVIEW' },
+      date: '2026-07-24',
+      range: 'TODAY',
+      startDate: '2026-07-24',
+      timezone: 'America/Chicago',
+      author: null,
+      coverage: { status: 'PARTIAL', runIds: ['run-1'], warnings: [] },
+      posts: [],
+    });
     mockCreateEditorialExperiment.mockResolvedValue({
       experiment: editorialExperimentFixture(),
       created: true,
@@ -558,6 +599,8 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/article-content');
     expect(body.paths).toHaveProperty('/api/v1/tags');
     expect(body.paths).toHaveProperty('/api/v1/editorial/today');
+    expect(body.paths).toHaveProperty('/api/v1/today/feed');
+    expect(body.paths).toHaveProperty('/api/v1/today/authors/{authorKey}');
     expect(body.paths).toHaveProperty('/api/v1/editorial/experiments');
     expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}');
     expect(body.paths).toHaveProperty('/api/v1/editorial/experiments/{id}/lock');
@@ -592,6 +635,40 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/callback');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}/sync');
+  });
+
+  it('reads the isolated people-first daily feed and author activity', async () => {
+    const app = createTestApp();
+    const env = createMockEnv();
+    const feed = await app.fetch(
+      new Request('http://localhost/api/v1/today/feed?date=2026-07-24', {
+        headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` },
+      }),
+      env
+    );
+    expect(feed.status).toBe(200);
+    expect(await feed.json()).toMatchObject({
+      variant: { id: 'people-first-v1', mode: 'REVIEW' },
+      date: '2026-07-24',
+    });
+    expect(mockGetDailyFeed).toHaveBeenCalledWith(expect.anything(), 'user_123', {
+      date: '2026-07-24',
+    });
+
+    const author = await app.fetch(
+      new Request(
+        'http://localhost/api/v1/today/authors/id%3Aauthor-1?date=2026-07-24&range=WEEK',
+        { headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` } }
+      ),
+      env
+    );
+    expect(author.status).toBe(200);
+    expect(mockGetDailyAuthorActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      'user_123',
+      'id:author-1',
+      { date: '2026-07-24', range: 'WEEK' }
+    );
   });
 
   it('reads the bounded editorial tuning profile with read authentication', async () => {

@@ -62,6 +62,7 @@ import {
 import { verifyClerkRequestToken } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { getEditorialToday } from '../lib/editorial-today';
+import { getDailyAuthorActivity, getDailyFeed } from '../lib/daily-feed';
 import {
   EditorialFeedbackConflictError,
   EditorialFeedbackTargetError,
@@ -237,6 +238,18 @@ const UpdateProgressBodySchema = z
     duration: z.number().min(0),
   })
   .strict();
+
+const DailyFeedQuerySchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+const DailyAuthorQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  range: z.enum(['TODAY', 'WEEK']).default('TODAY'),
+});
 
 const FinishBookmarkBodySchema = z
   .object({
@@ -2064,6 +2077,50 @@ apiV1Routes.get('/tags', apiAuth('bookmarks:read'), async (c) => {
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });
+});
+
+apiV1Routes.get('/today/feed', apiAuth('bookmarks:read'), async (c) => {
+  const parsed = DailyFeedQuerySchema.safeParse({ date: c.req.query('date') });
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid daily feed query',
+        code: 'INVALID_QUERY',
+        issues: parsed.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+  const result = await getDailyFeed(c.env.X_ARCHIVE_DB, c.get('userId')!, parsed.data);
+  return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
+});
+
+apiV1Routes.get('/today/authors/:authorKey', apiAuth('bookmarks:read'), async (c) => {
+  const parsed = DailyAuthorQuerySchema.safeParse({
+    date: c.req.query('date'),
+    range: c.req.query('range'),
+  });
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Invalid author activity query',
+        code: 'INVALID_QUERY',
+        issues: parsed.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+  const result = await getDailyAuthorActivity(
+    c.env.X_ARCHIVE_DB,
+    c.get('userId')!,
+    c.req.param('authorKey'),
+    parsed.data
+  );
+  return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
 });
 
 apiV1Routes.get('/editorial/today', apiAuth('bookmarks:read'), async (c) => {

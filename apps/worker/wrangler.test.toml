@@ -29,6 +29,12 @@ database_name = "zine-db-test"
 database_id = "test-zine-db"
 migrations_dir = "src/db/migrations"
 
+[[d1_databases]]
+binding = "X_ARCHIVE_DB"
+database_name = "zine-x-archive-test"
+database_id = "test-zine-x-archive"
+migrations_dir = "../x-archive/src/db/migrations"
+
 [[queues.producers]]
 queue = "zine-sync-queue-test"
 binding = "SYNC_QUEUE"

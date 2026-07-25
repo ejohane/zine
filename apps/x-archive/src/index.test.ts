@@ -58,10 +58,46 @@ function post(tweetId: string) {
   };
 }
 
+async function insertCapturedRunForDailySources() {
+  await api('/api/v1/x-timeline/runs', {
+    method: 'POST',
+    body: JSON.stringify({
+      runId: 'run-daily-sources',
+      requestedCount: 1,
+      startedAt: '2026-07-11T13:00:00.000Z',
+      collectorVersion: 'test-v1',
+    }),
+  });
+  await api('/api/v1/x-timeline/runs/run-daily-sources/chunks/0', {
+    method: 'PUT',
+    body: JSON.stringify({
+      posts: [post('daily-source-post')],
+      items: [
+        {
+          tweetId: 'daily-source-post',
+          position: 0,
+          observedAt: '2026-07-11T13:00:00.000Z',
+          presentation: 'POST',
+        },
+      ],
+    }),
+  });
+  await api('/api/v1/x-timeline/runs/run-daily-sources/complete', {
+    method: 'POST',
+    body: JSON.stringify({
+      collectedCount: 1,
+      completedAt: '2026-07-11T13:01:00.000Z',
+      excludedAds: 0,
+      status: 'COMPLETE',
+      failureReason: null,
+    }),
+  });
+}
+
 beforeEach(async () => {
   await testEnv.AUTH_DB.exec('DELETE FROM api_tokens;');
   await testEnv.ARCHIVE_DB.exec(
-    'DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_items; DELETE FROM x_post_links; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
+    'DELETE FROM x_daily_source_members; DELETE FROM x_daily_sources; DELETE FROM x_ingest_chunks; DELETE FROM x_timeline_run_items; DELETE FROM x_post_links; DELETE FROM x_post_relationships; DELETE FROM x_posts; DELETE FROM x_authors; DELETE FROM x_timeline_runs;'
   );
   await testEnv.AUTH_DB.prepare(
     `INSERT INTO api_tokens
@@ -184,6 +220,37 @@ describe('X archive worker', () => {
     const exported = await api('/api/v1/x-timeline/runs/run-00000001/export');
     expect(exported.status).toBe(200);
     expect(exported.headers.get('content-encoding')).toBe('gzip');
+  });
+
+  it('stores explicit Favorite/list author snapshots for daily review', async () => {
+    await insertCapturedRunForDailySources();
+    const put = await api('/api/v1/x-timeline/daily-sources/favorites', {
+      method: 'PUT',
+      body: JSON.stringify({
+        sourceType: 'FAVORITES',
+        name: 'Favorites',
+        selected: true,
+        capturedAt: '2026-07-11T13:02:00.000Z',
+        usernames: ['example', 'missing'],
+      }),
+    });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toMatchObject({
+      source: { id: 'favorites', type: 'FAVORITES', authorCount: 1 },
+      unresolvedUsernames: ['missing'],
+    });
+
+    const read = await api('/api/v1/x-timeline/daily-sources');
+    expect(await read.json()).toMatchObject({
+      sources: [
+        {
+          id: 'favorites',
+          type: 'FAVORITES',
+          selected: true,
+          authors: [{ username: 'example' }],
+        },
+      ],
+    });
   });
 
   it('stores one canonical post across multiple runs', async () => {

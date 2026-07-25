@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var store: TodayStore
     @State private var labStore: EditorialLabStore
     @State private var isShowingLab = false
+    @State private var isShowingDailyFeedReview = false
 
     init(
         client: APIClient,
@@ -40,6 +41,14 @@ struct TodayView: View {
                             ProgressView()
                                 .accessibilityLabel("Refreshing today’s issue")
                         }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            isShowingDailyFeedReview = true
+                        } label: {
+                            Image(systemName: "person.2.fill")
+                        }
+                        .accessibilityLabel("Open people-first Daily View preview")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -79,6 +88,9 @@ struct TodayView: View {
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: $isShowingDailyFeedReview) {
+            DailyFeedReviewView(client: client)
         }
         .alert("Couldn’t update Today", isPresented: actionErrorBinding) {
             Button("OK", role: .cancel) {
