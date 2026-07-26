@@ -453,6 +453,26 @@ struct APIClient {
         let _: EmptyResponse = try await send(request)
     }
 
+    func setProviderSubscriptionAutoBookmark(
+        id: String,
+        provider: SubscriptionSource,
+        enabled: Bool
+    ) async throws {
+        var request = URLRequest(
+            url: baseURL.appending(
+                path: "/api/v1/subscriptions/\(provider.pathComponent)/\(id)"
+            )
+        )
+        request.httpMethod = "PATCH"
+        request.httpBody = try JSONEncoder().encode(
+            UpdateProviderSubscriptionRequest(
+                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
+            )
+        )
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let _: EmptyResponse = try await send(request)
+    }
+
     func syncProviderSubscription(
         id: String,
         provider: SubscriptionSource

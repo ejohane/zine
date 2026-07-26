@@ -116,7 +116,8 @@ struct SubscriptionSourcesTests {
             imageUrl: nil,
             status: nil,
             isSubscribed: false,
-            lastPolledAt: nil
+            lastPolledAt: nil,
+            autoBookmark: nil
         )
         let subscribed = ProviderSubscriptionItem(
             subscriptionId: "sub-1",
@@ -125,7 +126,8 @@ struct SubscriptionSourcesTests {
             imageUrl: nil,
             status: .active,
             isSubscribed: true,
-            lastPolledAt: nil
+            lastPolledAt: nil,
+            autoBookmark: false
         )
         let recorder = SubscriptionClientRecorder(
             responses: [response(items: [item]), response(items: [subscribed])]
@@ -174,6 +176,7 @@ private actor SubscriptionClientRecorder {
             add: { [self] item in await recordAdd(item.channelId) },
             remove: { _ in },
             setPaused: { _, _ in },
+            setAutoBookmark: { _, _ in },
             sync: { _ in SubscriptionSyncResponse(itemsFound: 0) },
             connect: {},
             disconnect: {}

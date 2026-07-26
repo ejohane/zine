@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { ContentType, Provider } from '@zine/shared';
+import { ContentType, Provider, UserItemState } from '@zine/shared';
 import { items, providerItemsSeen, subscriptionItems, userItems } from '../../db/schema';
 import { buildIngestionStatements, executeBatchStatements } from './write';
 
@@ -114,6 +114,26 @@ describe('buildIngestionStatements', () => {
 
     expect(statements).toHaveLength(3);
     expect(inserted.find((entry) => entry.table === items)).toBeUndefined();
+  });
+
+  it('writes enabled auto-bookmarked items with the required timestamp', () => {
+    const { db, inserted } = createMockDb();
+
+    buildIngestionStatements(createPreparedItem(), {
+      db: db as never,
+      userId: 'user-1',
+      subscriptionId: 'sub-1',
+      provider: Provider.SPOTIFY,
+      autoBookmark: true,
+      nowISO: '2024-01-15T12:00:00.000Z',
+      now: 1705320000000,
+    });
+
+    const userItemInsert = inserted.find((entry) => entry.table === userItems);
+    expect(userItemInsert?.values).toMatchObject({
+      state: UserItemState.BOOKMARKED,
+      bookmarkedAt: '2024-01-15T12:00:00.000Z',
+    });
   });
 
   it('stores null publishedAt when timestamp is zero', () => {

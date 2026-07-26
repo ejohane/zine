@@ -89,6 +89,13 @@ final class ProviderSubscriptionsStore {
         }
     }
 
+    func setAutoBookmark(_ item: ProviderSubscriptionItem, enabled: Bool) async {
+        guard let subscriptionId = item.subscriptionId else { return }
+        await perform(item: item, failureMessage: "The auto-bookmark setting couldn’t be updated.") {
+            try await client.setAutoBookmark(subscriptionId, enabled)
+        }
+    }
+
     func sync(_ item: ProviderSubscriptionItem) async {
         guard let subscriptionId = item.subscriptionId else { return }
         pendingItemIDs.insert(item.channelId)

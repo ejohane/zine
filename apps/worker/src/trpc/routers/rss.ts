@@ -28,6 +28,10 @@ const RssFeedActionInputSchema = z.object({
   feedId: z.string().min(1),
 });
 
+const SetAutoBookmarkInputSchema = RssFeedActionInputSchema.extend({
+  enabled: z.boolean(),
+});
+
 const DiscoverRssFeedInputSchema = z.object({
   url: z.string().url('Invalid URL format'),
   refresh: z.boolean().optional(),
@@ -76,6 +80,7 @@ export const rssRouter = router({
           description: row.description,
           siteUrl: row.siteUrl,
           imageUrl: row.imageUrl,
+          autoBookmark: row.autoBookmark,
           status: row.status as z.infer<typeof RssFeedStatusSchema>,
           errorCount: row.errorCount,
           lastError: row.lastError,
@@ -87,6 +92,22 @@ export const rssRouter = router({
         nextCursor: hasMore ? (visibleRows[visibleRows.length - 1]?.id ?? null) : null,
         hasMore,
       };
+    }),
+
+  setAutoBookmark: protectedProcedure
+    .input(SetAutoBookmarkInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const feed = await getOwnedFeed(ctx.db, ctx.userId, input.feedId);
+      if (!feed) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'RSS feed not found' });
+      }
+
+      await ctx.db
+        .update(rssFeeds)
+        .set({ autoBookmark: input.enabled, updatedAt: Date.now() })
+        .where(eq(rssFeeds.id, feed.id));
+
+      return { success: true as const, autoBookmark: input.enabled };
     }),
 
   add: protectedProcedure.input(AddRssFeedInputSchema).mutation(async ({ ctx, input }) => {

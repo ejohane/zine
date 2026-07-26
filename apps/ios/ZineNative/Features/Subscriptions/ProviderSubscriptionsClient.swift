@@ -5,6 +5,7 @@ struct ProviderSubscriptionsClient {
     var add: (ProviderSubscriptionItem) async throws -> Void
     var remove: (String) async throws -> Void
     var setPaused: (String, Bool) async throws -> Void
+    var setAutoBookmark: (String, Bool) async throws -> Void
     var sync: (String) async throws -> SubscriptionSyncResponse
     var connect: () async throws -> Void
     var disconnect: () async throws -> Void
@@ -25,6 +26,13 @@ struct ProviderSubscriptionsClient {
                     id: $0,
                     provider: provider,
                     isPaused: $1
+                )
+            },
+            setAutoBookmark: {
+                try await apiClient.setProviderSubscriptionAutoBookmark(
+                    id: $0,
+                    provider: provider,
+                    enabled: $1
                 )
             },
             sync: { try await apiClient.syncProviderSubscription(id: $0, provider: provider) },

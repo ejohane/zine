@@ -114,6 +114,7 @@ struct ProviderSubscriptionItem: Decodable, Equatable, Identifiable {
     let status: ProviderSubscriptionStatus?
     let isSubscribed: Bool
     let lastPolledAt: Int?
+    let autoBookmark: Bool?
 
     var id: String { channelId }
 }
@@ -149,6 +150,7 @@ struct NewsletterFeed: Decodable, Equatable, Identifiable {
     let imageUrl: URL?
     let status: NewsletterStatus
     let lastSeenAt: Int?
+    let autoBookmark: Bool
 }
 
 struct NewsletterStats: Decodable, Equatable {
@@ -195,6 +197,7 @@ struct RssFeed: Decodable, Equatable, Identifiable {
     let lastError: String?
     let lastPolledAt: Int?
     let lastSuccessAt: Int?
+    let autoBookmark: Bool
 }
 
 struct RssStats: Decodable, Equatable {

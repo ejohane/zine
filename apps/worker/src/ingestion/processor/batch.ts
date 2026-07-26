@@ -9,6 +9,7 @@ import { ingestItem } from './ingest';
 import { prepareBatch } from './prepare';
 import type { BatchIngestResult, ConsolidatedBatchIngestResult, PreparedItem } from './types';
 import { buildIngestionStatements, executeBatchStatements } from './write';
+import { isProviderSubscriptionAutoBookmarkEnabled } from '../../subscriptions/auto-bookmark';
 
 // Batch Ingestion
 
@@ -184,6 +185,13 @@ export async function ingestBatchConsolidated<T>(
     return result;
   }
 
+  const autoBookmark = await isProviderSubscriptionAutoBookmarkEnabled(
+    db,
+    userId,
+    subscriptionId,
+    provider
+  );
+
   // Phase 1: Transform, validate, and check idempotency for all items
   const { preparedItems, skippedCount, errors, errorDetails } = await prepareBatch({
     userId,
@@ -205,7 +213,14 @@ export async function ingestBatchConsolidated<T>(
     result.batchCount = chunks.length;
 
     for (const itemChunk of chunks) {
-      const chunkSuccess = await executeChunkBatch(itemChunk, userId, subscriptionId, provider, db);
+      const chunkSuccess = await executeChunkBatch(
+        itemChunk,
+        userId,
+        subscriptionId,
+        provider,
+        db,
+        autoBookmark
+      );
 
       if (chunkSuccess) {
         result.created += itemChunk.length;
@@ -217,7 +232,8 @@ export async function ingestBatchConsolidated<T>(
             userId,
             subscriptionId,
             provider,
-            db
+            db,
+            autoBookmark
           );
 
           if (itemSuccess) {
@@ -272,12 +288,13 @@ async function executeChunkBatch(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: Database
+  db: Database,
+  autoBookmark: boolean
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
     const now = Date.now();
-    const context = { db, userId, subscriptionId, provider, nowISO, now };
+    const context = { db, userId, subscriptionId, provider, autoBookmark, nowISO, now };
     const statements = itemChunk.flatMap((prepared) => buildIngestionStatements(prepared, context));
 
     await executeBatchStatements(statements, db);
@@ -301,12 +318,13 @@ async function executeIndividualInsert(
   userId: string,
   subscriptionId: string,
   provider: Provider,
-  db: Database
+  db: Database,
+  autoBookmark: boolean
 ): Promise<boolean> {
   try {
     const nowISO = new Date().toISOString();
     const now = Date.now();
-    const context = { db, userId, subscriptionId, provider, nowISO, now };
+    const context = { db, userId, subscriptionId, provider, autoBookmark, nowISO, now };
     const statements = buildIngestionStatements(prepared, context);
 
     await executeBatchStatements(statements, db);

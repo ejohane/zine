@@ -39,6 +39,10 @@ const UnsubscribeInputSchema = z.object({
   feedId: z.string().min(1),
 });
 
+const SetAutoBookmarkInputSchema = UnsubscribeInputSchema.extend({
+  enabled: z.boolean(),
+});
+
 type ActiveGmailMailbox = {
   id: string;
   lastSyncAt: number | null;
@@ -230,10 +234,36 @@ export const newslettersRouter = router({
           firstSeenAt: row.firstSeenAt,
           unsubscribeUrl: row.unsubscribeUrl,
           unsubscribeMailto: row.unsubscribeMailto,
+          autoBookmark: row.autoBookmark,
         })),
         nextCursor: hasMore ? (rows[rows.length - 1]?.id ?? null) : null,
         hasMore,
       };
+    }),
+
+  setAutoBookmark: protectedProcedure
+    .input(SetAutoBookmarkInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const activeMailboxes = await getActiveGmailMailboxes(ctx.db, ctx.userId);
+      const mailboxIds = activeMailboxes.map((row) => row.id);
+      const row = await ctx.db.query.newsletterFeeds.findFirst({
+        where: and(
+          eq(newsletterFeeds.id, input.feedId),
+          eq(newsletterFeeds.userId, ctx.userId),
+          inArray(newsletterFeeds.gmailMailboxId, mailboxIds)
+        ),
+      });
+
+      if (!row) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Newsletter feed not found' });
+      }
+
+      await ctx.db
+        .update(newsletterFeeds)
+        .set({ autoBookmark: input.enabled, updatedAt: Date.now() })
+        .where(eq(newsletterFeeds.id, row.id));
+
+      return { success: true as const, autoBookmark: input.enabled };
     }),
 
   updateStatus: protectedProcedure

@@ -59,6 +59,7 @@ export interface IngestContext {
  */
 export interface WriteContext extends IngestContext {
   subscriptionId: string;
+  autoBookmark?: boolean;
   nowISO: string;
   now: number;
 }

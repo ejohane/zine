@@ -58,6 +58,7 @@ export const appRouter = router({
     pause: subscriptionsRouter.pause,
     resume: subscriptionsRouter.resume,
     syncNow: subscriptionsRouter.syncNow,
+    setAutoBookmark: subscriptionsRouter.setAutoBookmark,
     syncAllAsync: subscriptionsRouter.syncAllAsync,
     syncStatus: subscriptionsRouter.syncStatus,
     activeSyncJob: subscriptionsRouter.activeSyncJob,

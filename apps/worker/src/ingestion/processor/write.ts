@@ -1,10 +1,10 @@
 import { ulid } from 'ulid';
-import { UserItemState } from '@zine/shared';
 import type { BatchItem } from 'drizzle-orm/batch';
 
 import type { Database } from '../../db';
 import { items, providerItemsSeen, subscriptionItems, userItems } from '../../db/schema';
 import { unixToIso } from '../../lib/timestamps';
+import { getAutoBookmarkFields } from '../../subscriptions/auto-bookmark';
 import type { PreparedItem, WriteContext } from './types';
 
 // Write Helpers
@@ -16,7 +16,8 @@ export function buildIngestionStatements(
   prepared: PreparedItem,
   context: WriteContext
 ): BatchItem<'sqlite'>[] {
-  const { db, userId, subscriptionId, provider, nowISO, now } = context;
+  const { db, userId, subscriptionId, provider, autoBookmark, nowISO, now } = context;
+  const userItemState = getAutoBookmarkFields(autoBookmark === true, nowISO);
   const statements: BatchItem<'sqlite'>[] = [];
 
   if (!prepared.canonicalItemExists) {
@@ -53,7 +54,7 @@ export function buildIngestionStatements(
         id: prepared.userItemId,
         userId,
         itemId: prepared.canonicalItemId,
-        state: UserItemState.INBOX,
+        ...userItemState,
         ingestedAt: nowISO,
         createdAt: nowISO,
         updatedAt: nowISO,

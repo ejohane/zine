@@ -231,6 +231,15 @@ struct ProviderSubscriptionsView: View {
                 }
             }
 
+            if let autoBookmark = item.autoBookmark {
+                Button { Task { await store.setAutoBookmark(item, enabled: !autoBookmark) } } label: {
+                    Label(
+                        autoBookmark ? "Stop Auto-bookmarking" : "Auto-bookmark New Items",
+                        systemImage: autoBookmark ? "bookmark.slash" : "bookmark"
+                    )
+                }
+            }
+
             Button("Remove", systemImage: "trash", role: .destructive) {
                 pendingRemoval = item
             }
