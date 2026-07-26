@@ -65,6 +65,7 @@ struct ArticleReaderMetadata: Equatable {
     let bookmarkID: String
     let title: String
     let creator: String
+    let creatorImageURL: URL?
     let canonicalURL: URL
     let readingTimeMinutes: Int?
     let initialProgress: BookmarkProgress?

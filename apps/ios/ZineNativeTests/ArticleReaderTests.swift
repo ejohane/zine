@@ -31,6 +31,137 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertTrue(html.contains("<article><p>Readable body</p></article>"))
     }
 
+    func testHTMLDocumentAppliesReaderFontScaleToTypographyOnly() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.utf8)
+        )
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(metadata: Self.metadata(), response: response),
+            fontScale: ArticleReaderFontSize.extraLarge.scale
+        )
+
+        XCTAssertTrue(html.contains("--reader-font-scale: 1.3"))
+        XCTAssertTrue(html.contains("font-size: calc(17px * var(--reader-font-scale))"))
+        XCTAssertTrue(html.contains("padding: 88.0px 22px 96px"))
+        XCTAssertFalse(html.contains("zoom:"))
+    }
+
+    func testHTMLDocumentPlacesCreatorAvatarBeforeCreatorName() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.utf8)
+        )
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(
+                metadata: Self.metadata(
+                    creatorImageURL: URL(string: "https://example.com/avatar.jpg?size=48&fit=crop")
+                ),
+                response: response
+            )
+        )
+
+        let avatar = "<img class=\"creator-avatar\" src=\"https://example.com/avatar.jpg?size=48&amp;fit=crop\" alt=\"\">"
+        XCTAssertTrue(html.contains(avatar))
+        XCTAssertLessThan(html.range(of: avatar)!.lowerBound, html.range(of: "<span>Author</span>")!.lowerBound)
+    }
+
+    func testHTMLDocumentPlacesRuleBetweenCreatorMetadataAndBody() throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.utf8)
+        )
+        let html = ArticleHTMLDocumentBuilder.makeHTML(
+            for: ArticleReaderDocument(metadata: Self.metadata(), response: response)
+        )
+
+        let title = "<h1>A dependable reader</h1>"
+        let rule = "<hr class=\"title-rule\" aria-hidden=\"true\">"
+        let metadata = "<div class=\"meta\">"
+        let body = "<main>"
+        XCTAssertLessThan(html.range(of: title)!.lowerBound, html.range(of: metadata)!.lowerBound)
+        XCTAssertLessThan(html.range(of: metadata)!.lowerBound, html.range(of: rule)!.lowerBound)
+        XCTAssertLessThan(html.range(of: rule)!.lowerBound, html.range(of: body)!.lowerBound)
+    }
+
+    func testReaderFontSizePresetsHaveStableIncreasingScales() {
+        XCTAssertEqual(ArticleReaderFontSize.allCases.map(\.title), [
+            "Small", "Default", "Large", "Extra Large",
+        ])
+        XCTAssertEqual(ArticleReaderFontSize.allCases.map(\.scale), [0.9, 1, 1.15, 1.3])
+    }
+
+    @MainActor
+    func testReaderUsesPreciseStoredProgressInsteadOfRoundedPercent() {
+        let progress = BookmarkProgress(position: 0.2574, duration: 1, percent: 26)
+        let store = ArticleReaderStore(
+            metadata: Self.metadata(initialProgress: progress),
+            client: Self.client { _ in (500, "{}") }
+        )
+
+        XCTAssertEqual(progress.fraction, 0.2574, accuracy: 0.000_001)
+        XCTAssertEqual(store.initialProgressFraction, 0.2574, accuracy: 0.000_001)
+        XCTAssertEqual(
+            BookmarkProgress(position: 4, duration: 0, percent: 37).fraction,
+            0.37,
+            accuracy: 0.000_001
+        )
+    }
+
+    @MainActor
+    func testProgressWritesRemainOrderedWhenTheFirstRequestIsSlow() async {
+        var writes: [Double] = []
+        var activeWrites = 0
+        var maximumActiveWrites = 0
+        let queue = ArticleProgressWriteQueue { fraction in
+            activeWrites += 1
+            maximumActiveWrites = max(maximumActiveWrites, activeWrites)
+            if fraction == 0.2 {
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            writes.append(fraction)
+            activeWrites -= 1
+            return true
+        }
+
+        let first = Task { @MainActor in await queue.enqueue(0.2) }
+        await Task.yield()
+        let second = Task { @MainActor in await queue.enqueue(0.8) }
+
+        let firstResult = await first.value
+        let secondResult = await second.value
+        XCTAssertTrue(firstResult)
+        XCTAssertTrue(secondResult)
+        XCTAssertEqual(writes, [0.2, 0.8])
+        XCTAssertEqual(maximumActiveWrites, 1)
+    }
+
+    func testReaderChromeOffsetDirectlyTracksBothScrollDirections() {
+        var tracker = ArticleReaderChromeOffsetTracker()
+
+        tracker.begin(at: 100)
+        XCTAssertEqual(tracker.update(scrollOffset: 120), 20)
+        XCTAssertEqual(tracker.update(scrollOffset: 150), 50)
+        XCTAssertNil(tracker.update(scrollOffset: 150))
+        XCTAssertEqual(tracker.offset, 50)
+
+        XCTAssertEqual(tracker.update(scrollOffset: 138), 38)
+        XCTAssertEqual(tracker.update(scrollOffset: 100), 0)
+    }
+
+    func testReaderChromeOffsetStaysPutAcrossAPause() {
+        var tracker = ArticleReaderChromeOffsetTracker()
+
+        tracker.begin(at: 0)
+        XCTAssertEqual(tracker.update(scrollOffset: 80), 56)
+        tracker.end()
+        XCTAssertEqual(tracker.offset, 56)
+
+        tracker.begin(at: 80)
+        XCTAssertNil(tracker.update(scrollOffset: 80))
+        XCTAssertEqual(tracker.update(scrollOffset: 66), 42)
+    }
+
     func testCachePersistsOnlyReadableDocumentsPerUser() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "article-cache-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -98,14 +229,23 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertEqual(ArticleReaderURLProtocol.requests.map(\.httpMethod), ["GET", "POST"])
     }
 
-    private static func metadata(title: String = "A dependable reader") -> ArticleReaderMetadata {
+    private static func metadata(
+        title: String = "A dependable reader",
+        creatorImageURL: URL? = nil,
+        initialProgress: BookmarkProgress? = BookmarkProgress(
+            position: 0.25,
+            duration: 1,
+            percent: 25
+        )
+    ) -> ArticleReaderMetadata {
         ArticleReaderMetadata(
             bookmarkID: "bookmark-1",
             title: title,
             creator: "Author",
+            creatorImageURL: creatorImageURL,
             canonicalURL: URL(string: "https://example.com/article")!,
             readingTimeMinutes: 4,
-            initialProgress: BookmarkProgress(position: 0.25, duration: 1, percent: 25),
+            initialProgress: initialProgress,
             isFinished: false
         )
     }

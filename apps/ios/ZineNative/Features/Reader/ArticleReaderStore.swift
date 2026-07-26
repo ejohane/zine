@@ -10,6 +10,29 @@ enum ArticleReaderPhase: Equatable {
 }
 
 @MainActor
+final class ArticleProgressWriteQueue {
+    typealias Write = @MainActor (Double) async -> Bool
+
+    private let write: Write
+    private var tail: Task<Bool, Never>?
+
+    init(write: @escaping Write) {
+        self.write = write
+    }
+
+    func enqueue(_ fraction: Double) async -> Bool {
+        let previous = tail
+        let write = self.write
+        let task = Task { @MainActor in
+            _ = await previous?.value
+            return await write(fraction)
+        }
+        tail = task
+        return await task.value
+    }
+}
+
+@MainActor
 @Observable
 final class ArticleReaderStore {
     private(set) var phase: ArticleReaderPhase
@@ -19,6 +42,7 @@ final class ArticleReaderStore {
     let initialProgressFraction: Double
 
     private let client: APIClient
+    private let progressWriteQueue: ArticleProgressWriteQueue
     private var loadGeneration = 0
 
     init(
@@ -28,12 +52,26 @@ final class ArticleReaderStore {
     ) {
         self.metadata = metadata
         self.client = client
+        let bookmarkID = metadata.bookmarkID
+        progressWriteQueue = ArticleProgressWriteQueue { fraction in
+            do {
+                try await client.updateProgress(id: bookmarkID, fraction: fraction)
+                return true
+            } catch is CancellationError {
+                return false
+            } catch {
+                do {
+                    try await Task.sleep(for: .milliseconds(500))
+                    try await client.updateProgress(id: bookmarkID, fraction: fraction)
+                    return true
+                } catch {
+                    return false
+                }
+            }
+        }
         phase = initialPhase
         isFinished = metadata.isFinished
-        initialProgressFraction = min(
-            max((metadata.initialProgress?.percent ?? 0) / 100, 0),
-            1
-        )
+        initialProgressFraction = metadata.initialProgress?.fraction ?? 0
     }
 
     var readyDocument: ArticleReaderDocument? {
@@ -80,18 +118,7 @@ final class ArticleReaderStore {
 
     func persistProgress(_ fraction: Double) async -> BookmarkProgress? {
         let clamped = min(max(fraction, 0), 1)
-        do {
-            try await client.updateProgress(id: metadata.bookmarkID, fraction: clamped)
-        } catch is CancellationError {
-            return nil
-        } catch {
-            do {
-                try await Task.sleep(for: .milliseconds(500))
-                try await client.updateProgress(id: metadata.bookmarkID, fraction: clamped)
-            } catch {
-                return nil
-            }
-        }
+        guard await progressWriteQueue.enqueue(clamped) else { return nil }
 
         return BookmarkProgress(
             position: clamped,

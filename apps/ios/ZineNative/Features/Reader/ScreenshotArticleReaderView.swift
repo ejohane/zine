@@ -1,12 +1,19 @@
 import SwiftUI
 
 struct ScreenshotArticleReaderView: View {
+    private enum Destination: Hashable {
+        case reader
+    }
+
     let unavailable: Bool
+
+    @State private var path: [Destination] = [.reader]
 
     private let metadata = ArticleReaderMetadata(
         bookmarkID: "fixture-reader",
         title: "Designing Calm Software in a Noisy World",
         creator: "Mina Park",
+        creatorImageURL: URL(string: "https://avatars.githubusercontent.com/u/7396?v=4"),
         canonicalURL: URL(string: "https://example.com/calm-software")!,
         readingTimeMinutes: 7,
         initialProgress: BookmarkProgress(position: 0.18, duration: 1, percent: 18),
@@ -19,15 +26,22 @@ struct ScreenshotArticleReaderView: View {
     )
 
     var body: some View {
-        NavigationStack {
-            ArticleReaderView(
-                metadata: metadata,
-                client: client,
-                initialPhase: unavailable ? .unavailable(
-                    "This page doesn’t contain a dependable article body, so Zine won’t show an incomplete version."
-                ) : .ready(document),
-                loadsOnAppear: false
-            )
+        NavigationStack(path: $path) {
+            Text("Reader fixture root")
+                .accessibilityIdentifier("article-reader-fixture-root")
+                .navigationDestination(for: Destination.self) { destination in
+                    switch destination {
+                    case .reader:
+                        ArticleReaderView(
+                            metadata: metadata,
+                            client: client,
+                            initialPhase: unavailable ? .unavailable(
+                                "This page doesn’t contain a dependable article body, so Zine won’t show an incomplete version."
+                            ) : .ready(document),
+                            loadsOnAppear: false
+                        )
+                    }
+                }
         }
     }
 

@@ -216,6 +216,7 @@ struct BookmarkDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarVisibility(.hidden, for: .tabBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task(id: content.id) {
@@ -286,13 +287,14 @@ struct BookmarkDetailView: View {
 
             Spacer(minLength: 0)
 
-            if content.contentType == .article {
+            if content.provider.opensInZineReader(contentType: content.contentType) {
                 NavigationLink {
                     ArticleReaderView(
                         metadata: ArticleReaderMetadata(
                             bookmarkID: content.id,
                             title: content.title,
                             creator: content.creator,
+                            creatorImageURL: content.creatorImageUrl,
                             canonicalURL: content.canonicalUrl,
                             readingTimeMinutes: content.readingTimeMinutes,
                             initialProgress: content.progress,
@@ -304,12 +306,21 @@ struct BookmarkDetailView: View {
                         onFinishedChanged: updateFinishedState
                     )
                 } label: {
-                    Label("Read", systemImage: "book.pages")
-                        .font(.subheadline.weight(.semibold))
+                    Image(systemName: "book.pages")
+                        .resizable()
+                        .scaledToFit()
+                        .symbolRenderingMode(.monochrome)
+                        .frame(
+                            width: ProviderOpenButton.iconSize,
+                            height: ProviderOpenButton.iconSize
+                        )
+                        .frame(
+                            width: ProviderOpenButton.controlSize,
+                            height: ProviderOpenButton.controlSize
+                        )
+                        .background(Color("AccentColor"), in: Circle())
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 48)
-                        .background(Color.accentColor, in: Capsule())
+                        .accessibilityHidden(true)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Read in Zine")

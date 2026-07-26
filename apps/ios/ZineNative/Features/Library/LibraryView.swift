@@ -11,7 +11,6 @@ struct LibraryView: View {
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
-    @Namespace private var bookmarkTransition
 
     init(
         client: APIClient,
@@ -68,9 +67,6 @@ struct LibraryView: View {
                             store.setBookmarked(changed, isBookmarked: isBookmarked)
                         },
                         onExternalOpen: onExternalOpen
-                    )
-                    .navigationTransition(
-                        .zoom(sourceID: bookmark.id, in: bookmarkTransition)
                     )
                 }
         }
@@ -131,7 +127,6 @@ struct LibraryView: View {
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
                 .listRowSeparator(.hidden)
-                .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if !bookmark.isFinished {
                         Button {

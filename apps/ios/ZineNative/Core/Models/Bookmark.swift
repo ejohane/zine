@@ -42,6 +42,10 @@ enum Provider: String, Codable, CaseIterable, Identifiable {
         case .x: "X"
         }
     }
+
+    func opensInZineReader(contentType: ContentType) -> Bool {
+        contentType == .article && self != .substack
+    }
 }
 
 struct BookmarkTag: Codable, Hashable, Identifiable {
@@ -53,6 +57,11 @@ struct BookmarkProgress: Codable, Hashable {
     let position: Double
     let duration: Double
     let percent: Double
+
+    var fraction: Double {
+        let value = duration > 0 ? position / duration : percent / 100
+        return min(max(value, 0), 1)
+    }
 }
 
 struct Bookmark: Codable, Hashable, Identifiable {
