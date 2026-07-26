@@ -1,15 +1,19 @@
 import SwiftUI
 
 struct ArticleReaderView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    @AppStorage(ArticleReaderFontSize.storageKey) private var storedFontSize =
+        ArticleReaderFontSize.standard.rawValue
 
     @State private var store: ArticleReaderStore
     @State private var scrollProgress: Double
     @State private var lastPersistedProgress: Double
     @State private var hasRecordedOpen = false
     @State private var isUpdatingFinished = false
+    @State private var readerChromeOffset: CGFloat = 0
 
     private let onRead: () -> Void
     private let onProgressSaved: (BookmarkProgress) -> Void
@@ -25,7 +29,7 @@ struct ArticleReaderView: View {
         onProgressSaved: @escaping (BookmarkProgress) -> Void = { _ in },
         onFinishedChanged: @escaping (Bool) -> Void = { _ in }
     ) {
-        let initialProgress = min(max((metadata.initialProgress?.percent ?? 0) / 100, 0), 1)
+        let initialProgress = metadata.initialProgress?.fraction ?? 0
         _store = State(
             initialValue: ArticleReaderStore(
                 metadata: metadata,
@@ -42,30 +46,31 @@ struct ArticleReaderView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color(uiColor: .systemBackground)
                 .ignoresSafeArea()
 
             phaseContent
+
+            readerChromeViewport
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationTitle(dynamicTypeSize.isAccessibilitySize ? "" : "Reader")
-        .toolbar { readerToolbar }
+        .toolbarVisibility(.hidden, for: .navigationBar)
         .task(id: store.metadata.bookmarkID) {
             guard loadsOnAppear else { return }
             await store.load()
         }
         .task(id: progressWriteKey) {
             guard store.readyDocument != nil,
-                  scrollProgress > 0,
                   abs(scrollProgress - lastPersistedProgress) >= 0.01
             else { return }
+            let progress = scrollProgress
             do {
                 try await Task.sleep(for: .seconds(2))
             } catch {
                 return
             }
-            await persistProgress()
+            guard abs(progress - lastPersistedProgress) >= 0.0001 else { return }
+            await persistProgress(progress)
         }
         .onChange(of: store.readyDocument?.contentHash, initial: true) { _, hash in
             guard hash != nil else { return }
@@ -76,6 +81,7 @@ struct ArticleReaderView: View {
             flushProgress()
         }
         .onDisappear {
+            readerChromeOffset = 0
             flushProgress()
         }
     }
@@ -113,36 +119,16 @@ struct ArticleReaderView: View {
 
     @ViewBuilder
     private func reader(_ document: ArticleReaderDocument) -> some View {
-        VStack(spacing: 0) {
-            if document.isDegraded {
-                degradedNotice
-            }
-
-            ArticleHTMLView(
-                document: document,
-                initialProgress: store.initialProgressFraction,
-                onProgressChanged: { scrollProgress = $0 },
-                onOpenURL: { openURL($0) }
-            )
-            .accessibilityIdentifier("article-reader-content")
-        }
-    }
-
-    private var degradedNotice: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
-            Text("This article may be incomplete.")
-                .font(.subheadline.weight(.medium))
-            Spacer(minLength: 8)
-            Button("View Original") {
-                openOriginal()
-            }
-            .font(.subheadline.weight(.semibold))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.orange.opacity(0.1))
+        ArticleHTMLView(
+            document: document,
+            initialProgress: store.initialProgressFraction,
+            fontScale: readerFontSize.scale,
+            onProgressChanged: { scrollProgress = $0 },
+            onScrollSettled: persistSettledProgress,
+            onChromeOffsetChanged: { readerChromeOffset = $0 },
+            onOpenURL: { openURL($0) }
+        )
+        .accessibilityIdentifier("article-reader-content")
     }
 
     private func unavailableView(message: String, retryable: Bool) -> some View {
@@ -164,34 +150,78 @@ struct ArticleReaderView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var readerToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            ShareLink(item: store.metadata.canonicalURL) {
-                Image(systemName: "square.and.arrow.up")
-            }
-            .accessibilityLabel("Share article")
-
+    private var readerChrome: some View {
+        HStack(spacing: 10) {
             Button {
-                openOriginal()
+                dismiss()
             } label: {
-                Image(systemName: "safari")
+                Image(systemName: "chevron.left")
+                    .font(.headline.weight(.semibold))
+                    .frame(width: 44, height: 44)
             }
-            .accessibilityLabel("Open original article")
+            .buttonStyle(.plain)
+            .background(.thinMaterial, in: Circle())
+            .accessibilityLabel("Back")
 
-            Button {
-                Task { await toggleFinished() }
-            } label: {
-                Image(systemName: store.isFinished ? "checkmark.circle.fill" : "checkmark.circle")
-                    .foregroundStyle(store.isFinished ? .green : .primary)
+            Spacer(minLength: 8)
+
+            HStack(spacing: 0) {
+                Menu {
+                    ForEach(ArticleReaderFontSize.allCases) { fontSize in
+                        Button {
+                            storedFontSize = fontSize.rawValue
+                        } label: {
+                            if fontSize == readerFontSize {
+                                Label(fontSize.title, systemImage: "checkmark")
+                            } else {
+                                Text(fontSize.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "textformat.size")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Reader text size")
+
+                ShareLink(item: store.metadata.canonicalURL) {
+                    Image(systemName: "square.and.arrow.up")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Share article")
+
+                Button {
+                    openOriginal()
+                } label: {
+                    Image(systemName: "safari")
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Open original article")
             }
-            .disabled(isUpdatingFinished)
-            .accessibilityLabel(store.isFinished ? "Mark unfinished" : "Mark finished")
+            .background(.thinMaterial, in: Capsule())
         }
+        .padding(.horizontal, 12)
+        .frame(height: ArticleReaderChromeOffsetTracker.maximumOffset)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("article-reader-chrome")
+    }
+
+    private var readerChromeViewport: some View {
+        ZStack(alignment: .top) {
+            readerChrome
+                .offset(y: -readerChromeOffset)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: ArticleReaderChromeOffsetTracker.maximumOffset, alignment: .top)
+        .clipped()
     }
 
     private var progressWriteKey: Int {
         Int((scrollProgress * 100).rounded(.down))
+    }
+
+    private var readerFontSize: ArticleReaderFontSize {
+        ArticleReaderFontSize(rawValue: storedFontSize) ?? .standard
     }
 
     private func recordOpenIfNeeded() {
@@ -205,25 +235,26 @@ struct ArticleReaderView: View {
         openURL(store.metadata.canonicalURL)
     }
 
-    private func persistProgress() async {
-        guard let progress = await store.persistProgress(scrollProgress) else { return }
-        lastPersistedProgress = scrollProgress
+    private func persistSettledProgress(_ progress: Double) {
+        scrollProgress = progress
+        guard store.readyDocument != nil,
+              abs(progress - lastPersistedProgress) >= 0.0001
+        else { return }
+        Task { await persistProgress(progress) }
+    }
+
+    private func persistProgress(_ fraction: Double) async {
+        guard let progress = await store.persistProgress(fraction) else { return }
+        lastPersistedProgress = progress.fraction
         onProgressSaved(progress)
     }
 
     private func flushProgress() {
         guard store.readyDocument != nil,
-              scrollProgress > 0,
-              abs(scrollProgress - lastPersistedProgress) >= 0.005
+              abs(scrollProgress - lastPersistedProgress) >= 0.0001
         else { return }
         let progress = scrollProgress
-        Task {
-            guard let saved = await store.persistProgress(progress) else { return }
-            await MainActor.run {
-                lastPersistedProgress = progress
-                onProgressSaved(saved)
-            }
-        }
+        Task { await persistProgress(progress) }
     }
 
     private func toggleFinished() async {

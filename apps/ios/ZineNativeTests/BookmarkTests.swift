@@ -93,4 +93,11 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(Provider.substack.creatorActionTitle, "View on Substack")
         XCTAssertEqual(Provider.x.creatorActionTitle, "View on X")
     }
+
+    func testSubstackArticlesKeepTheirNativeProviderDestination() {
+        XCTAssertTrue(Provider.web.opensInZineReader(contentType: .article))
+        XCTAssertTrue(Provider.rss.opensInZineReader(contentType: .article))
+        XCTAssertFalse(Provider.substack.opensInZineReader(contentType: .article))
+        XCTAssertFalse(Provider.substack.opensInZineReader(contentType: .post))
+    }
 }

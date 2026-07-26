@@ -35,9 +35,6 @@ struct HomeView: View {
                 .navigationTitle("Home")
                 .navigationDestination(for: HomeNavigationRoute.self) { route in
                     destination(for: route)
-                        .navigationTransition(
-                            .zoom(sourceID: route.sourceID, in: bookmarkTransition)
-                        )
                 }
                 .navigationDestination(for: HomeSectionRoute.self) { route in
                     switch route {

@@ -156,6 +156,9 @@ struct ProviderLinkButton: View {
 }
 
 struct ProviderOpenButton: View {
+    static let iconSize: CGFloat = 27
+    static let controlSize: CGFloat = 56
+
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
 
@@ -181,8 +184,8 @@ struct ProviderOpenButton: View {
             openURL(destination)
         } label: {
             providerLogo
-                .frame(width: 27, height: 27)
-                .frame(width: 56, height: 56)
+                .frame(width: Self.iconSize, height: Self.iconSize)
+                .frame(width: Self.controlSize, height: Self.controlSize)
                 .background(action.backgroundColor, in: Circle())
                 .foregroundStyle(action.foregroundColor)
                 .accessibilityHidden(true)
