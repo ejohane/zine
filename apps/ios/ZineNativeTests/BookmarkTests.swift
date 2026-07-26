@@ -24,6 +24,28 @@ final class BookmarkTests: XCTestCase {
         XCTAssertEqual(bookmark.consumptionLabel, "1 hr 32 min")
     }
 
+    func testDecodesBookmarkSubscriptionSettingsAndFormatsActions() throws {
+        let enabled = try JSONDecoder().decode(
+            BookmarkSubscriptionSettingsResponse.self,
+            from: Data(
+                """
+                {"subscription":{"sourceId":"feed_1","provider":"GMAIL","autoBookmark":true}}
+                """.utf8
+            )
+        ).subscription
+        let disabled = try JSONDecoder().decode(
+            BookmarkSubscriptionSettingsResponse.self,
+            from: Data(
+                """
+                {"subscription":{"sourceId":"sub_1","provider":"YOUTUBE","autoBookmark":false}}
+                """.utf8
+            )
+        ).subscription
+
+        XCTAssertEqual(enabled?.actionTitle, "Stop Auto-bookmarking")
+        XCTAssertEqual(disabled?.actionTitle, "Auto-bookmark New Items")
+    }
+
     func testLibraryQueryIdentityIncludesEveryFilter() {
         let first = LibraryQuery(search: "swift", isFinished: false, provider: .rss, contentType: .article)
         let second = LibraryQuery(search: "swift", isFinished: true, provider: .rss, contentType: .article)

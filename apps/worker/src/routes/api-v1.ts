@@ -1834,6 +1834,21 @@ apiV1Routes.get('/bookmarks/:id', apiAuth('bookmarks:read'), async (c) => {
   }
 });
 
+apiV1Routes.get('/bookmarks/:id/subscription-settings', apiAuth('bookmarks:read'), async (c) => {
+  const caller = appRouter.createCaller(await createContext(c));
+
+  try {
+    const result = await caller.items.subscriptionSettings({ id: c.req.param('id') });
+    return c.json({
+      ...result,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    });
+  } catch (error) {
+    return trpcErrorResponse(c, error);
+  }
+});
+
 apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsedBody = FinishBookmarkBodySchema.safeParse(body);

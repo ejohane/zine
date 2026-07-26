@@ -9,6 +9,10 @@ struct BookmarkResponse: Decodable {
     let item: Bookmark
 }
 
+struct BookmarkSubscriptionSettingsResponse: Decodable {
+    let subscription: BookmarkSubscriptionSettings?
+}
+
 struct CreatorResponse: Decodable {
     let creator: CreatorProfile
 }
