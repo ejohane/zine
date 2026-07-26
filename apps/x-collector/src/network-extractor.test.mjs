@@ -46,6 +46,18 @@ function tweet(id, username, options = {}) {
   };
 }
 
+function modernUserTweet(id, username) {
+  const value = tweet(id, username);
+  value.core.user_results.result = {
+    rest_id: `user-${username}`,
+    is_blue_verified: true,
+    core: { screen_name: username, name: `Modern ${username}` },
+    avatar: { image_url: `https://img.example/modern-${username}.jpg` },
+    verification: { verified: true },
+  };
+  return value;
+}
+
 function item(value) {
   return { item: { itemContent: { tweet_results: { result: value } } } };
 }
@@ -57,6 +69,27 @@ function timelinePayload(entries) {
 }
 
 describe('network response extraction', () => {
+  it('reads the current split X user shape without degrading authors to unknown', () => {
+    const primary = modernUserTweet('modern-1', 'currentshape');
+    const payload = timelinePayload([
+      {
+        entryId: 'tweet-modern-1',
+        content: { itemContent: { tweet_results: { result: primary } } },
+      },
+    ]);
+
+    const batch = extractTimelineGraphQLResponse(payload, { observedAt, sourceType: 'FAVORITES' });
+
+    expect(batch.posts[0].author).toEqual({
+      id: 'user-currentshape',
+      username: 'currentshape',
+      name: 'Modern currentshape',
+      profileUrl: 'https://x.com/currentshape',
+      profileImageUrl: 'https://img.example/modern-currentshape.jpg',
+      verified: true,
+    });
+  });
+
   it('recognizes stable operation names and rejects a mismatched list source', () => {
     const variables = encodeURIComponent(JSON.stringify({ listId: '123' }));
     expect(

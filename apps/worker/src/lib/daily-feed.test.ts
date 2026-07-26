@@ -312,7 +312,7 @@ function fakeArchiveDb(
 }
 
 describe('people-first daily feed', () => {
-  it('groups exact same-conversation posts even when an intermediate parent is unavailable', async () => {
+  it('collapses exact same-conversation posts even when an intermediate parent is unavailable', async () => {
     const conversationRows = [
       postRow({
         id: '500',
@@ -346,18 +346,29 @@ describe('people-first daily feed', () => {
       { now: NOW }
     );
 
-    expect(result.conversations).toEqual([
+    expect(result.conversations).toEqual([]);
+    expect(result.threadUnits).toEqual([
       expect.objectContaining({
-        evidenceType: 'DIRECT_RELATIONSHIP',
+        id: 'conversation:500',
         postIds: ['500', '502'],
         relationshipTypes: ['CONVERSATION_ID'],
       }),
     ]);
   });
 
-  it('filters to explicit sources and groups only relationship-backed conversations', async () => {
+  it('filters to explicit sources and keeps relationship-backed posts in one thread unit', async () => {
     const result = await getDailyFeed(fakeArchiveDb(), USER_ID, { now: NOW });
 
+    expect(result).toMatchObject({
+      schemaVersion: 2,
+      variant: { id: 'people-first-v3', mode: 'REVIEW' },
+      clustering: {
+        version: 'daily-topics-v1',
+        method: 'THREAD_FIRST_EVIDENCE_CLUSTERING',
+        maxTopics: 5,
+        minimumFavoriteAuthors: 2,
+      },
+    });
     expect(result.coverage).toMatchObject({
       status: 'COMPLETE',
       archiveStatus: 'COMPLETE',
@@ -383,15 +394,20 @@ describe('people-first daily feed', () => {
         },
       ],
     });
-    expect(result.conversations).toEqual([
-      expect.objectContaining({
-        evidenceType: 'DIRECT_RELATIONSHIP',
-        postIds: ['101', '100'],
-        authors: ['bob', 'alice'],
-        favoriteAuthors: ['bob', 'reposter'],
-      }),
-    ]);
-    expect(result.sections).toEqual({ favoritePostIds: [], followingPostIds: ['102'] });
+    expect(result.conversations).toEqual([]);
+    expect(result.threadUnits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          postIds: ['101', '100'],
+          authors: ['bob', 'alice'],
+          favoriteAuthors: ['bob', 'reposter'],
+        }),
+      ])
+    );
+    expect(result.sections).toMatchObject({
+      favoritePostIds: ['100', '101'],
+      followingPostIds: ['102'],
+    });
     expect(result.inputs).toMatchObject({
       favorites: { runId: 'favorites-run', sourceId: 'favorites' },
       following: { runId: 'following-run' },
@@ -415,7 +431,7 @@ describe('people-first daily feed', () => {
     expect(result.posts).toHaveLength(3);
   });
 
-  it('groups a Favorite reply with immutable run context without adding context to streams', async () => {
+  it('collapses a Favorite reply with immutable run context without adding context to streams', async () => {
     const favoriteReply = postRow({
       id: '200',
       authorKey: 'id:alice',
@@ -454,15 +470,15 @@ describe('people-first daily feed', () => {
 
     const result = await getDailyFeed(db, USER_ID, { now: NOW });
 
-    expect(result.conversations).toEqual([
+    expect(result.conversations).toEqual([]);
+    expect(result.threadUnits).toEqual([
       expect.objectContaining({
-        evidenceType: 'DIRECT_RELATIONSHIP',
         favoritePostIds: ['200'],
         contextPostIds: ['199'],
         postIds: ['199', '200'],
       }),
     ]);
-    expect(result.sections).toEqual({ favoritePostIds: [], followingPostIds: [] });
+    expect(result.sections).toMatchObject({ favoritePostIds: ['200'], followingPostIds: [] });
     expect(result.posts.find((post) => post.id === '199')?.sourceIds).toEqual([]);
   });
 
@@ -577,7 +593,7 @@ describe('people-first daily feed', () => {
     expect(result.sections.followingPostIds).toEqual(['102']);
   });
 
-  it('groups Favorite quote context and preserves its explicit evidence', async () => {
+  it('preserves Favorite quote context without treating a quote pair as a topic', async () => {
     const quote = postRow({
       id: 'quote-2',
       authorKey: 'id:alice',
@@ -619,12 +635,11 @@ describe('people-first daily feed', () => {
       { now: NOW }
     );
 
-    expect(result.conversations[0]).toMatchObject({
-      evidenceType: 'DIRECT_RELATIONSHIP',
-      relationshipTypes: ['QUOTE_OF'],
-      favoritePostIds: ['quote-2'],
-      contextPostIds: ['quote-1'],
-    });
+    expect(result.conversations).toEqual([]);
+    expect(result.sections.favoritePostIds).toEqual(['quote-2']);
+    expect(result.posts.find((post) => post.id === 'quote-2')?.relationships).toEqual([
+      expect.objectContaining({ type: 'QUOTE_OF', tweetId: 'quote-1' }),
+    ]);
   });
 
   it('groups a shared normalized link but leaves weak topic overlap ungrouped', async () => {
@@ -681,7 +696,7 @@ describe('people-first daily feed', () => {
 
     expect(result.conversations).toEqual([
       expect.objectContaining({
-        evidenceType: 'SHARED_LINK',
+        evidenceType: 'TOPIC_SIMILARITY',
         favoritePostIds: ['link-1', 'link-2'],
       }),
     ]);
@@ -713,7 +728,7 @@ describe('people-first daily feed', () => {
       'did not prove complete 24-hour coverage'
     );
     expect(result.freshness.warnings).toContain('1 Favorite thread expansion was truncated.');
-    expect(result.conversations[0]?.coverageWarnings).toContain('context_budget_reached');
+    expect(result.threadUnits[0]?.coverageWarnings).not.toContain('context_budget_reached');
     expect(result.inputs.favorites?.contextCoverage).toMatchObject({ truncated: 1, failed: 1 });
   });
 

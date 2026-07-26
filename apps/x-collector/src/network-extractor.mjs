@@ -53,14 +53,17 @@ function unwrapTweet(value) {
 function authorFromTweet(tweet) {
   const user = object(tweet?.core?.user_results?.result);
   const legacy = object(user?.legacy) || {};
-  const username = legacy.screen_name || 'unknown';
+  const core = object(user?.core) || {};
+  const avatar = object(user?.avatar) || {};
+  const verification = object(user?.verification) || {};
+  const username = core.screen_name || legacy.screen_name || 'unknown';
   return {
     id: user?.rest_id || null,
     username,
-    name: legacy.name || username,
+    name: core.name || legacy.name || username,
     profileUrl: `${X_ORIGIN}/${username}`,
-    profileImageUrl: legacy.profile_image_url_https || null,
-    verified: user?.is_blue_verified ?? legacy.verified ?? null,
+    profileImageUrl: avatar.image_url || legacy.profile_image_url_https || null,
+    verified: user?.is_blue_verified ?? verification.verified ?? legacy.verified ?? null,
   };
 }
 

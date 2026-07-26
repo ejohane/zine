@@ -3,6 +3,82 @@ import XCTest
 @testable import ZineNative
 
 final class EditorialTests: XCTestCase {
+    func testDecodesPeopleFirstV3ThreadAndTopicContract() throws {
+        let response = try JSONDecoder().decode(
+            DailyFeedResponse.self,
+            from: Data(
+                """
+                {
+                  "schemaVersion":2,
+                  "variant":{"id":"people-first-v3","mode":"REVIEW"},
+                  "date":"2026-07-25",
+                  "timezone":"America/Chicago",
+                  "frozenAt":"2026-07-25T13:00:00.000Z",
+                  "freshness":{"isCurrent":true,"status":"COMPLETE","warnings":[]},
+                  "coverage":{
+                    "status":"COMPLETE","archiveStatus":"COMPLETE",
+                    "selectionStatus":"COMPLETE","runId":"run-1",
+                    "requestedCount":5000,"collectedCount":2,
+                    "message":"Complete rolling-window review slice."
+                  },
+                  "sources":[],
+                  "conversations":[],
+                  "topicClusters":[{
+                    "id":"topic:daily-topics-v1:one","label":"Open weight models",
+                    "labelSource":"EXTRACTED_PHRASE","labelTerms":["Open weight models"],
+                    "evidence":"2 Favorite conversations from 2 authors share explicit evidence.",
+                    "evidenceSignals":[{
+                      "type":"SHARED_PHRASE","value":"Open weight models",
+                      "threadUnitIds":["post:1","post:2"]
+                    }],
+                    "threadUnitIds":["post:1","post:2"],
+                    "favoriteThreadUnitIds":["post:1","post:2"],
+                    "supportingThreadUnitIds":[],"postIds":["1","2"],
+                    "favoritePostIds":["1","2"],"contextPostIds":[],
+                    "favoriteAuthors":["alice","bob"],"supportingAuthors":[],
+                    "score":250,"latestActivityAt":"2026-07-25T12:00:00.000Z",
+                    "coverageWarnings":[]
+                  }],
+                  "threadUnits":[{
+                    "id":"post:1","conversationId":"1","rootPostId":"1",
+                    "postIds":["1"],"favoritePostIds":["1"],"followingPostIds":[],
+                    "contextPostIds":[],"authorKeys":["id:alice"],
+                    "favoriteAuthorKeys":["id:alice"],"authors":["alice"],
+                    "favoriteAuthors":["alice"],"relationshipTypes":[],
+                    "structureStatus":"EXACT","latestActivityAt":"2026-07-25T12:00:00.000Z",
+                    "firstSourcePosition":0,"coverageWarnings":[]
+                  },{
+                    "id":"post:2","conversationId":"2","rootPostId":"2",
+                    "postIds":["2"],"favoritePostIds":["2"],"followingPostIds":[],
+                    "contextPostIds":[],"authorKeys":["id:bob"],
+                    "favoriteAuthorKeys":["id:bob"],"authors":["bob"],
+                    "favoriteAuthors":["bob"],"relationshipTypes":[],
+                    "structureStatus":"EXACT","latestActivityAt":"2026-07-25T11:00:00.000Z",
+                    "firstSourcePosition":1,"coverageWarnings":[]
+                  }],
+                  "clustering":{
+                    "version":"daily-topics-v1","method":"THREAD_FIRST_EVIDENCE_CLUSTERING",
+                    "semanticStatus":"COMPLETE","embeddingModel":"@cf/qwen/qwen3-embedding-0.6b",
+                    "maxTopics":5,"minimumFavoriteAuthors":2,
+                    "candidateLimit":40,"semanticUnitLimit":256
+                  },
+                  "posts":[],
+                  "sections":{
+                    "favoritePostIds":[],"followingPostIds":[],
+                    "favoriteThreadUnitIds":[],"followingThreadUnitIds":[]
+                  },
+                  "requestId":"request-1","traceId":"trace-1"
+                }
+                """.utf8
+            )
+        )
+
+        XCTAssertEqual(response.variant.id, "people-first-v3")
+        XCTAssertEqual(response.clustering?.version, "daily-topics-v1")
+        XCTAssertEqual(response.threadUnits?.count, 2)
+        XCTAssertEqual(response.topicClusters?.first?.favoriteThreadUnitIds, ["post:1", "post:2"])
+    }
+
     func testDecodesPeopleFirstDailyFeedWithEvidenceAndPostContext() throws {
         let response = try JSONDecoder().decode(
             DailyFeedResponse.self,

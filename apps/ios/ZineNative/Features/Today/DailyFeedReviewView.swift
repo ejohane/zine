@@ -75,30 +75,28 @@ private struct DailyFeedContent: View {
         Dictionary(uniqueKeysWithValues: response.sources.map { ($0.id, $0.name) })
     }
 
-    private var favoritePosts: [DailyPost] {
-        let ids = response.sections?.favoritePostIds
-            ?? response.posts.filter {
-                $0.sourceIds.contains(where: isFavoriteSource) && !conversationPostIDs.contains($0.id)
-            }.map(\.id)
-        return ids.compactMap { postsByID[$0] }
+    private var threadUnitsByID: [String: DailyThreadUnit] {
+        Dictionary(uniqueKeysWithValues: (response.threadUnits ?? []).map { ($0.id, $0) })
     }
 
-    private var followingPosts: [DailyPost] {
-        let ids = response.sections?.followingPostIds
-            ?? response.posts.filter {
-                !$0.sourceIds.contains(where: isFavoriteSource) && !conversationPostIDs.contains($0.id)
-            }.map(\.id)
-        return ids.compactMap { postsByID[$0] }
+    private var favoriteThreadUnits: [DailyThreadUnit] {
+        (response.sections?.favoriteThreadUnitIds ?? []).compactMap { threadUnitsByID[$0] }
     }
 
-    private var conversationPostIDs: Set<String> {
-        Set(response.conversations.flatMap(\.postIds))
+    private var followingThreadUnits: [DailyThreadUnit] {
+        (response.sections?.followingThreadUnitIds ?? []).compactMap { threadUnitsByID[$0] }
     }
 
-    private func isFavoriteSource(_ sourceID: String) -> Bool {
-        response.sources.first(where: { $0.id == sourceID }).map {
-            $0.type == .favorites || $0.type == .list
-        } ?? false
+    private var legacyFavoritePosts: [DailyPost] {
+        (response.sections?.favoritePostIds ?? []).compactMap { postsByID[$0] }
+    }
+
+    private var legacyFollowingPosts: [DailyPost] {
+        (response.sections?.followingPostIds ?? []).compactMap { postsByID[$0] }
+    }
+
+    private var usesThreadFirstContract: Bool {
+        response.topicClusters != nil && response.threadUnits != nil
     }
 
     var body: some View {
@@ -112,12 +110,34 @@ private struct DailyFeedContent: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 16)
 
-                sectionTitle("FAVORITES", "Conversations from Favorites")
+                sectionTitle("FAVORITES", "What Favorites are talking about")
                     .padding(.horizontal, 18)
                     .padding(.top, 30)
 
-                if response.conversations.isEmpty {
-                    Text("No evidence-backed Favorite conversations were found in this frozen slice.")
+                if usesThreadFirstContract, let topics = response.topicClusters {
+                    if topics.isEmpty {
+                        Text("No topic has enough independent Favorite voices in this frozen slice.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 18)
+                            .padding(.top, 10)
+                    } else {
+                        LazyVStack(spacing: 14) {
+                            ForEach(topics) { topic in
+                                DailyTopicClusterCard(
+                                    topic: topic,
+                                    threadUnitsByID: threadUnitsByID,
+                                    postsByID: postsByID,
+                                    sourceNames: sourceNames,
+                                    date: response.date
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 18)
+                        .padding(.top, 14)
+                    }
+                } else if response.conversations.isEmpty {
+                    Text("No evidence-backed Favorite topics were found in this frozen slice.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 18)
@@ -142,54 +162,75 @@ private struct DailyFeedContent: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 34)
 
-                if favoritePosts.isEmpty {
+                if usesThreadFirstContract, favoriteThreadUnits.isEmpty {
                     ContentUnavailableView(
-                        "No additional Favorite posts",
+                        "No additional Favorite conversations",
                         systemImage: "person.2.slash",
-                        description: Text("Favorite posts in this slice are either grouped above or unavailable under the disclosed coverage.")
+                        description: Text("Favorite conversations in this slice are either grouped above or unavailable under the disclosed coverage.")
                     )
                     .padding(.top, 34)
-                } else {
+                } else if usesThreadFirstContract {
                     LazyVStack(spacing: 14) {
-                        ForEach(favoritePosts) { post in
-                            DailyFeedPostCard(
-                                post: post,
+                        ForEach(favoriteThreadUnits) { threadUnit in
+                            DailyThreadUnitCard(
+                                threadUnit: threadUnit,
+                                postsByID: postsByID,
                                 sourceNames: sourceNames,
-                                authorDestinationDate: response.date
+                                date: response.date
                             )
                         }
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 16)
                     .padding(.bottom, 38)
+                } else {
+                    legacyPostList(legacyFavoritePosts)
                 }
 
                 sectionTitle("FOLLOWING", "More from Following")
                     .padding(.horizontal, 18)
                     .padding(.top, 34)
 
-                if followingPosts.isEmpty {
-                    Text("No additional Following posts remain after conversation context and deduplication.")
+                if usesThreadFirstContract, followingThreadUnits.isEmpty {
+                    Text("No additional Following conversations remain after topic support and deduplication.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 18)
                         .padding(.top, 10)
-                } else {
+                } else if usesThreadFirstContract {
                     LazyVStack(spacing: 14) {
-                        ForEach(followingPosts) { post in
-                            DailyFeedPostCard(
-                                post: post,
+                        ForEach(followingThreadUnits) { threadUnit in
+                            DailyThreadUnitCard(
+                                threadUnit: threadUnit,
+                                postsByID: postsByID,
                                 sourceNames: sourceNames,
-                                authorDestinationDate: response.date
+                                date: response.date
                             )
                         }
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 16)
                     .padding(.bottom, 38)
+                } else {
+                    legacyPostList(legacyFollowingPosts)
                 }
             }
         }
+    }
+
+    private func legacyPostList(_ posts: [DailyPost]) -> some View {
+        LazyVStack(spacing: 14) {
+            ForEach(posts) { post in
+                DailyFeedPostCard(
+                    post: post,
+                    sourceNames: sourceNames,
+                    authorDestinationDate: response.date
+                )
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 16)
+        .padding(.bottom, 38)
     }
 
     private func sectionTitle(_ eyebrow: String, _ title: String) -> some View {
@@ -263,6 +304,12 @@ private struct DailyCoverageNotice: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+            if let clustering = response.clustering {
+                Label(topicMethod(clustering), systemImage: "point.3.connected.trianglepath.dotted")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             ForEach(response.freshness.warnings, id: \.self) { warning in
                 Label(warning, systemImage: "exclamationmark.circle")
                     .font(.caption)
@@ -296,6 +343,208 @@ private struct DailyCoverageNotice: View {
 
     private var statusColor: Color {
         response.coverage.status == .complete ? .green : .orange
+    }
+
+    private func topicMethod(_ clustering: DailyTopicClustering) -> String {
+        if let model = clustering.embeddingModel {
+            let scope = clustering.semanticStatus == "PARTIAL" ? "bounded" : "complete"
+            return "Topics use extracted evidence plus \(scope) pinned semantic similarity (\(model))."
+        }
+        return "Topics use deterministic extracted phrases, links, and relationships."
+    }
+}
+
+private struct DailyTopicClusterCard: View {
+    let topic: DailyTopicCluster
+    let threadUnitsByID: [String: DailyThreadUnit]
+    let postsByID: [String: DailyPost]
+    let sourceNames: [String: String]
+    let date: String
+
+    @State private var showsAllFavorites = false
+    @State private var showsFollowingSupport = false
+
+    private var favoriteUnits: [DailyThreadUnit] {
+        topic.favoriteThreadUnitIds.compactMap { threadUnitsByID[$0] }
+    }
+
+    private var supportingUnits: [DailyThreadUnit] {
+        topic.supportingThreadUnitIds.compactMap { threadUnitsByID[$0] }
+    }
+
+    private var visibleFavoriteUnits: [DailyThreadUnit] {
+        showsAllFavorites ? favoriteUnits : Array(favoriteUnits.prefix(3))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "person.3.sequence.fill")
+                        .foregroundStyle(Color.accentColor)
+                    Text(topic.label)
+                        .font(.title3.weight(.bold))
+                    Spacer(minLength: 0)
+                }
+
+                Text(topic.evidence)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(Array(topic.evidenceSignals.prefix(4))) { signal in
+                            Label(signal.value, systemImage: signalIcon(signal.type))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color.secondary.opacity(0.09), in: Capsule())
+                        }
+                    }
+                }
+
+                ForEach(topic.coverageWarnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            ForEach(visibleFavoriteUnits) { threadUnit in
+                DailyThreadUnitCard(
+                    threadUnit: threadUnit,
+                    postsByID: postsByID,
+                    sourceNames: sourceNames,
+                    date: date,
+                    isEmbedded: true
+                )
+            }
+
+            if favoriteUnits.count > visibleFavoriteUnits.count {
+                Button("Show all \(favoriteUnits.count) Favorite conversations") {
+                    withAnimation(.easeInOut(duration: 0.2)) { showsAllFavorites = true }
+                }
+                .font(.caption.weight(.semibold))
+            } else if showsAllFavorites, favoriteUnits.count > 3 {
+                Button("Show fewer Favorite conversations") {
+                    withAnimation(.easeInOut(duration: 0.2)) { showsAllFavorites = false }
+                }
+                .font(.caption.weight(.semibold))
+            }
+
+            if !supportingUnits.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { showsFollowingSupport.toggle() }
+                } label: {
+                    Label(
+                        showsFollowingSupport
+                            ? "Hide supporting context"
+                            : "Show \(supportingUnits.count) supporting context conversation\(supportingUnits.count == 1 ? "" : "s")",
+                        systemImage: showsFollowingSupport ? "chevron.up" : "chevron.down"
+                    )
+                }
+                .font(.caption.weight(.semibold))
+
+                if showsFollowingSupport {
+                    ForEach(supportingUnits) { threadUnit in
+                        DailyThreadUnitCard(
+                            threadUnit: threadUnit,
+                            postsByID: postsByID,
+                            sourceNames: sourceNames,
+                            date: date,
+                            isEmbedded: true
+                        )
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+        .accessibilityElement(children: .contain)
+    }
+
+    private func signalIcon(_ type: String) -> String {
+        switch type {
+        case "DIRECT_REFERENCE": "quote.bubble"
+        case "SHARED_LINK": "link"
+        case "SHARED_MARKER": "number"
+        case "SEMANTIC_SIMILARITY": "point.3.connected.trianglepath.dotted"
+        default: "text.quote"
+        }
+    }
+}
+
+private struct DailyThreadUnitCard: View {
+    let threadUnit: DailyThreadUnit
+    let postsByID: [String: DailyPost]
+    let sourceNames: [String: String]
+    let date: String
+    var isEmbedded = false
+
+    @State private var isExpanded = false
+
+    private var posts: [DailyPost] {
+        threadUnit.postIds.compactMap { postsByID[$0] }
+    }
+
+    private var visiblePosts: [DailyPost] {
+        isExpanded ? posts : Array(posts.prefix(threadUnit.isThread ? 2 : 1))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if threadUnit.isThread {
+                HStack(spacing: 8) {
+                    Label("\(posts.count)-post thread", systemImage: "arrow.triangle.branch")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(threadUnit.structureStatus == "EXACT" ? "EXACT" : "PARTIAL")
+                        .font(.caption2.weight(.heavy))
+                        .tracking(0.6)
+                        .foregroundStyle(threadUnit.structureStatus == "EXACT" ? .green : .orange)
+                }
+
+                Text(threadUnit.authors.prefix(3).map { "@\($0)" }.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ForEach(Array(visiblePosts.enumerated()), id: \.element.id) { index, post in
+                if index > 0 { Divider() }
+                DailyFeedPostCard(
+                    post: post,
+                    sourceNames: sourceNames,
+                    authorDestinationDate: date,
+                    isEmbedded: true
+                )
+            }
+
+            if posts.count > visiblePosts.count {
+                Button("Show complete \(posts.count)-post thread") {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded = true }
+                }
+                .font(.caption.weight(.semibold))
+            } else if isExpanded, posts.count > 2 {
+                Button("Collapse thread") {
+                    withAnimation(.easeInOut(duration: 0.2)) { isExpanded = false }
+                }
+                .font(.caption.weight(.semibold))
+            }
+
+            ForEach(threadUnit.coverageWarnings, id: \.self) { warning in
+                Label(warning, systemImage: "exclamationmark.circle")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(isEmbedded ? 11 : 14)
+        .background(
+            Color.secondary.opacity(isEmbedded ? 0.055 : 0.08),
+            in: RoundedRectangle(cornerRadius: isEmbedded ? 13 : 16)
+        )
     }
 }
 
@@ -382,15 +631,18 @@ struct DailyFeedPostCard: View {
     let post: DailyPost
     let sourceNames: [String: String]
     private let authorDestinationDate: String?
+    private let isEmbedded: Bool
 
     init(
         post: DailyPost,
         sourceNames: [String: String],
-        authorDestinationDate: String? = nil
+        authorDestinationDate: String? = nil,
+        isEmbedded: Bool = false
     ) {
         self.post = post
         self.sourceNames = sourceNames
         self.authorDestinationDate = authorDestinationDate
+        self.isEmbedded = isEmbedded
     }
 
     var body: some View {
@@ -447,8 +699,11 @@ struct DailyFeedPostCard: View {
                 }
             }
         }
-        .padding(14)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+        .padding(isEmbedded ? 0 : 14)
+        .background(
+            isEmbedded ? Color.clear : Color.secondary.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 
     @ViewBuilder
@@ -681,6 +936,12 @@ private extension DailyPost {
         publishedAt: "2026-07-24T15:00:00.000Z",
         observedAt: "2026-07-24T15:01:00.000Z",
         kind: "POST",
+        conversationId: "123",
+        structure: DailyPostStructure(
+            status: "EXACT",
+            source: "X_WEB_GRAPHQL_LIST",
+            observedAt: "2026-07-24T15:01:00.000Z"
+        ),
         author: .preview,
         media: [],
         links: [],
