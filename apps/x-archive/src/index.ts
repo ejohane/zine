@@ -628,9 +628,18 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, author_key) DO UPDATE SET
           x_user_id = COALESCE(excluded.x_user_id, x_authors.x_user_id),
-          username = excluded.username,
-          name = excluded.name,
-          profile_url = COALESCE(excluded.profile_url, x_authors.profile_url),
+          username = CASE
+            WHEN LOWER(excluded.username) = 'unknown' THEN x_authors.username
+            ELSE excluded.username
+          END,
+          name = CASE
+            WHEN LOWER(excluded.name) = 'unknown' THEN x_authors.name
+            ELSE excluded.name
+          END,
+          profile_url = CASE
+            WHEN LOWER(excluded.username) = 'unknown' THEN x_authors.profile_url
+            ELSE COALESCE(excluded.profile_url, x_authors.profile_url)
+          END,
           profile_image_url = COALESCE(excluded.profile_image_url, x_authors.profile_image_url),
           verified = COALESCE(excluded.verified, x_authors.verified),
           last_seen_at = MAX(x_authors.last_seen_at, excluded.last_seen_at)`

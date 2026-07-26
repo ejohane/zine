@@ -146,6 +146,25 @@ function structurePriority(post: XPost): number {
   return post.structure ? STRUCTURE_PRIORITY[post.structure.source] : -1;
 }
 
+function meaningfulAuthorValue(value: string | null | undefined): boolean {
+  return Boolean(value && value.trim() && value.toLocaleLowerCase() !== 'unknown');
+}
+
+function mergeAuthor(previous: XPost['author'], incoming: XPost['author']): XPost['author'] {
+  const incomingUsernameIsKnown = meaningfulAuthorValue(incoming.username);
+  return {
+    id: incoming.id ?? previous.id ?? null,
+    username: incomingUsernameIsKnown ? incoming.username : previous.username,
+    name: meaningfulAuthorValue(incoming.name) ? incoming.name : previous.name,
+    profileUrl:
+      incomingUsernameIsKnown && meaningfulAuthorValue(incoming.profileUrl)
+        ? incoming.profileUrl
+        : previous.profileUrl,
+    profileImageUrl: incoming.profileImageUrl ?? previous.profileImageUrl ?? null,
+    verified: incoming.verified ?? previous.verified ?? null,
+  };
+}
+
 export function mergePost(previous: XPost | undefined, incoming: XPost): XPost {
   if (!previous) return incoming;
   const richer = structurePriority(incoming) >= structurePriority(previous) ? incoming : previous;
@@ -164,7 +183,7 @@ export function mergePost(previous: XPost | undefined, incoming: XPost): XPost {
     ...richer,
     conversationId: richer.conversationId ?? other.conversationId ?? null,
     structure: richer.structure ?? other.structure,
-    author: { ...other.author, ...richer.author },
+    author: mergeAuthor(other.author, richer.author),
     media: richer.media.length > 0 ? richer.media : other.media,
     links: [...links.values()],
     relationships: [...relationships.values()],

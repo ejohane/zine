@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "variant": { "id": "people-first-v2", "mode": "REVIEW" },
+  "schemaVersion": 2,
+  "variant": { "id": "people-first-v3", "mode": "REVIEW" },
   "date": "2026-07-25",
   "timezone": "America/Chicago",
   "frozenAt": "2026-07-25T10:15:00.000Z",
@@ -46,17 +46,92 @@
       "id": "topic:1:2",
       "evidenceType": "TOPIC_SIMILARITY",
       "label": "Shared topic · swiftdata",
-      "evidence": "2 Favorite posts share multiple explicit terms.",
+      "evidence": "2 Favorite conversations from 2 authors share explicit evidence.",
       "postIds": ["1", "2"],
       "authors": ["alice", "bob"],
       "relationshipTypes": [],
-      "favoritePostIds": ["1"],
-      "contextPostIds": ["2"],
-      "favoriteAuthors": ["alice"],
+      "favoritePostIds": ["1", "2"],
+      "contextPostIds": [],
+      "favoriteAuthors": ["alice", "bob"],
       "latestActivityAt": "2026-07-25T10:00:00.000Z",
       "coverageWarnings": []
     }
   ],
+  "topicClusters": [
+    {
+      "id": "topic:daily-topics-v1:swiftdata",
+      "label": "SwiftData migrations",
+      "labelSource": "EXTRACTED_PHRASE",
+      "labelTerms": ["SwiftData migrations"],
+      "evidence": "2 Favorite conversations from 2 authors share explicit evidence.",
+      "evidenceSignals": [
+        {
+          "type": "SHARED_PHRASE",
+          "value": "SwiftData migrations",
+          "threadUnitIds": ["post:1", "post:2"]
+        }
+      ],
+      "threadUnitIds": ["post:1", "post:2"],
+      "favoriteThreadUnitIds": ["post:1", "post:2"],
+      "supportingThreadUnitIds": [],
+      "postIds": ["1", "2"],
+      "favoritePostIds": ["1", "2"],
+      "contextPostIds": [],
+      "favoriteAuthors": ["alice", "bob"],
+      "supportingAuthors": [],
+      "score": 260,
+      "latestActivityAt": "2026-07-25T10:00:00.000Z",
+      "coverageWarnings": []
+    }
+  ],
+  "threadUnits": [
+    {
+      "id": "post:1",
+      "conversationId": "1",
+      "rootPostId": "1",
+      "postIds": ["1"],
+      "favoritePostIds": ["1"],
+      "followingPostIds": [],
+      "contextPostIds": [],
+      "authorKeys": ["id:alice"],
+      "favoriteAuthorKeys": ["id:alice"],
+      "authors": ["alice"],
+      "favoriteAuthors": ["alice"],
+      "relationshipTypes": [],
+      "structureStatus": "EXACT",
+      "latestActivityAt": "2026-07-25T10:00:00.000Z",
+      "firstSourcePosition": 0,
+      "coverageWarnings": []
+    },
+    {
+      "id": "post:2",
+      "conversationId": "2",
+      "rootPostId": "2",
+      "postIds": ["2"],
+      "favoritePostIds": ["2"],
+      "followingPostIds": [],
+      "contextPostIds": [],
+      "authorKeys": ["id:bob"],
+      "favoriteAuthorKeys": ["id:bob"],
+      "authors": ["bob"],
+      "favoriteAuthors": ["bob"],
+      "relationshipTypes": [],
+      "structureStatus": "EXACT",
+      "latestActivityAt": "2026-07-25T09:55:00.000Z",
+      "firstSourcePosition": 1,
+      "coverageWarnings": []
+    }
+  ],
+  "clustering": {
+    "version": "daily-topics-v1",
+    "method": "THREAD_FIRST_EVIDENCE_CLUSTERING",
+    "semanticStatus": "COMPLETE",
+    "embeddingModel": "@cf/qwen/qwen3-embedding-0.6b",
+    "maxTopics": 5,
+    "minimumFavoriteAuthors": 2,
+    "candidateLimit": 40,
+    "semanticUnitLimit": 256
+  },
   "posts": [
     {
       "id": "1",
@@ -65,6 +140,16 @@
       "publishedAt": "2026-07-25T10:00:00.000Z",
       "observedAt": "2026-07-25T10:01:00.000Z",
       "kind": "POST",
+      "conversationId": "1",
+      "structure": {
+        "status": "EXACT",
+        "source": "NETWORK_LIST_LATEST",
+        "operation": "ListLatestTweetsTimeline",
+        "moduleId": null,
+        "moduleTweetIds": [],
+        "modulePosition": null,
+        "warnings": []
+      },
       "author": {
         "key": "id:alice",
         "username": "alice",
@@ -85,10 +170,20 @@
     {
       "id": "2",
       "url": "https://x.com/bob/status/2",
-      "text": "Following context",
+      "text": "SwiftData migration notes from another Favorite",
       "publishedAt": "2026-07-25T09:55:00.000Z",
       "observedAt": "2026-07-25T10:02:00.000Z",
       "kind": "REPLY",
+      "conversationId": "2",
+      "structure": {
+        "status": "EXACT",
+        "source": "NETWORK_LIST_LATEST",
+        "operation": "ListLatestTweetsTimeline",
+        "moduleId": null,
+        "moduleTweetIds": [],
+        "modulePosition": null,
+        "warnings": []
+      },
       "author": {
         "key": "id:bob",
         "username": "bob",
@@ -103,11 +198,16 @@
       "relationships": [],
       "presentation": "POST",
       "repostedBy": null,
-      "sourceIds": ["following"],
-      "sourcePosition": 0
+      "sourceIds": ["x-list:123"],
+      "sourcePosition": 1
     }
   ],
-  "sections": { "favoritePostIds": [], "followingPostIds": [] },
+  "sections": {
+    "favoritePostIds": [],
+    "followingPostIds": [],
+    "favoriteThreadUnitIds": [],
+    "followingThreadUnitIds": []
+  },
   "inputs": {
     "favorites": {
       "runId": "favorites-run",

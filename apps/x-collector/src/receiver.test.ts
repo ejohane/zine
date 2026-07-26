@@ -24,7 +24,14 @@ describe('local browser receiver', () => {
         source: 'X_WEB_GRAPHQL_LIST' as const,
         observedAt: '2026-07-11T13:00:00.000Z',
       },
-      author: { username: 'reply', name: 'Reply' },
+      author: {
+        id: 'author-1',
+        username: 'reply',
+        name: 'Reply Author',
+        profileUrl: 'https://x.com/reply',
+        profileImageUrl: 'https://img.example/reply.jpg',
+        verified: true,
+      },
       media: [],
       links: [],
       relationships: [
@@ -46,6 +53,14 @@ describe('local browser receiver', () => {
         observedAt: '2026-07-11T14:00:00.000Z',
       },
       relationships: [],
+      author: {
+        id: 'author-1',
+        username: 'unknown',
+        name: 'unknown',
+        profileUrl: 'https://x.com/unknown',
+        profileImageUrl: null,
+        verified: null,
+      },
       capturedAt: '2026-07-11T14:00:00.000Z',
     };
 
@@ -53,6 +68,14 @@ describe('local browser receiver', () => {
       conversationId: '100',
       structure: { status: 'EXACT', source: 'X_WEB_GRAPHQL_LIST' },
       relationships: [{ type: 'REPLY_TO', tweetId: '100' }],
+      author: {
+        id: 'author-1',
+        username: 'reply',
+        name: 'Reply Author',
+        profileUrl: 'https://x.com/reply',
+        profileImageUrl: 'https://img.example/reply.jpg',
+        verified: true,
+      },
     });
   });
 

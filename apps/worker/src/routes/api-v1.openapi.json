@@ -1048,7 +1048,7 @@
         "tags": ["Editorial"],
         "operationId": "getPeopleFirstDailyFeed",
         "summary": "Get the frozen people-first Today review feed",
-        "description": "Returns a frozen rolling-24-hour Favorites-list timeline first, evidence-backed reply/quote/shared-link/topic conversation groups, ungrouped Favorite posts, and a deduplicated secondary count-bounded Following stream with immutable source, membership, collection-policy, window, run-context, and context-budget provenance. This review route does not replace the live editorial Today issue.",
+        "description": "Returns a frozen rolling-24-hour Favorites-list timeline collapsed into exact thread units, then a variable zero-to-five set of corroborated topic clusters ranked by distinct Favorite authors and Favorite thread units. Topic labels are extracted from post evidence rather than synthesized headlines; Following supplies bounded supporting conversations and a secondary thread stream. The response discloses the pinned clustering version, semantic fallback state, immutable source, membership, collection-policy, window, run-context, structure, and context-budget provenance. This review route does not replace the live editorial Today issue.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
         "x-api-status": "experimental",

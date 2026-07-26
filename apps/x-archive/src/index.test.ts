@@ -252,6 +252,57 @@ describe('X archive worker', () => {
     expect(exported.headers.get('content-encoding')).toBe('gzip');
   });
 
+  it('does not let an unknown recapture erase known author metadata', async () => {
+    for (const [runId, author] of [
+      ['run-known-author', post('author-post').author],
+      [
+        'run-unknown-author',
+        {
+          id: 'author-1',
+          username: 'unknown',
+          name: 'unknown',
+          profileUrl: 'https://x.com/unknown',
+        },
+      ],
+    ] as const) {
+      await api('/api/v1/x-timeline/runs', {
+        method: 'POST',
+        body: JSON.stringify({
+          runId,
+          requestedCount: 1,
+          startedAt: '2026-07-11T13:00:00.000Z',
+          collectorVersion: 'test-v1',
+        }),
+      });
+      await api(`/api/v1/x-timeline/runs/${runId}/chunks/0`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          posts: [{ ...post('author-post'), author }],
+          items: [
+            {
+              tweetId: 'author-post',
+              position: 0,
+              observedAt: '2026-07-11T13:00:00.000Z',
+              presentation: 'POST',
+            },
+          ],
+        }),
+      });
+    }
+
+    const author = await testEnv.ARCHIVE_DB.prepare(
+      'SELECT username, name, profile_url FROM x_authors WHERE user_id = ? AND author_key = ?'
+    )
+      .bind(USER_ID, 'id:author-1')
+      .first<{ username: string; name: string; profile_url: string | null }>();
+
+    expect(author).toEqual({
+      username: 'example',
+      name: 'Example',
+      profile_url: 'https://x.com/example',
+    });
+  });
+
   it('stores explicit Favorite/list author snapshots for daily review', async () => {
     await insertCapturedRunForDailySources();
     const put = await api('/api/v1/x-timeline/daily-sources/favorites', {

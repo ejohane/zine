@@ -1,3 +1,9 @@
+import {
+  buildDailyTopicClustering,
+  createWorkersAIDailyTopicEmbeddingProvider,
+  DEFAULT_DAILY_TOPIC_EMBEDDING_MODEL,
+} from './daily-topic-clustering';
+
 const DEFAULT_TIMEZONE = 'America/Chicago';
 const MAX_RUN_POSTS = 5_000;
 const RELATIONSHIP_QUERY_POST_LIMIT = 90;
@@ -218,8 +224,13 @@ function publicPost(
       profileImageUrl: row.profile_image_url,
       verified: row.verified === null ? null : Boolean(row.verified),
     },
-    media: parseJson(row.media_json, []),
-    links: parseJson(row.links_json, []),
+    media: parseJson(row.media_json, []) as unknown[],
+    links: parseJson(row.links_json, []) as Array<{
+      url?: string;
+      normalizedUrl?: string;
+      displayUrl?: string | null;
+      card?: { domain?: string | null } | null;
+    }>,
     metrics: parseJson(row.metrics_json, {}),
     relationships,
     presentation: row.presentation ?? row.kind,
@@ -492,299 +503,16 @@ function sourceIdsForAuthor(
     .map((source) => source.id);
 }
 
-function uniqueAuthors(posts: DailyPost[]): string[] {
-  return [...new Set(posts.map((post) => post.author.username))];
-}
-
-function uniquePresentationAuthors(posts: DailyPost[]): string[] {
-  return [...new Set(posts.map((post) => post.repostedBy?.username ?? post.author.username))];
-}
-
-const TOPIC_STOP_WORDS = new Set([
-  'about',
-  'after',
-  'again',
-  'also',
-  'because',
-  'before',
-  'being',
-  'from',
-  'have',
-  'into',
-  'just',
-  'more',
-  'that',
-  'their',
-  'there',
-  'these',
-  'they',
-  'this',
-  'those',
-  'through',
-  'what',
-  'when',
-  'where',
-  'which',
-  'while',
-  'with',
-  'would',
-  'your',
-  'https',
-  'http',
-]);
-
-function topicTokens(post: DailyPost): Set<string> {
-  const values = post.text.toLocaleLowerCase().match(/[#@]?[\p{L}\p{N}_-]{4,}/gu) ?? [];
-  return new Set(values.filter((value) => !TOPIC_STOP_WORDS.has(value)));
-}
-
-function sharedTopicTerms(leftTokens: Set<string>, rightTokens: Set<string>): string[] {
-  return [...leftTokens].filter((token) => rightTokens.has(token)).sort();
-}
-
-function dailyPostTimestamp(post: DailyPost): number {
-  return Date.parse(post.publishedAt ?? post.observedAt ?? '') || 0;
-}
-
-function conversationLatestActivity(posts: DailyPost[]): string | null {
-  const latest = Math.max(...posts.map(dailyPostTimestamp));
-  return latest > 0 ? new Date(latest).toISOString() : null;
-}
-
-function firstSourcePosition(posts: DailyPost[]): number {
-  return Math.min(...posts.map((post) => post.sourcePosition ?? Number.MAX_SAFE_INTEGER));
-}
-
-function conversationGroups(
-  posts: DailyPost[],
-  favoritePostIds = new Set(posts.map((post) => post.id)),
-  contextWarnings: string[] = []
-) {
-  const postById = new Map(posts.map((post) => [post.id, post]));
-  const topicTokensByPost = new Map(posts.map((post) => [post.id, topicTokens(post)]));
-  const parents = new Map(posts.map((post) => [post.id, post.id]));
-  const find = (id: string): string => {
-    const parent = parents.get(id) ?? id;
-    if (parent === id) return id;
-    const root = find(parent);
-    parents.set(id, root);
-    return root;
-  };
-  const union = (a: string, b: string) => {
-    const left = find(a);
-    const right = find(b);
-    if (left !== right) parents.set(right, left);
-  };
-
-  for (const post of posts) {
-    for (const relationship of post.relationships) {
-      if (postById.has(relationship.tweetId)) union(post.id, relationship.tweetId);
-    }
-  }
-  const postsByConversation = new Map<string, DailyPost[]>();
-  for (const post of posts) {
-    if (!post.conversationId) continue;
-    postsByConversation.set(post.conversationId, [
-      ...(postsByConversation.get(post.conversationId) ?? []),
-      post,
-    ]);
-  }
-  for (const groupPosts of postsByConversation.values()) {
-    for (let index = 1; index < groupPosts.length; index++) {
-      union(groupPosts[0].id, groupPosts[index].id);
-    }
-  }
-
-  const direct = new Map<string, DailyPost[]>();
-  for (const post of posts) {
-    const root = find(post.id);
-    direct.set(root, [...(direct.get(root) ?? []), post]);
-  }
-
-  const candidates: Array<{
-    id: string;
-    evidenceType: 'DIRECT_RELATIONSHIP' | 'SHARED_LINK' | 'TOPIC_SIMILARITY';
-    label: string;
-    evidence: string;
-    postIds: string[];
-    authors: string[];
-    relationshipTypes: string[];
-    favoritePostIds: string[];
-    contextPostIds: string[];
-    favoriteAuthors: string[];
-    latestActivityAt: string | null;
-    coverageWarnings: string[];
-    firstFavoritePosition: number;
-  }> = [];
-  for (const groupPosts of direct.values()) {
-    const orderedPosts = [...groupPosts].sort(
-      (left, right) => dailyPostTimestamp(left) - dailyPostTimestamp(right)
-    );
-    const selectedPosts = orderedPosts.slice(0, 8);
-    if (!selectedPosts.some((post) => favoritePostIds.has(post.id))) {
-      const favoriteAnchor = orderedPosts.find((post) => favoritePostIds.has(post.id));
-      if (favoriteAnchor) selectedPosts.splice(-1, 1, favoriteAnchor);
-    }
-    const authors = uniqueAuthors(selectedPosts);
-    const favoritePosts = selectedPosts.filter((post) => favoritePostIds.has(post.id));
-    if (groupPosts.length < 2 || favoritePosts.length === 0) continue;
-    const relationshipTypes = [
-      ...new Set(
-        groupPosts.flatMap((post) =>
-          post.relationships
-            .filter((relationship) => postById.has(relationship.tweetId))
-            .map((relationship) => relationship.type)
-        )
-      ),
-    ];
-    if (
-      groupPosts.some(
-        (post, index) =>
-          post.conversationId &&
-          groupPosts.some(
-            (candidate, candidateIndex) =>
-              candidateIndex !== index && candidate.conversationId === post.conversationId
-          )
-      )
-    ) {
-      relationshipTypes.push('CONVERSATION_ID');
-    }
-    candidates.push({
-      id: `relationship:${groupPosts
-        .map((post) => post.id)
-        .sort()
-        .join(':')}`,
-      evidenceType: 'DIRECT_RELATIONSHIP',
-      label: `Direct conversation · ${authors
-        .slice(0, 3)
-        .map((author) => `@${author}`)
-        .join(', ')}`,
-      evidence: `${selectedPosts.length} posts are connected by ${[...new Set(relationshipTypes)]
-        .map((type) => type.toLocaleLowerCase().replaceAll('_', ' '))
-        .join(', ')} metadata.`,
-      postIds: selectedPosts.map((post) => post.id),
-      authors,
-      relationshipTypes: [...new Set(relationshipTypes)],
-      favoritePostIds: favoritePosts.map((post) => post.id),
-      contextPostIds: selectedPosts
-        .filter((post) => !favoritePostIds.has(post.id))
-        .map((post) => post.id),
-      favoriteAuthors: uniquePresentationAuthors(favoritePosts),
-      latestActivityAt: conversationLatestActivity(selectedPosts),
-      coverageWarnings: contextWarnings,
-      firstFavoritePosition: firstSourcePosition(favoritePosts),
-    });
-  }
-
-  const linkGroups = new Map<string, DailyPost[]>();
-  for (const post of posts) {
-    for (const link of post.links as Array<{
-      normalizedUrl?: string;
-      card?: { domain?: string | null } | null;
-    }>) {
-      if (!link.normalizedUrl) continue;
-      linkGroups.set(link.normalizedUrl, [...(linkGroups.get(link.normalizedUrl) ?? []), post]);
-    }
-  }
-  for (const [url, linkedPosts] of linkGroups) {
-    const uniquePosts = [...new Map(linkedPosts.map((post) => [post.id, post])).values()]
-      .filter((post) => !candidates.some((candidate) => candidate.postIds.includes(post.id)))
-      .sort(
-        (left, right) =>
-          firstSourcePosition([left]) - firstSourcePosition([right]) ||
-          dailyPostTimestamp(right) - dailyPostTimestamp(left)
-      )
-      .slice(0, 8);
-    const authors = uniqueAuthors(uniquePosts);
-    const favoritePosts = uniquePosts.filter((post) => favoritePostIds.has(post.id));
-    if (uniquePosts.length < 2 || authors.length < 2 || favoritePosts.length === 0) continue;
-    const ids = uniquePosts.map((post) => post.id);
-    let domain = url;
-    try {
-      domain = new URL(url).hostname.replace(/^www\./, '');
-    } catch {
-      // Keep the normalized URL as explicit evidence when it cannot be parsed.
-    }
-    candidates.push({
-      id: `link:${url}`,
-      evidenceType: 'SHARED_LINK',
-      label: `Shared link · ${domain}`,
-      evidence: `${authors.length} authors linked to the same normalized URL.`,
-      postIds: ids.slice(0, 4),
-      authors,
-      relationshipTypes: [],
-      favoritePostIds: favoritePosts.map((post) => post.id),
-      contextPostIds: uniquePosts
-        .filter((post) => !favoritePostIds.has(post.id))
-        .map((post) => post.id),
-      favoriteAuthors: uniquePresentationAuthors(favoritePosts),
-      latestActivityAt: conversationLatestActivity(uniquePosts),
-      coverageWarnings: [],
-      firstFavoritePosition: firstSourcePosition(favoritePosts),
-    });
-  }
-
-  const favoritePosts = posts.filter((post) => favoritePostIds.has(post.id));
-  for (let leftIndex = 0; leftIndex < favoritePosts.length; leftIndex++) {
-    const left = favoritePosts[leftIndex]!;
-    if (candidates.some((candidate) => candidate.postIds.includes(left.id))) continue;
-    const related = [left];
-    const evidenceTerms = new Set<string>();
-    for (let rightIndex = leftIndex + 1; rightIndex < favoritePosts.length; rightIndex++) {
-      const right = favoritePosts[rightIndex]!;
-      if (candidates.some((candidate) => candidate.postIds.includes(right.id))) continue;
-      const terms = sharedTopicTerms(
-        topicTokensByPost.get(left.id) ?? new Set(),
-        topicTokensByPost.get(right.id) ?? new Set()
-      );
-      const hasStrongMarker = terms.some((term) => term.startsWith('#') || term.startsWith('@'));
-      if (terms.length < 3 && !(hasStrongMarker && terms.length >= 2)) continue;
-      related.push(right);
-      terms.slice(0, 4).forEach((term) => evidenceTerms.add(term));
-      if (related.length === 4) break;
-    }
-    if (related.length < 2 || uniqueAuthors(related).length < 2) continue;
-    const terms = [...evidenceTerms].slice(0, 3);
-    candidates.push({
-      id: `topic:${related
-        .map((post) => post.id)
-        .sort()
-        .join(':')}`,
-      evidenceType: 'TOPIC_SIMILARITY',
-      label: `Shared topic · ${terms.join(' · ')}`,
-      evidence: `${related.length} Favorite posts share multiple explicit terms: ${terms.join(', ')}.`,
-      postIds: related.map((post) => post.id),
-      authors: uniqueAuthors(related),
-      relationshipTypes: [],
-      favoritePostIds: related.map((post) => post.id),
-      contextPostIds: [],
-      favoriteAuthors: uniquePresentationAuthors(related),
-      latestActivityAt: conversationLatestActivity(related),
-      coverageWarnings: [],
-      firstFavoritePosition: firstSourcePosition(related),
-    });
-  }
-
-  return candidates
-    .sort(
-      (a, b) =>
-        (({ DIRECT_RELATIONSHIP: 0, SHARED_LINK: 1, TOPIC_SIMILARITY: 2 })[a.evidenceType] ?? 3) -
-          ({ DIRECT_RELATIONSHIP: 0, SHARED_LINK: 1, TOPIC_SIMILARITY: 2 }[b.evidenceType] ?? 3) ||
-        b.favoriteAuthors.length - a.favoriteAuthors.length ||
-        b.favoritePostIds.length - a.favoritePostIds.length ||
-        b.authors.length - a.authors.length ||
-        (Date.parse(b.latestActivityAt ?? '') || 0) - (Date.parse(a.latestActivityAt ?? '') || 0) ||
-        a.firstFavoritePosition - b.firstFavoritePosition ||
-        a.id.localeCompare(b.id)
-    )
-    .slice(0, 3)
-    .map(({ firstFavoritePosition: _firstFavoritePosition, ...conversation }) => conversation);
-}
-
 export async function getDailyFeed(
   db: D1Database,
   userId: string,
-  options: { date?: string; timezone?: string; now?: Date } = {}
+  options: {
+    date?: string;
+    timezone?: string;
+    now?: Date;
+    ai?: { run(model: string, input: unknown): Promise<unknown> } | null;
+    embeddingModel?: string;
+  } = {}
 ) {
   const timezone = options.timezone ?? DEFAULT_TIMEZONE;
   const now = options.now ?? new Date();
@@ -805,8 +533,8 @@ export async function getDailyFeed(
   const primaryRun = favoritesRun ?? followingRun;
   if (!primaryRun) {
     return {
-      schemaVersion: 1,
-      variant: { id: 'people-first-v2', mode: 'REVIEW' as const },
+      schemaVersion: 2,
+      variant: { id: 'people-first-v3', mode: 'REVIEW' as const },
       date: options.date ?? expectedDate,
       timezone,
       frozenAt: null,
@@ -821,9 +549,26 @@ export async function getDailyFeed(
         message: 'No complete or partial X Following archive run is available for this day.',
       },
       sources: [] as DailySource[],
-      conversations: [] as ReturnType<typeof conversationGroups>,
+      conversations: [],
+      topicClusters: [],
+      threadUnits: [],
+      clustering: {
+        version: 'daily-topics-v1',
+        method: 'THREAD_FIRST_EVIDENCE_CLUSTERING' as const,
+        semanticStatus: 'FALLBACK' as const,
+        embeddingModel: null,
+        maxTopics: 5,
+        minimumFavoriteAuthors: 2,
+        candidateLimit: 40,
+        semanticUnitLimit: 256,
+      },
       posts: [] as DailyPost[],
-      sections: { favoritePostIds: [], followingPostIds: [] },
+      sections: {
+        favoritePostIds: [],
+        followingPostIds: [],
+        favoriteThreadUnitIds: [],
+        followingThreadUnitIds: [],
+      },
       inputs: { favorites: null, following: null, membership: null },
     };
   }
@@ -957,6 +702,7 @@ export async function getDailyFeed(
     publicPost(row, [], relationships.get(row.tweet_id) ?? [])
   );
   const posts = [...favoritePosts, ...followingPosts, ...contextPosts];
+  const followingPostIds = new Set(followingPosts.map((post) => post.id));
   const favoriteContextCoverage = favoritesRun ? contextCoverage(favoritesRun) : null;
   const favoriteWindowCoverage = favoritesRun ? windowCoverage(favoritesRun) : null;
   const favoriteStructureCoverage = favoritesRun ? structureCoverage(favoritesRun) : null;
@@ -984,15 +730,56 @@ export async function getDailyFeed(
   }
   contextWarnings.push(...(favoriteContextCoverage?.warnings ?? []));
   contextWarnings.push(...(favoriteStructureCoverage?.warnings ?? []));
-  const conversations = conversationGroups(posts, favoritePostIds, contextWarnings);
-  const conversationPostIds = new Set(
-    conversations.flatMap((conversation) => conversation.postIds)
+  const topicClustering = await buildDailyTopicClustering(
+    posts,
+    favoritePostIds,
+    followingPostIds,
+    {
+      embeddingProvider: createWorkersAIDailyTopicEmbeddingProvider(
+        options.ai,
+        options.embeddingModel ?? DEFAULT_DAILY_TOPIC_EMBEDDING_MODEL
+      ),
+    }
+  );
+  const threadUnitsById = new Map(topicClustering.threadUnits.map((unit) => [unit.id, unit]));
+  const postById = new Map(posts.map((post) => [post.id, post]));
+  const conversations = topicClustering.topicClusters.map((topic) => {
+    const topicPosts = topic.postIds
+      .map((postId) => postById.get(postId))
+      .filter((post): post is DailyPost => Boolean(post));
+    return {
+      id: topic.id,
+      evidenceType: 'TOPIC_SIMILARITY' as const,
+      label: topic.label,
+      evidence: topic.evidence,
+      postIds: topic.postIds,
+      authors: [...new Set(topicPosts.map((post) => post.author.username))],
+      relationshipTypes: [
+        ...new Set(
+          topic.threadUnitIds.flatMap(
+            (threadUnitId) => threadUnitsById.get(threadUnitId)?.relationshipTypes ?? []
+          )
+        ),
+      ],
+      favoritePostIds: topic.favoritePostIds,
+      contextPostIds: topic.contextPostIds,
+      favoriteAuthors: topic.favoriteAuthors,
+      latestActivityAt: topic.latestActivityAt,
+      coverageWarnings: topic.coverageWarnings,
+    };
+  });
+  const favoriteUngroupedThreadIds = new Set(topicClustering.favoriteThreadUnitIds);
+  const followingUngroupedThreadIds = new Set(topicClustering.followingThreadUnitIds);
+  const unitIdByPostId = new Map(
+    topicClustering.threadUnits.flatMap((unit) =>
+      unit.postIds.map((postId) => [postId, unit.id] as const)
+    )
   );
   const favoriteUngroupedIds = favoritePosts
-    .filter((post) => !conversationPostIds.has(post.id))
+    .filter((post) => favoriteUngroupedThreadIds.has(unitIdByPostId.get(post.id) ?? ''))
     .map((post) => post.id);
   const followingSectionIds = followingPosts
-    .filter((post) => !conversationPostIds.has(post.id))
+    .filter((post) => followingUngroupedThreadIds.has(unitIdByPostId.get(post.id) ?? ''))
     .map((post) => post.id);
   const runComplete = (run: ArchiveRunRow | null) => {
     if (!run) return true;
@@ -1014,6 +801,7 @@ export async function getDailyFeed(
     (favoriteContextCoverage.truncated === 0 && favoriteContextCoverage.failed === 0);
   const membershipComplete = selectionStatus === 'COMPLETE' && unresolvedMembershipCount === 0;
   warnings.push(...contextWarnings);
+  warnings.push(...topicClustering.warnings);
   for (const run of [favoritesRun, followingRun].filter(Boolean) as ArchiveRunRow[]) {
     if (!runComplete(run)) {
       const policy = collectionPolicy(run);
@@ -1034,8 +822,8 @@ export async function getDailyFeed(
       : ('PARTIAL' as const);
 
   return {
-    schemaVersion: 1,
-    variant: { id: 'people-first-v2', mode: 'REVIEW' as const },
+    schemaVersion: 2,
+    variant: { id: 'people-first-v3', mode: 'REVIEW' as const },
     date,
     timezone,
     frozenAt: frozenAt.toISOString(),
@@ -1093,10 +881,15 @@ export async function getDailyFeed(
         : []),
     ],
     conversations,
+    topicClusters: topicClustering.topicClusters,
+    threadUnits: topicClustering.threadUnits,
+    clustering: topicClustering.algorithm,
     posts,
     sections: {
       favoritePostIds: favoriteUngroupedIds,
       followingPostIds: followingSectionIds,
+      favoriteThreadUnitIds: topicClustering.favoriteThreadUnitIds,
+      followingThreadUnitIds: topicClustering.followingThreadUnitIds,
     },
     inputs: {
       favorites: favoritesRun

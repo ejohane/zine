@@ -2093,7 +2093,11 @@ apiV1Routes.get('/today/feed', apiAuth('bookmarks:read'), async (c) => {
       400
     );
   }
-  const result = await getDailyFeed(c.env.X_ARCHIVE_DB, c.get('userId')!, parsed.data);
+  const result = await getDailyFeed(c.env.X_ARCHIVE_DB, c.get('userId')!, {
+    ...parsed.data,
+    ai: c.env.AI as unknown as { run(model: string, input: unknown): Promise<unknown> } | undefined,
+    embeddingModel: c.env.EMBEDDING_MODEL,
+  });
   return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
 });
 

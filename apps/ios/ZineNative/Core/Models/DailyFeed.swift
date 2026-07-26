@@ -10,6 +10,9 @@ struct DailyFeedResponse: Decodable, Hashable {
     let coverage: DailyFeedCoverage
     let sources: [DailyFeedSource]
     let conversations: [DailyConversation]
+    let topicClusters: [DailyTopicCluster]?
+    let threadUnits: [DailyThreadUnit]?
+    let clustering: DailyTopicClustering?
     let posts: [DailyPost]
     let sections: DailyFeedSections?
     let inputs: DailyFeedInputs?
@@ -101,9 +104,71 @@ struct DailyConversation: Decodable, Hashable, Identifiable {
     let coverageWarnings: [String]?
 }
 
+struct DailyTopicClustering: Decodable, Hashable {
+    let version: String
+    let method: String
+    let semanticStatus: String
+    let embeddingModel: String?
+    let maxTopics: Int
+    let minimumFavoriteAuthors: Int
+    let candidateLimit: Int
+    let semanticUnitLimit: Int
+}
+
+struct DailyTopicSignal: Decodable, Hashable, Identifiable {
+    let type: String
+    let value: String
+    let threadUnitIds: [String]
+
+    var id: String { "\(type):\(value)" }
+}
+
+struct DailyTopicCluster: Decodable, Hashable, Identifiable {
+    let id: String
+    let label: String
+    let labelSource: String
+    let labelTerms: [String]
+    let evidence: String
+    let evidenceSignals: [DailyTopicSignal]
+    let threadUnitIds: [String]
+    let favoriteThreadUnitIds: [String]
+    let supportingThreadUnitIds: [String]
+    let postIds: [String]
+    let favoritePostIds: [String]
+    let contextPostIds: [String]
+    let favoriteAuthors: [String]
+    let supportingAuthors: [String]
+    let score: Int
+    let latestActivityAt: String?
+    let coverageWarnings: [String]
+}
+
+struct DailyThreadUnit: Decodable, Hashable, Identifiable {
+    let id: String
+    let conversationId: String?
+    let rootPostId: String
+    let postIds: [String]
+    let favoritePostIds: [String]
+    let followingPostIds: [String]
+    let contextPostIds: [String]
+    let authorKeys: [String]
+    let favoriteAuthorKeys: [String]
+    let authors: [String]
+    let favoriteAuthors: [String]
+    let relationshipTypes: [String]
+    let structureStatus: String
+    let latestActivityAt: String?
+    let firstSourcePosition: Int?
+    let coverageWarnings: [String]
+
+    var isThread: Bool { postIds.count > 1 }
+}
+
 struct DailyFeedSections: Decodable, Hashable {
     let favoritePostIds: [String]
     let followingPostIds: [String]
+    let favoriteThreadUnitIds: [String]?
+    let followingThreadUnitIds: [String]?
 }
 
 struct DailyFeedInputs: Decodable, Hashable {
@@ -168,6 +233,8 @@ struct DailyPost: Decodable, Hashable, Identifiable {
     let publishedAt: String?
     let observedAt: String?
     let kind: String
+    let conversationId: String?
+    let structure: DailyPostStructure?
     let author: DailyAuthor
     let media: [DailyPostMedia]
     let links: [DailyPostLink]
@@ -184,6 +251,12 @@ struct DailyPost: Decodable, Hashable, Identifiable {
         let value = publishedAt ?? observedAt
         return value.flatMap { try? Date($0, strategy: .iso8601) }
     }
+}
+
+struct DailyPostStructure: Decodable, Hashable {
+    let status: String
+    let source: String
+    let observedAt: String?
 }
 
 struct DailyAuthor: Decodable, Hashable {
@@ -242,6 +315,7 @@ struct DailyPostRelationship: Decodable, Hashable, Identifiable {
     let type: String
     let tweetId: String
     let url: String?
+    let evidenceSource: String?
     let target: DailyRelatedPost?
 
     var id: String { "\(type):\(tweetId)" }
