@@ -81,7 +81,7 @@ try {
       apiUrl,
       token,
       port,
-      collectorVersion: 'browser-dom-v4',
+      collectorVersion: 'browser-network-v4',
       source,
       startedAt,
       collectionPolicy: collection.collectionPolicy,
