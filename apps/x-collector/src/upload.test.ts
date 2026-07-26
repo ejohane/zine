@@ -48,6 +48,15 @@ function capture(count = 26) {
       boundaryEvidenceRequired: 0,
       boundaryReached: false,
     },
+    structureCoverage: {
+      primaryPosts: count,
+      structuredPosts: count,
+      replyPosts: 0,
+      replyParentsKnown: 0,
+      conversationIdsKnown: count,
+      status: 'EXACT' as const,
+      warnings: [],
+    },
     posts,
     items: posts.map((post, position) => ({
       tweetId: post.tweetId,

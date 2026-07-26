@@ -288,6 +288,14 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
         text: quotedText.textContent?.trim() || '',
         publishedAt: quotedContainer?.querySelector('time')?.getAttribute('datetime') || null,
         kind: 'POST',
+        conversationId: null,
+        structure: {
+          status: 'PARTIAL',
+          source: /\/status\/\d+/.test(globalThis.location?.pathname || '')
+            ? 'DOM_PERMALINK'
+            : 'DOM_TIMELINE',
+          observedAt: capturedAt,
+        },
         author: authorFromContainer(quotedContainer, quotedIdentity.username),
         media: extractMedia(quotedContainer || article),
         links: extractOutboundLinks(quotedContainer || article, quotedText),
@@ -308,7 +316,7 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
 
     const articles = [...document.querySelectorAll('article[data-testid="tweet"]')];
     const threadMode = /\/status\/\d+/.test(globalThis.location?.pathname || '');
-    for (const [articleIndex, article] of articles.entries()) {
+    for (const article of articles) {
       if (isPromoted(article)) {
         const adKey =
           article.querySelector('a[href*="/status/"]')?.getAttribute('href') ||
@@ -333,19 +341,12 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
       const reply = /Replying to/i.test(article.textContent || '');
       const relationships = [];
       if (quoted)
-        relationships.push({ type: 'QUOTE_OF', tweetId: quoted.tweetId, url: quoted.url });
-      if (reply && threadMode && articleIndex > 0) {
-        const parentArticle = articles[articleIndex - 1];
-        const parentLink = parentArticle?.querySelector('a[href*="/status/"]:has(time)');
-        const parentIdentity = statusIdentity(parentLink?.getAttribute('href'));
-        if (parentIdentity && parentIdentity.tweetId !== identity.tweetId) {
-          relationships.push({
-            type: 'REPLY_TO',
-            tweetId: parentIdentity.tweetId,
-            url: parentIdentity.url,
-          });
-        }
-      }
+        relationships.push({
+          type: 'QUOTE_OF',
+          tweetId: quoted.tweetId,
+          url: quoted.url,
+          evidenceSource: threadMode ? 'DOM_PERMALINK' : 'DOM_TIMELINE',
+        });
       const post = {
         tweetId: identity.tweetId,
         url: identity.url,
@@ -353,6 +354,12 @@ export function extractVisibleTimelineBatch(seenAdKeys = []) {
         publishedAt: article.querySelector('time')?.getAttribute('datetime') || null,
         lang: article.querySelector('[data-testid="tweetText"]')?.getAttribute('lang') || null,
         kind: quoted ? 'QUOTE' : reply ? 'REPLY' : 'POST',
+        conversationId: null,
+        structure: {
+          status: 'PARTIAL',
+          source: threadMode ? 'DOM_PERMALINK' : 'DOM_TIMELINE',
+          observedAt: capturedAt,
+        },
         author: authorFromContainer(article, identity.username),
         media: extractMedia(article),
         links: extractOutboundLinks(

@@ -17,6 +17,7 @@ function postRow(input: {
   links?: unknown[];
   repostedBy?: unknown;
   presentation?: string;
+  conversationId?: string | null;
 }) {
   const timestamp = Date.parse(input.publishedAt);
   return {
@@ -26,6 +27,12 @@ function postRow(input: {
     published_at: timestamp,
     lang: 'en',
     kind: input.kind ?? 'POST',
+    conversation_id: input.conversationId ?? null,
+    structure_json: JSON.stringify(
+      input.conversationId
+        ? { status: 'EXACT', source: 'X_WEB_GRAPHQL_LIST', observedAt: input.publishedAt }
+        : { status: 'PARTIAL', source: 'DOM_TIMELINE' }
+    ),
     author_key: input.authorKey,
     username: input.username,
     author_name: input.name,
@@ -305,6 +312,49 @@ function fakeArchiveDb(
 }
 
 describe('people-first daily feed', () => {
+  it('groups exact same-conversation posts even when an intermediate parent is unavailable', async () => {
+    const conversationRows = [
+      postRow({
+        id: '500',
+        authorKey: 'id:one',
+        username: 'one',
+        name: 'One',
+        text: 'Root',
+        publishedAt: '2026-07-24T12:00:00.000Z',
+        conversationId: '500',
+        position: 0,
+      }),
+      postRow({
+        id: '502',
+        authorKey: 'id:two',
+        username: 'two',
+        name: 'Two',
+        text: 'Nested reply whose direct parent was unavailable',
+        publishedAt: '2026-07-24T12:10:00.000Z',
+        conversationId: '500',
+        position: 1,
+        kind: 'REPLY',
+      }),
+    ];
+    const result = await getDailyFeed(
+      fakeArchiveDb({
+        postRows: conversationRows,
+        favoritePostRows: conversationRows,
+        relationshipRows: [],
+      }),
+      USER_ID,
+      { now: NOW }
+    );
+
+    expect(result.conversations).toEqual([
+      expect.objectContaining({
+        evidenceType: 'DIRECT_RELATIONSHIP',
+        postIds: ['500', '502'],
+        relationshipTypes: ['CONVERSATION_ID'],
+      }),
+    ]);
+  });
+
   it('filters to explicit sources and groups only relationship-backed conversations', async () => {
     const result = await getDailyFeed(fakeArchiveDb(), USER_ID, { now: NOW });
 

@@ -1,6 +1,6 @@
 # Extraction contract
 
-Use the repository extractor at `apps/x-collector/src/browser-extractor.mjs`. It reads currently mounted `article[data-testid="tweet"]` elements from a verified Following or List source and returns:
+Use `apps/x-collector/src/network-extractor.mjs` as the primary extractor. It parses observed X web GraphQL timeline or TweetDetail response bodies after the browser has loaded them. `apps/x-collector/src/browser-extractor.mjs` is the partial fallback for currently mounted `article[data-testid="tweet"]` elements. Both return:
 
 ```js
 {
@@ -20,6 +20,15 @@ Use the repository extractor at `apps/x-collector/src/browser-extractor.mjs`. It
 - Scroll one viewport at a time. Large jumps can skip cards.
 - After five empty scrolls, perform the bounded up/down recovery sequence in SKILL.md before declaring a stall.
 
+## Network evidence boundary
+
+- Observe response bodies through the authenticated tab's CDP `Network` domain. Do not use the official X API, replay X requests, enable Fetch interception, or read/copy request headers, cookies, local storage, CSRF values, or large raw payloads into chat/logs.
+- Recognize endpoints by the operation-name segment, not the changing GraphQL hash. Supported timeline operations include `ListLatestTweetsTimeline` and the active Following/latest timeline operation; context uses `TweetDetail`.
+- For lists, parse the request URL's encoded `variables` only far enough to verify the configured list ID. A mismatch invalidates the response as source evidence.
+- Parse primary entries only from timeline instructions: `TimelineTimelineItem.itemContent` and `TimelineTimelineModule.items[].item.itemContent`. Nested tweet objects are referenced context, not timeline items.
+- A `VerticalConversation` module preserves one `groupId`, module order, item order, group size, `conversation_id_str`, and exact `in_reply_to_status_id_str` edges.
+- If X changes the endpoint or schema, reject the unrecognized response and use the DOM fallback with partial structural coverage. Never infer an edge from adjacency, same author, shared topic, or visual proximity.
+
 ## Primary versus referenced posts
 
 Each timeline card contributes at most one primary `item`. Its canonical post appears in `posts`.
@@ -27,6 +36,8 @@ Each timeline card contributes at most one primary `item`. Its canonical post ap
 A visible quoted post may contribute another canonical post and a `QUOTE_OF` relationship, but it does not contribute another timeline item or count toward N.
 
 X renders a repost as the original tweet plus social context. Store the original tweet once and set the timeline item's `presentation` to `REPOST`, with `repostedBy` when visible.
+
+Network posts additionally carry `conversationId`, exact structure provenance, relationship evidence source, and optional vertical-conversation grouping on timeline items. DOM posts carry partial structure provenance and no guessed reply parent.
 
 ## Ads
 

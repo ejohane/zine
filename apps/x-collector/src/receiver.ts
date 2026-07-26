@@ -134,6 +134,69 @@ function summarizeWindowCoverage(
   };
 }
 
+const STRUCTURE_PRIORITY = {
+  DOM_TIMELINE: 0,
+  DOM_PERMALINK: 1,
+  X_WEB_GRAPHQL_FOLLOWING: 2,
+  X_WEB_GRAPHQL_LIST: 2,
+  X_WEB_GRAPHQL_TWEET_DETAIL: 3,
+} as const;
+
+function structurePriority(post: XPost): number {
+  return post.structure ? STRUCTURE_PRIORITY[post.structure.source] : -1;
+}
+
+export function mergePost(previous: XPost | undefined, incoming: XPost): XPost {
+  if (!previous) return incoming;
+  const richer = structurePriority(incoming) >= structurePriority(previous) ? incoming : previous;
+  const other = richer === incoming ? previous : incoming;
+  const relationships = new Map(
+    [...previous.relationships, ...incoming.relationships].map((relationship) => [
+      `${relationship.type}:${relationship.tweetId}`,
+      relationship,
+    ])
+  );
+  const links = new Map(
+    [...previous.links, ...incoming.links].map((link) => [link.normalizedUrl, link])
+  );
+  return {
+    ...other,
+    ...richer,
+    conversationId: richer.conversationId ?? other.conversationId ?? null,
+    structure: richer.structure ?? other.structure,
+    author: { ...other.author, ...richer.author },
+    media: richer.media.length > 0 ? richer.media : other.media,
+    links: [...links.values()],
+    relationships: [...relationships.values()],
+    metrics: { ...other.metrics, ...richer.metrics },
+    capturedAt:
+      Date.parse(incoming.capturedAt) >= Date.parse(previous.capturedAt)
+        ? incoming.capturedAt
+        : previous.capturedAt,
+  };
+}
+
+function summarizeStructureCoverage(posts: XPost[], items: XTimelineItem[]) {
+  const primary = new Set(items.map((item) => item.tweetId));
+  const primaryPosts = posts.filter((post) => primary.has(post.tweetId));
+  const replyPosts = primaryPosts.filter((post) => post.kind === 'REPLY');
+  const replyParentsKnown = replyPosts.filter((post) =>
+    post.relationships.some((relationship) => relationship.type === 'REPLY_TO')
+  ).length;
+  const structuredPosts = primaryPosts.filter((post) => post.structure?.status === 'EXACT').length;
+  const status =
+    primaryPosts.length > 0 && structuredPosts === primaryPosts.length ? 'EXACT' : 'PARTIAL';
+  return {
+    primaryPosts: primaryPosts.length,
+    structuredPosts,
+    replyPosts: replyPosts.length,
+    replyParentsKnown,
+    conversationIdsKnown: primaryPosts.filter((post) => post.conversationId).length,
+    status,
+    warnings: status === 'EXACT' ? [] : ['thread_structure_partial_dom_fallback'],
+  } as const;
+}
+
 export function startReceiver(options: ReceiverOptions): ReceiverHandle {
   const runId = options.runId ?? crypto.randomUUID();
   const startedAt = options.startedAt ?? new Date().toISOString();
@@ -178,7 +241,7 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             runId,
             startedAt,
             requestedCount: options.requestedCount,
-            collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            collectorVersion: options.collectorVersion ?? 'browser-network-v4',
             source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
             collectionPolicy,
             posts: posts.size,
@@ -193,6 +256,7 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
               outsideWindowTweetIds,
               missingTimestampTweetIds
             ),
+            structureCoverage: summarizeStructureCoverage([...posts.values()], [...items.values()]),
             nextPosition:
               items.size === 0
                 ? 0
@@ -210,7 +274,7 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             runId,
             startedAt,
             requestedCount: options.requestedCount,
-            collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            collectorVersion: options.collectorVersion ?? 'browser-network-v4',
             source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
             collectionPolicy,
             acceptedTweetIds: orderedItems.map((item) => item.tweetId),
@@ -243,7 +307,8 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             { status: 400, headers: corsHeaders() }
           );
         }
-        for (const post of parsed.data.posts) posts.set(post.tweetId, post);
+        for (const post of parsed.data.posts)
+          posts.set(post.tweetId, mergePost(posts.get(post.tweetId), post));
         for (const item of parsed.data.items) {
           if (!items.has(item.tweetId)) items.set(item.tweetId, item);
         }
@@ -355,7 +420,7 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             requestedCount: options.requestedCount,
             startedAt,
             completedAt: new Date().toISOString(),
-            collectorVersion: options.collectorVersion ?? 'browser-dom-v3',
+            collectorVersion: options.collectorVersion ?? 'browser-network-v4',
             source: options.source ?? { type: 'FOLLOWING', id: 'following', name: 'Following' },
             collectionPolicy,
             terminationReason,
@@ -364,6 +429,7 @@ export function startReceiver(options: ReceiverOptions): ReceiverHandle {
             failureReason: parsed.data.failureReason ?? null,
             contextCoverage: summarizeContextCoverage(contextBudget, contextRecords),
             windowCoverage,
+            structureCoverage: summarizeStructureCoverage([...posts.values()], [...items.values()]),
             posts: [...posts.values()],
             items: [...items.values()].sort((left, right) => left.position - right.position),
           });

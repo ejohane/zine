@@ -73,7 +73,7 @@ describe('X browser collection session', () => {
 
     expect(prepared).toMatchObject({
       addedPosts: 1,
-      payload: { posts: [{ tweetId: '200' }], items: [] },
+      payload: { posts: [{ tweetId: '100' }, { tweetId: '200' }], items: [] },
     });
   });
 

@@ -149,6 +149,7 @@ export async function uploadCapture(
         failureReason: capture.failureReason ?? null,
         contextCoverage: capture.contextCoverage,
         windowCoverage: capture.windowCoverage,
+        structureCoverage: capture.structureCoverage,
         terminationReason: capture.terminationReason,
       }),
     },
