@@ -252,6 +252,42 @@ struct APIClient {
         return response.item
     }
 
+    func getBookmarkSubscriptionSettings(id: String) async throws -> BookmarkSubscriptionSettings? {
+        let response: BookmarkSubscriptionSettingsResponse = try await request(
+            url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/subscription-settings")
+        )
+        return response.subscription
+    }
+
+    func setBookmarkSubscriptionAutoBookmark(
+        _ settings: BookmarkSubscriptionSettings,
+        enabled: Bool
+    ) async throws {
+        switch settings.provider {
+        case .youtube, .spotify:
+            guard let source = SubscriptionSource(rawValue: settings.provider.rawValue) else {
+                throw APIError.invalidResponse
+            }
+            try await setProviderSubscriptionAutoBookmark(
+                id: settings.sourceId,
+                provider: source,
+                enabled: enabled
+            )
+        case .gmail:
+            try await updateNewsletter(
+                id: settings.sourceId,
+                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
+            )
+        case .rss:
+            try await updateRssFeed(
+                id: settings.sourceId,
+                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
+            )
+        case .substack, .web, .x:
+            throw APIError.invalidResponse
+        }
+    }
+
     func getCreator(id: String) async throws -> CreatorResponse {
         try await request(url: baseURL.appending(path: "/api/v1/creators/\(id)"))
     }

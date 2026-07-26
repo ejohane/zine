@@ -41,6 +41,12 @@ import {
   userItems,
   items,
   creators,
+  newsletterFeedMessages,
+  newsletterFeeds,
+  rssFeedItems,
+  rssFeeds,
+  subscriptionItems,
+  subscriptions,
   itemEnrichments,
   collectionItemOverrides,
   collections,
@@ -70,6 +76,12 @@ import { replaceTagsForUserItem } from '../tagging';
 export type ItemTag = {
   id: string;
   name: string;
+};
+
+export type ItemSubscriptionSettings = {
+  sourceId: string;
+  provider: Provider;
+  autoBookmark: boolean;
 };
 
 /**
@@ -370,6 +382,98 @@ async function getTagsForUserItems(
   }
 
   return map;
+}
+
+async function getItemSubscriptionSettings(
+  ctx: { db: Database; userId: string },
+  userItemId: string
+): Promise<ItemSubscriptionSettings | null> {
+  const ownedItems = await ctx.db
+    .select({ itemId: userItems.itemId, provider: items.provider })
+    .from(userItems)
+    .innerJoin(items, eq(userItems.itemId, items.id))
+    .where(and(eq(userItems.id, userItemId), eq(userItems.userId, ctx.userId)))
+    .limit(1);
+
+  if (ownedItems.length === 0) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: `Item ${userItemId} not found` });
+  }
+
+  const ownedItem = ownedItems[0];
+
+  if (ownedItem.provider === Provider.YOUTUBE || ownedItem.provider === Provider.SPOTIFY) {
+    const rows = await ctx.db
+      .select({
+        sourceId: subscriptions.id,
+        provider: subscriptions.provider,
+        autoBookmark: subscriptions.autoBookmark,
+      })
+      .from(subscriptionItems)
+      .innerJoin(subscriptions, eq(subscriptionItems.subscriptionId, subscriptions.id))
+      .where(
+        and(eq(subscriptionItems.itemId, ownedItem.itemId), eq(subscriptions.userId, ctx.userId))
+      )
+      .limit(1);
+
+    const row = rows[0];
+    return row
+      ? {
+          sourceId: row.sourceId,
+          provider: row.provider as Provider,
+          autoBookmark: row.autoBookmark,
+        }
+      : null;
+  }
+
+  if (ownedItem.provider === Provider.GMAIL) {
+    const rows = await ctx.db
+      .select({
+        sourceId: newsletterFeeds.id,
+        autoBookmark: newsletterFeeds.autoBookmark,
+      })
+      .from(newsletterFeedMessages)
+      .innerJoin(newsletterFeeds, eq(newsletterFeedMessages.newsletterFeedId, newsletterFeeds.id))
+      .where(
+        and(
+          eq(newsletterFeedMessages.itemId, ownedItem.itemId),
+          eq(newsletterFeedMessages.userId, ctx.userId),
+          eq(newsletterFeeds.userId, ctx.userId)
+        )
+      )
+      .limit(1);
+
+    const row = rows[0];
+    return row
+      ? {
+          sourceId: row.sourceId,
+          provider: Provider.GMAIL,
+          autoBookmark: row.autoBookmark,
+        }
+      : null;
+  }
+
+  if (ownedItem.provider === Provider.RSS) {
+    const rows = await ctx.db
+      .select({
+        sourceId: rssFeeds.id,
+        autoBookmark: rssFeeds.autoBookmark,
+      })
+      .from(rssFeedItems)
+      .innerJoin(rssFeeds, eq(rssFeedItems.rssFeedId, rssFeeds.id))
+      .where(and(eq(rssFeedItems.itemId, ownedItem.itemId), eq(rssFeeds.userId, ctx.userId)))
+      .limit(1);
+
+    const row = rows[0];
+    return row
+      ? {
+          sourceId: row.sourceId,
+          provider: Provider.RSS,
+          autoBookmark: row.autoBookmark,
+        }
+      : null;
+  }
+
+  return null;
 }
 
 export async function toItemViewsWithTags(
@@ -1112,6 +1216,15 @@ export const itemsRouter = router({
     }),
 
   /**
+   * Resolve the subscription or feed that produced a user item, when one exists.
+   */
+  subscriptionSettings: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(async ({ input, ctx }) => ({
+      subscription: await getItemSubscriptionSettings(ctx, input.id),
+    })),
+
+  /**
    * Get AI enrichment and advisory tag suggestions for a user item.
    */
   getEnrichment: protectedProcedure
@@ -1636,4 +1749,4 @@ export const itemsRouter = router({
 export type ItemsRouter = typeof itemsRouter;
 
 // Export helpers for testing and reuse
-export { normalizeNullString, toItemView };
+export { getItemSubscriptionSettings, normalizeNullString, toItemView };

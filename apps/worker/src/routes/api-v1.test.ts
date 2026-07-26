@@ -19,6 +19,7 @@ const {
   mockQuickWins,
   mockCollectionItems,
   mockGetItem,
+  mockGetItemSubscriptionSettings,
   mockBookmarkInboxItem,
   mockArchiveInboxItem,
   mockGetCreator,
@@ -99,6 +100,7 @@ const {
   mockQuickWins: vi.fn(),
   mockCollectionItems: vi.fn(),
   mockGetItem: vi.fn(),
+  mockGetItemSubscriptionSettings: vi.fn(),
   mockBookmarkInboxItem: vi.fn(),
   mockArchiveInboxItem: vi.fn(),
   mockGetCreator: vi.fn(),
@@ -529,6 +531,7 @@ describe('apiV1Routes', () => {
         recentlyOpened: mockRecentlyOpened,
         quickWins: mockQuickWins,
         get: mockGetItem,
+        subscriptionSettings: mockGetItemSubscriptionSettings,
         bookmark: mockBookmarkInboxItem,
         archive: mockArchiveInboxItem,
         unbookmark: mockUnbookmark,
@@ -607,6 +610,7 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/bookmarks');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/preview');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}');
+    expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/subscription-settings');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/tags');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/opened');
     expect(body.paths).toHaveProperty('/api/v1/bookmarks/{id}/progress');
@@ -2330,6 +2334,36 @@ describe('apiV1Routes', () => {
         id: 'ui_1',
         itemId: 'item_1',
         title: 'Detailed bookmark',
+      },
+      requestId: 'test-request-id',
+      traceId: 'test-trace-id',
+    });
+  });
+
+  it('gets auto-bookmark settings for the subscription that produced a bookmark', async () => {
+    mockGetItemSubscriptionSettings.mockResolvedValue({
+      subscription: {
+        sourceId: 'subscription_1',
+        provider: Provider.YOUTUBE,
+        autoBookmark: false,
+      },
+    });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/subscription-settings', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockGetItemSubscriptionSettings).toHaveBeenCalledWith({ id: 'ui_1' });
+    expect((await res.json()) as JsonBody).toMatchObject({
+      subscription: {
+        sourceId: 'subscription_1',
+        provider: 'YOUTUBE',
+        autoBookmark: false,
       },
       requestId: 'test-request-id',
       traceId: 'test-trace-id',

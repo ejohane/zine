@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.10.0",
+    "version": "1.11.0",
     "description": "REST API for reading and managing the Zine home dashboard, inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
@@ -740,6 +740,33 @@
           "404": {
             "$ref": "#/components/responses/NotFound"
           }
+        }
+      }
+    },
+    "/api/v1/bookmarks/{id}/subscription-settings": {
+      "get": {
+        "tags": ["Bookmarks", "Subscriptions"],
+        "operationId": "getBookmarkSubscriptionSettings",
+        "summary": "Get the subscription settings for a bookmark",
+        "description": "Returns the auto-bookmark setting for the subscription or feed that produced this item, or null when the item is not linked to a managed source.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [{ "$ref": "#/components/parameters/UserItemId" }],
+        "responses": {
+          "200": {
+            "description": "Subscription settings resolved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookmarkSubscriptionSettingsResponse"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -3746,6 +3773,35 @@
             "properties": {
               "item": {
                 "$ref": "#/components/schemas/Item"
+              }
+            }
+          }
+        ]
+      },
+      "BookmarkSubscriptionSettings": {
+        "type": "object",
+        "required": ["sourceId", "provider", "autoBookmark"],
+        "properties": {
+          "sourceId": { "type": "string" },
+          "provider": {
+            "type": "string",
+            "enum": ["YOUTUBE", "SPOTIFY", "GMAIL", "RSS"]
+          },
+          "autoBookmark": { "type": "boolean" }
+        }
+      },
+      "BookmarkSubscriptionSettingsResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/RequestMetadata" },
+          {
+            "type": "object",
+            "required": ["subscription"],
+            "properties": {
+              "subscription": {
+                "oneOf": [
+                  { "type": "null" },
+                  { "$ref": "#/components/schemas/BookmarkSubscriptionSettings" }
+                ]
               }
             }
           }

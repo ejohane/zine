@@ -129,6 +129,17 @@ struct SubscriptionSyncResponse: Decodable, Equatable {
     let itemsFound: Int
 }
 
+struct BookmarkSubscriptionSettings: Decodable, Equatable {
+    let sourceId: String
+    let provider: Provider
+    var autoBookmark: Bool
+
+    var actionTitle: String {
+        if autoBookmark { return "Stop Auto-bookmarking" }
+        return provider == .gmail ? "Auto-bookmark New Issues" : "Auto-bookmark New Items"
+    }
+}
+
 enum NewsletterStatus: String, Decodable {
     case active = "ACTIVE"
     case hidden = "HIDDEN"

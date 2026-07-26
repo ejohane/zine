@@ -114,6 +114,8 @@ struct BookmarkDetailView: View {
     @State private var isSaving = false
     @State private var isHydrating = false
     @State private var hydrationFailed = false
+    @State private var subscriptionSettings: BookmarkSubscriptionSettings?
+    @State private var isSavingSubscriptionSettings = false
     @State private var errorMessage: String?
 
     private let initialContent: BookmarkDetailContent
@@ -222,7 +224,10 @@ struct BookmarkDetailView: View {
         .task(id: content.id) {
             await hydrateBookmark()
         }
-        .alert("Couldn’t update bookmark", isPresented: Binding(
+        .task(id: content.id) {
+            await hydrateSubscriptionSettings()
+        }
+        .alert("Couldn’t update", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
@@ -435,6 +440,21 @@ struct BookmarkDetailView: View {
             } label: {
                 Label("Copy Link", systemImage: "doc.on.doc")
             }
+
+            if let subscriptionSettings {
+                Divider()
+                Button {
+                    Task { await toggleSubscriptionAutoBookmark() }
+                } label: {
+                    Label(
+                        subscriptionSettings.actionTitle,
+                        systemImage: subscriptionSettings.autoBookmark
+                            ? "bookmark.slash"
+                            : "bookmark"
+                    )
+                }
+                .disabled(isSavingSubscriptionSettings)
+            }
         } label: {
             actionIcon(systemName: "ellipsis")
         }
@@ -606,6 +626,38 @@ struct BookmarkDetailView: View {
             guard needsInitialBookmark else { return }
             isHydrating = false
             hydrationFailed = true
+        }
+    }
+
+    private func hydrateSubscriptionSettings() async {
+        do {
+            let settings = try await client.getBookmarkSubscriptionSettings(id: content.id)
+            guard !Task.isCancelled else { return }
+            subscriptionSettings = settings
+        } catch is CancellationError {
+            return
+        } catch {
+            subscriptionSettings = nil
+        }
+    }
+
+    private func toggleSubscriptionAutoBookmark() async {
+        guard var settings = subscriptionSettings, !isSavingSubscriptionSettings else { return }
+
+        let previousSettings = settings
+        settings.autoBookmark.toggle()
+        subscriptionSettings = settings
+        isSavingSubscriptionSettings = true
+        defer { isSavingSubscriptionSettings = false }
+
+        do {
+            try await client.setBookmarkSubscriptionAutoBookmark(
+                settings,
+                enabled: settings.autoBookmark
+            )
+        } catch {
+            subscriptionSettings = previousSettings
+            errorMessage = error.localizedDescription
         }
     }
 
