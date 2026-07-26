@@ -1003,6 +1003,7 @@ export const newsletterFeeds = sqliteTable(
     unsubscribePostHeader: text('unsubscribe_post_header'),
     detectionScore: real('detection_score').notNull(),
     status: text('status').notNull().default('ACTIVE'), // ACTIVE | HIDDEN | UNSUBSCRIBED (ingestion path sets UNSUBSCRIBED by default)
+    autoBookmark: integer('auto_bookmark', { mode: 'boolean' }).notNull().default(false),
     firstSeenAt: integer('first_seen_at').notNull(),
     lastSeenAt: integer('last_seen_at').notNull(),
     createdAt: integer('created_at').notNull(),
@@ -1099,6 +1100,7 @@ export const rssFeeds = sqliteTable(
     errorCount: integer('error_count').notNull().default(0),
     status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | UNSUBSCRIBED | ERROR
     pollIntervalSeconds: integer('poll_interval_seconds').notNull().default(3600),
+    autoBookmark: integer('auto_bookmark', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at').notNull(), // Unix ms
     updatedAt: integer('updated_at').notNull(), // Unix ms
   },
@@ -1180,6 +1182,7 @@ export const subscriptions = sqliteTable(
     lastPublishedAt: integer('last_published_at'), // Unix ms
     lastPolledAt: integer('last_polled_at'), // Unix ms
     pollIntervalSeconds: integer('poll_interval_seconds').default(3600), // Polling frequency
+    autoBookmark: integer('auto_bookmark', { mode: 'boolean' }).notNull().default(false),
 
     // Status
     status: text('status').notNull().default('ACTIVE'), // ACTIVE | PAUSED | DISCONNECTED | UNSUBSCRIBED

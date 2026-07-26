@@ -2305,7 +2305,10 @@
                 "required": ["action"],
                 "additionalProperties": false,
                 "properties": {
-                  "action": { "type": "string", "enum": ["pause", "resume"] }
+                  "action": {
+                    "type": "string",
+                    "enum": ["pause", "resume", "auto_bookmark_on", "auto_bookmark_off"]
+                  }
                 }
               }
             }
@@ -2562,7 +2565,10 @@
               "required": ["action"],
               "additionalProperties": false,
               "properties": {
-                "action": { "type": "string", "enum": ["pause", "resume"] }
+                "action": {
+                  "type": "string",
+                  "enum": ["pause", "resume", "auto_bookmark_on", "auto_bookmark_off"]
+                }
               }
             }
           }
@@ -2577,7 +2583,10 @@
               "required": ["action"],
               "additionalProperties": false,
               "properties": {
-                "action": { "type": "string", "enum": ["activate", "hide"] }
+                "action": {
+                  "type": "string",
+                  "enum": ["activate", "hide", "auto_bookmark_on", "auto_bookmark_off"]
+                }
               }
             }
           }
@@ -4182,7 +4191,8 @@
           "imageUrl",
           "status",
           "isSubscribed",
-          "lastPolledAt"
+          "lastPolledAt",
+          "autoBookmark"
         ],
         "properties": {
           "subscriptionId": { "type": ["string", "null"] },
@@ -4194,7 +4204,8 @@
             "enum": ["ACTIVE", "PAUSED", "DISCONNECTED", null]
           },
           "isSubscribed": { "type": "boolean" },
-          "lastPolledAt": { "type": ["integer", "null"] }
+          "lastPolledAt": { "type": ["integer", "null"] },
+          "autoBookmark": { "type": ["boolean", "null"] }
         }
       },
       "CreateSyncJobRequest": {

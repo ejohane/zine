@@ -293,6 +293,7 @@ function createTempSubscriptionRow(
     lastPublishedAt: null,
     lastPolledAt: null,
     pollIntervalSeconds: 3600,
+    autoBookmark: false,
     status: 'ACTIVE',
     disconnectedAt: null,
     disconnectedReason: null,

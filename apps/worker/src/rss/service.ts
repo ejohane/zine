@@ -225,10 +225,11 @@ async function ingestEntry(params: {
   db: Database;
   userId: string;
   feedId: string;
+  autoBookmark: boolean;
   entry: ParsedRssEntry;
   articleBodyEnv?: SyncOptions['articleBodyEnv'];
 }): Promise<boolean> {
-  const { db, userId, feedId, entry, articleBodyEnv } = params;
+  const { db, userId, feedId, autoBookmark, entry, articleBodyEnv } = params;
   const enrichedEntry = await enrichRssEntryMetadata(entry, feedId);
 
   const prepared = await prepareItem({
@@ -328,8 +329,9 @@ async function ingestEntry(params: {
         id: prepared.item.userItemId,
         userId,
         itemId: prepared.item.canonicalItemId,
-        state: UserItemState.INBOX,
+        state: autoBookmark ? UserItemState.BOOKMARKED : UserItemState.INBOX,
         ingestedAt: nowISO,
+        bookmarkedAt: autoBookmark ? nowISO : null,
         createdAt: nowISO,
         updatedAt: nowISO,
       })
@@ -391,6 +393,7 @@ async function ingestEntries(params: {
   db: Database;
   userId: string;
   feedId: string;
+  autoBookmark: boolean;
   entries: ParsedRssEntry[];
   maxEntries: number;
   articleBodyEnv?: SyncOptions['articleBodyEnv'];
@@ -404,6 +407,7 @@ async function ingestEntries(params: {
         db: params.db,
         userId: params.userId,
         feedId: params.feedId,
+        autoBookmark: params.autoBookmark,
         entry,
         articleBodyEnv: params.articleBodyEnv,
       });
@@ -528,6 +532,7 @@ export async function syncRssFeed(
       db,
       userId: feed.userId,
       feedId: feed.id,
+      autoBookmark: feed.autoBookmark === true,
       entries: parsed.entries,
       maxEntries,
       articleBodyEnv: options.articleBodyEnv,

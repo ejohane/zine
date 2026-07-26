@@ -67,6 +67,11 @@ const SyncNowInputSchema = z.object({
   subscriptionId: z.string().min(1),
 });
 
+const SetAutoBookmarkInputSchema = z.object({
+  subscriptionId: z.string().min(1),
+  enabled: z.boolean(),
+});
+
 const DiscoverAvailableInputSchema = z.object({
   provider: SubscriptionProviderSchema,
 });
@@ -138,6 +143,7 @@ export const subscriptionsRouter = router({
         lastPublishedAt: row.subscription.lastPublishedAt,
         lastPolledAt: row.subscription.lastPolledAt,
         pollIntervalSeconds: row.subscription.pollIntervalSeconds,
+        autoBookmark: row.subscription.autoBookmark,
         status: row.subscription.status,
         disconnectedAt: row.subscription.disconnectedAt,
         disconnectedReason: row.subscription.disconnectedReason,
@@ -150,6 +156,23 @@ export const subscriptionsRouter = router({
         nextCursor: hasMore && items.length > 0 ? items[items.length - 1].id : null,
         hasMore,
       };
+    }),
+  setAutoBookmark: protectedProcedure
+    .input(SetAutoBookmarkInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const updated = await ctx.db
+        .update(subscriptions)
+        .set({ autoBookmark: input.enabled, updatedAt: Date.now() })
+        .where(
+          and(eq(subscriptions.id, input.subscriptionId), eq(subscriptions.userId, ctx.userId))
+        )
+        .returning({ id: subscriptions.id, autoBookmark: subscriptions.autoBookmark });
+
+      if (updated.length === 0) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Subscription not found' });
+      }
+
+      return { success: true as const, autoBookmark: updated[0].autoBookmark };
     }),
   add: protectedProcedure.input(AddSubscriptionInputSchema).mutation(async ({ ctx, input }) => {
     const connection = await ctx.db.query.providerConnections.findFirst({

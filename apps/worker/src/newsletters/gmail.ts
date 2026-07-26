@@ -1584,6 +1584,7 @@ async function upsertNewsletterFeed(
     return {
       ...existing,
       status: existing.status as NewsletterFeedStatus,
+      autoBookmark: existing.autoBookmark,
     };
   }
 
@@ -1601,6 +1602,7 @@ async function upsertNewsletterFeed(
     unsubscribePostHeader: parsed.unsubscribePostHeader,
     detectionScore: parsed.detection.score,
     status: 'UNSUBSCRIBED',
+    autoBookmark: false,
     firstSeenAt: parsed.internalDateMs,
     lastSeenAt: parsed.internalDateMs,
     createdAt: now,
@@ -1610,6 +1612,7 @@ async function upsertNewsletterFeed(
   return {
     id: feedId,
     status: 'UNSUBSCRIBED' as NewsletterFeedStatus,
+    autoBookmark: false,
   };
 }
 
@@ -1620,6 +1623,7 @@ async function ingestNewsletterMessage(params: {
   googleSub: string;
   parsed: ParsedMessage;
   feedId: string;
+  autoBookmark: boolean;
   accessToken: string | null;
 }): Promise<boolean> {
   const existingMapping = await params.db.query.newsletterFeedMessages.findFirst({
@@ -1730,9 +1734,9 @@ async function ingestNewsletterMessage(params: {
       id: ulid(),
       userId: params.userId,
       itemId: canonicalItem.id,
-      state: 'INBOX',
+      state: params.autoBookmark ? 'BOOKMARKED' : 'INBOX',
       ingestedAt: nowIso,
-      bookmarkedAt: null,
+      bookmarkedAt: params.autoBookmark ? nowIso : null,
       archivedAt: null,
       lastOpenedAt: null,
       progressPosition: null,
@@ -1872,6 +1876,7 @@ async function backfillNewsletterItemsForFeedInternal(params: {
       canonicalKey: true,
       listId: true,
       fromAddress: true,
+      autoBookmark: true,
     },
   });
 
@@ -1959,6 +1964,7 @@ async function backfillNewsletterItemsForFeedInternal(params: {
       googleSub: mailbox.googleSub,
       parsed,
       feedId: feed.id,
+      autoBookmark: feed.autoBookmark === true,
       accessToken,
     });
 
@@ -2152,6 +2158,7 @@ export async function syncGmailNewslettersForUser(
         googleSub: mailbox.googleSub,
         parsed,
         feedId: feed.id,
+        autoBookmark: feed.autoBookmark === true,
         accessToken,
       });
 

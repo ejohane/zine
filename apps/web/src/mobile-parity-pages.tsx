@@ -724,6 +724,17 @@ function getCollectionRuleSummary(rules: CollectionRules) {
   return parts.length === 0 ? 'Manual collection' : `Saved filter: ${parts.join(', ')}`;
 }
 
+type LibrarySourceRow = {
+  id: string;
+  sourceId: string | null;
+  sourceType: 'provider' | 'newsletter' | 'rss' | 'x';
+  title: string;
+  meta: string;
+  status: string;
+  imageUrl: string | null;
+  autoBookmark: boolean | null;
+};
+
 function LibrarySources() {
   const subscriptionsQuery = trpc.subscriptions.list.useQuery({ limit: 100 });
   const newslettersQuery = trpc.subscriptions.newsletters.list.useQuery({ limit: 100 });
@@ -731,43 +742,74 @@ function LibrarySources() {
   const xBookmarksQuery = trpc.subscriptions.xBookmarks.status.useQuery(undefined, {
     staleTime: 60 * 1000,
   });
-  const rows = [
+  const utils = trpc.useUtils();
+  const providerAutoBookmark = trpc.subscriptions.setAutoBookmark.useMutation();
+  const newsletterAutoBookmark = trpc.subscriptions.newsletters.setAutoBookmark.useMutation();
+  const rssAutoBookmark = trpc.subscriptions.rss.setAutoBookmark.useMutation();
+  const rows: LibrarySourceRow[] = [
     ...(subscriptionsQuery.data?.items ?? []).map((source) => ({
       id: `subscription:${source.id}`,
+      sourceId: source.id,
+      sourceType: 'provider' as const,
       title: source.name,
       meta: `${mapProvider(source.provider)} subscription`,
       status: source.status,
       imageUrl: source.imageUrl ?? null,
+      autoBookmark: source.autoBookmark,
     })),
     ...(newslettersQuery.data?.items ?? []).map((source) => ({
       id: `newsletter:${source.id}`,
+      sourceId: source.id,
+      sourceType: 'newsletter' as const,
       title: source.displayName,
       meta: source.fromAddress ?? source.listId ?? 'Newsletter',
       status: source.status,
       imageUrl: source.imageUrl ?? null,
+      autoBookmark: source.autoBookmark,
     })),
     ...(rssQuery.data?.items ?? [])
       .filter((source) => source.status !== 'UNSUBSCRIBED')
       .map((source) => ({
         id: `rss:${source.id}`,
+        sourceId: source.id,
+        sourceType: 'rss' as const,
         title: formatDisplayText(source.title),
         meta: source.siteUrl ?? source.feedUrl,
         status: source.status,
         imageUrl: source.imageUrl ?? null,
+        autoBookmark: source.autoBookmark,
       })),
   ];
 
   if (xBookmarksQuery.data?.connected || xBookmarksQuery.data?.importedCount) {
     rows.push({
       id: 'x-bookmarks',
+      sourceId: null,
+      sourceType: 'x',
       title: 'X Bookmarks',
       meta: `${xBookmarksQuery.data.importedCount} imported`,
       status: xBookmarksQuery.data.connected
         ? 'ACTIVE'
         : (xBookmarksQuery.data.connectionStatus ?? 'DISCONNECTED'),
       imageUrl: null,
+      autoBookmark: null,
     });
   }
+
+  const toggleAutoBookmark = async (source: LibrarySourceRow) => {
+    if (!source.sourceId || source.autoBookmark === null) return;
+    const enabled = !source.autoBookmark;
+    if (source.sourceType === 'provider') {
+      await providerAutoBookmark.mutateAsync({ subscriptionId: source.sourceId, enabled });
+      await utils.subscriptions.list.invalidate();
+    } else if (source.sourceType === 'newsletter') {
+      await newsletterAutoBookmark.mutateAsync({ feedId: source.sourceId, enabled });
+      await utils.subscriptions.newsletters.list.invalidate();
+    } else {
+      await rssAutoBookmark.mutateAsync({ feedId: source.sourceId, enabled });
+      await utils.subscriptions.rss.list.invalidate();
+    }
+  };
 
   const isLoading =
     subscriptionsQuery.isLoading || newslettersQuery.isLoading || rssQuery.isLoading;
@@ -810,7 +852,25 @@ function LibrarySources() {
             <strong>{formatDisplayText(source.title)}</strong>
             <span>{source.meta}</span>
           </div>
-          <Badge>{source.status.toLowerCase()}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge>{source.status.toLowerCase()}</Badge>
+            {source.autoBookmark !== null ? (
+              <Button
+                type="button"
+                variant={source.autoBookmark ? 'default' : 'outline'}
+                className="h-8 px-2 text-xs"
+                aria-pressed={source.autoBookmark}
+                onClick={() => void toggleAutoBookmark(source)}
+                disabled={
+                  providerAutoBookmark.isPending ||
+                  newsletterAutoBookmark.isPending ||
+                  rssAutoBookmark.isPending
+                }
+              >
+                {source.autoBookmark ? 'Auto-bookmarking' : 'Auto-bookmark'}
+              </Button>
+            ) : null}
+          </div>
         </Surface>
       ))}
     </div>

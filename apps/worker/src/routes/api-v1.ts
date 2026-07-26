@@ -182,7 +182,7 @@ const AddProviderSubscriptionBodySchema = z
 
 const UpdateProviderSubscriptionBodySchema = z
   .object({
-    action: z.enum(['pause', 'resume']),
+    action: z.enum(['pause', 'resume', 'auto_bookmark_on', 'auto_bookmark_off']),
   })
   .strict();
 
@@ -203,7 +203,7 @@ const CompleteOAuthBodySchema = z
 
 const UpdateNewsletterBodySchema = z
   .object({
-    action: z.enum(['activate', 'hide']),
+    action: z.enum(['activate', 'hide', 'auto_bookmark_on', 'auto_bookmark_off']),
   })
   .strict();
 
@@ -216,7 +216,7 @@ const AddRssFeedBodySchema = z
 
 const UpdateRssFeedBodySchema = z
   .object({
-    action: z.enum(['pause', 'resume']),
+    action: z.enum(['pause', 'resume', 'auto_bookmark_on', 'auto_bookmark_off']),
   })
   .strict();
 
@@ -622,6 +622,7 @@ apiV1Routes.get('/subscriptions/youtube', apiAuth('sync:read'), async (c) => {
         name: subscription.name,
         imageUrl: subscription.imageUrl,
         status: subscription.status,
+        autoBookmark: subscription.autoBookmark,
         isSubscribed: true,
         lastPolledAt: subscription.lastPolledAt,
       })),
@@ -795,8 +796,12 @@ apiV1Routes.patch('/subscriptions/youtube/:subscriptionId', apiAuth('sync:write'
   const caller = appRouter.createCaller(await createContext(c));
   const input = { subscriptionId: c.req.param('subscriptionId') };
   try {
-    const result =
-      parsedBody.data.action === 'pause'
+    const result = parsedBody.data.action.startsWith('auto_bookmark')
+      ? await caller.subscriptions.setAutoBookmark({
+          ...input,
+          enabled: parsedBody.data.action === 'auto_bookmark_on',
+        })
+      : parsedBody.data.action === 'pause'
         ? await caller.subscriptions.pause(input)
         : await caller.subscriptions.resume(input);
     return c.json({
@@ -959,6 +964,7 @@ function registerManagedProviderRoutes(slug: string, provider: typeof Provider.S
           name: subscription.name,
           imageUrl: subscription.imageUrl,
           status: subscription.status,
+          autoBookmark: subscription.autoBookmark,
           isSubscribed: true,
           lastPolledAt: subscription.lastPolledAt,
         })),
@@ -1050,8 +1056,12 @@ function registerManagedProviderRoutes(slug: string, provider: typeof Provider.S
     const caller = appRouter.createCaller(await createContext(c));
     const input = { subscriptionId: c.req.param('subscriptionId') };
     try {
-      const result =
-        parsedBody.data.action === 'pause'
+      const result = parsedBody.data.action.startsWith('auto_bookmark')
+        ? await caller.subscriptions.setAutoBookmark({
+            ...input,
+            enabled: parsedBody.data.action === 'auto_bookmark_on',
+          })
+        : parsedBody.data.action === 'pause'
           ? await caller.subscriptions.pause(input)
           : await caller.subscriptions.resume(input);
       return c.json({
@@ -1144,10 +1154,15 @@ apiV1Routes.patch('/subscriptions/gmail/:feedId', apiAuth('sync:write'), async (
 
   const caller = appRouter.createCaller(await createContext(c));
   try {
-    const result = await caller.subscriptions.newsletters.updateStatus({
-      feedId: c.req.param('feedId'),
-      status: parsedBody.data.action === 'activate' ? 'ACTIVE' : 'HIDDEN',
-    });
+    const result = parsedBody.data.action.startsWith('auto_bookmark')
+      ? await caller.subscriptions.newsletters.setAutoBookmark({
+          feedId: c.req.param('feedId'),
+          enabled: parsedBody.data.action === 'auto_bookmark_on',
+        })
+      : await caller.subscriptions.newsletters.updateStatus({
+          feedId: c.req.param('feedId'),
+          status: parsedBody.data.action === 'activate' ? 'ACTIVE' : 'HIDDEN',
+        });
     return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
   } catch (error) {
     return trpcErrorResponse(c, error);
@@ -1238,8 +1253,12 @@ apiV1Routes.patch('/subscriptions/rss/:feedId', apiAuth('sync:write'), async (c)
   const caller = appRouter.createCaller(await createContext(c));
   const input = { feedId: c.req.param('feedId') };
   try {
-    const result =
-      parsedBody.data.action === 'pause'
+    const result = parsedBody.data.action.startsWith('auto_bookmark')
+      ? await caller.subscriptions.rss.setAutoBookmark({
+          ...input,
+          enabled: parsedBody.data.action === 'auto_bookmark_on',
+        })
+      : parsedBody.data.action === 'pause'
         ? await caller.subscriptions.rss.pause(input)
         : await caller.subscriptions.rss.resume(input);
     return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });

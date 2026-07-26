@@ -5,6 +5,7 @@ import type { NewItem } from '../transformers';
 import type { IngestResult } from './types';
 import { prepareItem } from './prepare';
 import { buildIngestionStatements, executeBatchStatements } from './write';
+import { isProviderSubscriptionAutoBookmarkEnabled } from '../../subscriptions/auto-bookmark';
 
 // Main Ingestion Function
 
@@ -65,12 +66,19 @@ export async function ingestItem<T>(
 
   const nowISO = new Date().toISOString();
   const now = Date.now();
+  const autoBookmark = await isProviderSubscriptionAutoBookmarkEnabled(
+    db,
+    userId,
+    subscriptionId,
+    provider
+  );
 
   const statements = buildIngestionStatements(prepared.item, {
     db,
     userId,
     subscriptionId,
     provider,
+    autoBookmark,
     nowISO,
     now,
   });

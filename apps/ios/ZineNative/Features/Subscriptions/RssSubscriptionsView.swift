@@ -61,6 +61,15 @@ private final class RssSubscriptionsStore {
         await perform(feed) { try await client.removeRssFeed(id: feed.id) }
     }
 
+    func setAutoBookmark(_ feed: RssFeed, enabled: Bool) async {
+        await perform(feed) {
+            try await client.updateRssFeed(
+                id: feed.id,
+                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
+            )
+        }
+    }
+
     func sync(_ feed: RssFeed) async {
         pendingFeedIDs.insert(feed.id)
         defer { pendingFeedIDs.remove(feed.id) }
@@ -238,6 +247,14 @@ struct RssSubscriptionsView: View {
                         Button { Task { await store.setPaused(feed, isPaused: false) } } label: {
                             Label("Resume", systemImage: "play.circle")
                         }
+                    }
+                    Button {
+                        Task { await store.setAutoBookmark(feed, enabled: !feed.autoBookmark) }
+                    } label: {
+                        Label(
+                            feed.autoBookmark ? "Stop Auto-bookmarking" : "Auto-bookmark New Items",
+                            systemImage: feed.autoBookmark ? "bookmark.slash" : "bookmark"
+                        )
                     }
                     Button("Remove", systemImage: "trash", role: .destructive) {
                         pendingRemoval = feed

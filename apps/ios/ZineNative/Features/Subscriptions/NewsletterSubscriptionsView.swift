@@ -78,6 +78,15 @@ private final class NewsletterSubscriptionsStore {
         await perform(feed) { try await client.unsubscribeNewsletter(id: feed.id) }
     }
 
+    func setAutoBookmark(_ feed: NewsletterFeed, enabled: Bool) async {
+        await perform(feed) {
+            try await client.updateNewsletter(
+                id: feed.id,
+                action: enabled ? "auto_bookmark_on" : "auto_bookmark_off"
+            )
+        }
+    }
+
     func dismissMessage() { actionMessage = nil }
 
     private func perform(_ feed: NewsletterFeed, action: () async throws -> Void) async {
@@ -288,6 +297,14 @@ struct NewsletterSubscriptionsView: View {
                         Button { Task { await store.setActive(feed, isActive: true) } } label: {
                             Label("Activate", systemImage: "checkmark.circle")
                         }
+                    }
+                    Button {
+                        Task { await store.setAutoBookmark(feed, enabled: !feed.autoBookmark) }
+                    } label: {
+                        Label(
+                            feed.autoBookmark ? "Stop Auto-bookmarking" : "Auto-bookmark New Issues",
+                            systemImage: feed.autoBookmark ? "bookmark.slash" : "bookmark"
+                        )
                     }
                     Button("Unsubscribe", systemImage: "envelope.badge", role: .destructive) {
                         pendingUnsubscribe = feed
