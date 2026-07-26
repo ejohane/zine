@@ -16,4 +16,22 @@ describe('list member extractor', () => {
 
     expect(extractVisibleListMembers()).toEqual(['alice', 'bob']);
   });
+
+  it('ignores user cells outside the list-members timeline', () => {
+    const { document, window } = parseHTML(`
+      <main>
+        <div aria-label="Timeline: List members">
+          <div data-testid="UserCell"><a href="/Alice">Alice</a></div>
+          <div data-testid="UserCell"><a href="/bob">Bob</a></div>
+        </div>
+      </main>
+      <aside>
+        <div data-testid="UserCell"><a href="/suggested">Suggested</a></div>
+      </aside>
+    `);
+    globalThis.document = document;
+    globalThis.window = window;
+
+    expect(extractVisibleListMembers()).toEqual(['alice', 'bob']);
+  });
 });
