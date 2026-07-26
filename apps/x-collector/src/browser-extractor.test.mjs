@@ -97,7 +97,7 @@ describe('X browser extractor', () => {
     expect(repeated.adKeys).toEqual([]);
   });
 
-  it('captures reply ancestry when extracting a focused thread', () => {
+  it('marks DOM reply structure partial without inferring ancestry from adjacency', () => {
     const { document } = parseHTML(`
       <article data-testid="tweet">
         <div data-testid="User-Name"><span>Parent</span><span>@parent</span><a href="/parent"></a></div>
@@ -118,7 +118,9 @@ describe('X browser extractor', () => {
     expect(result.posts[1]).toMatchObject({
       tweetId: '401',
       kind: 'REPLY',
-      relationships: [{ type: 'REPLY_TO', tweetId: '400' }],
+      relationships: [],
+      conversationId: null,
+      structure: { status: 'PARTIAL', source: 'DOM_PERMALINK' },
     });
   });
 });

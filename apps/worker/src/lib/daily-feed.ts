@@ -20,6 +20,7 @@ type ArchiveRunRow = {
   collection_policy_json: string;
   termination_reason: string;
   window_coverage_json: string;
+  structure_coverage_json: string;
 };
 
 type ContextCoverage = {
@@ -47,6 +48,16 @@ type WindowCoverage = {
   boundaryReached: boolean;
 };
 
+type StructureCoverage = {
+  primaryPosts: number;
+  structuredPosts: number;
+  replyPosts: number;
+  replyParentsKnown: number;
+  conversationIdsKnown: number;
+  status: 'EXACT' | 'PARTIAL';
+  warnings: string[];
+};
+
 type ArchivePostRow = {
   tweet_id: string;
   url: string;
@@ -54,6 +65,8 @@ type ArchivePostRow = {
   published_at: number | null;
   lang: string | null;
   kind: string;
+  conversation_id: string | null;
+  structure_json: string;
   author_key: string;
   username: string;
   author_name: string;
@@ -81,6 +94,7 @@ type RelationshipRow = {
   target_username: string | null;
   target_author_name: string | null;
   target_profile_image_url: string | null;
+  evidence_source: string | null;
 };
 
 type DailySourceRow = {
@@ -117,6 +131,7 @@ type DailyRelationship = {
   type: string;
   tweetId: string;
   url: string | null;
+  evidenceSource: string | null;
   target: {
     tweetId: string;
     text: string;
@@ -193,6 +208,8 @@ function publicPost(
     publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
     observedAt: row.observed_at ? new Date(row.observed_at).toISOString() : null,
     kind: row.kind,
+    conversationId: row.conversation_id,
+    structure: parseJson(row.structure_json, null),
     author: {
       key: row.author_key,
       username: row.username,
@@ -217,7 +234,8 @@ async function archiveRuns(db: D1Database, userId: string): Promise<ArchiveRunRo
     .prepare(
       `SELECT id, requested_count, collected_count, status, started_at, completed_at,
         excluded_ads, failure_reason, source_type, source_id, source_name, source_url,
-        context_coverage_json, collection_policy_json, termination_reason, window_coverage_json
+        context_coverage_json, collection_policy_json, termination_reason, window_coverage_json,
+        structure_coverage_json
        FROM x_timeline_runs
        WHERE user_id = ? AND status IN ('COMPLETE', 'PARTIAL') AND completed_at IS NOT NULL
        ORDER BY completed_at DESC, id DESC LIMIT 60`
@@ -256,6 +274,21 @@ function windowCoverage(run: ArchiveRunRow): WindowCoverage {
   };
 }
 
+function structureCoverage(run: ArchiveRunRow): StructureCoverage {
+  const parsed = parseJson(run.structure_coverage_json, {}) as Partial<StructureCoverage>;
+  return {
+    primaryPosts: parsed.primaryPosts ?? 0,
+    structuredPosts: parsed.structuredPosts ?? 0,
+    replyPosts: parsed.replyPosts ?? 0,
+    replyParentsKnown: parsed.replyParentsKnown ?? 0,
+    conversationIdsKnown: parsed.conversationIdsKnown ?? 0,
+    status: parsed.status === 'EXACT' ? 'EXACT' : 'PARTIAL',
+    warnings: Array.isArray(parsed.warnings)
+      ? parsed.warnings.filter((warning): warning is string => typeof warning === 'string')
+      : [],
+  };
+}
+
 async function selectRun(
   db: D1Database,
   userId: string,
@@ -281,7 +314,8 @@ async function postsForRun(
   const rows = await db
     .prepare(
       `SELECT i.position, i.observed_at, i.presentation, i.reposted_by_json,
-        p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind, p.author_key,
+        p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind, p.conversation_id,
+        p.structure_json, p.author_key,
         a.username, a.name AS author_name, a.profile_url, a.profile_image_url, a.verified,
         p.media_json, p.links_json, p.metrics_json, p.first_seen_at, p.last_seen_at
        FROM x_timeline_run_items i
@@ -304,7 +338,8 @@ async function contextPostsForRun(
     .prepare(
       `SELECT NULL AS position, c.observed_at, 'CONTEXT' AS presentation,
         NULL AS reposted_by_json, p.tweet_id, p.url, p.text, p.published_at, p.lang,
-        p.kind, p.author_key, a.username, a.name AS author_name, a.profile_url,
+        p.kind, p.conversation_id, p.structure_json, p.author_key,
+        a.username, a.name AS author_name, a.profile_url,
         a.profile_image_url, a.verified, p.media_json, p.links_json, p.metrics_json,
         p.first_seen_at, p.last_seen_at
        FROM x_timeline_run_context_posts c
@@ -333,6 +368,7 @@ async function relationshipsForPosts(
     const rows = await db
       .prepare(
         `SELECT r.source_tweet_id, r.relationship_type, r.target_tweet_id, r.target_url,
+          r.evidence_source,
           target.text AS target_text, target.author_key AS target_author_key,
           target_author.username AS target_username, target_author.name AS target_author_name,
           target_author.profile_image_url AS target_profile_image_url
@@ -365,6 +401,7 @@ async function relationshipsForPosts(
         type: row.relationship_type,
         tweetId: row.target_tweet_id,
         url: row.target_url,
+        evidenceSource: row.evidence_source,
         target,
       };
       result.set(row.source_tweet_id, [...(result.get(row.source_tweet_id) ?? []), relationship]);
@@ -544,6 +581,19 @@ function conversationGroups(
       if (postById.has(relationship.tweetId)) union(post.id, relationship.tweetId);
     }
   }
+  const postsByConversation = new Map<string, DailyPost[]>();
+  for (const post of posts) {
+    if (!post.conversationId) continue;
+    postsByConversation.set(post.conversationId, [
+      ...(postsByConversation.get(post.conversationId) ?? []),
+      post,
+    ]);
+  }
+  for (const groupPosts of postsByConversation.values()) {
+    for (let index = 1; index < groupPosts.length; index++) {
+      union(groupPosts[0].id, groupPosts[index].id);
+    }
+  }
 
   const direct = new Map<string, DailyPost[]>();
   for (const post of posts) {
@@ -587,6 +637,18 @@ function conversationGroups(
         )
       ),
     ];
+    if (
+      groupPosts.some(
+        (post, index) =>
+          post.conversationId &&
+          groupPosts.some(
+            (candidate, candidateIndex) =>
+              candidateIndex !== index && candidate.conversationId === post.conversationId
+          )
+      )
+    ) {
+      relationshipTypes.push('CONVERSATION_ID');
+    }
     candidates.push({
       id: `relationship:${groupPosts
         .map((post) => post.id)
@@ -597,12 +659,12 @@ function conversationGroups(
         .slice(0, 3)
         .map((author) => `@${author}`)
         .join(', ')}`,
-      evidence: `${selectedPosts.length} posts are connected by ${relationshipTypes
+      evidence: `${selectedPosts.length} posts are connected by ${[...new Set(relationshipTypes)]
         .map((type) => type.toLocaleLowerCase().replaceAll('_', ' '))
         .join(', ')} metadata.`,
       postIds: selectedPosts.map((post) => post.id),
       authors,
-      relationshipTypes,
+      relationshipTypes: [...new Set(relationshipTypes)],
       favoritePostIds: favoritePosts.map((post) => post.id),
       contextPostIds: selectedPosts
         .filter((post) => !favoritePostIds.has(post.id))
@@ -897,6 +959,7 @@ export async function getDailyFeed(
   const posts = [...favoritePosts, ...followingPosts, ...contextPosts];
   const favoriteContextCoverage = favoritesRun ? contextCoverage(favoritesRun) : null;
   const favoriteWindowCoverage = favoritesRun ? windowCoverage(favoritesRun) : null;
+  const favoriteStructureCoverage = favoritesRun ? structureCoverage(favoritesRun) : null;
   const contextWarnings: string[] = [];
   const missingWindowTimestampCount = favoriteWindowCoverage?.missingPublishedAt ?? 0;
   if (missingWindowTimestampCount > 0) {
@@ -920,6 +983,7 @@ export async function getDailyFeed(
     );
   }
   contextWarnings.push(...(favoriteContextCoverage?.warnings ?? []));
+  contextWarnings.push(...(favoriteStructureCoverage?.warnings ?? []));
   const conversations = conversationGroups(posts, favoritePostIds, contextWarnings);
   const conversationPostIds = new Set(
     conversations.flatMap((conversation) => conversation.postIds)
@@ -1048,6 +1112,7 @@ export async function getDailyFeed(
             terminationReason: favoritesRun.termination_reason,
             windowCoverage: favoriteWindowCoverage,
             contextCoverage: favoriteContextCoverage,
+            structureCoverage: structureCoverage(favoritesRun),
             frozenAt: favoritesRun.completed_at
               ? new Date(favoritesRun.completed_at).toISOString()
               : null,
@@ -1066,6 +1131,7 @@ export async function getDailyFeed(
             terminationReason: followingRun.termination_reason,
             windowCoverage: windowCoverage(followingRun),
             contextCoverage: contextCoverage(followingRun),
+            structureCoverage: structureCoverage(followingRun),
             frozenAt: followingRun.completed_at
               ? new Date(followingRun.completed_at).toISOString()
               : null,
@@ -1094,7 +1160,8 @@ async function postsForAuthor(
 ): Promise<ArchivePostRow[]> {
   const rows = await db
     .prepare(
-      `SELECT p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind, p.author_key,
+      `SELECT p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind,
+        p.conversation_id, p.structure_json, p.author_key,
         a.username, a.name AS author_name, a.profile_url, a.profile_image_url, a.verified,
         p.media_json, p.links_json, p.metrics_json, p.first_seen_at, p.last_seen_at,
         i.position, i.observed_at, i.presentation, i.reposted_by_json

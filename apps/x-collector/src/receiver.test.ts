@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { startReceiver, type ReceiverHandle } from './receiver';
+import { mergePost, startReceiver, type ReceiverHandle } from './receiver';
 
 let receiver: ReceiverHandle | null = null;
 let apiServer: ReturnType<typeof Bun.serve> | null = null;
@@ -12,6 +12,50 @@ afterEach(() => {
 });
 
 describe('local browser receiver', () => {
+  it('does not let a later DOM observation erase exact thread structure', () => {
+    const exact = {
+      tweetId: '101',
+      url: 'https://x.com/reply/status/101',
+      text: 'Reply',
+      kind: 'REPLY' as const,
+      conversationId: '100',
+      structure: {
+        status: 'EXACT' as const,
+        source: 'X_WEB_GRAPHQL_LIST' as const,
+        observedAt: '2026-07-11T13:00:00.000Z',
+      },
+      author: { username: 'reply', name: 'Reply' },
+      media: [],
+      links: [],
+      relationships: [
+        {
+          type: 'REPLY_TO' as const,
+          tweetId: '100',
+          evidenceSource: 'X_WEB_GRAPHQL_LIST' as const,
+        },
+      ],
+      metrics: {},
+      capturedAt: '2026-07-11T13:00:00.000Z',
+    };
+    const partial = {
+      ...exact,
+      conversationId: null,
+      structure: {
+        status: 'PARTIAL' as const,
+        source: 'DOM_TIMELINE' as const,
+        observedAt: '2026-07-11T14:00:00.000Z',
+      },
+      relationships: [],
+      capturedAt: '2026-07-11T14:00:00.000Z',
+    };
+
+    expect(mergePost(exact, partial)).toMatchObject({
+      conversationId: '100',
+      structure: { status: 'EXACT', source: 'X_WEB_GRAPHQL_LIST' },
+      relationships: [{ type: 'REPLY_TO', tweetId: '100' }],
+    });
+  });
+
   it('accumulates browser batches and performs a verified upload', async () => {
     let completionBody: Record<string, unknown> | null = null;
     let membershipBody: Record<string, unknown> | null = null;

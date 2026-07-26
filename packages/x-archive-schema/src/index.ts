@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const X_ARCHIVE_SCHEMA_VERSION = 3;
+export const X_ARCHIVE_SCHEMA_VERSION = 4;
 export const X_ARCHIVE_MAX_TIMELINE_ITEMS_PER_CHUNK = 25;
 export const X_ARCHIVE_MAX_POSTS_PER_CHUNK = 75;
 
@@ -85,6 +85,37 @@ export const XWindowCoverageSchema = z
   .strict();
 export type XWindowCoverage = z.infer<typeof XWindowCoverageSchema>;
 
+export const XStructureEvidenceSourceSchema = z.enum([
+  'X_WEB_GRAPHQL_LIST',
+  'X_WEB_GRAPHQL_FOLLOWING',
+  'X_WEB_GRAPHQL_TWEET_DETAIL',
+  'DOM_TIMELINE',
+  'DOM_PERMALINK',
+]);
+export type XStructureEvidenceSource = z.infer<typeof XStructureEvidenceSourceSchema>;
+
+export const XStructureEvidenceSchema = z
+  .object({
+    status: z.enum(['EXACT', 'PARTIAL']),
+    source: XStructureEvidenceSourceSchema,
+    observedAt: z.string().datetime(),
+  })
+  .strict();
+export type XStructureEvidence = z.infer<typeof XStructureEvidenceSchema>;
+
+export const XStructureCoverageSchema = z
+  .object({
+    primaryPosts: z.number().int().nonnegative().default(0),
+    structuredPosts: z.number().int().nonnegative().default(0),
+    replyPosts: z.number().int().nonnegative().default(0),
+    replyParentsKnown: z.number().int().nonnegative().default(0),
+    conversationIdsKnown: z.number().int().nonnegative().default(0),
+    status: z.enum(['EXACT', 'PARTIAL']).default('PARTIAL'),
+    warnings: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+  })
+  .strict();
+export type XStructureCoverage = z.infer<typeof XStructureCoverageSchema>;
+
 export const XPostRelationshipTypeSchema = z.enum(['REPLY_TO', 'REPOST_OF', 'QUOTE_OF']);
 export type XPostRelationshipType = z.infer<typeof XPostRelationshipTypeSchema>;
 
@@ -147,6 +178,7 @@ export const XPostRelationshipSchema = z
     type: XPostRelationshipTypeSchema,
     tweetId: z.string().min(1).max(64),
     url: OptionalUrlSchema,
+    evidenceSource: XStructureEvidenceSourceSchema.optional(),
   })
   .strict();
 export type XPostRelationship = z.infer<typeof XPostRelationshipSchema>;
@@ -169,6 +201,8 @@ export const XPostSchema = z
     publishedAt: z.string().datetime().nullable().optional(),
     lang: z.string().max(32).nullable().optional(),
     kind: XPostKindSchema,
+    conversationId: z.string().min(1).max(64).nullable().optional(),
+    structure: XStructureEvidenceSchema.optional(),
     author: XAuthorSchema,
     media: z.array(XMediaSchema).max(20).default([]),
     links: z.array(XPostLinkSchema).max(50).default([]),
@@ -199,6 +233,11 @@ export const XTimelineItemSchema = z
     observedAt: z.string().datetime(),
     presentation: z.enum(['POST', 'REPOST']).default('POST'),
     repostedBy: XAuthorSchema.nullable().optional(),
+    groupId: z.string().min(1).max(200).nullable().optional(),
+    groupType: z.enum(['VERTICAL_CONVERSATION']).nullable().optional(),
+    groupPosition: z.number().int().nonnegative().nullable().optional(),
+    groupItemPosition: z.number().int().nonnegative().nullable().optional(),
+    groupSize: z.number().int().positive().nullable().optional(),
   })
   .strict();
 export type XTimelineItem = z.infer<typeof XTimelineItemSchema>;
@@ -222,6 +261,7 @@ export const XTimelineCaptureSchema = z
     failureReason: z.string().max(2_000).nullable().optional(),
     contextCoverage: XContextCoverageSchema.default({}),
     windowCoverage: XWindowCoverageSchema.default({}),
+    structureCoverage: XStructureCoverageSchema.default({}),
     posts: z.array(XPostSchema),
     items: z.array(XTimelineItemSchema),
   })
@@ -340,6 +380,7 @@ export const CompleteXTimelineRunSchema = z
     collectedCount: z.number().int().nonnegative(),
     contextCoverage: XContextCoverageSchema.default({}),
     windowCoverage: XWindowCoverageSchema.default({}),
+    structureCoverage: XStructureCoverageSchema.default({}),
     terminationReason: XCollectionTerminationReasonSchema.default('COUNT_REACHED'),
   })
   .strict();

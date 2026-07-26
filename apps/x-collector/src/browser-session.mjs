@@ -138,9 +138,12 @@ export function prepareTimelineBatch(rawBatch, state, requestedCount) {
 
 export function prepareContextBatch(rawBatch, state) {
   const posts = [];
+  let addedPosts = 0;
   for (const post of rawBatch.posts || []) {
-    if (state.acceptedPostIds.has(post.tweetId)) continue;
-    state.acceptedPostIds.add(post.tweetId);
+    if (!state.acceptedPostIds.has(post.tweetId)) {
+      state.acceptedPostIds.add(post.tweetId);
+      addedPosts++;
+    }
     posts.push(post);
   }
   return {
@@ -151,6 +154,6 @@ export function prepareContextBatch(rawBatch, state) {
       excludedAds: 0,
       windowEvidence: { outsideWindowTweetIds: [], missingTimestampTweetIds: [] },
     },
-    addedPosts: posts.length,
+    addedPosts,
   };
 }

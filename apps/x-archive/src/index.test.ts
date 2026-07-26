@@ -452,6 +452,77 @@ describe('X archive worker', () => {
     });
   });
 
+  it('preserves exact thread evidence across a later partial DOM capture', async () => {
+    const exactPost = {
+      ...post('701'),
+      kind: 'REPLY',
+      conversationId: '700',
+      structure: {
+        status: 'EXACT',
+        source: 'X_WEB_GRAPHQL_LIST',
+        observedAt: '2026-07-11T13:00:00.000Z',
+      },
+      relationships: [
+        {
+          type: 'REPLY_TO',
+          tweetId: '700',
+          url: 'https://x.com/i/status/700',
+          evidenceSource: 'X_WEB_GRAPHQL_LIST',
+        },
+      ],
+    };
+    const partialPost = {
+      ...post('701'),
+      kind: 'REPLY',
+      conversationId: null,
+      structure: {
+        status: 'PARTIAL',
+        source: 'DOM_TIMELINE',
+        observedAt: '2026-07-12T13:00:00.000Z',
+      },
+      relationships: [],
+      capturedAt: '2026-07-12T13:00:00.000Z',
+    };
+
+    for (const [runId, value] of [
+      ['run-exact-structure', exactPost],
+      ['run-partial-structure', partialPost],
+    ] as const) {
+      await api('/api/v1/x-timeline/runs', {
+        method: 'POST',
+        body: JSON.stringify({
+          runId,
+          requestedCount: 1,
+          startedAt: value.capturedAt,
+          collectorVersion: 'browser-network-v4',
+        }),
+      });
+      const response = await api(`/api/v1/x-timeline/runs/${runId}/chunks/0`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          posts: [value],
+          items: [{ tweetId: '701', position: 0, observedAt: value.capturedAt }],
+        }),
+      });
+      expect(response.status).toBe(200);
+    }
+
+    const read = await api('/api/v1/x-timeline/posts/701');
+    expect(await read.json()).toMatchObject({
+      post: {
+        conversationId: '700',
+        structure: { status: 'EXACT', source: 'X_WEB_GRAPHQL_LIST' },
+        relationships: [
+          {
+            type: 'REPLY_TO',
+            tweetId: '700',
+            evidenceSource: 'X_WEB_GRAPHQL_LIST',
+          },
+        ],
+      },
+    });
+  });
+
   it('accepts an empty-link chunk retry recorded with the version 1 checksum shape', async () => {
     await api('/api/v1/x-timeline/runs', {
       method: 'POST',

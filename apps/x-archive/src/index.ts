@@ -6,7 +6,9 @@ import {
   X_ARCHIVE_SCHEMA_VERSION,
   type XPost,
   type XPostLink,
+  type XPostRelationship,
   XPostLinkSchema,
+  XStructureEvidenceSchema,
 } from '@zine/x-archive-schema';
 import { z } from 'zod';
 
@@ -68,6 +70,7 @@ type RunRow = {
   collection_policy_json: string;
   termination_reason: string;
   window_coverage_json: string;
+  structure_coverage_json: string;
   created_at: number;
   updated_at: number;
 };
@@ -95,6 +98,8 @@ type PostRow = {
   first_run_id: string;
   latest_run_id: string;
   schema_version: number;
+  conversation_id: string | null;
+  structure_json: string;
 };
 
 type PostLinkOccurrenceRow = PostRow & {
@@ -182,6 +187,11 @@ function parseJson(value: string | null | undefined, fallback: unknown): unknown
   }
 }
 
+function parseStructure(value: string | null | undefined) {
+  const parsed = XStructureEvidenceSchema.safeParse(parseJson(value, null));
+  return parsed.success ? parsed.data : undefined;
+}
+
 function mergePostLinks(previous: XPostLink[], incoming: XPostLink[]): XPostLink[] {
   const links = new Map(previous.map((link) => [link.normalizedUrl, link]));
   for (const link of incoming) {
@@ -209,6 +219,20 @@ function mergePostLinks(previous: XPostLink[], incoming: XPostLink[]): XPostLink
     });
   }
   return [...links.values()];
+}
+
+const STRUCTURE_PRIORITY = {
+  DOM_TIMELINE: 0,
+  DOM_PERMALINK: 1,
+  X_WEB_GRAPHQL_FOLLOWING: 2,
+  X_WEB_GRAPHQL_LIST: 2,
+  X_WEB_GRAPHQL_TWEET_DETAIL: 3,
+} as const;
+
+function structurePriority(value: unknown): number {
+  if (!value || typeof value !== 'object') return -1;
+  const source = (value as { source?: keyof typeof STRUCTURE_PRIORITY }).source;
+  return source ? STRUCTURE_PRIORITY[source] : -1;
 }
 
 function publicRun(row: RunRow) {
@@ -245,6 +269,15 @@ function publicRun(row: RunRow) {
       boundaryEvidenceRequired: 0,
       boundaryReached: false,
     }),
+    structureCoverage: parseJson(row.structure_coverage_json, {
+      primaryPosts: 0,
+      structuredPosts: 0,
+      replyPosts: 0,
+      replyParentsKnown: 0,
+      conversationIdsKnown: 0,
+      status: 'PARTIAL',
+      warnings: ['legacy_capture_no_structural_coverage'],
+    }),
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -258,6 +291,8 @@ function publicPost(row: PostRow) {
     publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
     lang: row.lang,
     kind: row.kind,
+    conversationId: row.conversation_id,
+    structure: parseStructure(row.structure_json) ?? null,
     author: {
       key: row.author_key,
       username: row.username,
@@ -468,11 +503,17 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
   const placeholders = postIds.map(() => '?').join(', ');
   const existingRows = postIds.length
     ? await c.env.ARCHIVE_DB.prepare(
-        `SELECT tweet_id, content_hash, links_json
+        `SELECT tweet_id, content_hash, links_json, conversation_id, structure_json
          FROM x_posts WHERE user_id = ? AND tweet_id IN (${placeholders})`
       )
         .bind(userId, ...postIds)
-        .all<{ tweet_id: string; content_hash: string; links_json: string }>()
+        .all<{
+          tweet_id: string;
+          content_hash: string;
+          links_json: string;
+          conversation_id: string | null;
+          structure_json: string;
+        }>()
     : { results: [] };
   const existingHashes = new Map(
     existingRows.results.map((row) => [row.tweet_id, row.content_hash])
@@ -480,11 +521,72 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
   const existingLinks = new Map(
     existingRows.results.map((row) => [row.tweet_id, parsePostLinks(row.links_json)])
   );
+  const existingStructure = new Map(
+    existingRows.results.map((row) => [row.tweet_id, parseStructure(row.structure_json)])
+  );
+  const existingConversationIds = new Map(
+    existingRows.results.map((row) => [row.tweet_id, row.conversation_id])
+  );
+  const existingRelationshipRows = postIds.length
+    ? await c.env.ARCHIVE_DB.prepare(
+        `SELECT source_tweet_id, relationship_type, target_tweet_id, target_url, evidence_source
+         FROM x_post_relationships
+         WHERE user_id = ? AND source_tweet_id IN (${placeholders})`
+      )
+        .bind(userId, ...postIds)
+        .all<{
+          source_tweet_id: string;
+          relationship_type: XPostRelationship['type'];
+          target_tweet_id: string;
+          target_url: string | null;
+          evidence_source: XPostRelationship['evidenceSource'];
+        }>()
+    : { results: [] };
+  const existingRelationships = new Map<string, XPostRelationship[]>();
+  for (const row of existingRelationshipRows.results) {
+    existingRelationships.set(row.source_tweet_id, [
+      ...(existingRelationships.get(row.source_tweet_id) ?? []),
+      {
+        type: row.relationship_type,
+        tweetId: row.target_tweet_id,
+        url: row.target_url,
+        evidenceSource: row.evidence_source,
+      },
+    ]);
+  }
   const postsById = new Map(
-    [...inputPostsById].map(([tweetId, post]) => [
-      tweetId,
-      { ...post, links: mergePostLinks(existingLinks.get(tweetId) ?? [], post.links) },
-    ])
+    [...inputPostsById].map(([tweetId, post]) => {
+      const previousStructure = existingStructure.get(tweetId);
+      const incomingWins =
+        structurePriority(post.structure) >= structurePriority(previousStructure);
+      const relationships =
+        post.structure?.status === 'EXACT' && incomingWins
+          ? post.relationships
+          : previousStructure?.status === 'EXACT' && !incomingWins
+            ? (existingRelationships.get(tweetId) ?? [])
+            : [...(existingRelationships.get(tweetId) ?? []), ...post.relationships].filter(
+                (relationship, index, all) =>
+                  all.findIndex(
+                    (candidate) =>
+                      candidate.type === relationship.type &&
+                      candidate.tweetId === relationship.tweetId
+                  ) === index
+              );
+      return [
+        tweetId,
+        {
+          ...post,
+          conversationId: incomingWins
+            ? (post.conversationId ?? existingConversationIds.get(tweetId) ?? null)
+            : (existingConversationIds.get(tweetId) ?? post.conversationId ?? null),
+          structure: incomingWins
+            ? (post.structure ?? previousStructure ?? undefined)
+            : (previousStructure ?? post.structure),
+          links: mergePostLinks(existingLinks.get(tweetId) ?? [], post.links),
+          relationships,
+        },
+      ];
+    })
   );
 
   const hashes = new Map<string, string>();
@@ -554,8 +656,8 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         `INSERT INTO x_posts
           (user_id, tweet_id, url, text, published_at, lang, kind, author_key, media_json, links_json,
            metrics_json, r2_key, content_hash, first_seen_at, last_seen_at, first_run_id, latest_run_id,
-           schema_version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           schema_version, conversation_id, structure_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(user_id, tweet_id) DO UPDATE SET
           url = excluded.url,
           text = excluded.text,
@@ -570,7 +672,9 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
           content_hash = excluded.content_hash,
           last_seen_at = MAX(x_posts.last_seen_at, excluded.last_seen_at),
           latest_run_id = excluded.latest_run_id,
-          schema_version = excluded.schema_version`
+          schema_version = excluded.schema_version,
+          conversation_id = COALESCE(excluded.conversation_id, x_posts.conversation_id),
+          structure_json = excluded.structure_json`
       ).bind(
         userId,
         post.tweetId,
@@ -589,7 +693,9 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         seenAt,
         runId,
         runId,
-        X_ARCHIVE_SCHEMA_VERSION
+        X_ARCHIVE_SCHEMA_VERSION,
+        post.conversationId ?? null,
+        JSON.stringify(post.structure ?? { status: 'PARTIAL', source: 'DOM_TIMELINE' })
       )
     );
     statements.push(
@@ -624,14 +730,17 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
       statements.push(
         c.env.ARCHIVE_DB.prepare(
           `INSERT INTO x_post_relationships
-            (user_id, source_tweet_id, relationship_type, target_tweet_id, target_url)
-           VALUES (?, ?, ?, ?, ?)`
+            (user_id, source_tweet_id, relationship_type, target_tweet_id, target_url,
+             evidence_source, observed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           userId,
           post.tweetId,
           relationship.type,
           relationship.tweetId,
-          relationship.url ?? null
+          relationship.url ?? null,
+          relationship.evidenceSource ?? post.structure?.source ?? 'DOM_TIMELINE',
+          seenAt
         )
       );
     }
@@ -650,13 +759,19 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
     statements.push(
       c.env.ARCHIVE_DB.prepare(
         `INSERT INTO x_timeline_run_items
-          (run_id, user_id, tweet_id, position, observed_at, presentation, reposted_by_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
+          (run_id, user_id, tweet_id, position, observed_at, presentation, reposted_by_json,
+           group_id, group_type, group_position, group_item_position, group_size)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(run_id, tweet_id) DO UPDATE SET
            position = MIN(x_timeline_run_items.position, excluded.position),
            observed_at = MIN(x_timeline_run_items.observed_at, excluded.observed_at),
            presentation = excluded.presentation,
-           reposted_by_json = excluded.reposted_by_json`
+           reposted_by_json = excluded.reposted_by_json,
+           group_id = COALESCE(excluded.group_id, x_timeline_run_items.group_id),
+           group_type = COALESCE(excluded.group_type, x_timeline_run_items.group_type),
+           group_position = COALESCE(excluded.group_position, x_timeline_run_items.group_position),
+           group_item_position = COALESCE(excluded.group_item_position, x_timeline_run_items.group_item_position),
+           group_size = COALESCE(excluded.group_size, x_timeline_run_items.group_size)`
       ).bind(
         runId,
         userId,
@@ -664,7 +779,12 @@ app.put('/api/v1/x-timeline/runs/:runId/chunks/:chunkIndex', async (c) => {
         item.position,
         Date.parse(item.observedAt),
         item.presentation,
-        item.repostedBy ? JSON.stringify(item.repostedBy) : null
+        item.repostedBy ? JSON.stringify(item.repostedBy) : null,
+        item.groupId ?? null,
+        item.groupType ?? null,
+        item.groupPosition ?? null,
+        item.groupItemPosition ?? null,
+        item.groupSize ?? null
       )
     );
   }
@@ -731,7 +851,8 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
   }
 
   const items = await c.env.ARCHIVE_DB.prepare(
-    `SELECT tweet_id, position, observed_at, presentation, reposted_by_json
+    `SELECT tweet_id, position, observed_at, presentation, reposted_by_json,
+       group_id, group_type, group_position, group_item_position, group_size
      FROM x_timeline_run_items WHERE run_id = ? ORDER BY position ASC`
   )
     .bind(runId)
@@ -741,6 +862,11 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       observed_at: number;
       presentation: string;
       reposted_by_json: string | null;
+      group_id: string | null;
+      group_type: string | null;
+      group_position: number | null;
+      group_item_position: number | null;
+      group_size: number | null;
     }>();
   if (items.results.length !== parsed.data.collectedCount) {
     return c.json(
@@ -771,12 +897,18 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       collectionPolicy: parseJson(run.collection_policy_json, { mode: 'COUNT' }),
       terminationReason: parsed.data.terminationReason,
       windowCoverage: parsed.data.windowCoverage,
+      structureCoverage: parsed.data.structureCoverage,
       items: items.results.map((item) => ({
         tweetId: item.tweet_id,
         position: item.position,
         observedAt: new Date(item.observed_at).toISOString(),
         presentation: item.presentation,
         repostedBy: item.reposted_by_json ? (JSON.parse(item.reposted_by_json) as unknown) : null,
+        groupId: item.group_id,
+        groupType: item.group_type,
+        groupPosition: item.group_position,
+        groupItemPosition: item.group_item_position,
+        groupSize: item.group_size,
       })),
     }),
     {
@@ -789,7 +921,7 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
     `UPDATE x_timeline_runs SET
       collected_count = ?, status = ?, completed_at = ?, excluded_ads = ?, manifest_key = ?,
       failure_reason = ?, context_coverage_json = ?, termination_reason = ?,
-      window_coverage_json = ?, updated_at = ?
+      window_coverage_json = ?, structure_coverage_json = ?, updated_at = ?
      WHERE id = ? AND user_id = ?`
   )
     .bind(
@@ -802,6 +934,7 @@ app.post('/api/v1/x-timeline/runs/:runId/complete', async (c) => {
       JSON.stringify(parsed.data.contextCoverage),
       parsed.data.terminationReason,
       JSON.stringify(parsed.data.windowCoverage),
+      JSON.stringify(parsed.data.structureCoverage),
       Date.now(),
       runId,
       userId
@@ -1114,10 +1247,11 @@ app.get('/api/v1/x-timeline/runs/:runId', async (c) => {
   if (!run) return c.json({ error: 'Run not found', code: 'NOT_FOUND' }, 404);
   const items = await c.env.ARCHIVE_DB.prepare(
     `SELECT i.position, i.observed_at, i.presentation, i.reposted_by_json,
+      i.group_id, i.group_type, i.group_position, i.group_item_position, i.group_size,
       p.tweet_id, p.url, p.text, p.published_at, p.lang, p.kind,
       p.author_key, a.username, a.name AS author_name, a.profile_url, a.profile_image_url, a.verified,
       p.media_json, p.links_json, p.metrics_json, p.r2_key, p.content_hash, p.first_seen_at, p.last_seen_at,
-      p.first_run_id, p.latest_run_id, p.schema_version
+      p.first_run_id, p.latest_run_id, p.schema_version, p.conversation_id, p.structure_json
      FROM x_timeline_run_items i
      JOIN x_posts p ON p.user_id = i.user_id AND p.tweet_id = i.tweet_id
      JOIN x_authors a ON a.user_id = p.user_id AND a.author_key = p.author_key
@@ -1130,6 +1264,11 @@ app.get('/api/v1/x-timeline/runs/:runId', async (c) => {
         observed_at: number;
         presentation: string;
         reposted_by_json: string | null;
+        group_id: string | null;
+        group_type: string | null;
+        group_position: number | null;
+        group_item_position: number | null;
+        group_size: number | null;
       }
     >();
   return c.json({
@@ -1139,6 +1278,11 @@ app.get('/api/v1/x-timeline/runs/:runId', async (c) => {
       observedAt: new Date(item.observed_at).toISOString(),
       presentation: item.presentation,
       repostedBy: item.reposted_by_json ? (JSON.parse(item.reposted_by_json) as unknown) : null,
+      groupId: item.group_id,
+      groupType: item.group_type,
+      groupPosition: item.group_position,
+      groupItemPosition: item.group_item_position,
+      groupSize: item.group_size,
       post: publicPost(item),
     })),
   });
@@ -1214,7 +1358,8 @@ app.get('/api/v1/x-timeline/posts/:tweetId', async (c) => {
     .first<PostRow>();
   if (!row) return c.json({ error: 'Post not found', code: 'NOT_FOUND' }, 404);
   const relationships = await c.env.ARCHIVE_DB.prepare(
-    `SELECT relationship_type AS type, target_tweet_id AS tweetId, target_url AS url
+    `SELECT relationship_type AS type, target_tweet_id AS tweetId, target_url AS url,
+       evidence_source AS evidenceSource
      FROM x_post_relationships WHERE user_id = ? AND source_tweet_id = ?`
   )
     .bind(userId, row.tweet_id)
