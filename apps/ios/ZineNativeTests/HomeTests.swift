@@ -148,6 +148,43 @@ final class HomeTests: XCTestCase {
         XCTAssertEqual(items.map(\.id), [bookmark.id, previouslyOpened.id])
     }
 
+    @MainActor
+    func testSuccessfulHomeRefreshDropsOptimisticItemMissingAfterCompletion() {
+        let optimistic = makeHomeItem(
+            id: "completed",
+            minutes: 20,
+            lastOpenedAt: "2026-07-18T11:00:00Z"
+        )
+
+        let reconciled = HomeStore.reconciledOptimisticOpenedItems(
+            [optimistic.id: optimistic],
+            serverItems: []
+        )
+
+        XCTAssertTrue(reconciled.isEmpty)
+    }
+
+    @MainActor
+    func testSuccessfulHomeRefreshKeepsNewerOptimisticOpenUntilServerCatchesUp() {
+        let server = makeHomeItem(
+            id: "opened",
+            minutes: 20,
+            lastOpenedAt: "2026-07-18T10:00:00Z"
+        )
+        let optimistic = makeHomeItem(
+            id: "opened",
+            minutes: 20,
+            lastOpenedAt: "2026-07-18T11:00:00Z"
+        )
+
+        let reconciled = HomeStore.reconciledOptimisticOpenedItems(
+            [optimistic.id: optimistic],
+            serverItems: [server]
+        )
+
+        XCTAssertEqual(reconciled[optimistic.id], optimistic)
+    }
+
     func testHomeTransitionSourceIDsAreStableAndSectionScoped() {
         let item = makeHomeItem(id: "shared", minutes: 12)
 

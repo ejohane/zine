@@ -113,10 +113,20 @@ final class HomeStore {
 
     private func reconcileOptimisticOpenedItems() {
         guard let home else { return }
-        let serverItems = Dictionary(uniqueKeysWithValues: home.jumpBackIn.map { ($0.id, $0) })
+        optimisticOpenedItems = Self.reconciledOptimisticOpenedItems(
+            optimisticOpenedItems,
+            serverItems: home.jumpBackIn
+        )
+    }
 
-        optimisticOpenedItems = optimisticOpenedItems.filter { id, optimistic in
-            guard let server = serverItems[id] else { return true }
+    static func reconciledOptimisticOpenedItems(
+        _ optimisticItems: [String: HomeItem],
+        serverItems: [HomeItem]
+    ) -> [String: HomeItem] {
+        let serverItemsByID = Dictionary(uniqueKeysWithValues: serverItems.map { ($0.id, $0) })
+
+        return optimisticItems.filter { id, optimistic in
+            guard let server = serverItemsByID[id] else { return false }
             return (server.lastOpenedAt ?? "") < (optimistic.lastOpenedAt ?? "")
         }
     }
