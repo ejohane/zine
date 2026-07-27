@@ -1070,15 +1070,179 @@
         }
       }
     },
+    "/api/v1/today": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getPeopleDailyToday",
+        "summary": "Get the active precomputed people-first Today edition",
+        "description": "Returns the lightweight overview for the immutable active People Daily edition. No clustering, embeddings, or generative work runs on this read path. Supports ETag conditional reads.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "responses": {
+          "200": { "description": "Active People Daily overview." },
+          "304": { "description": "The cached edition is current." },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/sections/{sectionId}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getPeopleDailySection",
+        "summary": "Get one People Daily section with exact conversations",
+        "description": "Lazily returns only the posts and exact thread units referenced by one overview section or the reserved more section.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "name": "sectionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "One immutable section detail." },
+          "304": { "description": "The cached section is current." },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/builds": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "startPeopleDailyBuild",
+        "summary": "Register a resumable People Daily morning build",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "responses": {
+          "200": { "description": "Existing idempotent build." },
+          "201": { "description": "Build registered in COLLECTING state." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "description": "The build ID is already used by different inputs." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/builds/{buildId}": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "getPeopleDailyBuild",
+        "summary": "Get People Daily build state and stage timings",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          { "name": "buildId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Durable build state." },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/builds/{buildId}/publish": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "publishPeopleDailyBuild",
+        "summary": "Build, validate, and atomically publish one People Daily artifact",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          { "name": "buildId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Idempotent existing publication." },
+          "201": { "description": "New immutable edition published." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "The build inputs conflict with a prior attempt." },
+          "422": { "description": "Artifact validation failed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/builds/{buildId}/failure": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "failPeopleDailyBuild",
+        "summary": "Record a sanitized People Daily build failure",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          { "name": "buildId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Build retained in FAILED state." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "description": "A published build cannot be failed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/editions": {
+      "get": {
+        "tags": ["Editorial"],
+        "operationId": "listPeopleDailyEditions",
+        "summary": "List immutable People Daily edition history",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:read"],
+        "x-api-status": "current",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 30 }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Published editions and the current active edition ID." },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/api/v1/today/editions/{editionId}/activate": {
+      "post": {
+        "tags": ["Editorial"],
+        "operationId": "activatePeopleDailyEdition",
+        "summary": "Atomically activate an existing immutable People Daily edition",
+        "description": "Validates the retained artifact before moving the active pointer. This provides data rollback without recollection.",
+        "security": [{ "bearerAuth": [] }],
+        "x-required-scopes": ["bookmarks:write"],
+        "x-api-status": "current",
+        "parameters": [
+          { "name": "editionId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "The retained edition is active." },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": { "description": "The retained artifact failed validation." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/api/v1/today/feed": {
       "get": {
         "tags": ["Editorial"],
         "operationId": "getPeopleFirstDailyFeed",
         "summary": "Get the frozen people-first Today review feed",
-        "description": "Returns a frozen rolling-24-hour Favorites-list timeline collapsed into exact thread units, then a variable zero-to-five set of corroborated topic clusters ranked by distinct Favorite authors and Favorite thread units. Topic labels are extracted from post evidence rather than synthesized headlines; Following supplies bounded supporting conversations and a secondary thread stream. The response discloses the pinned clustering version, semantic fallback state, immutable source, membership, collection-policy, window, run-context, structure, and context-budget provenance. This review route does not replace the live editorial Today issue.",
+        "description": "Legacy rollback route that computes the people-first feed on demand. The canonical native Today reads the precomputed /api/v1/today edition instead.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
-        "x-api-status": "experimental",
+        "x-api-status": "deprecated",
         "parameters": [
           {
             "name": "date",

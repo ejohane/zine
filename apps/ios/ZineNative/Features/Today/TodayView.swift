@@ -2,6 +2,34 @@ import SwiftUI
 
 struct TodayView: View {
     let client: APIClient
+    let cache: PeopleDailyCache
+    let refreshRevision: Int
+
+    init(
+        client: APIClient,
+        cache: PeopleDailyCache,
+        refreshRevision: Int,
+        onContentChanged _: @escaping () -> Void,
+        onExternalOpen _: @escaping (Bookmark) -> Void
+    ) {
+        self.client = client
+        self.cache = cache
+        self.refreshRevision = refreshRevision
+    }
+
+    var body: some View {
+        PeopleDailyTodayView(
+            client: client,
+            cache: cache,
+            refreshRevision: refreshRevision
+        )
+    }
+}
+
+// Retained for one release as an operational rollback surface while the
+// people-first Today edition becomes canonical.
+private struct LegacyEditorialTodayView: View {
+    let client: APIClient
     let refreshRevision: Int
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void

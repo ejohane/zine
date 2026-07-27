@@ -3,6 +3,57 @@ import XCTest
 @testable import ZineNative
 
 final class EditorialTests: XCTestCase {
+    func testDecodesAndCachesCanonicalPeopleDailyOverview() async throws {
+        let data = Data(
+            """
+            {
+              "id":"people_daily_2026-07-26_r1_abc","editionDate":"2026-07-26",
+              "revision":1,"status":"PUBLISHED","schemaVersion":1,
+              "contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "favoritesRunId":"favorites-1","followingRunId":"following-1",
+              "membershipSnapshotId":"members-1","algorithmVersion":"people-daily-v1",
+              "promptVersion":"people-daily-overview-v1","model":"overview-model",
+              "coverageStatus":"COMPLETE","warnings":[],
+              "counts":{"posts":2,"threadUnits":1,"overviewSections":1},
+              "timingsMs":{"total":1200},"builtAt":"2026-07-26T12:00:00.000Z",
+              "publishedAt":"2026-07-26T12:00:01.000Z","date":"2026-07-26",
+              "timezone":"America/Chicago","frozenAt":"2026-07-26T12:00:00.000Z",
+              "freshness":{"isCurrent":true,"status":"COMPLETE","warnings":[]},
+              "coverage":{"status":"COMPLETE","archiveStatus":"COMPLETE",
+                "selectionStatus":"COMPLETE","runId":"favorites-1","requestedCount":5000,
+                "collectedCount":2,"message":"Complete."},
+              "sources":[],
+              "overview":{"version":"daily-overview-v1","status":"COMPLETE",
+                "model":"overview-model","frozen":true,"inputFingerprint":"fingerprint",
+                "warnings":[]},
+              "overviewSections":[{"id":"topic:1","title":"Open models",
+                "summary":"People are comparing access to open models.","source":"GENERATED",
+                "representativePostIds":["1"],"favoriteThreadUnitIds":["conversation:1"],
+                "supportingThreadUnitIds":[],"authorKeys":["id:alice"],
+                "favoriteConversationCount":1,"supportingConversationCount":0,
+                "latestActivityAt":null,"coverageWarnings":[]}],
+              "authors":[{"key":"id:alice","username":"alice","name":"Alice",
+                "profileUrl":null,"profileImageUrl":null,"verified":false}],
+              "more":{"id":"more","favoriteConversationCount":2,
+                "supportingConversationCount":1},"inputs":null,
+              "requestId":"request-1","traceId":"trace-1"
+            }
+            """.utf8
+        )
+        let response = try JSONDecoder().decode(PeopleDailyOverviewResponse.self, from: data)
+        XCTAssertEqual(response.id, "people_daily_2026-07-26_r1_abc")
+        XCTAssertEqual(response.overviewSections.first?.favoriteThreadUnitIds, ["conversation:1"])
+
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = PeopleDailyCache(userID: "user-1", baseDirectory: directory)
+        await cache.save(response, at: Date(timeIntervalSince1970: 100))
+        let cached = await cache.loadLatest()
+        XCTAssertEqual(cached?.response, response)
+        XCTAssertEqual(cached?.savedAt, Date(timeIntervalSince1970: 100))
+    }
+
     func testDecodesPeopleFirstV4OverviewThreadAndTopicContract() throws {
         let response = try JSONDecoder().decode(
             DailyFeedResponse.self,

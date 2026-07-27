@@ -24,6 +24,9 @@ import {
   editorialFeedbackEvents,
   editorialRuns,
   dailyEditions,
+  peopleDailyActiveEditions,
+  peopleDailyBuilds,
+  peopleDailyEditions,
 } from '../db/schema';
 import { webhookLogger } from '../lib/logger';
 
@@ -60,8 +63,7 @@ interface ClerkWebhookEvent {
  */
 const IDEMPOTENCY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-async function deleteEditorialArtifacts(bucket: R2Bucket, userId: string): Promise<void> {
-  const prefix = `editorial/users/${encodeURIComponent(userId)}/`;
+async function deleteArtifactPrefix(bucket: R2Bucket, prefix: string): Promise<void> {
   let cursor: string | undefined;
   while (true) {
     const options: R2ListOptions = { prefix, limit: 1_000 };
@@ -78,12 +80,17 @@ async function deleteEditorialArtifacts(bucket: R2Bucket, userId: string): Promi
 }
 
 async function deleteUserData(env: Bindings, userId: string): Promise<void> {
-  await deleteEditorialArtifacts(env.ARTICLE_CONTENT, userId);
+  const safeUserId = encodeURIComponent(userId);
+  await deleteArtifactPrefix(env.ARTICLE_CONTENT, `editorial/users/${safeUserId}/`);
+  await deleteArtifactPrefix(env.ARTICLE_CONTENT, `people-daily/users/${safeUserId}/`);
 
   const db = createDb(env.DB);
   await db.delete(editorialFeedbackEvents).where(eq(editorialFeedbackEvents.userId, userId));
   await db.delete(editorialRuns).where(eq(editorialRuns.userId, userId));
   await db.delete(dailyEditions).where(eq(dailyEditions.userId, userId));
+  await db.delete(peopleDailyActiveEditions).where(eq(peopleDailyActiveEditions.userId, userId));
+  await db.delete(peopleDailyBuilds).where(eq(peopleDailyBuilds.userId, userId));
+  await db.delete(peopleDailyEditions).where(eq(peopleDailyEditions.userId, userId));
   await db.delete(providerItemsSeen).where(eq(providerItemsSeen.userId, userId));
   await db.delete(xBookmarkItems).where(eq(xBookmarkItems.userId, userId));
   await db.delete(xBookmarkSyncs).where(eq(xBookmarkSyncs.userId, userId));

@@ -72,6 +72,88 @@ export const dailyEditions = sqliteTable(
   ]
 );
 
+// Immutable, precomputed people-first Today editions. The complete conversation
+// artifact lives in R2; these rows are the durable index and publication pointer.
+export const peopleDailyEditions = sqliteTable(
+  'people_daily_editions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    editionDate: text('edition_date').notNull(),
+    revision: integer('revision').notNull(),
+    status: text('status').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+    artifactKey: text('artifact_key').notNull(),
+    contentHash: text('content_hash').notNull(),
+    favoritesRunId: text('favorites_run_id').notNull(),
+    followingRunId: text('following_run_id').notNull(),
+    membershipSnapshotId: text('membership_snapshot_id'),
+    algorithmVersion: text('algorithm_version').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    model: text('model'),
+    coverageStatus: text('coverage_status').notNull(),
+    warningsJson: text('warnings_json').notNull(),
+    countsJson: text('counts_json').notNull(),
+    timingsJson: text('timings_json').notNull(),
+    builtAt: integer('built_at').notNull(),
+    publishedAt: integer('published_at').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('people_daily_editions_user_date_revision_idx').on(
+      table.userId,
+      table.editionDate,
+      table.revision
+    ),
+    uniqueIndex('people_daily_editions_user_hash_idx').on(table.userId, table.contentHash),
+    index('people_daily_editions_user_published_idx').on(table.userId, table.publishedAt),
+  ]
+);
+
+export const peopleDailyBuilds = sqliteTable(
+  'people_daily_builds',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id),
+    editionDate: text('edition_date').notNull(),
+    status: text('status').notNull(),
+    editionId: text('edition_id').references(() => peopleDailyEditions.id, {
+      onDelete: 'set null',
+    }),
+    favoritesRunId: text('favorites_run_id'),
+    followingRunId: text('following_run_id'),
+    algorithmVersion: text('algorithm_version').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    model: text('model'),
+    inputHash: text('input_hash'),
+    failureStage: text('failure_stage'),
+    errorMessage: text('error_message'),
+    timingsJson: text('timings_json').notNull(),
+    startedAt: integer('started_at').notNull(),
+    completedAt: integer('completed_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    index('people_daily_builds_user_date_idx').on(table.userId, table.editionDate, table.updatedAt),
+    index('people_daily_builds_user_status_idx').on(table.userId, table.status, table.updatedAt),
+  ]
+);
+
+export const peopleDailyActiveEditions = sqliteTable('people_daily_active_editions', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id),
+  editionId: text('edition_id')
+    .notNull()
+    .references(() => peopleDailyEditions.id),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 // Inspectable generation metadata for each immutable daily edition run.
 // Large snapshot, candidate, validation, and edition documents remain in R2.
 export const editorialRuns = sqliteTable(

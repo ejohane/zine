@@ -87,6 +87,14 @@ const {
   mockPromoteEditorialExperiment,
   mockGetDailyFeed,
   mockGetDailyAuthorActivity,
+  mockStartPeopleDailyBuild,
+  mockGetPeopleDailyBuild,
+  mockPublishPeopleDailyBuild,
+  mockFailPeopleDailyBuild,
+  mockGetPeopleDailyOverview,
+  mockGetPeopleDailySection,
+  mockListPeopleDailyEditions,
+  mockActivatePeopleDailyEdition,
 } = vi.hoisted(() => ({
   mockCreateDb: vi.fn(),
   mockCreateContext: vi.fn(async (c: { get: (key: string) => unknown }) => ({
@@ -168,6 +176,14 @@ const {
   mockPromoteEditorialExperiment: vi.fn(),
   mockGetDailyFeed: vi.fn(),
   mockGetDailyAuthorActivity: vi.fn(),
+  mockStartPeopleDailyBuild: vi.fn(),
+  mockGetPeopleDailyBuild: vi.fn(),
+  mockPublishPeopleDailyBuild: vi.fn(),
+  mockFailPeopleDailyBuild: vi.fn(),
+  mockGetPeopleDailyOverview: vi.fn(),
+  mockGetPeopleDailySection: vi.fn(),
+  mockListPeopleDailyEditions: vi.fn(),
+  mockActivatePeopleDailyEdition: vi.fn(),
 }));
 
 vi.mock('../db', () => ({
@@ -253,6 +269,25 @@ vi.mock('../lib/daily-feed', () => ({
   getDailyFeed: mockGetDailyFeed,
   getDailyAuthorActivity: mockGetDailyAuthorActivity,
 }));
+
+vi.mock('../lib/people-daily-editions', () => {
+  class PeopleDailyConflictError extends Error {}
+  class PeopleDailyNotFoundError extends Error {}
+  class PeopleDailyValidationError extends Error {}
+  return {
+    PeopleDailyConflictError,
+    PeopleDailyNotFoundError,
+    PeopleDailyValidationError,
+    startPeopleDailyBuild: mockStartPeopleDailyBuild,
+    getPeopleDailyBuild: mockGetPeopleDailyBuild,
+    publishPeopleDailyBuild: mockPublishPeopleDailyBuild,
+    failPeopleDailyBuild: mockFailPeopleDailyBuild,
+    getPeopleDailyOverview: mockGetPeopleDailyOverview,
+    getPeopleDailySection: mockGetPeopleDailySection,
+    listPeopleDailyEditions: mockListPeopleDailyEditions,
+    activatePeopleDailyEdition: mockActivatePeopleDailyEdition,
+  };
+});
 
 vi.mock('../sync/service', async () => {
   class RateLimitError extends Error {
@@ -515,6 +550,92 @@ describe('apiV1Routes', () => {
       coverage: { status: 'PARTIAL', runIds: ['run-1'], warnings: [] },
       posts: [],
     });
+    const peopleDailyEdition = {
+      id: 'people-daily-1',
+      editionDate: '2026-07-24',
+      revision: 1,
+      status: 'PUBLISHED',
+      schemaVersion: 1,
+      contentHash: 'a'.repeat(64),
+      favoritesRunId: 'favorites-run-1',
+      followingRunId: 'following-run-1',
+      membershipSnapshotId: 'membership-1',
+      algorithmVersion: 'people-daily-v1',
+      promptVersion: 'people-daily-overview-v1',
+      model: 'overview-model',
+      coverageStatus: 'COMPLETE',
+      warnings: [],
+      counts: { posts: 2, threadUnits: 1, overviewSections: 1 },
+      timingsMs: { total: 1200 },
+      builtAt: '2026-07-24T13:00:00.000Z',
+      publishedAt: '2026-07-24T13:00:01.000Z',
+    };
+    mockGetPeopleDailyOverview.mockResolvedValue({
+      ...peopleDailyEdition,
+      date: '2026-07-24',
+      timezone: 'America/Chicago',
+      frozenAt: '2026-07-24T13:00:00.000Z',
+      freshness: { isCurrent: true, status: 'COMPLETE', warnings: [] },
+      coverage: {
+        status: 'COMPLETE',
+        archiveStatus: 'COMPLETE',
+        selectionStatus: 'COMPLETE',
+        runId: 'favorites-run-1',
+        requestedCount: 5000,
+        collectedCount: 2,
+        message: 'Complete.',
+      },
+      sources: [],
+      overview: null,
+      overviewSections: [],
+      authors: [],
+      more: { id: 'more', favoriteConversationCount: 1, supportingConversationCount: 0 },
+      inputs: null,
+    });
+    mockGetPeopleDailySection.mockResolvedValue({
+      edition: peopleDailyEdition,
+      date: '2026-07-24',
+      timezone: 'America/Chicago',
+      section: {
+        id: 'more',
+        title: 'More conversations',
+        summary: 'Standalone conversations.',
+        favoriteThreadUnitIds: ['post:1'],
+        supportingThreadUnitIds: [],
+        coverageWarnings: [],
+      },
+      sources: [],
+      threadUnits: [],
+      posts: [],
+    });
+    mockStartPeopleDailyBuild.mockResolvedValue({
+      created: true,
+      build: { id: 'build-1', status: 'COLLECTING', editionDate: '2026-07-24' },
+    });
+    mockGetPeopleDailyBuild.mockResolvedValue({
+      id: 'build-1',
+      status: 'PUBLISHED',
+      editionDate: '2026-07-24',
+      editionId: 'people-daily-1',
+    });
+    mockPublishPeopleDailyBuild.mockResolvedValue({
+      created: true,
+      build: { id: 'build-1', status: 'PUBLISHED', editionId: 'people-daily-1' },
+      edition: peopleDailyEdition,
+    });
+    mockFailPeopleDailyBuild.mockResolvedValue({
+      id: 'build-1',
+      status: 'FAILED',
+      failureStage: 'COLLECT_FOLLOWING',
+    });
+    mockListPeopleDailyEditions.mockResolvedValue({
+      activeEditionId: 'people-daily-1',
+      editions: [peopleDailyEdition],
+    });
+    mockActivatePeopleDailyEdition.mockResolvedValue({
+      edition: peopleDailyEdition,
+      activatedAt: '2026-07-24T14:00:00.000Z',
+    });
     mockCreateEditorialExperiment.mockResolvedValue({
       experiment: editorialExperimentFixture(),
       created: true,
@@ -654,6 +775,127 @@ describe('apiV1Routes', () => {
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/connection/callback');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}');
     expect(body.paths).toHaveProperty('/api/v1/subscriptions/youtube/{subscriptionId}/sync');
+    expect(body.paths).toHaveProperty('/api/v1/today');
+    expect(body.paths).toHaveProperty('/api/v1/today/sections/{sectionId}');
+    expect(body.paths).toHaveProperty('/api/v1/today/builds');
+    expect(body.paths).toHaveProperty('/api/v1/today/builds/{buildId}/publish');
+    expect(body.paths).toHaveProperty('/api/v1/today/builds/{buildId}/failure');
+    expect(body.paths).toHaveProperty('/api/v1/today/editions');
+    expect(body.paths).toHaveProperty('/api/v1/today/editions/{editionId}/activate');
+  });
+
+  it('reads the precomputed Today overview and lazy section with ETags', async () => {
+    const app = createTestApp();
+    const env = createMockEnv();
+    const today = await app.fetch(
+      new Request('http://localhost/api/v1/today', {
+        headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` },
+      }),
+      env
+    );
+    expect(today.status).toBe(200);
+    expect(today.headers.get('etag')).toBe(`"${'a'.repeat(64)}"`);
+    expect(await today.json()).toMatchObject({ id: 'people-daily-1', date: '2026-07-24' });
+
+    const unchanged = await app.fetch(
+      new Request('http://localhost/api/v1/today', {
+        headers: {
+          Authorization: `Bearer ${READ_ONLY_TOKEN}`,
+          'If-None-Match': `"${'a'.repeat(64)}"`,
+        },
+      }),
+      env
+    );
+    expect(unchanged.status).toBe(304);
+
+    const section = await app.fetch(
+      new Request('http://localhost/api/v1/today/sections/more', {
+        headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` },
+      }),
+      env
+    );
+    expect(section.status).toBe(200);
+    expect(await section.json()).toMatchObject({
+      edition: { id: 'people-daily-1' },
+      section: { id: 'more' },
+    });
+    expect(mockGetPeopleDailyOverview).toHaveBeenCalledWith(
+      env.DB,
+      env.ARTICLE_CONTENT,
+      'user_123'
+    );
+  });
+
+  it('registers and publishes a durable People Daily build with write scope', async () => {
+    const app = createTestApp();
+    const env = createMockEnv();
+    const start = await app.fetch(
+      new Request('http://localhost/api/v1/today/builds', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: 'build-1', editionDate: '2026-07-24', model: 'overview-model' }),
+      }),
+      env
+    );
+    expect(start.status).toBe(201);
+
+    const publish = await app.fetch(
+      new Request('http://localhost/api/v1/today/builds/build-1/publish', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${READ_WRITE_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          favoritesRunId: 'favorites-run-1',
+          followingRunId: 'following-run-1',
+        }),
+      }),
+      env
+    );
+    expect(publish.status).toBe(201);
+    expect(await publish.json()).toMatchObject({ edition: { id: 'people-daily-1' } });
+    expect(mockPublishPeopleDailyBuild).toHaveBeenCalledWith(
+      env.DB,
+      env.X_ARCHIVE_DB,
+      env.ARTICLE_CONTENT,
+      'user_123',
+      'build-1',
+      { favoritesRunId: 'favorites-run-1', followingRunId: 'following-run-1' },
+      expect.objectContaining({ ai: env.AI })
+    );
+  });
+
+  it('lists and reactivates immutable People Daily editions for rollback', async () => {
+    const app = createTestApp();
+    const env = createMockEnv();
+    const list = await app.fetch(
+      new Request('http://localhost/api/v1/today/editions', {
+        headers: { Authorization: `Bearer ${READ_ONLY_TOKEN}` },
+      }),
+      env
+    );
+    expect(list.status).toBe(200);
+    expect(await list.json()).toMatchObject({ activeEditionId: 'people-daily-1' });
+
+    const activate = await app.fetch(
+      new Request('http://localhost/api/v1/today/editions/people-daily-1/activate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      env
+    );
+    expect(activate.status).toBe(200);
+    expect(await activate.json()).toMatchObject({ edition: { id: 'people-daily-1' } });
+    expect(mockActivatePeopleDailyEdition).toHaveBeenCalledWith(
+      env.DB,
+      env.ARTICLE_CONTENT,
+      'user_123',
+      'people-daily-1'
+    );
   });
 
   it('reads the isolated people-first daily feed and author activity', async () => {
