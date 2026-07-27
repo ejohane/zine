@@ -13,7 +13,7 @@ import type { SyncQueueMessage } from './sync/types';
 export interface Bindings {
   /** D1 database for persistent storage */
   DB: D1Database;
-  /** Read-only access to the canonical X Following archive for people-first Today. */
+  /** Canonical X archive plus frozen people-first Daily View artifacts. */
   X_ARCHIVE_DB: D1Database;
   /** KV namespace for webhook idempotency */
   WEBHOOK_IDEMPOTENCY: KVNamespace;

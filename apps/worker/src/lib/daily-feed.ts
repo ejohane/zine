@@ -3,6 +3,7 @@ import {
   createWorkersAIDailyTopicEmbeddingProvider,
   DEFAULT_DAILY_TOPIC_EMBEDDING_MODEL,
 } from './daily-topic-clustering';
+import { buildDailyOverview, DAILY_OVERVIEW_VERSION } from './daily-overview';
 
 const DEFAULT_TIMEZONE = 'America/Chicago';
 const MAX_RUN_POSTS = 5_000;
@@ -512,6 +513,7 @@ export async function getDailyFeed(
     now?: Date;
     ai?: { run(model: string, input: unknown): Promise<unknown> } | null;
     embeddingModel?: string;
+    overviewModel?: string;
   } = {}
 ) {
   const timezone = options.timezone ?? DEFAULT_TIMEZONE;
@@ -533,8 +535,8 @@ export async function getDailyFeed(
   const primaryRun = favoritesRun ?? followingRun;
   if (!primaryRun) {
     return {
-      schemaVersion: 2,
-      variant: { id: 'people-first-v3', mode: 'REVIEW' as const },
+      schemaVersion: 3,
+      variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' as const },
       date: options.date ?? expectedDate,
       timezone,
       frozenAt: null,
@@ -552,6 +554,15 @@ export async function getDailyFeed(
       conversations: [],
       topicClusters: [],
       threadUnits: [],
+      overview: {
+        version: DAILY_OVERVIEW_VERSION,
+        status: 'FALLBACK' as const,
+        model: null,
+        frozen: true,
+        inputFingerprint: '',
+        warnings: [] as string[],
+      },
+      overviewSections: [],
       clustering: {
         version: 'daily-topics-v1',
         method: 'THREAD_FIRST_EVIDENCE_CLUSTERING' as const,
@@ -743,6 +754,18 @@ export async function getDailyFeed(
   );
   const threadUnitsById = new Map(topicClustering.threadUnits.map((unit) => [unit.id, unit]));
   const postById = new Map(posts.map((post) => [post.id, post]));
+  const dailyOverview = await buildDailyOverview({
+    db,
+    userId,
+    date,
+    favoritesRunId: favoritesRun?.id ?? null,
+    followingRunId: followingRun?.id ?? null,
+    clusters: topicClustering.topicClusters,
+    threadUnits: topicClustering.threadUnits,
+    posts,
+    ai: options.ai,
+    model: options.overviewModel,
+  });
   const conversations = topicClustering.topicClusters.map((topic) => {
     const topicPosts = topic.postIds
       .map((postId) => postById.get(postId))
@@ -822,8 +845,8 @@ export async function getDailyFeed(
       : ('PARTIAL' as const);
 
   return {
-    schemaVersion: 2,
-    variant: { id: 'people-first-v3', mode: 'REVIEW' as const },
+    schemaVersion: 3,
+    variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' as const },
     date,
     timezone,
     frozenAt: frozenAt.toISOString(),
@@ -883,6 +906,8 @@ export async function getDailyFeed(
     conversations,
     topicClusters: topicClustering.topicClusters,
     threadUnits: topicClustering.threadUnits,
+    overview: dailyOverview.overview,
+    overviewSections: dailyOverview.overviewSections,
     clustering: topicClustering.algorithm,
     posts,
     sections: {

@@ -3,14 +3,14 @@ import XCTest
 @testable import ZineNative
 
 final class EditorialTests: XCTestCase {
-    func testDecodesPeopleFirstV3ThreadAndTopicContract() throws {
+    func testDecodesPeopleFirstV4OverviewThreadAndTopicContract() throws {
         let response = try JSONDecoder().decode(
             DailyFeedResponse.self,
             from: Data(
                 """
                 {
-                  "schemaVersion":2,
-                  "variant":{"id":"people-first-v3","mode":"REVIEW"},
+                  "schemaVersion":3,
+                  "variant":{"id":"people-first-v4-editorial-overview","mode":"REVIEW"},
                   "date":"2026-07-25",
                   "timezone":"America/Chicago",
                   "frozenAt":"2026-07-25T13:00:00.000Z",
@@ -56,6 +56,25 @@ final class EditorialTests: XCTestCase {
                     "structureStatus":"EXACT","latestActivityAt":"2026-07-25T11:00:00.000Z",
                     "firstSourcePosition":1,"coverageWarnings":[]
                   }],
+                  "overview":{
+                    "version":"daily-overview-v1","status":"COMPLETE",
+                    "model":"overview-model","frozen":true,
+                    "inputFingerprint":"fingerprint-1","warnings":[]
+                  },
+                  "overviewSections":[{
+                    "id":"topic:daily-topics-v1:one",
+                    "title":"Open weights and access",
+                    "summary":"People are comparing how open-weight models should be distributed and kept available.",
+                    "source":"GENERATED",
+                    "representativePostIds":["1","2"],
+                    "favoriteThreadUnitIds":["post:1","post:2"],
+                    "supportingThreadUnitIds":[],
+                    "authorKeys":["id:alice","id:bob"],
+                    "favoriteConversationCount":2,
+                    "supportingConversationCount":0,
+                    "latestActivityAt":"2026-07-25T12:00:00.000Z",
+                    "coverageWarnings":[]
+                  }],
                   "clustering":{
                     "version":"daily-topics-v1","method":"THREAD_FIRST_EVIDENCE_CLUSTERING",
                     "semanticStatus":"COMPLETE","embeddingModel":"@cf/qwen/qwen3-embedding-0.6b",
@@ -73,7 +92,10 @@ final class EditorialTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(response.variant.id, "people-first-v3")
+        XCTAssertEqual(response.variant.id, "people-first-v4-editorial-overview")
+        XCTAssertEqual(response.overview?.version, "daily-overview-v1")
+        XCTAssertEqual(response.overviewSections?.first?.title, "Open weights and access")
+        XCTAssertEqual(response.overviewSections?.first?.representativePostIds, ["1", "2"])
         XCTAssertEqual(response.clustering?.version, "daily-topics-v1")
         XCTAssertEqual(response.threadUnits?.count, 2)
         XCTAssertEqual(response.topicClusters?.first?.favoriteThreadUnitIds, ["post:1", "post:2"])
