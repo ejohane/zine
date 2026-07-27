@@ -1,5 +1,335 @@
 import SwiftUI
 
+private enum PeopleDailyRoute: Hashable {
+    case section(String)
+}
+
+struct PeopleDailyTodayView: View {
+    let client: APIClient
+    let refreshRevision: Int
+
+    @State private var store: PeopleDailyStore
+
+    init(client: APIClient, cache: PeopleDailyCache, refreshRevision: Int) {
+        self.client = client
+        self.refreshRevision = refreshRevision
+        _store = State(initialValue: PeopleDailyStore(client: client, cache: cache))
+    }
+
+    var body: some View {
+        NavigationStack {
+            content
+                .navigationTitle("Today")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if store.isRefreshing {
+                        ToolbarItem(placement: .topBarLeading) {
+                            ProgressView()
+                                .accessibilityLabel("Refreshing Today")
+                        }
+                    }
+                }
+                .navigationDestination(for: DailyAuthorRoute.self) { route in
+                    DailyAuthorActivityView(
+                        client: client,
+                        author: route.author,
+                        date: route.date
+                    )
+                }
+                .navigationDestination(for: PeopleDailyRoute.self) { route in
+                    switch route {
+                    case let .section(id):
+                        PeopleDailySectionView(client: client, sectionID: id)
+                    }
+                }
+        }
+        .task(id: refreshRevision) { await store.load() }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if store.isLoading, store.response == nil {
+            ProgressView("Loading Today…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = store.errorMessage, store.response == nil {
+            ContentUnavailableView {
+                Label("Today unavailable", systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(error)
+            } actions: {
+                Button("Try again") { Task { await store.load() } }
+            }
+        } else if let response = store.response {
+            PeopleDailyOverviewView(
+                response: response,
+                isShowingCachedEdition: store.isShowingCachedEdition,
+                cachedAt: store.cachedAt,
+                refreshErrorMessage: store.refreshErrorMessage
+            )
+            .refreshable { await store.load() }
+        }
+    }
+}
+
+private struct PeopleDailyOverviewView: View {
+    let response: PeopleDailyOverviewResponse
+    let isShowingCachedEdition: Bool
+    let cachedAt: Date?
+    let refreshErrorMessage: String?
+
+    private var authorsByKey: [String: DailyAuthor] {
+        Dictionary(uniqueKeysWithValues: response.authors.map { ($0.key, $0) })
+    }
+
+    private var moreCount: Int {
+        response.more.favoriteConversationCount + response.more.supportingConversationCount
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(formattedDate)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Text("What people are talking about")
+                        .font(.largeTitle.weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+
+                PeopleDailyCoverageNotice(
+                    response: response,
+                    isShowingCachedEdition: isShowingCachedEdition,
+                    cachedAt: cachedAt,
+                    refreshErrorMessage: refreshErrorMessage
+                )
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+
+                if response.overviewSections.isEmpty, moreCount == 0 {
+                    ContentUnavailableView(
+                        "No conversations yet",
+                        systemImage: "person.2.slash",
+                        description: Text("Today’s edition does not contain enough evidence-backed conversation to publish sections.")
+                    )
+                    .padding(.top, 48)
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(response.overviewSections) { section in
+                            NavigationLink(value: PeopleDailyRoute.section(section.id)) {
+                                DailyOverviewSectionRow(
+                                    section: section,
+                                    authors: section.authorKeys.compactMap { authorsByKey[$0] }
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            Divider()
+                                .padding(.leading, 58)
+                        }
+
+                        if moreCount > 0 {
+                            NavigationLink(value: PeopleDailyRoute.section(response.more.id)) {
+                                DailyMoreConversationsRow(count: moreCount)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 20)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+    }
+
+    private var formattedDate: String {
+        let components = response.date.split(separator: "-").compactMap { Int($0) }
+        guard components.count == 3 else { return response.date }
+        var value = DateComponents()
+        value.calendar = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(identifier: response.timezone)
+        value.year = components[0]
+        value.month = components[1]
+        value.day = components[2]
+        return value.date?.formatted(.dateTime.weekday(.wide).month(.wide).day()) ?? response.date
+    }
+}
+
+private struct PeopleDailyCoverageNotice: View {
+    let response: PeopleDailyOverviewResponse
+    let isShowingCachedEdition: Bool
+    let cachedAt: Date?
+    let refreshErrorMessage: String?
+
+    @State private var showsDetails = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showsDetails.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(response.freshness.status == .complete ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(isShowingCachedEdition ? "Saved edition" : statusTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text("\(response.more.favoriteConversationCount) Favorites")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Image(systemName: showsDetails ? "chevron.up" : "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showsDetails {
+                Text(response.coverage.message)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let cachedAt, isShowingCachedEdition {
+                    Text("Saved \(cachedAt.formatted(.relative(presentation: .named)))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                if let refreshErrorMessage {
+                    Label(refreshErrorMessage, systemImage: "wifi.exclamationmark")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(response.freshness.warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    private var statusTitle: String {
+        switch response.freshness.status {
+        case .complete: "Complete daily edition"
+        case .partial: "Partial review coverage"
+        case .unavailable: "Coverage unavailable"
+        }
+    }
+}
+
+private struct PeopleDailySectionView: View {
+    let client: APIClient
+    let sectionID: String
+
+    @State private var store: PeopleDailySectionStore
+    @State private var scope: DailyConversationScope = .favorites
+
+    init(client: APIClient, sectionID: String) {
+        self.client = client
+        self.sectionID = sectionID
+        _store = State(initialValue: PeopleDailySectionStore(client: client, sectionID: sectionID))
+    }
+
+    var body: some View {
+        Group {
+            if store.isLoading, store.response == nil {
+                ProgressView("Loading conversations…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = store.errorMessage, store.response == nil {
+                ContentUnavailableView {
+                    Label("Conversations unavailable", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Try again") { Task { await store.load() } }
+                }
+            } else if let response = store.response {
+                sectionContent(response)
+            }
+        }
+        .navigationTitle(store.response?.section.title ?? "Conversations")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await store.load() }
+    }
+
+    private func sectionContent(_ response: PeopleDailySectionResponse) -> some View {
+        let unitsByID = Dictionary(uniqueKeysWithValues: response.threadUnits.map { ($0.id, $0) })
+        let postsByID = Dictionary(uniqueKeysWithValues: response.posts.map { ($0.id, $0) })
+        let sourceNames = Dictionary(uniqueKeysWithValues: response.sources.map { ($0.id, $0.name) })
+        let favoriteIDs = response.section.favoriteThreadUnitIds
+        let nearbyIDs = response.section.supportingThreadUnitIds
+        let visibleUnits = (scope == .favorites ? favoriteIDs : nearbyIDs).compactMap { unitsByID[$0] }
+
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(response.section.title)
+                        .font(.largeTitle.weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(response.section.summary)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    ForEach(response.section.coverageWarnings, id: \.self) { warning in
+                        Label(warning, systemImage: "exclamationmark.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+
+                if !nearbyIDs.isEmpty {
+                    Picker("Conversation source", selection: $scope) {
+                        Text("Favorites · \(favoriteIDs.count)")
+                            .tag(DailyConversationScope.favorites)
+                        Text("Nearby · \(nearbyIDs.count)")
+                            .tag(DailyConversationScope.context)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 20)
+                }
+
+                if visibleUnits.isEmpty {
+                    ContentUnavailableView(
+                        scope == .favorites ? "No Favorite conversations" : "No nearby conversations",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("Nothing is available under this source in the frozen edition.")
+                    )
+                    .padding(.top, 48)
+                } else {
+                    ForEach(Array(visibleUnits.enumerated()), id: \.element.id) { index, threadUnit in
+                        DailyThreadUnitCard(
+                            threadUnit: threadUnit,
+                            postsByID: postsByID,
+                            sourceNames: sourceNames,
+                            date: response.date,
+                            isEmbedded: true
+                        )
+                        .padding(.horizontal, 18)
+                        .padding(.top, 22)
+                        if index < visibleUnits.count - 1 {
+                            Divider()
+                                .padding(.leading, 76)
+                                .padding(.top, 20)
+                        }
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+    }
+}
+
 private struct DailyAuthorRoute: Hashable {
     let author: DailyAuthor
     let date: String

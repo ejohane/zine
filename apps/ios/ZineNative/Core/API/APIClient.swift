@@ -56,6 +56,16 @@ struct APIClient {
         try await request(url: baseURL.appending(path: "/api/v1/editorial/today"))
     }
 
+    func getPeopleDailyToday() async throws -> PeopleDailyOverviewResponse {
+        try await request(url: baseURL.appending(path: "/api/v1/today"))
+    }
+
+    func getPeopleDailySection(id: String) async throws -> PeopleDailySectionResponse {
+        try await request(
+            url: baseURL.appending(path: "/api/v1/today/sections/\(id)")
+        )
+    }
+
     func getDailyFeed(date: String? = nil) async throws -> DailyFeedResponse {
         var components = URLComponents(
             url: baseURL.appending(path: "/api/v1/today/feed"),

@@ -318,6 +318,29 @@ async function selectRun(
   );
 }
 
+async function selectRunById(
+  db: D1Database,
+  userId: string,
+  runId: string,
+  sourceTypes: ArchiveRunRow['source_type'][]
+): Promise<ArchiveRunRow | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, requested_count, collected_count, status, started_at, completed_at,
+        excluded_ads, failure_reason, source_type, source_id, source_name, source_url,
+        context_coverage_json, collection_policy_json, termination_reason, window_coverage_json,
+        structure_coverage_json
+       FROM x_timeline_runs
+       WHERE user_id = ? AND id = ? AND status IN ('COMPLETE', 'PARTIAL')
+         AND completed_at IS NOT NULL
+       LIMIT 1`
+    )
+    .bind(userId, runId)
+    .first<ArchiveRunRow>();
+  if (!row || !sourceTypes.includes(row.source_type)) return null;
+  return row;
+}
+
 async function postsForRun(
   db: D1Database,
   userId: string,
@@ -509,6 +532,8 @@ export async function getDailyFeed(
   userId: string,
   options: {
     date?: string;
+    favoritesRunId?: string;
+    followingRunId?: string;
     timezone?: string;
     now?: Date;
     ai?: { run(model: string, input: unknown): Promise<unknown> } | null;
@@ -516,13 +541,36 @@ export async function getDailyFeed(
     overviewModel?: string;
   } = {}
 ) {
+  const generationStarted = performance.now();
+  const generationTimingsMs: Record<string, number> = {};
   const timezone = options.timezone ?? DEFAULT_TIMEZONE;
   const now = options.now ?? new Date();
   const expectedDate = localDate(now, timezone);
   const requestedDate = options.date ?? expectedDate;
-  let favoritesRun = await selectRun(db, userId, requestedDate, timezone, ['FAVORITES', 'LIST']);
-  let followingRun = await selectRun(db, userId, requestedDate, timezone, ['FOLLOWING']);
-  if (!options.date && !favoritesRun && !followingRun) {
+  let favoritesRun = options.favoritesRunId
+    ? await selectRunById(db, userId, options.favoritesRunId, ['FAVORITES', 'LIST'])
+    : await selectRun(db, userId, requestedDate, timezone, ['FAVORITES', 'LIST']);
+  let followingRun = options.followingRunId
+    ? await selectRunById(db, userId, options.followingRunId, ['FOLLOWING'])
+    : await selectRun(db, userId, requestedDate, timezone, ['FOLLOWING']);
+  if (options.favoritesRunId && !favoritesRun) {
+    throw new Error(
+      `Favorites archive run is unavailable or has the wrong source: ${options.favoritesRunId}`
+    );
+  }
+  if (options.followingRunId && !followingRun) {
+    throw new Error(
+      `Following archive run is unavailable or has the wrong source: ${options.followingRunId}`
+    );
+  }
+  generationTimingsMs.archiveSelection = Math.round(performance.now() - generationStarted);
+  if (
+    !options.date &&
+    !options.favoritesRunId &&
+    !options.followingRunId &&
+    !favoritesRun &&
+    !followingRun
+  ) {
     favoritesRun = await selectRun(db, userId, undefined, timezone, ['FAVORITES', 'LIST']);
     const fallbackDate = favoritesRun
       ? localDate(new Date(favoritesRun.completed_at ?? favoritesRun.started_at), timezone)
@@ -581,6 +629,7 @@ export async function getDailyFeed(
         followingThreadUnitIds: [],
       },
       inputs: { favorites: null, following: null, membership: null },
+      generationTimingsMs,
     };
   }
 
@@ -594,6 +643,7 @@ export async function getDailyFeed(
           : new Date(favoritesRun.started_at - 24 * 60 * 60 * 1_000).toISOString()
       )
     : null;
+  const postHydrationStarted = performance.now();
   const rawFavoriteRows = favoritesRun ? await postsForRun(db, userId, favoritesRun.id) : [];
   const favoriteRows = rawFavoriteRows.filter(
     (row) =>
@@ -632,15 +682,20 @@ export async function getDailyFeed(
     ).values(),
   ];
   const archivePosts = [...primaryRows, ...uniqueContextRows];
+  generationTimingsMs.postHydration = Math.round(performance.now() - postHydrationStarted);
+  const relationshipStarted = performance.now();
   const relationships = await relationshipsForPosts(
     db,
     userId,
     archivePosts.map((post) => post.tweet_id)
   );
+  generationTimingsMs.relationshipHydration = Math.round(performance.now() - relationshipStarted);
+  const membershipStarted = performance.now();
   const sourceResult = await dailySources(db, userId, {
     runId: favoritesRun?.id,
     referenceAt: frozenAt.getTime(),
   });
+  generationTimingsMs.membership = Math.round(performance.now() - membershipStarted);
   const warnings: string[] = [];
   if (sourceResult.warning) warnings.push(sourceResult.warning);
   if (favoritesRun && favoritePolicy?.mode !== 'ROLLING_WINDOW') {
@@ -741,6 +796,7 @@ export async function getDailyFeed(
   }
   contextWarnings.push(...(favoriteContextCoverage?.warnings ?? []));
   contextWarnings.push(...(favoriteStructureCoverage?.warnings ?? []));
+  const clusteringStarted = performance.now();
   const topicClustering = await buildDailyTopicClustering(
     posts,
     favoritePostIds,
@@ -752,8 +808,10 @@ export async function getDailyFeed(
       ),
     }
   );
+  generationTimingsMs.clusteringAndEmbeddings = Math.round(performance.now() - clusteringStarted);
   const threadUnitsById = new Map(topicClustering.threadUnits.map((unit) => [unit.id, unit]));
   const postById = new Map(posts.map((post) => [post.id, post]));
+  const overviewStarted = performance.now();
   const dailyOverview = await buildDailyOverview({
     db,
     userId,
@@ -766,6 +824,7 @@ export async function getDailyFeed(
     ai: options.ai,
     model: options.overviewModel,
   });
+  generationTimingsMs.overviewCopy = Math.round(performance.now() - overviewStarted);
   const conversations = topicClustering.topicClusters.map((topic) => {
     const topicPosts = topic.postIds
       .map((postId) => postById.get(postId))
@@ -844,6 +903,7 @@ export async function getDailyFeed(
       ? ('COMPLETE' as const)
       : ('PARTIAL' as const);
 
+  generationTimingsMs.total = Math.round(performance.now() - generationStarted);
   return {
     schemaVersion: 3,
     variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' as const },
@@ -968,6 +1028,7 @@ export async function getDailyFeed(
           }
         : null,
     },
+    generationTimingsMs,
   };
 }
 

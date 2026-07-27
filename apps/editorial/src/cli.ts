@@ -47,6 +47,134 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 }
 
 async function main() {
+  if (command === 'people-daily-start') {
+    console.log(
+      JSON.stringify(
+        await postEditorialRequest(
+          '/api/v1/today/builds',
+          {
+            id: requiredArg(args, 'run-id'),
+            editionDate: requiredArg(args, 'date'),
+            ...(typeof args.model === 'string' ? { model: args.model } : {}),
+          },
+          {
+            token: process.env.ZINE_ACCESS_TOKEN,
+            apiUrl: editorialApiUrlFromArgs(args),
+          }
+        )
+      )
+    );
+    return;
+  }
+
+  if (command === 'people-daily-publish') {
+    const runId = requiredArg(args, 'run-id');
+    console.log(
+      JSON.stringify(
+        await postEditorialRequest(
+          `/api/v1/today/builds/${encodeURIComponent(runId)}/publish`,
+          {
+            favoritesRunId: requiredArg(args, 'favorites-run-id'),
+            followingRunId: requiredArg(args, 'following-run-id'),
+          },
+          {
+            token: process.env.ZINE_ACCESS_TOKEN,
+            apiUrl: editorialApiUrlFromArgs(args),
+          }
+        )
+      )
+    );
+    return;
+  }
+
+  if (command === 'people-daily-status') {
+    const runId = requiredArg(args, 'run-id');
+    console.log(
+      JSON.stringify(
+        await getEditorialRequest(`/api/v1/today/builds/${encodeURIComponent(runId)}`, {
+          token: process.env.ZINE_ACCESS_TOKEN,
+          apiUrl: editorialApiUrlFromArgs(args),
+        })
+      )
+    );
+    return;
+  }
+
+  if (command === 'people-daily-fail') {
+    const runId = requiredArg(args, 'run-id');
+    console.log(
+      JSON.stringify(
+        await postEditorialRequest(
+          `/api/v1/today/builds/${encodeURIComponent(runId)}/failure`,
+          { stage: requiredArg(args, 'stage'), message: requiredArg(args, 'message') },
+          {
+            token: process.env.ZINE_ACCESS_TOKEN,
+            apiUrl: editorialApiUrlFromArgs(args),
+          }
+        )
+      )
+    );
+    return;
+  }
+
+  if (command === 'people-daily-verify') {
+    const today = (await getEditorialRequest('/api/v1/today', {
+      token: process.env.ZINE_ACCESS_TOKEN,
+      apiUrl: editorialApiUrlFromArgs(args),
+    })) as { id?: string; date?: string; overviewSections?: Array<{ id?: string }> };
+    const firstSectionId = today.overviewSections?.find((section) => section.id)?.id ?? 'more';
+    const section = (await getEditorialRequest(
+      `/api/v1/today/sections/${encodeURIComponent(firstSectionId)}`,
+      {
+        token: process.env.ZINE_ACCESS_TOKEN,
+        apiUrl: editorialApiUrlFromArgs(args),
+      }
+    )) as { edition?: { id?: string }; threadUnits?: unknown[]; posts?: unknown[] };
+    if (!today.id || section.edition?.id !== today.id) {
+      throw new Error('People Daily overview and section readback reference different editions');
+    }
+    console.log(
+      JSON.stringify({
+        verified: true,
+        editionId: today.id,
+        date: today.date,
+        sectionId: firstSectionId,
+        threadUnits: section.threadUnits?.length ?? 0,
+        posts: section.posts?.length ?? 0,
+      })
+    );
+    return;
+  }
+
+  if (command === 'people-daily-history') {
+    console.log(
+      JSON.stringify(
+        await getEditorialRequest('/api/v1/today/editions', {
+          token: process.env.ZINE_ACCESS_TOKEN,
+          apiUrl: editorialApiUrlFromArgs(args),
+        })
+      )
+    );
+    return;
+  }
+
+  if (command === 'people-daily-activate') {
+    const editionId = requiredArg(args, 'edition-id');
+    console.log(
+      JSON.stringify(
+        await postEditorialRequest(
+          `/api/v1/today/editions/${encodeURIComponent(editionId)}/activate`,
+          {},
+          {
+            token: process.env.ZINE_ACCESS_TOKEN,
+            apiUrl: editorialApiUrlFromArgs(args),
+          }
+        )
+      )
+    );
+    return;
+  }
+
   if (command === 'experiment-create') {
     const body = CreateEditorialExperimentSchema.parse(await readJson(requiredArg(args, 'file')));
     console.log(

@@ -264,6 +264,10 @@ describe('POST /api/auth/webhook', () => {
       prefix: 'editorial/users/user_456/',
       limit: 1_000,
     });
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledWith({
+      prefix: 'people-daily/users/user_456/',
+      limit: 1_000,
+    });
     expect(mockDelete.mock.calls.slice(0, 3).map(([table]) => table)).toEqual([
       editorialFeedbackEvents,
       editorialRuns,
@@ -443,6 +447,10 @@ describe('DELETE /api/auth/account', () => {
       prefix: 'editorial/users/user_to_delete/',
       limit: 1_000,
     });
+    expect(mockEnv.ARTICLE_CONTENT.list).toHaveBeenCalledWith({
+      prefix: 'people-daily/users/user_to_delete/',
+      limit: 1_000,
+    });
   });
 
   it('deletes every page of editorial artifacts before D1 account data', async () => {
@@ -462,6 +470,10 @@ describe('DELETE /api/auth/account', () => {
       })
       .mockResolvedValueOnce({
         objects: [{ key: 'editorial/users/user_paginated/two' }],
+        truncated: false,
+      })
+      .mockResolvedValueOnce({
+        objects: [],
         truncated: false,
       });
 

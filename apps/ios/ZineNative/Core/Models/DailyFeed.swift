@@ -1,6 +1,88 @@
 import Foundation
 
-struct DailyFeedResponse: Decodable, Hashable {
+struct PeopleDailyOverviewResponse: Codable, Hashable {
+    let id: String
+    let editionDate: String
+    let revision: Int
+    let status: String
+    let schemaVersion: Int
+    let contentHash: String
+    let favoritesRunId: String
+    let followingRunId: String
+    let membershipSnapshotId: String?
+    let algorithmVersion: String
+    let promptVersion: String
+    let model: String?
+    let coverageStatus: DailyCoverageStatus
+    let warnings: [String]
+    let counts: [String: Int]
+    let timingsMs: [String: Int]
+    let builtAt: String
+    let publishedAt: String
+    let date: String
+    let timezone: String
+    let frozenAt: String?
+    let freshness: DailyFeedFreshness
+    let coverage: DailyFeedCoverage
+    let sources: [DailyFeedSource]
+    let overview: DailyOverviewMetadata?
+    let overviewSections: [DailyOverviewSection]
+    let authors: [DailyAuthor]
+    let more: PeopleDailyMoreSummary
+    let inputs: DailyFeedInputs?
+    let requestId: String
+    let traceId: String
+}
+
+struct PeopleDailyMoreSummary: Codable, Hashable {
+    let id: String
+    let favoriteConversationCount: Int
+    let supportingConversationCount: Int
+}
+
+struct PeopleDailyEditionSummary: Codable, Hashable {
+    let id: String
+    let editionDate: String
+    let revision: Int
+    let status: String
+    let schemaVersion: Int
+    let contentHash: String
+    let favoritesRunId: String
+    let followingRunId: String
+    let membershipSnapshotId: String?
+    let algorithmVersion: String
+    let promptVersion: String
+    let model: String?
+    let coverageStatus: DailyCoverageStatus
+    let warnings: [String]
+    let counts: [String: Int]
+    let timingsMs: [String: Int]
+    let builtAt: String
+    let publishedAt: String
+}
+
+struct PeopleDailySectionResponse: Codable, Hashable {
+    let edition: PeopleDailyEditionSummary
+    let date: String
+    let timezone: String
+    let section: PeopleDailySection
+    let sources: [DailyFeedSource]
+    let threadUnits: [DailyThreadUnit]
+    let posts: [DailyPost]
+    let requestId: String
+    let traceId: String
+}
+
+struct PeopleDailySection: Codable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let summary: String
+    let favoriteThreadUnitIds: [String]
+    let supportingThreadUnitIds: [String]
+    let coverageWarnings: [String]
+}
+
+struct DailyFeedResponse: Codable, Hashable {
     let schemaVersion: Int
     let variant: DailyFeedVariant
     let date: String
@@ -22,7 +104,7 @@ struct DailyFeedResponse: Decodable, Hashable {
     let traceId: String
 }
 
-struct DailyOverviewMetadata: Decodable, Hashable {
+struct DailyOverviewMetadata: Codable, Hashable {
     let version: String
     let status: String
     let model: String?
@@ -31,7 +113,7 @@ struct DailyOverviewMetadata: Decodable, Hashable {
     let warnings: [String]
 }
 
-struct DailyOverviewSection: Decodable, Hashable, Identifiable {
+struct DailyOverviewSection: Codable, Hashable, Identifiable {
     let id: String
     let title: String
     let summary: String
@@ -46,8 +128,8 @@ struct DailyOverviewSection: Decodable, Hashable, Identifiable {
     let coverageWarnings: [String]
 }
 
-struct DailyFeedVariant: Decodable, Hashable {
-    enum Mode: String, Decodable, Hashable {
+struct DailyFeedVariant: Codable, Hashable {
+    enum Mode: String, Codable, Hashable {
         case review = "REVIEW"
     }
 
@@ -55,20 +137,20 @@ struct DailyFeedVariant: Decodable, Hashable {
     let mode: Mode
 }
 
-enum DailyCoverageStatus: String, Decodable, Hashable {
+enum DailyCoverageStatus: String, Codable, Hashable {
     case complete = "COMPLETE"
     case partial = "PARTIAL"
     case unavailable = "UNAVAILABLE"
 }
 
-struct DailyFeedFreshness: Decodable, Hashable {
+struct DailyFeedFreshness: Codable, Hashable {
     let isCurrent: Bool
     let status: DailyCoverageStatus
     let warnings: [String]
 }
 
-struct DailyFeedCoverage: Decodable, Hashable {
-    enum SelectionStatus: String, Decodable, Hashable {
+struct DailyFeedCoverage: Codable, Hashable {
+    enum SelectionStatus: String, Codable, Hashable {
         case complete = "COMPLETE"
         case stale = "STALE"
         case fallback = "FALLBACK"
@@ -88,8 +170,8 @@ struct DailyFeedCoverage: Decodable, Hashable {
     let terminationReason: String?
 }
 
-struct DailyFeedSource: Decodable, Hashable, Identifiable {
-    enum SourceType: String, Decodable, Hashable {
+struct DailyFeedSource: Codable, Hashable, Identifiable {
+    enum SourceType: String, Codable, Hashable {
         case favorites = "FAVORITES"
         case list = "LIST"
         case following = "FOLLOWING"
@@ -109,8 +191,8 @@ struct DailyFeedSource: Decodable, Hashable, Identifiable {
     let failureReason: String?
 }
 
-struct DailyConversation: Decodable, Hashable, Identifiable {
-    enum EvidenceType: String, Decodable, Hashable {
+struct DailyConversation: Codable, Hashable, Identifiable {
+    enum EvidenceType: String, Codable, Hashable {
         case directRelationship = "DIRECT_RELATIONSHIP"
         case sharedLink = "SHARED_LINK"
         case topicSimilarity = "TOPIC_SIMILARITY"
@@ -130,7 +212,7 @@ struct DailyConversation: Decodable, Hashable, Identifiable {
     let coverageWarnings: [String]?
 }
 
-struct DailyTopicClustering: Decodable, Hashable {
+struct DailyTopicClustering: Codable, Hashable {
     let version: String
     let method: String
     let semanticStatus: String
@@ -141,7 +223,7 @@ struct DailyTopicClustering: Decodable, Hashable {
     let semanticUnitLimit: Int
 }
 
-struct DailyTopicSignal: Decodable, Hashable, Identifiable {
+struct DailyTopicSignal: Codable, Hashable, Identifiable {
     let type: String
     let value: String
     let threadUnitIds: [String]
@@ -149,7 +231,7 @@ struct DailyTopicSignal: Decodable, Hashable, Identifiable {
     var id: String { "\(type):\(value)" }
 }
 
-struct DailyTopicCluster: Decodable, Hashable, Identifiable {
+struct DailyTopicCluster: Codable, Hashable, Identifiable {
     let id: String
     let label: String
     let labelSource: String
@@ -169,7 +251,7 @@ struct DailyTopicCluster: Decodable, Hashable, Identifiable {
     let coverageWarnings: [String]
 }
 
-struct DailyThreadUnit: Decodable, Hashable, Identifiable {
+struct DailyThreadUnit: Codable, Hashable, Identifiable {
     let id: String
     let conversationId: String?
     let rootPostId: String
@@ -190,20 +272,20 @@ struct DailyThreadUnit: Decodable, Hashable, Identifiable {
     var isThread: Bool { postIds.count > 1 }
 }
 
-struct DailyFeedSections: Decodable, Hashable {
+struct DailyFeedSections: Codable, Hashable {
     let favoritePostIds: [String]
     let followingPostIds: [String]
     let favoriteThreadUnitIds: [String]?
     let followingThreadUnitIds: [String]?
 }
 
-struct DailyFeedInputs: Decodable, Hashable {
+struct DailyFeedInputs: Codable, Hashable {
     let favorites: DailyFeedInputRun?
     let following: DailyFeedInputRun?
     let membership: DailyFeedMembershipInput?
 }
 
-struct DailyFeedInputRun: Decodable, Hashable {
+struct DailyFeedInputRun: Codable, Hashable {
     let runId: String
     let sourceId: String
     let sourceName: String
@@ -218,21 +300,21 @@ struct DailyFeedInputRun: Decodable, Hashable {
     let frozenAt: String?
 }
 
-struct DailyCollectionPolicy: Decodable, Hashable {
+struct DailyCollectionPolicy: Codable, Hashable {
     let mode: String
     let windowHours: Int?
     let cutoffAt: String?
     let boundaryEvidenceRequired: Int?
 }
 
-struct DailyWindowCoverage: Decodable, Hashable {
+struct DailyWindowCoverage: Codable, Hashable {
     let outsideWindow: Int
     let missingPublishedAt: Int
     let boundaryEvidenceRequired: Int
     let boundaryReached: Bool
 }
 
-struct DailyContextCoverage: Decodable, Hashable {
+struct DailyContextCoverage: Codable, Hashable {
     let budget: Int
     let attempted: Int
     let completed: Int
@@ -241,7 +323,7 @@ struct DailyContextCoverage: Decodable, Hashable {
     let warnings: [String]
 }
 
-struct DailyFeedMembershipInput: Decodable, Hashable {
+struct DailyFeedMembershipInput: Codable, Hashable {
     let snapshotId: String?
     let runId: String?
     let sourceId: String
@@ -252,7 +334,7 @@ struct DailyFeedMembershipInput: Decodable, Hashable {
     let failureReason: String?
 }
 
-struct DailyPost: Decodable, Hashable, Identifiable {
+struct DailyPost: Codable, Hashable, Identifiable {
     let id: String
     let url: String
     let text: String
@@ -279,13 +361,13 @@ struct DailyPost: Decodable, Hashable, Identifiable {
     }
 }
 
-struct DailyPostStructure: Decodable, Hashable {
+struct DailyPostStructure: Codable, Hashable {
     let status: String
     let source: String
     let observedAt: String?
 }
 
-struct DailyAuthor: Decodable, Hashable {
+struct DailyAuthor: Codable, Hashable {
     let key: String
     let username: String
     let name: String
@@ -297,7 +379,7 @@ struct DailyAuthor: Decodable, Hashable {
     var profileImageURL: URL? { profileImageUrl.flatMap(URL.init(string:)) }
 }
 
-struct DailyPostMedia: Decodable, Hashable, Identifiable {
+struct DailyPostMedia: Codable, Hashable, Identifiable {
     let type: String
     let url: String
     let previewUrl: String?
@@ -310,7 +392,7 @@ struct DailyPostMedia: Decodable, Hashable, Identifiable {
     var displayURL: URL? { URL(string: previewUrl ?? url) }
 }
 
-struct DailyPostLink: Decodable, Hashable, Identifiable {
+struct DailyPostLink: Codable, Hashable, Identifiable {
     let url: String
     let normalizedUrl: String
     let displayUrl: String?
@@ -322,14 +404,14 @@ struct DailyPostLink: Decodable, Hashable, Identifiable {
     var destinationURL: URL? { URL(string: normalizedUrl) ?? URL(string: url) }
 }
 
-struct DailyPostLinkCard: Decodable, Hashable {
+struct DailyPostLinkCard: Codable, Hashable {
     let title: String?
     let description: String?
     let domain: String?
     let imageUrl: String?
 }
 
-struct DailyPostMetrics: Decodable, Hashable {
+struct DailyPostMetrics: Codable, Hashable {
     let replies: Int?
     let reposts: Int?
     let likes: Int?
@@ -337,7 +419,7 @@ struct DailyPostMetrics: Decodable, Hashable {
     let bookmarks: Int?
 }
 
-struct DailyPostRelationship: Decodable, Hashable, Identifiable {
+struct DailyPostRelationship: Codable, Hashable, Identifiable {
     let type: String
     let tweetId: String
     let url: String?
@@ -347,7 +429,7 @@ struct DailyPostRelationship: Decodable, Hashable, Identifiable {
     var id: String { "\(type):\(tweetId)" }
 }
 
-struct DailyRelatedPost: Decodable, Hashable {
+struct DailyRelatedPost: Codable, Hashable {
     let tweetId: String
     let text: String
     let url: String
@@ -368,7 +450,7 @@ enum DailyAuthorRange: String, Codable, Hashable, CaseIterable, Identifiable {
     }
 }
 
-struct DailyAuthorActivityResponse: Decodable, Hashable {
+struct DailyAuthorActivityResponse: Codable, Hashable {
     let schemaVersion: Int
     let variant: DailyFeedVariant
     let date: String
@@ -382,7 +464,7 @@ struct DailyAuthorActivityResponse: Decodable, Hashable {
     let traceId: String
 }
 
-struct DailyAuthorCoverage: Decodable, Hashable {
+struct DailyAuthorCoverage: Codable, Hashable {
     let status: DailyCoverageStatus
     let runIds: [String]
     let warnings: [String]

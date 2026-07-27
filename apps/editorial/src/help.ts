@@ -1,4 +1,11 @@
 export const EDITORIAL_HELP_TEXT = `Usage:
+  editorial people-daily-start --run-id <id> --date <YYYY-MM-DD> [--model <model>]
+  editorial people-daily-publish --run-id <id> --favorites-run-id <id> --following-run-id <id>
+  editorial people-daily-status --run-id <id>
+  editorial people-daily-fail --run-id <id> --stage <stage> --message <sanitized-message>
+  editorial people-daily-verify
+  editorial people-daily-history
+  editorial people-daily-activate --edition-id <id>
   editorial experiment-create --file <experiment.json>
   editorial experiment-update --experiment-id <id> --file <update.json>
   editorial experiment-status [--experiment-id <id>]

@@ -1,5 +1,8 @@
 # Daily Editorial Pipeline
 
+> Legacy rollback pipeline: the canonical native Today surface is now People Daily. See
+> [People Daily](./people-daily.md). These artifacts and APIs remain readable for one release.
+
 For durable A/B comparison and phone review of editorial changes, see [Editorial experiments](./editorial-experiments.md).
 
 ## Scope
