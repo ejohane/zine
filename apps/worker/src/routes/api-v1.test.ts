@@ -320,6 +320,7 @@ function createMockEnv(): Env['Bindings'] {
     CREATOR_CONTENT_CACHE: {} as KVNamespace,
     AI: { run: vi.fn() } as unknown as Ai,
     EMBEDDING_MODEL: '@cf/qwen/qwen3-embedding-0.6b',
+    ENRICHMENT_MODEL: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     ENVIRONMENT: 'test',
   } as Env['Bindings'];
 }
@@ -472,8 +473,8 @@ describe('apiV1Routes', () => {
     });
     mockListEditorialExperiments.mockResolvedValue([]);
     mockGetDailyFeed.mockResolvedValue({
-      schemaVersion: 2,
-      variant: { id: 'people-first-v3', mode: 'REVIEW' },
+      schemaVersion: 3,
+      variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' },
       date: '2026-07-24',
       timezone: 'America/Chicago',
       frozenAt: '2026-07-24T13:00:00.000Z',
@@ -666,13 +667,14 @@ describe('apiV1Routes', () => {
     );
     expect(feed.status).toBe(200);
     expect(await feed.json()).toMatchObject({
-      variant: { id: 'people-first-v3', mode: 'REVIEW' },
+      variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' },
       date: '2026-07-24',
     });
     expect(mockGetDailyFeed).toHaveBeenCalledWith(expect.anything(), 'user_123', {
       date: '2026-07-24',
       ai: env.AI,
       embeddingModel: '@cf/qwen/qwen3-embedding-0.6b',
+      overviewModel: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     });
 
     const author = await app.fetch(

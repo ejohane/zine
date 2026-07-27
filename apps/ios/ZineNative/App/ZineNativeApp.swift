@@ -70,6 +70,10 @@ struct ZineNativeApp: App {
             ScreenshotTodayStoryView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-today-fixtures") {
             ScreenshotTodayView()
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-daily-overview-fixture") {
+            ScreenshotDailyOverviewView()
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-daily-thread-fixture") {
+            ScreenshotDailyThreadView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-fixtures") {
             ScreenshotHomeView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-fixtures") {

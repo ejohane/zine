@@ -360,13 +360,17 @@ describe('people-first daily feed', () => {
     const result = await getDailyFeed(fakeArchiveDb(), USER_ID, { now: NOW });
 
     expect(result).toMatchObject({
-      schemaVersion: 2,
-      variant: { id: 'people-first-v3', mode: 'REVIEW' },
+      schemaVersion: 3,
+      variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' },
       clustering: {
         version: 'daily-topics-v1',
         method: 'THREAD_FIRST_EVIDENCE_CLUSTERING',
         maxTopics: 5,
         minimumFavoriteAuthors: 2,
+      },
+      overview: {
+        version: 'daily-overview-v1',
+        status: 'FALLBACK',
       },
     });
     expect(result.coverage).toMatchObject({

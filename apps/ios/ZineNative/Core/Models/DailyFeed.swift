@@ -12,12 +12,38 @@ struct DailyFeedResponse: Decodable, Hashable {
     let conversations: [DailyConversation]
     let topicClusters: [DailyTopicCluster]?
     let threadUnits: [DailyThreadUnit]?
+    let overview: DailyOverviewMetadata?
+    let overviewSections: [DailyOverviewSection]?
     let clustering: DailyTopicClustering?
     let posts: [DailyPost]
     let sections: DailyFeedSections?
     let inputs: DailyFeedInputs?
     let requestId: String
     let traceId: String
+}
+
+struct DailyOverviewMetadata: Decodable, Hashable {
+    let version: String
+    let status: String
+    let model: String?
+    let frozen: Bool
+    let inputFingerprint: String
+    let warnings: [String]
+}
+
+struct DailyOverviewSection: Decodable, Hashable, Identifiable {
+    let id: String
+    let title: String
+    let summary: String
+    let source: String
+    let representativePostIds: [String]
+    let favoriteThreadUnitIds: [String]
+    let supportingThreadUnitIds: [String]
+    let authorKeys: [String]
+    let favoriteConversationCount: Int
+    let supportingConversationCount: Int
+    let latestActivityAt: String?
+    let coverageWarnings: [String]
 }
 
 struct DailyFeedVariant: Decodable, Hashable {

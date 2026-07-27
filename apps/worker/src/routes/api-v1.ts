@@ -2131,6 +2131,7 @@ apiV1Routes.get('/today/feed', apiAuth('bookmarks:read'), async (c) => {
     ...parsed.data,
     ai: c.env.AI as unknown as { run(model: string, input: unknown): Promise<unknown> } | undefined,
     embeddingModel: c.env.EMBEDDING_MODEL,
+    overviewModel: c.env.ENRICHMENT_MODEL,
   });
   return c.json({ ...result, requestId: c.get('requestId'), traceId: c.get('traceId') });
 });

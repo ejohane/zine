@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "variant": { "id": "people-first-v3", "mode": "REVIEW" },
+  "schemaVersion": 3,
+  "variant": { "id": "people-first-v4-editorial-overview", "mode": "REVIEW" },
   "date": "2026-07-25",
   "timezone": "America/Chicago",
   "frozenAt": "2026-07-25T10:15:00.000Z",
@@ -132,6 +132,30 @@
     "candidateLimit": 40,
     "semanticUnitLimit": 256
   },
+  "overview": {
+    "version": "daily-overview-v1",
+    "status": "COMPLETE",
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "frozen": true,
+    "inputFingerprint": "fixture-fingerprint",
+    "warnings": []
+  },
+  "overviewSections": [
+    {
+      "id": "topic:daily-topics-v1:swiftdata",
+      "title": "SwiftData migrations in practice",
+      "summary": "Two developers are comparing the practical costs and performance of SwiftData migrations.",
+      "source": "GENERATED",
+      "representativePostIds": ["1", "2"],
+      "favoriteThreadUnitIds": ["post:1", "post:2"],
+      "supportingThreadUnitIds": [],
+      "authorKeys": ["id:alice", "id:bob"],
+      "favoriteConversationCount": 2,
+      "supportingConversationCount": 0,
+      "latestActivityAt": "2026-07-25T10:00:00.000Z",
+      "coverageWarnings": []
+    }
+  ],
   "posts": [
     {
       "id": "1",
