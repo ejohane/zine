@@ -59,7 +59,7 @@ The single 5:00 AM America/Chicago task must:
 7. Decode the exact production overview and section JSON through the shipped Swift models.
 8. Report collection, generation, validation, upload, publication, readback, and decode states separately.
 
-If any collection step fails, the task records the matching failure stage and does not publish. If publication succeeds but readback fails, it records/report the readback failure without misrepresenting the already-published edition.
+Favorites is the edition's agenda and must finish with verified rolling-window boundary evidence. A missing, unverified, or incomplete Favorites run records the matching failure stage and does not publish. Following is secondary context: after all bounded recovery is exhausted, a receiver-verified `PARTIAL` Following run may still publish when its source is verified and its structure coverage is exact. The resulting edition must remain visibly `PARTIAL` and retain the requested/collected counts, termination reason, and failure warning. Authentication failures, source ambiguity, For You contamination, unverified uploads, or partial thread structure still prevent publication. If publication succeeds but readback fails, the task records/reports the readback failure without misrepresenting the already-published edition.
 
 ## Native behavior
 
