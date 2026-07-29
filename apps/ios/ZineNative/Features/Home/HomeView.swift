@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HomeView: View {
     let client: APIClient
+    let peopleDailyStore: PeopleDailyStore
     let refreshRevision: Int
     let externalOpenEvent: ExternalBookmarkOpenEvent?
     let onContentChanged: () -> Void
@@ -14,6 +15,7 @@ struct HomeView: View {
     init(
         client: APIClient,
         cache: HomeCache,
+        peopleDailyStore: PeopleDailyStore,
         refreshRevision: Int,
         externalOpenEvent: ExternalBookmarkOpenEvent?,
         onContentChanged: @escaping () -> Void,
@@ -21,6 +23,7 @@ struct HomeView: View {
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void
     ) {
         self.client = client
+        self.peopleDailyStore = peopleDailyStore
         self.refreshRevision = refreshRevision
         self.externalOpenEvent = externalOpenEvent
         self.onContentChanged = onContentChanged
@@ -53,6 +56,12 @@ struct HomeView: View {
                         )
                     }
                 }
+                .navigationDestination(for: PeopleDailyRoute.self) { route in
+                    switch route {
+                    case let .section(id):
+                        PeopleDailySectionView(client: client, sectionID: id)
+                    }
+                }
         }
         .task(id: refreshRevision) {
             await store.reload()
@@ -70,9 +79,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && store.sections.isEmpty {
+        if store.isLoading && dashboardSections.isEmpty {
             ProgressView("Loading Home…")
-        } else if let error = store.errorMessage, store.sections.isEmpty {
+        } else if let error = store.errorMessage, dashboardSections.isEmpty {
             ContentUnavailableView {
                 Label("Home unavailable", systemImage: "exclamationmark.triangle")
             } description: {
@@ -82,7 +91,7 @@ struct HomeView: View {
                     Task { await store.reload() }
                 }
             }
-        } else if store.sections.isEmpty {
+        } else if dashboardSections.isEmpty {
             ContentUnavailableView(
                 "Nothing to pick up yet",
                 systemImage: "sparkles.rectangle.stack",
@@ -91,7 +100,7 @@ struct HomeView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: 30) {
-                    ForEach(store.sections) { section in
+                    ForEach(dashboardSections) { section in
                         HomeDashboardSectionView(
                             section: section,
                             transitionNamespace: bookmarkTransition
@@ -102,9 +111,24 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .refreshable {
-                await store.reload()
+                async let home: Void = store.reload()
+                async let today: Void = peopleDailyStore.load()
+                _ = await (home, today)
             }
         }
+    }
+
+    private var dashboardSections: [HomeDashboardSection] {
+        guard let response = peopleDailyStore.response else { return store.sections }
+        let topics = HomeStore.strongestTodayTopics(
+            sections: response.overviewSections,
+            authors: response.authors,
+            date: response.date,
+            timezone: response.timezone,
+            freshnessStatus: response.freshness.status,
+            isShowingCachedEdition: peopleDailyStore.isShowingCachedEdition
+        )
+        return HomeStore.interleaveTodayTopics(topics, into: store.sections)
     }
 
     @ViewBuilder

@@ -32,6 +32,10 @@ struct ScreenshotHomeView: View {
                 .listStyle(.plain)
                 .navigationTitle(route.title)
             }
+            .navigationDestination(for: PeopleDailyRoute.self) { _ in
+                Text("Today topic")
+                    .navigationTitle("Conversations")
+            }
         }
     }
 
@@ -102,6 +106,14 @@ private enum ScreenshotHomeFixtures {
                 progress: BookmarkProgress(position: 6, duration: 15, percent: 40)
             ),
         ]),
+        .todayTopic(todayTopic(
+            id: "agents",
+            title: "How people are reaching agents remotely",
+            summary: "Private networks and small custom apps are making agents available away from the desk.",
+            authors: ["Dan", "Ken", "Joel"],
+            favoriteCount: 4,
+            nearbyCount: 1
+        )),
         .inbox([
             bookmark(id: "inbox-1", title: "What comes after the app?", creator: "Stratechery"),
             bookmark(id: "inbox-2", title: "Designing tools for thought", creator: "Maggie Appleton"),
@@ -113,6 +125,14 @@ private enum ScreenshotHomeFixtures {
             homeItem(id: "quick-3", title: "A field guide to curiosity", creator: "Works in Progress"),
             homeItem(id: "quick-4", title: "Notes on taste", creator: "Every"),
         ]),
+        .todayTopic(todayTopic(
+            id: "open-weights",
+            title: "Open weights and access",
+            summary: "People compare who benefits when powerful models become easier to use.",
+            authors: ["Alice", "Bob", "Carol"],
+            favoriteCount: 3,
+            nearbyCount: 2
+        )),
         .recentlySaved([
             homeItem(id: "saved-1", title: "The future of personal software", creator: "Ink & Switch"),
             homeItem(id: "saved-2", title: "How great products compound", creator: "A Smart Bear"),
@@ -198,6 +218,47 @@ private enum ScreenshotHomeFixtures {
             isFinished: false,
             finishedAt: nil,
             tags: []
+        )
+    }
+
+    private static func todayTopic(
+        id: String,
+        title: String,
+        summary: String,
+        authors: [String],
+        favoriteCount: Int,
+        nearbyCount: Int
+    ) -> HomeTodayTopic {
+        let dailyAuthors = authors.map { name in
+            DailyAuthor(
+                key: name.lowercased(),
+                username: name.lowercased(),
+                name: name,
+                profileUrl: nil,
+                profileImageUrl: nil,
+                verified: nil
+            )
+        }
+        return HomeTodayTopic(
+            section: DailyOverviewSection(
+                id: id,
+                title: title,
+                summary: summary,
+                source: "GENERATED",
+                representativePostIds: [],
+                favoriteThreadUnitIds: (0..<favoriteCount).map { "favorite-\(id)-\($0)" },
+                supportingThreadUnitIds: (0..<nearbyCount).map { "nearby-\(id)-\($0)" },
+                authorKeys: dailyAuthors.map(\.key),
+                favoriteConversationCount: favoriteCount,
+                supportingConversationCount: nearbyCount,
+                latestActivityAt: "2026-07-28T12:00:00Z",
+                coverageWarnings: []
+            ),
+            authors: dailyAuthors,
+            date: "2026-07-28",
+            timezone: "America/Chicago",
+            freshnessStatus: .complete,
+            isShowingCachedEdition: false
         )
     }
 }

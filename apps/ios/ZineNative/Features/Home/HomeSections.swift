@@ -126,7 +126,73 @@ struct HomeDashboardSectionView: View {
                 sectionID: section.id,
                 transitionNamespace: transitionNamespace
             )
+        case .todayTopic(let topic):
+            HomeTodayTopicSection(topic: topic)
         }
+    }
+}
+
+private struct HomeTodayTopicSection: View {
+    let topic: HomeTodayTopic
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text("Today")
+                    .font(.caption.weight(.heavy))
+                    .tracking(1.1)
+                    .foregroundStyle(Color.accentColor)
+
+                Text(formattedDate)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                if topic.isShowingCachedEdition {
+                    statusLabel("Saved edition", color: .secondary)
+                } else {
+                    switch topic.freshnessStatus {
+                    case .complete:
+                        EmptyView()
+                    case .partial:
+                        statusLabel("Partial", color: .orange)
+                    case .unavailable:
+                        statusLabel("Unavailable", color: .secondary)
+                    }
+                }
+            }
+
+            NavigationLink(value: PeopleDailyRoute.section(topic.section.id)) {
+                DailyOverviewSectionRow(
+                    section: topic.section,
+                    authors: topic.authors
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func statusLabel(_ text: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var formattedDate: String {
+        let components = topic.date.split(separator: "-").compactMap { Int($0) }
+        guard components.count == 3 else { return topic.date }
+        var value = DateComponents()
+        value.calendar = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(identifier: topic.timezone)
+        value.year = components[0]
+        value.month = components[1]
+        value.day = components[2]
+        return value.date?.formatted(.dateTime.month(.abbreviated).day()) ?? topic.date
     }
 }
 

@@ -37,10 +37,10 @@ private struct AuthenticatedAppView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private let client: APIClient
-    private let peopleDailyCache: PeopleDailyCache
     private let homeCache: HomeCache
     private let libraryCache: LibraryCache
 
+    @State private var peopleDailyStore: PeopleDailyStore
     @State private var search = ""
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
@@ -48,7 +48,7 @@ private struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
 
     init(configuration: AppConfiguration, userID: String) {
-        client = APIClient(
+        let client = APIClient(
             baseURL: configuration.apiBaseURL,
             tokenProvider: {
                 guard let token = try await Clerk.shared.auth.getToken() else {
@@ -58,9 +58,14 @@ private struct AuthenticatedAppView: View {
             },
             articleBodyCache: ArticleBodyCache(userID: userID)
         )
-        peopleDailyCache = PeopleDailyCache(userID: userID)
+        let peopleDailyCache = PeopleDailyCache(userID: userID)
+        self.client = client
         homeCache = HomeCache(userID: userID)
         libraryCache = LibraryCache(userID: userID)
+        _peopleDailyStore = State(initialValue: PeopleDailyStore(
+            client: client,
+            cache: peopleDailyCache
+        ))
     }
 
     var body: some View {
@@ -68,8 +73,7 @@ private struct AuthenticatedAppView: View {
             Tab("Today", systemImage: "newspaper") {
                 TodayView(
                     client: client,
-                    cache: peopleDailyCache,
-                    refreshRevision: homeRevision,
+                    store: peopleDailyStore,
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen
                 )
@@ -80,6 +84,7 @@ private struct AuthenticatedAppView: View {
                 HomeView(
                     client: client,
                     cache: homeCache,
+                    peopleDailyStore: peopleDailyStore,
                     refreshRevision: homeRevision,
                     externalOpenEvent: externalOpenEvent,
                     onContentChanged: markBookmarkContentChanged,
@@ -119,6 +124,9 @@ private struct AuthenticatedAppView: View {
             }
         }
         .tint(Color.primary)
+        .task(id: homeRevision) {
+            await peopleDailyStore.load()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 homeRevision += 1

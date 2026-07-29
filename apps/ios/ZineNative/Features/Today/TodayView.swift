@@ -2,26 +2,22 @@ import SwiftUI
 
 struct TodayView: View {
     let client: APIClient
-    let cache: PeopleDailyCache
-    let refreshRevision: Int
+    let store: PeopleDailyStore
 
     init(
         client: APIClient,
-        cache: PeopleDailyCache,
-        refreshRevision: Int,
+        store: PeopleDailyStore,
         onContentChanged _: @escaping () -> Void,
         onExternalOpen _: @escaping (Bookmark) -> Void
     ) {
         self.client = client
-        self.cache = cache
-        self.refreshRevision = refreshRevision
+        self.store = store
     }
 
     var body: some View {
         PeopleDailyTodayView(
             client: client,
-            cache: cache,
-            refreshRevision: refreshRevision
+            store: store
         )
     }
 }
