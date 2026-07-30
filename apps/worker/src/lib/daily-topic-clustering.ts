@@ -1,4 +1,4 @@
-export const DAILY_TOPIC_ALGORITHM_VERSION = 'daily-topics-v1';
+export const DAILY_TOPIC_ALGORITHM_VERSION = 'daily-topics-v2';
 export const DEFAULT_DAILY_TOPIC_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 
 const MAX_TOPICS = 5;
@@ -884,13 +884,59 @@ export async function buildDailyTopicClustering(
     );
 
   const selected: typeof rankedCandidates = [];
+  const selectedSourceCandidates: TopicCandidate[] = [];
+  const assignedUnitIds = new Set<string>();
   for (const ranked of rankedCandidates) {
-    const duplicate = selected.some(({ candidate }) => {
+    const duplicate = selectedSourceCandidates.some((candidate) => {
       const overlap = jaccard(candidate.favoriteUnitIds, ranked.candidate.favoriteUnitIds);
       return overlap >= 0.75;
     });
     if (duplicate) continue;
-    selected.push(ranked);
+
+    const favoriteUnitIds = new Set(
+      [...ranked.candidate.favoriteUnitIds].filter((unitId) => !assignedUnitIds.has(unitId))
+    );
+    const favoriteUnitsForCandidate = [...favoriteUnitIds]
+      .map((unitId) => unitsById.get(unitId))
+      .filter((unit): unit is DailyThreadUnit => Boolean(unit));
+    const favoriteAuthorKeys = unique(
+      favoriteUnitsForCandidate.flatMap((unit) => unit.favoriteAuthorKeys)
+    );
+    if (favoriteAuthorKeys.length < 2) continue;
+
+    const supportingUnitIds = new Set(
+      [...ranked.candidate.supportingUnitIds].filter(
+        (unitId) => !assignedUnitIds.has(unitId) && !favoriteUnitIds.has(unitId)
+      )
+    );
+    const candidate: TopicCandidate = {
+      anchors: ranked.candidate.anchors,
+      favoriteUnitIds,
+      supportingUnitIds,
+      semanticEvidence: new Map(
+        [...ranked.candidate.semanticEvidence].filter(([unitId]) => favoriteUnitIds.has(unitId))
+      ),
+    };
+    const favoriteAuthors = unique(
+      favoriteUnitsForCandidate.flatMap((unit) => unit.favoriteAuthors)
+    );
+    const favoritePosts = unique(favoriteUnitsForCandidate.flatMap((unit) => unit.favoritePostIds));
+    const score =
+      favoriteAuthorKeys.length * 100 +
+      favoriteUnitsForCandidate.length * 25 +
+      favoritePosts.length * 5 +
+      Math.min(supportingUnitIds.size, 10) * 2;
+
+    selected.push({
+      candidate,
+      favoriteAuthors,
+      favoriteAuthorKeys,
+      favoritePosts,
+      score,
+    });
+    selectedSourceCandidates.push(ranked.candidate);
+    favoriteUnitIds.forEach((unitId) => assignedUnitIds.add(unitId));
+    supportingUnitIds.forEach((unitId) => assignedUnitIds.add(unitId));
     if (selected.length === MAX_TOPICS) break;
   }
 

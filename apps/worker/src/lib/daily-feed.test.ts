@@ -363,7 +363,7 @@ describe('people-first daily feed', () => {
       schemaVersion: 3,
       variant: { id: 'people-first-v4-editorial-overview', mode: 'REVIEW' },
       clustering: {
-        version: 'daily-topics-v1',
+        version: 'daily-topics-v2',
         method: 'THREAD_FIRST_EVIDENCE_CLUSTERING',
         maxTopics: 5,
         minimumFavoriteAuthors: 2,

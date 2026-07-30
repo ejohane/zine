@@ -282,6 +282,65 @@ describe('daily topic clustering', () => {
     expect(result.topicClusters[0].score).toBeGreaterThan(result.topicClusters[1].score);
   });
 
+  it('assigns each conversation to only one topic even when it matches multiple categories', async () => {
+    const posts = [
+      post({
+        id: 'atlas-1',
+        username: 'alice',
+        text: 'Atlas launch notes',
+        position: 0,
+        link: 'https://atlas.example/launch',
+      }),
+      post({
+        id: 'atlas-2',
+        username: 'bob',
+        text: 'Atlas benchmark notes',
+        position: 1,
+        link: 'https://atlas.example/launch',
+      }),
+      post({
+        id: 'bridge',
+        username: 'carol',
+        text: 'Comparing Atlas and Beacon',
+        position: 2,
+        link: 'https://atlas.example/launch',
+      }),
+      post({
+        id: 'beacon-1',
+        username: 'dave',
+        text: 'Beacon pricing notes',
+        position: 3,
+        link: 'https://beacon.example/pricing',
+      }),
+      post({
+        id: 'beacon-2',
+        username: 'erin',
+        text: 'Beacon rollout notes',
+        position: 4,
+        link: 'https://beacon.example/pricing',
+      }),
+    ];
+    posts[2].links.push({
+      url: 'https://beacon.example/pricing',
+      normalizedUrl: 'https://beacon.example/pricing',
+    });
+
+    const result = await buildDailyTopicClustering(
+      posts,
+      new Set(posts.map((value) => value.id)),
+      new Set()
+    );
+    const assignedThreadIds = result.topicClusters.flatMap((topic) => topic.threadUnitIds);
+    const assignedPostIds = result.topicClusters.flatMap((topic) => topic.postIds);
+
+    expect(result.topicClusters).toHaveLength(2);
+    expect(new Set(assignedThreadIds).size).toBe(assignedThreadIds.length);
+    expect(new Set(assignedPostIds).size).toBe(assignedPostIds.length);
+    expect(result.topicClusters.filter((topic) => topic.postIds.includes('bridge'))).toHaveLength(
+      1
+    );
+  });
+
   it('uses pinned embeddings only for expansion and records their provenance', async () => {
     const posts = [
       post({ id: 'seed-1', username: 'one', text: 'Robotics safety research', position: 0 }),

@@ -21,6 +21,7 @@ Retries use the same build ID. Reusing it with changed inputs is rejected. Publi
 - For You is never accepted.
 - Exact conversation IDs, reply parents, quotes, reposts, links, authors, media metadata, source positions, membership, collection policy, and partial-coverage warnings come from the frozen archive runs.
 - Deterministic topic membership is fixed before copy generation. Workers AI may write a short section title and description from the supplied posts; it cannot add, remove, or move a conversation.
+- Topic membership is exclusive across the edition. The strongest eligible section claims a conversation once; lower-ranked sections can use only unassigned conversations, and publication rejects any repeated thread or post.
 - X posts show what people are discussing. Generated copy must not present post claims as verified facts.
 
 ## Storage

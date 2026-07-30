@@ -314,6 +314,10 @@ function validateArtifact(
       supportingThreadUnitIds: string[];
       representativePostIds: string[];
     }>;
+    sections?: {
+      favoriteThreadUnitIds?: string[];
+      followingThreadUnitIds?: string[];
+    };
     inputs?: {
       favorites?: { runId: string } | null;
       following?: { runId: string } | null;
@@ -337,19 +341,49 @@ function validateArtifact(
       throw new PeopleDailyValidationError(`Thread unit ${unit.id} references a missing post`);
     }
   }
-  for (const section of feed.overviewSections ?? []) {
-    const referencedUnits = [...section.favoriteThreadUnitIds, ...section.supportingThreadUnitIds];
-    if (referencedUnits.some((unitId) => !units.has(unitId))) {
+  const assignedUnits = new Map<string, string>();
+  const assignedPosts = new Map<string, string>();
+  const claimUnit = (sectionId: string, unitId: string) => {
+    const unit = units.get(unitId);
+    if (!unit) {
       throw new PeopleDailyValidationError(
-        `Overview section ${section.id} references a missing thread`
+        `Overview section ${sectionId} references a missing thread`
       );
     }
+    const previousUnitSection = assignedUnits.get(unitId);
+    if (previousUnitSection && previousUnitSection !== sectionId) {
+      throw new PeopleDailyValidationError(
+        `Thread unit ${unitId} is repeated in sections ${previousUnitSection} and ${sectionId}`
+      );
+    }
+    assignedUnits.set(unitId, sectionId);
+    for (const postId of unit.postIds) {
+      const previousPostSection = assignedPosts.get(postId);
+      if (previousPostSection && previousPostSection !== sectionId) {
+        throw new PeopleDailyValidationError(
+          `Post ${postId} is repeated in sections ${previousPostSection} and ${sectionId}`
+        );
+      }
+      assignedPosts.set(postId, sectionId);
+    }
+  };
+  for (const section of feed.overviewSections ?? []) {
+    const referencedUnits = new Set([
+      ...section.favoriteThreadUnitIds,
+      ...section.supportingThreadUnitIds,
+    ]);
+    referencedUnits.forEach((unitId) => claimUnit(section.id, unitId));
     if (section.representativePostIds.some((postId) => !postIds.has(postId))) {
       throw new PeopleDailyValidationError(
         `Overview section ${section.id} references a missing post`
       );
     }
   }
+  const moreUnitIds = new Set([
+    ...(feed.sections?.favoriteThreadUnitIds ?? []),
+    ...(feed.sections?.followingThreadUnitIds ?? []),
+  ]);
+  moreUnitIds.forEach((unitId) => claimUnit('more', unitId));
 }
 
 export async function publishPeopleDailyBuild(

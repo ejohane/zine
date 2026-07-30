@@ -1,6 +1,7 @@
 import {
   buildDailyTopicClustering,
   createWorkersAIDailyTopicEmbeddingProvider,
+  DAILY_TOPIC_ALGORITHM_VERSION,
   DEFAULT_DAILY_TOPIC_EMBEDDING_MODEL,
 } from './daily-topic-clustering';
 import { buildDailyOverview, DAILY_OVERVIEW_VERSION } from './daily-overview';
@@ -612,7 +613,7 @@ export async function getDailyFeed(
       },
       overviewSections: [],
       clustering: {
-        version: 'daily-topics-v1',
+        version: DAILY_TOPIC_ALGORITHM_VERSION,
         method: 'THREAD_FIRST_EVIDENCE_CLUSTERING' as const,
         semanticStatus: 'FALLBACK' as const,
         embeddingModel: null,
