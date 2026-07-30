@@ -402,6 +402,30 @@ describe('People Daily editions', () => {
     expect(active.size).toBe(0);
   });
 
+  it('rejects an edition that repeats a conversation across categories', async () => {
+    const { db, bucket, editions, active } = fakeResources();
+    const repeated = feed();
+    repeated.overviewSections.push({
+      ...repeated.overviewSections[0],
+      id: 'topic:2',
+      title: 'A repeated conversation',
+    });
+    mockGetDailyFeed.mockResolvedValueOnce(repeated);
+
+    await startPeopleDailyBuild(db, 'user-1', {
+      id: 'build-repeated',
+      editionDate: '2026-07-26',
+    });
+    await expect(
+      publishPeopleDailyBuild(db, {} as D1Database, bucket, 'user-1', 'build-repeated', {
+        favoritesRunId: 'favorites-1',
+        followingRunId: 'following-1',
+      })
+    ).rejects.toThrow('Thread unit conversation:1 is repeated in sections topic:1 and topic:2');
+    expect(editions.size).toBe(0);
+    expect(active.size).toBe(0);
+  });
+
   it('lists immutable history and reactivates a validated prior artifact', async () => {
     const { db, bucket, active } = fakeResources();
     await startPeopleDailyBuild(db, 'user-1', {
