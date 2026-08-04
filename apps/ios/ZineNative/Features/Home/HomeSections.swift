@@ -48,7 +48,7 @@ enum HomeSectionRoute: Hashable {
     }
 }
 
-private struct HomeNavigationLink<Label: View>: View {
+struct HomeNavigationLink<Label: View>: View {
     let route: HomeNavigationRoute
     let transitionNamespace: Namespace.ID
     @ViewBuilder let label: () -> Label
@@ -62,9 +62,22 @@ private struct HomeNavigationLink<Label: View>: View {
 
 struct HomeDashboardSectionView: View {
     let section: HomeDashboardSection
+    var density: HomeLayoutDensity = .standard
     let transitionNamespace: Namespace.ID
 
     var body: some View {
+        if density == .compact {
+            CondensedHomeDashboardSectionView(
+                section: section,
+                transitionNamespace: transitionNamespace
+            )
+        } else {
+            standardContent
+        }
+    }
+
+    @ViewBuilder
+    private var standardContent: some View {
         switch section {
         case .jumpBackIn(let items):
             HomeJumpBackInSection(
@@ -126,7 +139,73 @@ struct HomeDashboardSectionView: View {
                 sectionID: section.id,
                 transitionNamespace: transitionNamespace
             )
+        case .todayTopic(let topic):
+            HomeTodayTopicSection(topic: topic)
         }
+    }
+}
+
+private struct HomeTodayTopicSection: View {
+    let topic: HomeTodayTopic
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                Text("Today")
+                    .font(.caption.weight(.heavy))
+                    .tracking(1.1)
+                    .foregroundStyle(Color.accentColor)
+
+                Text(formattedDate)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                if topic.isShowingCachedEdition {
+                    statusLabel("Saved edition", color: .secondary)
+                } else {
+                    switch topic.freshnessStatus {
+                    case .complete:
+                        EmptyView()
+                    case .partial:
+                        statusLabel("Partial", color: .orange)
+                    case .unavailable:
+                        statusLabel("Unavailable", color: .secondary)
+                    }
+                }
+            }
+
+            NavigationLink(value: PeopleDailyRoute.section(topic.section.id)) {
+                DailyOverviewSectionRow(
+                    section: topic.section,
+                    authors: topic.authors
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 20)
+    }
+
+    private func statusLabel(_ text: String, color: Color) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(color)
+                .frame(width: 5, height: 5)
+            Text(text)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var formattedDate: String {
+        let components = topic.date.split(separator: "-").compactMap { Int($0) }
+        guard components.count == 3 else { return topic.date }
+        var value = DateComponents()
+        value.calendar = Calendar(identifier: .gregorian)
+        value.timeZone = TimeZone(identifier: topic.timezone)
+        value.year = components[0]
+        value.month = components[1]
+        value.day = components[2]
+        return value.date?.formatted(.dateTime.month(.abbreviated).day()) ?? topic.date
     }
 }
 
@@ -192,7 +271,7 @@ private struct HomeJumpBackInSection: View {
                                 route: .item(item, sectionID: sectionID),
                                 transitionNamespace: transitionNamespace
                             ) {
-                                HomeJumpBackInCompactCard(item: item)
+                                HomeCompactHorizontalCard(item: item)
                             }
                         }
                     }
@@ -203,8 +282,10 @@ private struct HomeJumpBackInSection: View {
     }
 }
 
-private struct HomeJumpBackInCompactCard: View {
-    let item: HomeItem
+struct HomeCompactHorizontalCard: View {
+    private let thumbnailUrl: URL?
+    private let contentType: ContentType
+    private let title: String
 
     private enum Metrics {
         static let cardWidth: CGFloat = 220
@@ -213,19 +294,31 @@ private struct HomeJumpBackInCompactCard: View {
         static let imageHeight: CGFloat = 54
     }
 
+    init(item: HomeItem) {
+        thumbnailUrl = item.thumbnailUrl
+        contentType = item.contentType
+        title = item.title
+    }
+
+    init(bookmark: Bookmark) {
+        thumbnailUrl = bookmark.thumbnailUrl
+        contentType = bookmark.contentType
+        title = bookmark.title
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             CachedRemoteImage(
-                url: item.thumbnailUrl,
+                url: thumbnailUrl,
                 targetSize: CGSize(width: Metrics.imageWidth, height: Metrics.imageHeight)
             ) {
-                HomeImagePlaceholder(contentType: item.contentType, iconSize: 20)
+                HomeImagePlaceholder(contentType: contentType, iconSize: 20)
             }
             .frame(width: Metrics.imageWidth, height: Metrics.imageHeight)
             .clipped()
             .clipShape(.rect(cornerRadius: 9))
 
-            Text(item.title)
+            Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(3)
@@ -446,7 +539,7 @@ private struct HomeCompactListSection: View {
     }
 }
 
-private struct HomeResumeCard: View {
+struct HomeResumeCard: View {
     let item: HomeItem
 
     var body: some View {
@@ -579,7 +672,7 @@ private struct HomeGridCard: View {
     }
 }
 
-private struct HomeItemRow: View {
+struct HomeItemRow: View {
     let item: HomeItem
 
     var body: some View {
@@ -607,7 +700,7 @@ private struct HomeItemRow: View {
     }
 }
 
-private struct HomeItemMetadata: View {
+struct HomeItemMetadata: View {
     let item: HomeItem
 
     var body: some View {
@@ -625,7 +718,7 @@ private struct HomeItemMetadata: View {
     }
 }
 
-private struct HomeImagePlaceholder: View {
+struct HomeImagePlaceholder: View {
     let contentType: ContentType
     let iconSize: CGFloat
 

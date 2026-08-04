@@ -1,40 +1,83 @@
 import SwiftUI
 
+enum HomeLayoutDensity: Equatable {
+    case standard
+    case compact
+
+    private static let hiddenCompactCollectionTitles: Set<String> = [
+        "car ride",
+        "care ride",
+        "career ride",
+        "faves",
+    ]
+
+    var sectionSpacing: CGFloat {
+        switch self {
+        case .standard: 30
+        case .compact: 18
+        }
+    }
+
+    func visibleSections(from sections: [HomeDashboardSection]) -> [HomeDashboardSection] {
+        guard self == .compact else { return sections }
+
+        return sections.filter { section in
+            switch section {
+            case .quickWins:
+                false
+            case .collection(let collection):
+                !Self.hiddenCompactCollectionTitles.contains(
+                    collection.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                )
+            default:
+                true
+            }
+        }
+    }
+}
+
 struct HomeView: View {
     let client: APIClient
-    let refreshRevision: Int
-    let externalOpenEvent: ExternalBookmarkOpenEvent?
+    let store: HomeStore
+    let peopleDailyStore: PeopleDailyStore
+    var density: HomeLayoutDensity = .standard
+    var title = "Home"
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
 
-    @State private var store: HomeStore
     @Namespace private var bookmarkTransition
 
     init(
         client: APIClient,
-        cache: HomeCache,
-        refreshRevision: Int,
-        externalOpenEvent: ExternalBookmarkOpenEvent?,
+        store: HomeStore,
+        peopleDailyStore: PeopleDailyStore,
+        density: HomeLayoutDensity = .standard,
+        title: String = "Home",
         onContentChanged: @escaping () -> Void,
         onExternalOpen: @escaping (Bookmark) -> Void,
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void
     ) {
         self.client = client
-        self.refreshRevision = refreshRevision
-        self.externalOpenEvent = externalOpenEvent
+        self.store = store
+        self.peopleDailyStore = peopleDailyStore
+        self.density = density
+        self.title = title
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
-        _store = State(initialValue: HomeStore(client: client, cache: cache))
     }
 
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle("Home")
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
                 .navigationDestination(for: HomeNavigationRoute.self) { route in
                     destination(for: route)
+                        .navigationTransition(
+                            .zoom(sourceID: route.sourceID, in: bookmarkTransition)
+                        )
                 }
                 .navigationDestination(for: HomeSectionRoute.self) { route in
                     switch route {
@@ -53,28 +96,22 @@ struct HomeView: View {
                         )
                     }
                 }
-        }
-        .task(id: refreshRevision) {
-            await store.reload()
-        }
-        .onChange(of: externalOpenEvent, initial: true) { _, event in
-            guard let event else { return }
-            switch event.change {
-            case .promote:
-                store.promoteOpened(event.bookmark, at: event.openedAt)
-            case .rollback:
-                store.rollbackOpened(id: event.bookmark.id, openedAt: event.openedAt)
-            }
+                .navigationDestination(for: PeopleDailyRoute.self) { route in
+                    switch route {
+                    case let .section(id):
+                        PeopleDailySectionView(client: client, sectionID: id)
+                    }
+                }
         }
     }
 
     @ViewBuilder
     private var content: some View {
-        if store.isLoading && store.sections.isEmpty {
-            ProgressView("Loading Home…")
-        } else if let error = store.errorMessage, store.sections.isEmpty {
+        if store.isLoading && dashboardSections.isEmpty {
+            ProgressView("Loading \(title)…")
+        } else if let error = store.errorMessage, dashboardSections.isEmpty {
             ContentUnavailableView {
-                Label("Home unavailable", systemImage: "exclamationmark.triangle")
+                Label("\(title) unavailable", systemImage: "exclamationmark.triangle")
             } description: {
                 Text(error)
             } actions: {
@@ -82,7 +119,7 @@ struct HomeView: View {
                     Task { await store.reload() }
                 }
             }
-        } else if store.sections.isEmpty {
+        } else if dashboardSections.isEmpty {
             ContentUnavailableView(
                 "Nothing to pick up yet",
                 systemImage: "sparkles.rectangle.stack",
@@ -90,21 +127,41 @@ struct HomeView: View {
             )
         } else {
             ScrollView {
-                LazyVStack(spacing: 30) {
-                    ForEach(store.sections) { section in
+                LazyVStack(spacing: density.sectionSpacing) {
+                    ForEach(dashboardSections) { section in
                         HomeDashboardSectionView(
                             section: section,
+                            density: density,
                             transitionNamespace: bookmarkTransition
                         )
                     }
                 }
-                .padding(.vertical, 10)
-                .padding(.bottom, 24)
+                .padding(.vertical, density == .compact ? 6 : 10)
+                .padding(.bottom, density == .compact ? 16 : 24)
             }
             .refreshable {
-                await store.reload()
+                async let home: Void = store.reload()
+                async let today: Void = peopleDailyStore.load()
+                _ = await (home, today)
             }
         }
+    }
+
+    private var dashboardSections: [HomeDashboardSection] {
+        guard let response = peopleDailyStore.response else {
+            return density.visibleSections(from: store.sections)
+        }
+        let topics = HomeStore.strongestTodayTopics(
+            sections: response.overviewSections,
+            authors: response.authors,
+            date: response.date,
+            timezone: response.timezone,
+            freshnessStatus: response.freshness.status,
+            isShowingCachedEdition: peopleDailyStore.isShowingCachedEdition
+        )
+        return density.visibleSections(
+            from: HomeStore.interleaveTodayTopics(topics, into: store.sections)
+        )
     }
 
     @ViewBuilder

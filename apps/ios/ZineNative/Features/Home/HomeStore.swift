@@ -1,6 +1,17 @@
 import Foundation
 import Observation
 
+struct HomeTodayTopic: Hashable, Identifiable {
+    let section: DailyOverviewSection
+    let authors: [DailyAuthor]
+    let date: String
+    let timezone: String
+    let freshnessStatus: DailyCoverageStatus
+    let isShowingCachedEdition: Bool
+
+    var id: String { section.id }
+}
+
 enum HomeDashboardSection: Identifiable {
     case jumpBackIn([HomeItem])
     case inbox([Bookmark])
@@ -10,6 +21,7 @@ enum HomeDashboardSection: Identifiable {
     case articles([HomeItem])
     case videos([HomeItem])
     case collection(HomeCollection)
+    case todayTopic(HomeTodayTopic)
 
     var id: String {
         switch self {
@@ -21,6 +33,7 @@ enum HomeDashboardSection: Identifiable {
         case .articles: "articles"
         case .videos: "videos"
         case .collection(let collection): "collection-\(collection.id)"
+        case .todayTopic(let topic): "today-topic-\(topic.id)"
         }
     }
 }
@@ -206,6 +219,77 @@ final class HomeStore {
             result.insert(.quickWins(quickWins), at: insertionIndex)
         }
 
+        return result
+    }
+
+    static func strongestTodayTopics(
+        sections: [DailyOverviewSection],
+        authors: [DailyAuthor],
+        date: String,
+        timezone: String,
+        freshnessStatus: DailyCoverageStatus,
+        isShowingCachedEdition: Bool
+    ) -> [HomeTodayTopic] {
+        let authorsByKey = Dictionary(uniqueKeysWithValues: authors.map { ($0.key, $0) })
+        return sections.prefix(2).map { section in
+            HomeTodayTopic(
+                section: section,
+                authors: section.authorKeys.compactMap { authorsByKey[$0] },
+                date: date,
+                timezone: timezone,
+                freshnessStatus: freshnessStatus,
+                isShowingCachedEdition: isShowingCachedEdition
+            )
+        }
+    }
+
+    static func interleaveTodayTopics(
+        _ topics: [HomeTodayTopic],
+        into sections: [HomeDashboardSection]
+    ) -> [HomeDashboardSection] {
+        guard let firstTopic = topics.first else { return sections }
+
+        var result = sections
+        let firstInsertionIndex: Int
+        if let jumpBackInIndex = result.firstIndex(where: { section in
+            if case .jumpBackIn = section { return true }
+            return false
+        }) {
+            firstInsertionIndex = result.index(after: jumpBackInIndex)
+        } else {
+            firstInsertionIndex = min(1, result.endIndex)
+        }
+        result.insert(.todayTopic(firstTopic), at: firstInsertionIndex)
+
+        guard topics.count > 1 else { return result }
+        let secondTopic = topics[1]
+        let searchStart = result.index(after: firstInsertionIndex)
+
+        if let collectionIndex = result[searchStart...].firstIndex(where: { section in
+            if case .collection = section { return true }
+            return false
+        }) {
+            result.insert(.todayTopic(secondTopic), at: result.index(after: collectionIndex))
+            return result
+        }
+
+        if let quickWinsIndex = result[searchStart...].firstIndex(where: { section in
+            if case .quickWins = section { return true }
+            return false
+        }) {
+            result.insert(.todayTopic(secondTopic), at: result.index(after: quickWinsIndex))
+            return result
+        }
+
+        if let inboxIndex = result[searchStart...].firstIndex(where: { section in
+            if case .inbox = section { return true }
+            return false
+        }) {
+            result.insert(.todayTopic(secondTopic), at: result.index(after: inboxIndex))
+            return result
+        }
+
+        result.append(.todayTopic(secondTopic))
         return result
     }
 
