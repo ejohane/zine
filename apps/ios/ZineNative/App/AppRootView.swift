@@ -37,10 +37,10 @@ private struct AuthenticatedAppView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     private let client: APIClient
-    private let peopleDailyCache: PeopleDailyCache
-    private let homeCache: HomeCache
     private let libraryCache: LibraryCache
 
+    @State private var homeStore: HomeStore
+    @State private var peopleDailyStore: PeopleDailyStore
     @State private var search = ""
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
@@ -48,7 +48,7 @@ private struct AuthenticatedAppView: View {
     @State private var externalOpenError: String?
 
     init(configuration: AppConfiguration, userID: String) {
-        client = APIClient(
+        let client = APIClient(
             baseURL: configuration.apiBaseURL,
             tokenProvider: {
                 guard let token = try await Clerk.shared.auth.getToken() else {
@@ -58,30 +58,25 @@ private struct AuthenticatedAppView: View {
             },
             articleBodyCache: ArticleBodyCache(userID: userID)
         )
-        peopleDailyCache = PeopleDailyCache(userID: userID)
-        homeCache = HomeCache(userID: userID)
+        let peopleDailyCache = PeopleDailyCache(userID: userID)
+        let homeCache = HomeCache(userID: userID)
+        self.client = client
         libraryCache = LibraryCache(userID: userID)
+        _homeStore = State(initialValue: HomeStore(client: client, cache: homeCache))
+        _peopleDailyStore = State(initialValue: PeopleDailyStore(
+            client: client,
+            cache: peopleDailyCache
+        ))
     }
 
     var body: some View {
         TabView {
-            Tab("Today", systemImage: "newspaper") {
-                TodayView(
-                    client: client,
-                    cache: peopleDailyCache,
-                    refreshRevision: homeRevision,
-                    onContentChanged: markBookmarkContentChanged,
-                    onExternalOpen: handleExternalOpen
-                )
-                .tint(Color.accentColor)
-            }
-
             Tab("Home", systemImage: "house") {
                 HomeView(
                     client: client,
-                    cache: homeCache,
-                    refreshRevision: homeRevision,
-                    externalOpenEvent: externalOpenEvent,
+                    store: homeStore,
+                    peopleDailyStore: peopleDailyStore,
+                    density: .compact,
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen,
                     onHomeItemExternalOpen: handleHomeItemExternalOpen
@@ -119,6 +114,20 @@ private struct AuthenticatedAppView: View {
             }
         }
         .tint(Color.primary)
+        .task(id: homeRevision) {
+            async let home: Void = homeStore.reload()
+            async let today: Void = peopleDailyStore.load()
+            _ = await (home, today)
+        }
+        .onChange(of: externalOpenEvent, initial: true) { _, event in
+            guard let event else { return }
+            switch event.change {
+            case .promote:
+                homeStore.promoteOpened(event.bookmark, at: event.openedAt)
+            case .rollback:
+                homeStore.rollbackOpened(id: event.bookmark.id, openedAt: event.openedAt)
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 homeRevision += 1

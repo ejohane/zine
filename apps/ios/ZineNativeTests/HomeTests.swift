@@ -3,6 +3,45 @@ import XCTest
 @testable import ZineNative
 
 final class HomeTests: XCTestCase {
+    func testCompactHomeHidesQuickWinsCareRideAndFavesWithoutChangingStandardHome() {
+        let sections: [HomeDashboardSection] = [
+            .quickWins([makeHomeItem(id: "quick", minutes: 5)]),
+            .collection(HomeCollection(
+                collectionId: "care-ride",
+                title: "Care Ride",
+                layout: .stackRail,
+                position: 0,
+                count: 1,
+                items: [makeHomeItem(id: "care", minutes: 12)]
+            )),
+            .collection(HomeCollection(
+                collectionId: "faves",
+                title: "Faves",
+                layout: .coverRail,
+                position: 1,
+                count: 1,
+                items: [makeHomeItem(id: "favorite", minutes: 12)]
+            )),
+            .collection(HomeCollection(
+                collectionId: "ideas",
+                title: "Ideas",
+                layout: .stackRail,
+                position: 2,
+                count: 1,
+                items: [makeHomeItem(id: "idea", minutes: 12)]
+            )),
+        ]
+
+        XCTAssertEqual(
+            HomeLayoutDensity.compact.visibleSections(from: sections).map(\.id),
+            ["collection-ideas"]
+        )
+        XCTAssertEqual(
+            HomeLayoutDensity.standard.visibleSections(from: sections).map(\.id),
+            sections.map(\.id)
+        )
+    }
+
     @MainActor
     func testBuildsOrderedDashboardAndInsertsQuickWinsAfterInbox() {
         let resume = makeHomeItem(id: "resume", minutes: 30, lastOpenedAt: "2026-07-18T10:00:00Z")
@@ -211,6 +250,103 @@ final class HomeTests: XCTestCase {
         XCTAssertTrue(content.tags.isEmpty)
     }
 
+    @MainActor
+    func testSelectsOnlyTheTwoStrongestTodayTopicsInPublishedOrder() {
+        let authors = [
+            makeDailyAuthor(key: "alice"),
+            makeDailyAuthor(key: "bob"),
+            makeDailyAuthor(key: "carol"),
+        ]
+        let sections = [
+            makeDailySection(id: "strongest", authorKeys: ["alice", "bob"]),
+            makeDailySection(id: "second", authorKeys: ["carol"]),
+            makeDailySection(id: "third", authorKeys: ["alice"]),
+        ]
+
+        let topics = HomeStore.strongestTodayTopics(
+            sections: sections,
+            authors: authors,
+            date: "2026-07-28",
+            timezone: "America/Chicago",
+            freshnessStatus: .partial,
+            isShowingCachedEdition: true
+        )
+
+        XCTAssertEqual(topics.map(\.id), ["strongest", "second"])
+        XCTAssertEqual(topics[0].authors.map(\.key), ["alice", "bob"])
+        XCTAssertEqual(topics[1].authors.map(\.key), ["carol"])
+        XCTAssertEqual(topics[0].freshnessStatus, .partial)
+        XCTAssertTrue(topics[0].isShowingCachedEdition)
+    }
+
+    @MainActor
+    func testInterleavesTodayTopicsAfterJumpBackInAndFirstCollection() {
+        let topics = [makeTodayTopic(id: "one"), makeTodayTopic(id: "two")]
+        let sections: [HomeDashboardSection] = [
+            .jumpBackIn([makeHomeItem(id: "resume", minutes: 20)]),
+            .inbox([makeBookmark(index: 0)]),
+            .collection(HomeCollection(
+                collectionId: "ideas",
+                title: "Ideas",
+                layout: .stackRail,
+                position: 0,
+                count: 1,
+                items: [makeHomeItem(id: "idea", minutes: 12)]
+            )),
+            .recentlySaved([makeHomeItem(id: "recent", minutes: 10)]),
+        ]
+
+        let result = HomeStore.interleaveTodayTopics(topics, into: sections)
+
+        XCTAssertEqual(
+            result.map(\.id),
+            [
+                "jump-back-in",
+                "today-topic-one",
+                "inbox",
+                "collection-ideas",
+                "today-topic-two",
+                "recently-saved",
+            ]
+        )
+    }
+
+    @MainActor
+    func testInterleavesSecondTodayTopicAfterQuickWinsWithoutACollection() {
+        let topics = [makeTodayTopic(id: "one"), makeTodayTopic(id: "two")]
+        let sections: [HomeDashboardSection] = [
+            .jumpBackIn([makeHomeItem(id: "resume", minutes: 20)]),
+            .inbox([makeBookmark(index: 0)]),
+            .quickWins([makeHomeItem(id: "quick", minutes: 5)]),
+            .recentlySaved([makeHomeItem(id: "recent", minutes: 10)]),
+        ]
+
+        let result = HomeStore.interleaveTodayTopics(topics, into: sections)
+
+        XCTAssertEqual(
+            result.map(\.id),
+            [
+                "jump-back-in",
+                "today-topic-one",
+                "inbox",
+                "quick-wins",
+                "today-topic-two",
+                "recently-saved",
+            ]
+        )
+    }
+
+    @MainActor
+    func testLeavesHomeUnchangedWithoutTodayTopics() {
+        let sections: [HomeDashboardSection] = [
+            .inbox([makeBookmark(index: 0)]),
+        ]
+
+        let result = HomeStore.interleaveTodayTopics([], into: sections)
+
+        XCTAssertEqual(result.map(\.id), ["inbox"])
+    }
+
     func testHomeCacheKeepsOnlyFourInboxItems() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: UUID().uuidString, directoryHint: .isDirectory)
@@ -277,6 +413,45 @@ final class HomeTests: XCTestCase {
             isFinished: false,
             finishedAt: nil,
             tags: []
+        )
+    }
+
+    private func makeTodayTopic(id: String) -> HomeTodayTopic {
+        HomeTodayTopic(
+            section: makeDailySection(id: id, authorKeys: ["author-\(id)"]),
+            authors: [makeDailyAuthor(key: "author-\(id)")],
+            date: "2026-07-28",
+            timezone: "America/Chicago",
+            freshnessStatus: .complete,
+            isShowingCachedEdition: false
+        )
+    }
+
+    private func makeDailySection(id: String, authorKeys: [String]) -> DailyOverviewSection {
+        DailyOverviewSection(
+            id: id,
+            title: "Topic \(id)",
+            summary: "Summary for \(id).",
+            source: "GENERATED",
+            representativePostIds: [],
+            favoriteThreadUnitIds: ["conversation-\(id)"],
+            supportingThreadUnitIds: [],
+            authorKeys: authorKeys,
+            favoriteConversationCount: 1,
+            supportingConversationCount: 0,
+            latestActivityAt: "2026-07-28T12:00:00Z",
+            coverageWarnings: []
+        )
+    }
+
+    private func makeDailyAuthor(key: String) -> DailyAuthor {
+        DailyAuthor(
+            key: key,
+            username: key,
+            name: key.capitalized,
+            profileUrl: nil,
+            profileImageUrl: nil,
+            verified: nil
         )
     }
 }

@@ -1,20 +1,12 @@
 import SwiftUI
 
-private enum PeopleDailyRoute: Hashable {
+enum PeopleDailyRoute: Hashable {
     case section(String)
 }
 
 struct PeopleDailyTodayView: View {
     let client: APIClient
-    let refreshRevision: Int
-
-    @State private var store: PeopleDailyStore
-
-    init(client: APIClient, cache: PeopleDailyCache, refreshRevision: Int) {
-        self.client = client
-        self.refreshRevision = refreshRevision
-        _store = State(initialValue: PeopleDailyStore(client: client, cache: cache))
-    }
+    let store: PeopleDailyStore
 
     var body: some View {
         NavigationStack {
@@ -43,7 +35,6 @@ struct PeopleDailyTodayView: View {
                     }
                 }
         }
-        .task(id: refreshRevision) { await store.load() }
     }
 
     @ViewBuilder
@@ -225,7 +216,7 @@ private struct PeopleDailyCoverageNotice: View {
     }
 }
 
-private struct PeopleDailySectionView: View {
+struct PeopleDailySectionView: View {
     let client: APIClient
     let sectionID: String
 
@@ -503,7 +494,7 @@ private struct DailyOverviewView: View {
     }
 }
 
-private struct DailyOverviewSectionRow: View {
+struct DailyOverviewSectionRow: View {
     let section: DailyOverviewSection
     let authors: [DailyAuthor]
 
@@ -917,7 +908,7 @@ private struct DailyThreadUnitCard: View {
     }
 }
 
-private struct DailyParticipantFacepile: View {
+struct DailyParticipantFacepile: View {
     let authors: [DailyAuthor]
     var size: CGFloat = 30
     var maximumVisible = 3

@@ -14,6 +14,7 @@ final class PeopleDailyStore {
 
     private let client: APIClient
     private let cache: PeopleDailyCache
+    private var loadTask: Task<Void, Never>?
 
     init(client: APIClient, cache: PeopleDailyCache) {
         self.client = client
@@ -21,6 +22,21 @@ final class PeopleDailyStore {
     }
 
     func load() async {
+        if let loadTask {
+            await loadTask.value
+            return
+        }
+
+        let task = Task<Void, Never> { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performLoad()
+        }
+        loadTask = task
+        await task.value
+        loadTask = nil
+    }
+
+    private func performLoad() async {
         errorMessage = nil
         refreshErrorMessage = nil
 
