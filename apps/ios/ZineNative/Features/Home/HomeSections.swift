@@ -46,6 +46,15 @@ enum HomeSectionRoute: Hashable {
         case .collection(_, let title): title
         }
     }
+
+    var initialContentTypeFilter: ContentType? {
+        switch self {
+        case .podcasts: .podcast
+        case .articles: .article
+        case .videos: .video
+        default: nil
+        }
+    }
 }
 
 struct HomeNavigationLink<Label: View>: View {

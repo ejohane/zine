@@ -184,6 +184,7 @@ struct APIClient {
     }
 
     func listOpenedBookmarks(
+        contentType: ContentType? = nil,
         cursor: String? = nil,
         limit: Int = 30
     ) async throws -> PaginatedBookmarksResponse {
@@ -192,6 +193,9 @@ struct APIClient {
             resolvingAgainstBaseURL: false
         )!
         var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let contentType {
+            items.append(URLQueryItem(name: "contentType", value: contentType.rawValue))
+        }
         if let cursor {
             items.append(URLQueryItem(name: "cursor", value: cursor))
         }
@@ -200,6 +204,7 @@ struct APIClient {
     }
 
     func listQuickWinBookmarks(
+        contentType: ContentType? = nil,
         cursor: String? = nil,
         limit: Int = 30
     ) async throws -> PaginatedBookmarksResponse {
@@ -208,6 +213,9 @@ struct APIClient {
             resolvingAgainstBaseURL: false
         )!
         var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let contentType {
+            items.append(URLQueryItem(name: "contentType", value: contentType.rawValue))
+        }
         if let cursor {
             items.append(URLQueryItem(name: "cursor", value: cursor))
         }
@@ -217,6 +225,7 @@ struct APIClient {
 
     func listCollectionItems(
         id: String,
+        contentType: ContentType? = nil,
         cursor: String? = nil,
         limit: Int = 30
     ) async throws -> PaginatedBookmarksResponse {
@@ -225,6 +234,9 @@ struct APIClient {
             resolvingAgainstBaseURL: false
         )!
         var items = [URLQueryItem(name: "limit", value: String(limit))]
+        if let contentType {
+            items.append(URLQueryItem(name: "contentType", value: contentType.rawValue))
+        }
         if let cursor {
             items.append(URLQueryItem(name: "cursor", value: cursor))
         }

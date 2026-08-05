@@ -52,10 +52,15 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(isSearchMode ? "Search" : "Library")
+                .navigationTitle(isSearchMode ? "Search" : "")
+                .navigationBarTitleDisplayMode(.inline)
+                .solidContentTypeFilterChrome()
+                .toolbar(isSearchMode ? .visible : .hidden, for: .navigationBar)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        filterMenu
+                    if isSearchMode {
+                        ToolbarItem(placement: .topBarLeading) {
+                            filterMenu
+                        }
                     }
                 }
                 .navigationDestination(for: Bookmark.self) { bookmark in
@@ -92,8 +97,40 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var content: some View {
+        if isSearchMode {
+            resultsList
+        } else {
+            VStack(spacing: 0) {
+                ContentTypeFilterHeader(title: "Library", selection: $contentType)
+
+                resultsList
+            }
+            .background(Color(uiColor: .systemBackground))
+        }
+    }
+
+    private var resultsList: some View {
+        List {
+            resultRows
+        }
+        .listStyle(.plain)
+        .refreshable {
+            await store.reload(query: query)
+        }
+        .overlay(alignment: .bottom) {
+            if store.isLoadingMore {
+                ProgressView()
+                    .padding()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var resultRows: some View {
         if store.isLoading && store.items.isEmpty {
             ProgressView("Loading library…")
+                .frame(maxWidth: .infinity, minHeight: 260)
+                .listRowSeparator(.hidden)
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("Library unavailable", systemImage: "exclamationmark.triangle")
@@ -104,63 +141,72 @@ struct LibraryView: View {
                     Task { await store.reload(query: query) }
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
-            if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                ContentUnavailableView(
-                    "Search your library",
-                    systemImage: "magnifyingglass",
-                    description: Text("Find saved items by title or creator.")
-                )
-            } else if isSearchMode {
-                ContentUnavailableView.search(text: search)
-            } else {
-                ContentUnavailableView(
-                    "No bookmarks",
-                    systemImage: "bookmark",
-                    description: Text("Items you bookmark from Inbox will appear here.")
-                )
-            }
-        } else {
-            List(store.items) { bookmark in
-                NavigationLink(value: bookmark) {
-                    BookmarkRow(bookmark: bookmark)
-                }
-                .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+            emptyState
+                .frame(maxWidth: .infinity, minHeight: 320)
                 .listRowSeparator(.hidden)
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if !bookmark.isFinished {
-                        Button {
-                            Task { await store.complete(bookmark) }
-                        } label: {
-                            Label("Complete", systemImage: "checkmark.circle.fill")
-                        }
-                        .tint(.green)
-                        .accessibilityLabel("Complete bookmark")
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        Task { await store.archive(bookmark) }
-                    } label: {
-                        Label("Archive", systemImage: "archivebox.fill")
-                    }
-                    .tint(.red)
-                    .accessibilityLabel("Archive bookmark")
-                }
-                .task {
-                    await store.loadMoreIfNeeded(current: bookmark)
-                }
+        } else {
+            ForEach(store.items) { bookmark in
+                bookmarkRow(bookmark)
             }
-            .listStyle(.plain)
-            .refreshable {
-                await store.reload(query: query)
-            }
-            .overlay(alignment: .bottom) {
-                if store.isLoadingMore {
-                    ProgressView()
-                        .padding()
+        }
+    }
+
+    @ViewBuilder
+    private var emptyState: some View {
+        if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            ContentUnavailableView(
+                "Search your library",
+                systemImage: "magnifyingglass",
+                description: Text("Find saved items by title or creator.")
+            )
+        } else if isSearchMode {
+            ContentUnavailableView.search(text: search)
+        } else if let contentType {
+            ContentUnavailableView(
+                "No \(contentType.title.lowercased())s",
+                systemImage: contentType.systemImage,
+                description: Text("Try another format or return to All.")
+            )
+        } else {
+            ContentUnavailableView(
+                "No bookmarks",
+                systemImage: "bookmark",
+                description: Text("Items you bookmark from Inbox will appear here.")
+            )
+        }
+    }
+
+    private func bookmarkRow(_ bookmark: Bookmark) -> some View {
+        NavigationLink(value: bookmark) {
+            BookmarkRow(bookmark: bookmark)
+        }
+        .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+        .listRowSeparator(.hidden)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            if !bookmark.isFinished {
+                Button {
+                    Task { await store.complete(bookmark) }
+                } label: {
+                    Label("Complete", systemImage: "checkmark.circle.fill")
                 }
+                .tint(.green)
+                .accessibilityLabel("Complete bookmark")
             }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                Task { await store.archive(bookmark) }
+            } label: {
+                Label("Archive", systemImage: "archivebox.fill")
+            }
+            .tint(.red)
+            .accessibilityLabel("Archive bookmark")
+        }
+        .task {
+            await store.loadMoreIfNeeded(current: bookmark)
         }
     }
 

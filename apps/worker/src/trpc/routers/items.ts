@@ -657,6 +657,14 @@ const PaginationSchema = z.object({
   limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 
+const ContentTypePaginationSchema = PaginationSchema.pick({ cursor: true, limit: true }).extend({
+  filter: z
+    .object({
+      contentType: ContentTypeSchema.nullish(),
+    })
+    .optional(),
+});
+
 const HomeInputSchema = z
   .object({
     filter: z
@@ -849,7 +857,7 @@ export const itemsRouter = router({
    * Uses cursor-based pagination sorted by lastOpenedAt DESC.
    */
   recentlyOpened: protectedProcedure
-    .input(PaginationSchema.pick({ cursor: true, limit: true }).optional())
+    .input(ContentTypePaginationSchema.optional())
     .query(async ({ input, ctx }) => {
       const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
       const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
@@ -859,6 +867,10 @@ export const itemsRouter = router({
         eq(userItems.isFinished, false),
         isNotNull(userItems.lastOpenedAt),
       ];
+
+      if (input?.filter?.contentType) {
+        conditions.push(eq(items.contentType, input.filter.contentType));
+      }
 
       if (cursor) {
         conditions.push(
@@ -901,7 +913,7 @@ export const itemsRouter = router({
    * Get unfinished bookmarks that take ten minutes or less, newest save first.
    */
   quickWins: protectedProcedure
-    .input(PaginationSchema.pick({ cursor: true, limit: true }).optional())
+    .input(ContentTypePaginationSchema.optional())
     .query(async ({ input, ctx }) => {
       const limit = input?.limit ?? DEFAULT_PAGE_SIZE;
       const cursor = input?.cursor ? decodeCursor(input.cursor) : null;
@@ -915,6 +927,10 @@ export const itemsRouter = router({
           and(gt(items.duration, 0), lte(items.duration, 10 * 60))
         )!,
       ];
+
+      if (input?.filter?.contentType) {
+        conditions.push(eq(items.contentType, input.filter.contentType));
+      }
 
       if (cursor) {
         conditions.push(

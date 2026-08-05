@@ -12,6 +12,7 @@ final class HomeSectionListStore {
 
     private let route: HomeSectionRoute
     private let client: APIClient
+    private var activeContentType: ContentType?
     private var removedIndices: [String: Int] = [:]
     private var pendingInboxItemIDs: Set<String> = []
 
@@ -20,14 +21,27 @@ final class HomeSectionListStore {
         self.client = client
     }
 
-    func reload() async {
+    func reload(contentType: ContentType? = nil) async {
+        let filterChanged = activeContentType != contentType
+        activeContentType = contentType
         errorMessage = nil
+
+        if filterChanged {
+            items = []
+            nextCursor = nil
+            isLoadingMore = false
+        }
+
         isLoading = items.isEmpty
-        defer { isLoading = false }
+        defer {
+            if activeContentType == contentType {
+                isLoading = false
+            }
+        }
 
         do {
-            let response = try await request()
-            guard !Task.isCancelled else { return }
+            let response = try await request(contentType: contentType)
+            guard !Task.isCancelled, activeContentType == contentType else { return }
             items = response.items
             nextCursor = response.nextCursor
             prefetchImages(in: response.items)
@@ -46,11 +60,19 @@ final class HomeSectionListStore {
         else { return }
 
         isLoadingMore = true
-        defer { isLoadingMore = false }
+        let requestedContentType = activeContentType
+        defer {
+            if activeContentType == requestedContentType {
+                isLoadingMore = false
+            }
+        }
 
         do {
-            let response = try await request(cursor: nextCursor)
-            guard !Task.isCancelled else { return }
+            let response = try await request(
+                contentType: requestedContentType,
+                cursor: nextCursor
+            )
+            guard !Task.isCancelled, activeContentType == requestedContentType else { return }
             let existingIDs = Set(items.map(\.id))
             items.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
             self.nextCursor = response.nextCursor
@@ -72,7 +94,8 @@ final class HomeSectionListStore {
     }
 
     func setBookmarked(_ bookmark: Bookmark, isBookmarked: Bool) {
-        let shouldRemain = route == .inbox ? !isBookmarked : isBookmarked
+        let matchesFilter = activeContentType == nil || bookmark.contentType == activeContentType
+        let shouldRemain = (route == .inbox ? !isBookmarked : isBookmarked) && matchesFilter
         if shouldRemain {
             guard !items.contains(where: { $0.id == bookmark.id }) else { return }
             let index = min(removedIndices.removeValue(forKey: bookmark.id) ?? 0, items.endIndex)
@@ -136,37 +159,45 @@ final class HomeSectionListStore {
         items.insert(bookmark, at: min(index, items.endIndex))
     }
 
-    private func request(cursor: String? = nil) async throws -> PaginatedBookmarksResponse {
+    private func request(
+        contentType: ContentType?,
+        cursor: String? = nil
+    ) async throws -> PaginatedBookmarksResponse {
         switch route {
         case .jumpBackIn:
-            return try await client.listOpenedBookmarks(cursor: cursor)
+            return try await client.listOpenedBookmarks(
+                contentType: contentType,
+                cursor: cursor
+            )
         case .inbox:
-            return try await client.listInbox(query: InboxQuery(), cursor: cursor)
+            return try await client.listInbox(
+                query: InboxQuery(contentType: contentType),
+                cursor: cursor
+            )
         case .quickWins:
-            return try await client.listQuickWinBookmarks(cursor: cursor)
-        case .recentlySaved:
-            return try await client.listBookmarks(query: LibraryQuery(), cursor: cursor)
-        case .podcasts:
-            return try await client.listBookmarks(
-                query: LibraryQuery(contentType: .podcast),
+            return try await client.listQuickWinBookmarks(
+                contentType: contentType,
                 cursor: cursor
             )
-        case .articles:
+        case .recentlySaved, .podcasts, .articles, .videos:
             return try await client.listBookmarks(
-                query: LibraryQuery(contentType: .article),
-                cursor: cursor
-            )
-        case .videos:
-            return try await client.listBookmarks(
-                query: LibraryQuery(contentType: .video),
+                query: LibraryQuery(contentType: contentType),
                 cursor: cursor
             )
         case .collection(let id, _):
-            return try await client.listCollectionItems(id: id, cursor: cursor)
+            return try await client.listCollectionItems(
+                id: id,
+                contentType: contentType,
+                cursor: cursor
+            )
         }
     }
 
     private func shouldKeep(_ bookmark: Bookmark) -> Bool {
+        guard activeContentType == nil || bookmark.contentType == activeContentType else {
+            return false
+        }
+
         switch route {
         case .collection:
             return bookmark.state == "BOOKMARKED"

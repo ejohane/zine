@@ -7,6 +7,7 @@ struct HomeSectionListView: View {
     let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: HomeSectionListStore
+    @State private var contentType: ContentType?
     @Namespace private var bookmarkTransition
 
     init(
@@ -20,12 +21,14 @@ struct HomeSectionListView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         _store = State(initialValue: HomeSectionListStore(route: route, client: client))
+        _contentType = State(initialValue: route.initialContentTypeFilter)
     }
 
     var body: some View {
         content
-            .navigationTitle(route.title)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .solidContentTypeFilterChrome()
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -45,8 +48,8 @@ struct HomeSectionListView: View {
                     .zoom(sourceID: bookmark.id, in: bookmarkTransition)
                 )
             }
-            .task {
-                await store.reload()
+            .task(id: contentType) {
+                await store.reload(contentType: contentType)
             }
             .alert("Couldn’t update inbox", isPresented: actionErrorBinding) {
                 Button("OK", role: .cancel) {
@@ -59,8 +62,32 @@ struct HomeSectionListView: View {
 
     @ViewBuilder
     private var content: some View {
+        VStack(spacing: 0) {
+            ContentTypeFilterHeader(title: route.title, selection: $contentType)
+
+            List {
+                resultRows
+            }
+            .listStyle(.plain)
+            .refreshable {
+                await store.reload(contentType: contentType)
+            }
+            .overlay(alignment: .bottom) {
+                if store.isLoadingMore {
+                    ProgressView()
+                        .padding()
+                }
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    @ViewBuilder
+    private var resultRows: some View {
         if store.isLoading && store.items.isEmpty {
             ProgressView("Loading \(route.title.lowercased())…")
+                .frame(maxWidth: .infinity, minHeight: 260)
+                .listRowSeparator(.hidden)
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("Section unavailable", systemImage: "exclamationmark.triangle")
@@ -68,17 +95,25 @@ struct HomeSectionListView: View {
                 Text(error)
             } actions: {
                 Button("Try again") {
-                    Task { await store.reload() }
+                    Task { await store.reload(contentType: contentType) }
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
             ContentUnavailableView(
-                "Nothing here yet",
-                systemImage: "rectangle.stack",
-                description: Text("Items for this section will appear here.")
+                contentType.map { "No \($0.title.lowercased())s" } ?? "Nothing here yet",
+                systemImage: contentType?.systemImage ?? "rectangle.stack",
+                description: Text(
+                    contentType == nil
+                        ? "Items for this section will appear here."
+                        : "Try another format or return to All."
+                )
             )
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowSeparator(.hidden)
         } else {
-            List(store.items) { bookmark in
+            ForEach(store.items) { bookmark in
                 NavigationLink(value: bookmark) {
                     BookmarkRow(bookmark: bookmark)
                 }
@@ -109,16 +144,6 @@ struct HomeSectionListView: View {
                 }
                 .task {
                     await store.loadMoreIfNeeded(current: bookmark)
-                }
-            }
-            .listStyle(.plain)
-            .refreshable {
-                await store.reload()
-            }
-            .overlay(alignment: .bottom) {
-                if store.isLoadingMore {
-                    ProgressView()
-                        .padding()
                 }
             }
         }

@@ -1729,11 +1729,29 @@ apiV1Routes.get('/bookmarks', apiAuth('bookmarks:read'), async (c) => {
 });
 
 apiV1Routes.get('/bookmarks/opened', apiAuth('bookmarks:read'), async (c) => {
+  const parsedQuery = BookmarkQuerySchema.safeParse({
+    contentType: c.req.query('contentType'),
+  });
+
+  if (!parsedQuery.success) {
+    return c.json(
+      {
+        error: 'Invalid query parameters',
+        code: 'INVALID_QUERY_PARAMETERS',
+        issues: parsedQuery.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
   const caller = appRouter.createCaller(await createContext(c));
   const cursor = c.req.query('cursor');
   const result = await caller.items.recentlyOpened({
     limit: parseLimit(c.req.query('limit')),
     cursor: cursor && cursor.length > 0 ? cursor : undefined,
+    filter: { contentType: parsedQuery.data.contentType },
   });
 
   return c.json({
@@ -1745,11 +1763,29 @@ apiV1Routes.get('/bookmarks/opened', apiAuth('bookmarks:read'), async (c) => {
 });
 
 apiV1Routes.get('/bookmarks/quick-wins', apiAuth('bookmarks:read'), async (c) => {
+  const parsedQuery = BookmarkQuerySchema.safeParse({
+    contentType: c.req.query('contentType'),
+  });
+
+  if (!parsedQuery.success) {
+    return c.json(
+      {
+        error: 'Invalid query parameters',
+        code: 'INVALID_QUERY_PARAMETERS',
+        issues: parsedQuery.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
   const caller = appRouter.createCaller(await createContext(c));
   const cursor = c.req.query('cursor');
   const result = await caller.items.quickWins({
     limit: parseLimit(c.req.query('limit')),
     cursor: cursor && cursor.length > 0 ? cursor : undefined,
+    filter: { contentType: parsedQuery.data.contentType },
   });
 
   return c.json({
@@ -1761,12 +1797,30 @@ apiV1Routes.get('/bookmarks/quick-wins', apiAuth('bookmarks:read'), async (c) =>
 });
 
 apiV1Routes.get('/collections/:id/items', apiAuth('bookmarks:read'), async (c) => {
+  const parsedQuery = BookmarkQuerySchema.safeParse({
+    contentType: c.req.query('contentType'),
+  });
+
+  if (!parsedQuery.success) {
+    return c.json(
+      {
+        error: 'Invalid query parameters',
+        code: 'INVALID_QUERY_PARAMETERS',
+        issues: parsedQuery.error.issues,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      400
+    );
+  }
+
   const caller = appRouter.createCaller(await createContext(c));
   const cursor = c.req.query('cursor');
   const result = await caller.collections.items({
     id: c.req.param('id'),
     limit: parseLimit(c.req.query('limit')),
     cursor: cursor && cursor.length > 0 ? cursor : undefined,
+    filter: { contentType: parsedQuery.data.contentType },
   });
 
   return c.json({

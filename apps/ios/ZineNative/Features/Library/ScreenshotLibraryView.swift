@@ -6,26 +6,33 @@ struct ScreenshotLibraryView: View {
         baseURL: URL(string: "https://example.invalid")!,
         tokenProvider: { "screenshot-fixture" }
     )
+    @State private var contentType: ContentType?
+
+    private var bookmarks: [Bookmark] {
+        guard let contentType else { return ScreenshotFixtures.bookmarks }
+        return ScreenshotFixtures.bookmarks.filter { $0.contentType == contentType }
+    }
 
     var body: some View {
         NavigationStack {
-            List(ScreenshotFixtures.bookmarks) { bookmark in
-                NavigationLink(value: bookmark) {
-                    BookmarkRow(bookmark: bookmark)
-                }
-                .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
-                .listRowSeparator(.hidden)
-            }
-            .listStyle(.plain)
-            .navigationTitle("Library")
-            .searchable(text: .constant(""), prompt: "Search your library")
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {} label: {
-                        Label("Filter", systemImage: "line.3.horizontal.decrease.circle")
+            VStack(spacing: 0) {
+                ContentTypeFilterHeader(title: "Library", selection: $contentType)
+
+                List {
+                    ForEach(bookmarks) { bookmark in
+                        NavigationLink(value: bookmark) {
+                            BookmarkRow(bookmark: bookmark)
+                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                        .listRowSeparator(.hidden)
                     }
                 }
+                .listStyle(.plain)
             }
+            .background(Color(uiColor: .systemBackground))
+            .navigationTitle("")
+            .solidContentTypeFilterChrome()
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(bookmark: bookmark, client: client) { _ in }
             }

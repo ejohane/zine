@@ -237,6 +237,28 @@ final class HomeTests: XCTestCase {
         )
     }
 
+    func testContentSpecificHomeListsStartWithTheirMatchingFormatSelected() {
+        XCTAssertEqual(HomeSectionRoute.podcasts.initialContentTypeFilter, .podcast)
+        XCTAssertEqual(HomeSectionRoute.articles.initialContentTypeFilter, .article)
+        XCTAssertEqual(HomeSectionRoute.videos.initialContentTypeFilter, .video)
+        XCTAssertNil(HomeSectionRoute.jumpBackIn.initialContentTypeFilter)
+        XCTAssertNil(HomeSectionRoute.quickWins.initialContentTypeFilter)
+        XCTAssertNil(HomeSectionRoute.collection(id: "collection-1", title: "Ideas").initialContentTypeFilter)
+    }
+
+    func testContentTypeChipSelectionCanChangeOrReturnToAll() {
+        XCTAssertEqual(
+            ContentTypeFilterBar.toggledSelection(current: .article, option: .podcast),
+            .podcast
+        )
+        XCTAssertNil(
+            ContentTypeFilterBar.toggledSelection(current: .article, option: .article)
+        )
+        XCTAssertNil(
+            ContentTypeFilterBar.toggledSelection(current: nil, option: nil)
+        )
+    }
+
     func testHomeItemProvidesImmediateBookmarkDetailContent() {
         let item = makeHomeItem(id: "instant", minutes: 12)
         let content = BookmarkDetailContent(item: item)

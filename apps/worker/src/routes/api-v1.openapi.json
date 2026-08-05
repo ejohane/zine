@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Zine REST API",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "description": "REST API for reading and managing the Zine home dashboard, inbox items, bookmarks, creators, tags, article content, progress, subscriptions across supported sources, and sync jobs. Requests may authenticate with a Clerk session token or a scoped Zine personal access token."
   },
   "servers": [
@@ -452,13 +452,14 @@
         "tags": ["Bookmarks"],
         "operationId": "listOpenedBookmarks",
         "summary": "List opened bookmarks",
-        "description": "Returns unfinished bookmarked items the user has opened, sorted by most recently opened first.",
+        "description": "Returns unfinished bookmarked items the user has opened, optionally filtered by content type and sorted by most recently opened first.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
         "x-api-status": "current",
         "parameters": [
           { "$ref": "#/components/parameters/Limit" },
-          { "$ref": "#/components/parameters/Cursor" }
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/ContentType" }
         ],
         "responses": {
           "200": {
@@ -479,13 +480,14 @@
         "tags": ["Bookmarks"],
         "operationId": "listQuickWinBookmarks",
         "summary": "List quick-win bookmarks",
-        "description": "Returns unfinished bookmarks that take ten minutes or less, sorted by most recently saved first.",
+        "description": "Returns unfinished bookmarks that take ten minutes or less, optionally filtered by content type and sorted by most recently saved first.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
         "x-api-status": "current",
         "parameters": [
           { "$ref": "#/components/parameters/Limit" },
-          { "$ref": "#/components/parameters/Cursor" }
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/ContentType" }
         ],
         "responses": {
           "200": {
@@ -506,7 +508,7 @@
         "tags": ["Bookmarks"],
         "operationId": "listCollectionItems",
         "summary": "List collection items",
-        "description": "Returns all bookmarks in a custom collection using the collection's configured sort order.",
+        "description": "Returns bookmarks in a custom collection, optionally filtered by content type, using the collection's configured sort order.",
         "security": [{ "bearerAuth": [] }],
         "x-required-scopes": ["bookmarks:read"],
         "x-api-status": "current",
@@ -518,7 +520,8 @@
             "schema": { "type": "string" }
           },
           { "$ref": "#/components/parameters/Limit" },
-          { "$ref": "#/components/parameters/Cursor" }
+          { "$ref": "#/components/parameters/Cursor" },
+          { "$ref": "#/components/parameters/ContentType" }
         ],
         "responses": {
           "200": {
