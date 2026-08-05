@@ -2237,9 +2237,12 @@ describe('apiV1Routes', () => {
     const app = createTestApp();
 
     const res = await app.fetch(
-      new Request('http://localhost/api/v1/bookmarks/opened?limit=20&cursor=opened-cursor', {
-        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
-      }),
+      new Request(
+        'http://localhost/api/v1/bookmarks/opened?limit=20&cursor=opened-cursor&contentType=ARTICLE',
+        {
+          headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+        }
+      ),
       createMockEnv()
     );
 
@@ -2247,6 +2250,7 @@ describe('apiV1Routes', () => {
     expect(mockRecentlyOpened).toHaveBeenCalledWith({
       limit: 20,
       cursor: 'opened-cursor',
+      filter: { contentType: ContentType.ARTICLE },
     });
     expect((await res.json()) as JsonBody).toMatchObject({
       items: [{ title: 'Opened bookmark' }],
@@ -2262,9 +2266,12 @@ describe('apiV1Routes', () => {
     const app = createTestApp();
 
     const res = await app.fetch(
-      new Request('http://localhost/api/v1/bookmarks/quick-wins?limit=20&cursor=quick-cursor', {
-        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
-      }),
+      new Request(
+        'http://localhost/api/v1/bookmarks/quick-wins?limit=20&cursor=quick-cursor&contentType=PODCAST',
+        {
+          headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+        }
+      ),
       createMockEnv()
     );
 
@@ -2272,6 +2279,7 @@ describe('apiV1Routes', () => {
     expect(mockQuickWins).toHaveBeenCalledWith({
       limit: 20,
       cursor: 'quick-cursor',
+      filter: { contentType: ContentType.PODCAST },
     });
     expect((await res.json()) as JsonBody).toMatchObject({
       items: [{ title: 'Quick bookmark' }],
@@ -2288,7 +2296,7 @@ describe('apiV1Routes', () => {
 
     const res = await app.fetch(
       new Request(
-        'http://localhost/api/v1/collections/collection_1/items?limit=20&cursor=collection-cursor',
+        'http://localhost/api/v1/collections/collection_1/items?limit=20&cursor=collection-cursor&contentType=VIDEO',
         {
           headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
         }
@@ -2301,6 +2309,7 @@ describe('apiV1Routes', () => {
       id: 'collection_1',
       limit: 20,
       cursor: 'collection-cursor',
+      filter: { contentType: ContentType.VIDEO },
     });
     expect((await res.json()) as JsonBody).toMatchObject({
       items: [{ title: 'Collected bookmark' }],
@@ -2323,6 +2332,23 @@ describe('apiV1Routes', () => {
       code: 'INVALID_QUERY_PARAMETERS',
     });
     expect(mockLibrary).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid content-type filters on specialized bookmark lists', async () => {
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/opened?contentType=BOOK', {
+        headers: { Authorization: `Bearer ${READ_WRITE_TOKEN}` },
+      }),
+      createMockEnv()
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()) as JsonBody).toMatchObject({
+      code: 'INVALID_QUERY_PARAMETERS',
+    });
+    expect(mockRecentlyOpened).not.toHaveBeenCalled();
   });
 
   it('moves an inbox item to bookmarks', async () => {

@@ -30,11 +30,7 @@ struct ScreenshotHomeView: View {
                     )
             }
             .navigationDestination(for: HomeSectionRoute.self) { route in
-                List(ScreenshotHomeFixtures.openedBookmarks) { bookmark in
-                    BookmarkRow(bookmark: bookmark)
-                }
-                .listStyle(.plain)
-                .navigationTitle(route.title)
+                ScreenshotHomeSectionListView(route: route)
             }
             .navigationDestination(for: PeopleDailyRoute.self) { _ in
                 Text("Today topic")
@@ -53,6 +49,39 @@ struct ScreenshotHomeView: View {
             Text(bookmark.title)
                 .navigationTitle(bookmark.title)
         }
+    }
+}
+
+private struct ScreenshotHomeSectionListView: View {
+    let route: HomeSectionRoute
+
+    @State private var contentType: ContentType?
+
+    init(route: HomeSectionRoute) {
+        self.route = route
+        _contentType = State(initialValue: route.initialContentTypeFilter)
+    }
+
+    private var bookmarks: [Bookmark] {
+        guard let contentType else { return ScreenshotHomeFixtures.openedBookmarks }
+        return ScreenshotHomeFixtures.openedBookmarks.filter { $0.contentType == contentType }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ContentTypeFilterHeader(title: route.title, selection: $contentType)
+
+            List {
+                ForEach(bookmarks) { bookmark in
+                    BookmarkRow(bookmark: bookmark)
+                }
+            }
+            .listStyle(.plain)
+        }
+        .background(Color(uiColor: .systemBackground))
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .solidContentTypeFilterChrome()
     }
 }
 

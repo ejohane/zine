@@ -6,6 +6,7 @@ struct JumpBackInListView: View {
     let onExternalOpen: (Bookmark) -> Void
 
     @State private var store: JumpBackInListStore
+    @State private var contentType: ContentType?
     @Namespace private var bookmarkTransition
 
     init(
@@ -21,8 +22,9 @@ struct JumpBackInListView: View {
 
     var body: some View {
         content
-            .navigationTitle("Jump Back In")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .solidContentTypeFilterChrome()
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -45,15 +47,39 @@ struct JumpBackInListView: View {
                     .zoom(sourceID: bookmark.id, in: bookmarkTransition)
                 )
             }
-            .task {
-                await store.reload()
+            .task(id: contentType) {
+                await store.reload(contentType: contentType)
             }
     }
 
     @ViewBuilder
     private var content: some View {
+        VStack(spacing: 0) {
+            ContentTypeFilterHeader(title: "Jump Back In", selection: $contentType)
+
+            List {
+                resultRows
+            }
+            .listStyle(.plain)
+            .refreshable {
+                await store.reload(contentType: contentType)
+            }
+            .overlay(alignment: .bottom) {
+                if store.isLoadingMore {
+                    ProgressView()
+                        .padding()
+                }
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    @ViewBuilder
+    private var resultRows: some View {
         if store.isLoading && store.items.isEmpty {
             ProgressView("Loading history…")
+                .frame(maxWidth: .infinity, minHeight: 260)
+                .listRowSeparator(.hidden)
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("History unavailable", systemImage: "exclamationmark.triangle")
@@ -61,17 +87,25 @@ struct JumpBackInListView: View {
                 Text(error)
             } actions: {
                 Button("Try again") {
-                    Task { await store.reload() }
+                    Task { await store.reload(contentType: contentType) }
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
             ContentUnavailableView(
-                "No opened bookmarks",
-                systemImage: "clock.arrow.circlepath",
-                description: Text("Bookmarks you open will appear here.")
+                contentType.map { "No opened \($0.title.lowercased())s" } ?? "No opened bookmarks",
+                systemImage: contentType?.systemImage ?? "clock.arrow.circlepath",
+                description: Text(
+                    contentType == nil
+                        ? "Bookmarks you open will appear here."
+                        : "Try another format or return to All."
+                )
             )
+            .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowSeparator(.hidden)
         } else {
-            List(store.items) { bookmark in
+            ForEach(store.items) { bookmark in
                 NavigationLink(value: bookmark) {
                     BookmarkRow(bookmark: bookmark)
                 }
@@ -80,16 +114,6 @@ struct JumpBackInListView: View {
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .task {
                     await store.loadMoreIfNeeded(current: bookmark)
-                }
-            }
-            .listStyle(.plain)
-            .refreshable {
-                await store.reload()
-            }
-            .overlay(alignment: .bottom) {
-                if store.isLoadingMore {
-                    ProgressView()
-                        .padding()
                 }
             }
         }

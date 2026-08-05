@@ -9,6 +9,7 @@ import {
   CollectionRulesSchema,
   CollectionSort,
   CollectionSortSchema,
+  ContentTypeSchema,
   HomeCollectionLayout,
   HomeCollectionLayoutSchema,
   UserItemState,
@@ -518,6 +519,11 @@ export const collectionsRouter = router({
         id: z.string().min(1),
         cursor: z.string().optional(),
         limit: z.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+        filter: z
+          .object({
+            contentType: ContentTypeSchema.nullish(),
+          })
+          .optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -548,6 +554,9 @@ export const collectionsRouter = router({
         eq(userItems.state, UserItemState.BOOKMARKED),
         membershipCondition,
       ];
+      if (input.filter?.contentType) {
+        conditions.push(eq(items.contentType, input.filter.contentType));
+      }
       if (cursorCondition) {
         conditions.push(cursorCondition);
       }
