@@ -3,6 +3,14 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import previewWorker, { isPreviewApiPath } from './preview-worker';
 
 const env = {
+  API: {
+    fetch: vi.fn(
+      async (_request: Request) =>
+        new Response(JSON.stringify({ ok: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        })
+    ),
+  },
   ASSETS: {
     fetch: vi.fn(
       async () => new Response('<html>Zine</html>', { headers: { 'Content-Type': 'text/html' } })
@@ -16,6 +24,7 @@ const env = {
 describe('preview Worker', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    env.API.fetch.mockClear();
     env.ASSETS.fetch.mockClear();
   });
 
@@ -27,14 +36,6 @@ describe('preview Worker', () => {
   });
 
   test('proxies API requests to the configured upstream without browser cookies or origins', async () => {
-    const upstreamFetch = vi.fn(
-      async (_request: Request) =>
-        new Response(JSON.stringify({ ok: true }), {
-          headers: { 'Content-Type': 'application/json' },
-        })
-    );
-    vi.stubGlobal('fetch', upstreamFetch);
-
     const response = await previewWorker.fetch(
       new Request('https://feature.preview.myzine.app/trpc/items.list?batch=1', {
         headers: {
@@ -47,8 +48,8 @@ describe('preview Worker', () => {
       env
     );
 
-    expect(upstreamFetch).toHaveBeenCalledTimes(1);
-    const upstreamRequest = upstreamFetch.mock.calls[0]![0] as Request;
+    expect(env.API.fetch).toHaveBeenCalledTimes(1);
+    const upstreamRequest = env.API.fetch.mock.calls[0]![0] as Request;
     expect(upstreamRequest.url).toBe('https://api.myzine.app/trpc/items.list?batch=1');
     expect(upstreamRequest.headers.get('authorization')).toBe('Bearer token-123');
     expect(upstreamRequest.headers.get('x-zine-trace-id')).toBe('trace-123');

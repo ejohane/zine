@@ -1,4 +1,7 @@
 interface PreviewWorkerEnv {
+  API: {
+    fetch(request: Request): Promise<Response>;
+  };
   ASSETS: {
     fetch(request: Request): Promise<Response>;
   };
@@ -92,7 +95,7 @@ export default {
         );
       }
 
-      const upstreamResponse = await fetch(buildUpstreamRequest(request, upstreamApiUrl));
+      const upstreamResponse = await env.API.fetch(buildUpstreamRequest(request, upstreamApiUrl));
       return withPreviewHeaders(upstreamResponse, previewId);
     }
 

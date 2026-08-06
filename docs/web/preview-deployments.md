@@ -30,8 +30,9 @@ use `pull_request_target` while checking out and building pull-request code.
 
 Each branch receives a separate static-assets Worker and exact custom domain. Browser requests to
 `/trpc` and `/api/v1` stay on the preview origin; the preview Worker forwards only those paths to
-`VITE_API_URL`. Authorization headers are preserved, while browser cookies and origin headers are
-not forwarded. Other backend, admin, and webhook paths are not proxied.
+the production API through a Cloudflare service binding. Authorization headers are preserved,
+while browser cookies and origin headers are not forwarded. Other backend, admin, and webhook
+paths are not proxied.
 
 Preview assets and API responses include `X-Robots-Tag: noindex, nofollow, noarchive`. The web app
 also displays a persistent preview badge stating that it is connected to live Zine data.

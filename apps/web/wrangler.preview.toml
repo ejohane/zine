@@ -10,6 +10,10 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
+[[services]]
+binding = "API"
+service = "zine-worker-production"
+
 [vars]
 UPSTREAM_API_URL = "https://api.myzine.app"
 PREVIEW_ID = "local-preview"

@@ -162,6 +162,7 @@ jobs:
           EXPECTED_GIT_SHA: ${{ needs.build.outputs.git_sha }}
           PREVIEW_URL: ${{ needs.build.outputs.url }}
         run: |
+          ready=false
           for attempt in $(seq 1 60); do
             if response="$(curl --fail --silent --show-error \
               --connect-timeout 5 --max-time 15 \
@@ -169,15 +170,29 @@ jobs:
               echo "$response" | jq -e --arg sha "$EXPECTED_GIT_SHA" \
                 '.status == "ok" and .service == "zine-web-preview" and .gitSha == $sha'
             then
-              exit 0
+              ready=true
+              break
             fi
 
             echo "Preview certificate or deployment is not ready (attempt ${attempt}/60)."
             sleep 5
           done
 
-          echo "Preview did not become ready within five minutes." >&2
-          exit 1
+          if [ "$ready" != true ]; then
+            echo "Preview did not become ready within five minutes." >&2
+            exit 1
+          fi
+
+          api_status="$(curl --silent --show-error \
+            --output preview-api-response.json --write-out '%{http_code}' \
+            "${PREVIEW_URL}/api/v1/inbox")"
+          if [ "$api_status" != 401 ] || \
+            ! jq -e '.code == "UNAUTHORIZED"' preview-api-response.json >/dev/null
+          then
+            echo "Preview API proxy returned an unexpected response (${api_status})." >&2
+            cat preview-api-response.json >&2
+            exit 1
+          fi
 
       - name: Publish preview summary
         env:
