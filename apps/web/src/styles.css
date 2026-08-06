@@ -2,6 +2,74 @@
 @import 'tailwindcss';
 @import '@zine/design-system/web/theme.css';
 
+.preview-banner {
+  position: fixed;
+  z-index: 100;
+  right: 1rem;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--dark-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dark-surface) 96%, transparent);
+  color: var(--dark-text-secondary);
+  box-shadow: var(--shadow);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.preview-banner strong {
+  color: var(--dark-text);
+  font-weight: 650;
+}
+
+.preview-banner__status {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--brand-orange);
+}
+
+.preview-banner__warning {
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--dark-border);
+}
+
+.preview-banner a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--dark-inline-link);
+  text-decoration: none;
+}
+
+.preview-banner a:hover {
+  text-decoration: underline;
+}
+
+.preview-banner a:focus-visible {
+  border-radius: 0.25rem;
+  outline: 2px solid var(--brand-orange);
+  outline-offset: 3px;
+}
+
+@media (max-width: 47.99rem) {
+  .preview-banner {
+    right: 0.75rem;
+    bottom: calc(5rem + env(safe-area-inset-bottom));
+    left: 0.75rem;
+    justify-content: center;
+  }
+
+  .preview-banner__warning {
+    display: none;
+  }
+}
+
 * {
   box-sizing: border-box;
 }

@@ -19,7 +19,15 @@ const callbackMutate = vi.fn<
   }) => Promise<void>
 >(async () => undefined);
 
-async function loadOAuthModule(envOverrides: Partial<Record<string, string>> = {}) {
+type OAuthEnvOverrides = Partial<{
+  API_URL: string;
+  IS_PREVIEW_DEPLOYMENT: boolean;
+  SPOTIFY_CLIENT_ID: string;
+  X_CLIENT_ID: string;
+  YOUTUBE_CLIENT_ID: string;
+}>;
+
+async function loadOAuthModule(envOverrides: OAuthEnvOverrides = {}) {
   vi.resetModules();
 
   createTRPCClientMock.mockReset();
@@ -45,6 +53,7 @@ async function loadOAuthModule(envOverrides: Partial<Record<string, string>> = {
 
   vi.doMock('./env', () => ({
     API_URL: 'http://localhost:8787',
+    IS_PREVIEW_DEPLOYMENT: false,
     SPOTIFY_CLIENT_ID: 'spotify-client',
     X_CLIENT_ID: 'x-client',
     YOUTUBE_CLIENT_ID: 'google-client',
@@ -65,6 +74,15 @@ describe('oauth helpers', () => {
     await expect(connectProvider('SPOTIFY', async () => null)).rejects.toThrow(
       'Missing VITE_SPOTIFY_CLIENT_ID.'
     );
+  });
+
+  test('connectProvider does not start provider OAuth from a preview hostname', async () => {
+    const { connectProvider } = await loadOAuthModule({ IS_PREVIEW_DEPLOYMENT: true });
+
+    await expect(connectProvider('SPOTIFY', async () => null)).rejects.toThrow(
+      'Connecting a new source is unavailable in previews'
+    );
+    expect(registerStateMutate).not.toHaveBeenCalled();
   });
 
   test('connectProvider registers state and redirects to the provider auth screen', async () => {

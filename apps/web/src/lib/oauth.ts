@@ -4,7 +4,13 @@ import superjson from 'superjson';
 
 import type { AppRouter } from '@zine/worker/trpc/router';
 
-import { API_URL, SPOTIFY_CLIENT_ID, X_CLIENT_ID, YOUTUBE_CLIENT_ID } from './env';
+import {
+  API_URL,
+  IS_PREVIEW_DEPLOYMENT,
+  SPOTIFY_CLIENT_ID,
+  X_CLIENT_ID,
+  YOUTUBE_CLIENT_ID,
+} from './env';
 
 export type { OAuthProvider } from '@zine/shared/types';
 
@@ -121,6 +127,12 @@ export async function connectProvider(
   getToken: TokenGetter,
   redirect: RedirectHandler = (url) => window.location.assign(url)
 ) {
+  if (IS_PREVIEW_DEPLOYMENT) {
+    throw new Error(
+      'Connecting a new source is unavailable in previews because providers require an exact callback URL.'
+    );
+  }
+
   const config = OAUTH_CONFIG[provider];
   if (!config.clientId) {
     throw new Error(
