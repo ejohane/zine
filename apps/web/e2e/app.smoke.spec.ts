@@ -69,6 +69,33 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
     .poll(() => reader.evaluate((element) => element.scrollTop))
     .toBe(readerScrollPosition);
 
+  const readerToolbar = page.getByRole('toolbar', { name: 'Reader controls' });
+  await reader.evaluate((element) => {
+    element.scrollTop = Math.min(720, element.scrollHeight - element.clientHeight);
+  });
+  await expect(readerToolbar).toHaveClass(/workbench-readerbar--article-pinned/);
+  await expect(readerToolbar.getByText('Stable component APIs')).toBeVisible();
+  await expect(readerToolbar.getByText('Zine Editorial')).toBeVisible();
+  await expect(readerToolbar.getByText('8 min read')).toBeVisible();
+  await expect(readerToolbar.getByRole('group', { name: 'Pinned bookmark actions' })).toBeVisible();
+  await expect(
+    readerToolbar.getByRole('button', { name: 'Mark Stable component APIs as finished' })
+  ).toBeVisible();
+  await expect(readerToolbar.getByRole('link', { name: 'Open source' })).toBeVisible();
+  await expect(
+    page.locator('.new-page-bookmark-view__actions-left--reader-pinned')
+  ).toHaveAttribute('aria-hidden', 'true');
+
+  await reader.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect(readerToolbar).not.toHaveClass(/workbench-readerbar--article-pinned/);
+  await expect(readerToolbar.getByText('Reader')).toBeVisible();
+
+  await reader.evaluate((element, scrollPosition) => {
+    element.scrollTop = scrollPosition;
+  }, readerScrollPosition);
+
   await page.keyboard.press('Escape');
   await expect(page.locator('.new-page-screen')).not.toHaveClass(
     /new-page-screen--reader-expanded/

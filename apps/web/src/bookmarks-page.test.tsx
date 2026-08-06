@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { ContentType, Provider } from '@zine/shared';
@@ -545,6 +545,49 @@ describe('BookmarksPage', () => {
       'false'
     );
     await waitFor(() => expect(reader.scrollTop).toBe(240));
+  });
+
+  test('pins article identity and actions after the immersive reader intro scrolls away', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${articleItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    const reader = container.querySelector('.new-page-bookmark-view') as HTMLElement;
+    const identity = container.querySelector('.new-page-bookmark-view__identity') as HTMLElement;
+    Object.defineProperty(identity, 'offsetTop', { configurable: true, value: 40 });
+    Object.defineProperty(identity, 'offsetHeight', { configurable: true, value: 160 });
+
+    await user.click(screen.getByRole('button', { name: 'Open immersive reader' }));
+
+    reader.scrollTop = 240;
+    fireEvent.scroll(reader);
+
+    const toolbar = screen.getByRole('toolbar', { name: 'Reader controls' });
+    await waitFor(() => expect(toolbar).toHaveClass('workbench-readerbar--article-pinned'));
+    expect(within(toolbar).getByText('Stable component APIs')).toBeVisible();
+    expect(within(toolbar).getByText('Zine Editorial')).toBeVisible();
+    expect(within(toolbar).getByText('8 min read')).toBeVisible();
+    expect(within(toolbar).getByRole('group', { name: 'Pinned bookmark actions' })).toBeVisible();
+    expect(
+      within(toolbar).getByRole('button', { name: 'Mark Stable component APIs as finished' })
+    ).toBeVisible();
+    expect(within(toolbar).getByRole('link', { name: 'Open in Substack' })).toBeVisible();
+
+    const inlineActions = container.querySelector(
+      '.new-page-bookmark-view__actions-left--reader-pinned'
+    );
+    expect(inlineActions).toHaveAttribute('aria-hidden', 'true');
+
+    reader.scrollTop = 0;
+    fireEvent.scroll(reader);
+
+    await waitFor(() => expect(toolbar).not.toHaveClass('workbench-readerbar--article-pinned'));
+    expect(within(toolbar).getByText('Reader')).toBeVisible();
+    expect(
+      within(toolbar).queryByRole('group', { name: 'Pinned bookmark actions' })
+    ).not.toBeInTheDocument();
   });
 
   test('keeps phone detail as the existing full-window drill-in without a redundant expand action', () => {
