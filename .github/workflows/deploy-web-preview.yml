@@ -183,13 +183,25 @@ jobs:
             exit 1
           fi
 
-          api_status="$(curl --silent --show-error \
-            --output preview-api-response.json --write-out '%{http_code}' \
-            "${PREVIEW_URL}/api/v1/inbox")"
-          if [ "$api_status" != 401 ] || \
-            ! jq -e '.code == "UNAUTHORIZED"' preview-api-response.json >/dev/null
-          then
-            echo "Preview API proxy returned an unexpected response (${api_status})." >&2
+          api_ready=false
+          for attempt in $(seq 1 24); do
+            api_status="$(curl --silent --show-error \
+              --connect-timeout 5 --max-time 15 \
+              --output preview-api-response.json --write-out '%{http_code}' \
+              "${PREVIEW_URL}/api/v1/inbox")"
+            if [ "$api_status" = 401 ] && \
+              jq -e '.code == "UNAUTHORIZED"' preview-api-response.json >/dev/null
+            then
+              api_ready=true
+              break
+            fi
+
+            echo "Preview API binding is not ready (attempt ${attempt}/24, status ${api_status})."
+            sleep 5
+          done
+
+          if [ "$api_ready" != true ]; then
+            echo "Preview API proxy did not become ready within two minutes (${api_status})." >&2
             cat preview-api-response.json >&2
             exit 1
           fi
