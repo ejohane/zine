@@ -115,6 +115,7 @@ jobs:
     name: Deploy branch preview
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: web-preview
       url: ${{ needs.build.outputs.url }}
@@ -161,11 +162,22 @@ jobs:
           EXPECTED_GIT_SHA: ${{ needs.build.outputs.git_sha }}
           PREVIEW_URL: ${{ needs.build.outputs.url }}
         run: |
-          response="$(curl --fail --silent --show-error \
-            --retry 12 --retry-delay 5 --retry-all-errors \
-            "${PREVIEW_URL}/_preview/health")"
-          echo "$response" | jq -e --arg sha "$EXPECTED_GIT_SHA" \
-            '.status == "ok" and .service == "zine-web-preview" and .gitSha == $sha'
+          for attempt in $(seq 1 60); do
+            if response="$(curl --fail --silent --show-error \
+              --connect-timeout 5 --max-time 15 \
+              "${PREVIEW_URL}/_preview/health")" && \
+              echo "$response" | jq -e --arg sha "$EXPECTED_GIT_SHA" \
+                '.status == "ok" and .service == "zine-web-preview" and .gitSha == $sha'
+            then
+              exit 0
+            fi
+
+            echo "Preview certificate or deployment is not ready (attempt ${attempt}/60)."
+            sleep 5
+          done
+
+          echo "Preview did not become ready within five minutes." >&2
+          exit 1
 
       - name: Publish preview summary
         env:
