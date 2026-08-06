@@ -5,6 +5,7 @@ import {
   Inbox,
   Library,
   LogOut,
+  Maximize2,
   Newspaper,
   Search,
   Settings as SettingsIcon,
@@ -188,11 +189,20 @@ function BookmarkSelectionReference() {
 
           <div className="new-page-inset__content">
             <section className="new-page-column-card new-page-bookmark-pane">
-              <div className="workbench-readerbar">
-                <span>
-                  <span aria-hidden="true" /> Saved to Library
-                </span>
-                <span>Video</span>
+              <div className="workbench-readerbar" role="toolbar" aria-label="Reader controls">
+                <div className="workbench-readerbar__context">
+                  <span>Reader</span>
+                  <span aria-hidden="true">·</span>
+                  <span>Video</span>
+                </div>
+                <Button
+                  tone="ghost"
+                  size="icon"
+                  className="workbench-readerbar__expand"
+                  aria-label="Open immersive reader"
+                >
+                  <Maximize2 size={18} strokeWidth={2} />
+                </Button>
               </div>
               <article className="new-page-bookmark-view new-page-bookmark-view--pane">
                 <div className="new-page-bookmark-view__body">

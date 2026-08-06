@@ -225,7 +225,15 @@ export async function mockWebTrpc(page: Page, mode: MockMode = 'default') {
       contentType: 'application/json',
       body: JSON.stringify({
         content: article
-          ? '<p>Extracted article text begins here, in the same reading flow as Zine for iOS.</p><h2>A stable reading surface</h2><p>The complete article continues beneath the saved-item header.</p>'
+          ? [
+              '<p>Extracted article text begins here, in the same reading flow as Zine for iOS.</p>',
+              '<h2>A stable reading surface</h2>',
+              ...Array.from(
+                { length: 12 },
+                (_, index) =>
+                  `<p>Reader section ${index + 1} keeps enough realistic copy in the fixture to exercise long-form scrolling and immersive layout transitions.</p>`
+              ),
+            ].join('')
           : null,
         articleBody: {
           availability: article ? 'AVAILABLE' : 'UNAVAILABLE',

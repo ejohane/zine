@@ -5,6 +5,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Ellipsis,
+  Maximize2,
+  Minimize2,
   Plus,
   Share,
 } from 'lucide-react';
@@ -559,6 +561,8 @@ export function BookmarksPage() {
   const [manualBookmarkOpen, setManualBookmarkOpen] = useState(false);
   const [manualBookmarkNotice, setManualBookmarkNotice] = useState<string | null>(null);
   const [bookmarkTagsOpen, setBookmarkTagsOpen] = useState(false);
+  const [isReaderExpanded, setIsReaderExpanded] = useState(false);
+  const readerScrollPositionRef = useRef<number | null>(null);
   const isPhoneLayout = useMediaQuery('(max-width: 700px)');
   const bookmarkFilter = parseBookmarkFilter(searchParams.get(CONTENT_FILTER_SEARCH_PARAM));
   const activeCollectionId = searchParams.get(COLLECTION_SEARCH_PARAM) || null;
@@ -738,7 +742,7 @@ export function BookmarksPage() {
   const showBookmarkDetailSkeleton =
     showInitialBookmarksLoadingState ||
     Boolean(selectedBookmarkId && !displayBookmark && selectedBookmarkDetailQuery.isLoading);
-  const showBookmarkListPane = !isPhoneLayout || !selectedBookmarkId;
+  const showBookmarkListPane = !isReaderExpanded && (!isPhoneLayout || !selectedBookmarkId);
   const showBookmarkDetailPane = !isPhoneLayout || Boolean(selectedBookmarkId);
   const showMobileTabBar = isPhoneLayout && !selectedBookmarkId;
   const refreshNotice = bookmarksQuery.error
@@ -748,7 +752,44 @@ export function BookmarksPage() {
       : null;
   const headerNotice = manualBookmarkNotice ?? refreshNotice;
   const showMobileHeader = Boolean(headerNotice);
-  const showInsetHeader = !isPhoneLayout || showMobileHeader;
+  const showInsetHeader = !isReaderExpanded && (!isPhoneLayout || showMobileHeader);
+
+  useEffect(() => {
+    readerScrollPositionRef.current = null;
+    setIsReaderExpanded(false);
+  }, [isPhoneLayout, selectedBookmarkId]);
+
+  useEffect(() => {
+    const scrollPosition = readerScrollPositionRef.current;
+    if (scrollPosition === null) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      if (bookmarkDetailRef.current) {
+        bookmarkDetailRef.current.scrollTop = scrollPosition;
+      }
+      readerScrollPositionRef.current = null;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [bookmarkDetailRef, isReaderExpanded]);
+
+  useEffect(() => {
+    if (!isReaderExpanded) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        readerScrollPositionRef.current = bookmarkDetailRef.current?.scrollTop ?? 0;
+        setIsReaderExpanded(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [bookmarkDetailRef, isReaderExpanded]);
 
   const invalidateSelectedBookmark = () => {
     if (!selectedBookmarkId) {
@@ -856,12 +897,18 @@ export function BookmarksPage() {
   }
 
   return (
-    <main className={cn('new-page-screen', isPhoneLayout && 'new-page-screen--phone')}>
-      {!isPhoneLayout ? <WorkspaceSidebar /> : null}
+    <main
+      className={cn(
+        'new-page-screen',
+        isPhoneLayout && 'new-page-screen--phone',
+        isReaderExpanded && 'new-page-screen--reader-expanded'
+      )}
+    >
+      {!isPhoneLayout && !isReaderExpanded ? <WorkspaceSidebar /> : null}
 
       {showMobileTabBar ? <MobileTabBar /> : null}
 
-      <div className="new-page-inset">
+      <div className={cn('new-page-inset', isReaderExpanded && 'new-page-inset--reader-expanded')}>
         {showInsetHeader ? (
           <header className="new-page-inset__header">
             {!isPhoneLayout ? (
@@ -909,7 +956,12 @@ export function BookmarksPage() {
           </header>
         ) : null}
 
-        <div className="new-page-inset__body">
+        <div
+          className={cn(
+            'new-page-inset__body',
+            isReaderExpanded && 'new-page-inset__body--reader-expanded'
+          )}
+        >
           {showBookmarkListPane ? (
             <aside className="new-page-column-card">
               <div className="new-page-column-card__header new-page-column-card__header--library">
@@ -1042,17 +1094,47 @@ export function BookmarksPage() {
           ) : null}
 
           {showBookmarkDetailPane ? (
-            <div className="new-page-inset__content">
+            <div
+              className={cn(
+                'new-page-inset__content',
+                isReaderExpanded && 'new-page-inset__content--reader-expanded'
+              )}
+            >
               <section
-                className="new-page-column-card new-page-bookmark-pane"
+                className={cn(
+                  'new-page-column-card new-page-bookmark-pane',
+                  isReaderExpanded && 'new-page-bookmark-pane--reader-expanded'
+                )}
                 aria-busy={showBookmarkDetailSkeleton}
               >
                 {displayBookmark && !isPhoneLayout ? (
-                  <div className="workbench-readerbar">
-                    <span>
-                      <span aria-hidden="true" /> Saved to Library
-                    </span>
-                    <span>{mapContentType(displayBookmark.contentType)}</span>
+                  <div className="workbench-readerbar" role="toolbar" aria-label="Reader controls">
+                    <div className="workbench-readerbar__context">
+                      <span>Reader</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{mapContentType(displayBookmark.contentType)}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      tone="ghost"
+                      size="icon"
+                      className="workbench-readerbar__expand"
+                      aria-label={
+                        isReaderExpanded ? 'Exit immersive reader' : 'Open immersive reader'
+                      }
+                      aria-pressed={isReaderExpanded}
+                      title={isReaderExpanded ? 'Exit immersive reader' : 'Open immersive reader'}
+                      onClick={() => {
+                        readerScrollPositionRef.current = bookmarkDetailRef.current?.scrollTop ?? 0;
+                        setIsReaderExpanded((expanded) => !expanded);
+                      }}
+                    >
+                      {isReaderExpanded ? (
+                        <Minimize2 size={18} strokeWidth={2} />
+                      ) : (
+                        <Maximize2 size={18} strokeWidth={2} />
+                      )}
+                    </Button>
                   </div>
                 ) : null}
                 {showBookmarkDetailSkeleton ? (
@@ -1064,6 +1146,7 @@ export function BookmarksPage() {
                       'new-page-bookmark-view new-page-bookmark-view--pane',
                       isPhoneLayout && 'new-page-bookmark-view--phone',
                       isPhoneDetailView && 'new-page-bookmark-view--phone-detail',
+                      isReaderExpanded && 'new-page-bookmark-view--reader-expanded',
                       !showBookmarkHero && 'new-page-bookmark-view--no-hero',
                       displayBookmark.contentType === ContentType.POST &&
                         'new-page-bookmark-view--post'

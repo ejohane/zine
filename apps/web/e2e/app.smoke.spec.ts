@@ -51,6 +51,34 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
   expect(aboutBox!.y).toBeLessThan(actionsBox!.y);
   expect(articleBox!.y).toBeGreaterThan(actionsBox!.y);
 
+  const reader = page.locator('.new-page-bookmark-view');
+  const readerScrollPosition = await reader.evaluate((element) => {
+    element.scrollTop = Math.min(240, element.scrollHeight - element.clientHeight);
+    return element.scrollTop;
+  });
+  expect(readerScrollPosition).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Open immersive reader' }).click();
+  await expect(page.locator('.new-page-screen')).toHaveClass(/new-page-screen--reader-expanded/);
+  await expect(page.locator('.new-page-sidebar')).toHaveCount(0);
+  await expect(page.locator('.new-page-column-card__header--library')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Exit immersive reader' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await expect
+    .poll(() => reader.evaluate((element) => element.scrollTop))
+    .toBe(readerScrollPosition);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.new-page-screen')).not.toHaveClass(
+    /new-page-screen--reader-expanded/
+  );
+  await expect(page.locator('.new-page-sidebar')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open immersive reader' })).toBeVisible();
+  await expect
+    .poll(() => reader.evaluate((element) => element.scrollTop))
+    .toBe(readerScrollPosition);
+
   await page.goto('/library/people');
   await expect(page.getByText('Alice Example')).toBeVisible();
 

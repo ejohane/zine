@@ -509,6 +509,57 @@ describe('BookmarksPage', () => {
     );
   });
 
+  test('expands the desktop reader without losing its position and exits with Escape', async () => {
+    const user = userEvent.setup();
+    const { container } = renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${articleItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    const reader = container.querySelector('.new-page-bookmark-view') as HTMLElement;
+    reader.scrollTop = 240;
+
+    const expandButton = screen.getByRole('button', { name: 'Open immersive reader' });
+    expect(screen.getByRole('toolbar', { name: 'Reader controls' })).toBeVisible();
+    expect(expandButton).toHaveAttribute('aria-pressed', 'false');
+
+    await user.click(expandButton);
+
+    expect(container.querySelector('main')).toHaveClass('new-page-screen--reader-expanded');
+    expect(container.querySelector('.new-page-sidebar')).toBeNull();
+    expect(container.querySelector('.new-page-column-card__header--library')).toBeNull();
+    expect(container.querySelector('.new-page-inset__header')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Exit immersive reader' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(container.querySelector('.new-page-bookmark-view')).toBe(reader);
+    expect(reader.scrollTop).toBe(240);
+
+    await user.keyboard('{Escape}');
+
+    expect(container.querySelector('main')).not.toHaveClass('new-page-screen--reader-expanded');
+    expect(container.querySelector('.new-page-sidebar')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Open immersive reader' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await waitFor(() => expect(reader.scrollTop).toBe(240));
+  });
+
+  test('keeps phone detail as the existing full-window drill-in without a redundant expand action', () => {
+    setViewportWidth(390);
+
+    renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${articleItem.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(screen.getByRole('button', { name: 'Back to bookmarks list' })).toBeVisible();
+    expect(screen.queryByRole('toolbar', { name: 'Reader controls' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open immersive reader' })).not.toBeInTheDocument();
+  });
+
   test('uses the mobile-complete green fill for finished bookmark icons in detail view', () => {
     const finishedVideoItem = createLibraryItem({
       ...videoItem,

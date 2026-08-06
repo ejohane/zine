@@ -439,32 +439,40 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 3.6rem;
-  padding: 0 1.75rem;
+  min-height: 3.5rem;
+  flex: 0 0 auto;
+  padding: 0 1rem 0 1.5rem;
   border-bottom: 1px solid var(--workbench-line);
-  color: var(--workbench-success);
-  font-size: 0.75rem;
+  background: var(--workbench-paper);
 }
 
-.workbench-readerbar > span:first-child {
+.workbench-readerbar__context {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.workbench-readerbar > span:first-child > span {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 50%;
-  background: var(--workbench-success);
-}
-
-.workbench-readerbar > span:last-child {
+  gap: 0.4rem;
+  min-width: 0;
   color: var(--workbench-muted);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.workbench-readerbar__context > span:first-child {
+  color: var(--workbench-ink);
+}
+
+.workbench-readerbar__expand {
+  width: 2.25rem;
+  min-height: 2.25rem;
+  flex: 0 0 auto;
+  color: var(--workbench-muted);
+}
+
+.workbench-readerbar__expand:hover,
+.workbench-readerbar__expand[aria-pressed='true'] {
+  background: var(--workbench-sheet);
+  color: var(--workbench-ink);
 }
 
 .new-page-bookmark-view {
@@ -6468,4 +6476,40 @@ body::before {
 .mobile-tab-bar__tab--active {
   background: var(--workbench-sheet);
   color: var(--workbench-accent);
+}
+
+/* Immersive reader keeps the utility bar available while the article owns the window. */
+.new-page-screen--reader-expanded {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.new-page-inset--reader-expanded {
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.new-page-inset__body--reader-expanded,
+.new-page-inset__content--reader-expanded,
+.new-page-bookmark-pane--reader-expanded {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.new-page-inset__body--reader-expanded {
+  display: flex;
+}
+
+.new-page-inset__content--reader-expanded {
+  gap: 0;
+}
+
+.new-page-bookmark-pane--reader-expanded {
+  border: 0;
+}
+
+.new-page-bookmark-view--reader-expanded .new-page-bookmark-view__body {
+  width: min(52rem, calc(100% - 4rem));
 }
