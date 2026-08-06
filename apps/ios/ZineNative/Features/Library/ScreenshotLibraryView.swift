@@ -24,12 +24,15 @@ struct ScreenshotLibraryView: View {
                             BookmarkRow(bookmark: bookmark)
                         }
                         .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                        .listRowBackground(ZineTheme.canvas)
                         .listRowSeparator(.hidden)
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(ZineTheme.canvas)
             }
-            .background(Color(uiColor: .systemBackground))
+            .background(ZineTheme.canvas)
             .navigationTitle("")
             .solidContentTypeFilterChrome()
             .toolbar(.hidden, for: .navigationBar)
@@ -37,6 +40,7 @@ struct ScreenshotLibraryView: View {
                 BookmarkDetailView(bookmark: bookmark, client: client) { _ in }
             }
         }
+        .zineScreenChrome()
     }
 }
 

@@ -163,14 +163,14 @@ private struct HomeTodayTopicSection: View {
                 Text("Today")
                     .font(.caption.weight(.heavy))
                     .tracking(1.1)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ZineTheme.brandAccent)
 
                 Text(formattedDate)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
 
                 if topic.isShowingCachedEdition {
-                    statusLabel("Saved edition", color: .secondary)
+                    statusLabel("Saved edition", color: ZineTheme.secondaryText)
                 } else {
                     switch topic.freshnessStatus {
                     case .complete:
@@ -178,7 +178,7 @@ private struct HomeTodayTopicSection: View {
                     case .partial:
                         statusLabel("Partial", color: .orange)
                     case .unavailable:
-                        statusLabel("Unavailable", color: .secondary)
+                        statusLabel("Unavailable", color: ZineTheme.secondaryText)
                     }
                 }
             }
@@ -201,7 +201,7 @@ private struct HomeTodayTopicSection: View {
                 .frame(width: 5, height: 5)
             Text(text)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
         }
     }
 
@@ -231,9 +231,9 @@ private struct HomeSectionHeader: View {
                         .font(.title3.bold())
                     Image(systemName: "chevron.right")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("View all \(title)")
@@ -241,7 +241,7 @@ private struct HomeSectionHeader: View {
             if let subtitle {
                 Text(subtitle)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -329,14 +329,14 @@ struct HomeCompactHorizontalCard: View {
 
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(3)
                 .frame(maxHeight: .infinity, alignment: .leading)
                 .padding(.trailing, 10)
         }
         .padding(.leading, 9)
         .frame(width: Metrics.cardWidth, height: Metrics.cardHeight, alignment: .leading)
-        .background(.secondary.opacity(0.08))
+        .background(ZineTheme.surface)
         .clipShape(.rect(cornerRadius: 14))
         .accessibilityElement(children: .combine)
     }
@@ -373,7 +373,7 @@ private struct HomeInboxSection: View {
                     }
                 }
             }
-            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 16))
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 16))
         }
         .padding(.horizontal, 20)
     }
@@ -542,7 +542,7 @@ private struct HomeCompactListSection: View {
                     }
                 }
             }
-            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 16))
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 16))
         }
         .padding(.horizontal, 20)
     }
@@ -590,7 +590,7 @@ struct HomeResumeCard: View {
 
                 if let progress = item.progress, progress.percent > 0 {
                     ProgressView(value: min(max(progress.percent / 100, 0), 1))
-                        .tint(Color.accentColor)
+                        .tint(ZineTheme.brandAccent)
                 }
             }
             .padding(16)
@@ -618,7 +618,7 @@ private struct HomeLandscapeCard: View {
 
             Text(item.title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
 
             HomeItemMetadata(item: item)
@@ -645,7 +645,7 @@ private struct HomeCoverCard: View {
 
             Text(item.title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
             HomeItemMetadata(item: item)
         }
@@ -672,7 +672,7 @@ private struct HomeGridCard: View {
 
             Text(item.title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
             HomeItemMetadata(item: item)
         }
@@ -699,7 +699,7 @@ struct HomeItemRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
                     .lineLimit(1)
                 HomeItemMetadata(item: item)
             }
@@ -723,7 +723,7 @@ struct HomeItemMetadata: View {
             }
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ZineTheme.secondaryText)
     }
 }
 
@@ -733,10 +733,10 @@ struct HomeImagePlaceholder: View {
 
     var body: some View {
         ZStack {
-            Color.secondary.opacity(0.12)
+            ZineTheme.raised
             Image(systemName: contentType.systemImage)
                 .font(.system(size: iconSize))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
         }
     }
 }

@@ -21,16 +21,16 @@ struct CreatorAvatar: View {
     private var fallback: some View {
         ZStack {
             Circle()
-                .fill(.secondary.opacity(0.12))
+                .fill(ZineTheme.raised)
 
             if let initial {
                 Text(initial)
                     .font(.system(size: size * 0.45, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             } else {
                 Image(systemName: contentType.systemImage)
                     .font(.system(size: size * 0.38, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
     }

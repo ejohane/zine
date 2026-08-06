@@ -92,7 +92,7 @@ struct DailyAuthorActivityView: View {
                 image.resizable().scaledToFill()
             } placeholder: {
                 ZStack {
-                    Circle().fill(Color.secondary.opacity(0.15))
+                    Circle().fill(ZineTheme.raised)
                     Text(author.name.prefix(1).uppercased())
                         .font(.title2.weight(.bold))
                 }
@@ -105,10 +105,10 @@ struct DailyAuthorActivityView: View {
                     .font(.title2.weight(.bold))
                 Text("@\(author.username)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                 Text("All posts available in Zine’s X archive")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
         }
     }
@@ -120,12 +120,12 @@ struct DailyAuthorActivityView: View {
             ForEach(coverage.warnings, id: \.self) { warning in
                 Text(warning)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
+        .background(ZineTheme.brandAccent.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
     }
 }

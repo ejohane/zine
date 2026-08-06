@@ -152,7 +152,7 @@ private struct TodayMasthead: View {
                 Spacer()
                 Text(issueDate)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
 
             Divider()
@@ -164,12 +164,12 @@ private struct TodayMasthead: View {
 
             Text(issue.dek)
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(coverageWindow)
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(ZineTheme.tertiaryText)
         }
     }
 
@@ -217,16 +217,16 @@ private struct TodayCoverStory: View {
                 Text("COVER STORY")
                     .font(.caption2.weight(.heavy))
                     .tracking(1.4)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ZineTheme.brandAccent)
 
                 Text(story.title)
                     .font(.system(size: 28, weight: .bold, design: .serif))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(story.lede.text)
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(4)
 
                 TodayStorySignalLine(story: story, issue: issue)
@@ -245,10 +245,10 @@ private struct TodayCoverStory: View {
 
     private var coverPlaceholder: some View {
         ZStack {
-            Color.secondary.opacity(0.1)
+            ZineTheme.raised
             Image(systemName: "newspaper")
                 .font(.system(size: 42))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
         }
     }
 }
@@ -264,7 +264,7 @@ private struct TodayBriefing: View {
                 HStack(alignment: .top, spacing: 14) {
                     Text(String(format: "%02d", index + 1))
                         .font(.caption.monospacedDigit().weight(.bold))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ZineTheme.brandAccent)
                         .padding(.top, 3)
                     Text(item.text)
                         .font(.body)
@@ -293,16 +293,16 @@ private struct TodayStoryCard: View {
                     Text("\(story.type.rawValue) · \(story.lifecycle.rawValue)")
                         .font(.caption2.weight(.bold))
                         .tracking(0.7)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
 
                     Text(story.title)
                         .font(.title3.weight(.bold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(ZineTheme.primaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(story.lede.text)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .lineLimit(3)
 
                     TodayStorySignalLine(story: story, issue: issue)
@@ -313,7 +313,7 @@ private struct TodayStoryCard: View {
                         url: imageURL,
                         targetSize: CGSize(width: 104, height: 104)
                     ) {
-                        Color.secondary.opacity(0.1)
+                        ZineTheme.raised
                     }
                     .frame(width: 104, height: 104)
                     .clipped()
@@ -347,7 +347,7 @@ private struct TodayStorySignalLine: View {
             Image(systemName: "chevron.right")
         }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ZineTheme.secondaryText)
     }
 
     private var storySources: [EditorialSource] {
@@ -372,7 +372,7 @@ private struct TodayRecommendationCard: View {
                 HStack(alignment: .top, spacing: 13) {
                     Image(systemName: recommendation.format.systemImage)
                         .font(.title3)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ZineTheme.brandAccent)
                         .frame(width: 28)
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -384,23 +384,23 @@ private struct TodayRecommendationCard: View {
                         }
                         .font(.caption2.weight(.bold))
                         .tracking(0.7)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
 
                         Text(recommendation.title)
                             .font(.headline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(ZineTheme.primaryText)
                             .fixedSize(horizontal: false, vertical: true)
 
                         Text(recommendation.reason)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
             }
             .buttonStyle(.plain)
@@ -414,7 +414,7 @@ private struct TodayRecommendationCard: View {
                         .foregroundStyle(.green)
                 } else if presentation?.isSaved == true {
                     Label("Saved", systemImage: "bookmark.fill")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ZineTheme.brandAccent)
                 } else if source != nil {
                     Button(action: onSave) {
                         Label("Save", systemImage: "bookmark")
@@ -455,7 +455,7 @@ private struct TodayRecommendationCard: View {
             .font(.caption.weight(.semibold))
         }
         .padding(16)
-        .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 16))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 16))
         .task {
             onFeedback(.impression)
         }
@@ -470,19 +470,19 @@ private struct TodayEmergingSignalCard: View {
             Text(signal.momentum.rawValue)
                 .font(.caption2.weight(.bold))
                 .tracking(0.7)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             Text(signal.title)
                 .font(.headline)
             Text(signal.summary.text)
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
             Text("Why watch: \(signal.whyWatch.text)")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 16))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 16))
     }
 }
 
@@ -494,14 +494,14 @@ private struct TodayBigPicture: View {
             Text("THE BIG PICTURE")
                 .font(.caption2.weight(.heavy))
                 .tracking(1.3)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             Text(text)
                 .font(.system(.title3, design: .serif, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.secondary.opacity(0.1), in: .rect(cornerRadius: 18))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
     }
 }
 
@@ -516,11 +516,11 @@ private struct TodayCoverageFooter: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ZineTheme.secondaryText)
             .padding(.top, 10)
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ZineTheme.secondaryText)
     }
 }
 
@@ -533,7 +533,7 @@ private struct TodaySectionTitle: View {
             Text(eyebrow)
                 .font(.caption2.weight(.heavy))
                 .tracking(1.4)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             Text(title)
                 .font(.title2.bold())
         }
@@ -597,18 +597,18 @@ private struct TodayIssueNoticeView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: systemImage)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             VStack(alignment: .leading, spacing: 3) {
                 Text(notice.title)
                     .font(.subheadline.weight(.semibold))
                 Text(notice.message)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.secondary.opacity(0.09), in: .rect(cornerRadius: 14))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 14))
         .accessibilityElement(children: .combine)
     }
 

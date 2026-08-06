@@ -81,9 +81,9 @@ private struct CondensedSectionHeader: View {
                     .font(.headline)
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(ZineTheme.primaryText)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
@@ -123,7 +123,7 @@ private struct CondensedJumpBackInSection: View {
             HStack(spacing: 7) {
                 ForEach(carouselItems.indices, id: \.self) { index in
                     Circle()
-                        .fill(index == selectedPage ? Color.accentColor : Color.secondary.opacity(0.3))
+                        .fill(index == selectedPage ? ZineTheme.brandAccent : ZineTheme.secondaryText.opacity(0.3))
                         .frame(width: 7, height: 7)
                 }
             }
@@ -331,7 +331,7 @@ private struct CondensedItemListSection: View {
                     }
                 }
             }
-            .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 13))
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 13))
         }
         .padding(.horizontal, 16)
     }
@@ -351,40 +351,40 @@ private struct CondensedTodayTopicSection: View {
                         Text("TODAY")
                             .font(.caption2.weight(.heavy))
                             .tracking(0.8)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(ZineTheme.brandAccent)
 
                         if let statusText {
                             Text(statusText)
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                         }
                     }
 
                     Text(topic.section.title)
                         .font(.headline)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(ZineTheme.primaryText)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
 
                     Text(topic.section.summary)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .multilineTextAlignment(.leading)
                         .lineLimit(2)
 
                     Text(conversationSummary)
                         .font(.caption2.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
 
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.bold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
                     .padding(.top, 2)
             }
             .padding(12)
-            .background(Color.accentColor.opacity(0.07), in: .rect(cornerRadius: 14))
+            .background(ZineTheme.brandAccent.opacity(0.07), in: .rect(cornerRadius: 14))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -427,7 +427,7 @@ private struct CondensedLandscapeCard: View {
 
             Text(item.title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
 
             HomeItemMetadata(item: item)
@@ -456,7 +456,7 @@ private struct CondensedCoverCard: View {
 
             Text(item.title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
 
             HomeItemMetadata(item: item)
@@ -484,7 +484,7 @@ private struct CondensedGridCard: View {
 
             Text(item.title)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
                 .lineLimit(2)
 
             HomeItemMetadata(item: item)

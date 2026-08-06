@@ -47,7 +47,7 @@ struct ArticleReaderView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color(uiColor: .systemBackground)
+            ZineTheme.canvas
                 .ignoresSafeArea()
 
             phaseContent
@@ -160,7 +160,9 @@ struct ArticleReaderView: View {
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
-            .background(.thinMaterial, in: Circle())
+            .foregroundStyle(ZineTheme.primaryText)
+            .background(ZineTheme.surface.opacity(0.96), in: Circle())
+            .overlay { Circle().stroke(ZineTheme.border, lineWidth: 1) }
             .accessibilityLabel("Back")
 
             Spacer(minLength: 8)
@@ -198,7 +200,9 @@ struct ArticleReaderView: View {
                 }
                 .accessibilityLabel("Open original article")
             }
-            .background(.thinMaterial, in: Capsule())
+            .foregroundStyle(ZineTheme.primaryText)
+            .background(ZineTheme.surface.opacity(0.96), in: Capsule())
+            .overlay { Capsule().stroke(ZineTheme.border, lineWidth: 1) }
         }
         .padding(.horizontal, 12)
         .frame(height: ArticleReaderChromeOffsetTracker.maximumOffset)

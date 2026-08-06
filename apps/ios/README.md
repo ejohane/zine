@@ -26,6 +26,13 @@ iOS 18 or newer simulator or device.
 
 All new iOS product work, verification, and deployment belongs in this project.
 
+## Design system
+
+The native color palette, semantic roles, usage rules, exceptions, and
+verification expectations are documented in [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md).
+Use `ZineNative/Core/ZineTheme.swift` rather than introducing view-local palette
+values.
+
 ## Share extension
 
 The `ZineShareExtension` target appears as Zine in the iOS share sheet for web

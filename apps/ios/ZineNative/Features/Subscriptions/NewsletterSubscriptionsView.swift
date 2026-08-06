@@ -215,6 +215,8 @@ struct NewsletterSubscriptionsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .refreshable { await store.reload() }
     }
 
@@ -225,7 +227,7 @@ struct NewsletterSubscriptionsView: View {
             }
 
             if store.isUpdatingConnection {
-                HStack { ProgressView(); Text("Updating connection…").foregroundStyle(.secondary) }
+                HStack { ProgressView(); Text("Updating connection…").foregroundStyle(ZineTheme.secondaryText) }
             } else if store.response?.connection?.isActive == true {
                 Button {
                     Task { await store.sync() }
@@ -260,8 +262,8 @@ struct NewsletterSubscriptionsView: View {
 
     private var connectionColor: Color {
         if store.response?.connection?.isActive == true { return .green }
-        if store.response?.connection?.needsAttention == true { return .orange }
-        return .secondary
+        if store.response?.connection?.needsAttention == true { return ZineTheme.brandAccent }
+        return ZineTheme.secondaryText
     }
 
     private func newsletterRow(_ feed: NewsletterFeed) -> some View {
@@ -271,7 +273,7 @@ struct NewsletterSubscriptionsView: View {
                     .resizable()
                     .scaledToFit()
                     .padding(10)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
             .frame(width: 44, height: 44)
             .clipShape(.circle)
@@ -280,7 +282,7 @@ struct NewsletterSubscriptionsView: View {
                 Text(feed.displayName).lineLimit(2)
                 Text(feed.fromAddress ?? feed.status.title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(1)
             }
 

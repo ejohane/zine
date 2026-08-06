@@ -137,7 +137,7 @@ enum ArticleHTMLDocumentBuilder {
               max-width: 760px;
               padding: \(topPadding)px 22px 96px;
               background: #ffffff;
-              color: #1c1c1e;
+              color: #151719;
               font: -apple-system-body;
               font-size: calc(17px * var(--reader-font-scale));
               line-height: 1.66;
@@ -155,13 +155,13 @@ enum ArticleHTMLDocumentBuilder {
             .title-rule {
               margin: 14px 0 0;
               border: 0;
-              border-top: 1px solid #d1d1d6;
+              border-top: 1px solid #cfd4da;
             }
             .meta {
               display: flex;
               align-items: center;
               gap: 8px;
-              color: #636366;
+              color: #5d646c;
               font: -apple-system-subheadline;
               font-size: calc(15px * var(--reader-font-scale));
               line-height: 1.4;
@@ -178,7 +178,7 @@ enum ArticleHTMLDocumentBuilder {
               border-radius: 50%;
               object-fit: cover;
               flex: 0 0 auto;
-              background: #e5e5ea;
+              background: #e9edf0;
             }
             main > :first-child { margin-top: 0; }
             p, ul, ol, blockquote, pre, figure { margin: 0 0 1.25em; }
@@ -214,7 +214,7 @@ enum ArticleHTMLDocumentBuilder {
             figure { margin-left: 0; margin-right: 0; }
             figcaption {
               margin-top: -0.8em;
-              color: #6e6e73;
+              color: #5d646c;
               font-size: calc(14px * var(--reader-font-scale));
               line-height: 1.45;
               text-align: center;
@@ -222,8 +222,8 @@ enum ArticleHTMLDocumentBuilder {
             blockquote {
               margin-left: 0;
               padding-left: 18px;
-              border-left: 3px solid #c7c7cc;
-              color: #48484a;
+              border-left: 3px solid #ef661f;
+              color: #5d646c;
             }
             pre, code {
               font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -233,18 +233,20 @@ enum ArticleHTMLDocumentBuilder {
               padding: 15px;
               overflow-x: auto;
               white-space: pre-wrap;
-              background: #f2f2f7;
+              background: #e9edf0;
               border-radius: 12px;
             }
-            a { color: #0066cc; text-decoration-thickness: 0.08em; }
-            hr { border: 0; border-top: 1px solid #d1d1d6; margin: 2em 0; }
+            a { color: #b64012; text-decoration-thickness: 0.08em; }
+            hr { border: 0; border-top: 1px solid #cfd4da; margin: 2em 0; }
+            ::selection { background: rgba(239, 102, 31, 0.24); }
             @media (prefers-color-scheme: dark) {
-              body { background: #000000; color: #f2f2f7; }
-              .meta, figcaption { color: #a1a1a6; }
-              blockquote { color: #d1d1d6; border-left-color: #636366; }
-              pre { background: #1c1c1e; }
-              a { color: #64a8ff; }
-              hr { border-top-color: #38383a; }
+              body { background: #14171a; color: #f5f7f8; }
+              .meta, figcaption { color: #b2bac2; }
+              .creator-avatar { background: #20252a; }
+              blockquote { color: #b2bac2; border-left-color: #ef661f; }
+              pre { background: #20252a; }
+              a { color: #ffad7c; }
+              hr, .title-rule { border-top-color: #343a40; }
             }
             @media (max-width: 420px) {
               body { padding-left: 20px; padding-right: 20px; }

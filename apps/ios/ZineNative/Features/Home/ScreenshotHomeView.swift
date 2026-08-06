@@ -37,6 +37,7 @@ struct ScreenshotHomeView: View {
                     .navigationTitle("Conversations")
             }
         }
+        .zineScreenChrome()
     }
 
     @ViewBuilder
@@ -77,8 +78,10 @@ private struct ScreenshotHomeSectionListView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .solidContentTypeFilterChrome()

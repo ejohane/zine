@@ -82,7 +82,7 @@ private struct PeopleDailyOverviewView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(formattedDate)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                     Text("What people are talking about")
                         .font(.largeTitle.weight(.bold))
                         .fixedSize(horizontal: false, vertical: true)
@@ -164,18 +164,22 @@ private struct PeopleDailyCoverageNotice: View {
             } label: {
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(response.freshness.status == .complete ? Color.green : Color.orange)
+                        .fill(
+                            response.freshness.status == .complete
+                                ? Color.green
+                                : ZineTheme.brandAccent
+                        )
                         .frame(width: 7, height: 7)
                     Text(isShowingCachedEdition ? "Saved edition" : statusTitle)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(ZineTheme.primaryText)
                     Spacer()
                     Text("\(response.more.favoriteConversationCount) Favorites")
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                     Image(systemName: showsDetails ? "chevron.up" : "chevron.down")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
                 .contentShape(Rectangle())
             }
@@ -184,21 +188,21 @@ private struct PeopleDailyCoverageNotice: View {
             if showsDetails {
                 Text(response.coverage.message)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                 if let cachedAt, isShowingCachedEdition {
                     Text("Saved \(cachedAt.formatted(.relative(presentation: .named)))")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
                 if let refreshErrorMessage {
                     Label(refreshErrorMessage, systemImage: "wifi.exclamationmark")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
                 ForEach(response.freshness.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.circle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -267,12 +271,12 @@ struct PeopleDailySectionView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Text(response.section.summary)
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     ForEach(response.section.coverageWarnings, id: \.self) { warning in
                         Label(warning, systemImage: "exclamationmark.circle")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -376,7 +380,7 @@ struct DailyFeedReviewView: View {
                         Text("ZINE")
                             .font(.caption2.weight(.heavy))
                             .tracking(1.2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { dismiss() }
@@ -507,22 +511,22 @@ struct DailyOverviewSectionRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(section.title)
                         .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(ZineTheme.primaryText)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 4)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
 
                 Text(section.summary)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(conversationSummary)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
         }
         .padding(.vertical, 18)
@@ -550,7 +554,7 @@ private struct DailyMoreConversationsRow: View {
         HStack(spacing: 14) {
             Image(systemName: "text.bubble")
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
                 .frame(width: 44, height: 44)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -558,12 +562,12 @@ private struct DailyMoreConversationsRow: View {
                     .font(.headline)
                 Text("\(count) conversation\(count == 1 ? "" : "s") that stand on their own today")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
             Spacer(minLength: 4)
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(ZineTheme.tertiaryText)
         }
         .padding(.vertical, 18)
         .contentShape(Rectangle())
@@ -642,13 +646,13 @@ private struct DailySectionDetailView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Text(summary)
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
                     ForEach(section?.coverageWarnings ?? [], id: \.self) { warning in
                         Label(warning, systemImage: "exclamationmark.circle")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                 }
                 .padding(.horizontal, 18)
@@ -707,7 +711,7 @@ private struct DailyFeedHeader: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(formattedDate)
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
 
             Text("What people are talking about")
                 .font(.largeTitle.weight(.bold))
@@ -743,14 +747,14 @@ private struct DailyCoverageNotice: View {
                         .frame(width: 7, height: 7)
                     Text(statusTitle)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(ZineTheme.primaryText)
                     Spacer()
                     Text(scopeSummary)
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                     Image(systemName: showsDetails ? "chevron.up" : "chevron.down")
                         .font(.caption2.weight(.semibold))
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
                 .contentShape(Rectangle())
             }
@@ -759,19 +763,19 @@ private struct DailyCoverageNotice: View {
             if showsDetails {
                 Text(response.coverage.message)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
 
                 ForEach(response.freshness.warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.circle")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 ForEach(response.overview?.warnings ?? [], id: \.self) { warning in
                     Label(warning, systemImage: "text.quote")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -797,7 +801,7 @@ private struct DailyCoverageNotice: View {
     }
 
     private var statusColor: Color {
-        response.coverage.status == .complete ? .green : .secondary
+        response.coverage.status == .complete ? .green : ZineTheme.secondaryText
     }
 
 }
@@ -836,13 +840,13 @@ private struct DailyThreadUnitCard: View {
                             .font(.subheadline.weight(.semibold))
                         Text(participantSummary)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                             .lineLimit(1)
 
                         if threadUnit.structureStatus != "EXACT" {
                             Label("Some replies may be missing", systemImage: "exclamationmark.circle")
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                         }
                     }
                     Spacer(minLength: 8)
@@ -890,13 +894,13 @@ private struct DailyThreadUnitCard: View {
             ForEach(threadUnit.coverageWarnings, id: \.self) { warning in
                 Label(warning, systemImage: "exclamationmark.circle")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .padding(.top, 8)
             }
         }
         .padding(isEmbedded ? 0 : 14)
         .background(
-            isEmbedded ? Color.clear : Color.secondary.opacity(0.08),
+            isEmbedded ? Color.clear : ZineTheme.surface,
             in: RoundedRectangle(cornerRadius: 16)
         )
     }
@@ -919,19 +923,19 @@ struct DailyParticipantFacepile: View {
                 DailyAuthorAvatar(author: author, size: size)
                     .overlay {
                         Circle()
-                            .stroke(Color(uiColor: .systemBackground), lineWidth: 2)
+                            .stroke(ZineTheme.canvas, lineWidth: 2)
                     }
             }
 
             if authors.count > maximumVisible {
                 Text("+\(authors.count - maximumVisible)")
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .frame(width: size, height: size)
-                    .background(Color(uiColor: .secondarySystemBackground), in: Circle())
+                    .background(ZineTheme.raised, in: Circle())
                     .overlay {
                         Circle()
-                            .stroke(Color(uiColor: .systemBackground), lineWidth: 2)
+                            .stroke(ZineTheme.canvas, lineWidth: 2)
                     }
             }
         }
@@ -966,13 +970,13 @@ private struct DailyThreadPostRow: View {
                 if let relationshipLabel {
                     Label(relationshipLabel.text, systemImage: relationshipLabel.icon)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
 
                 if let repostedBy = post.repostedBy {
                     Label("Reposted by @\(repostedBy.username)", systemImage: "arrow.2.squarepath")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
 
                 Text(post.text)
@@ -996,9 +1000,9 @@ private struct DailyThreadPostRow: View {
                     if let postURL = post.postURL {
                         Link(destination: postURL) {
                             Label("Open on X", systemImage: "arrow.up.right")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                         }
-                        .tint(.secondary)
+                        .tint(ZineTheme.secondaryText)
                     }
                     Spacer(minLength: 8)
                     DailyPostMetricsView(metrics: post.metrics)
@@ -1009,10 +1013,10 @@ private struct DailyThreadPostRow: View {
                     HStack(spacing: 5) {
                         if sourceName.localizedCaseInsensitiveContains("favorite") {
                             Image(systemName: "star.fill")
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(ZineTheme.brandAccent)
                         }
                         Text(sourceName)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                     .font(.caption2.weight(.semibold))
                 }
@@ -1026,21 +1030,21 @@ private struct DailyThreadPostRow: View {
             HStack(spacing: 5) {
                 Text(post.author.name)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
                 if post.author.verified == true {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
                 Text("@\(post.author.username)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if let effectiveDate = post.effectiveDate {
                     Text(effectiveDate, style: .relative)
                         .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
             }
             .contentShape(Rectangle())
@@ -1080,7 +1084,7 @@ private struct DailyThreadRail: View {
                     Circle()
                         .stroke(Color(uiColor: .separator), lineWidth: 1)
                 }
-                .background(Color(uiColor: .systemBackground), in: Circle())
+                .background(ZineTheme.canvas, in: Circle())
         }
         .frame(width: 46)
         .frame(maxHeight: .infinity, alignment: .top)
@@ -1096,7 +1100,7 @@ private struct DailyThreadRail: View {
                         path.addLine(to: CGPoint(x: geometry.size.width / 2, y: geometry.size.height))
                     }
                 }
-                .stroke(Color.secondary.opacity(0.28), lineWidth: 1.5)
+                .stroke(ZineTheme.border, lineWidth: 1.5)
             }
         }
         .accessibilityHidden(true)
@@ -1117,18 +1121,18 @@ private struct DailyConversationCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: evidenceIcon)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ZineTheme.brandAccent)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(conversation.label)
                         .font(.headline)
                     Text(conversation.evidence)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
 
                     ForEach(conversation.coverageWarnings ?? [], id: \.self) { warning in
                         Label(warning, systemImage: "exclamationmark.circle")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                 }
             }
@@ -1142,15 +1146,17 @@ private struct DailyConversationCard: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("\(post.author.name)  @\(post.author.username)")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(ZineTheme.primaryText)
                             Text(post.text)
                                 .font(.subheadline)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(ZineTheme.primaryText)
                                 .lineLimit(3)
                                 .multilineTextAlignment(.leading)
                             Text(isFavorite(post) ? "Favorite source" : "Conversation context")
                                 .font(.caption2.weight(.semibold))
-                                .foregroundStyle(isFavorite(post) ? Color.accentColor : .secondary)
+                                .foregroundStyle(
+                                    isFavorite(post) ? ZineTheme.brandAccent : ZineTheme.secondaryText
+                                )
                         }
                         Spacer(minLength: 0)
                     }
@@ -1166,7 +1172,7 @@ private struct DailyConversationCard: View {
             }
         }
         .padding(14)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+        .background(ZineTheme.surface, in: RoundedRectangle(cornerRadius: 16))
     }
 
     private func isFavorite(_ post: DailyPost) -> Bool {
@@ -1205,7 +1211,7 @@ struct DailyFeedPostCard: View {
             if let repostedBy = post.repostedBy {
                 Label("Reposted by @\(repostedBy.username)", systemImage: "arrow.2.squarepath")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
 
             authorHeader
@@ -1249,14 +1255,14 @@ struct DailyFeedPostCard: View {
                             .font(.caption2.weight(.semibold))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 4)
-                            .background(Color.accentColor.opacity(0.1), in: Capsule())
+                            .background(ZineTheme.brandAccent.opacity(0.1), in: Capsule())
                     }
                 }
             }
         }
         .padding(isEmbedded ? 0 : 14)
         .background(
-            isEmbedded ? Color.clear : Color.secondary.opacity(0.08),
+            isEmbedded ? Color.clear : ZineTheme.surface,
             in: RoundedRectangle(cornerRadius: 16)
         )
     }
@@ -1283,7 +1289,7 @@ struct DailyFeedPostCard: View {
                     if post.author.verified == true {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption2)
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(ZineTheme.brandAccent)
                     }
                 }
                 HStack(spacing: 5) {
@@ -1297,13 +1303,13 @@ struct DailyFeedPostCard: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
             }
             Spacer()
             if authorDestinationDate != nil {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
         }
         .contentShape(Rectangle())
@@ -1319,10 +1325,10 @@ private struct DailyAuthorAvatar: View {
             image.resizable().scaledToFill()
         } placeholder: {
             ZStack {
-                Circle().fill(Color.secondary.opacity(0.16))
+                Circle().fill(ZineTheme.raised)
                 Text(author.name.prefix(1).uppercased())
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
         .frame(width: size, height: size)
@@ -1338,7 +1344,7 @@ private struct DailyRelationshipContext: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(label, systemImage: icon)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
 
             if let target = relationship.target {
                 VStack(alignment: .leading, spacing: 3) {
@@ -1346,12 +1352,12 @@ private struct DailyRelationshipContext: View {
                         .font(.caption.weight(.semibold))
                     Text(target.text)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .lineLimit(4)
                 }
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+                .background(ZineTheme.surface, in: RoundedRectangle(cornerRadius: 10))
             }
         }
     }
@@ -1386,9 +1392,9 @@ private struct DailyPostMediaStrip: View {
                         image.resizable().scaledToFill()
                     } placeholder: {
                         ZStack {
-                            Color.secondary.opacity(0.12)
+                            ZineTheme.raised
                             Image(systemName: item.type == "VIDEO" ? "play.fill" : "photo")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                         }
                     }
                     .frame(width: 220, height: 128)
@@ -1411,7 +1417,7 @@ private struct DailyPostLinkView: View {
                         AsyncImage(url: imageURL) { image in
                             image.resizable().scaledToFill()
                         } placeholder: {
-                            Color.secondary.opacity(0.12)
+                            ZineTheme.raised
                         }
                         .frame(width: 54, height: 54)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -1419,19 +1425,19 @@ private struct DailyPostLinkView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(link.card?.domain ?? domain)
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                         Text(link.card?.title ?? link.displayUrl ?? link.normalizedUrl)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(ZineTheme.primaryText)
                             .lineLimit(2)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "arrow.up.right")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
                 .padding(9)
-                .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 11))
+                .background(ZineTheme.surface, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
         }
@@ -1457,7 +1463,7 @@ private struct DailyPostMetricsView: View {
                 Label("\(likes)", systemImage: "heart")
             }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ZineTheme.secondaryText)
     }
 }
 
@@ -1484,7 +1490,7 @@ struct ScreenshotDailyOverviewView: View {
                         Text("ZINE")
                             .font(.caption2.weight(.heavy))
                             .tracking(1.2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") {}
@@ -1512,7 +1518,7 @@ struct ScreenshotDailyThreadView: View {
                     Text("Favorites")
                         .font(.caption.weight(.heavy))
                         .tracking(1.1)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
 
                     Text("Conversations from people you chose")
                         .font(.title2.weight(.bold))

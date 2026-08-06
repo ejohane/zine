@@ -74,14 +74,14 @@ struct CreatorView: View {
                 if let handle = store.profile?.handle, !handle.isEmpty {
                     Text(handle)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
             }
 
             if let description = store.profile?.description, !description.isEmpty {
                 Text(description)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .multilineTextAlignment(.center)
                     .lineLimit(5)
             }
@@ -104,7 +104,7 @@ struct CreatorView: View {
             if let error = store.profileErrorMessage {
                 Text("Some profile details couldn’t be loaded. \(error)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .multilineTextAlignment(.center)
             }
         }
@@ -213,7 +213,7 @@ struct CreatorView: View {
                     .font(.headline)
                 Text("\(bookmarks.count)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
 
             if isLoading && bookmarks.isEmpty {
@@ -223,7 +223,7 @@ struct CreatorView: View {
             } else if bookmarks.isEmpty {
                 Text(emptyMessage)
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .padding(.vertical, 8)
             } else {
                 bookmarkRows(bookmarks, isCompleted: isCompleted)
@@ -319,11 +319,11 @@ struct CreatorView: View {
             Text(title).font(.subheadline.weight(.semibold))
             Text(message)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(.secondary.opacity(0.08), in: .rect(cornerRadius: 12))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 12))
     }
 
     private func creatorContentRow(
@@ -339,9 +339,9 @@ struct CreatorView: View {
                 targetSize: CGSize(width: 94, height: 60)
             ) {
                 ZStack {
-                    Color.secondary.opacity(0.12)
+                    ZineTheme.raised
                     Image(systemName: placeholderSystemImage)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
             }
             .frame(width: 94, height: 60)
@@ -350,18 +350,18 @@ struct CreatorView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
                     .lineLimit(2)
                 Text(metadataLabel)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(1)
             }
 
             Spacer(minLength: 0)
             Image(systemName: accessorySystemImage)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(ZineTheme.tertiaryText)
         }
         .contentShape(Rectangle())
     }
