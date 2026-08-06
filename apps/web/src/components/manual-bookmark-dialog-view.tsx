@@ -2,6 +2,7 @@ import { AlertCircle, Clipboard, Link2, LoaderCircle, Plus, RefreshCcw, X } from
 
 import type { BookmarkPreview } from '../lib/router-types';
 import { cn } from '../lib/utils';
+import { DialogDescription, DialogTitle } from './ui/dialog';
 import {
   formatDuration,
   formatPlainText,
@@ -152,15 +153,15 @@ export function ManualBookmarkDialogView({
     <div className="manual-bookmark-dialog" data-testid="manual-bookmark-dialog">
       <div className="manual-bookmark-dialog__header">
         <div className="manual-bookmark-dialog__header-copy">
-          <h2 id="manual-bookmark-dialog-title" className="manual-bookmark-dialog__title">
+          <DialogTitle id="manual-bookmark-dialog-title" className="manual-bookmark-dialog__title">
             Add bookmark
-          </h2>
-          <p
+          </DialogTitle>
+          <DialogDescription
             id="manual-bookmark-dialog-description"
             className="manual-bookmark-dialog__description"
           >
             Paste a link, review the preview, and save it straight into your library.
-          </p>
+          </DialogDescription>
         </div>
 
         <button

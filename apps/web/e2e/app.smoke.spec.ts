@@ -7,7 +7,7 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
 
   await page.goto('/');
   await expect(page).toHaveURL(/\/home$/);
-  await expect(page.getByRole('strong').filter({ hasText: 'Home' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Today' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Jump Back In' })).toBeVisible();
   await expect(page.getByText('Design systems at scale').first()).toBeVisible();
 
@@ -33,7 +33,23 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
 
   await page.getByRole('link', { name: 'Library' }).first().click();
   await expect(page).toHaveURL(/\/library\/bookmarks$/);
-  await expect(page.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+
+  await page.getByRole('button', { name: /Stable component APIs/ }).click();
+  await expect(page).toHaveURL(/\/item\/article-1$/);
+  await expect(page.getByText('About this article')).toBeVisible();
+  await expect(
+    page.getByText('Extracted article text begins here, in the same reading flow as Zine for iOS.')
+  ).toBeVisible();
+
+  const aboutBox = await page.locator('.new-page-bookmark-view__about').boundingBox();
+  const actionsBox = await page.locator('.new-page-bookmark-view__actions').boundingBox();
+  const articleBox = await page.locator('.new-page-bookmark-view__article').boundingBox();
+  expect(aboutBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  expect(articleBox).not.toBeNull();
+  expect(aboutBox!.y).toBeLessThan(actionsBox!.y);
+  expect(articleBox!.y).toBeGreaterThan(actionsBox!.y);
 
   await page.goto('/library/people');
   await expect(page.getByText('Alice Example')).toBeVisible();
@@ -43,7 +59,7 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
   await expect(page.getByText('Interface Notes')).toBeVisible();
 
   await page.goto('/library/collections');
-  await expect(page.getByText('Design systems')).toBeVisible();
+  await expect(page.locator('.web-collection-tile').getByText('Design systems')).toBeVisible();
 
   await page.getByRole('link', { name: 'Settings' }).first().click();
   await expect(page).toHaveURL(/\/settings$/);

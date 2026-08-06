@@ -1,12 +1,17 @@
 export {
+  BrandColors,
   Colors,
   ContentColors,
+  CoolReadingScale,
   FilterChipPalette,
   IconSizes,
   Motion,
+  OrangeScale,
   ProviderColors,
   Radius,
+  SemanticColorRoles,
   Spacing,
+  StatusColors,
   Typography,
 } from './foundations';
 export type { ThemeColorName, ThemeColors, ThemeName } from './foundations';

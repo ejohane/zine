@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 const stories = [
+  'foundations-tokens-reference--reference',
   'layout-web-app-states--auth-sign-in',
   'layout-web-app-states--bookmark-selection',
   'layout-web-app-states--bookmark-empty',

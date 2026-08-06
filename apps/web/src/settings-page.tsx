@@ -1,16 +1,11 @@
 import {
   ChevronRight,
   Copy,
-  Home,
-  Inbox,
-  Library,
   LogOut,
   Mail,
   Newspaper,
   Podcast,
   Rss,
-  Search,
-  Settings,
   Sparkles,
   Trash2,
   Video,
@@ -18,11 +13,10 @@ import {
 } from 'lucide-react';
 import type { ApiTokenScope } from '@zine/shared/api-tokens';
 import { useMemo, useState, type FormEvent } from 'react';
-import { Link, NavLink } from 'react-router-dom';
 
-import { AppWordmark } from './app-wordmark';
-import { Badge, Button, LinkButton, Surface, cn } from './components';
+import { Badge, Button, LinkButton, Surface } from './components';
 import { MobileTabBar } from './components/mobile-tab-bar';
+import { WorkspaceSidebar } from './components/workspace-sidebar';
 import { sourceConfigs, supportedSources, type SubscriptionSource } from './lib/onboarding';
 import { usePwaState } from './lib/pwa';
 import { trpc, useAppSession, useAuthAvailability } from './lib/trpc';
@@ -412,81 +406,7 @@ export function SettingsPage() {
 
   return (
     <main className="new-page-screen">
-      <div className="new-page-sidebar">
-        <div className="new-page-sidebar__rail">
-          <div className="new-page-sidebar__rail-top">
-            <div className="new-page-sidebar__rail-header">
-              <Link to="/home" className="new-page-sidebar__brand" aria-label="Go to home">
-                <div className="new-page-sidebar__brand-icon">
-                  <AppWordmark compact />
-                </div>
-              </Link>
-            </div>
-
-            <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
-              <NavLink
-                to="/home"
-                end
-                className={({ isActive }) =>
-                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-                }
-                aria-label="Home"
-                title="Home"
-              >
-                <Home size={18} strokeWidth={2.15} />
-                <span>Home</span>
-              </NavLink>
-              <NavLink
-                to="/inbox"
-                className={({ isActive }) =>
-                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-                }
-                aria-label="Inbox"
-                title="Inbox"
-              >
-                <Inbox size={18} strokeWidth={2.15} />
-                <span>Inbox</span>
-              </NavLink>
-              <NavLink
-                to="/search"
-                className={({ isActive }) =>
-                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-                }
-                aria-label="Search"
-                title="Search"
-              >
-                <Search size={18} strokeWidth={2.15} />
-                <span>Search</span>
-              </NavLink>
-              <NavLink
-                to="/library/bookmarks"
-                className={({ isActive }) =>
-                  cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-                }
-                aria-label="Library"
-                title="Library"
-              >
-                <Library size={18} strokeWidth={2.15} />
-                <span>Library</span>
-              </NavLink>
-            </nav>
-          </div>
-
-          <div className="new-page-sidebar__rail-footer">
-            <NavLink
-              to="/settings"
-              className={({ isActive }) =>
-                cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-              }
-              aria-label="Settings"
-              title="Settings"
-            >
-              <Settings size={18} strokeWidth={2.15} />
-              <span>Settings</span>
-            </NavLink>
-          </div>
-        </div>
-      </div>
+      <WorkspaceSidebar />
 
       <div className="new-page-inset">
         <header className="new-page-inset__header">

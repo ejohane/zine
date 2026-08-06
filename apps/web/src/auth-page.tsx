@@ -1,20 +1,22 @@
 import { SignIn, SignUp } from '@clerk/clerk-react';
 import { Navigate } from 'react-router-dom';
 
+import { Colors } from '@zine/design-system';
+
 import { AppWordmark } from './app-wordmark';
 import { useAuthAvailability } from './lib/trpc';
 
 const clerkAppearance = {
   variables: {
     colorBackground: 'transparent',
-    colorPrimary: '#111111',
-    colorText: '#111111',
-    colorTextSecondary: '#6B7280',
-    colorDanger: '#DC2626',
-    colorSuccess: '#059669',
-    colorInputBackground: '#F9FAFB',
-    colorInputText: '#111111',
-    colorNeutral: '#111111',
+    colorPrimary: Colors.light.accent,
+    colorText: Colors.light.textPrimary,
+    colorTextSecondary: Colors.light.textSecondary,
+    colorDanger: Colors.light.statusError,
+    colorSuccess: Colors.light.statusSuccess,
+    colorInputBackground: Colors.light.surfaceCanvas,
+    colorInputText: Colors.light.textPrimary,
+    colorNeutral: Colors.light.textPrimary,
     borderRadius: '0.75rem',
   },
 };

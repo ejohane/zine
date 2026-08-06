@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { CollectionSort, ContentType, Provider } from '@zine/shared';
+import { ContentType, Provider } from '@zine/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { renderRoute } from './test/render-router';
@@ -137,6 +137,10 @@ describe('BookmarksPage', () => {
     resetTrpcMocks();
     installDefaultBookmarkMocks();
     setViewportWidth(1280);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {}))
+    );
     Object.defineProperty(window.navigator, 'share', {
       configurable: true,
       value: undefined,
@@ -158,7 +162,7 @@ describe('BookmarksPage', () => {
       route: '/bookmarks',
       path: '/bookmarks',
     });
-    expect(loadingView.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(loadingView.getByRole('heading', { name: 'Library' })).toBeVisible();
     expect(loadingView.getByTestId('bookmark-detail-skeleton')).toBeVisible();
     expect(loadingView.getAllByTestId('bookmark-row-skeleton')).toHaveLength(6);
     expect(loadingView.getByRole('status', { hidden: true })).toHaveTextContent(
@@ -233,7 +237,7 @@ describe('BookmarksPage', () => {
       )
     ).toBe(false);
 
-    await user.click(screen.getByRole('button', { name: 'All' }));
+    await user.click(screen.getByRole('button', { name: 'Articles' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('location-search')).toHaveTextContent('');
@@ -244,38 +248,22 @@ describe('BookmarksPage', () => {
     expect(screen.getByText(podcastItem.title)).toBeVisible();
   });
 
-  test('saves the selected filter as a smart collection', async () => {
-    const user = userEvent.setup();
-
-    renderRoute(
-      <>
-        <BookmarksPage />
-        <LocationProbe />
-      </>,
-      {
-        route: '/bookmarks?contentType=video',
-        path: '/bookmarks',
-      }
-    );
-
-    await user.click(screen.getByRole('button', { name: /Save as collection/i }));
-
-    await waitFor(() => {
-      expect(mutationSpies.collectionsCreate).toHaveBeenCalledWith({
-        name: 'Videos collection',
-        description: null,
-        rules: {
-          contentTypes: [ContentType.VIDEO],
-          isFinished: false,
-        },
-        sort: CollectionSort.NEWEST_SAVED,
-      });
+  test('keeps the Library index as simple as the iOS content filter header', () => {
+    renderRoute(<BookmarksPage />, {
+      route: '/library/bookmarks',
+      path: '/library/bookmarks',
     });
 
-    await waitFor(() => {
-      expect(invalidateSpies.collectionsListInvalidate).toHaveBeenCalled();
-      expect(screen.getByTestId('location-search')).toHaveTextContent('?collection=collection-1');
-    });
+    const filters = screen.getByRole('group', { name: 'Content format filters' });
+    expect(
+      within(filters)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+    ).toEqual(['All', 'Articles', 'Podcasts', 'Videos', 'Posts']);
+    expect(screen.queryByRole('searchbox', { name: 'Search library' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
+    expect(screen.queryByText('Save as collection')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recently bookmarked')).not.toBeInTheDocument();
   });
 
   test('navigates to the settings page from the sidebar', async () => {
@@ -324,7 +312,7 @@ describe('BookmarksPage', () => {
       path: '/bookmarks',
     });
 
-    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Library' })).toBeVisible();
     expect(screen.getByText(articleItem.title)).toBeVisible();
     expect(screen.queryByText('Loading bookmarks')).not.toBeInTheDocument();
   });
@@ -464,6 +452,61 @@ describe('BookmarksPage', () => {
     expect(screen.queryByText('Use as a reference for future UI work.')).not.toBeInTheDocument();
     expect(screen.queryByText('Overall 91%')).not.toBeInTheDocument();
     expect(screen.queryByText('cloudflare · @cf/qwen/qwen3-30b-a3b-fp8')).not.toBeInTheDocument();
+  });
+
+  test('moves the article summary into the header and renders the extracted reader body below the action rule', async () => {
+    const webArticle = createLibraryItem({
+      ...articleItem,
+      provider: Provider.WEB,
+      canonicalUrl: 'https://zine.example/read/stable-component-apis',
+    });
+    hookSpies.itemsLibraryUseQuery.mockImplementation(() => ({
+      data: { items: [webArticle] },
+      isLoading: false,
+      error: null,
+    }));
+    hookSpies.itemsGetUseQuery.mockImplementation(() => ({
+      data: webArticle,
+      isLoading: false,
+      error: null,
+    }));
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          content:
+            '<p>The extracted opening paragraph.</p><a href="/next">Continue reading</a><img src="/cover.jpg" alt="Reader cover" onerror="alert(1)"><script>bad()</script>',
+          articleBody: { availability: 'AVAILABLE' },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+
+    const { container } = renderRoute(<BookmarksPage />, {
+      route: `/bookmarks/${webArticle.id}`,
+      path: '/bookmarks/:bookmarkId',
+    });
+
+    expect(await screen.findByText('The extracted opening paragraph.')).toBeVisible();
+
+    const about = container.querySelector('.new-page-bookmark-view__about');
+    const actions = container.querySelector('.new-page-bookmark-view__actions');
+    const article = container.querySelector('.new-page-bookmark-view__article');
+    expect(about).not.toBeNull();
+    expect(actions).not.toBeNull();
+    expect(article).not.toBeNull();
+    expect(about!.compareDocumentPosition(actions!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(actions!.compareDocumentPosition(article!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    expect(screen.getByRole('link', { name: 'Continue reading' })).toHaveAttribute(
+      'href',
+      'https://zine.example/next'
+    );
+    expect(screen.getByRole('img', { name: 'Reader cover' })).not.toHaveAttribute('onerror');
+    expect(article!.querySelector('script')).toBeNull();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(`/api/v1/bookmarks/${webArticle.id}/article-content`),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   test('uses the mobile-complete green fill for finished bookmark icons in detail view', () => {
@@ -622,7 +665,7 @@ describe('BookmarksPage', () => {
       }
     );
 
-    expect(screen.getByRole('heading', { name: 'Bookmarks' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Library' })).toBeVisible();
     expect(screen.queryByText('Select a bookmark')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Current page location')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add bookmark' })).not.toBeInTheDocument();

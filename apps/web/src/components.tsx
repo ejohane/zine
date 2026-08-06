@@ -74,7 +74,7 @@ export function Surface({
   radius?: keyof typeof Radius;
   style?: CSSProperties;
 }) {
-  const borderColor = getSurfaceBorderColor(Colors.dark, tone, border);
+  const borderColor = getSurfaceBorderColor(Colors.light, tone, border);
 
   return (
     <section
@@ -84,7 +84,7 @@ export function Surface({
       )}
       style={{
         borderRadius: Radius[radius],
-        backgroundColor: getSurfaceBackgroundColor(Colors.dark, tone),
+        backgroundColor: getSurfaceBackgroundColor(Colors.light, tone),
         borderColor: borderColor ?? 'transparent',
         borderWidth: borderColor ? 1 : 0,
         ...style,

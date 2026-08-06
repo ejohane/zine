@@ -4,6 +4,7 @@ import { FaSpotify } from 'react-icons/fa';
 import { IoLogoYoutube, IoNewspaperOutline } from 'react-icons/io5';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
+import { BrandColors } from '@zine/design-system';
 import { Provider } from '@zine/shared';
 
 import { Button, EmptyState, cn } from './components';
@@ -32,20 +33,20 @@ const INTRO_STEP_SUMMARIES: Record<IntegrationStep, string> = {
 
 const INTRO_BRAND: Record<IntegrationStep, { bg: string; icon: ReactNode }> = {
   YOUTUBE: {
-    bg: '#FF0000',
-    icon: <IoLogoYoutube size={18} color="#FFFFFF" />,
+    bg: BrandColors.orange,
+    icon: <IoLogoYoutube size={18} color={BrandColors.black} />,
   },
   SPOTIFY: {
-    bg: '#1DB954',
-    icon: <FaSpotify size={18} color="#FFFFFF" />,
+    bg: BrandColors.orange,
+    icon: <FaSpotify size={18} color={BrandColors.black} />,
   },
   GMAIL: {
-    bg: '#1A73E8',
-    icon: <IoNewspaperOutline size={18} color="#FFFFFF" />,
+    bg: BrandColors.orange,
+    icon: <IoNewspaperOutline size={18} color={BrandColors.black} />,
   },
   RSS: {
-    bg: '#F59E0B',
-    icon: <Rss size={16} color="#FFFFFF" strokeWidth={2.5} />,
+    bg: BrandColors.orange,
+    icon: <Rss size={16} color={BrandColors.black} strokeWidth={2.5} />,
   },
 };
 
@@ -805,7 +806,7 @@ function GmailStep({
             aria-hidden="true"
             style={{ backgroundColor: INTRO_BRAND.GMAIL.bg }}
           >
-            <Mail size={22} color="#fff" />
+            <Mail size={22} color={BrandColors.black} />
           </span>
           <h2 className="wizard-connect__title">Scan for newsletters</h2>
           <p className="wizard-connect__description">

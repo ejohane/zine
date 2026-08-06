@@ -1,14 +1,19 @@
 import { describe, expect, test } from 'bun:test';
 
 import {
+  BrandColors,
   ButtonSpec,
   Colors,
+  CoolReadingScale,
   FilterChipPalette,
   FilterChipForegrounds,
   ItemCardFixtures,
   Motion,
+  OrangeScale,
   Radius,
+  SemanticColorRoles,
   Spacing,
+  StatusColors,
   Typography,
   createWebThemeVariables,
   getBadgeMetrics,
@@ -22,20 +27,59 @@ import {
 } from '../src/index';
 
 describe('design-system foundations', () => {
-  test('preserves the mobile dark token baseline', () => {
+  test('codifies the Zine brand and reading scales', () => {
+    expect(BrandColors).toEqual({ black: '#000000', orange: '#EF661F' });
+    expect(OrangeScale).toEqual({
+      50: '#FEF7F1',
+      100: '#FCEADD',
+      300: '#F3B181',
+      500: '#DF702F',
+      700: '#A94A1E',
+      950: '#3A170A',
+    });
+    expect(CoolReadingScale).toEqual({
+      50: '#F8F9FA',
+      100: '#F1F2F4',
+      300: '#D0D4DA',
+      500: '#828892',
+      800: '#26292D',
+      950: '#000000',
+    });
+  });
+
+  test('maps the cross-platform semantic roles into the existing theme contract', () => {
+    expect(SemanticColorRoles.light).toEqual({
+      canvas: '#F5F7F8',
+      surface: '#FFFFFF',
+      raised: '#E9EDF0',
+      primaryText: '#151719',
+      secondaryText: '#5D646C',
+      border: '#CFD4DA',
+      brandAccent: '#EF661F',
+      onAccent: '#000000',
+      inlineLink: '#B64012',
+    });
+    expect(SemanticColorRoles.dark.surface).toBe('#14171A');
+    expect(SemanticColorRoles.dark.inlineLink).toBe('#FFAD7C');
+    expect(StatusColors.danger).toEqual({ accent: '#B83A32', surface: '#F5E4E2' });
+
+    expect(Colors.light.surfaceCanvas).toBe(SemanticColorRoles.light.canvas);
+    expect(Colors.light.accent).toBe(BrandColors.orange);
+    expect(Colors.light.accentForeground).toBe(BrandColors.black);
     expect(Colors.dark.background).toBe('#000000');
-    expect(Colors.dark.surfaceElevated).toBe('#1A1A1A');
-    expect(Colors.dark.textSubheader).toBe('rgba(255, 255, 255, 0.82)');
-    expect(Colors.dark.statusErrorSurface).toBe('rgba(239, 68, 68, 0.16)');
+    expect(Colors.dark.surfaceElevated).toBe('#14171A');
+    expect(Colors.dark.textSubheader).toBe('#B2BAC2');
+    expect(Colors.dark.statusErrorSurface).toBe('#F5E4E2');
     expect(Spacing.lg).toBe(16);
     expect(Radius.lg).toBe(16);
     expect(Typography.headlineLarge.fontSize).toBe(28);
     expect(Motion.opacity.pressed).toBe(0.8);
   });
 
-  test('keeps the filter chip palette aligned with mobile semantics', () => {
-    expect(FilterChipPalette.article.accent).toBe('#3B82F6');
-    expect(FilterChipPalette.video.surface).toBe('rgba(255, 59, 48, 0.16)');
+  test('keeps filter chips on the shared orange selection treatment', () => {
+    expect(FilterChipPalette.article.accent).toBe(BrandColors.orange);
+    expect(FilterChipPalette.video.surface).toBe(BrandColors.orange);
+    expect(FilterChipForegrounds.post).toBe(BrandColors.black);
   });
 });
 
@@ -101,9 +145,9 @@ describe('design-system primitive specs', () => {
       foregroundColor: Colors.dark.textSubheader,
     });
     expect(getFilterChipPalette(Colors.dark, 'article', true)).toEqual({
-      backgroundColor: FilterChipPalette.article.surface,
-      borderColor: FilterChipPalette.article.accent,
-      foregroundColor: FilterChipForegrounds.article,
+      backgroundColor: Colors.dark.accent,
+      borderColor: Colors.dark.accent,
+      foregroundColor: Colors.dark.accentForeground,
     });
   });
 });
@@ -120,17 +164,25 @@ describe('design-system web adapter', () => {
   test('maps the shared tokens to shadcn-compatible CSS variables', () => {
     const variables = createWebThemeVariables();
 
-    expect(variables['--background']).toBe(Colors.dark.surfaceCanvas);
-    expect(variables['--foreground']).toBe(Colors.dark.textPrimary);
-    expect(variables['--card']).toBe(Colors.dark.surfaceElevated);
-    expect(variables['--primary']).toBe(Colors.dark.accent);
-    expect(variables['--primary-foreground']).toBe(Colors.dark.accentForeground);
-    expect(variables['--text-subheader']).toBe(Colors.dark.textSubheader);
-    expect(variables['--surface-raised']).toBe(Colors.dark.surfaceRaised);
+    expect(variables['--background']).toBe(Colors.light.surfaceCanvas);
+    expect(variables['--foreground']).toBe(Colors.light.textPrimary);
+    expect(variables['--card']).toBe(Colors.light.surfaceElevated);
+    expect(variables['--primary']).toBe(Colors.light.accent);
+    expect(variables['--primary-foreground']).toBe(Colors.light.accentForeground);
+    expect(variables['--text-subheader']).toBe(Colors.light.textSubheader);
+    expect(variables['--surface-raised']).toBe(Colors.light.surfaceRaised);
     expect(variables['--radius']).toBe(`${Radius.lg / 16}rem`);
     expect(variables['--filter-chip-article-accent']).toBe(FilterChipPalette.article.accent);
-    expect(variables['--filter-chip-article-foreground']).toBe('#BFDBFE');
+    expect(variables['--filter-chip-article-foreground']).toBe(BrandColors.black);
     expect(variables['--filter-chip-video-surface']).toBe(FilterChipPalette.video.surface);
-    expect(variables['--filter-chip-video-foreground']).toBe('#FCA5A5');
+    expect(variables['--filter-chip-video-foreground']).toBe(BrandColors.black);
+    expect(variables['--font-sans']).toContain('Inter Variable');
+    expect(variables['--font-editorial']).toBeUndefined();
+    expect(variables['--brand-orange']).toBe(BrandColors.orange);
+    expect(variables['--orange-300']).toBe(OrangeScale[300]);
+    expect(variables['--cool-reading-800']).toBe(CoolReadingScale[800]);
+    expect(variables['--workbench-paper']).toBe(SemanticColorRoles.light.canvas);
+    expect(variables['--workbench-sidebar']).toBe(BrandColors.black);
+    expect(variables['--workbench-sidebar-text-active']).toBe(SemanticColorRoles.dark.primaryText);
   });
 });
