@@ -132,6 +132,8 @@ struct ProviderSubscriptionsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .refreshable { await store.reload() }
     }
 
@@ -148,7 +150,7 @@ struct ProviderSubscriptionsView: View {
                 HStack {
                     ProgressView()
                     Text(store.connection?.isActive == true ? "Disconnecting…" : "Connecting…")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
             } else if store.connection?.isActive == true {
                 Button("Disconnect \(provider.providerTitle)", role: .destructive) {
@@ -177,8 +179,8 @@ struct ProviderSubscriptionsView: View {
 
     private var connectionColor: Color {
         if store.connection?.isActive == true { return .green }
-        if store.connection?.needsAttention == true { return .orange }
-        return .secondary
+        if store.connection?.needsAttention == true { return ZineTheme.brandAccent }
+        return ZineTheme.secondaryText
     }
 
     private func itemRow(_ item: ProviderSubscriptionItem) -> some View {
@@ -188,7 +190,7 @@ struct ProviderSubscriptionsView: View {
                     .resizable()
                     .scaledToFit()
                     .padding(8)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
             .frame(width: 44, height: 44)
             .clipShape(.circle)
@@ -198,7 +200,9 @@ struct ProviderSubscriptionsView: View {
                 Text(item.status?.title ?? "Available to add")
                     .font(.caption)
                     .foregroundStyle(
-                        item.status == .active || item.status == nil ? Color.secondary : Color.orange
+                        item.status == .active || item.status == nil
+                            ? ZineTheme.secondaryText
+                            : ZineTheme.brandAccent
                     )
             }
 

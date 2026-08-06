@@ -165,6 +165,11 @@
 ## Design System Workflow
 
 - New mobile UI belongs in `apps/ios` and should follow the existing native SwiftUI component, navigation, typography, color, accessibility, and state-management patterns there.
+- Before changing native iOS UI, read `apps/ios/DESIGN_SYSTEM.md`. Treat its palette and `apps/ios/ZineNative/Core/ZineTheme.swift` as the native color contract.
+- In supported native views, use `ZineTheme` semantic roles instead of raw hex/RGB values or direct `Color.primary`/`Color.secondary` styling. Add a semantic role, both light and dark values, and focused resolution tests when an established role cannot express the design.
+- Keep Zine orange (`#EF661F`) restrained to selection, primary actions, progress, links, and small brand moments. Keep cards and long-form reading surfaces neutral, and preserve the Zine logo exactly.
+- Verify material native color changes in both light and dark mode across the affected screen states. Changes to saved-content or reading UI must include Library, bookmark detail, and article-reader verification where applicable.
+- Content artwork, provider branding, contrast-driven media overlays, semantic status feedback, and third-party account UI may retain their established colors; keep these exceptions local and do not use them as alternate app palette logic.
 - The Expo-specific guidance below applies only to explicitly requested legacy `apps/mobile` work.
 
 - When editing deprecated Expo shared mobile UI, read:

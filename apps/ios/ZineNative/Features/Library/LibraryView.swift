@@ -75,6 +75,7 @@ struct LibraryView: View {
                     )
                 }
         }
+        .zineScreenChrome()
         .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
             if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 store.reset()
@@ -105,7 +106,7 @@ struct LibraryView: View {
 
                 resultsList
             }
-            .background(Color(uiColor: .systemBackground))
+            .background(ZineTheme.canvas)
         }
     }
 
@@ -114,6 +115,8 @@ struct LibraryView: View {
             resultRows
         }
         .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .refreshable {
             await store.reload(query: query)
         }
@@ -184,6 +187,7 @@ struct LibraryView: View {
             BookmarkRow(bookmark: bookmark)
         }
         .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+        .listRowBackground(ZineTheme.canvas)
         .listRowSeparator(.hidden)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if !bookmark.isFinished {

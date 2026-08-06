@@ -61,6 +61,8 @@ struct JumpBackInListView: View {
                 resultRows
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
             .refreshable {
                 await store.reload(contentType: contentType)
             }
@@ -71,7 +73,8 @@ struct JumpBackInListView: View {
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
+        .foregroundStyle(ZineTheme.primaryText)
     }
 
     @ViewBuilder

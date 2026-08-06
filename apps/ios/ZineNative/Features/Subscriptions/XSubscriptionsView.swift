@@ -165,7 +165,7 @@ struct XSubscriptionsView: View {
                 }
 
                 if store.isUpdatingConnection {
-                    HStack { ProgressView(); Text("Updating connection…").foregroundStyle(.secondary) }
+                    HStack { ProgressView(); Text("Updating connection…").foregroundStyle(ZineTheme.secondaryText) }
                 } else if store.response?.connection?.isActive == true {
                     Button("Disconnect X", role: .destructive) {
                         showsDisconnectConfirmation = true
@@ -210,7 +210,7 @@ struct XSubscriptionsView: View {
                         }
                     }
                     if let error = store.response?.sync?.lastError, !error.isEmpty {
-                        Text(error).font(.caption).foregroundStyle(.orange)
+                        Text(error).font(.caption).foregroundStyle(ZineTheme.brandAccent)
                     }
                 } header: {
                     Text("Bookmark Sync")
@@ -227,6 +227,8 @@ struct XSubscriptionsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .refreshable { await store.reload() }
     }
 
@@ -238,8 +240,8 @@ struct XSubscriptionsView: View {
 
     private var connectionColor: Color {
         if store.response?.connection?.isActive == true { return .green }
-        if store.response?.connection?.needsAttention == true { return .orange }
-        return .secondary
+        if store.response?.connection?.needsAttention == true { return ZineTheme.brandAccent }
+        return ZineTheme.secondaryText
     }
 
     private var messageBinding: Binding<Bool> {

@@ -69,6 +69,8 @@ struct HomeSectionListView: View {
                 resultRows
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
             .refreshable {
                 await store.reload(contentType: contentType)
             }
@@ -79,7 +81,8 @@ struct HomeSectionListView: View {
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
+        .foregroundStyle(ZineTheme.primaryText)
     }
 
     @ViewBuilder

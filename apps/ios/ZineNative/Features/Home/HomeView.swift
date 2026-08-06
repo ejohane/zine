@@ -103,6 +103,7 @@ struct HomeView: View {
                     }
                 }
         }
+        .zineScreenChrome()
     }
 
     @ViewBuilder
@@ -139,6 +140,7 @@ struct HomeView: View {
                 .padding(.vertical, density == .compact ? 6 : 10)
                 .padding(.bottom, density == .compact ? 16 : 24)
             }
+            .background(ZineTheme.canvas)
             .refreshable {
                 async let home: Void = store.reload()
                 async let today: Void = peopleDailyStore.load()

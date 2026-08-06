@@ -69,6 +69,8 @@ struct SubscriptionsView: View {
                         Text("Connect accounts and choose what Zine should sync from each source.")
                     }
                 }
+                .scrollContentBackground(.hidden)
+                .background(ZineTheme.canvas)
                 .refreshable { await store.reload() }
             }
         }
@@ -78,6 +80,7 @@ struct SubscriptionsView: View {
             destination(for: source)
         }
         .task { await store.reload() }
+        .zineScreenChrome()
     }
 
     private var orderedSources: [SubscriptionSourceSummary] {
@@ -89,14 +92,14 @@ struct SubscriptionsView: View {
         HStack(spacing: 12) {
             Image(systemName: summary.provider.systemImage)
                 .font(.title3)
-                .foregroundStyle(summary.needsAttention ? .orange : .primary)
+                .foregroundStyle(summary.needsAttention ? ZineTheme.brandAccent : ZineTheme.primaryText)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(summary.provider.title)
                 Text(summary.statusText)
                     .font(.caption)
-                    .foregroundStyle(summary.needsAttention ? .orange : .secondary)
+                    .foregroundStyle(summary.needsAttention ? ZineTheme.brandAccent : ZineTheme.secondaryText)
             }
         }
         .padding(.vertical, 3)

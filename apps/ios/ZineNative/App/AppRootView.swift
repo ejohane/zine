@@ -81,7 +81,7 @@ private struct AuthenticatedAppView: View {
                     onExternalOpen: handleExternalOpen,
                     onHomeItemExternalOpen: handleHomeItemExternalOpen
                 )
-                .tint(Color.accentColor)
+                .tint(ZineTheme.brandAccent)
             }
 
             Tab("Library", systemImage: "books.vertical") {
@@ -92,12 +92,12 @@ private struct AuthenticatedAppView: View {
                     onContentChanged: markHomeChanged,
                     onExternalOpen: handleExternalOpen
                 )
-                .tint(Color.accentColor)
+                .tint(ZineTheme.brandAccent)
             }
 
             Tab("Settings", systemImage: "gearshape") {
                 AppSettingsView(client: client)
-                    .tint(Color.accentColor)
+                    .tint(ZineTheme.brandAccent)
             }
 
             Tab(role: .search) {
@@ -110,10 +110,11 @@ private struct AuthenticatedAppView: View {
                     onExternalOpen: handleExternalOpen
                 )
                 .searchable(text: $search, prompt: "Search your library")
-                .tint(Color.accentColor)
+                .tint(ZineTheme.brandAccent)
             }
         }
-        .tint(Color.primary)
+        .tint(ZineTheme.brandAccent)
+        .background(ZineTheme.canvas)
         .task(id: homeRevision) {
             async let home: Void = homeStore.reload()
             async let today: Void = peopleDailyStore.load()

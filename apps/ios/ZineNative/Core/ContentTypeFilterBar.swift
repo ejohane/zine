@@ -15,7 +15,7 @@ struct ContentTypeFilterHeader: View {
             ContentTypeFilterBar(selection: $selection)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
     }
 }
 
@@ -30,7 +30,7 @@ struct ContentTypeFilterBar: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityLabel("Content format filters")
     }
@@ -70,13 +70,13 @@ private struct ContentTypeFilterChip: View {
 
     var body: some View {
         chipButton
-            .background(Color(uiColor: .systemBackground), in: Capsule())
+            .background(isSelected ? ZineTheme.brandAccent : ZineTheme.surface, in: Capsule())
             .overlay {
                 Capsule()
                     .strokeBorder(
                         isSelected
-                            ? Color.accentColor.opacity(0.5)
-                            : Color.secondary.opacity(0.18),
+                            ? ZineTheme.brandAccent
+                            : ZineTheme.border,
                         lineWidth: 1
                     )
             }
@@ -95,7 +95,7 @@ private struct ContentTypeFilterChip: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
             }
-            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .foregroundStyle(isSelected ? ZineTheme.onAccent : ZineTheme.secondaryText)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Capsule())
@@ -106,7 +106,7 @@ private struct ContentTypeFilterChip: View {
 
 extension View {
     func solidContentTypeFilterChrome() -> some View {
-        toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+        toolbarBackground(ZineTheme.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
     }
 }

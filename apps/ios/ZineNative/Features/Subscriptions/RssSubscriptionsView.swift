@@ -209,6 +209,8 @@ struct RssSubscriptionsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .refreshable { await store.reload() }
     }
 
@@ -219,7 +221,7 @@ struct RssSubscriptionsView: View {
                     .resizable()
                     .scaledToFit()
                     .padding(10)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(ZineTheme.tertiaryText)
             }
             .frame(width: 44, height: 44)
             .clipShape(.circle)
@@ -228,7 +230,9 @@ struct RssSubscriptionsView: View {
                 Text(feed.title).lineLimit(2)
                 Text(feed.status.title)
                     .font(.caption)
-                    .foregroundStyle(feed.status == .active ? Color.secondary : Color.orange)
+                    .foregroundStyle(
+                        feed.status == .active ? ZineTheme.secondaryText : ZineTheme.brandAccent
+                    )
             }
 
             Spacer()

@@ -71,14 +71,14 @@ struct EditorialLabView: View {
                         Text("EXPERIMENT")
                             .font(.caption2.weight(.bold))
                             .tracking(1)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                         Text(experiment.title)
                             .font(.headline)
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(ZineTheme.primaryText)
                     }
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
                 .contentShape(.rect)
             }
@@ -95,7 +95,11 @@ struct EditorialLabView: View {
                 Text(experiment.status.title.uppercased())
                     .font(.caption2.weight(.bold))
                     .tracking(0.7)
-                    .foregroundStyle(experiment.status == .readyForReview ? Color.accentColor : .secondary)
+                    .foregroundStyle(
+                        experiment.status == .readyForReview
+                            ? ZineTheme.brandAccent
+                            : ZineTheme.secondaryText
+                    )
             }
 
             LabBriefItem(title: "Hypothesis", text: experiment.hypothesis)
@@ -122,39 +126,43 @@ struct EditorialLabView: View {
                             .frame(width: 34, height: 34)
                             .background(
                                 store.selectedVariantID == variant.id
-                                    ? Color.accentColor
-                                    : Color.secondary.opacity(0.12),
+                                    ? ZineTheme.brandAccent
+                                    : ZineTheme.raised,
                                 in: Circle()
                             )
-                            .foregroundStyle(store.selectedVariantID == variant.id ? .white : .primary)
+                            .foregroundStyle(
+                                store.selectedVariantID == variant.id
+                                    ? ZineTheme.onAccent
+                                    : ZineTheme.primaryText
+                            )
 
                         VStack(alignment: .leading, spacing: 5) {
                             Text(variant.name)
                                 .font(.headline)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(ZineTheme.primaryText)
                             Text(variant.description)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                             Text(variant.headline)
                                 .font(.subheadline.weight(.medium))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(ZineTheme.primaryText)
                             Text("Quality \(variant.qualityScore, specifier: "%.1f")")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                         }
                         Spacer(minLength: 0)
                         if store.selectedVariantID == variant.id {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(ZineTheme.brandAccent)
                         }
                     }
                     .padding(16)
-                    .background(Color.secondary.opacity(0.07), in: .rect(cornerRadius: 18))
+                    .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
                     .overlay {
                         RoundedRectangle(cornerRadius: 18)
                             .stroke(
                                 store.selectedVariantID == variant.id
-                                    ? Color.accentColor.opacity(0.7)
+                                    ? ZineTheme.brandAccent.opacity(0.7)
                                     : .clear,
                                 lineWidth: 1.5
                             )
@@ -195,7 +203,7 @@ struct EditorialLabView: View {
                 .font(.title3.bold())
             Text("This saves your judgment. It never publishes a winner automatically.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
 
             HStack(spacing: 8) {
                 ForEach(EditorialExperimentPreference.allCases) { option in
@@ -203,7 +211,9 @@ struct EditorialLabView: View {
                         store.setPreference(option)
                     }
                     .buttonStyle(.bordered)
-                    .tint(store.preference == option ? Color.accentColor : .secondary)
+                    .tint(
+                        store.preference == option ? ZineTheme.brandAccent : ZineTheme.secondaryText
+                    )
                     .fontWeight(store.preference == option ? .semibold : .regular)
                     .frame(maxWidth: .infinity)
                 }
@@ -217,7 +227,7 @@ struct EditorialLabView: View {
             ))
             .frame(minHeight: 110)
             .padding(10)
-            .background(Color.secondary.opacity(0.07), in: .rect(cornerRadius: 14))
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 14))
             .accessibilityLabel("Experiment decision notes")
 
             Button {
@@ -251,13 +261,13 @@ struct EditorialLabView: View {
             Text("NEXT")
                 .font(.caption2.bold())
                 .tracking(1)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
             Text(experiment.nextAction)
                 .font(.subheadline)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondary.opacity(0.07), in: .rect(cornerRadius: 16))
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 16))
     }
 }
 
@@ -270,7 +280,7 @@ private struct LabBriefItem: View {
             Text(title.uppercased())
                 .font(.caption2.bold())
                 .tracking(1)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
             Text(text)
                 .font(.body)
         }
@@ -286,7 +296,7 @@ private struct LabBulletList: View {
             Text(title.uppercased())
                 .font(.caption2.bold())
                 .tracking(1)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
             ForEach(items, id: \.self) { item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("•")

@@ -199,7 +199,7 @@ struct BookmarkDetailView: View {
             let heroHeight = heroHeight(in: viewport.size)
 
             ZStack {
-                Color(uiColor: .systemBackground)
+                ZineTheme.canvas
                     .ignoresSafeArea()
 
                 ScrollView {
@@ -210,7 +210,7 @@ struct BookmarkDetailView: View {
                                 minHeight: max(viewport.size.height - heroHeight, 0),
                                 alignment: .top
                             )
-                            .background(Color(uiColor: .systemBackground))
+                            .background(ZineTheme.canvas)
                     }
                 }
                 .coordinateSpace(name: "bookmarkDetailScroll")
@@ -251,7 +251,7 @@ struct BookmarkDetailView: View {
             if let summary = content.summary, !summary.isEmpty {
                 Text(summary)
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
 
             if !content.tags.isEmpty {
@@ -262,7 +262,7 @@ struct BookmarkDetailView: View {
                                 .font(.caption)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
-                                .background(.secondary.opacity(0.12), in: .capsule)
+                                .background(ZineTheme.raised, in: .capsule)
                         }
                     }
                 }
@@ -323,8 +323,8 @@ struct BookmarkDetailView: View {
                             width: ProviderOpenButton.controlSize,
                             height: ProviderOpenButton.controlSize
                         )
-                        .background(Color("AccentColor"), in: Circle())
-                        .foregroundStyle(.white)
+                        .background(ZineTheme.brandAccent, in: Circle())
+                        .foregroundStyle(ZineTheme.onAccent)
                         .accessibilityHidden(true)
                 }
                 .buttonStyle(.plain)
@@ -369,7 +369,7 @@ struct BookmarkDetailView: View {
                 .accessibilityLabel("Retry loading bookmark actions")
             }
 
-            actionIcon(systemName: "tag", color: .secondary.opacity(0.45))
+            actionIcon(systemName: "tag", color: ZineTheme.secondaryText.opacity(0.45))
                 .accessibilityHidden(true)
         }
     }
@@ -380,7 +380,7 @@ struct BookmarkDetailView: View {
         } label: {
             actionIcon(
                 systemName: isBookmarked ? "bookmark.fill" : "bookmark",
-                color: isBookmarked ? .primary : .secondary
+                color: isBookmarked ? ZineTheme.primaryText : ZineTheme.secondaryText
             )
             .contentTransition(.symbolEffect(.replace))
         }
@@ -400,7 +400,7 @@ struct BookmarkDetailView: View {
                 systemName: isFinished
                     ? "checkmark.circle.fill"
                     : "checkmark.circle",
-                color: isFinished ? .green : .secondary
+                color: isFinished ? .green : ZineTheme.secondaryText
             )
         }
         .buttonStyle(.plain)
@@ -510,12 +510,12 @@ struct BookmarkDetailView: View {
 
             Text(content.creator)
                 .font(.headline)
-                .foregroundStyle(.primary)
+                .foregroundStyle(ZineTheme.primaryText)
 
             if showsDisclosure {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
         .accessibilityElement(children: .combine)
@@ -550,7 +550,7 @@ struct BookmarkDetailView: View {
 
     private var heroBase: some View {
         ZStack {
-            Color(uiColor: .systemBackground)
+            ZineTheme.canvas
 
             heroImage
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -572,10 +572,10 @@ struct BookmarkDetailView: View {
             targetSize: CGSize(width: 430, height: 320)
         ) {
             ZStack {
-                Color.secondary.opacity(0.12)
+                ZineTheme.raised
                 Image(systemName: content.contentType.systemImage)
                     .font(.system(size: 48))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
     }
@@ -601,7 +601,7 @@ struct BookmarkDetailView: View {
             }
         }
         .font(.subheadline)
-        .foregroundStyle(Color.primary.opacity(0.72))
+        .foregroundStyle(ZineTheme.primaryText.opacity(0.72))
     }
 
     private func hydrateBookmark() async {
