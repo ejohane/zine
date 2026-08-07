@@ -5,22 +5,26 @@ struct HomeSectionListView: View {
     let client: APIClient
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
+    let tabReselection: Int
 
     @State private var store: HomeSectionListStore
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
+    @State private var isVisible = false
     @Namespace private var bookmarkTransition
 
     init(
         route: HomeSectionRoute,
         client: APIClient,
         onContentChanged: @escaping () -> Void = {},
-        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
+        tabReselection: Int = 0
     ) {
         self.route = route
         self.client = client
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
+        self.tabReselection = tabReselection
         _store = State(initialValue: HomeSectionListStore(route: route, client: client))
         _contentType = State(initialValue: route.initialContentTypeFilter)
     }
@@ -71,39 +75,62 @@ struct HomeSectionListView: View {
     }
 
     private var content: some View {
-        List {
-            CollapsingListTitle(
-                title: route.title,
-                progress: titleCollapseProgress
-            )
+        ScrollViewReader { proxy in
+            List {
+                CollapsingListTitle(
+                    title: route.title,
+                    progress: titleCollapseProgress
+                )
+                .id(ScrollAnchor.top)
 
-            Section {
-                resultRows
-            } header: {
-                ContentTypeFilterBar(selection: $contentType)
-                    .textCase(nil)
-                    .listRowInsets(EdgeInsets())
+                Section {
+                    resultRows
+                } header: {
+                    ContentTypeFilterBar(selection: $contentType)
+                        .textCase(nil)
+                        .listRowInsets(EdgeInsets())
+                }
             }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            let offset = geometry.contentOffset.y + geometry.contentInsets.top
-            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-        } action: { _, progress in
-            titleCollapseProgress = progress
-        }
-        .refreshable {
-            await store.reload(contentType: contentType)
-        }
-        .overlay(alignment: .bottom) {
-            if store.isLoadingMore {
-                ProgressView()
-                    .padding()
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
             }
+            .onChange(of: tabReselection) {
+                handleTabReselection(using: proxy)
+            }
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
+            .refreshable {
+                await store.reload(contentType: contentType)
+            }
+            .overlay(alignment: .bottom) {
+                if store.isLoadingMore {
+                    ProgressView()
+                        .padding()
+                }
+            }
+            .foregroundStyle(ZineTheme.primaryText)
         }
-        .foregroundStyle(ZineTheme.primaryText)
+    }
+
+    private enum ScrollAnchor {
+        static let top = "home-section-list-top"
+    }
+
+    private func handleTabReselection(using proxy: ScrollViewProxy) {
+        FilteredListTabAction.perform(
+            isVisible: isVisible,
+            collapseProgress: titleCollapseProgress,
+            hasActiveFilter: contentType != nil,
+            proxy: proxy,
+            topID: ScrollAnchor.top,
+            resetFilter: { contentType = nil }
+        )
     }
 
     @ViewBuilder
