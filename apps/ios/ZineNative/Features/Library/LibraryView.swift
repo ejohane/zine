@@ -11,6 +11,7 @@ struct LibraryView: View {
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
 
     init(
         client: APIClient,
@@ -52,14 +53,21 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(isSearchMode ? "Search" : "")
+                .navigationTitle(isSearchMode ? "Search" : "Library")
                 .navigationBarTitleDisplayMode(.inline)
                 .solidContentTypeFilterChrome()
-                .toolbar(isSearchMode ? .visible : .hidden, for: .navigationBar)
+                .toolbar(.visible, for: .navigationBar)
                 .toolbar {
                     if isSearchMode {
                         ToolbarItem(placement: .topBarLeading) {
                             filterMenu
+                        }
+                    } else {
+                        ToolbarItem(placement: .principal) {
+                            CollapsedListTitle(
+                                title: "Library",
+                                progress: titleCollapseProgress
+                            )
                         }
                     }
                 }
@@ -98,25 +106,37 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isSearchMode {
-            resultsList
-        } else {
-            VStack(spacing: 0) {
-                ContentTypeFilterHeader(title: "Library", selection: $contentType)
-
-                resultsList
-            }
-            .background(ZineTheme.canvas)
-        }
+        resultsList
     }
 
     private var resultsList: some View {
         List {
-            resultRows
+            if isSearchMode {
+                resultRows
+            } else {
+                CollapsingListTitle(
+                    title: "Library",
+                    progress: titleCollapseProgress
+                )
+
+                Section {
+                    resultRows
+                } header: {
+                    ContentTypeFilterBar(selection: $contentType)
+                        .textCase(nil)
+                        .listRowInsets(EdgeInsets())
+                }
+            }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(ZineTheme.canvas)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let offset = geometry.contentOffset.y + geometry.contentInsets.top
+            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+        } action: { _, progress in
+            titleCollapseProgress = progress
+        }
         .refreshable {
             await store.reload(query: query)
         }

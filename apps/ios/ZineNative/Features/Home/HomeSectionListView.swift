@@ -8,6 +8,7 @@ struct HomeSectionListView: View {
 
     @State private var store: HomeSectionListStore
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
     @Namespace private var bookmarkTransition
 
     init(
@@ -29,6 +30,15 @@ struct HomeSectionListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .solidContentTypeFilterChrome()
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CollapsedListTitle(
+                        title: route.title,
+                        progress: titleCollapseProgress
+                    )
+                }
+            }
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -60,28 +70,39 @@ struct HomeSectionListView: View {
             }
     }
 
-    @ViewBuilder
     private var content: some View {
-        VStack(spacing: 0) {
-            ContentTypeFilterHeader(title: route.title, selection: $contentType)
+        List {
+            CollapsingListTitle(
+                title: route.title,
+                progress: titleCollapseProgress
+            )
 
-            List {
+            Section {
                 resultRows
-            }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(ZineTheme.canvas)
-            .refreshable {
-                await store.reload(contentType: contentType)
-            }
-            .overlay(alignment: .bottom) {
-                if store.isLoadingMore {
-                    ProgressView()
-                        .padding()
-                }
+            } header: {
+                ContentTypeFilterBar(selection: $contentType)
+                    .textCase(nil)
+                    .listRowInsets(EdgeInsets())
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(ZineTheme.canvas)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let offset = geometry.contentOffset.y + geometry.contentInsets.top
+            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+        } action: { _, progress in
+            titleCollapseProgress = progress
+        }
+        .refreshable {
+            await store.reload(contentType: contentType)
+        }
+        .overlay(alignment: .bottom) {
+            if store.isLoadingMore {
+                ProgressView()
+                    .padding()
+            }
+        }
         .foregroundStyle(ZineTheme.primaryText)
     }
 

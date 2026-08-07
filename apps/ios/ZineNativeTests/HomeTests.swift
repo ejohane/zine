@@ -259,6 +259,12 @@ final class HomeTests: XCTestCase {
         )
     }
 
+    func testContentTypeTitleCollapseProgressClampsScrollOffset() {
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: -20), 0)
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 22), 0.5)
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 80), 1)
+    }
+
     func testHomeItemProvidesImmediateBookmarkDetailContent() {
         let item = makeHomeItem(id: "instant", minutes: 12)
         let content = BookmarkDetailContent(item: item)
