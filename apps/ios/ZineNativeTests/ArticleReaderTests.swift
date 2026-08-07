@@ -162,6 +162,12 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertEqual(tracker.update(scrollOffset: 66), 42)
     }
 
+    func testEndActionsRevealOnlyAtTheArticleBottom() {
+        XCTAssertFalse(ArticleReaderEndActions.shouldReveal(for: 0.98))
+        XCTAssertTrue(ArticleReaderEndActions.shouldReveal(for: 0.985))
+        XCTAssertTrue(ArticleReaderEndActions.shouldReveal(for: 1))
+    }
+
     func testCachePersistsOnlyReadableDocumentsPerUser() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "article-cache-\(UUID().uuidString)", directoryHint: .isDirectory)
@@ -229,6 +235,66 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertEqual(ArticleReaderURLProtocol.requests.map(\.httpMethod), ["GET", "POST"])
     }
 
+    @MainActor
+    func testStoreTogglesCompletionThroughTheBookmarkEndpoint() async throws {
+        let client = Self.client { request in
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            XCTAssertEqual(request.url?.path, "/api/v1/bookmarks/bookmark-1")
+            let body = try XCTUnwrap(Self.bodyData(from: request))
+            let payload = try JSONDecoder().decode([String: Bool].self, from: body)
+            XCTAssertEqual(payload, ["isFinished": true])
+            return (200, """
+                {
+                  "bookmark":{
+                    "id":"bookmark-1","itemId":"item-1","isFinished":true,
+                    "finishedAt":"2026-08-07T12:00:00Z"
+                  }
+                }
+                """)
+        }
+        let store = ArticleReaderStore(metadata: Self.metadata(), client: client)
+
+        let result = await store.toggleFinished()
+
+        XCTAssertEqual(result, true)
+        XCTAssertTrue(store.isFinished)
+    }
+
+    func testTagEndpointsListAndReplaceArticleTags() async throws {
+        let client = Self.client { request in
+            switch request.httpMethod {
+            case "GET":
+                XCTAssertEqual(request.url?.path, "/api/v1/tags")
+                return (200, #"{"tags":[{"id":"tag-1","name":"Design"}]}"#)
+            case "PUT":
+                XCTAssertEqual(request.url?.path, "/api/v1/bookmarks/bookmark-1/tags")
+                let body = try XCTUnwrap(Self.bodyData(from: request))
+                let payload = try JSONDecoder().decode([String: [String]].self, from: body)
+                XCTAssertEqual(payload, ["tags": ["Design", "Reading"]])
+                return (200, """
+                    {
+                      "success":true,
+                      "tags":[
+                        {"id":"tag-1","name":"Design"},
+                        {"id":"tag-2","name":"Reading"}
+                      ]
+                    }
+                    """)
+            default:
+                return (405, "{}")
+            }
+        }
+
+        let available = try await client.listTags()
+        let saved = try await client.setTags(
+            id: "bookmark-1",
+            tags: ["Design", "Reading"]
+        )
+
+        XCTAssertEqual(available.map(\.name), ["Design"])
+        XCTAssertEqual(saved.map(\.name), ["Design", "Reading"])
+    }
+
     private static func metadata(
         title: String = "A dependable reader",
         creatorImageURL: URL? = nil,
@@ -246,7 +312,8 @@ final class ArticleReaderTests: XCTestCase {
             canonicalURL: URL(string: "https://example.com/article")!,
             readingTimeMinutes: 4,
             initialProgress: initialProgress,
-            isFinished: false
+            isFinished: false,
+            tags: []
         )
     }
 
@@ -262,6 +329,25 @@ final class ArticleReaderTests: XCTestCase {
             tokenProvider: { "test-token" },
             session: URLSession(configuration: configuration)
         )
+    }
+
+    private static func bodyData(from request: URLRequest) -> Data? {
+        if let body = request.httpBody {
+            return body
+        }
+        guard let stream = request.httpBodyStream else { return nil }
+
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while true {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
     }
 
     private static let availableJSON = """

@@ -88,7 +88,7 @@ struct Bookmark: Codable, Hashable, Identifiable {
     var progress: BookmarkProgress?
     var isFinished: Bool
     var finishedAt: String?
-    let tags: [BookmarkTag]
+    var tags: [BookmarkTag]
 
     var consumptionLabel: String? {
         if let readingTimeMinutes {
