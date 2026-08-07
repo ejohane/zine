@@ -1,21 +1,40 @@
 import SwiftUI
 
-struct ContentTypeFilterHeader: View {
+struct CollapsingListTitle: View {
     let title: String
-    @Binding var selection: ContentType?
+    let progress: CGFloat
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.largeTitle.weight(.bold))
-                .padding(.horizontal, 18)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
+        Text(title)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(ZineTheme.primaryText)
+            .scaleEffect(1 - (progress * 0.12), anchor: .leading)
+            .opacity(1 - progress)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
+            .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
+            .listRowBackground(ZineTheme.canvas)
+            .listRowSeparator(.hidden)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityHidden(progress >= 0.5)
+    }
 
-            ContentTypeFilterBar(selection: $selection)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ZineTheme.canvas)
+    static func collapseProgress(scrollOffset: CGFloat) -> CGFloat {
+        min(max(scrollOffset / 44, 0), 1)
+    }
+}
+
+struct CollapsedListTitle: View {
+    let title: String
+    let progress: CGFloat
+
+    var body: some View {
+        Text(title)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(ZineTheme.primaryText)
+            .opacity(progress)
+            .accessibilityHidden(progress < 0.5)
     }
 }
 

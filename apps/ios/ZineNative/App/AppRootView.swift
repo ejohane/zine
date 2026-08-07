@@ -34,6 +34,13 @@ struct AppRootView: View {
 }
 
 private struct AuthenticatedAppView: View {
+    private enum AppTab: Hashable {
+        case home
+        case library
+        case settings
+        case search
+    }
+
     @Environment(\.scenePhase) private var scenePhase
 
     private let client: APIClient
@@ -42,6 +49,9 @@ private struct AuthenticatedAppView: View {
     @State private var homeStore: HomeStore
     @State private var peopleDailyStore: PeopleDailyStore
     @State private var search = ""
+    @State private var selectedTab = AppTab.home
+    @State private var homeTabReselection = 0
+    @State private var libraryTabReselection = 0
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
     @State private var externalOpenEvent: ExternalBookmarkOpenEvent?
@@ -70,8 +80,8 @@ private struct AuthenticatedAppView: View {
     }
 
     var body: some View {
-        TabView {
-            Tab("Home", systemImage: "house") {
+        TabView(selection: tabSelection) {
+            Tab("Home", systemImage: "house", value: AppTab.home) {
                 HomeView(
                     client: client,
                     store: homeStore,
@@ -79,28 +89,30 @@ private struct AuthenticatedAppView: View {
                     density: .compact,
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen,
-                    onHomeItemExternalOpen: handleHomeItemExternalOpen
+                    onHomeItemExternalOpen: handleHomeItemExternalOpen,
+                    tabReselection: homeTabReselection
                 )
                 .tint(ZineTheme.brandAccent)
             }
 
-            Tab("Library", systemImage: "books.vertical") {
+            Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
                 LibraryView(
                     client: client,
                     cache: libraryCache,
                     refreshRevision: libraryRevision,
                     onContentChanged: markHomeChanged,
-                    onExternalOpen: handleExternalOpen
+                    onExternalOpen: handleExternalOpen,
+                    tabReselection: libraryTabReselection
                 )
                 .tint(ZineTheme.brandAccent)
             }
 
-            Tab("Settings", systemImage: "gearshape") {
+            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
                 AppSettingsView(client: client)
                     .tint(ZineTheme.brandAccent)
             }
 
-            Tab(role: .search) {
+            Tab(value: AppTab.search, role: .search) {
                 LibraryView(
                     client: client,
                     cache: libraryCache,
@@ -141,6 +153,30 @@ private struct AuthenticatedAppView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(externalOpenError ?? "Please try again.")
+        }
+    }
+
+    private var tabSelection: Binding<AppTab> {
+        Binding(
+            get: { selectedTab },
+            set: { newTab in
+                if newTab == selectedTab {
+                    handleTabReselection(newTab)
+                } else {
+                    selectedTab = newTab
+                }
+            }
+        )
+    }
+
+    private func handleTabReselection(_ tab: AppTab) {
+        switch tab {
+        case .home:
+            homeTabReselection += 1
+        case .library:
+            libraryTabReselection += 1
+        case .settings, .search:
+            break
         }
     }
 

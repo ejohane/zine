@@ -6,11 +6,14 @@ struct LibraryView: View {
     let refreshRevision: Int
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
+    let tabReselection: Int
 
     @State private var store: LibraryStore
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
+    @State private var isVisible = false
 
     init(
         client: APIClient,
@@ -18,13 +21,15 @@ struct LibraryView: View {
         searchText: Binding<String>? = nil,
         refreshRevision: Int = 0,
         onContentChanged: @escaping () -> Void = {},
-        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
+        tabReselection: Int = 0
     ) {
         self.client = client
         self.searchText = searchText
         self.refreshRevision = refreshRevision
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
+        self.tabReselection = tabReselection
         _store = State(initialValue: LibraryStore(
             client: client,
             cache: cache,
@@ -52,14 +57,21 @@ struct LibraryView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(isSearchMode ? "Search" : "")
+                .navigationTitle(isSearchMode ? "Search" : "Library")
                 .navigationBarTitleDisplayMode(.inline)
                 .solidContentTypeFilterChrome()
-                .toolbar(isSearchMode ? .visible : .hidden, for: .navigationBar)
+                .toolbar(.visible, for: .navigationBar)
                 .toolbar {
                     if isSearchMode {
                         ToolbarItem(placement: .topBarLeading) {
                             filterMenu
+                        }
+                    } else {
+                        ToolbarItem(placement: .principal) {
+                            CollapsedListTitle(
+                                title: "Library",
+                                progress: titleCollapseProgress
+                            )
                         }
                     }
                 }
@@ -98,34 +110,69 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var content: some View {
-        if isSearchMode {
-            resultsList
-        } else {
-            VStack(spacing: 0) {
-                ContentTypeFilterHeader(title: "Library", selection: $contentType)
-
-                resultsList
-            }
-            .background(ZineTheme.canvas)
-        }
+        resultsList
     }
 
     private var resultsList: some View {
-        List {
-            resultRows
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
-        .refreshable {
-            await store.reload(query: query)
-        }
-        .overlay(alignment: .bottom) {
-            if store.isLoadingMore {
-                ProgressView()
-                    .padding()
+        ScrollViewReader { proxy in
+            List {
+                if isSearchMode {
+                    resultRows
+                } else {
+                    CollapsingListTitle(
+                        title: "Library",
+                        progress: titleCollapseProgress
+                    )
+                    .id(ScrollAnchor.top)
+
+                    Section {
+                        resultRows
+                    } header: {
+                        ContentTypeFilterBar(selection: $contentType)
+                            .textCase(nil)
+                            .listRowInsets(EdgeInsets())
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+            }
+            .onChange(of: tabReselection) {
+                handleTabReselection(using: proxy)
+            }
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
+            .refreshable {
+                await store.reload(query: query)
+            }
+            .overlay(alignment: .bottom) {
+                if store.isLoadingMore {
+                    ProgressView()
+                        .padding()
+                }
             }
         }
+    }
+
+    private enum ScrollAnchor {
+        static let top = "library-list-top"
+    }
+
+    private func handleTabReselection(using proxy: ScrollViewProxy) {
+        FilteredListTabAction.perform(
+            isVisible: isVisible && !isSearchMode,
+            collapseProgress: titleCollapseProgress,
+            hasActiveFilter: contentType != nil,
+            proxy: proxy,
+            topID: ScrollAnchor.top,
+            resetFilter: { contentType = nil }
+        )
     }
 
     @ViewBuilder

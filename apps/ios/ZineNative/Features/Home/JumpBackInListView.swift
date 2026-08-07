@@ -4,19 +4,24 @@ struct JumpBackInListView: View {
     let client: APIClient
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
+    let tabReselection: Int
 
     @State private var store: JumpBackInListStore
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
+    @State private var isVisible = false
     @Namespace private var bookmarkTransition
 
     init(
         client: APIClient,
         onContentChanged: @escaping () -> Void = {},
-        onExternalOpen: @escaping (Bookmark) -> Void = { _ in }
+        onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
+        tabReselection: Int = 0
     ) {
         self.client = client
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
+        self.tabReselection = tabReselection
         _store = State(initialValue: JumpBackInListStore(client: client))
     }
 
@@ -25,6 +30,15 @@ struct JumpBackInListView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .solidContentTypeFilterChrome()
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CollapsedListTitle(
+                        title: "Jump Back In",
+                        progress: titleCollapseProgress
+                    )
+                }
+            }
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -52,17 +66,37 @@ struct JumpBackInListView: View {
             }
     }
 
-    @ViewBuilder
     private var content: some View {
-        VStack(spacing: 0) {
-            ContentTypeFilterHeader(title: "Jump Back In", selection: $contentType)
-
+        ScrollViewReader { proxy in
             List {
-                resultRows
+                CollapsingListTitle(
+                    title: "Jump Back In",
+                    progress: titleCollapseProgress
+                )
+                .id(ScrollAnchor.top)
+
+                Section {
+                    resultRows
+                } header: {
+                    ContentTypeFilterBar(selection: $contentType)
+                        .textCase(nil)
+                        .listRowInsets(EdgeInsets())
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(ZineTheme.canvas)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+            }
+            .onChange(of: tabReselection) {
+                handleTabReselection(using: proxy)
+            }
+            .onAppear { isVisible = true }
+            .onDisappear { isVisible = false }
             .refreshable {
                 await store.reload(contentType: contentType)
             }
@@ -72,9 +106,23 @@ struct JumpBackInListView: View {
                         .padding()
                 }
             }
+            .foregroundStyle(ZineTheme.primaryText)
         }
-        .background(ZineTheme.canvas)
-        .foregroundStyle(ZineTheme.primaryText)
+    }
+
+    private enum ScrollAnchor {
+        static let top = "jump-back-in-list-top"
+    }
+
+    private func handleTabReselection(using proxy: ScrollViewProxy) {
+        FilteredListTabAction.perform(
+            isVisible: isVisible,
+            collapseProgress: titleCollapseProgress,
+            hasActiveFilter: contentType != nil,
+            proxy: proxy,
+            topID: ScrollAnchor.top,
+            resetFilter: { contentType = nil }
+        )
     }
 
     @ViewBuilder

@@ -45,6 +45,7 @@ struct HomeView: View {
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
+    let tabReselection: Int
 
     @Namespace private var bookmarkTransition
 
@@ -56,7 +57,8 @@ struct HomeView: View {
         title: String = "Home",
         onContentChanged: @escaping () -> Void,
         onExternalOpen: @escaping (Bookmark) -> Void,
-        onHomeItemExternalOpen: @escaping (HomeItem) -> Void
+        onHomeItemExternalOpen: @escaping (HomeItem) -> Void,
+        tabReselection: Int = 0
     ) {
         self.client = client
         self.store = store
@@ -66,6 +68,7 @@ struct HomeView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
+        self.tabReselection = tabReselection
     }
 
     var body: some View {
@@ -85,14 +88,16 @@ struct HomeView: View {
                         JumpBackInListView(
                             client: client,
                             onContentChanged: onContentChanged,
-                            onExternalOpen: onExternalOpen
+                            onExternalOpen: onExternalOpen,
+                            tabReselection: tabReselection
                         )
                     default:
                         HomeSectionListView(
                             route: route,
                             client: client,
                             onContentChanged: onContentChanged,
-                            onExternalOpen: onExternalOpen
+                            onExternalOpen: onExternalOpen,
+                            tabReselection: tabReselection
                         )
                     }
                 }

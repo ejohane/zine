@@ -259,6 +259,50 @@ final class HomeTests: XCTestCase {
         )
     }
 
+    func testContentTypeTitleCollapseProgressClampsScrollOffset() {
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: -20), 0)
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 22), 0.5)
+        XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 80), 1)
+    }
+
+    func testFilteredListTabReselectionScrollsBeforeResettingFilter() {
+        XCTAssertEqual(
+            FilteredListTabAction.resolve(
+                isVisible: true,
+                isAtTop: false,
+                hasActiveFilter: true
+            ),
+            .scrollToTop
+        )
+        XCTAssertEqual(
+            FilteredListTabAction.resolve(
+                isVisible: true,
+                isAtTop: true,
+                hasActiveFilter: true
+            ),
+            .resetFilter
+        )
+    }
+
+    func testFilteredListTabReselectionIgnoresUnfilteredOrHiddenLists() {
+        XCTAssertEqual(
+            FilteredListTabAction.resolve(
+                isVisible: true,
+                isAtTop: false,
+                hasActiveFilter: false
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            FilteredListTabAction.resolve(
+                isVisible: false,
+                isAtTop: true,
+                hasActiveFilter: true
+            ),
+            .none
+        )
+    }
+
     func testHomeItemProvidesImmediateBookmarkDetailContent() {
         let item = makeHomeItem(id: "instant", minutes: 12)
         let content = BookmarkDetailContent(item: item)
