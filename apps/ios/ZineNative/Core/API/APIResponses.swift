@@ -33,3 +33,7 @@ struct FinishedStateResponse: Decodable {
 
     let bookmark: FinishedBookmark
 }
+
+struct BookmarkTagsResponse: Decodable {
+    let tags: [BookmarkTag]
+}

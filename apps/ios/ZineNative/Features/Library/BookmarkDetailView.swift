@@ -303,12 +303,14 @@ struct BookmarkDetailView: View {
                             canonicalURL: content.canonicalUrl,
                             readingTimeMinutes: content.readingTimeMinutes,
                             initialProgress: content.progress,
-                            isFinished: content.isFinished
+                            isFinished: content.isFinished,
+                            tags: content.tags
                         ),
                         client: client,
                         onRead: { onExternalOpen(bookmark) },
                         onProgressSaved: updateReadingProgress,
-                        onFinishedChanged: updateFinishedState
+                        onFinishedChanged: updateFinishedState,
+                        onTagsChanged: updateTags
                     )
                 } label: {
                     Image(systemName: "book.pages")
@@ -718,6 +720,13 @@ struct BookmarkDetailView: View {
         guard var bookmark else { return }
         bookmark.isFinished = isFinished
         bookmark.finishedAt = isFinished ? Date().formatted(.iso8601) : nil
+        self.bookmark = bookmark
+        onUpdate(bookmark)
+    }
+
+    private func updateTags(_ tags: [BookmarkTag]) {
+        guard var bookmark else { return }
+        bookmark.tags = tags
         self.bookmark = bookmark
         onUpdate(bookmark)
     }

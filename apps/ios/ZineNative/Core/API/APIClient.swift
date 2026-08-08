@@ -350,6 +350,22 @@ struct APIClient {
         return response.bookmark
     }
 
+    func listTags() async throws -> [BookmarkTag] {
+        let response: BookmarkTagsResponse = try await request(
+            url: baseURL.appending(path: "/api/v1/tags")
+        )
+        return response.tags
+    }
+
+    func setTags(id: String, tags: [String]) async throws -> [BookmarkTag] {
+        var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/tags"))
+        request.httpMethod = "PUT"
+        request.httpBody = try JSONEncoder().encode(["tags": tags])
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let response: BookmarkTagsResponse = try await send(request)
+        return response.tags
+    }
+
     func archiveBookmark(id: String) async throws {
         var request = URLRequest(url: baseURL.appending(path: "/api/v1/bookmarks/\(id)"))
         request.httpMethod = "DELETE"
