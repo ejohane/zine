@@ -13,6 +13,9 @@ import type {
 } from './types';
 
 const DEFAULT_CHUNK_CHARACTER_LIMIT = 12_000;
+const MAX_TRAILING_CHUNK_CHARACTER_COUNT = 2_000;
+const TRAILING_CHUNK_FRACTION = 0.2;
+const TRAILING_MERGE_OVERFLOW_FRACTION = 0.1;
 const ANALYSIS_CONCURRENCY = 3;
 
 const EvidenceIdsSchema = z.array(z.string().min(1)).min(1).max(24);
@@ -109,6 +112,38 @@ export interface PreparedArticleChunk {
   text: string;
 }
 
+function compactTrailingChunk(
+  chunks: PreparedArticleChunk[],
+  characterLimit: number
+): PreparedArticleChunk[] {
+  if (chunks.length < 2) return chunks;
+
+  const previous = chunks.at(-2);
+  const trailing = chunks.at(-1);
+  if (!previous || !trailing) return chunks;
+
+  const trailingThreshold = Math.max(
+    1,
+    Math.min(
+      MAX_TRAILING_CHUNK_CHARACTER_COUNT,
+      Math.floor(characterLimit * TRAILING_CHUNK_FRACTION)
+    )
+  );
+  const mergedText = `${previous.text}\n\n${trailing.text}`;
+  const mergedLimit = Math.ceil(characterLimit * (1 + TRAILING_MERGE_OVERFLOW_FRACTION));
+  if (trailing.characterCount >= trailingThreshold || mergedText.length > mergedLimit) {
+    return chunks;
+  }
+
+  chunks.splice(-2, 2, {
+    ordinal: previous.ordinal,
+    blockIds: [...new Set([...previous.blockIds, ...trailing.blockIds])],
+    characterCount: mergedText.length,
+    text: mergedText,
+  });
+  return chunks;
+}
+
 function formatBlock(block: EnrichmentContentBlock): string {
   return `[block:${block.id} kind:${block.kind}]\n${block.text.trim()}`;
 }
@@ -170,7 +205,7 @@ export function prepareArticleChunks(
     }
   }
   flush();
-  return chunks;
+  return compactTrailingChunk(chunks, characterLimit);
 }
 
 function validEvidenceIds(ids: string[], allowed: Set<string>): string[] {
@@ -389,6 +424,7 @@ export async function enrichArticleWithQwen(
 export const articleUnderstandingInternals = {
   buildSemanticDocument,
   chunkMessages,
+  compactTrailingChunk,
   schemaForChunk,
   splitOversizedBlock,
 };
