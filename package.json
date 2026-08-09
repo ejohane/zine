@@ -10,6 +10,7 @@
   "scripts": {
     "build": "turbo run build",
     "build:ios": "bun run --cwd apps/mobile build:ios",
+    "ios:preview": "bash ./scripts/ios-simulator-preview.sh",
     "deploy:ios:production": "bun run --cwd apps/mobile deploy:ios:production",
     "deploy:ios:testflight:local": "bun run --cwd apps/mobile deploy:ios:testflight:local",
     "dev": "turbo run dev",
@@ -86,6 +87,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.4.2",
+    "serve-sim": "0.1.45",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.49.0"

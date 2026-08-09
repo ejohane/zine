@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Zine Local Development'
+  short_description: 'Run and visually verify Zine locally'
+  default_prompt: 'Use $zine-local-development to run Zine locally and verify the relevant native behavior through the serve-sim browser preview.'
+
+policy:
+  allow_implicit_invocation: true

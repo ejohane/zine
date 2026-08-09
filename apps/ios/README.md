@@ -26,6 +26,40 @@ iOS 18 or newer simulator or device.
 
 All new iOS product work, verification, and deployment belongs in this project.
 
+## Browser simulator preview
+
+Run the native app in Zine's dedicated Simulator and mirror it into a browser:
+
+```sh
+bun run ios:preview
+```
+
+The normal worktree development command starts this preview alongside the
+worker, web app, and other development services by default:
+
+```sh
+bun run dev:worktree
+```
+
+The command boots `iPhone 17 — Zine`, builds and installs the current
+`ZineNative` checkout, launches `app.zine.native`, and starts the `serve-sim`
+preview. Its default URL is `http://localhost:3200`. Keep the command running
+while using the preview; Control-C stops only the helper attached to Zine's
+simulator.
+
+Set `ZINE_SIMULATOR_NAME` or `ZINE_SIMULATOR_UDID` to use another Simulator.
+Set `ZINE_SKIP_IOS_BUILD=1` to relaunch an already installed build without
+rebuilding it. Set `ZINE_SERVE_SIM=0` when running `dev:worktree` to disable the
+native preview. Additional `serve-sim` options can follow `--` when using the
+standalone command, for example:
+
+```sh
+bun run ios:preview -- --theme dark --panes tools
+```
+
+This workflow requires Apple Silicon, Xcode command-line tools, and the Node 22
+version pinned by the repository.
+
 ## Design system
 
 The native color palette, semantic roles, usage rules, exceptions, and
