@@ -61,6 +61,28 @@ describe('article understanding', () => {
     expect(parsed.actionableTakeaways).toHaveLength(1);
   });
 
+  it('treats empty optional perspective and audience objects as unsupported', () => {
+    const parsed = ArticleChunkAnalysisSchema.parse({
+      summary: { text: 'Summary', evidenceBlockIds: ['article-body'] },
+      claims: [{ statement: 'Supported claim', evidenceBlockIds: ['article-body'] }],
+      concepts: [
+        {
+          name: 'Specific concept',
+          description: 'Supported concept',
+          evidenceBlockIds: ['article-body'],
+        },
+      ],
+      perspective: { description: '', evidenceBlockIds: [] },
+      audience: { description: '', evidenceBlockIds: [] },
+      actionableTakeaways: [
+        { description: 'Supported takeaway', evidenceBlockIds: ['article-body'] },
+      ],
+    });
+
+    expect(parsed.perspective).toBeNull();
+    expect(parsed.audience).toBeNull();
+  });
+
   it('rejects summary-only analysis', () => {
     expect(() =>
       ArticleChunkAnalysisSchema.parse({
@@ -107,6 +129,48 @@ describe('article understanding', () => {
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.flatMap((chunk) => chunk.blockIds)).toEqual(['intro', 'middle', 'ending']);
     expect(chunks.at(-1)?.text).toContain('tail-marker');
+  });
+
+  it('folds an undersized trailing fragment into the preceding chunk', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(140) },
+        { id: 'footer', kind: 'paragraph', text: 'footer' },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.blockIds).toEqual(['main', 'footer']);
+    expect(chunks[0]?.characterCount).toBeGreaterThan(200);
+    expect(chunks[0]?.characterCount).toBeLessThanOrEqual(220);
+    expect(chunks[0]?.text).toContain('footer');
+  });
+
+  it('keeps a substantive trailing chunk separate', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(140) },
+        { id: 'ending', kind: 'paragraph', text: 'b'.repeat(60) },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.map((chunk) => chunk.blockIds)).toEqual([['main'], ['ending']]);
+  });
+
+  it('does not compact a small tail when the bounded overflow would be exceeded', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(165) },
+        { id: 'footer', kind: 'paragraph', text: 'footer' },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.map((chunk) => chunk.blockIds)).toEqual([['main'], ['footer']]);
   });
 
   it('splits an oversized block without dropping its ending', () => {

@@ -375,6 +375,29 @@ async function writeUserFailed(db: Database, message: EnrichmentQueueMessage, er
     });
 }
 
+async function markDlqFailed(
+  db: Database,
+  message: EnrichmentQueueMessage,
+  error: Error
+): Promise<void> {
+  const now = Date.now();
+  await db
+    .update(itemEnrichments)
+    .set({
+      status: 'FAILED',
+      errorMessage: error.message,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(itemEnrichments.itemId, message.itemId),
+        eq(itemEnrichments.schemaVersion, message.schemaVersion),
+        eq(itemEnrichments.status, 'PENDING')
+      )
+    );
+  await writeUserFailed(db, message, error);
+}
+
 async function processMessage(message: EnrichmentMessage, db: Database, env: Bindings) {
   const parsed = EnrichmentQueueMessageSchema.safeParse(message.body);
   if (!parsed.success) {
@@ -571,7 +594,7 @@ export async function handleEnrichmentQueue(
 
 export async function handleEnrichmentDLQ(
   batch: MessageBatch<EnrichmentQueueMessage>,
-  _env: Bindings
+  env: Bindings
 ): Promise<void> {
   enrichmentLogger.error('Enrichment messages reached DLQ', {
     messageCount: batch.messages.length,
@@ -579,7 +602,23 @@ export async function handleEnrichmentDLQ(
     messageIds: batch.messages.map((message) => message.id),
   });
 
+  const db = createDb(env.DB);
   for (const message of batch.messages) {
+    const parsed = EnrichmentQueueMessageSchema.safeParse(message.body);
+    if (!parsed.success) {
+      enrichmentLogger.error('Invalid enrichment DLQ message body', {
+        messageId: message.id,
+        error: parsed.error.message,
+      });
+      message.ack();
+      continue;
+    }
+
+    await markDlqFailed(
+      db,
+      parsed.data,
+      new Error(`Enrichment message exhausted retries and reached ${batch.queue}`)
+    );
     message.ack();
   }
 }
@@ -587,4 +626,5 @@ export async function handleEnrichmentDLQ(
 export const enrichmentConsumerInternals = {
   normalizeSuggestedTags,
   buildTagsFromCanonical,
+  markDlqFailed,
 };
