@@ -709,6 +709,13 @@ export const itemEnrichments = sqliteTable(
     evergreenScore: real('evergreen_score'),
     timeSensitivity: text('time_sensitivity'),
     confidenceJson: text('confidence_json'),
+    sourceCoverage: text('source_coverage'),
+    sourceKind: text('source_kind'),
+    sourceContentHash: text('source_content_hash'),
+    sourceWordCount: integer('source_word_count'),
+    sourceQualityScore: real('source_quality_score'),
+    sourceQualityWarningsJson: text('source_quality_warnings_json'),
+    understandingJson: text('understanding_json'),
     errorMessage: text('error_message'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -722,6 +729,11 @@ export const itemEnrichments = sqliteTable(
     ),
     index('item_enrichments_item_idx').on(table.itemId, table.updatedAt),
     index('item_enrichments_status_idx').on(table.status, table.updatedAt),
+    index('item_enrichments_source_hash_idx').on(
+      table.itemId,
+      table.sourceContentHash,
+      table.updatedAt
+    ),
   ]
 );
 

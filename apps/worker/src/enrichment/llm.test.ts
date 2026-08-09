@@ -139,6 +139,18 @@ describe('enrichWithQwen', () => {
     expect(result.confidence.overall).toBe(output.confidence.overall);
   });
 
+  it('accepts JSON wrapped in explanatory prose and a code fence', async () => {
+    const output = createValidModelOutput();
+    const run = vi.fn().mockResolvedValue({
+      response: `Here is the requested object:\n\n\`\`\`json\n${JSON.stringify(output)}\n\`\`\``,
+    });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.summary.short).toBe(output.summary.short);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('normalizes common model enum drift before validation', async () => {
     const output = createValidModelOutput();
     output.entities = [
@@ -157,6 +169,16 @@ describe('enrichWithQwen', () => {
 
     expect(result.entities[0]?.relationship).toBe('CREATOR');
     expect(result.suggestedTags[0]?.kind).toBe('topic');
+  });
+
+  it('normalizes a generic related entity relationship to mentioned', async () => {
+    const output = createValidModelOutput();
+    output.entities[0]!.relationship = 'RELATED';
+    const run = vi.fn().mockResolvedValue({ response: JSON.stringify(output) });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.entities[0]?.relationship).toBe('MENTIONED');
   });
 
   it('throws validation error when both model attempts are invalid', async () => {

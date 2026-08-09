@@ -4,6 +4,9 @@ Phase 1 makes article-body availability a durable, observable backend primitive 
 
 The extraction and review implementation that builds on this contract is documented in [Article-body extraction quality](./article-body-extraction.md).
 
+The semantic consumer of current article-body artifacts is documented in
+[Article understanding foundation](./article-understanding.md).
+
 ## Definition of done
 
 - D1 owns explicit per-item lifecycle state: pending, processing, available, degraded, or unavailable.

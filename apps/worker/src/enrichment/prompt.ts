@@ -117,6 +117,9 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
       'Every entity must include name, type, relationship, confidence, and evidenceText.',
       'For human PERSON entities, prefer full real names. Do not emit first-name-only people unless the input clearly identifies that exact person; if only a first name is available, either omit it or assign confidence below 0.6.',
       'Prefer stable categories and short lowercase tag names.',
+      'When articleContent contains structured semantic notes, preserve their distinctive claims, mechanisms, tensions, caveats, and practical implications in the summary, topics, tags, and reasonToRevisit.',
+      'Prefer narrow collection-worthy themes such as a specific mechanism, argument, or approach. Avoid broad tags such as ai, technology, design, productivity, business, or software engineering when the input supports a more precise theme.',
+      'The detailed summary should identify the central thesis, how it works, and an important caveat or implication when supported.',
       'Do not invent facts not supported by the input.',
       'Use confidence below 0.6 when the input is thin or ambiguous.',
       'For each entity, set relationship to its role in this item: HOST, CO_HOST, OWNER, CREATOR, AUTHOR, GUEST, INTERVIEWER, INTERVIEWEE, PRIMARY_SUBJECT, or MENTIONED.',
@@ -143,7 +146,7 @@ export function buildEnrichmentMessages(input: EnrichmentPromptInput) {
     {
       role: 'system',
       content:
-        'You produce concise, valid JSON metadata for bookmarks. Keep tags useful for later recommendations.',
+        'You produce concise, valid JSON metadata for bookmarks and collection recommendations. Preserve the distinctive reason this item belongs with some articles but not others on the same broad subject.',
     },
     {
       role: 'user',

@@ -1266,10 +1266,10 @@ export const itemsRouter = router({
           .where(
             and(
               eq(itemEnrichments.itemId, owned[0].itemId),
-              eq(itemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
+              lte(itemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
             )
           )
-          .orderBy(desc(itemEnrichments.updatedAt))
+          .orderBy(desc(itemEnrichments.schemaVersion), desc(itemEnrichments.updatedAt))
           .limit(1),
         ctx.db
           .select()
@@ -1278,10 +1278,10 @@ export const itemsRouter = router({
             and(
               eq(userItemEnrichments.userItemId, input.id),
               eq(userItemEnrichments.userId, ctx.userId),
-              eq(userItemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
+              lte(userItemEnrichments.schemaVersion, ENRICHMENT_SCHEMA_VERSION)
             )
           )
-          .orderBy(desc(userItemEnrichments.updatedAt))
+          .orderBy(desc(userItemEnrichments.schemaVersion), desc(userItemEnrichments.updatedAt))
           .limit(1),
       ]);
 
@@ -1321,6 +1321,7 @@ export const itemsRouter = router({
       return {
         item: {
           status: canonical?.status ?? 'MISSING',
+          schemaVersion: canonical?.schemaVersion ?? null,
           modelProvider: canonical?.modelProvider ?? null,
           modelName: canonical?.modelName ?? null,
           summaryShort: canonical?.summaryShort ?? null,
@@ -1356,10 +1357,20 @@ export const itemsRouter = router({
           evergreenScore: canonical?.evergreenScore ?? null,
           timeSensitivity: canonical?.timeSensitivity ?? null,
           confidence: parseJsonObjectValue(canonical?.confidenceJson ?? null),
+          source: {
+            coverage: canonical?.sourceCoverage ?? null,
+            kind: canonical?.sourceKind ?? null,
+            contentHash: canonical?.sourceContentHash ?? null,
+            wordCount: canonical?.sourceWordCount ?? null,
+            qualityScore: canonical?.sourceQualityScore ?? null,
+            qualityWarnings: parseJsonArray<string>(canonical?.sourceQualityWarningsJson ?? null),
+          },
+          understanding: parseJsonObjectValue(canonical?.understandingJson ?? null),
           enrichedAt: canonical?.enrichedAt ?? null,
         },
         userItem: {
           status: userEnrichment?.status ?? 'MISSING',
+          schemaVersion: userEnrichment?.schemaVersion ?? null,
           suggestedTags: parseJsonArray<SuggestedTag>(userEnrichment?.suggestedTagsJson ?? null),
           inferredSaveIntent: userEnrichment?.inferredSaveIntent ?? null,
           reasonToRevisit: userEnrichment?.reasonToRevisit ?? null,

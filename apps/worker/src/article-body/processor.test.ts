@@ -2,17 +2,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   acquireArticleBody,
+  getItemContentHash,
   markArticleBodyUnavailable,
   publishArticleBodyArtifact,
   resolveArticleBodyDlqEvents,
 } = vi.hoisted(() => ({
   acquireArticleBody: vi.fn(),
+  getItemContentHash: vi.fn(),
   markArticleBodyUnavailable: vi.fn(),
   publishArticleBodyArtifact: vi.fn(),
   resolveArticleBodyDlqEvents: vi.fn(),
 }));
 
 vi.mock('./acquisition', () => ({ acquireArticleBody }));
+vi.mock('../enrichment/service', () => ({ getItemContentHash }));
 vi.mock('./service', () => ({
   markArticleBodyUnavailable,
   publishArticleBodyArtifact,
@@ -78,6 +81,7 @@ function createDb(item: Record<string, unknown> | undefined = {}) {
 describe('article-body processor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getItemContentHash.mockResolvedValue('content-hash-v3');
   });
 
   it('publishes a successful artifact and mirrors reading metrics onto the item', async () => {
@@ -166,5 +170,54 @@ describe('article-body processor', () => {
     expect(articleBodyProcessorInternals.isRetryableAcquisitionFailure('QUALITY_REJECTED')).toBe(
       false
     );
+  });
+
+  it('queues fresh understanding for every bookmarked owner after publication', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const where = vi.fn().mockResolvedValue([
+      { id: 'user-item-1', userId: 'user-1' },
+      { id: 'user-item-2', userId: 'user-2' },
+    ]);
+    const from = vi.fn().mockReturnValue({ where });
+    const select = vi.fn().mockReturnValue({ from });
+
+    const count = await articleBodyProcessorInternals.enqueuePublishedArticleEnrichment(
+      { select } as never,
+      { ENRICHMENT_QUEUE: { send }, ARTICLE_UNDERSTANDING_MODE: 'all' } as never,
+      'item_1'
+    );
+
+    expect(count).toBe(2);
+    expect(getItemContentHash).toHaveBeenCalledWith(expect.anything(), 'item_1');
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'item_1',
+        userItemId: 'user-item-1',
+        userId: 'user-1',
+        trigger: 'article_body_ready',
+        schemaVersion: 3,
+        contentHash: 'content-hash-v3',
+      })
+    );
+  });
+
+  it('does not queue automatic understanding in backfill-only mode', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const select = vi.fn();
+
+    const count = await articleBodyProcessorInternals.enqueuePublishedArticleEnrichment(
+      { select } as never,
+      {
+        ENRICHMENT_QUEUE: { send },
+        ARTICLE_UNDERSTANDING_MODE: 'backfill_only',
+      } as never,
+      'item_1'
+    );
+
+    expect(count).toBe(0);
+    expect(select).not.toHaveBeenCalled();
+    expect(getItemContentHash).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
   });
 });
