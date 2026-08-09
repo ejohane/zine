@@ -190,11 +190,6 @@ function BookmarkSelectionReference() {
           <div className="new-page-inset__content">
             <section className="new-page-column-card new-page-bookmark-pane">
               <div className="workbench-readerbar" role="toolbar" aria-label="Reader controls">
-                <div className="workbench-readerbar__context">
-                  <span>Reader</span>
-                  <span aria-hidden="true">·</span>
-                  <span>Video</span>
-                </div>
                 <Button
                   tone="ghost"
                   size="icon"

@@ -520,7 +520,10 @@ describe('BookmarksPage', () => {
     reader.scrollTop = 240;
 
     const expandButton = screen.getByRole('button', { name: 'Open immersive reader' });
-    expect(screen.getByRole('toolbar', { name: 'Reader controls' })).toBeVisible();
+    const readerToolbar = screen.getByRole('toolbar', { name: 'Reader controls' });
+    expect(readerToolbar).toBeVisible();
+    expect(within(readerToolbar).queryByText('Reader')).not.toBeInTheDocument();
+    expect(within(readerToolbar).queryByText('article')).not.toBeInTheDocument();
     expect(expandButton).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(expandButton);
@@ -584,7 +587,8 @@ describe('BookmarksPage', () => {
     fireEvent.scroll(reader);
 
     await waitFor(() => expect(toolbar).not.toHaveClass('workbench-readerbar--article-pinned'));
-    expect(within(toolbar).getByText('Reader')).toBeVisible();
+    expect(within(toolbar).queryByText('Reader')).not.toBeInTheDocument();
+    expect(within(toolbar).queryByText('article')).not.toBeInTheDocument();
     expect(
       within(toolbar).queryByRole('group', { name: 'Pinned bookmark actions' })
     ).not.toBeInTheDocument();

@@ -6,7 +6,7 @@
   "main": "./src/index.ts",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist",
-    "dev": "wrangler dev --port ${X_ARCHIVE_PORT:-8790}",
+    "dev": "wrangler dev --port ${X_ARCHIVE_PORT:-8790} --inspector-port ${X_ARCHIVE_INSPECTOR_PORT:-9231}",
     "lint": "eslint src --ext .ts --cache --cache-location .eslintcache",
     "typecheck": "tsc --noEmit",
     "test": "vitest",

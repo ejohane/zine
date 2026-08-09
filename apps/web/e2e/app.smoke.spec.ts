@@ -90,7 +90,8 @@ test('loads the mobile-parity app routes and opens canonical detail', async ({ p
     element.scrollTop = 0;
   });
   await expect(readerToolbar).not.toHaveClass(/workbench-readerbar--article-pinned/);
-  await expect(readerToolbar.getByText('Reader')).toBeVisible();
+  await expect(readerToolbar.getByText('Reader')).toHaveCount(0);
+  await expect(readerToolbar.getByText('article')).toHaveCount(0);
 
   await reader.evaluate((element, scrollPosition) => {
     element.scrollTop = scrollPosition;

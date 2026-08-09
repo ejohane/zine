@@ -1305,13 +1305,7 @@ export function BookmarksPage() {
                           </span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="workbench-readerbar__context">
-                        <span>Reader</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{mapContentType(displayBookmark.contentType)}</span>
-                      </div>
-                    )}
+                    ) : null}
                     <div className="workbench-readerbar__controls">
                       {isReaderHeaderPinned ? renderBookmarkActionButtons({ compact: true }) : null}
                       {isReaderHeaderPinned && selectedBookmarkSourceUrl && bookmarkFabConfig ? (

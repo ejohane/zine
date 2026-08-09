@@ -10,6 +10,8 @@
       "persistent": true,
       "env": [
         "WORKER_PORT",
+        "WORKER_INSPECTOR_PORT",
+        "X_ARCHIVE_INSPECTOR_PORT",
         "METRO_PORT",
         "WEB_PORT",
         "EXPO_HOSTNAME",
