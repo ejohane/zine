@@ -26,7 +26,7 @@
 - Install dependencies: `bun install`
 - Start all dev tasks: `bun run dev`
 - Start the web app only: `bun run dev:web`
-- Worktree-safe dev startup: `bun run dev:worktree`
+- Worktree-safe dev startup with native `serve-sim` preview: `bun run dev:worktree`
 - Reset worktree state before re-seeding: `bun run dev:reset`
 - Run repository tests (deprecated Expo compatibility + worker + web unit/component): `bun run test`
 - Run web unit/component tests: `bun run test:web`
@@ -68,10 +68,24 @@
   - Falls back to `localhost` when Tailscale is unavailable
   - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
   - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://<reachable-host>:<public-api-port>`
+  - Builds, installs, and launches `apps/ios/ZineNative.xcodeproj` in the dedicated Zine Simulator
+  - Starts a scoped `serve-sim` browser preview and stops it with the rest of the dev stack
 - The Metro, Expo Go, and `apps/mobile/.env.local` behavior above is legacy support for the deprecated client. Do not use it as the default path for new mobile development or verification.
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
+- Override the simulator with `ZINE_SIMULATOR_NAME=<name>` or `ZINE_SIMULATOR_UDID=<udid>`.
+- Skip an intentional repeat native build with `ZINE_SKIP_IOS_BUILD=1 bun run dev:worktree`.
+- Disable the native preview only when explicitly required with `ZINE_SERVE_SIM=0 bun run dev:worktree`.
+
+### Required Local Development and Verification Workflow
+
+- Use `.codex/skills/zine-local-development/SKILL.md` for every request to implement, run, test, verify, debug, inspect, or visually review local Zine runtime behavior.
+- `bun run dev:worktree` is the default local entrypoint. It starts the canonical native app and `serve-sim`; do not launch a parallel preview unless the task explicitly requires an isolated alternate simulator.
+- For native local testing and verification, open the exact `serve-sim` URL printed by the command in the Codex in-app Browser and use the Browser plugin's computer-use surface to exercise the relevant user journey.
+- A successful native build, test run, install, launch, loaded preview page, or shell-only `simctl` interaction is not UI verification. Require a real streamed frame, computer-use interaction, and visible final state.
+- Report automated checks, build, install, launch, live stream, computer-use interaction, and UI observation as separate evidence states.
+- If the host cannot provide the simulator or Browser computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never silently substitute legacy Expo, a static screenshot, or logs.
 
 ### Production-Shaped Local Data
 
