@@ -1,14 +1,23 @@
 import type { ContentType, Provider } from '@zine/shared';
 
-export const ENRICHMENT_SCHEMA_VERSION = 2;
+export const ENRICHMENT_SCHEMA_VERSION = 3;
 export const DEFAULT_ENRICHMENT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 export const DEFAULT_EMBEDDING_MODEL = '@cf/qwen/qwen3-embedding-0.6b';
 export const DEFAULT_EMBEDDING_DIMENSIONS = 1024;
 
 export type EnrichmentStatus = 'PENDING' | 'COMPLETE' | 'FAILED';
-export type EnrichmentTrigger = 'manual_save' | 'inbox_bookmark' | 'backfill';
+export type EnrichmentTrigger =
+  | 'manual_save'
+  | 'inbox_bookmark'
+  | 'article_body_ready'
+  | 'backfill';
 export type VectorVisibility = 'public' | 'user';
 export type SuggestedTagKind = 'topic' | 'entity' | 'intent' | 'format';
+export type EnrichmentSourceCoverage =
+  | 'FULL_CONTENT'
+  | 'PARTIAL_CONTENT'
+  | 'DESCRIPTION_ONLY'
+  | 'METADATA_ONLY';
 
 export interface EnrichmentQueueMessage {
   itemId: string;
@@ -111,6 +120,55 @@ export interface EnrichmentPromptInput {
   articleContent: string | null;
 }
 
+export interface EnrichmentContentBlock {
+  id: string;
+  kind: string;
+  text: string;
+}
+
+export interface EnrichmentSourceEvidence {
+  coverage: EnrichmentSourceCoverage;
+  sourceKind: string;
+  contentHash: string | null;
+  wordCount: number | null;
+  qualityScore: number | null;
+  qualityWarnings: string[];
+  blocks: EnrichmentContentBlock[];
+}
+
+export interface ArticleUnderstandingEvidence {
+  evidenceBlockIds: string[];
+}
+
+export interface ArticleUnderstandingChunk {
+  ordinal: number;
+  blockIds: string[];
+  characterCount: number;
+  summary: { text: string } & ArticleUnderstandingEvidence;
+  topics: Array<{ name: string; description: string } & ArticleUnderstandingEvidence>;
+  claims: Array<{ statement: string } & ArticleUnderstandingEvidence>;
+  questionsAnswered: Array<{ question: string; answer: string } & ArticleUnderstandingEvidence>;
+  concepts: Array<{ name: string; description: string } & ArticleUnderstandingEvidence>;
+  entities: Array<
+    {
+      name: string;
+      type: string;
+      relationship: EntityRelationship;
+    } & ArticleUnderstandingEvidence
+  >;
+  perspective: ({ description: string } & ArticleUnderstandingEvidence) | null;
+  audience: ({ description: string } & ArticleUnderstandingEvidence) | null;
+  prerequisites: Array<{ description: string } & ArticleUnderstandingEvidence>;
+  actionableTakeaways: Array<{ description: string } & ArticleUnderstandingEvidence>;
+}
+
+export interface ArticleUnderstanding {
+  schemaVersion: 1;
+  sourceContentHash: string;
+  coverage: Extract<EnrichmentSourceCoverage, 'FULL_CONTENT' | 'PARTIAL_CONTENT'>;
+  chunks: ArticleUnderstandingChunk[];
+}
+
 export interface EmbeddingUpsertInput {
   itemId: string;
   userId: string;
@@ -119,4 +177,13 @@ export interface EmbeddingUpsertInput {
   primaryCategory: string | null;
   contentHash: string;
   text: string;
+}
+
+export interface ChunkEmbeddingUpsertInput extends Omit<EmbeddingUpsertInput, 'text'> {
+  sourceContentHash: string;
+  chunks: Array<{
+    ordinal: number;
+    text: string;
+    blockIds: string[];
+  }>;
 }

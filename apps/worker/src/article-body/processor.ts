@@ -1,7 +1,11 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
+import { UserItemState } from '@zine/shared';
 
 import type { Database } from '../db';
-import { creators, items } from '../db/schema';
+import { creators, items, userItems } from '../db/schema';
+import { getItemContentHash } from '../enrichment/service';
+import { shouldUseArticleUnderstanding } from '../enrichment/article-understanding-rollout';
+import { ENRICHMENT_SCHEMA_VERSION, type EnrichmentQueueMessage } from '../enrichment/types';
 import { logger } from '../lib/logger';
 import type { Bindings } from '../types';
 import { acquireArticleBody } from './acquisition';
@@ -23,6 +27,39 @@ export class RetryableArticleBodyError extends Error {
     super(message);
     this.name = 'RetryableArticleBodyError';
   }
+}
+
+async function enqueuePublishedArticleEnrichment(
+  db: Database,
+  env: Bindings,
+  itemId: string
+): Promise<number> {
+  if (!shouldUseArticleUnderstanding(env.ARTICLE_UNDERSTANDING_MODE, 'article_body_ready')) {
+    return 0;
+  }
+  const queue = env.ENRICHMENT_QUEUE as Queue<EnrichmentQueueMessage> | undefined;
+  if (!queue) return 0;
+  const contentHash = await getItemContentHash(db, itemId);
+  if (!contentHash) return 0;
+  const relationships = await db
+    .select({ id: userItems.id, userId: userItems.userId })
+    .from(userItems)
+    .where(and(eq(userItems.itemId, itemId), eq(userItems.state, UserItemState.BOOKMARKED)));
+
+  await Promise.all(
+    relationships.map((relationship) =>
+      queue.send({
+        itemId,
+        userItemId: relationship.id,
+        userId: relationship.userId,
+        trigger: 'article_body_ready',
+        schemaVersion: ENRICHMENT_SCHEMA_VERSION,
+        contentHash,
+        enqueuedAt: Date.now(),
+      })
+    )
+  );
+  return relationships.length;
 }
 
 function isRetryableAcquisitionFailure(errorCode: string | null): boolean {
@@ -115,6 +152,25 @@ export async function processArticleBodyQueueMessage(
     );
   }
 
+  try {
+    const enrichmentJobs = await enqueuePublishedArticleEnrichment(db, env, item.id);
+    if (enrichmentJobs > 0) {
+      processorLogger.info('Article understanding queued after body publication', {
+        operation: 'article_body.process',
+        event: 'article_body.process.enrichment_queued',
+        itemId: item.id,
+        enrichmentJobs,
+      });
+    }
+  } catch (error) {
+    processorLogger.warn('Article body published but understanding enqueue failed', {
+      operation: 'article_body.process',
+      event: 'article_body.process.enrichment_enqueue_failed',
+      itemId: item.id,
+      error,
+    });
+  }
+
   processorLogger.info('Article body published', {
     operation: 'article_body.process',
     event: 'article_body.process.published',
@@ -128,5 +184,6 @@ export async function processArticleBodyQueueMessage(
 }
 
 export const articleBodyProcessorInternals = {
+  enqueuePublishedArticleEnrichment,
   isRetryableAcquisitionFailure,
 };

@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
 
-import { creators, items, userItems } from '../db/schema';
+import { articleBodyStates, articleBodyVersions, creators, items, userItems } from '../db/schema';
 import { logger } from '../lib/logger';
 import type { TRPCContext } from '../trpc/context';
 import {
@@ -14,14 +15,7 @@ const enrichmentLogger = logger.child('enrichment-service');
 type EnrichmentQueue = Queue<EnrichmentQueueMessage>;
 
 function stableHash(value: string): string {
-  let hash = 0x811c9dc5;
-
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return (hash >>> 0).toString(16).padStart(8, '0');
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
 }
 
 export function computeItemContentHash(input: {
@@ -33,6 +27,7 @@ export function computeItemContentHash(input: {
   summary: string | null;
   creatorName: string | null;
   articleContentKey: string | null;
+  sourceContentHash?: string | null;
 }): string {
   return stableHash(
     JSON.stringify({
@@ -44,6 +39,7 @@ export function computeItemContentHash(input: {
       summary: input.summary,
       creatorName: input.creatorName,
       articleContentKey: input.articleContentKey,
+      sourceContentHash: input.sourceContentHash ?? null,
     })
   );
 }
@@ -61,10 +57,13 @@ export async function getItemContentHash(
       publisher: items.publisher,
       summary: items.summary,
       articleContentKey: items.articleContentKey,
+      sourceContentHash: articleBodyVersions.contentHash,
       creatorName: creators.name,
     })
     .from(items)
     .leftJoin(creators, eq(items.creatorId, creators.id))
+    .leftJoin(articleBodyStates, eq(articleBodyStates.itemId, items.id))
+    .leftJoin(articleBodyVersions, eq(articleBodyStates.currentVersionId, articleBodyVersions.id))
     .where(eq(items.id, itemId))
     .limit(1);
 

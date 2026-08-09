@@ -1,5 +1,6 @@
 import type { Bindings } from '../types';
 import { logger } from '../lib/logger';
+import type { z } from 'zod';
 import { buildEnrichmentMessages } from './prompt';
 import { EnrichmentModelOutputSchema } from './schema';
 import {
@@ -21,8 +22,8 @@ type WorkersAIRun = {
   run(model: string, input: unknown): Promise<unknown>;
 };
 
-function getEnrichmentModel(env: Bindings): string {
-  return env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL;
+function getEnrichmentModel(env: Bindings, modelOverride?: string): string {
+  return modelOverride || env.ENRICHMENT_MODEL || DEFAULT_ENRICHMENT_MODEL;
 }
 
 function getResponseText(response: unknown): string | null {
@@ -64,16 +65,33 @@ function stripJsonFence(text: string): string {
   return fenced?.[1]?.trim() ?? trimmed;
 }
 
-function parseModelResponse(response: unknown): EnrichmentModelOutput {
-  const direct = EnrichmentModelOutputSchema.safeParse(response);
+function jsonTextCandidates(text: string): string[] {
+  const trimmed = text.trim();
+  const candidates = [stripJsonFence(trimmed)];
+
+  for (const match of trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)\s*```/gi)) {
+    if (match[1]) candidates.push(match[1].trim());
+  }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  return [...new Set(candidates)];
+}
+
+function parseModelResponse<T>(response: unknown, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T {
+  const direct = schema.safeParse(response);
   if (direct.success) return direct.data;
 
   if (response && typeof response === 'object') {
     const record = response as Record<string, unknown>;
-    const nestedResponse = EnrichmentModelOutputSchema.safeParse(record.response);
+    const nestedResponse = schema.safeParse(record.response);
     if (nestedResponse.success) return nestedResponse.data;
 
-    const nestedResult = EnrichmentModelOutputSchema.safeParse(record.result);
+    const nestedResult = schema.safeParse(record.result);
     if (nestedResult.success) return nestedResult.data;
   }
 
@@ -83,14 +101,22 @@ function parseModelResponse(response: unknown): EnrichmentModelOutput {
   }
 
   let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripJsonFence(text)) as unknown;
-  } catch (error) {
+  let parseError: unknown;
+  for (const candidate of jsonTextCandidates(text)) {
+    try {
+      parsed = JSON.parse(candidate) as unknown;
+      parseError = null;
+      break;
+    } catch (error) {
+      parseError = error;
+    }
+  }
+  if (parseError) {
     throw new EnrichmentModelValidationError(
-      `Workers AI response was not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+      `Workers AI response was not valid JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`
     );
   }
-  const validated = EnrichmentModelOutputSchema.safeParse(parsed);
+  const validated = schema.safeParse(parsed);
   if (!validated.success) {
     throw new EnrichmentModelValidationError(
       `Workers AI JSON failed schema validation: ${validated.error.message}`
@@ -100,47 +126,76 @@ function parseModelResponse(response: unknown): EnrichmentModelOutput {
   return validated.data;
 }
 
-async function runQwen(env: Bindings, input: unknown): Promise<unknown> {
+async function runQwen(env: Bindings, input: unknown, modelOverride?: string): Promise<unknown> {
   const ai = env.AI as unknown as WorkersAIRun | undefined;
   if (!ai) {
     throw new Error('Workers AI binding is not configured');
   }
 
-  return ai.run(getEnrichmentModel(env), input);
+  return ai.run(getEnrichmentModel(env, modelOverride), input);
+}
+
+export async function runStructuredJson<T>(
+  env: Bindings,
+  input: {
+    messages: Array<{ role: string; content: string }>;
+    schema: z.ZodType<T, z.ZodTypeDef, unknown>;
+    maxTokens: number;
+    repairPrompt: string;
+    operation: string;
+    model?: string;
+  }
+): Promise<T> {
+  const request = {
+    messages: input.messages,
+    // Workers AI JSON schema mode can reject larger nested schemas before returning output.
+    // Keep generation constrained to JSON and let the local Zod schema enforce the contract.
+    response_format: { type: 'json_object' },
+    max_tokens: input.maxTokens,
+  };
+
+  try {
+    return parseModelResponse(await runQwen(env, request, input.model), input.schema);
+  } catch (error) {
+    llmLogger.warn(`${input.operation} response invalid; retrying with repair prompt`, {
+      error,
+    });
+
+    return parseModelResponse(
+      await runQwen(
+        env,
+        {
+          ...request,
+          messages: [
+            ...input.messages,
+            {
+              role: 'user',
+              content: input.repairPrompt,
+            },
+          ],
+        },
+        input.model
+      ),
+      input.schema
+    );
+  }
 }
 
 export async function enrichWithQwen(
   env: Bindings,
-  input: EnrichmentPromptInput
+  input: EnrichmentPromptInput,
+  modelOverride?: string
 ): Promise<EnrichmentModelOutput> {
   const messages = buildEnrichmentMessages(input);
-  const request = {
+  return runStructuredJson<EnrichmentModelOutput>(env, {
     messages,
-    // Workers AI JSON schema mode can reject larger nested schemas before returning output.
-    // Keep generation constrained to JSON and let the local Zod schema enforce the contract.
-    response_format: { type: 'json_object' },
-    max_tokens: 1800,
-  };
-
-  try {
-    return parseModelResponse(await runQwen(env, request));
-  } catch (error) {
-    llmLogger.warn('Initial enrichment response invalid; retrying with repair prompt', {
-      error,
-    });
-
-    const repairRequest = {
-      ...request,
-      messages: [
-        ...messages,
-        {
-          role: 'user',
-          content:
-            'Retry. Return only one valid JSON object with top-level keys summary, classification, topics, entities, suggestedTags, userContext, and confidence. No markdown or commentary.',
-        },
-      ],
-    };
-
-    return parseModelResponse(await runQwen(env, repairRequest));
-  }
+    schema: EnrichmentModelOutputSchema,
+    maxTokens: 1800,
+    repairPrompt:
+      'Retry. Return only one valid JSON object with top-level keys summary, classification, topics, entities, suggestedTags, userContext, and confidence. No markdown or commentary.',
+    operation: 'Initial enrichment',
+    model: modelOverride,
+  });
 }
+
+export const llmInternals = { jsonTextCandidates, stripJsonFence };
