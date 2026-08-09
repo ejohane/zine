@@ -144,6 +144,7 @@ export async function runStructuredJson<T>(
     repairPrompt: string;
     operation: string;
     model?: string;
+    repairAttempts?: number;
   }
 ): Promise<T> {
   const request = {
@@ -154,31 +155,38 @@ export async function runStructuredJson<T>(
     max_tokens: input.maxTokens,
   };
 
-  try {
-    return parseModelResponse(await runQwen(env, request, input.model), input.schema);
-  } catch (error) {
-    llmLogger.warn(`${input.operation} response invalid; retrying with repair prompt`, {
-      error,
-    });
+  const repairAttempts = Math.max(0, input.repairAttempts ?? 1);
+  let lastError: unknown;
 
-    return parseModelResponse(
-      await runQwen(
-        env,
-        {
-          ...request,
-          messages: [
+  for (let attempt = 0; attempt <= repairAttempts; attempt++) {
+    const messages =
+      attempt === 0
+        ? input.messages
+        : [
             ...input.messages,
             {
               role: 'user',
-              content: input.repairPrompt,
+              content: `${input.repairPrompt}\n\nPrevious validation failure:\n${lastError instanceof Error ? lastError.message.slice(0, 2_000) : String(lastError).slice(0, 2_000)}`,
             },
-          ],
-        },
-        input.model
-      ),
-      input.schema
-    );
+          ];
+
+    try {
+      return parseModelResponse(
+        await runQwen(env, { ...request, messages }, input.model),
+        input.schema
+      );
+    } catch (error) {
+      lastError = error;
+      if (attempt >= repairAttempts) throw error;
+      llmLogger.warn(`${input.operation} response invalid; retrying with repair prompt`, {
+        attempt: attempt + 1,
+        repairAttempts,
+        error,
+      });
+    }
   }
+
+  throw lastError;
 }
 
 export async function enrichWithQwen(
