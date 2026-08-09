@@ -82,7 +82,7 @@ private struct LegacyEditorialTodayView: View {
                                 .overlay(alignment: .topTrailing) {
                                     if labStore.readyExperimentCount > 0 {
                                         Circle()
-                                            .fill(Color.accentColor)
+                                            .fill(ZineTheme.brandAccent)
                                             .frame(width: 7, height: 7)
                                             .offset(x: 3, y: -2)
                                     }
@@ -202,14 +202,14 @@ private struct LegacyEditorialTodayView: View {
     ) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "flask.fill")
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             VStack(alignment: .leading, spacing: 2) {
                 Text("PREVIEWING VARIANT \(variant.label.rawValue)")
                     .font(.caption2.bold())
                     .tracking(0.8)
                 Text(experiment.title)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(1)
             }
             Spacer()
@@ -221,7 +221,7 @@ private struct LegacyEditorialTodayView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .background(.thinMaterial)
+        .background(ZineTheme.surface.opacity(0.96))
         .accessibilityElement(children: .combine)
     }
 
@@ -366,7 +366,7 @@ private struct EditorialExternalSourceView: View {
                         url: imageURL,
                         targetSize: CGSize(width: 390, height: 220)
                     ) {
-                        Color.secondary.opacity(0.1)
+                        ZineTheme.raised
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 220)
@@ -378,7 +378,7 @@ private struct EditorialExternalSourceView: View {
                     Text(sourceLabel.uppercased())
                         .font(.caption2.weight(.bold))
                         .tracking(1)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(ZineTheme.brandAccent)
 
                     Text(presentation?.title ?? source?.title ?? "Source")
                         .font(.system(size: 30, weight: .bold, design: .serif))
@@ -386,14 +386,14 @@ private struct EditorialExternalSourceView: View {
                     if let subtitle = presentation?.subtitle ?? source?.creator {
                         Text(subtitle)
                             .font(.headline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ZineTheme.secondaryText)
                     }
                 }
 
                 if let excerpt = presentation?.excerpt, !excerpt.isEmpty {
                     Text(excerpt)
                         .font(.body)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
 
                 actions
@@ -423,7 +423,7 @@ private struct EditorialExternalSourceView: View {
                 HStack(spacing: 18) {
                     if presentation?.isSaved == true {
                         Label("Saved", systemImage: "bookmark.fill")
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(ZineTheme.brandAccent)
                     } else {
                         Button {
                             Task {

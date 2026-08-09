@@ -15,13 +15,15 @@ set -e
 #   3. Symlinks worker secrets (.dev.vars) from main
 #   4. Generates mobile .env.local with a reachable API URL
 #   5. Starts a public dev proxy when non-localhost access is needed
-#   6. Starts all services via turbo
+#   6. Builds, launches, and serves the native iOS app in the browser
+#   7. Starts all services via turbo
 #
 # USAGE:
 #   bun run dev:worktree                                # Normal usage
 #   ZINE_WORKER_PORT=8888 bun run dev:worktree          # Override port
 #   ZINE_DEV_HOST=100.92.242.50 bun run dev:worktree    # Override mobile/API host
 #   ZINE_API_PORT=8890 bun run dev:worktree             # Override public API port
+#   ZINE_SERVE_SIM=0 bun run dev:worktree               # Disable native preview
 #   bun run dev:reset && bun run dev:worktree          # Fresh re-seed
 #
 # =============================================================================
@@ -311,8 +313,13 @@ export EXPO_HOSTNAME="$DEV_HOST"
 export REACT_NATIVE_PACKAGER_HOSTNAME="$DEV_HOST"
 
 PROXY_PID=""
+IOS_PREVIEW_PID=""
 
 cleanup() {
+  if [ -n "$IOS_PREVIEW_PID" ] && kill -0 "$IOS_PREVIEW_PID" 2>/dev/null; then
+    kill "$IOS_PREVIEW_PID" 2>/dev/null || true
+    wait "$IOS_PREVIEW_PID" 2>/dev/null || true
+  fi
   if [ -n "$PROXY_PID" ] && kill -0 "$PROXY_PID" 2>/dev/null; then
     kill "$PROXY_PID" 2>/dev/null || true
     wait "$PROXY_PID" 2>/dev/null || true
@@ -329,6 +336,14 @@ if [ "$PUBLIC_API_PORT" != "$WORKER_PORT" ]; then
     ZINE_PROXY_TARGET_PORT="$WORKER_PORT" \
     node ./scripts/dev-worker-proxy.mjs &
   PROXY_PID=$!
+fi
+
+if [ "${ZINE_SERVE_SIM:-1}" != "0" ]; then
+  echo "   📱 Starting native iOS preview with serve-sim..."
+  bash ./scripts/ios-simulator-preview.sh &
+  IOS_PREVIEW_PID=$!
+else
+  echo "   ℹ️  Native iOS preview disabled (ZINE_SERVE_SIM=0)"
 fi
 
 echo ""

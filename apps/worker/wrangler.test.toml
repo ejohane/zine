@@ -71,5 +71,7 @@ max_batch_timeout = 30
 ENVIRONMENT = "test"
 SPOTIFY_EPISODE_FETCH_CONCURRENCY = "5"
 ENRICHMENT_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+ARTICLE_UNDERSTANDING_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8"
+ARTICLE_UNDERSTANDING_MODE = "all"
 EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
 EMBEDDING_DIMENSIONS = "1024"

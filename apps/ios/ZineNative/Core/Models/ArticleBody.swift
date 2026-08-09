@@ -70,6 +70,7 @@ struct ArticleReaderMetadata: Equatable {
     let readingTimeMinutes: Int?
     let initialProgress: BookmarkProgress?
     let isFinished: Bool
+    let tags: [BookmarkTag]
 }
 
 struct ArticleReaderDocument: Equatable {

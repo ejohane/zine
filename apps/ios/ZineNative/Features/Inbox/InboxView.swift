@@ -61,6 +61,7 @@ struct InboxView: View {
                     )
                 }
         }
+        .zineScreenChrome()
         .task(id: query) {
             await store.reload(query: query)
         }
@@ -99,6 +100,7 @@ struct InboxView: View {
                     BookmarkRow(bookmark: bookmark)
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                .listRowBackground(ZineTheme.canvas)
                 .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
@@ -124,6 +126,8 @@ struct InboxView: View {
                 }
             }
             .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
             .refreshable {
                 await store.reload(query: query)
             }

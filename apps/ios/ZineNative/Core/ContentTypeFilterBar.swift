@@ -1,21 +1,40 @@
 import SwiftUI
 
-struct ContentTypeFilterHeader: View {
+struct CollapsingListTitle: View {
     let title: String
-    @Binding var selection: ContentType?
+    let progress: CGFloat
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.largeTitle.weight(.bold))
-                .padding(.horizontal, 18)
-                .padding(.top, 8)
-                .padding(.bottom, 2)
+        Text(title)
+            .font(.largeTitle.weight(.bold))
+            .foregroundStyle(ZineTheme.primaryText)
+            .scaleEffect(1 - (progress * 0.12), anchor: .leading)
+            .opacity(1 - progress)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
+            .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
+            .listRowBackground(ZineTheme.canvas)
+            .listRowSeparator(.hidden)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityHidden(progress >= 0.5)
+    }
 
-            ContentTypeFilterBar(selection: $selection)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemBackground))
+    static func collapseProgress(scrollOffset: CGFloat) -> CGFloat {
+        min(max(scrollOffset / 44, 0), 1)
+    }
+}
+
+struct CollapsedListTitle: View {
+    let title: String
+    let progress: CGFloat
+
+    var body: some View {
+        Text(title)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(ZineTheme.primaryText)
+            .opacity(progress)
+            .accessibilityHidden(progress < 0.5)
     }
 }
 
@@ -30,7 +49,7 @@ struct ContentTypeFilterBar: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(uiColor: .systemBackground))
+        .background(ZineTheme.canvas)
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityLabel("Content format filters")
     }
@@ -70,13 +89,13 @@ private struct ContentTypeFilterChip: View {
 
     var body: some View {
         chipButton
-            .background(Color(uiColor: .systemBackground), in: Capsule())
+            .background(isSelected ? ZineTheme.brandAccent : ZineTheme.surface, in: Capsule())
             .overlay {
                 Capsule()
                     .strokeBorder(
                         isSelected
-                            ? Color.accentColor.opacity(0.5)
-                            : Color.secondary.opacity(0.18),
+                            ? ZineTheme.brandAccent
+                            : ZineTheme.border,
                         lineWidth: 1
                     )
             }
@@ -95,7 +114,7 @@ private struct ContentTypeFilterChip: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
             }
-            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .foregroundStyle(isSelected ? ZineTheme.onAccent : ZineTheme.secondaryText)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .contentShape(Capsule())
@@ -106,7 +125,7 @@ private struct ContentTypeFilterChip: View {
 
 extension View {
     func solidContentTypeFilterChrome() -> some View {
-        toolbarBackground(Color(uiColor: .systemBackground), for: .navigationBar)
+        toolbarBackground(ZineTheme.canvas, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
     }
 }

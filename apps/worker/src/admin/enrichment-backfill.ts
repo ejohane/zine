@@ -28,6 +28,7 @@ export interface EnrichmentBackfillOptions {
   dryRun?: boolean;
   limit?: number;
   cursor?: string | null;
+  eligibleArticlesOnly?: boolean;
 }
 
 export interface EnrichmentBackfillCandidate {
@@ -39,6 +40,7 @@ export interface EnrichmentBackfillCandidate {
 
 export interface EnrichmentBackfillResult {
   dryRun: boolean;
+  eligibleArticlesOnly: boolean;
   schemaVersion: number;
   limit: number;
   cursor: string | null;
@@ -73,9 +75,20 @@ function mapCandidate(row: BackfillRow): EnrichmentBackfillCandidate {
 
 async function loadCandidates(
   db: D1Database,
-  options: { limit: number; cursor: string | null }
+  options: { limit: number; cursor: string | null; eligibleArticlesOnly: boolean }
 ): Promise<EnrichmentBackfillCandidate[]> {
   const cursorClause = options.cursor ? 'AND ui.id > ?' : '';
+  const eligibilityClause = options.eligibleArticlesOnly
+    ? `
+      AND i.content_type = 'ARTICLE'
+      AND EXISTS (
+        SELECT 1
+        FROM article_body_states abs
+        INNER JOIN article_body_versions abv ON abv.id = abs.current_version_id
+        WHERE abs.item_id = i.id
+          AND abs.status IN ('AVAILABLE', 'DEGRADED')
+      )`
+    : '';
   const statement = db.prepare(`
     SELECT
       ui.id AS user_item_id,
@@ -98,6 +111,7 @@ async function loadCandidates(
      AND uie.status = 'COMPLETE'
     WHERE ui.state = 'BOOKMARKED'
       AND uie.id IS NULL
+      ${eligibilityClause}
       ${cursorClause}
     ORDER BY ui.id
     LIMIT ?
@@ -118,7 +132,8 @@ export async function backfillBookmarkEnrichment(
   const dryRun = options.dryRun ?? true;
   const limit = normalizeLimit(options.limit);
   const cursor = options.cursor ?? null;
-  const candidates = await loadCandidates(env.DB, { limit, cursor });
+  const eligibleArticlesOnly = options.eligibleArticlesOnly ?? false;
+  const candidates = await loadCandidates(env.DB, { limit, cursor, eligibleArticlesOnly });
   const queue = env.ENRICHMENT_QUEUE as EnrichmentQueue | undefined;
 
   if (!dryRun && !queue) {
@@ -146,6 +161,7 @@ export async function backfillBookmarkEnrichment(
 
   backfillLogger.info('Bookmark enrichment backfill page processed', {
     dryRun,
+    eligibleArticlesOnly,
     limit,
     cursor,
     nextCursor,
@@ -155,6 +171,7 @@ export async function backfillBookmarkEnrichment(
 
   return {
     dryRun,
+    eligibleArticlesOnly,
     schemaVersion: ENRICHMENT_SCHEMA_VERSION,
     limit,
     cursor,

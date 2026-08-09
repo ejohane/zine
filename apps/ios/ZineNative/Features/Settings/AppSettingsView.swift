@@ -76,6 +76,8 @@ private struct AppearanceSettingsView: View {
                 Text("System follows your iPhone’s appearance setting.")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
     }

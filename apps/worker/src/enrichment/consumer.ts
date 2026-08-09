@@ -11,12 +11,14 @@ import {
   userItemEnrichments,
   userItems,
 } from '../db/schema';
-import { getArticleContent } from '../lib/article-storage';
 import { logger } from '../lib/logger';
 import { syncPeopleForItem } from '../people/service';
 import { resolveXProfilesForItem } from '../people/social-resolution';
 import type { Bindings } from '../types';
-import { upsertItemEmbedding } from './embeddings';
+import { enrichArticleWithQwen } from './article-understanding';
+import { shouldUseArticleUnderstanding } from './article-understanding-rollout';
+import { metadataEnrichmentSource, resolveArticleEnrichmentSource } from './article-source';
+import { upsertItemChunkEmbeddings, upsertItemEmbedding } from './embeddings';
 import { EnrichmentModelValidationError, enrichWithQwen } from './llm';
 import { buildArticleExcerpt, buildEmbeddingText, buildPromptInput } from './prompt';
 import { EnrichmentQueueMessageSchema } from './schema';
@@ -25,6 +27,7 @@ import {
   DEFAULT_ENRICHMENT_MODEL,
   type EnrichmentModelOutput,
   type EnrichmentQueueMessage,
+  type EnrichmentSourceEvidence,
   type EnrichmentSourceCreator,
   type EnrichmentSourceItem,
   type ModelSuggestedTag,
@@ -213,7 +216,9 @@ async function writeCanonicalComplete(
   db: Database,
   message: EnrichmentQueueMessage,
   output: EnrichmentModelOutput,
-  env: Bindings
+  env: Bindings,
+  source: EnrichmentSourceEvidence,
+  understanding: unknown | null
 ) {
   const now = Date.now();
   await db
@@ -237,6 +242,13 @@ async function writeCanonicalComplete(
       evergreenScore: output.classification.evergreenScore,
       timeSensitivity: output.classification.timeSensitivity,
       confidenceJson: JSON.stringify(output.confidence),
+      sourceCoverage: source.coverage,
+      sourceKind: source.sourceKind,
+      sourceContentHash: source.contentHash,
+      sourceWordCount: source.wordCount,
+      sourceQualityScore: source.qualityScore,
+      sourceQualityWarningsJson: JSON.stringify(source.qualityWarnings),
+      understandingJson: understanding ? JSON.stringify(understanding) : null,
       createdAt: now,
       updatedAt: now,
       enrichedAt: now,
@@ -258,6 +270,13 @@ async function writeCanonicalComplete(
         evergreenScore: output.classification.evergreenScore,
         timeSensitivity: output.classification.timeSensitivity,
         confidenceJson: JSON.stringify(output.confidence),
+        sourceCoverage: source.coverage,
+        sourceKind: source.sourceKind,
+        sourceContentHash: source.contentHash,
+        sourceWordCount: source.wordCount,
+        sourceQualityScore: source.qualityScore,
+        sourceQualityWarningsJson: JSON.stringify(source.qualityWarnings),
+        understandingJson: understanding ? JSON.stringify(understanding) : null,
         errorMessage: null,
         updatedAt: now,
         enrichedAt: now,
@@ -379,6 +398,10 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
     return;
   }
 
+  const sourceEvidence =
+    String(source.item.contentType) === 'ARTICLE'
+      ? await resolveArticleEnrichmentSource(db, env.ARTICLE_CONTENT, source.item)
+      : metadataEnrichmentSource(source.item);
   const contentHash = computeItemContentHash({
     title: source.item.title,
     canonicalUrl: source.item.canonicalUrl,
@@ -388,6 +411,7 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
     summary: source.item.summary,
     creatorName: source.creator?.name ?? null,
     articleContentKey: source.item.articleContentKey,
+    sourceContentHash: sourceEvidence.contentHash,
   });
   const effectiveBody = { ...body, contentHash };
   const existingTags = await loadExistingTags(db, body.userId);
@@ -425,17 +449,71 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
 
     await upsertCanonicalPending(db, effectiveBody);
 
-    const articleContent = source.item.articleContentKey
-      ? await getArticleContent(env.ARTICLE_CONTENT, source.item.id)
-      : null;
     const promptInput = buildPromptInput({
       item: source.item,
       creator: source.creator,
-      articleContent,
+      articleContent: null,
     });
-    const output = await enrichWithQwen(env, promptInput);
+    let articleResult: Awaited<ReturnType<typeof enrichArticleWithQwen>> | null = null;
+    if (
+      shouldUseArticleUnderstanding(env.ARTICLE_UNDERSTANDING_MODE, body.trigger) &&
+      (sourceEvidence.coverage === 'FULL_CONTENT' ||
+        sourceEvidence.coverage === 'PARTIAL_CONTENT') &&
+      sourceEvidence.contentHash !== null &&
+      sourceEvidence.blocks.length > 0
+    ) {
+      articleResult = await enrichArticleWithQwen(env, {
+        promptInput,
+        source: {
+          ...sourceEvidence,
+          coverage: sourceEvidence.coverage,
+          contentHash: sourceEvidence.contentHash,
+        },
+      });
+    }
+    const output = articleResult?.output ?? (await enrichWithQwen(env, promptInput));
 
-    await writeCanonicalComplete(db, effectiveBody, output, env);
+    await upsertItemEmbedding(db, env, {
+      itemId: source.item.id,
+      userId: body.userId,
+      provider: String(source.item.provider),
+      contentType: String(source.item.contentType),
+      primaryCategory: output.classification.primaryCategory,
+      contentHash,
+      text: buildEmbeddingText({
+        item: source.item,
+        creator: source.creator,
+        output,
+        articleExcerpt: articleResult
+          ? buildArticleExcerpt(JSON.stringify(articleResult.understanding))
+          : null,
+      }),
+    });
+    if (articleResult) {
+      await upsertItemChunkEmbeddings(db, env, {
+        itemId: source.item.id,
+        userId: body.userId,
+        provider: String(source.item.provider),
+        contentType: String(source.item.contentType),
+        primaryCategory: output.classification.primaryCategory,
+        contentHash,
+        sourceContentHash: articleResult.understanding.sourceContentHash,
+        chunks: articleResult.chunks.map((chunk) => ({
+          ordinal: chunk.ordinal,
+          text: chunk.text,
+          blockIds: chunk.blockIds,
+        })),
+      });
+    }
+
+    await writeCanonicalComplete(
+      db,
+      effectiveBody,
+      output,
+      env,
+      sourceEvidence,
+      articleResult?.understanding ?? null
+    );
 
     try {
       await syncPeopleForItem(db, { itemId: effectiveBody.itemId });
@@ -455,21 +533,6 @@ async function processMessage(message: EnrichmentMessage, db: Database, env: Bin
       suggestedTags,
       inferredSaveIntent: output.userContext.inferredSaveIntent,
       reasonToRevisit: output.userContext.reasonToRevisit,
-    });
-
-    await upsertItemEmbedding(db, env, {
-      itemId: source.item.id,
-      userId: body.userId,
-      provider: String(source.item.provider),
-      contentType: String(source.item.contentType),
-      primaryCategory: output.classification.primaryCategory,
-      contentHash,
-      text: buildEmbeddingText({
-        item: source.item,
-        creator: source.creator,
-        output,
-        articleExcerpt: buildArticleExcerpt(articleContent),
-      }),
     });
 
     message.ack();

@@ -101,5 +101,7 @@ describe('enrichment prompt helpers', () => {
       'userContext',
       'confidence',
     ]);
+    expect(userPayload.constraints.join(' ')).toContain('collection-worthy');
+    expect(userPayload.constraints.join(' ')).toContain('Avoid broad tags');
   });
 });

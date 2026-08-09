@@ -208,6 +208,7 @@ app.post('/admin/enrichment/backfill', async (c) => {
     dryRun: typeof body.dryRun === 'boolean' ? body.dryRun : true,
     limit: typeof body.limit === 'number' ? body.limit : undefined,
     cursor: typeof body.cursor === 'string' && body.cursor.length > 0 ? body.cursor : null,
+    eligibleArticlesOnly: body.eligibleArticlesOnly === true,
   });
 
   return c.json({

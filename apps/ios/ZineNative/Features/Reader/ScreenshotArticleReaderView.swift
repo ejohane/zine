@@ -17,7 +17,8 @@ struct ScreenshotArticleReaderView: View {
         canonicalURL: URL(string: "https://example.com/calm-software")!,
         readingTimeMinutes: 7,
         initialProgress: BookmarkProgress(position: 0.18, duration: 1, percent: 18),
-        isFinished: false
+        isFinished: false,
+        tags: [BookmarkTag(id: "fixture-tag", name: "Design")]
     )
 
     private let client = APIClient(

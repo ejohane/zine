@@ -37,6 +37,7 @@ struct ScreenshotHomeView: View {
                     .navigationTitle("Conversations")
             }
         }
+        .zineScreenChrome()
     }
 
     @ViewBuilder
@@ -56,6 +57,7 @@ private struct ScreenshotHomeSectionListView: View {
     let route: HomeSectionRoute
 
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
 
     init(route: HomeSectionRoute) {
         self.route = route
@@ -68,20 +70,43 @@ private struct ScreenshotHomeSectionListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ContentTypeFilterHeader(title: route.title, selection: $contentType)
+        List {
+            CollapsingListTitle(
+                title: route.title,
+                progress: titleCollapseProgress
+            )
 
-            List {
+            Section {
                 ForEach(bookmarks) { bookmark in
                     BookmarkRow(bookmark: bookmark)
                 }
+            } header: {
+                ContentTypeFilterBar(selection: $contentType)
+                    .textCase(nil)
+                    .listRowInsets(EdgeInsets())
             }
-            .listStyle(.plain)
         }
-        .background(Color(uiColor: .systemBackground))
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let offset = geometry.contentOffset.y + geometry.contentInsets.top
+            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+        } action: { _, progress in
+            titleCollapseProgress = progress
+        }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .solidContentTypeFilterChrome()
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                CollapsedListTitle(
+                    title: route.title,
+                    progress: titleCollapseProgress
+                )
+            }
+        }
     }
 }
 

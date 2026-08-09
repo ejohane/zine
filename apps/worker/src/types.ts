@@ -33,6 +33,10 @@ export interface Bindings {
   ENVIRONMENT: string;
   /** Workers AI model used for bookmark enrichment */
   ENRICHMENT_MODEL?: string;
+  /** Workers AI model used for evidence-backed full-article understanding */
+  ARTICLE_UNDERSTANDING_MODEL?: string;
+  /** Deep article-understanding rollout: off, backfill_only, or all. */
+  ARTICLE_UNDERSTANDING_MODE?: string;
   /** Workers AI model used for item embeddings */
   EMBEDDING_MODEL?: string;
   /** Embedding vector dimensions */

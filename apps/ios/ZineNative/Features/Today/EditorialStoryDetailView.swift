@@ -52,12 +52,12 @@ struct EditorialStoryDetailView: View {
                                 if let handle = voice.handle {
                                     Text(handle.hasPrefix("@") ? handle : "@\(handle)")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(ZineTheme.secondaryText)
                                 }
                             }
                             Text(voice.contribution)
                                 .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(ZineTheme.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,15 +79,15 @@ struct EditorialStoryDetailView: View {
                     NavigationLink(value: TodayNavigationRoute.source(connection.sourceId)) {
                         HStack(alignment: .top, spacing: 10) {
                             Image(systemName: "bookmark.fill")
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(ZineTheme.brandAccent)
                             Text(connection.reason)
                                 .font(.subheadline)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(ZineTheme.primaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                             Image(systemName: "chevron.right")
                                 .font(.caption.weight(.semibold))
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(ZineTheme.tertiaryText)
                         }
                         .contentShape(Rectangle())
                     }
@@ -101,7 +101,7 @@ struct EditorialStoryDetailView: View {
         Text(text)
             .font(.caption2.weight(.heavy))
             .tracking(1.2)
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(ZineTheme.brandAccent)
     }
 
     private var header: some View {
@@ -109,7 +109,7 @@ struct EditorialStoryDetailView: View {
             Text("\(story.type.rawValue) · \(story.momentum.rawValue) MOMENTUM")
                 .font(.caption2.weight(.bold))
                 .tracking(1)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
 
             Text(story.title)
                 .font(.system(size: 36, weight: .bold, design: .serif))
@@ -117,7 +117,7 @@ struct EditorialStoryDetailView: View {
 
             Text(story.lede.text)
                 .font(.title3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ZineTheme.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -127,7 +127,7 @@ struct EditorialStoryDetailView: View {
             Text(label)
                 .font(.caption2.weight(.heavy))
                 .tracking(1.2)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(ZineTheme.brandAccent)
             Text(text)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
@@ -193,24 +193,26 @@ private struct EditorialSourceRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
                 .font(.headline)
-                .foregroundStyle(source.origin == .x ? .primary : Color.accentColor)
+                .foregroundStyle(
+                    source.origin == .x ? ZineTheme.primaryText : ZineTheme.brandAccent
+                )
                 .frame(width: 26)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(presentation?.title ?? source.title ?? source.creator ?? "Source")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
 
                 if let detail = presentation?.subtitle ?? source.creator ?? source.publisher {
                     Text(detail)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                 }
 
                 if let excerpt = presentation?.excerpt, !excerpt.isEmpty {
                     Text(excerpt)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ZineTheme.secondaryText)
                         .lineLimit(3)
                 }
             }
@@ -221,11 +223,11 @@ private struct EditorialSourceRow: View {
                     .foregroundStyle(.green)
             } else if presentation?.isSaved == true {
                 Image(systemName: "bookmark.fill")
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(ZineTheme.brandAccent)
             }
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(ZineTheme.tertiaryText)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

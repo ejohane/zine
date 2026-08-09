@@ -204,6 +204,13 @@
       "when": 1785116600000,
       "tag": "0028_add_people_daily_editions",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1786150800000,
+      "tag": "0029_add_article_understanding",
+      "breakpoints": true
     }
   ]
 }

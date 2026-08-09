@@ -9,7 +9,7 @@ struct BookmarkRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(bookmark.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(ZineTheme.primaryText)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
@@ -44,7 +44,7 @@ struct BookmarkRow: View {
                     .lineLimit(1)
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ZineTheme.secondaryText)
         }
     }
 
@@ -54,10 +54,10 @@ struct BookmarkRow: View {
             targetSize: CGSize(width: 64, height: 48)
         ) {
             ZStack {
-                Color.secondary.opacity(0.12)
+                ZineTheme.raised
                 Image(systemName: bookmark.contentType.systemImage)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ZineTheme.secondaryText)
             }
         }
         .frame(width: 64, height: 48)

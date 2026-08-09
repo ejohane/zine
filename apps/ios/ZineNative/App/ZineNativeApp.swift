@@ -41,6 +41,7 @@ struct ZineNativeApp: App {
     @AppStorage(AppAppearance.storageKey) private var storedAppearance = AppAppearance.system.rawValue
 
     init() {
+        ZineTheme.configureUIKitAppearance()
         if configuration.isClerkConfigured {
             Clerk.configure(publishableKey: configuration.clerkPublishableKey)
         }
@@ -50,11 +51,20 @@ struct ZineNativeApp: App {
         WindowGroup {
             rootView
                 .preferredColorScheme(appearance.colorScheme)
+                .zineAppTheme()
         }
     }
 
     private var appearance: AppAppearance {
-        AppAppearance(rawValue: storedAppearance) ?? .system
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-light-mode") {
+            return .light
+        }
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-dark-mode") {
+            return .dark
+        }
+#endif
+        return AppAppearance(rawValue: storedAppearance) ?? .system
     }
 
     @ViewBuilder
