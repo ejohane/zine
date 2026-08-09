@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
-import { EnrichmentModelValidationError, enrichWithQwen } from './llm';
+import { EnrichmentModelValidationError, enrichWithQwen, runStructuredJson } from './llm';
 import type { EnrichmentPromptInput } from './types';
 
 function createPromptInput(): EnrichmentPromptInput {
@@ -179,6 +180,44 @@ describe('enrichWithQwen', () => {
     const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
 
     expect(result.entities[0]?.relationship).toBe('MENTIONED');
+  });
+
+  it('bounds verbose free-form classification fields without discarding the output', async () => {
+    const output = createValidModelOutput();
+    output.classification.intent = 'x'.repeat(100);
+    const run = vi.fn().mockResolvedValue({ response: JSON.stringify(output) });
+
+    const result = await enrichWithQwen({ AI: { run } } as never, createPromptInput());
+
+    expect(result.classification.intent).toBe('x'.repeat(64));
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('can make a second evidence-preserving repair attempt with validation feedback', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: '{}' })
+      .mockResolvedValueOnce({ response: '{bad-json' })
+      .mockResolvedValueOnce({ response: JSON.stringify({ value: 'supported' }) });
+
+    const result = await runStructuredJson({ AI: { run } } as never, {
+      messages: [{ role: 'user', content: 'Return a value.' }],
+      schema: z.object({ value: z.string().min(1) }),
+      maxTokens: 100,
+      repairPrompt: 'Repair the object.',
+      operation: 'Test repair',
+      repairAttempts: 2,
+    });
+
+    expect(result.value).toBe('supported');
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(run.mock.calls[1]?.[1]).toMatchObject({
+      messages: expect.arrayContaining([
+        expect.objectContaining({
+          content: expect.stringContaining('Previous validation failure'),
+        }),
+      ]),
+    });
   });
 
   it('throws validation error when both model attempts are invalid', async () => {

@@ -1,6 +1,7 @@
 import { ulid } from 'ulid';
 import { eq, inArray } from 'drizzle-orm';
 import { Provider } from '@zine/shared';
+import { createHash } from 'node:crypto';
 
 import type { Bindings } from '../types';
 import type { Database } from '../db';
@@ -100,8 +101,10 @@ export function buildChunkVectorId(
   }
 ) {
   const base = buildVectorId(input);
-  const hash = input.sourceContentHash.replace(/^sha256:/, '').slice(0, 32);
-  return `${base}:content:${hash}:chunk:${input.ordinal}`;
+  const digest = createHash('sha256')
+    .update(`${base}\n${input.sourceContentHash}\n${input.ordinal}`)
+    .digest('hex');
+  return `chunk:${digest.slice(0, 58)}`;
 }
 
 async function upsertEmbeddingRef(
@@ -264,14 +267,16 @@ export async function upsertItemChunkEmbeddings(
   }
 
   const currentIds = new Set(vectorRows.map((vector) => vector.id));
-  const chunkVectorPrefix = `${buildVectorId(input)}:content:`;
+  const legacyChunkVectorPrefix = `${buildVectorId(input)}:content:`;
   const existingRefs = await db
     .select({ id: itemEmbeddingRefs.id, vectorId: itemEmbeddingRefs.vectorId })
     .from(itemEmbeddingRefs)
     .where(eq(itemEmbeddingRefs.itemId, input.itemId));
   const stale = existingRefs.filter(
     (reference) =>
-      reference.vectorId.startsWith(chunkVectorPrefix) && !currentIds.has(reference.vectorId)
+      (reference.vectorId.startsWith('chunk:') ||
+        reference.vectorId.startsWith(legacyChunkVectorPrefix)) &&
+      !currentIds.has(reference.vectorId)
   );
   if (stale.length > 0) {
     if (index.deleteByIds) await index.deleteByIds(stale.map((reference) => reference.vectorId));

@@ -22,6 +22,13 @@ const BaseEntityRelationshipSchema = z.enum([
 ]);
 const BaseSuggestedTagKindSchema = z.enum(['topic', 'entity', 'intent', 'format']);
 
+function boundedModelString(maxLength: number) {
+  return z.preprocess(
+    (value) => (typeof value === 'string' ? value.trim().slice(0, maxLength) : value),
+    z.string().min(1).max(maxLength)
+  );
+}
+
 function normalizeEnumishString(value: string): string {
   return value
     .trim()
@@ -100,12 +107,12 @@ export const EnrichmentModelOutputSchema: z.ZodType<EnrichmentModelOutput, z.Zod
       detail: z.string().min(1).max(2000),
     }),
     classification: z.object({
-      primaryCategory: z.string().min(1).max(64),
+      primaryCategory: boundedModelString(64),
       secondaryCategories: z.array(z.string().min(1).max(64)).max(5),
-      intent: z.string().min(1).max(64),
-      difficulty: z.string().min(1).max(64),
+      intent: boundedModelString(64),
+      difficulty: boundedModelString(64),
       evergreenScore: ConfidenceSchema,
-      timeSensitivity: z.string().min(1).max(64),
+      timeSensitivity: boundedModelString(64),
     }),
     topics: z
       .array(

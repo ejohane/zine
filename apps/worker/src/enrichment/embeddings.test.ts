@@ -46,9 +46,21 @@ describe('embedding privacy helpers', () => {
       ordinal: 2,
     });
 
-    expect(first).toContain(':content:');
-    expect(first).toContain(':chunk:2');
+    expect(first).toMatch(/^chunk:[a-f0-9]{58}$/);
+    expect(first.length).toBe(64);
     expect(first).not.toBe(changed);
+  });
+
+  it('keeps long production identifiers within the Vectorize ID limit', () => {
+    const vectorId = buildChunkVectorId({
+      itemId: '01KFCQJ597092ADP0M2NZ4HNF7',
+      userId: 'user_31ejjz59G6mTX1SIyErOi0fwu4A',
+      provider: 'WEB',
+      sourceContentHash: `sha256:${'a'.repeat(64)}`,
+      ordinal: 12,
+    });
+
+    expect(Buffer.byteLength(vectorId, 'utf8')).toBeLessThanOrEqual(64);
   });
 
   it('extracts a vector for every batched chunk', () => {

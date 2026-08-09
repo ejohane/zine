@@ -20,6 +20,17 @@ const EvidenceSchema = z.object({ evidenceBlockIds: EvidenceIdsSchema });
 const DescriptionEvidenceSchema = EvidenceSchema.extend({
   description: z.string().min(1).max(500),
 });
+const OptionalDescriptionEvidenceSchema = z.preprocess((value) => {
+  if (!value || typeof value !== 'object') return value;
+  const record = value as Record<string, unknown>;
+  const description = typeof record.description === 'string' ? record.description.trim() : '';
+  const evidenceBlockIds = Array.isArray(record.evidenceBlockIds)
+    ? record.evidenceBlockIds.filter(
+        (entry) => typeof entry === 'string' && entry.trim().length > 0
+      )
+    : [];
+  return description.length > 0 && evidenceBlockIds.length > 0 ? value : null;
+}, DescriptionEvidenceSchema.nullable().default(null));
 
 type ArticleChunkAnalysis = Omit<
   ArticleUnderstandingChunk,
@@ -76,8 +87,8 @@ export const ArticleChunkAnalysisSchema: z.ZodType<ArticleChunkAnalysis, z.ZodTy
       )
       .default([])
       .transform((values) => values.slice(0, 15)),
-    perspective: DescriptionEvidenceSchema.nullable().default(null),
-    audience: DescriptionEvidenceSchema.nullable().default(null),
+    perspective: OptionalDescriptionEvidenceSchema,
+    audience: OptionalDescriptionEvidenceSchema,
     prerequisites: z
       .array(DescriptionEvidenceSchema)
       .default([])
@@ -262,6 +273,7 @@ function chunkMessages(chunk: PreparedArticleChunk) {
           'Actionable takeaways state what a reader could do, test, notice, or decide because of the article. Do not invent advice unsupported by the text.',
           'For substantive article text, return at least 3 claims, 2 concepts, and 2 actionable takeaways. Empty semantic arrays are invalid.',
           'Include disagreements, limitations, open problems, or failed approaches when the text supplies them.',
+          'Use null for perspective or audience when the text does not support them. Never return empty descriptions or empty evidenceBlockIds.',
           'Return concise notes suitable for deciding whether this article belongs in a narrowly themed collection.',
           'Return at most 10 topics, 10 claims, 8 questions answered, 10 concepts, 15 entities, 8 prerequisites, and 8 actionable takeaways.',
         ],
@@ -302,9 +314,10 @@ async function analyzeChunk(
     schema: schemaForChunk(chunk),
     maxTokens: 4000,
     repairPrompt:
-      'Retry with exactly the requested JSON fields and no prose outside the JSON object. Copy evidence block IDs exactly from the [block:...] markers; altered or invented IDs will be rejected. A summary alone is invalid: include at least 3 supported claims, 2 article-specific concepts, and 2 supported actionableTakeaways. Return at most 10 topics, 10 claims, 8 questionsAnswered, 10 concepts, 15 entities, 8 prerequisites, and 8 actionableTakeaways.',
+      'Retry with exactly the requested JSON fields and no prose outside the JSON object. Copy evidence block IDs exactly from the [block:...] markers; altered or invented IDs will be rejected. A summary alone is invalid: include at least 3 supported claims, 2 article-specific concepts, and 2 supported actionableTakeaways. Use null, never empty objects, for unsupported perspective or audience. Return at most 10 topics, 10 claims, 8 questionsAnswered, 10 concepts, 15 entities, 8 prerequisites, and 8 actionableTakeaways.',
     operation: `Article chunk ${chunk.ordinal} analysis`,
     model: env.ARTICLE_UNDERSTANDING_MODEL,
+    repairAttempts: 2,
   });
   return normalizeChunkAnalysis(chunk, analysis);
 }

@@ -61,6 +61,28 @@ describe('article understanding', () => {
     expect(parsed.actionableTakeaways).toHaveLength(1);
   });
 
+  it('treats empty optional perspective and audience objects as unsupported', () => {
+    const parsed = ArticleChunkAnalysisSchema.parse({
+      summary: { text: 'Summary', evidenceBlockIds: ['article-body'] },
+      claims: [{ statement: 'Supported claim', evidenceBlockIds: ['article-body'] }],
+      concepts: [
+        {
+          name: 'Specific concept',
+          description: 'Supported concept',
+          evidenceBlockIds: ['article-body'],
+        },
+      ],
+      perspective: { description: '', evidenceBlockIds: [] },
+      audience: { description: '', evidenceBlockIds: [] },
+      actionableTakeaways: [
+        { description: 'Supported takeaway', evidenceBlockIds: ['article-body'] },
+      ],
+    });
+
+    expect(parsed.perspective).toBeNull();
+    expect(parsed.audience).toBeNull();
+  });
+
   it('rejects summary-only analysis', () => {
     expect(() =>
       ArticleChunkAnalysisSchema.parse({
