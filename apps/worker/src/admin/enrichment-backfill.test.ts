@@ -68,6 +68,7 @@ describe('backfillBookmarkEnrichment', () => {
 
     expect(result).toMatchObject({
       dryRun: true,
+      eligibleArticlesOnly: false,
       schemaVersion: ENRICHMENT_SCHEMA_VERSION,
       limit: 2,
       cursor: null,
@@ -118,6 +119,25 @@ describe('backfillBookmarkEnrichment', () => {
     });
 
     expect(bind).toHaveBeenCalledWith(ENRICHMENT_SCHEMA_VERSION, 'ui_099', 10);
+  });
+
+  it('can restrict candidates to articles with a current usable body', async () => {
+    const { env, prepare, bind } = createEnv([]);
+
+    const result = await backfillBookmarkEnrichment(env as never, {
+      dryRun: true,
+      limit: 10,
+      eligibleArticlesOnly: true,
+    });
+
+    const query = prepare.mock.calls[0]?.[0] as string;
+    expect(query).toContain("AND i.content_type = 'ARTICLE'");
+    expect(query).toContain(
+      'INNER JOIN article_body_versions abv ON abv.id = abs.current_version_id'
+    );
+    expect(query).toContain("AND abs.status IN ('AVAILABLE', 'DEGRADED')");
+    expect(bind).toHaveBeenCalledWith(ENRICHMENT_SCHEMA_VERSION, 10);
+    expect(result.eligibleArticlesOnly).toBe(true);
   });
 
   it('only excludes complete enrichment rows so failed rows can be retried', async () => {
