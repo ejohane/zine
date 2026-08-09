@@ -54,6 +54,21 @@ not a claim of corpus-wide recommendation quality.
 Missing or invalid values fail closed to `off`. Development and staging use `all`; the initial
 production configuration uses `backfill_only` for a bounded, explicit canary.
 
+Use the authenticated enrichment backfill route with `eligibleArticlesOnly: true` to restrict a
+canary to saved articles that have a current `AVAILABLE` or `DEGRADED` article body. Start with a
+dry run and keep the same filter when enqueueing the reviewed page:
+
+```json
+{
+  "dryRun": true,
+  "eligibleArticlesOnly": true,
+  "limit": 10
+}
+```
+
+The option defaults to `false`, so existing general enrichment backfills retain their current
+selection behavior.
+
 Description-only and metadata-only items continue through the existing lightweight enrichment
 path. Their coverage remains explicit so later collection ranking can require deep understanding or
 degrade honestly. While schema-v3 backfill progresses, enrichment reads retain the latest older
