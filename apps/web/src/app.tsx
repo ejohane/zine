@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from '
 
 import { AuthPage } from './auth-page';
 import { BookmarksPage } from './bookmarks-page';
+import { PreviewBanner } from './components/preview-banner';
 import { HomePage, InboxPage, LibraryPage, SearchPage } from './mobile-parity-pages';
 import { OAuthCallbackPage } from './oauth-callback-page';
 import { PwaProvider } from './lib/pwa';
@@ -121,6 +122,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
+        <PreviewBanner />
         <PwaSupport />
       </PwaProvider>
     </BrowserRouter>

@@ -5,6 +5,7 @@ import {
   Inbox,
   Library,
   LogOut,
+  Maximize2,
   Newspaper,
   Search,
   Settings as SettingsIcon,
@@ -94,10 +95,11 @@ function BookmarkSelectionReference() {
                 </div>
               </div>
             </div>
+            <p className="workspace-sidebar__label">Workspace</p>
             <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
               <div className="new-page-sidebar__rail-btn">
                 <Home size={18} strokeWidth={2.15} />
-                <span>Home</span>
+                <span>Today</span>
               </div>
               <div className="new-page-sidebar__rail-btn">
                 <Inbox size={18} strokeWidth={2.15} />
@@ -112,6 +114,22 @@ function BookmarkSelectionReference() {
                 <span>Library</span>
               </div>
             </nav>
+            <div className="workspace-sidebar__collections">
+              <p className="workspace-sidebar__label">Collections</p>
+              <nav aria-label="Collections">
+                <div className="new-page-sidebar__rail-btn workspace-sidebar__collection">
+                  <span className="workspace-sidebar__collection-dot" aria-hidden="true" />
+                  <span>Read next</span>
+                </div>
+                <div className="new-page-sidebar__rail-btn workspace-sidebar__collection">
+                  <span
+                    className="workspace-sidebar__collection-dot workspace-sidebar__collection-dot--1"
+                    aria-hidden="true"
+                  />
+                  <span>AI &amp; tools</span>
+                </div>
+              </nav>
+            </div>
           </div>
           <div className="new-page-sidebar__rail-footer">
             <div className="new-page-sidebar__rail-btn">
@@ -131,13 +149,18 @@ function BookmarkSelectionReference() {
 
         <div className="new-page-inset__body">
           <aside className="new-page-column-card">
-            <div className="new-page-column-card__header">
-              <h2 className="new-page-column-card__title">Bookmarks</h2>
-              <div className="new-page-column-card__chips">
-                <FilterChip label="All" size="small" selected />
+            <div className="new-page-column-card__header new-page-column-card__header--library">
+              <h1 className="new-page-column-card__title">Library</h1>
+              <div
+                className="new-page-column-card__chips"
+                role="group"
+                aria-label="Content format filters"
+              >
+                <FilterChip label="All" size="small" />
                 <FilterChip label="Articles" size="small" tone={ContentType.ARTICLE} />
-                <FilterChip label="Videos" size="small" tone={ContentType.VIDEO} selected />
                 <FilterChip label="Podcasts" size="small" tone={ContentType.PODCAST} />
+                <FilterChip label="Videos" size="small" tone={ContentType.VIDEO} selected />
+                <FilterChip label="Posts" size="small" tone={ContentType.POST} />
               </div>
             </div>
 
@@ -166,21 +189,25 @@ function BookmarkSelectionReference() {
 
           <div className="new-page-inset__content">
             <section className="new-page-column-card new-page-bookmark-pane">
+              <div className="workbench-readerbar" role="toolbar" aria-label="Reader controls">
+                <Button
+                  tone="ghost"
+                  size="icon"
+                  className="workbench-readerbar__expand"
+                  aria-label="Open immersive reader"
+                >
+                  <Maximize2 size={18} strokeWidth={2} />
+                </Button>
+              </div>
               <article className="new-page-bookmark-view new-page-bookmark-view--pane">
-                <div className="new-page-bookmark-view__hero">
-                  <div className="new-page-bookmark-view__hero-placeholder" />
-
-                  <div className="new-page-bookmark-view__hero-content">
+                <div className="new-page-bookmark-view__body">
+                  <div className="new-page-bookmark-view__header">
                     <div className="new-page-bookmark-view__badges">
                       <Badge>youtube</Badge>
                       <Badge>video</Badge>
                     </div>
-
                     <h2 className="new-page-bookmark-view__title">Design systems at scale</h2>
                   </div>
-                </div>
-
-                <div className="new-page-bookmark-view__body">
                   <div className="new-page-bookmark-view__creator-block">
                     <div className="new-page-bookmark-view__creator">
                       <div className="new-page-bookmark-view__creator-avatar new-page-bookmark-view__creator-avatar--fallback">
@@ -196,6 +223,10 @@ function BookmarkSelectionReference() {
                     <span>@zine-editorial</span>
                     <span>2 days ago</span>
                     <span>10:05</span>
+                  </div>
+
+                  <div className="new-page-bookmark-view__hero">
+                    <div className="new-page-bookmark-view__hero-placeholder" />
                   </div>
 
                   <div className="new-page-bookmark-view__actions">

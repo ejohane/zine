@@ -40,7 +40,7 @@ function Button({
   const resolvedVariant = resolveButtonVariant(variant);
   const resolvedSize = size === 'icon' ? 'md' : size;
   const metrics = getButtonMetrics(resolvedSize);
-  const palette = getButtonPalette(Colors.dark, resolvedVariant, tone, Boolean(disabled));
+  const palette = getButtonPalette(Colors.light, resolvedVariant, tone, Boolean(disabled));
   const iconStyle = size === 'icon';
   const textStyle = typographyStyle(metrics);
 

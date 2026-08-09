@@ -103,10 +103,11 @@ resolve_dev_host() {
     echo "localhost"
 }
 
+PORT_OFFSET=$(($(echo "$WORKTREE_PATH" | cksum | awk '{print $1}') % 100))
+
 if [ -n "$ZINE_WORKER_PORT" ]; then
   WORKER_PORT=$ZINE_WORKER_PORT
 else
-  PORT_OFFSET=$(($(echo "$WORKTREE_PATH" | cksum | awk '{print $1}') % 100))
   PREFERRED_PORT=$((8700 + PORT_OFFSET))
   WORKER_PORT=$(find_available_port $PREFERRED_PORT)
   
@@ -114,6 +115,13 @@ else
     echo "   ℹ️  Port $PREFERRED_PORT in use, using $WORKER_PORT instead"
   fi
 fi
+
+# Wrangler defaults every local Worker inspector to 9229. Turbo starts the
+# primary Worker and X archive Worker together, so give each one a stable,
+# worktree-specific inspector port to prevent one runtime from blocking the
+# other before its HTTP server starts.
+WORKER_INSPECTOR_PORT=$(find_available_port_from $((9200 + PORT_OFFSET)))
+X_ARCHIVE_INSPECTOR_PORT=$(find_available_port_from $((9300 + PORT_OFFSET)))
 
 # Metro bundler port: 8081 for main, 8100+ for worktrees
 if [ "$WORKTREE_PATH" = "$MAIN_WORKTREE" ]; then
@@ -307,6 +315,8 @@ fi
 # Export and Start Services
 # -----------------------------------------------------------------------------
 export WORKER_PORT
+export WORKER_INSPECTOR_PORT
+export X_ARCHIVE_INSPECTOR_PORT
 export METRO_PORT
 export WEB_PORT
 export EXPO_HOSTNAME="$DEV_HOST"

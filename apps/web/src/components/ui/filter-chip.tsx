@@ -55,7 +55,7 @@ export function FilterChip({
 }: FilterChipProps) {
   const displayedCount = typeof count === 'number' ? (count > 99 ? '99+' : String(count)) : null;
   const metrics = getFilterChipMetrics(size);
-  const palette = getFilterChipPalette(Colors.dark, resolveFilterChipTone(tone), selected);
+  const palette = getFilterChipPalette(Colors.light, resolveFilterChipTone(tone), selected);
   const textStyle = typographyStyle(metrics);
 
   return (

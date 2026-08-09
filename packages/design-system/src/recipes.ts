@@ -1,4 +1,11 @@
-import { FilterChipPalette, Radius, Spacing, Typography, type ThemeColors } from './foundations';
+import {
+  BrandColors,
+  Radius,
+  Spacing,
+  Typography,
+  type FilterChipPalette,
+  type ThemeColors,
+} from './foundations';
 import type {
   BadgeSize,
   BadgeTone,
@@ -63,10 +70,10 @@ export type FilterChipMetrics = TextMetrics & {
 };
 
 export const FilterChipForegrounds: Record<FilterChipToneKey, string> = {
-  article: '#BFDBFE',
-  podcast: '#BBF7D0',
-  video: '#FCA5A5',
-  post: '#F5F5F5',
+  article: BrandColors.black,
+  podcast: BrandColors.black,
+  video: BrandColors.black,
+  post: BrandColors.black,
 };
 
 function toTextMetrics(token: {
@@ -311,7 +318,7 @@ export function getSurfaceBorderColor(
 
 export function getFilterChipPalette(
   colors: ThemeColors,
-  tone: FilterChipToneKey | 'default',
+  _tone: FilterChipToneKey | 'default',
   selected: boolean
 ): FilterChipPaletteState {
   if (!selected) {
@@ -322,18 +329,10 @@ export function getFilterChipPalette(
     };
   }
 
-  if (tone === 'default') {
-    return {
-      backgroundColor: colors.surfaceRaised,
-      borderColor: colors.borderDefault,
-      foregroundColor: colors.textPrimary,
-    };
-  }
-
   return {
-    backgroundColor: FilterChipPalette[tone].surface,
-    borderColor: FilterChipPalette[tone].accent,
-    foregroundColor: FilterChipForegrounds[tone],
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+    foregroundColor: colors.accentForeground,
   };
 }
 

@@ -1,0 +1,254 @@
+name: Deploy Web Preview
+
+on:
+  push:
+    branches-ignore: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/design-system/**'
+      - 'packages/shared/**'
+      - 'apps/worker/src/trpc/**'
+      - '.github/workflows/deploy-web-preview.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'bunfig.toml'
+  delete:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deploy or remove a branch preview
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - delete
+      ref:
+        description: Branch name to deploy or remove
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: web-preview-${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build branch preview
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      (github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy'))
+    runs-on: ubuntu-latest
+    outputs:
+      git_sha: ${{ steps.commit.outputs.git_sha }}
+      hostname: ${{ steps.target.outputs.hostname }}
+      preview_id: ${{ steps.target.outputs.id }}
+      url: ${{ steps.target.outputs.url }}
+      worker_name: ${{ steps.target.outputs.workerName }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Resolve preview target
+        id: target
+        env:
+          PREVIEW_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
+        run: bun apps/web/scripts/preview-target.ts "$PREVIEW_REF"
+
+      - name: Resolve checked out commit
+        id: commit
+        run: echo "git_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate public build configuration
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_UPSTREAM_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          missing=0
+          for name in VITE_CLERK_PUBLISHABLE_KEY VITE_UPSTREAM_API_URL; do
+            if [ -z "${!name}" ]; then
+              echo "Missing required preview setting: $name" >&2
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Run focused web tests
+        run: bun run --cwd apps/web test
+
+      - name: Build preview assets
+        env:
+          VITE_API_URL: ${{ steps.target.outputs.url }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_DEPLOYMENT_ENV: preview
+          VITE_GIT_SHA: ${{ steps.commit.outputs.git_sha }}
+          VITE_PREVIEW_ID: ${{ steps.target.outputs.id }}
+          VITE_SPOTIFY_CLIENT_ID: ${{ vars.VITE_SPOTIFY_CLIENT_ID }}
+          VITE_YOUTUBE_CLIENT_ID: ${{ vars.VITE_YOUTUBE_CLIENT_ID }}
+        run: bun run --cwd apps/web build
+
+      - name: Upload immutable preview bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-preview-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 3
+          path: |
+            apps/web/dist
+            apps/web/src/preview-worker.ts
+            apps/web/wrangler.preview.toml
+
+  deploy:
+    name: Deploy branch preview
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: web-preview
+      url: ${{ needs.build.outputs.url }}
+    steps:
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Download immutable preview bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: web-preview-${{ github.run_id }}
+          path: preview-bundle
+
+      - name: Validate Cloudflare credentials
+        working-directory: preview-bundle
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bunx wrangler@4.119.0 whoami
+
+      - name: Deploy isolated preview Worker
+        working-directory: preview-bundle
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PREVIEW_GIT_SHA: ${{ needs.build.outputs.git_sha }}
+          PREVIEW_ID: ${{ needs.build.outputs.preview_id }}
+          PREVIEW_HOSTNAME: ${{ needs.build.outputs.hostname }}
+          UPSTREAM_API_URL: ${{ vars.VITE_API_URL }}
+          WORKER_NAME: ${{ needs.build.outputs.worker_name }}
+        run: |
+          bunx wrangler@4.119.0 deploy \
+            --config wrangler.preview.toml \
+            --name "$WORKER_NAME" \
+            --domain "$PREVIEW_HOSTNAME" \
+            --message "GitHub ${PREVIEW_GIT_SHA}" \
+            --var "UPSTREAM_API_URL:${UPSTREAM_API_URL}" \
+            --var "PREVIEW_ID:${PREVIEW_ID}" \
+            --var "PREVIEW_GIT_SHA:${PREVIEW_GIT_SHA}"
+
+      - name: Verify deployed preview
+        env:
+          EXPECTED_GIT_SHA: ${{ needs.build.outputs.git_sha }}
+          PREVIEW_URL: ${{ needs.build.outputs.url }}
+        run: |
+          ready=false
+          for attempt in $(seq 1 60); do
+            if response="$(curl --fail --silent --show-error \
+              --connect-timeout 5 --max-time 15 \
+              "${PREVIEW_URL}/_preview/health")" && \
+              echo "$response" | jq -e --arg sha "$EXPECTED_GIT_SHA" \
+                '.status == "ok" and .service == "zine-web-preview" and .gitSha == $sha'
+            then
+              ready=true
+              break
+            fi
+
+            echo "Preview certificate or deployment is not ready (attempt ${attempt}/60)."
+            sleep 5
+          done
+
+          if [ "$ready" != true ]; then
+            echo "Preview did not become ready within five minutes." >&2
+            exit 1
+          fi
+
+          api_ready=false
+          for attempt in $(seq 1 24); do
+            api_status="$(curl --silent --show-error \
+              --connect-timeout 5 --max-time 15 \
+              --output preview-api-response.json --write-out '%{http_code}' \
+              "${PREVIEW_URL}/api/v1/inbox")"
+            if [ "$api_status" = 401 ] && \
+              jq -e '.code == "UNAUTHORIZED"' preview-api-response.json >/dev/null
+            then
+              api_ready=true
+              break
+            fi
+
+            echo "Preview API binding is not ready (attempt ${attempt}/24, status ${api_status})."
+            sleep 5
+          done
+
+          if [ "$api_ready" != true ]; then
+            echo "Preview API proxy did not become ready within two minutes (${api_status})." >&2
+            cat preview-api-response.json >&2
+            exit 1
+          fi
+
+      - name: Publish preview summary
+        env:
+          PREVIEW_ID: ${{ needs.build.outputs.preview_id }}
+          PREVIEW_URL: ${{ needs.build.outputs.url }}
+        run: |
+          {
+            echo "### Zine web preview"
+            echo
+            echo "- URL: ${PREVIEW_URL}"
+            echo "- Preview: ${PREVIEW_ID}"
+            echo "- Data: live Zine account data"
+            echo "- Provider connection flows: disabled"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup:
+    name: Remove branch preview
+    if: >-
+      (github.event_name == 'delete' && github.event.ref_type == 'branch' && github.event.ref != 'main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.action == 'delete')
+    runs-on: ubuntu-latest
+    environment: web-preview
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Resolve preview target
+        id: target
+        env:
+          PREVIEW_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.ref }}
+        run: bun apps/web/scripts/preview-target.ts "$PREVIEW_REF"
+
+      - name: Validate Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: bunx wrangler@4.119.0 whoami
+
+      - name: Delete isolated preview Worker
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WORKER_NAME: ${{ steps.target.outputs.workerName }}
+        run: bunx wrangler@4.119.0 delete "$WORKER_NAME" --force

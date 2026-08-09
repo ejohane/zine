@@ -53,7 +53,7 @@ function Badge({
 }) {
   const resolvedTone = resolveBadgeTone(tone, variant);
   const metrics = getBadgeMetrics(size);
-  const palette = getBadgePalette(Colors.dark, resolvedTone);
+  const palette = getBadgePalette(Colors.light, resolvedTone);
   const textStyle = typographyStyle(metrics);
 
   return (

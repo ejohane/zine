@@ -1,15 +1,4 @@
-import {
-  BookmarkCheck,
-  ChevronRight,
-  Folder,
-  Home,
-  Inbox,
-  Library,
-  Rss,
-  Search,
-  Settings,
-  UserRound,
-} from 'lucide-react';
+import { BookmarkCheck, Folder, Rss, Search, UserRound } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -18,14 +7,14 @@ import {
   type ComponentType,
   type ReactNode,
 } from 'react';
-import { Link, NavLink, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { ContentType, type CollectionRules } from '@zine/shared';
 
-import { AppWordmark } from './app-wordmark';
 import { Badge, Button, EmptyState, Surface, cn } from './components';
 import { ItemCardView, type ItemCardData } from './components/item-card';
 import { MobileTabBar } from './components/mobile-tab-bar';
+import { WorkspaceSidebar } from './components/workspace-sidebar';
 import { FilterChip } from './components/ui/filter-chip';
 import { formatDisplayText, mapProvider } from './lib/format';
 import type { LibraryItem } from './lib/router-types';
@@ -129,88 +118,6 @@ function ContentFilterBar({
   );
 }
 
-function PrimaryNav() {
-  const location = useLocation();
-  const libraryActive =
-    location.pathname.startsWith('/library') || location.pathname.startsWith('/item/');
-
-  return (
-    <>
-      <div className="new-page-sidebar__rail-top">
-        <div className="new-page-sidebar__rail-header">
-          <Link to="/home" className="new-page-sidebar__brand" aria-label="Go to home">
-            <div className="new-page-sidebar__brand-icon">
-              <AppWordmark compact />
-            </div>
-          </Link>
-        </div>
-
-        <nav className="new-page-sidebar__rail-nav" aria-label="Primary">
-          <NavLink
-            to="/home"
-            className={({ isActive }) =>
-              cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-            }
-            aria-label="Home"
-            title="Home"
-          >
-            <Home size={18} strokeWidth={2.15} />
-            <span>Home</span>
-          </NavLink>
-          <NavLink
-            to="/inbox"
-            className={({ isActive }) =>
-              cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-            }
-            aria-label="Inbox"
-            title="Inbox"
-          >
-            <Inbox size={18} strokeWidth={2.15} />
-            <span>Inbox</span>
-          </NavLink>
-          <NavLink
-            to="/search"
-            className={({ isActive }) =>
-              cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-            }
-            aria-label="Search"
-            title="Search"
-          >
-            <Search size={18} strokeWidth={2.15} />
-            <span>Search</span>
-          </NavLink>
-          <NavLink
-            to="/library/bookmarks"
-            className={cn(
-              'new-page-sidebar__rail-btn',
-              libraryActive && 'new-page-sidebar__rail-btn--active'
-            )}
-            aria-label="Library"
-            title="Library"
-          >
-            <Library size={18} strokeWidth={2.15} />
-            <span>Library</span>
-          </NavLink>
-        </nav>
-      </div>
-
-      <div className="new-page-sidebar__rail-footer">
-        <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            cn('new-page-sidebar__rail-btn', isActive && 'new-page-sidebar__rail-btn--active')
-          }
-          aria-label="Settings"
-          title="Settings"
-        >
-          <Settings size={18} strokeWidth={2.15} />
-          <span>Settings</span>
-        </NavLink>
-      </div>
-    </>
-  );
-}
-
 function WebPageFrame({
   eyebrow,
   title,
@@ -224,21 +131,16 @@ function WebPageFrame({
 }) {
   return (
     <main className="new-page-screen web-page-screen">
-      <div className="new-page-sidebar">
-        <div className="new-page-sidebar__rail">
-          <PrimaryNav />
-        </div>
-      </div>
+      <WorkspaceSidebar />
 
       <MobileTabBar />
 
       <div className="new-page-inset web-page-inset">
         <header className="new-page-inset__header web-page-header">
-          <nav className="new-page-breadcrumb" aria-label="Current page location">
-            <span>{eyebrow}</span>
-            <ChevronRight size={14} strokeWidth={2.2} />
-            <strong>{title}</strong>
-          </nav>
+          <div className="workbench-page-title">
+            <p>{eyebrow}</p>
+            <h1>{title}</h1>
+          </div>
           {actions ? <div className="new-page-inset__header-actions">{actions}</div> : null}
         </header>
         <div className="new-page-inset__body web-page-body">{children}</div>
@@ -347,8 +249,8 @@ export function HomePage() {
 
   return (
     <WebPageFrame
-      eyebrow="Today"
-      title="Home"
+      eyebrow="Home"
+      title="Today"
       actions={<ContentFilterBar activeFilter={activeFilter} onChange={setActiveFilter} />}
     >
       <div className="web-page-scroll">

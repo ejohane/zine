@@ -11,7 +11,7 @@ const libraryItems = [
     creatorImageUrl: null,
     thumbnailUrl: null,
     contentType: ContentType.ARTICLE,
-    provider: Provider.SUBSTACK,
+    provider: Provider.WEB,
     duration: null,
     readingTimeMinutes: 8,
     publisher: null,
@@ -214,6 +214,34 @@ function failure(message: string, path: string, httpStatus = 500) {
 }
 
 export async function mockWebTrpc(page: Page, mode: MockMode = 'default') {
+  await page.route('**/api/v1/bookmarks/*/article-content', async (route) => {
+    const bookmarkId = new URL(route.request().url()).pathname.split('/').at(-2);
+    const article = libraryItems.find(
+      (item) => item.id === bookmarkId && item.contentType === ContentType.ARTICLE
+    );
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: article
+          ? [
+              '<p>Extracted article text begins here, in the same reading flow as Zine for iOS.</p>',
+              '<h2>A stable reading surface</h2>',
+              ...Array.from(
+                { length: 12 },
+                (_, index) =>
+                  `<p>Reader section ${index + 1} keeps enough realistic copy in the fixture to exercise long-form scrolling and immersive layout transitions.</p>`
+              ),
+            ].join('')
+          : null,
+        articleBody: {
+          availability: article ? 'AVAILABLE' : 'UNAVAILABLE',
+        },
+      }),
+    });
+  });
+
   await page.route('**/trpc/**', async (route) => {
     const url = new URL(route.request().url());
     const procedures = url.pathname.split('/trpc/')[1]?.split(',') ?? [];

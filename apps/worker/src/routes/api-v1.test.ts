@@ -69,6 +69,7 @@ const {
   mockFindUserItem,
   mockUserItemUpdateSet,
   mockConsumptionInsertValues,
+  mockGetDevelopmentAuthBypassUserId,
   mockVerifyClerkRequestToken,
   mockStartEditorialRun,
   mockFailEditorialRun,
@@ -158,6 +159,7 @@ const {
   mockFindUserItem: vi.fn(),
   mockUserItemUpdateSet: vi.fn(),
   mockConsumptionInsertValues: vi.fn(),
+  mockGetDevelopmentAuthBypassUserId: vi.fn(),
   mockVerifyClerkRequestToken: vi.fn(),
   mockStartEditorialRun: vi.fn(),
   mockFailEditorialRun: vi.fn(),
@@ -214,6 +216,7 @@ vi.mock('../trpc/router', () => ({
 }));
 
 vi.mock('../middleware/auth', () => ({
+  getDevelopmentAuthBypassUserId: mockGetDevelopmentAuthBypassUserId,
   verifyClerkRequestToken: mockVerifyClerkRequestToken,
 }));
 
@@ -434,6 +437,7 @@ describe('apiV1Routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbToken(createTokenRecord(['bookmarks:read', 'bookmarks:write']));
+    mockGetDevelopmentAuthBypassUserId.mockReturnValue(null);
     mockVerifyClerkRequestToken.mockResolvedValue({
       success: true,
       userId: 'clerk_user_123',
@@ -2893,6 +2897,34 @@ describe('apiV1Routes', () => {
         sourceKind: 'LEGACY',
         qualityWarnings: ['LEGACY_UNNORMALIZED'],
       },
+    });
+  });
+
+  it('serves bookmark article content through the development auth bypass', async () => {
+    mockGetDevelopmentAuthBypassUserId.mockReturnValue('dev-user-001');
+    mockGetItem.mockResolvedValue({
+      id: 'ui_1',
+      itemId: 'item_1',
+      title: 'Local article',
+    });
+    mockGetArticleContent.mockResolvedValue({ content: '<article>Local body</article>' });
+    const app = createTestApp();
+
+    const res = await app.fetch(
+      new Request('http://localhost/api/v1/bookmarks/ui_1/article-content'),
+      {
+        ...createMockEnv(),
+        ENVIRONMENT: 'development',
+      } as Env['Bindings']
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockVerifyClerkRequestToken).not.toHaveBeenCalled();
+    expect(mockCreateContext).toHaveBeenCalledWith(
+      expect.objectContaining({ get: expect.any(Function) })
+    );
+    expect((await res.json()) as JsonBody).toMatchObject({
+      content: '<article>Local body</article>',
     });
   });
 

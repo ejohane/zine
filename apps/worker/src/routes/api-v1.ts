@@ -59,7 +59,7 @@ import {
   listEditorialEditions,
   storeEditorialEdition,
 } from '../lib/editorial-storage';
-import { verifyClerkRequestToken } from '../middleware/auth';
+import { getDevelopmentAuthBypassUserId, verifyClerkRequestToken } from '../middleware/auth';
 import { logger } from '../lib/logger';
 import { getEditorialToday } from '../lib/editorial-today';
 import { getDailyAuthorActivity, getDailyFeed } from '../lib/daily-feed';
@@ -511,6 +511,14 @@ function apiAuth(requiredPatScope: ApiTokenScope) {
   const middleware: MiddlewareHandler<Env> = async (c, next) => {
     const requestId = c.get('requestId');
     const traceId = c.get('traceId');
+    const developmentUserId = getDevelopmentAuthBypassUserId(c.env);
+
+    if (developmentUserId) {
+      c.set('userId', developmentUserId);
+      await next();
+      return;
+    }
+
     const rawToken = extractBearerToken(c.req.header('Authorization'));
 
     if (!rawToken) {

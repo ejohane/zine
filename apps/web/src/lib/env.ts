@@ -5,3 +5,8 @@ export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY?
 export const YOUTUBE_CLIENT_ID = import.meta.env.VITE_YOUTUBE_CLIENT_ID?.trim() || '';
 export const SPOTIFY_CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID?.trim() || '';
 export const X_CLIENT_ID = import.meta.env.VITE_X_CLIENT_ID?.trim() || '';
+export const DEPLOYMENT_ENVIRONMENT =
+  import.meta.env.VITE_DEPLOYMENT_ENV?.trim().toLowerCase() || 'development';
+export const PREVIEW_ID = import.meta.env.VITE_PREVIEW_ID?.trim() || '';
+export const GIT_SHA = import.meta.env.VITE_GIT_SHA?.trim() || '';
+export const IS_PREVIEW_DEPLOYMENT = DEPLOYMENT_ENVIRONMENT === 'preview';

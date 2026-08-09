@@ -18,7 +18,7 @@ const DEFAULT_CLERK_JWKS_URL = 'https://clerk.myzine.app/.well-known/jwks.json';
 /**
  * Development user ID used when auth is bypassed
  */
-const DEV_USER_ID = 'dev-user-001';
+export const DEV_USER_ID = 'dev-user-001';
 
 /**
  * Flag to track if we've already ensured the dev user exists
@@ -50,6 +50,10 @@ function createAuthError(message: string, code: string, requestId: string): Auth
 
 function shouldUseDevelopmentAuthBypass(env: Env['Bindings']): boolean {
   return env.ENVIRONMENT === 'development' && !env.CLERK_JWKS_URL;
+}
+
+export function getDevelopmentAuthBypassUserId(env: Env['Bindings']): string | null {
+  return shouldUseDevelopmentAuthBypass(env) ? DEV_USER_ID : null;
 }
 
 function getClerkJwksUrl(env: Env['Bindings']): string {

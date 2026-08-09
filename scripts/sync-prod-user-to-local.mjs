@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFile, execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -7,11 +8,13 @@ import {
   readFileSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import { promisify } from 'node:util';
 import { Database } from 'bun:sqlite';
 
 const REPO_ROOT = resolve(dirname(new URL(import.meta.url).pathname), '..');
@@ -21,20 +24,58 @@ const BACKUP_DIR = join(REPO_ROOT, '.local-data/local-d1-backups');
 const RAW_SQL = join(SNAPSHOT_DIR, 'prod-raw.sql');
 const RAW_DB = join(SNAPSHOT_DIR, 'prod-raw.sqlite');
 const SANITIZED_SQL = join(SNAPSHOT_DIR, 'local-sanitized.sql');
+const ARTICLE_BODIES_DIR = join(SNAPSHOT_DIR, 'article-bodies');
+const STAGED_STATE_DIR = join(SNAPSHOT_DIR, 'staged-wrangler-state');
 const STATE_DIR = join(WORKER_DIR, '.wrangler/state');
 const MIGRATIONS_DIR = join(WORKER_DIR, 'src/db/migrations');
 
 const PROD_DATABASE = 'zine-db-production';
 const PROD_ENV = 'production';
+const PROD_ARTICLE_BUCKET = 'zine-article-content-prod';
+const LOCAL_ARTICLE_BUCKET = 'zine-article-content-dev';
 const PROD_USER_ID = 'user_31ejjz59G6mTX1SIyErOi0fwu4A';
 const LOCAL_USER_ID = 'dev-user-001';
 const LOCAL_EMAIL = 'dev@example.com';
+const ARTICLE_BODY_TRANSFER_CONCURRENCY = 6;
+const LOCAL_R2_RESTORE_CONCURRENCY = 1;
 
-const args = new Set(process.argv.slice(2));
-const assumeYes = args.has('--yes') || args.has('-y');
-const skipExport = args.has('--skip-export');
-const skipRestore = args.has('--skip-restore');
-const keepRaw = args.has('--keep-raw');
+const SUPPORTED_ARGS = new Set([
+  '--yes',
+  '-y',
+  '--skip-export',
+  '--skip-restore',
+  '--keep-raw',
+  '--include-article-bodies',
+]);
+
+export function parseSyncOptions(argv) {
+  const unknownArgs = argv.filter((arg) => !SUPPORTED_ARGS.has(arg));
+  if (unknownArgs.length > 0) {
+    throw new Error(
+      `Unknown argument${unknownArgs.length === 1 ? '' : 's'}: ${unknownArgs.join(', ')}`
+    );
+  }
+
+  const args = new Set(argv);
+  const options = {
+    assumeYes: args.has('--yes') || args.has('-y'),
+    skipExport: args.has('--skip-export'),
+    skipRestore: args.has('--skip-restore'),
+    keepRaw: args.has('--keep-raw'),
+    includeArticleBodies: args.has('--include-article-bodies'),
+  };
+
+  if (options.includeArticleBodies && options.skipRestore) {
+    throw new Error('--include-article-bodies cannot be combined with --skip-restore.');
+  }
+
+  return options;
+}
+
+const { assumeYes, skipExport, skipRestore, keepRaw, includeArticleBodies } = parseSyncOptions(
+  import.meta.main ? process.argv.slice(2) : []
+);
+const execFileAsync = promisify(execFile);
 
 function run(command, args, options = {}) {
   console.log(`$ ${command} ${args.join(' ')}`);
@@ -79,6 +120,54 @@ function runCaptured(command, args, options = {}) {
   if (options.successMessage) {
     console.log(options.successMessage);
   }
+}
+
+async function runCapturedAsync(command, args, options = {}) {
+  try {
+    await execFileAsync(command, args, {
+      cwd: options.cwd ?? REPO_ROOT,
+      encoding: 'utf8',
+      maxBuffer: 1024 * 1024 * 100,
+    });
+  } catch (error) {
+    const output = `${error?.stdout ?? ''}\n${error?.stderr ?? ''}`.trim();
+    const tail = output.split('\n').slice(-40).join('\n');
+    if (tail) console.error(tail);
+    throw new Error(`${command} ${args.slice(0, 4).join(' ')} failed`);
+  }
+}
+
+function assertLocalDevStackStopped() {
+  if (skipRestore) return;
+
+  const result = spawnSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+  if (result.status !== 0) return;
+
+  const runningWrangler = result.stdout
+    .split('\n')
+    .filter((line) => line.includes(REPO_ROOT))
+    .filter((line) => /(?:\.bin\/wrangler|wrangler-dist\/cli\.js)\s+dev\b/.test(line));
+
+  if (runningWrangler.length > 0) {
+    throw new Error(
+      [
+        'The local Zine dev stack is running in this worktree.',
+        'Stop bun run dev:worktree before replacing local Wrangler state, then restart it after the sync.',
+      ].join('\n')
+    );
+  }
+}
+
+async function mapWithConcurrency(values, concurrency, operation) {
+  let nextIndex = 0;
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await operation(values[index], index);
+    }
+  });
+  await Promise.all(workers);
 }
 
 function sqlString(value) {
@@ -126,17 +215,7 @@ function exportProductionD1() {
   rmSync(RAW_SQL, { force: true });
   run(
     'bun',
-    [
-      'wrangler',
-      'd1',
-      'export',
-      PROD_DATABASE,
-      '--env',
-      PROD_ENV,
-      '--remote',
-      '--output',
-      RAW_SQL,
-    ],
+    ['wrangler', 'd1', 'export', PROD_DATABASE, '--env', PROD_ENV, '--remote', '--output', RAW_SQL],
     { cwd: WORKER_DIR }
   );
 }
@@ -151,6 +230,7 @@ function sanitizeSqlite() {
   const prodUser = sqlString(PROD_USER_ID);
   const localUser = sqlString(LOCAL_USER_ID);
   const localEmail = sqlString(LOCAL_EMAIL);
+  const articleContentKeyReset = includeArticleBodies ? '' : ',\n       article_content_key = NULL';
 
   runSqlite(
     RAW_DB,
@@ -184,6 +264,15 @@ CREATE TEMP TABLE keep_rss_feeds AS
 CREATE TEMP TABLE keep_sources AS
   SELECT id FROM sources WHERE user_id = ${prodUser};
 
+CREATE TEMP TABLE keep_daily_editions AS
+  SELECT id FROM daily_editions WHERE user_id = ${prodUser};
+
+CREATE TEMP TABLE keep_editorial_experiments AS
+  SELECT id FROM editorial_experiments WHERE user_id = ${prodUser};
+
+CREATE TEMP TABLE keep_people_daily_editions AS
+  SELECT id FROM people_daily_editions WHERE user_id = ${prodUser};
+
 CREATE TEMP TABLE keep_items AS
   SELECT DISTINCT item_id AS id FROM user_items WHERE user_id = ${prodUser}
   UNION
@@ -215,6 +304,56 @@ DELETE FROM dead_letter_queue;
 DELETE FROM item_embedding_refs;
 DELETE FROM rss_discovery_cache;
 DELETE FROM newsletter_unsubscribe_events;
+DELETE FROM api_tokens;
+
+DELETE FROM editorial_experiment_reviews
+ WHERE user_id != ${prodUser}
+    OR experiment_id NOT IN (SELECT id FROM keep_editorial_experiments);
+
+DELETE FROM editorial_experiment_variants
+ WHERE user_id != ${prodUser}
+    OR experiment_id NOT IN (SELECT id FROM keep_editorial_experiments);
+
+DELETE FROM editorial_experiments WHERE user_id != ${prodUser};
+
+UPDATE editorial_experiments
+   SET promoted_edition_id = NULL
+ WHERE promoted_edition_id IS NOT NULL
+   AND promoted_edition_id NOT IN (SELECT id FROM keep_daily_editions);
+
+DELETE FROM editorial_feedback_events
+ WHERE user_id != ${prodUser}
+    OR edition_id NOT IN (SELECT id FROM keep_daily_editions);
+
+DELETE FROM editorial_runs WHERE user_id != ${prodUser};
+
+UPDATE editorial_runs
+   SET edition_id = NULL
+ WHERE edition_id IS NOT NULL
+   AND edition_id NOT IN (SELECT id FROM keep_daily_editions);
+
+DELETE FROM daily_editions WHERE user_id != ${prodUser};
+
+DELETE FROM people_daily_active_editions
+ WHERE user_id != ${prodUser}
+    OR edition_id NOT IN (SELECT id FROM keep_people_daily_editions);
+
+DELETE FROM people_daily_builds WHERE user_id != ${prodUser};
+
+UPDATE people_daily_builds
+   SET edition_id = NULL
+ WHERE edition_id IS NOT NULL
+   AND edition_id NOT IN (SELECT id FROM keep_people_daily_editions);
+
+DELETE FROM people_daily_editions WHERE user_id != ${prodUser};
+
+DELETE FROM home_screen_sections
+ WHERE user_id != ${prodUser}
+    OR (collection_id IS NOT NULL AND collection_id NOT IN (SELECT id FROM keep_collections));
+
+DELETE FROM person_social_profiles
+ WHERE user_id != ${prodUser}
+    OR user_person_id NOT IN (SELECT id FROM user_people WHERE user_id = ${prodUser});
 
 DELETE FROM user_person_mentions
  WHERE user_id != ${prodUser}
@@ -315,6 +454,17 @@ UPDATE rss_feeds SET user_id = ${localUser};
 UPDATE subscriptions SET user_id = ${localUser};
 UPDATE user_notifications SET user_id = ${localUser};
 UPDATE provider_items_seen SET user_id = ${localUser};
+UPDATE person_social_profiles SET user_id = ${localUser};
+UPDATE home_screen_sections SET user_id = ${localUser};
+UPDATE daily_editions SET user_id = ${localUser};
+UPDATE editorial_runs SET user_id = ${localUser};
+UPDATE editorial_feedback_events SET user_id = ${localUser};
+UPDATE editorial_experiments SET user_id = ${localUser};
+UPDATE editorial_experiment_variants SET user_id = ${localUser};
+UPDATE editorial_experiment_reviews SET user_id = ${localUser};
+UPDATE people_daily_editions SET user_id = ${localUser};
+UPDATE people_daily_builds SET user_id = ${localUser};
+UPDATE people_daily_active_editions SET user_id = ${localUser};
 
 UPDATE provider_connections
    SET provider_user_id = 'local-redacted-' || lower(provider),
@@ -358,17 +508,142 @@ UPDATE newsletter_feed_messages
        END;
 
 UPDATE items
-   SET raw_metadata = NULL,
-       article_content_key = NULL;
+   SET raw_metadata = NULL${articleContentKeyReset};
 
 UPDATE user_notifications SET data = NULL;
 UPDATE rss_feeds SET last_error = NULL;
 UPDATE item_enrichments SET error_message = NULL;
 UPDATE user_item_enrichments SET error_message = NULL;
 
-PRAGMA foreign_key_check;
 `
   );
+
+  const foreignKeyViolations = runSqlite(RAW_DB, 'PRAGMA foreign_key_check;').trim();
+  if (foreignKeyViolations) {
+    const preview = foreignKeyViolations.split('\n').slice(0, 20).join('\n');
+    throw new Error(`Sanitized snapshot has foreign key violations:\n${preview}`);
+  }
+}
+
+export function collectArticleBodyObjects(db) {
+  return db
+    .query(
+      `
+SELECT object_key AS objectKey,
+       CASE WHEN object_key LIKE '%.json' THEN 'application/json; charset=utf-8'
+            ELSE 'text/html; charset=utf-8'
+        END AS contentType
+  FROM (
+    SELECT DISTINCT versions.r2_key AS object_key
+      FROM article_body_states states
+      JOIN article_body_versions versions ON versions.id = states.current_version_id
+     WHERE versions.r2_key IS NOT NULL
+    UNION
+    SELECT DISTINCT article_content_key AS object_key
+      FROM items
+     WHERE article_content_key IS NOT NULL
+  )
+ ORDER BY object_key
+`
+    )
+    .all();
+}
+
+function articleBodyFilePath(objectKey) {
+  const digest = createHash('sha256').update(objectKey).digest('hex');
+  const extension = objectKey.endsWith('.json') ? '.json' : '.html';
+  return join(ARTICLE_BODIES_DIR, `${digest}${extension}`);
+}
+
+async function downloadArticleBodies() {
+  if (!includeArticleBodies) return [];
+
+  const db = new Database(RAW_DB, { readonly: true });
+  let objects;
+  try {
+    objects = collectArticleBodyObjects(db);
+  } finally {
+    db.close();
+  }
+
+  if (!skipExport) {
+    rmSync(ARTICLE_BODIES_DIR, { recursive: true, force: true });
+  }
+  mkdirSync(ARTICLE_BODIES_DIR, { recursive: true });
+
+  if (objects.length === 0) {
+    console.log('No article body objects are referenced by the sanitized snapshot.');
+    return [];
+  }
+
+  console.log(
+    `Downloading ${objects.length} referenced article body objects from production R2...`
+  );
+  let completed = 0;
+  let reused = 0;
+  await mapWithConcurrency(objects, ARTICLE_BODY_TRANSFER_CONCURRENCY, async (object) => {
+    const filePath = articleBodyFilePath(object.objectKey);
+    const canReuse = skipExport && existsSync(filePath) && statSync(filePath).size > 0;
+    if (canReuse) {
+      reused += 1;
+    } else {
+      await runCapturedAsync(
+        'bun',
+        [
+          'wrangler',
+          'r2',
+          'object',
+          'get',
+          `${PROD_ARTICLE_BUCKET}/${object.objectKey}`,
+          '--env',
+          PROD_ENV,
+          '--file',
+          filePath,
+        ],
+        { cwd: WORKER_DIR }
+      );
+    }
+    completed += 1;
+    if (completed % 25 === 0 || completed === objects.length) {
+      console.log(`Downloaded ${completed}/${objects.length} article body objects.`);
+    }
+  });
+  if (reused > 0) {
+    console.log(`Reused ${reused} previously downloaded article body objects.`);
+  }
+
+  return objects.map((object) => ({ ...object, filePath: articleBodyFilePath(object.objectKey) }));
+}
+
+async function restoreLocalArticleBodies(objects) {
+  if (!includeArticleBodies || objects.length === 0) return;
+
+  console.log(`Restoring ${objects.length} article body objects into local R2...`);
+  let completed = 0;
+  await mapWithConcurrency(objects, LOCAL_R2_RESTORE_CONCURRENCY, async (object) => {
+    await runCapturedAsync(
+      'bun',
+      [
+        'wrangler',
+        'r2',
+        'object',
+        'put',
+        `${LOCAL_ARTICLE_BUCKET}/${object.objectKey}`,
+        '--file',
+        object.filePath,
+        '--content-type',
+        object.contentType,
+        '--local',
+        '--persist-to',
+        STAGED_STATE_DIR,
+      ],
+      { cwd: WORKER_DIR }
+    );
+    completed += 1;
+    if (completed % 25 === 0 || completed === objects.length) {
+      console.log(`Restored ${completed}/${objects.length} article body objects.`);
+    }
+  });
 }
 
 function markRepoMigrationsApplied() {
@@ -459,31 +734,54 @@ SELECT type, name, tbl_name, sql
   }
 }
 
-function backupAndClearLocalState() {
+function installStagedLocalState() {
   if (skipRestore) return;
-  if (!existsSync(STATE_DIR)) return;
 
-  mkdirSync(BACKUP_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
-  const backupPath = join(BACKUP_DIR, `state-${stamp}`);
-  renameSync(STATE_DIR, backupPath);
-  console.log(`Backed up existing local D1 state to ${backupPath}`);
+  if (existsSync(STATE_DIR)) {
+    mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
+    const backupPath = join(BACKUP_DIR, `state-${stamp}`);
+    renameSync(STATE_DIR, backupPath);
+    console.log(`Backed up existing local Wrangler state to ${backupPath}`);
+  }
+
+  renameSync(STAGED_STATE_DIR, STATE_DIR);
+  console.log('Installed the staged local Wrangler state.');
 }
 
-function restoreLocalD1() {
+function buildStagedLocalD1() {
   if (skipRestore) {
     console.log(`Skipping local restore. Sanitized SQL is at ${SANITIZED_SQL}`);
     return;
   }
 
-  runCaptured('bun', ['wrangler', 'd1', 'execute', 'DB', '--local', '--file', SANITIZED_SQL], {
-    cwd: WORKER_DIR,
-    successMessage: 'Local D1 snapshot imported.',
-  });
-  runCaptured('bun', ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local'], {
-    cwd: WORKER_DIR,
-    successMessage: 'Local D1 migrations are marked current.',
-  });
+  rmSync(STAGED_STATE_DIR, { recursive: true, force: true });
+  runCaptured(
+    'bun',
+    [
+      'wrangler',
+      'd1',
+      'execute',
+      'DB',
+      '--local',
+      '--persist-to',
+      STAGED_STATE_DIR,
+      '--file',
+      SANITIZED_SQL,
+    ],
+    {
+      cwd: WORKER_DIR,
+      successMessage: 'Staged local D1 snapshot imported.',
+    }
+  );
+  runCaptured(
+    'bun',
+    ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local', '--persist-to', STAGED_STATE_DIR],
+    {
+      cwd: WORKER_DIR,
+      successMessage: 'Staged local D1 migrations are marked current.',
+    }
+  );
 }
 
 function cleanupRawArtifacts() {
@@ -494,6 +792,7 @@ function cleanupRawArtifacts() {
 
   rmSync(RAW_SQL, { force: true });
   rmSync(RAW_DB, { force: true });
+  rmSync(ARTICLE_BODIES_DIR, { recursive: true, force: true });
 }
 
 function printCounts() {
@@ -514,6 +813,7 @@ UNION ALL SELECT 'gmail_mailboxes', count(*) FROM gmail_mailboxes;
 }
 
 async function main() {
+  assertLocalDevStackStopped();
   await confirmDestructiveLocalRestore();
   ensureTools();
   mkdirSync(SNAPSHOT_DIR, { recursive: true });
@@ -523,8 +823,10 @@ async function main() {
   markRepoMigrationsApplied();
   dumpSanitizedSql();
   printCounts();
-  backupAndClearLocalState();
-  restoreLocalD1();
+  const articleBodyObjects = await downloadArticleBodies();
+  buildStagedLocalD1();
+  await restoreLocalArticleBodies(articleBodyObjects);
+  installStagedLocalState();
   cleanupRawArtifacts();
   console.log('');
   if (skipRestore) {
@@ -532,10 +834,17 @@ async function main() {
   } else {
     console.log(`Sanitized local snapshot restored for ${LOCAL_USER_ID}.`);
   }
+  if (includeArticleBodies) {
+    console.log(
+      `Restored ${articleBodyObjects.length} referenced article body objects to local R2.`
+    );
+  }
   console.log(`Sanitized SQL is at ${SANITIZED_SQL}.`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}
