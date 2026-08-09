@@ -131,6 +131,48 @@ describe('article understanding', () => {
     expect(chunks.at(-1)?.text).toContain('tail-marker');
   });
 
+  it('folds an undersized trailing fragment into the preceding chunk', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(140) },
+        { id: 'footer', kind: 'paragraph', text: 'footer' },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.blockIds).toEqual(['main', 'footer']);
+    expect(chunks[0]?.characterCount).toBeGreaterThan(200);
+    expect(chunks[0]?.characterCount).toBeLessThanOrEqual(220);
+    expect(chunks[0]?.text).toContain('footer');
+  });
+
+  it('keeps a substantive trailing chunk separate', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(140) },
+        { id: 'ending', kind: 'paragraph', text: 'b'.repeat(60) },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.map((chunk) => chunk.blockIds)).toEqual([['main'], ['ending']]);
+  });
+
+  it('does not compact a small tail when the bounded overflow would be exceeded', () => {
+    const chunks = prepareArticleChunks(
+      [
+        { id: 'main', kind: 'paragraph', text: 'a'.repeat(165) },
+        { id: 'footer', kind: 'paragraph', text: 'footer' },
+      ],
+      200
+    );
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks.map((chunk) => chunk.blockIds)).toEqual([['main'], ['footer']]);
+  });
+
   it('splits an oversized block without dropping its ending', () => {
     const chunks = prepareArticleChunks(
       [{ id: 'large', kind: 'paragraph', text: `${'word '.repeat(300)}ending-marker` }],
