@@ -18,10 +18,24 @@ const TRAILING_CHUNK_FRACTION = 0.2;
 const TRAILING_MERGE_OVERFLOW_FRACTION = 0.1;
 const ANALYSIS_CONCURRENCY = 3;
 
+const INCOMPLETE_SEMANTIC_ENDING =
+  /(?:[,;:\-\u2013\u2014]|\b(?:a|an|the|and|or|but|of|to|for|with|in|on|at|by|from|as|that|which|who|when|where|because|while|if))$/i;
+
+function completeSemanticText(label: string, maxLength: number) {
+  return z
+    .string()
+    .trim()
+    .min(2)
+    .max(maxLength)
+    .refine((value) => !INCOMPLETE_SEMANTIC_ENDING.test(value), {
+      message: `${label} must be a complete thought, not truncated prose`,
+    });
+}
+
 const EvidenceIdsSchema = z.array(z.string().min(1)).min(1).max(24);
 const EvidenceSchema = z.object({ evidenceBlockIds: EvidenceIdsSchema });
 const DescriptionEvidenceSchema = EvidenceSchema.extend({
-  description: z.string().min(1).max(500),
+  description: completeSemanticText('Description', 500),
 });
 const OptionalDescriptionEvidenceSchema = z.preprocess((value) => {
   if (!value || typeof value !== 'object') return value;
@@ -42,18 +56,18 @@ type ArticleChunkAnalysis = Omit<
 
 export const ArticleChunkAnalysisSchema: z.ZodType<ArticleChunkAnalysis, z.ZodTypeDef, unknown> =
   z.object({
-    summary: EvidenceSchema.extend({ text: z.string().min(1).max(1200) }),
+    summary: EvidenceSchema.extend({ text: completeSemanticText('Summary', 1200) }),
     topics: z
       .array(
         EvidenceSchema.extend({
           name: z.string().min(1).max(100),
-          description: z.string().min(1).max(400),
+          description: completeSemanticText('Topic description', 400),
         })
       )
       .default([])
       .transform((values) => values.slice(0, 10)),
     claims: z
-      .array(EvidenceSchema.extend({ statement: z.string().min(1).max(600) }))
+      .array(EvidenceSchema.extend({ statement: completeSemanticText('Claim', 600) }))
       .default([])
       .transform((values) => values.slice(0, 10))
       .refine((values) => values.length > 0, {
@@ -62,8 +76,8 @@ export const ArticleChunkAnalysisSchema: z.ZodType<ArticleChunkAnalysis, z.ZodTy
     questionsAnswered: z
       .array(
         EvidenceSchema.extend({
-          question: z.string().min(1).max(400),
-          answer: z.string().min(1).max(800),
+          question: completeSemanticText('Question', 400),
+          answer: completeSemanticText('Answer', 800),
         })
       )
       .default([])
@@ -72,7 +86,7 @@ export const ArticleChunkAnalysisSchema: z.ZodType<ArticleChunkAnalysis, z.ZodTy
       .array(
         EvidenceSchema.extend({
           name: z.string().min(1).max(120),
-          description: z.string().min(1).max(500),
+          description: completeSemanticText('Concept description', 500),
         })
       )
       .default([])
@@ -349,7 +363,7 @@ async function analyzeChunk(
     schema: schemaForChunk(chunk),
     maxTokens: 4000,
     repairPrompt:
-      'Retry with exactly the requested JSON fields and no prose outside the JSON object. Copy evidence block IDs exactly from the [block:...] markers; altered or invented IDs will be rejected. A summary alone is invalid: include at least 3 supported claims, 2 article-specific concepts, and 2 supported actionableTakeaways. Use null, never empty objects, for unsupported perspective or audience. Return at most 10 topics, 10 claims, 8 questionsAnswered, 10 concepts, 15 entities, 8 prerequisites, and 8 actionableTakeaways.',
+      'Retry with exactly the requested JSON fields and no prose outside the JSON object. Every summary, claim, answer, and description must be a complete thought; never return a clipped sentence or end on a function word such as the, of, or with. Copy evidence block IDs exactly from the [block:...] markers; altered or invented IDs will be rejected. A summary alone is invalid: include at least 3 supported claims, 2 article-specific concepts, and 2 supported actionableTakeaways. Use null, never empty objects, for unsupported perspective or audience. Return at most 10 topics, 10 claims, 8 questionsAnswered, 10 concepts, 15 entities, 8 prerequisites, and 8 actionableTakeaways.',
     operation: `Article chunk ${chunk.ordinal} analysis`,
     model: env.ARTICLE_UNDERSTANDING_MODEL,
     repairAttempts: 2,

@@ -87,6 +87,10 @@ describe('getQueueHealth', () => {
     const result = await getQueueHealth({
       OAUTH_STATE_KV: {},
       SYNC_QUEUE: {},
+      ENRICHMENT_QUEUE: {},
+      AI: {},
+      ARTICLE_UNDERSTANDING_MODEL: 'article-model',
+      ARTICLE_UNDERSTANDING_MODE: 'all',
     } as never);
 
     expect(result.status).toBe('degraded');
@@ -106,6 +110,13 @@ describe('getQueueHealth', () => {
       configured: true,
       states: { AVAILABLE: 10, DEGRADED: 1, UNAVAILABLE: 2 },
       dlqCount: 0,
+    });
+    expect(result.queues.articleUnderstanding).toEqual({
+      mode: 'all',
+      automaticEnrollment: true,
+      queueConfigured: true,
+      aiConfigured: true,
+      modelConfigured: true,
     });
   });
 
@@ -127,5 +138,27 @@ describe('getQueueHealth', () => {
     const result = await getQueueHealth({ OAUTH_STATE_KV: {} } as never);
 
     expect(result.status).toBe('degraded');
+  });
+
+  it('reports the effective fail-closed article-understanding rollout mode', async () => {
+    getDLQSummary.mockResolvedValue({
+      count: 0,
+      oldestAt: null,
+      newestAt: null,
+      recent: [],
+    });
+
+    const result = await getQueueHealth({
+      OAUTH_STATE_KV: {},
+      ARTICLE_UNDERSTANDING_MODE: 'unexpected',
+    } as never);
+
+    expect(result.queues.articleUnderstanding).toEqual({
+      mode: 'off',
+      automaticEnrollment: false,
+      queueConfigured: false,
+      aiConfigured: false,
+      modelConfigured: false,
+    });
   });
 });

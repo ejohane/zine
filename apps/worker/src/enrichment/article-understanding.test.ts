@@ -91,6 +91,36 @@ describe('article understanding', () => {
     ).toThrow(/supported claim/);
   });
 
+  it('rejects syntactically valid but truncated semantic prose', () => {
+    const validAnalysis = {
+      summary: { text: 'Complete summary', evidenceBlockIds: ['article-body'] },
+      claims: [{ statement: 'Complete supported claim', evidenceBlockIds: ['article-body'] }],
+      concepts: [
+        {
+          name: 'Specific concept',
+          description: 'Complete concept description',
+          evidenceBlockIds: ['article-body'],
+        },
+      ],
+      actionableTakeaways: [
+        { description: 'Complete supported takeaway', evidenceBlockIds: ['article-body'] },
+      ],
+    };
+
+    expect(() =>
+      ArticleChunkAnalysisSchema.parse({
+        ...validAnalysis,
+        claims: [{ statement: 'The article disputes the', evidenceBlockIds: ['article-body'] }],
+      })
+    ).toThrow(/complete thought/);
+    expect(() =>
+      ArticleChunkAnalysisSchema.parse({
+        ...validAnalysis,
+        claims: [{ statement: 'The', evidenceBlockIds: ['article-body'] }],
+      })
+    ).toThrow(/complete thought/);
+  });
+
   it('rejects semantic signals that cite invented block IDs', () => {
     const chunk = {
       ordinal: 0,
@@ -314,5 +344,112 @@ describe('article understanding', () => {
     expect(result.output.summary.short).toBe('Whole article');
     expect(run).toHaveBeenCalledTimes(3);
     expect(run.mock.calls.every(([model]) => model === 'article-model')).toBe(true);
+  });
+
+  it('repairs truncated semantic prose before synthesizing the article', async () => {
+    let analysisAttempts = 0;
+    const run = vi.fn().mockImplementation(async (_model: string, request: unknown) => {
+      const messages = (request as { messages: Array<{ content: string }> }).messages;
+      const payload = JSON.parse(messages[1]?.content ?? '{}') as {
+        task?: string;
+      };
+      if (payload.task?.startsWith('Extract evidence-backed')) {
+        analysisAttempts++;
+        return {
+          response: JSON.stringify({
+            summary: { text: 'A complete article summary', evidenceBlockIds: ['body'] },
+            topics: [],
+            claims: [
+              {
+                statement:
+                  analysisAttempts === 1
+                    ? 'The article disputes the'
+                    : 'The article disputes the claim that reading is disappearing.',
+                evidenceBlockIds: ['body'],
+              },
+            ],
+            questionsAnswered: [],
+            concepts: [
+              {
+                name: 'Textual resilience',
+                description: 'Text remains useful despite competing media formats.',
+                evidenceBlockIds: ['body'],
+              },
+            ],
+            entities: [],
+            perspective: null,
+            audience: null,
+            prerequisites: [],
+            actionableTakeaways: [
+              {
+                description: 'Compare format claims against the evidence behind them.',
+                evidenceBlockIds: ['body'],
+              },
+            ],
+          }),
+        };
+      }
+
+      return {
+        response: {
+          summary: { short: 'Whole article', detail: 'The complete synthesized article.' },
+          classification: {
+            primaryCategory: 'culture',
+            secondaryCategories: [],
+            intent: 'analysis',
+            difficulty: 'intermediate',
+            evergreenScore: 0.8,
+            timeSensitivity: 'evergreen',
+          },
+          topics: [],
+          entities: [],
+          suggestedTags: [],
+          userContext: {
+            inferredSaveIntent: 'Saved for reference.',
+            reasonToRevisit: 'Contains a complete argument.',
+          },
+          confidence: { overall: 0.9, summary: 0.9, classification: 0.8, tags: 0.7 },
+        },
+      };
+    });
+
+    const result = await enrichArticleWithQwen(
+      { AI: { run }, ARTICLE_UNDERSTANDING_MODEL: 'article-model' } as never,
+      {
+        promptInput: {
+          item: {
+            id: 'item-repair',
+            title: 'Repair semantic prose',
+            canonicalUrl: 'https://example.com/repair',
+            contentType: 'ARTICLE',
+            provider: 'WEB',
+            publisher: 'Example',
+            summary: null,
+            rawMetadata: null,
+            articleContentKey: null,
+          },
+          creator: null,
+          articleContent: null,
+        },
+        source: {
+          coverage: 'FULL_CONTENT',
+          sourceKind: 'PUBLIC_WEB',
+          contentHash: `sha256:${'b'.repeat(64)}`,
+          wordCount: 300,
+          qualityScore: 1,
+          qualityWarnings: [],
+          blocks: [{ id: 'body', kind: 'paragraph', text: 'Complete source text.' }],
+        },
+      }
+    );
+
+    expect(result.understanding.chunks[0]?.claims[0]?.statement).toBe(
+      'The article disputes the claim that reading is disappearing.'
+    );
+    expect(analysisAttempts).toBe(2);
+    expect(run).toHaveBeenCalledTimes(3);
+    expect(
+      (run.mock.calls[1]?.[1] as { messages: Array<{ content: string }> }).messages.at(-1)?.content
+    ).toContain('Previous validation failure');
   });
 });
