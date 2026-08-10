@@ -1,5 +1,6 @@
 import { getDLQSummary } from '../sync/dlq-consumer';
 import { getArticleBodyHealth } from '../article-body/diagnostics';
+import { parseArticleUnderstandingMode } from '../enrichment/article-understanding-rollout';
 import type { Bindings } from '../types';
 
 type CheckStatus = 'ok' | 'error';
@@ -74,6 +75,7 @@ export async function getQueueHealth(env: Bindings) {
 
   const degraded =
     dlqSummary.count > 0 || articleBody.status === 'error' || articleBody.dlqCount > 0;
+  const articleUnderstandingMode = parseArticleUnderstandingMode(env.ARTICLE_UNDERSTANDING_MODE);
 
   return {
     status: degraded ? 'degraded' : 'ok',
@@ -93,6 +95,13 @@ export async function getQueueHealth(env: Bindings) {
         })),
       },
       articleBody,
+      articleUnderstanding: {
+        mode: articleUnderstandingMode,
+        automaticEnrollment: articleUnderstandingMode === 'all',
+        queueConfigured: Boolean(env.ENRICHMENT_QUEUE),
+        aiConfigured: Boolean(env.AI),
+        modelConfigured: Boolean(env.ARTICLE_UNDERSTANDING_MODEL),
+      },
     },
   };
 }

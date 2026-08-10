@@ -51,8 +51,10 @@ not a claim of corpus-wide recommendation quality.
   not automatically enqueue understanding when a new article body is published.
 - `all` enables deep understanding for every eligible enrichment trigger.
 
-Missing or invalid values fail closed to `off`. Development and staging use `all`; the initial
-production configuration uses `backfill_only` for a bounded, explicit canary.
+Missing or invalid values fail closed to `off`. Production initially used `backfill_only` for a
+bounded, explicit canary. After the evidence-backed cohort and a fresh-save acceptance test passed,
+production joined development and staging on `all` so publication of a new article body
+automatically queues deep understanding for its bookmarked users.
 
 Use the authenticated enrichment backfill route with `eligibleArticlesOnly: true` to restrict a
 canary to saved articles that have a current `AVAILABLE` or `DEGRADED` article body. Start with a
