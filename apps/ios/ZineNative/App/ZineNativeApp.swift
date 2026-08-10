@@ -85,7 +85,7 @@ struct ZineNativeApp: App {
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-daily-thread-fixture") {
             ScreenshotDailyThreadView()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-fixtures") {
-            ScreenshotHomeView()
+            ScreenshotHomeTabShell()
         } else if ProcessInfo.processInfo.arguments.contains("-screenshot-fixtures") {
             ScreenshotLibraryView()
         } else {

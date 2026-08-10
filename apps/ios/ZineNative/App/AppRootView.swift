@@ -125,8 +125,7 @@ private struct AuthenticatedAppView: View {
                 .tint(ZineTheme.brandAccent)
             }
         }
-        .tint(ZineTheme.brandAccent)
-        .background(ZineTheme.canvas)
+        .zineTabShellChrome()
         .task(id: homeRevision) {
             async let home: Void = homeStore.reload()
             async let today: Void = peopleDailyStore.load()
