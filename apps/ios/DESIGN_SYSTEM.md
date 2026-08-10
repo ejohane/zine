@@ -13,8 +13,8 @@ same hierarchy works in light and dark appearances.
 
 | Role           | Light     | Dark      | Intended use                                                  |
 | -------------- | --------- | --------- | ------------------------------------------------------------- |
-| Canvas         | `#F5F7F8` | `#000000` | Screen backgrounds and navigation chrome                      |
-| Surface        | `#FFFFFF` | `#14171A` | Cards, sheets, reader surfaces, and tab chrome                |
+| Canvas         | `#F5F7F8` | `#000000` | Screen backgrounds beneath system navigation chrome           |
+| Surface        | `#FFFFFF` | `#14171A` | Cards, sheets, reader surfaces, and elevated regions          |
 | Raised         | `#E9EDF0` | `#20252A` | Placeholders, subdued controls, and elevated regions          |
 | Primary text   | `#151719` | `#F5F7F8` | Titles, body copy, and primary icons                          |
 | Secondary text | `#5D646C` | `#B2BAC2` | Metadata, supporting copy, and inactive controls              |
@@ -33,6 +33,14 @@ the surrounding theme changes.
   `ZineTheme.tertiaryText` for de-emphasized metadata.
 - Use `zineAppTheme()` at an app-level container and `zineScreenChrome()` for
   list-style screens when those modifiers fit the view structure.
+- Keep navigation bars and tab bars system-managed. Semantic colors may tint
+  controls and provide the content beneath them, but must not globally replace
+  native materials, scroll-edge behavior, or shadows with opaque palette
+  backgrounds. Apply solid toolbar chrome only to a screen that explicitly
+  requires it, such as a collapsing filtered-list header.
+- Keep the root tab bar and ordinary screen navigation bars explicitly visible.
+  Visibility and semantic item tint are separate from the system-managed bar
+  material; hiding either bar must remain scoped to an immersive destination.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update

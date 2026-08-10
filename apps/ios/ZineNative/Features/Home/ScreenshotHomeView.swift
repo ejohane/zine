@@ -1,6 +1,43 @@
 #if DEBUG
 import SwiftUI
 
+struct ScreenshotHomeTabShell: View {
+    @State private var selectedTab = 0
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            Tab("Home", systemImage: "house", value: 0) {
+                ScreenshotHomeView(density: .compact)
+            }
+
+            Tab("Library", systemImage: "books.vertical", value: 1) {
+                NavigationStack {
+                    Text("Library")
+                        .navigationTitle("Library")
+                }
+                .zineScreenChrome()
+            }
+
+            Tab("Settings", systemImage: "gearshape", value: 2) {
+                NavigationStack {
+                    Text("Settings")
+                        .navigationTitle("Settings")
+                }
+                .zineScreenChrome()
+            }
+
+            Tab("Search", systemImage: "magnifyingglass", value: 3) {
+                NavigationStack {
+                    Text("Search")
+                        .navigationTitle("Search")
+                }
+                .zineScreenChrome()
+            }
+        }
+        .zineTabShellChrome()
+    }
+}
+
 struct ScreenshotHomeView: View {
     var density: HomeLayoutDensity = .standard
 

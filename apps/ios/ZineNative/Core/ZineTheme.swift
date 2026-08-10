@@ -72,54 +72,13 @@ enum ZineTheme {
 
     @MainActor
     static func configureUIKitAppearance() {
-        let navigationAppearance = UINavigationBarAppearance()
-        navigationAppearance.configureWithOpaqueBackground()
-        navigationAppearance.backgroundColor = uiColor(.canvas)
-        navigationAppearance.shadowColor = uiColor(.border)
-        navigationAppearance.titleTextAttributes = [.foregroundColor: uiColor(.primaryText)]
-        navigationAppearance.largeTitleTextAttributes = [.foregroundColor: uiColor(.primaryText)]
-        UINavigationBar.appearance().standardAppearance = navigationAppearance
-        UINavigationBar.appearance().scrollEdgeAppearance = navigationAppearance
-        UINavigationBar.appearance().compactAppearance = navigationAppearance
         UINavigationBar.appearance().tintColor = uiColor(.brandAccent)
-
-        let tabAppearance = UITabBarAppearance()
-        tabAppearance.configureWithOpaqueBackground()
-        tabAppearance.backgroundColor = uiColor(.surface)
-        tabAppearance.shadowColor = uiColor(.border)
-        configure(
-            tabAppearance.stackedLayoutAppearance,
-            normal: uiColor(.secondaryText),
-            selected: uiColor(.brandAccent)
-        )
-        configure(
-            tabAppearance.inlineLayoutAppearance,
-            normal: uiColor(.secondaryText),
-            selected: uiColor(.brandAccent)
-        )
-        configure(
-            tabAppearance.compactInlineLayoutAppearance,
-            normal: uiColor(.secondaryText),
-            selected: uiColor(.brandAccent)
-        )
-        UITabBar.appearance().standardAppearance = tabAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        UITabBar.appearance().tintColor = uiColor(.brandAccent)
+        UITabBar.appearance().unselectedItemTintColor = uiColor(.secondaryText)
 
         UIRefreshControl.appearance().tintColor = uiColor(.brandAccent)
         UIPageControl.appearance().currentPageIndicatorTintColor = uiColor(.brandAccent)
         UIPageControl.appearance().pageIndicatorTintColor = uiColor(.secondaryText).withAlphaComponent(0.3)
-    }
-
-    @MainActor
-    private static func configure(
-        _ appearance: UITabBarItemAppearance,
-        normal: UIColor,
-        selected: UIColor
-    ) {
-        appearance.normal.iconColor = normal
-        appearance.normal.titleTextAttributes = [.foregroundColor: normal]
-        appearance.selected.iconColor = selected
-        appearance.selected.titleTextAttributes = [.foregroundColor: selected]
     }
 }
 
@@ -147,7 +106,12 @@ extension View {
             .background(ZineTheme.canvas)
             .foregroundStyle(ZineTheme.primaryText)
             .tint(ZineTheme.brandAccent)
-            .toolbarBackground(ZineTheme.canvas, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar(.visible, for: .navigationBar)
+    }
+
+    func zineTabShellChrome() -> some View {
+        toolbar(.visible, for: .tabBar)
+            .tint(ZineTheme.brandAccent)
+            .background(ZineTheme.canvas)
     }
 }

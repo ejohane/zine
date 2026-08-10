@@ -45,6 +45,22 @@ final class ZineThemeTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testUIKitBarsKeepSystemManagedMaterialsAndScrollEdges() {
+        ZineTheme.configureUIKitAppearance()
+
+        let navigationBar = UINavigationBar()
+        XCTAssertNil(navigationBar.standardAppearance.backgroundColor)
+        XCTAssertNil(navigationBar.scrollEdgeAppearance)
+
+        let tabBar = UITabBar()
+        XCTAssertNil(tabBar.standardAppearance.backgroundColor)
+        XCTAssertNil(tabBar.scrollEdgeAppearance)
+
+        let darkTraits = UITraitCollection(userInterfaceStyle: .dark)
+        XCTAssertEqual(tabBar.tintColor.resolvedColor(with: darkTraits).hexRGB, "EF661F")
+    }
+
     private func assertPalette(
         style: UIUserInterfaceStyle,
         expected: [ZineTheme.Role: String],
