@@ -227,6 +227,7 @@ export interface WorkersAIStructuredOptions<T> {
   repairAttempts?: number;
   transportRetries?: number;
   fetchImpl?: typeof fetch;
+  onDiagnostic?: (message: string) => void;
 }
 
 export interface SemanticCollectionCorpusRow {
@@ -362,7 +363,7 @@ export async function runWorkersAIStructured<T>(
       const retryable =
         response.status === 408 || response.status === 429 || response.status >= 500;
       if (response.ok || !retryable || transportAttempt >= transportRetries) break;
-      console.error(
+      options.onDiagnostic?.(
         `${options.operation} transport ${response.status}; retry ${transportAttempt + 1}/${transportRetries}`
       );
       await new Promise((resolve) => setTimeout(resolve, 500 * (transportAttempt + 1)));
@@ -383,7 +384,7 @@ export async function runWorkersAIStructured<T>(
     }
 
     if (attempt < repairAttempts) {
-      console.error(
+      options.onDiagnostic?.(
         `${options.operation} failed validation; repair ${attempt + 1}/${repairAttempts}: ${lastFailure.slice(0, 800)}`
       );
     }

@@ -36,6 +36,7 @@ const PRODUCTION_DATABASE = 'zine-db-production';
 const PRODUCTION_ENVIRONMENT = 'production';
 const PROMPT_VERSION = 'semantic-collections-v1';
 const MAXIMUM_DISCOVERED_OVERLAP = 0.6;
+const reportDiagnostic = (message: string): void => console.error(message);
 const MINIMUM_CORE_RETENTION = 0.7;
 
 interface ExperimentOptions {
@@ -157,6 +158,7 @@ async function discoverThemes(input: {
     maxTokens: 2_400,
     schema: ThemeDiscoverySchema,
     operation: 'Collection theme discovery',
+    onDiagnostic: reportDiagnostic,
     repairPrompt:
       'Return exactly three distinct, narrow collection themes as valid JSON. Each theme must include exactly three exact seedItemIds. Keep rationales under 500 characters. Ensure seed portfolios have low pairwise overlap and collectively cover at least 70% of the corpus. Do not return generic subject categories or prose outside the object.',
     messages: [
@@ -292,6 +294,7 @@ async function generateProposal(input: {
     maxTokens: 6_000,
     schema: CollectionProposalModelOutputSchema,
     operation: `Collection proposal ${input.proposalId}`,
+    onDiagnostic: reportDiagnostic,
     repairPrompt:
       'Return the exact requested JSON object. Score every supplied article exactly once, cite only exact signal IDs belonging to every selected item and near miss, keep near misses unselected, and use complete non-truncated prose. For AI-discovered collections, retain all three exact themeSeedItemIds and select at most one additional article.',
     repairAttempts: 4,

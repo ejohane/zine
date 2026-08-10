@@ -220,6 +220,7 @@ describe('semantic collection model client', () => {
 
   it('retries transient transport failures without consuming semantic repair attempts', async () => {
     let calls = 0;
+    const diagnostics: string[] = [];
     const result = await runWorkersAIStructured({
       accountId: 'account',
       apiToken: 'token',
@@ -230,6 +231,7 @@ describe('semantic collection model client', () => {
       repairPrompt: 'Repair.',
       repairAttempts: 0,
       transportRetries: 1,
+      onDiagnostic: (message) => diagnostics.push(message),
       messages: [{ role: 'user', content: 'Return JSON. /no_think' }],
       schema: z.object({ ok: z.literal(true) }),
       fetchImpl: (async () => {
@@ -248,6 +250,7 @@ describe('semantic collection model client', () => {
 
     expect(result).toEqual({ ok: true });
     expect(calls).toBe(2);
+    expect(diagnostics).toEqual(['transport test transport 408; retry 1/1']);
   });
 });
 
