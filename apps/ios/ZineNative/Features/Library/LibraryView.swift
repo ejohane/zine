@@ -14,6 +14,8 @@ struct LibraryView: View {
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
     @State private var isVisible = false
+    @State private var navigationPath = NavigationPath()
+    @Namespace private var bookmarkTransition
 
     init(
         client: APIClient,
@@ -55,11 +57,11 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             content
                 .navigationTitle(isSearchMode ? "Search" : "Library")
                 .navigationBarTitleDisplayMode(.inline)
-                .solidContentTypeFilterChrome()
+                .contentTypeFilterChrome()
                 .toolbar(.visible, for: .navigationBar)
                 .toolbar {
                     if isSearchMode {
@@ -85,9 +87,13 @@ struct LibraryView: View {
                         },
                         onExternalOpen: onExternalOpen
                     )
+                    .navigationTransition(
+                        .zoom(sourceID: bookmark.id, in: bookmarkTransition)
+                    )
                 }
         }
         .zineScreenChrome()
+        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
         .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
             if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 store.reset()
@@ -236,6 +242,7 @@ struct LibraryView: View {
         .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
         .listRowBackground(ZineTheme.canvas)
         .listRowSeparator(.hidden)
+        .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if !bookmark.isFinished {
                 Button {

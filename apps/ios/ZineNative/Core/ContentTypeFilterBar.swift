@@ -124,8 +124,7 @@ private struct ContentTypeFilterChip: View {
 }
 
 extension View {
-    func solidContentTypeFilterChrome() -> some View {
+    func contentTypeFilterChrome() -> some View {
         toolbarBackground(ZineTheme.canvas, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
     }
 }

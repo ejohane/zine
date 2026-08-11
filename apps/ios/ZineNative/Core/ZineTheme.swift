@@ -109,9 +109,26 @@ extension View {
             .toolbar(.visible, for: .navigationBar)
     }
 
+    func restoreTabBarWhenNavigationIsAtRoot(_ isAtRoot: Bool) -> some View {
+        modifier(RootTabBarVisibilityModifier(isAtRoot: isAtRoot))
+    }
+
     func zineTabShellChrome() -> some View {
         toolbar(.visible, for: .tabBar)
             .tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
+    }
+}
+
+private struct RootTabBarVisibilityModifier: ViewModifier {
+    let isAtRoot: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isAtRoot {
+            content.toolbar(.visible, for: .tabBar)
+        } else {
+            content
+        }
     }
 }

@@ -33,7 +33,7 @@ struct HomeSectionListView: View {
         content
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .solidContentTypeFilterChrome()
+            .contentTypeFilterChrome()
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {

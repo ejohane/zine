@@ -7,6 +7,7 @@ struct InboxView: View {
     @State private var store: InboxStore
     @State private var provider: Provider?
     @State private var contentType: ContentType?
+    @State private var navigationPath = NavigationPath()
     @Namespace private var bookmarkTransition
 
     init(
@@ -31,7 +32,7 @@ struct InboxView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             content
                 .navigationTitle("Inbox")
                 .toolbar {
@@ -62,6 +63,7 @@ struct InboxView: View {
                 }
         }
         .zineScreenChrome()
+        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
         .task(id: query) {
             await store.reload(query: query)
         }

@@ -11,11 +11,7 @@ struct ScreenshotHomeTabShell: View {
             }
 
             Tab("Library", systemImage: "books.vertical", value: 1) {
-                NavigationStack {
-                    Text("Library")
-                        .navigationTitle("Library")
-                }
-                .zineScreenChrome()
+                ScreenshotLibraryView()
             }
 
             Tab("Settings", systemImage: "gearshape", value: 2) {
@@ -42,9 +38,10 @@ struct ScreenshotHomeView: View {
     var density: HomeLayoutDensity = .standard
 
     @Namespace private var bookmarkTransition
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: density.sectionSpacing) {
                     ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
@@ -75,6 +72,7 @@ struct ScreenshotHomeView: View {
             }
         }
         .zineScreenChrome()
+        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
     }
 
     @ViewBuilder
@@ -134,7 +132,7 @@ private struct ScreenshotHomeSectionListView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .solidContentTypeFilterChrome()
+        .contentTypeFilterChrome()
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
