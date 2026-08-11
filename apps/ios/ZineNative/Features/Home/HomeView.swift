@@ -48,7 +48,6 @@ struct HomeView: View {
     let tabReselection: Int
 
     @Namespace private var bookmarkTransition
-    @State private var navigationPath = NavigationPath()
 
     init(
         client: APIClient,
@@ -73,7 +72,7 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack {
             content
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
@@ -110,7 +109,6 @@ struct HomeView: View {
                 }
         }
         .zineScreenChrome()
-        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
     }
 
     @ViewBuilder

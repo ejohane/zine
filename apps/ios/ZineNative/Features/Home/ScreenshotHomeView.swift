@@ -38,10 +38,9 @@ struct ScreenshotHomeView: View {
     var density: HomeLayoutDensity = .standard
 
     @Namespace private var bookmarkTransition
-    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack {
             ScrollView {
                 LazyVStack(spacing: density.sectionSpacing) {
                     ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
@@ -72,7 +71,6 @@ struct ScreenshotHomeView: View {
             }
         }
         .zineScreenChrome()
-        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
     }
 
     @ViewBuilder

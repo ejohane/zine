@@ -8,7 +8,6 @@ struct ScreenshotLibraryView: View {
     )
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
-    @State private var navigationPath = NavigationPath()
     @Namespace private var bookmarkTransition
 
     private var bookmarks: [Bookmark] {
@@ -17,7 +16,7 @@ struct ScreenshotLibraryView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack {
             List {
                 CollapsingListTitle(
                     title: "Library",
@@ -71,7 +70,6 @@ struct ScreenshotLibraryView: View {
             }
         }
         .zineScreenChrome()
-        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
     }
 }
 

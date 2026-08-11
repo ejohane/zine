@@ -14,7 +14,6 @@ struct LibraryView: View {
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
     @State private var isVisible = false
-    @State private var navigationPath = NavigationPath()
     @Namespace private var bookmarkTransition
 
     init(
@@ -57,7 +56,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
+        NavigationStack {
             content
                 .navigationTitle(isSearchMode ? "Search" : "Library")
                 .navigationBarTitleDisplayMode(.inline)
@@ -93,7 +92,6 @@ struct LibraryView: View {
                 }
         }
         .zineScreenChrome()
-        .restoreTabBarWhenNavigationIsAtRoot(navigationPath.isEmpty)
         .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
             if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 store.reset()
