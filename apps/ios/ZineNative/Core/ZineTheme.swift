@@ -110,8 +110,7 @@ extension View {
     }
 
     func zineTabShellChrome() -> some View {
-        toolbar(.visible, for: .tabBar)
-            .tint(ZineTheme.brandAccent)
+        tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
     }
 }
