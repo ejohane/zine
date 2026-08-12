@@ -8,6 +8,7 @@ struct ScreenshotLibraryView: View {
     )
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
+    @Namespace private var bookmarkTransition
 
     private var bookmarks: [Bookmark] {
         guard let contentType else { return ScreenshotFixtures.bookmarks }
@@ -25,12 +26,14 @@ struct ScreenshotLibraryView: View {
                 Section {
                     ForEach(0..<(bookmarks.count * 3), id: \.self) { index in
                         let bookmark = bookmarks[index % bookmarks.count]
-                        NavigationLink(value: bookmark) {
+                        let route = ScreenshotLibraryRoute(bookmark: bookmark, sourceID: index)
+                        NavigationLink(value: route) {
                             BookmarkRow(bookmark: bookmark)
                         }
                         .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
                         .listRowBackground(ZineTheme.canvas)
                         .listRowSeparator(.hidden)
+                        .matchedTransitionSource(id: route.sourceID, in: bookmarkTransition)
                     }
                 } header: {
                     ContentTypeFilterBar(selection: $contentType)
@@ -49,7 +52,7 @@ struct ScreenshotLibraryView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .solidContentTypeFilterChrome()
+            .contentTypeFilterChrome()
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -59,12 +62,20 @@ struct ScreenshotLibraryView: View {
                     )
                 }
             }
-            .navigationDestination(for: Bookmark.self) { bookmark in
-                BookmarkDetailView(bookmark: bookmark, client: client) { _ in }
+            .navigationDestination(for: ScreenshotLibraryRoute.self) { route in
+                BookmarkDetailView(bookmark: route.bookmark, client: client) { _ in }
+                    .navigationTransition(
+                        .zoom(sourceID: route.sourceID, in: bookmarkTransition)
+                    )
             }
         }
         .zineScreenChrome()
     }
+}
+
+private struct ScreenshotLibraryRoute: Hashable {
+    let bookmark: Bookmark
+    let sourceID: Int
 }
 
 struct ScreenshotBookmarkDetailView: View {

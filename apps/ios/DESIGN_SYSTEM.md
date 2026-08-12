@@ -36,11 +36,15 @@ the surrounding theme changes.
 - Keep navigation bars and tab bars system-managed. Semantic colors may tint
   controls and provide the content beneath them, but must not globally replace
   native materials, scroll-edge behavior, or shadows with opaque palette
-  backgrounds. Apply solid toolbar chrome only to a screen that explicitly
-  requires it, such as a collapsing filtered-list header.
+  backgrounds. A collapsing filtered-list header may provide the canvas as its
+  toolbar background style, but must not force the material visible: forced
+  source chrome remains pinned over an interactive detail dismissal.
 - Keep the root tab bar and ordinary screen navigation bars explicitly visible.
   Visibility and semantic item tint are separate from the system-managed bar
   material; hiding either bar must remain scoped to an immersive destination.
+  Each tab's root screen must reset tab-bar visibility to automatic so an
+  interactive pop cannot leave behind hidden state from the departing
+  destination while immersive detail views can still hide it locally.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update

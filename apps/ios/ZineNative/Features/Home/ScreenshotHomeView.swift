@@ -11,11 +11,7 @@ struct ScreenshotHomeTabShell: View {
             }
 
             Tab("Library", systemImage: "books.vertical", value: 1) {
-                NavigationStack {
-                    Text("Library")
-                        .navigationTitle("Library")
-                }
-                .zineScreenChrome()
+                ScreenshotLibraryView()
             }
 
             Tab("Settings", systemImage: "gearshape", value: 2) {
@@ -134,7 +130,7 @@ private struct ScreenshotHomeSectionListView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .solidContentTypeFilterChrome()
+        .contentTypeFilterChrome()
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
