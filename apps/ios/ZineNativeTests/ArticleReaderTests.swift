@@ -254,10 +254,34 @@ final class ArticleReaderTests: XCTestCase {
         }
         let store = ArticleReaderStore(metadata: Self.metadata(), client: client)
 
-        let result = await store.toggleFinished()
+        let mutation = try XCTUnwrap(store.beginFinishedToggle())
+
+        XCTAssertTrue(store.isFinished)
+        XCTAssertTrue(store.isUpdatingFinished)
+
+        let result = await store.persistFinishedToggle(mutation)
 
         XCTAssertEqual(result, true)
         XCTAssertTrue(store.isFinished)
+        XCTAssertFalse(store.isUpdatingFinished)
+    }
+
+    @MainActor
+    func testStoreRollsBackOptimisticCompletionWhenTheRequestFails() async throws {
+        let client = Self.client { request in
+            XCTAssertEqual(request.httpMethod, "PATCH")
+            return (500, #"{"error":"unavailable"}"#)
+        }
+        let store = ArticleReaderStore(metadata: Self.metadata(), client: client)
+
+        let mutation = try XCTUnwrap(store.beginFinishedToggle())
+
+        XCTAssertTrue(store.isFinished)
+        let result = await store.persistFinishedToggle(mutation)
+
+        XCTAssertFalse(result)
+        XCTAssertFalse(store.isFinished)
+        XCTAssertFalse(store.isUpdatingFinished)
     }
 
     func testTagEndpointsListAndReplaceArticleTags() async throws {

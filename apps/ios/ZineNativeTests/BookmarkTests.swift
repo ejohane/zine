@@ -64,6 +64,32 @@ final class BookmarkTests: XCTestCase {
         )
     }
 
+    func testFinishedStateTogglesImmediatelyAndRollsBack() throws {
+        var state = OptimisticFinishedState(isFinished: false, finishedAt: nil)
+
+        let mutation = try XCTUnwrap(state.beginToggle(now: Date(timeIntervalSince1970: 0)))
+
+        XCTAssertTrue(state.isFinished)
+        XCTAssertTrue(state.isUpdating)
+        XCTAssertNotNil(state.finishedAt)
+        XCTAssertNil(state.beginToggle())
+
+        state.rollback(mutation)
+
+        XCTAssertFalse(state.isFinished)
+        XCTAssertFalse(state.isUpdating)
+        XCTAssertNil(state.finishedAt)
+    }
+
+    func testFinishedStateDoesNotLetLateHydrationOverwriteTheUserAction() throws {
+        var state = OptimisticFinishedState(isFinished: false, finishedAt: nil)
+        _ = try XCTUnwrap(state.beginToggle())
+
+        state.hydrate(isFinished: false, finishedAt: nil)
+
+        XCTAssertTrue(state.isFinished)
+    }
+
     func testProviderTitlesUseProductCapitalization() {
         XCTAssertEqual(Provider.youtube.title, "YouTube")
         XCTAssertEqual(Provider.x.title, "X")

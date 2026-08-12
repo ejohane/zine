@@ -337,7 +337,7 @@ final class EditorialTests: XCTestCase {
             zineUserItemId: "user-item-1",
             zineItemId: "item-1",
             isSaved: true,
-            isFinished: false
+            isFinished: true
         )
 
         let content = BookmarkDetailContent(
@@ -353,6 +353,7 @@ final class EditorialTests: XCTestCase {
         XCTAssertEqual(content.contentType, .article)
         XCTAssertEqual(content.summary, "Useful context.")
         XCTAssertEqual(content.thumbnailUrl, URL(string: "https://example.com/image.jpg"))
+        XCTAssertTrue(content.isFinished)
     }
 
     func testDecodesWhyTodayXVoicesAndZineConnections() throws {
