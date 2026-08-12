@@ -36,7 +36,7 @@ final class ArticleProgressWriteQueue {
 @Observable
 final class ArticleReaderStore {
     private(set) var phase: ArticleReaderPhase
-    private(set) var isFinished: Bool
+    private var finishedState: OptimisticFinishedState
 
     let metadata: ArticleReaderMetadata
     let initialProgressFraction: Double
@@ -70,8 +70,19 @@ final class ArticleReaderStore {
             }
         }
         phase = initialPhase
-        isFinished = metadata.isFinished
+        finishedState = OptimisticFinishedState(
+            isFinished: metadata.isFinished,
+            finishedAt: nil
+        )
         initialProgressFraction = metadata.initialProgress?.fraction ?? 0
+    }
+
+    var isFinished: Bool {
+        finishedState.isFinished
+    }
+
+    var isUpdatingFinished: Bool {
+        finishedState.isUpdating
     }
 
     var readyDocument: ArticleReaderDocument? {
@@ -127,16 +138,27 @@ final class ArticleReaderStore {
         )
     }
 
-    func toggleFinished() async -> Bool? {
+    func beginFinishedToggle() -> OptimisticFinishedState.Mutation? {
+        finishedState.beginToggle()
+    }
+
+    func persistFinishedToggle(_ mutation: OptimisticFinishedState.Mutation) async -> Bool {
         do {
             let result = try await client.setFinished(
                 id: metadata.bookmarkID,
-                isFinished: !isFinished
+                isFinished: mutation.requestedIsFinished
             )
-            isFinished = result.isFinished
-            return result.isFinished
+            finishedState.accept(
+                isFinished: result.isFinished,
+                finishedAt: result.finishedAt
+            )
+            return true
+        } catch is CancellationError {
+            finishedState.rollback(mutation)
+            return false
         } catch {
-            return nil
+            finishedState.rollback(mutation)
+            return false
         }
     }
 

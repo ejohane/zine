@@ -26,7 +26,6 @@ struct ArticleReaderView: View {
     @State private var scrollProgress: Double
     @State private var lastPersistedProgress: Double
     @State private var hasRecordedOpen = false
-    @State private var isUpdatingFinished = false
     @State private var readerChromeOffset: CGFloat = 0
     @State private var showsEndActions: Bool
     @State private var presentedSheet: ArticleReaderSheet?
@@ -35,7 +34,8 @@ struct ArticleReaderView: View {
 
     private let onRead: () -> Void
     private let onProgressSaved: (BookmarkProgress) -> Void
-    private let onFinishedChanged: (Bool) -> Void
+    private let onFinishedChanged: (Bool, BookmarkChangePhase) -> Void
+    private let onFinishedCommit: (Bool) -> Void
     private let onTagsChanged: ([BookmarkTag]) -> Void
     private let client: APIClient
     private let loadsOnAppear: Bool
@@ -47,7 +47,8 @@ struct ArticleReaderView: View {
         loadsOnAppear: Bool = true,
         onRead: @escaping () -> Void = {},
         onProgressSaved: @escaping (BookmarkProgress) -> Void = { _ in },
-        onFinishedChanged: @escaping (Bool) -> Void = { _ in },
+        onFinishedChanged: @escaping (Bool, BookmarkChangePhase) -> Void = { _, _ in },
+        onFinishedCommit: @escaping (Bool) -> Void = { _ in },
         onTagsChanged: @escaping ([BookmarkTag]) -> Void = { _ in }
     ) {
         let initialProgress = metadata.initialProgress?.fraction ?? 0
@@ -67,6 +68,7 @@ struct ArticleReaderView: View {
         self.onRead = onRead
         self.onProgressSaved = onProgressSaved
         self.onFinishedChanged = onFinishedChanged
+        self.onFinishedCommit = onFinishedCommit
         self.onTagsChanged = onTagsChanged
         self.client = client
         self.loadsOnAppear = loadsOnAppear
@@ -290,16 +292,11 @@ struct ArticleReaderView: View {
 
                 Spacer()
 
-                if isUpdatingFinished {
-                    ProgressView()
-                        .controlSize(.small)
-                        .accessibilityLabel("Updating completion")
-                }
             }
 
             HStack(spacing: 10) {
                 Button {
-                    Task { await toggleFinished() }
+                    toggleFinished()
                 } label: {
                     Label(
                         store.isFinished ? "Mark unfinished" : "Mark complete",
@@ -312,7 +309,7 @@ struct ArticleReaderView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(ZineTheme.brandAccent)
                 .foregroundStyle(ZineTheme.onAccent)
-                .disabled(isUpdatingFinished)
+                .allowsHitTesting(!store.isUpdatingFinished)
                 .accessibilityIdentifier("article-reader-toggle-complete")
 
                 Button {
@@ -383,15 +380,18 @@ struct ArticleReaderView: View {
         Task { await persistProgress(progress) }
     }
 
-    private func toggleFinished() async {
-        guard !isUpdatingFinished else { return }
-        isUpdatingFinished = true
-        defer { isUpdatingFinished = false }
-        guard let value = await store.toggleFinished() else {
-            actionErrorMessage = "Zine couldn’t change the completion state. Check your connection and try again."
-            return
+    private func toggleFinished() {
+        guard let mutation = store.beginFinishedToggle() else { return }
+        onFinishedChanged(store.isFinished, .optimistic)
+
+        Task {
+            guard await store.persistFinishedToggle(mutation) else {
+                onFinishedChanged(store.isFinished, .rollback)
+                actionErrorMessage = "Zine couldn’t change the completion state. Check your connection and try again."
+                return
+            }
+            onFinishedCommit(store.isFinished)
         }
-        onFinishedChanged(value)
     }
 
     private func updateScrollProgress(_ progress: Double) {

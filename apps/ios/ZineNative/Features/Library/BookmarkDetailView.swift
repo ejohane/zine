@@ -88,7 +88,7 @@ struct BookmarkDetailContent: Equatable {
         duration = nil
         readingTimeMinutes = nil
         progress = nil
-        isFinished = false
+        isFinished = presentation?.isFinished ?? false
         tags = []
     }
 
@@ -111,9 +111,7 @@ struct BookmarkDetailView: View {
     @State private var isBookmarked: Bool
     @State private var hasToggledBookmark = false
     @State private var isSavingBookmark = false
-    @State private var isSaving = false
-    @State private var isHydrating = false
-    @State private var hydrationFailed = false
+    @State private var finishedState: OptimisticFinishedState
     @State private var subscriptionSettings: BookmarkSubscriptionSettings?
     @State private var isSavingSubscriptionSettings = false
     @State private var errorMessage: String?
@@ -136,7 +134,10 @@ struct BookmarkDetailView: View {
         initialContent = BookmarkDetailContent(bookmark: bookmark)
         _bookmark = State(initialValue: .some(bookmark))
         _isBookmarked = State(initialValue: bookmark.state == "BOOKMARKED")
-        _isHydrating = State(initialValue: false)
+        _finishedState = State(initialValue: OptimisticFinishedState(
+            isFinished: bookmark.isFinished,
+            finishedAt: bookmark.finishedAt
+        ))
         self.client = client
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
@@ -157,7 +158,10 @@ struct BookmarkDetailView: View {
         initialContent = BookmarkDetailContent(item: item)
         _bookmark = State(initialValue: nil)
         _isBookmarked = State(initialValue: true)
-        _isHydrating = State(initialValue: true)
+        _finishedState = State(initialValue: OptimisticFinishedState(
+            isFinished: initialContent.isFinished,
+            finishedAt: nil
+        ))
         self.client = client
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
@@ -182,7 +186,10 @@ struct BookmarkDetailView: View {
         )
         _bookmark = State(initialValue: nil)
         _isBookmarked = State(initialValue: presentation?.isSaved ?? true)
-        _isHydrating = State(initialValue: true)
+        _finishedState = State(initialValue: OptimisticFinishedState(
+            isFinished: initialContent.isFinished,
+            finishedAt: nil
+        ))
         self.client = client
         self.onUpdate = onUpdate
         self.onBookmarkChange = onBookmarkChange
@@ -303,13 +310,14 @@ struct BookmarkDetailView: View {
                             canonicalURL: content.canonicalUrl,
                             readingTimeMinutes: content.readingTimeMinutes,
                             initialProgress: content.progress,
-                            isFinished: content.isFinished,
+                            isFinished: finishedState.isFinished,
                             tags: content.tags
                         ),
                         client: client,
                         onRead: { onExternalOpen(bookmark) },
                         onProgressSaved: updateReadingProgress,
                         onFinishedChanged: updateFinishedState,
+                        onFinishedCommit: commitFinishedState,
                         onTagsChanged: updateTags
                     )
                 } label: {
@@ -348,29 +356,21 @@ struct BookmarkDetailView: View {
     private var bookmarkActions: some View {
         if bookmark != nil {
             bookmarkButton
+        } else {
+            actionIcon(
+                systemName: isBookmarked ? "bookmark.fill" : "bookmark",
+                color: ZineTheme.secondaryText.opacity(0.55)
+            )
+                .accessibilityHidden(true)
+        }
 
-            if isBookmarked {
-                completionButton
-            }
+        if isBookmarked {
+            completionButton
+        }
+
+        if bookmark != nil {
             tagsMenu
         } else {
-            actionIcon(systemName: "bookmark.fill", color: .primary.opacity(0.55))
-                .accessibilityHidden(true)
-
-            if isHydrating {
-                ProgressView()
-                    .frame(width: 42, height: 44)
-                    .accessibilityLabel("Loading bookmark actions")
-            } else if hydrationFailed {
-                Button {
-                    Task { await hydrateBookmark() }
-                } label: {
-                    actionIcon(systemName: "arrow.clockwise")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Retry loading bookmark actions")
-            }
-
             actionIcon(systemName: "tag", color: ZineTheme.secondaryText.opacity(0.45))
                 .accessibilityHidden(true)
         }
@@ -393,21 +393,20 @@ struct BookmarkDetailView: View {
     }
 
     private var completionButton: some View {
-        let isFinished = bookmark?.isFinished ?? false
-
         return Button {
-            Task { await toggleFinished() }
+            toggleFinished()
         } label: {
             actionIcon(
-                systemName: isFinished
+                systemName: finishedState.isFinished
                     ? "checkmark.circle.fill"
                     : "checkmark.circle",
-                color: isFinished ? .green : ZineTheme.secondaryText
+                color: finishedState.isFinished ? .green : ZineTheme.secondaryText
             )
+            .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(.plain)
-        .disabled(isSaving)
-        .accessibilityLabel(isFinished ? "Mark unfinished" : "Mark complete")
+        .allowsHitTesting(!finishedState.isUpdating)
+        .accessibilityLabel(finishedState.isFinished ? "Mark unfinished" : "Mark complete")
         .actionRowHaptic()
     }
 
@@ -607,27 +606,23 @@ struct BookmarkDetailView: View {
     }
 
     private func hydrateBookmark() async {
-        let needsInitialBookmark = bookmark == nil
-        if needsInitialBookmark {
-            isHydrating = true
-            hydrationFailed = false
-        }
-
         do {
-            let refreshed = try await client.getBookmark(id: content.id)
+            var refreshed = try await client.getBookmark(id: content.id)
             guard !Task.isCancelled else { return }
+            finishedState.hydrate(
+                isFinished: refreshed.isFinished,
+                finishedAt: refreshed.finishedAt
+            )
+            refreshed.isFinished = finishedState.isFinished
+            refreshed.finishedAt = finishedState.finishedAt
             bookmark = refreshed
-            isHydrating = false
-            hydrationFailed = false
             if !hasToggledBookmark {
                 isBookmarked = refreshed.state == "BOOKMARKED"
             }
         } catch is CancellationError {
             return
         } catch {
-            guard needsInitialBookmark else { return }
-            isHydrating = false
-            hydrationFailed = true
+            return
         }
     }
 
@@ -663,23 +658,29 @@ struct BookmarkDetailView: View {
         }
     }
 
-    private func toggleFinished() async {
-        guard var bookmark else { return }
+    private func toggleFinished() {
+        guard let mutation = finishedState.beginToggle() else { return }
+        updateBookmarkFromFinishedState(notify: false)
 
-        isSaving = true
-        defer { isSaving = false }
-
-        do {
-            let result = try await client.setFinished(
-                id: bookmark.id,
-                isFinished: !bookmark.isFinished
-            )
-            bookmark.isFinished = result.isFinished
-            bookmark.finishedAt = result.finishedAt
-            self.bookmark = bookmark
-            onUpdate(bookmark)
-        } catch {
-            errorMessage = error.localizedDescription
+        Task {
+            do {
+                let result = try await client.setFinished(
+                    id: content.id,
+                    isFinished: mutation.requestedIsFinished
+                )
+                finishedState.accept(
+                    isFinished: result.isFinished,
+                    finishedAt: result.finishedAt
+                )
+                updateBookmarkFromFinishedState(notify: true)
+            } catch is CancellationError {
+                finishedState.rollback(mutation)
+                updateBookmarkFromFinishedState(notify: false)
+            } catch {
+                finishedState.rollback(mutation)
+                updateBookmarkFromFinishedState(notify: false)
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -716,12 +717,31 @@ struct BookmarkDetailView: View {
         onUpdate(bookmark)
     }
 
-    private func updateFinishedState(_ isFinished: Bool) {
+    private func updateFinishedState(_ isFinished: Bool, phase: BookmarkChangePhase) {
+        finishedState.synchronize(
+            isFinished: isFinished,
+            finishedAt: isFinished ? Date().formatted(.iso8601) : nil,
+            isUpdating: phase == .optimistic
+        )
+        updateBookmarkFromFinishedState(notify: false)
+    }
+
+    private func commitFinishedState(_ isFinished: Bool) {
+        finishedState.accept(
+            isFinished: isFinished,
+            finishedAt: isFinished ? Date().formatted(.iso8601) : nil
+        )
+        updateBookmarkFromFinishedState(notify: true)
+    }
+
+    private func updateBookmarkFromFinishedState(notify: Bool) {
         guard var bookmark else { return }
-        bookmark.isFinished = isFinished
-        bookmark.finishedAt = isFinished ? Date().formatted(.iso8601) : nil
+        bookmark.isFinished = finishedState.isFinished
+        bookmark.finishedAt = finishedState.finishedAt
         self.bookmark = bookmark
-        onUpdate(bookmark)
+        if notify {
+            onUpdate(bookmark)
+        }
     }
 
     private func updateTags(_ tags: [BookmarkTag]) {
