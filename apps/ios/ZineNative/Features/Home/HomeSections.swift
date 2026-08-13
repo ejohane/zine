@@ -148,73 +148,104 @@ struct HomeDashboardSectionView: View {
                 sectionID: section.id,
                 transitionNamespace: transitionNamespace
             )
-        case .todayTopic(let topic):
-            HomeTodayTopicSection(topic: topic)
+        case .featuredArticle(let item):
+            HomeFeaturedArticleSection(
+                item: item,
+                sectionID: section.id,
+                horizontalPadding: 20,
+                transitionNamespace: transitionNamespace
+            )
         }
     }
 }
 
-private struct HomeTodayTopicSection: View {
-    let topic: HomeTodayTopic
+struct HomeFeaturedArticleSection: View {
+    let item: HomeItem
+    let sectionID: String
+    let horizontalPadding: CGFloat
+    let transitionNamespace: Namespace.ID
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                Text("Today")
-                    .font(.caption.weight(.heavy))
-                    .tracking(1.1)
-                    .foregroundStyle(ZineTheme.brandAccent)
+        HomeNavigationLink(
+            route: .item(item, sectionID: sectionID),
+            transitionNamespace: transitionNamespace
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 9) {
+                    CreatorAvatar(
+                        imageUrl: item.creatorImageUrl,
+                        creator: item.creator,
+                        contentType: item.contentType,
+                        size: 32
+                    )
 
-                Text(formattedDate)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ZineTheme.secondaryText)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(item.creator)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ZineTheme.primaryText)
+                            .lineLimit(1)
 
-                if topic.isShowingCachedEdition {
-                    statusLabel("Saved edition", color: ZineTheme.secondaryText)
-                } else {
-                    switch topic.freshnessStatus {
-                    case .complete:
-                        EmptyView()
-                    case .partial:
-                        statusLabel("Partial", color: .orange)
-                    case .unavailable:
-                        statusLabel("Unavailable", color: ZineTheme.secondaryText)
+                        Text("RECENTLY ADDED")
+                            .font(.caption2.weight(.heavy))
+                            .tracking(0.8)
+                            .foregroundStyle(ZineTheme.brandAccent)
                     }
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(ZineTheme.tertiaryText)
+                }
+
+                Text(item.title)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(ZineTheme.primaryText)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+
+                if let excerpt {
+                    Text(excerpt)
+                        .font(.subheadline)
+                        .foregroundStyle(ZineTheme.secondaryText)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(4)
+                }
+
+                if !footerLabels.isEmpty {
+                    Text(footerLabels.joined(separator: " · "))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ZineTheme.tertiaryText)
                 }
             }
-
-            NavigationLink(value: PeopleDailyRoute.section(topic.section.id)) {
-                DailyOverviewSectionRow(
-                    section: topic.section,
-                    authors: topic.authors
-                )
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ZineTheme.surface, in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(ZineTheme.border.opacity(0.45), lineWidth: 0.5)
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Opens the article")
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, horizontalPadding)
     }
 
-    private func statusLabel(_ text: String, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 5, height: 5)
-            Text(text)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(ZineTheme.secondaryText)
-        }
+    private var excerpt: String? {
+        let value = item.summary?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? nil : value
     }
 
-    private var formattedDate: String {
-        let components = topic.date.split(separator: "-").compactMap { Int($0) }
-        guard components.count == 3 else { return topic.date }
-        var value = DateComponents()
-        value.calendar = Calendar(identifier: .gregorian)
-        value.timeZone = TimeZone(identifier: topic.timezone)
-        value.year = components[0]
-        value.month = components[1]
-        value.day = components[2]
-        return value.date?.formatted(.dateTime.month(.abbreviated).day()) ?? topic.date
+    private var footerLabels: [String] {
+        [item.consumptionLabel, savedLabel].compactMap { $0 }
+    }
+
+    private var savedLabel: String? {
+        guard let bookmarkedAt = item.bookmarkedAt,
+              let date = try? Date(bookmarkedAt, strategy: .iso8601)
+        else { return nil }
+        return "Saved \(date.formatted(.relative(presentation: .named)))"
     }
 }
 

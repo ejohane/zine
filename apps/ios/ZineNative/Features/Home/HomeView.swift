@@ -39,7 +39,6 @@ enum HomeLayoutDensity: Equatable {
 struct HomeView: View {
     let client: APIClient
     let store: HomeStore
-    let peopleDailyStore: PeopleDailyStore
     var density: HomeLayoutDensity = .standard
     var title = "Home"
     let onContentChanged: () -> Void
@@ -52,7 +51,6 @@ struct HomeView: View {
     init(
         client: APIClient,
         store: HomeStore,
-        peopleDailyStore: PeopleDailyStore,
         density: HomeLayoutDensity = .standard,
         title: String = "Home",
         onContentChanged: @escaping () -> Void,
@@ -62,7 +60,6 @@ struct HomeView: View {
     ) {
         self.client = client
         self.store = store
-        self.peopleDailyStore = peopleDailyStore
         self.density = density
         self.title = title
         self.onContentChanged = onContentChanged
@@ -99,12 +96,6 @@ struct HomeView: View {
                             onExternalOpen: onExternalOpen,
                             tabReselection: tabReselection
                         )
-                    }
-                }
-                .navigationDestination(for: PeopleDailyRoute.self) { route in
-                    switch route {
-                    case let .section(id):
-                        PeopleDailySectionView(client: client, sectionID: id)
                     }
                 }
         }
@@ -147,28 +138,13 @@ struct HomeView: View {
             }
             .background(ZineTheme.canvas)
             .refreshable {
-                async let home: Void = store.reload()
-                async let today: Void = peopleDailyStore.load()
-                _ = await (home, today)
+                await store.reload()
             }
         }
     }
 
     private var dashboardSections: [HomeDashboardSection] {
-        guard let response = peopleDailyStore.response else {
-            return density.visibleSections(from: store.sections)
-        }
-        let topics = HomeStore.strongestTodayTopics(
-            sections: response.overviewSections,
-            authors: response.authors,
-            date: response.date,
-            timezone: response.timezone,
-            freshnessStatus: response.freshness.status,
-            isShowingCachedEdition: peopleDailyStore.isShowingCachedEdition
-        )
-        return density.visibleSections(
-            from: HomeStore.interleaveTodayTopics(topics, into: store.sections)
-        )
+        density.visibleSections(from: store.sections)
     }
 
     @ViewBuilder
