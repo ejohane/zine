@@ -65,10 +65,6 @@ struct ScreenshotHomeView: View {
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 ScreenshotHomeSectionListView(route: route)
             }
-            .navigationDestination(for: PeopleDailyRoute.self) { _ in
-                Text("Today topic")
-                    .navigationTitle("Conversations")
-            }
         }
         .zineScreenChrome()
     }
@@ -150,6 +146,16 @@ private enum ScreenshotHomeFixtures {
         bookmark(id: "opened-3", title: "A practical guide to product intuition", creator: "Every"),
     ]
 
+    static let featuredArticle = homeItem(
+        id: "featured-article",
+        title: "Designing software for a world of personal agents",
+        creator: "Maggie Appleton",
+        creatorImageUrl: URL(string: "https://i.pravatar.cc/96?img=47"),
+        summary: "The next generation of tools will be shaped less by universal workflows and more by software that learns the context, taste, and intent of one person.",
+        minutes: 8,
+        bookmarkedAt: Date.now.formatted(.iso8601)
+    )
+
     static let sections: [HomeDashboardSection] = [
         .jumpBackIn([
             homeItem(
@@ -197,14 +203,7 @@ private enum ScreenshotHomeFixtures {
                 progress: BookmarkProgress(position: 6, duration: 15, percent: 40)
             ),
         ]),
-        .todayTopic(todayTopic(
-            id: "agents",
-            title: "How people are reaching agents remotely",
-            summary: "Private networks and small custom apps are making agents available away from the desk.",
-            authors: ["Dan", "Ken", "Joel"],
-            favoriteCount: 4,
-            nearbyCount: 1
-        )),
+        .featuredArticle(featuredArticle),
         .inbox([
             bookmark(id: "inbox-1", title: "What comes after the app?", creator: "Stratechery"),
             bookmark(id: "inbox-2", title: "Designing tools for thought", creator: "Maggie Appleton"),
@@ -216,16 +215,18 @@ private enum ScreenshotHomeFixtures {
             homeItem(id: "quick-3", title: "A field guide to curiosity", creator: "Works in Progress"),
             homeItem(id: "quick-4", title: "Notes on taste", creator: "Every"),
         ]),
-        .todayTopic(todayTopic(
-            id: "open-weights",
-            title: "Open weights and access",
-            summary: "People compare who benefits when powerful models become easier to use.",
-            authors: ["Alice", "Bob", "Carol"],
-            favoriteCount: 3,
-            nearbyCount: 2
-        )),
         .recentlySaved([
-            homeItem(id: "saved-1", title: "The future of personal software", creator: "Ink & Switch"),
+            featuredArticle,
+            homeItem(
+                id: "resume",
+                title: "Building products that feel inevitable",
+                creator: "Lenny’s Podcast",
+                contentType: .podcast,
+                provider: .spotify,
+                duration: 3_420,
+                minutes: nil,
+                progress: BookmarkProgress(position: 1_368, duration: 3_420, percent: 40)
+            ),
             homeItem(id: "saved-2", title: "How great products compound", creator: "A Smart Bear"),
             homeItem(id: "saved-3", title: "Interfaces for invisible systems", creator: "Rachel Been"),
         ]),
@@ -255,10 +256,13 @@ private enum ScreenshotHomeFixtures {
         id: String,
         title: String,
         creator: String,
+        creatorImageUrl: URL? = nil,
+        summary: String? = nil,
         contentType: ContentType = .article,
         provider: Provider = .rss,
         duration: Int? = nil,
         minutes: Int? = 7,
+        bookmarkedAt: String = "2026-07-18T12:00:00Z",
         progress: BookmarkProgress? = nil
     ) -> HomeItem {
         HomeItem(
@@ -270,14 +274,14 @@ private enum ScreenshotHomeFixtures {
             contentType: contentType,
             provider: provider,
             creator: creator,
-            creatorImageUrl: nil,
+            creatorImageUrl: creatorImageUrl,
             creatorId: nil,
             publisher: nil,
-            summary: nil,
+            summary: summary,
             duration: duration,
             publishedAt: "2026-07-18T12:00:00Z",
             readingTimeMinutes: minutes,
-            bookmarkedAt: "2026-07-18T12:00:00Z",
+            bookmarkedAt: bookmarkedAt,
             lastOpenedAt: progress == nil ? nil : "2026-07-18T18:00:00Z",
             progress: progress
         )
@@ -312,45 +316,5 @@ private enum ScreenshotHomeFixtures {
         )
     }
 
-    private static func todayTopic(
-        id: String,
-        title: String,
-        summary: String,
-        authors: [String],
-        favoriteCount: Int,
-        nearbyCount: Int
-    ) -> HomeTodayTopic {
-        let dailyAuthors = authors.map { name in
-            DailyAuthor(
-                key: name.lowercased(),
-                username: name.lowercased(),
-                name: name,
-                profileUrl: nil,
-                profileImageUrl: nil,
-                verified: nil
-            )
-        }
-        return HomeTodayTopic(
-            section: DailyOverviewSection(
-                id: id,
-                title: title,
-                summary: summary,
-                source: "GENERATED",
-                representativePostIds: [],
-                favoriteThreadUnitIds: (0..<favoriteCount).map { "favorite-\(id)-\($0)" },
-                supportingThreadUnitIds: (0..<nearbyCount).map { "nearby-\(id)-\($0)" },
-                authorKeys: dailyAuthors.map(\.key),
-                favoriteConversationCount: favoriteCount,
-                supportingConversationCount: nearbyCount,
-                latestActivityAt: "2026-07-28T12:00:00Z",
-                coverageWarnings: []
-            ),
-            authors: dailyAuthors,
-            date: "2026-07-28",
-            timezone: "America/Chicago",
-            freshnessStatus: .complete,
-            isShowingCachedEdition: false
-        )
-    }
 }
 #endif

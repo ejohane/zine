@@ -88,6 +88,45 @@ final class HomeTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testRecentlySavedKeepsItemsThatAlsoAppearElsewhereOnHome() throws {
+        let shared = makeHomeItem(
+            id: "shared",
+            minutes: 5,
+            lastOpenedAt: "2026-08-12T10:00:00Z"
+        )
+        let recent = makeHomeItem(id: "recent", minutes: 20)
+        let home = HomeResponse(
+            recentBookmarks: [shared, recent],
+            jumpBackIn: [shared],
+            byContentType: HomeContentTypeSections(videos: [], podcasts: [], articles: []),
+            customCollections: [],
+            sectionOrder: [
+                HomeLayoutSection(kind: .builtIn, builtInSection: .jumpBackIn, collectionId: nil),
+                HomeLayoutSection(
+                    kind: .builtIn,
+                    builtInSection: .recentlyBookmarked,
+                    collectionId: nil
+                ),
+            ],
+            requestId: nil,
+            traceId: nil
+        )
+
+        let sections = HomeStore.makeSections(home: home, inboxItems: [])
+        let jumpBackIn = try XCTUnwrap(sections.first)
+        let recentlySaved = try XCTUnwrap(sections.last)
+
+        guard case .jumpBackIn(let jumpBackInItems) = jumpBackIn,
+              case .recentlySaved(let recentlySavedItems) = recentlySaved
+        else {
+            return XCTFail("Expected Jump Back In followed by Recently Saved")
+        }
+
+        XCTAssertEqual(jumpBackInItems.map(\.id), ["shared"])
+        XCTAssertEqual(recentlySavedItems.map(\.id), ["shared", "recent"])
+    }
+
     func testDecodesCompactHomeResponseWithProgress() throws {
         let response = try JSONDecoder().decode(
             HomeResponse.self,
@@ -317,100 +356,71 @@ final class HomeTests: XCTestCase {
     }
 
     @MainActor
-    func testSelectsOnlyTheTwoStrongestTodayTopicsInPublishedOrder() {
-        let authors = [
-            makeDailyAuthor(key: "alice"),
-            makeDailyAuthor(key: "bob"),
-            makeDailyAuthor(key: "carol"),
-        ]
-        let sections = [
-            makeDailySection(id: "strongest", authorKeys: ["alice", "bob"]),
-            makeDailySection(id: "second", authorKeys: ["carol"]),
-            makeDailySection(id: "third", authorKeys: ["alice"]),
-        ]
-
-        let topics = HomeStore.strongestTodayTopics(
-            sections: sections,
-            authors: authors,
-            date: "2026-07-28",
-            timezone: "America/Chicago",
-            freshnessStatus: .partial,
-            isShowingCachedEdition: true
-        )
-
-        XCTAssertEqual(topics.map(\.id), ["strongest", "second"])
-        XCTAssertEqual(topics[0].authors.map(\.key), ["alice", "bob"])
-        XCTAssertEqual(topics[1].authors.map(\.key), ["carol"])
-        XCTAssertEqual(topics[0].freshnessStatus, .partial)
-        XCTAssertTrue(topics[0].isShowingCachedEdition)
-    }
-
-    @MainActor
-    func testInterleavesTodayTopicsAfterJumpBackInAndFirstCollection() {
-        let topics = [makeTodayTopic(id: "one"), makeTodayTopic(id: "two")]
+    func testInterleavesOneFeaturedArticleAfterJumpBackIn() {
+        let article = makeHomeItem(id: "article", minutes: 8, summary: "Useful context.")
         let sections: [HomeDashboardSection] = [
             .jumpBackIn([makeHomeItem(id: "resume", minutes: 20)]),
             .inbox([makeBookmark(index: 0)]),
-            .collection(HomeCollection(
-                collectionId: "ideas",
-                title: "Ideas",
-                layout: .stackRail,
-                position: 0,
-                count: 1,
-                items: [makeHomeItem(id: "idea", minutes: 12)]
-            )),
             .recentlySaved([makeHomeItem(id: "recent", minutes: 10)]),
         ]
 
-        let result = HomeStore.interleaveTodayTopics(topics, into: sections)
+        let result = HomeStore.interleaveFeaturedArticle(article, into: sections)
 
         XCTAssertEqual(
             result.map(\.id),
             [
                 "jump-back-in",
-                "today-topic-one",
+                "featured-article",
                 "inbox",
-                "collection-ideas",
-                "today-topic-two",
                 "recently-saved",
             ]
         )
+
+        guard case .featuredArticle(let featured) = result[1] else {
+            return XCTFail("Expected the featured article after Jump Back In")
+        }
+        XCTAssertEqual(featured.id, article.id)
     }
 
     @MainActor
-    func testInterleavesSecondTodayTopicAfterQuickWinsWithoutACollection() {
-        let topics = [makeTodayTopic(id: "one"), makeTodayTopic(id: "two")]
-        let sections: [HomeDashboardSection] = [
-            .jumpBackIn([makeHomeItem(id: "resume", minutes: 20)]),
-            .inbox([makeBookmark(index: 0)]),
-            .quickWins([makeHomeItem(id: "quick", minutes: 5)]),
-            .recentlySaved([makeHomeItem(id: "recent", minutes: 10)]),
-        ]
-
-        let result = HomeStore.interleaveTodayTopics(topics, into: sections)
-
-        XCTAssertEqual(
-            result.map(\.id),
-            [
-                "jump-back-in",
-                "today-topic-one",
-                "inbox",
-                "quick-wins",
-                "today-topic-two",
-                "recently-saved",
-            ]
-        )
-    }
-
-    @MainActor
-    func testLeavesHomeUnchangedWithoutTodayTopics() {
+    func testLeavesHomeUnchangedWithoutAFeaturedArticle() {
         let sections: [HomeDashboardSection] = [
             .inbox([makeBookmark(index: 0)]),
         ]
 
-        let result = HomeStore.interleaveTodayTopics([], into: sections)
+        let result = HomeStore.interleaveFeaturedArticle(nil, into: sections)
 
         XCTAssertEqual(result.map(\.id), ["inbox"])
+    }
+
+    @MainActor
+    func testFeaturesNewestSavedArticleThatHasContent() throws {
+        let video = makeHomeItem(id: "video", minutes: 18, contentType: .video, summary: "Video")
+        let emptyArticle = makeHomeItem(id: "empty", minutes: 16, summary: "  ")
+        let featured = makeHomeItem(id: "featured", minutes: 19, summary: "Article excerpt")
+        let home = HomeResponse(
+            recentBookmarks: [video, emptyArticle, featured],
+            jumpBackIn: [],
+            byContentType: HomeContentTypeSections(videos: [video], podcasts: [], articles: [emptyArticle, featured]),
+            customCollections: [],
+            sectionOrder: [
+                HomeLayoutSection(
+                    kind: .builtIn,
+                    builtInSection: .recentlyBookmarked,
+                    collectionId: nil
+                ),
+            ],
+            requestId: nil,
+            traceId: nil
+        )
+
+        let sections = HomeStore.makeSections(home: home, inboxItems: [])
+
+        XCTAssertEqual(sections.map(\.id), ["recently-saved", "featured-article"])
+        guard case .featuredArticle(let article) = try XCTUnwrap(sections.last) else {
+            return XCTFail("Expected a featured article")
+        }
+        XCTAssertEqual(article.id, "featured")
     }
 
     func testHomeCacheKeepsOnlyFourInboxItems() async throws {
@@ -429,7 +439,9 @@ final class HomeTests: XCTestCase {
     private func makeHomeItem(
         id: String,
         minutes: Int,
-        lastOpenedAt: String? = nil
+        lastOpenedAt: String? = nil,
+        contentType: ContentType = .article,
+        summary: String? = nil
     ) -> HomeItem {
         HomeItem(
             id: id,
@@ -437,13 +449,13 @@ final class HomeTests: XCTestCase {
             title: "Item \(id)",
             thumbnailUrl: nil,
             canonicalUrl: URL(string: "https://example.com/\(id)")!,
-            contentType: .article,
+            contentType: contentType,
             provider: .rss,
             creator: "Creator",
             creatorImageUrl: nil,
             creatorId: "creator-1",
             publisher: nil,
-            summary: nil,
+            summary: summary,
             duration: nil,
             publishedAt: nil,
             readingTimeMinutes: minutes,
@@ -482,42 +494,4 @@ final class HomeTests: XCTestCase {
         )
     }
 
-    private func makeTodayTopic(id: String) -> HomeTodayTopic {
-        HomeTodayTopic(
-            section: makeDailySection(id: id, authorKeys: ["author-\(id)"]),
-            authors: [makeDailyAuthor(key: "author-\(id)")],
-            date: "2026-07-28",
-            timezone: "America/Chicago",
-            freshnessStatus: .complete,
-            isShowingCachedEdition: false
-        )
-    }
-
-    private func makeDailySection(id: String, authorKeys: [String]) -> DailyOverviewSection {
-        DailyOverviewSection(
-            id: id,
-            title: "Topic \(id)",
-            summary: "Summary for \(id).",
-            source: "GENERATED",
-            representativePostIds: [],
-            favoriteThreadUnitIds: ["conversation-\(id)"],
-            supportingThreadUnitIds: [],
-            authorKeys: authorKeys,
-            favoriteConversationCount: 1,
-            supportingConversationCount: 0,
-            latestActivityAt: "2026-07-28T12:00:00Z",
-            coverageWarnings: []
-        )
-    }
-
-    private func makeDailyAuthor(key: String) -> DailyAuthor {
-        DailyAuthor(
-            key: key,
-            username: key,
-            name: key.capitalized,
-            profileUrl: nil,
-            profileImageUrl: nil,
-            verified: nil
-        )
-    }
 }

@@ -47,7 +47,6 @@ private struct AuthenticatedAppView: View {
     private let libraryCache: LibraryCache
 
     @State private var homeStore: HomeStore
-    @State private var peopleDailyStore: PeopleDailyStore
     @State private var search = ""
     @State private var selectedTab = AppTab.home
     @State private var homeTabReselection = 0
@@ -68,15 +67,10 @@ private struct AuthenticatedAppView: View {
             },
             articleBodyCache: ArticleBodyCache(userID: userID)
         )
-        let peopleDailyCache = PeopleDailyCache(userID: userID)
         let homeCache = HomeCache(userID: userID)
         self.client = client
         libraryCache = LibraryCache(userID: userID)
         _homeStore = State(initialValue: HomeStore(client: client, cache: homeCache))
-        _peopleDailyStore = State(initialValue: PeopleDailyStore(
-            client: client,
-            cache: peopleDailyCache
-        ))
     }
 
     var body: some View {
@@ -85,7 +79,6 @@ private struct AuthenticatedAppView: View {
                 HomeView(
                     client: client,
                     store: homeStore,
-                    peopleDailyStore: peopleDailyStore,
                     density: .compact,
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen,
@@ -127,9 +120,7 @@ private struct AuthenticatedAppView: View {
         }
         .zineTabShellChrome()
         .task(id: homeRevision) {
-            async let home: Void = homeStore.reload()
-            async let today: Void = peopleDailyStore.load()
-            _ = await (home, today)
+            await homeStore.reload()
         }
         .onChange(of: externalOpenEvent, initial: true) { _, event in
             guard let event else { return }

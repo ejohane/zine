@@ -64,8 +64,13 @@ struct CondensedHomeDashboardSectionView: View {
                 sectionID: section.id,
                 transitionNamespace: transitionNamespace
             )
-        case .todayTopic(let topic):
-            CondensedTodayTopicSection(topic: topic)
+        case .featuredArticle(let item):
+            HomeFeaturedArticleSection(
+                item: item,
+                sectionID: section.id,
+                horizontalPadding: 16,
+                transitionNamespace: transitionNamespace
+            )
         }
     }
 }
@@ -334,77 +339,6 @@ private struct CondensedItemListSection: View {
             .background(ZineTheme.surface, in: .rect(cornerRadius: 13))
         }
         .padding(.horizontal, 16)
-    }
-}
-
-private struct CondensedTodayTopicSection: View {
-    let topic: HomeTodayTopic
-
-    var body: some View {
-        NavigationLink(value: PeopleDailyRoute.section(topic.section.id)) {
-            HStack(alignment: .top, spacing: 10) {
-                DailyParticipantFacepile(authors: topic.authors, size: 20, maximumVisible: 3)
-                    .frame(width: 54, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text("TODAY")
-                            .font(.caption2.weight(.heavy))
-                            .tracking(0.8)
-                            .foregroundStyle(ZineTheme.brandAccent)
-
-                        if let statusText {
-                            Text(statusText)
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(ZineTheme.secondaryText)
-                        }
-                    }
-
-                    Text(topic.section.title)
-                        .font(.headline)
-                        .foregroundStyle(ZineTheme.primaryText)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-
-                    Text(topic.section.summary)
-                        .font(.caption)
-                        .foregroundStyle(ZineTheme.secondaryText)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-
-                    Text(conversationSummary)
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(ZineTheme.tertiaryText)
-                }
-
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(ZineTheme.tertiaryText)
-                    .padding(.top, 2)
-            }
-            .padding(12)
-            .background(ZineTheme.brandAccent.opacity(0.07), in: .rect(cornerRadius: 14))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .accessibilityHint("Opens the conversations in this section")
-    }
-
-    private var statusText: String? {
-        if topic.isShowingCachedEdition { return "Saved edition" }
-        switch topic.freshnessStatus {
-        case .complete: return nil
-        case .partial: return nil
-        case .unavailable: return "Unavailable"
-        }
-    }
-
-    private var conversationSummary: String {
-        let favorites = "\(topic.section.favoriteConversationCount) conversation\(topic.section.favoriteConversationCount == 1 ? "" : "s")"
-        guard topic.section.supportingConversationCount > 0 else { return favorites }
-        return "\(favorites) · \(topic.section.supportingConversationCount) nearby"
     }
 }
 

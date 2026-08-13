@@ -3,7 +3,6 @@ import SwiftUI
 struct TodayView: View {
     let client: APIClient
     let homeStore: HomeStore
-    let peopleDailyStore: PeopleDailyStore
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
@@ -12,7 +11,6 @@ struct TodayView: View {
         HomeView(
             client: client,
             store: homeStore,
-            peopleDailyStore: peopleDailyStore,
             density: .compact,
             title: "Today",
             onContentChanged: onContentChanged,
