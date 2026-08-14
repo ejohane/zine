@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { Provider, UserItemState } from '@zine/shared';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -502,6 +502,15 @@ export async function syncRssFeed(
   feed: RssFeedRow,
   options: SyncOptions = {}
 ): Promise<SyncRssFeedResult> {
+  if (feed.status === 'UNSUBSCRIBED') {
+    return {
+      newItems: 0,
+      processedEntries: 0,
+      skipped: true,
+      reason: 'unsubscribed',
+    };
+  }
+
   const requestedMaxEntries = options.maxEntries ?? MAX_ENTRIES_PER_SYNC;
   const maxEntries =
     feed.lastSuccessAt == null
@@ -575,6 +584,19 @@ export async function syncRssFeedById(
   return syncRssFeed(db, feed, options);
 }
 
+function dueRssFeedCondition(now: number) {
+  return and(
+    eq(rssFeeds.status, 'ACTIVE'),
+    gt(rssFeeds.pollIntervalSeconds, 0),
+    or(
+      isNull(rssFeeds.lastPolledAt),
+      lt(rssFeeds.lastPolledAt, sql`${now} - (${rssFeeds.pollIntervalSeconds} * 1000)`)
+    )
+  );
+}
+
+export const rssServiceInternals = { dueRssFeedCondition };
+
 export async function pollRssFeeds(env: Bindings, _ctx: ExecutionContext): Promise<RssPollResult> {
   const lockAcquired = await tryAcquireLock(
     env.OAUTH_STATE_KV,
@@ -595,11 +617,7 @@ export async function pollRssFeeds(env: Bindings, _ctx: ExecutionContext): Promi
     const db = createDb(env.DB);
     const now = Date.now();
     const dueFeeds = await db.query.rssFeeds.findMany({
-      where: and(
-        eq(rssFeeds.status, 'ACTIVE'),
-        sql`${rssFeeds.pollIntervalSeconds} > 0`,
-        sql`${rssFeeds.lastPolledAt} IS NULL OR ${rssFeeds.lastPolledAt} < ${now} - (${rssFeeds.pollIntervalSeconds} * 1000)`
-      ),
+      where: dueRssFeedCondition(now),
       orderBy: [asc(rssFeeds.lastPolledAt)],
       limit: RSS_POLL_BATCH_SIZE,
     });
