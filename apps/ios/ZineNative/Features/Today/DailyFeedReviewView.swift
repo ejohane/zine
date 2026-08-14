@@ -40,8 +40,7 @@ struct PeopleDailyTodayView: View {
     @ViewBuilder
     private var content: some View {
         if store.isLoading, store.response == nil {
-            ProgressView("Loading Today…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZineLoadingView(label: "Loading Today…")
         } else if let error = store.errorMessage, store.response == nil {
             ContentUnavailableView {
                 Label("Today unavailable", systemImage: "exclamationmark.triangle")
@@ -236,8 +235,7 @@ struct PeopleDailySectionView: View {
     var body: some View {
         Group {
             if store.isLoading, store.response == nil {
-                ProgressView("Loading conversations…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                ZineLoadingView(label: "Loading conversations…")
             } else if let error = store.errorMessage, store.response == nil {
                 ContentUnavailableView {
                     Label("Conversations unavailable", systemImage: "exclamationmark.triangle")
@@ -407,8 +405,7 @@ struct DailyFeedReviewView: View {
     @ViewBuilder
     private var content: some View {
         if store.isLoading, store.response == nil {
-            ProgressView("Loading frozen X posts…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZineLoadingView(label: "Loading frozen X posts…")
         } else if let error = store.errorMessage, store.response == nil {
             ContentUnavailableView {
                 Label("Daily View unavailable", systemImage: "exclamationmark.triangle")

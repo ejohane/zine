@@ -27,8 +27,7 @@ struct DailyAuthorActivityView: View {
     @ViewBuilder
     private var content: some View {
         if store.isLoading, store.response == nil {
-            ProgressView("Loading @\(author.username)…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZineLoadingView(label: "Loading @\(author.username)…")
         } else if let error = store.errorMessage, store.response == nil {
             ContentUnavailableView {
                 Label("Activity unavailable", systemImage: "exclamationmark.triangle")

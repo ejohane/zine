@@ -76,7 +76,7 @@ struct ArticleReaderView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ZineTheme.canvas
+            ZineTheme.surface
                 .ignoresSafeArea()
 
             phaseContent

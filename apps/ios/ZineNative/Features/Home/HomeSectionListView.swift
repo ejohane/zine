@@ -33,7 +33,8 @@ struct HomeSectionListView: View {
         content
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .contentTypeFilterChrome()
+            .contentTypeFilterChrome(background: ZineTheme.surface)
+            .toolbarBackground(ZineTheme.surface, for: .tabBar)
             .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -79,21 +80,25 @@ struct HomeSectionListView: View {
             List {
                 CollapsingListTitle(
                     title: route.title,
-                    progress: titleCollapseProgress
+                    progress: titleCollapseProgress,
+                    background: ZineTheme.surface
                 )
                 .id(ScrollAnchor.top)
 
                 Section {
                     resultRows
                 } header: {
-                    ContentTypeFilterBar(selection: $contentType)
+                    ContentTypeFilterBar(
+                        selection: $contentType,
+                        background: ZineTheme.surface
+                    )
                         .textCase(nil)
                         .listRowInsets(EdgeInsets())
                 }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(ZineTheme.canvas)
+            .background(ZineTheme.surface)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
                 return CollapsingListTitle.collapseProgress(scrollOffset: offset)
@@ -136,9 +141,10 @@ struct HomeSectionListView: View {
     @ViewBuilder
     private var resultRows: some View {
         if store.isLoading && store.items.isEmpty {
-            ProgressView("Loading \(route.title.lowercased())…")
-                .frame(maxWidth: .infinity, minHeight: 260)
-                .listRowSeparator(.hidden)
+            FilteredListLoadingRow(
+                label: "Loading \(route.title.lowercased())…",
+                background: ZineTheme.surface
+            )
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("Section unavailable", systemImage: "exclamationmark.triangle")
@@ -150,6 +156,7 @@ struct HomeSectionListView: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowBackground(ZineTheme.surface)
             .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
             ContentUnavailableView(
@@ -162,6 +169,7 @@ struct HomeSectionListView: View {
                 )
             )
             .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowBackground(ZineTheme.surface)
             .listRowSeparator(.hidden)
         } else {
             ForEach(store.items) { bookmark in
@@ -169,6 +177,7 @@ struct HomeSectionListView: View {
                     BookmarkRow(bookmark: bookmark)
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                .listRowBackground(ZineTheme.surface)
                 .listRowSeparator(.hidden)
                 .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {

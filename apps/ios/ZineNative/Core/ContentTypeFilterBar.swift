@@ -3,6 +3,7 @@ import SwiftUI
 struct CollapsingListTitle: View {
     let title: String
     let progress: CGFloat
+    var background = ZineTheme.canvas
 
     var body: some View {
         Text(title)
@@ -14,7 +15,7 @@ struct CollapsingListTitle: View {
             .padding(.top, 8)
             .padding(.bottom, 2)
             .listRowInsets(EdgeInsets(top: 0, leading: 18, bottom: 0, trailing: 18))
-            .listRowBackground(ZineTheme.canvas)
+            .listRowBackground(background)
             .listRowSeparator(.hidden)
             .accessibilityAddTraits(.isHeader)
             .accessibilityHidden(progress >= 0.5)
@@ -40,6 +41,7 @@ struct CollapsedListTitle: View {
 
 struct ContentTypeFilterBar: View {
     @Binding var selection: ContentType?
+    var background = ZineTheme.canvas
 
     private let options: [ContentType?] = [nil, .article, .podcast, .video, .post]
 
@@ -49,7 +51,7 @@ struct ContentTypeFilterBar: View {
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ZineTheme.canvas)
+        .background(background)
         .sensoryFeedback(.selection, trigger: selection)
         .accessibilityLabel("Content format filters")
     }
@@ -78,6 +80,18 @@ struct ContentTypeFilterBar: View {
         option: ContentType?
     ) -> ContentType? {
         current == option ? nil : option
+    }
+}
+
+struct FilteredListLoadingRow: View {
+    let label: String
+    var background = ZineTheme.canvas
+
+    var body: some View {
+        ProgressView(label)
+            .frame(maxWidth: .infinity, minHeight: 260)
+            .listRowBackground(background)
+            .listRowSeparator(.hidden)
     }
 }
 
@@ -124,7 +138,7 @@ private struct ContentTypeFilterChip: View {
 }
 
 extension View {
-    func contentTypeFilterChrome() -> some View {
-        toolbarBackground(ZineTheme.canvas, for: .navigationBar)
+    func contentTypeFilterChrome(background: Color = ZineTheme.canvas) -> some View {
+        toolbarBackground(background, for: .navigationBar)
     }
 }

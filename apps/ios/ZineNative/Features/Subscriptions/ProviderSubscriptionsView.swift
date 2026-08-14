@@ -42,7 +42,7 @@ struct ProviderSubscriptionsView: View {
     var body: some View {
         Group {
             if store.isLoading && store.items.isEmpty {
-                ProgressView("Loading \(provider.title)…")
+                ZineLoadingView(label: "Loading \(provider.title)…")
             } else if let error = store.errorMessage, store.items.isEmpty {
                 ContentUnavailableView {
                     Label("\(provider.title) unavailable", systemImage: "exclamationmark.triangle")

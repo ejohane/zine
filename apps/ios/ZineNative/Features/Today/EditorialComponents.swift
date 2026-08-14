@@ -649,6 +649,7 @@ struct TodayLoadingView: View {
             .padding(20)
             .redacted(reason: .placeholder)
         }
+        .background(ZineTheme.canvas)
         .accessibilityLabel("Loading today’s issue")
     }
 }

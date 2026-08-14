@@ -182,9 +182,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var resultRows: some View {
         if store.isLoading && store.items.isEmpty {
-            ProgressView("Loading library…")
-                .frame(maxWidth: .infinity, minHeight: 260)
-                .listRowSeparator(.hidden)
+            FilteredListLoadingRow(label: "Loading library…")
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("Library unavailable", systemImage: "exclamationmark.triangle")
@@ -196,10 +194,12 @@ struct LibraryView: View {
                 }
             }
             .frame(maxWidth: .infinity, minHeight: 320)
+            .listRowBackground(ZineTheme.canvas)
             .listRowSeparator(.hidden)
         } else if store.items.isEmpty {
             emptyState
                 .frame(maxWidth: .infinity, minHeight: 320)
+                .listRowBackground(ZineTheme.canvas)
                 .listRowSeparator(.hidden)
         } else {
             ForEach(store.items) { bookmark in

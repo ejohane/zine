@@ -82,6 +82,19 @@ enum ZineTheme {
     }
 }
 
+struct ZineLoadingView: View {
+    let label: String
+    var background = ZineTheme.canvas
+
+    var body: some View {
+        ProgressView(label)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .foregroundStyle(ZineTheme.primaryText)
+            .tint(ZineTheme.brandAccent)
+            .background(background)
+    }
+}
+
 private extension UIColor {
     convenience init(zineHex hex: String) {
         let value = UInt64(hex, radix: 16) ?? 0
@@ -106,11 +119,13 @@ extension View {
             .background(ZineTheme.canvas)
             .foregroundStyle(ZineTheme.primaryText)
             .tint(ZineTheme.brandAccent)
+            .toolbarBackground(ZineTheme.canvas, for: .navigationBar)
             .toolbar(.visible, for: .navigationBar)
     }
 
     func zineTabShellChrome() -> some View {
         tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
+            .toolbarBackground(ZineTheme.canvas, for: .tabBar)
     }
 }
