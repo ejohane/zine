@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ContentType, Provider } from '@zine/shared';
+import type { D1Database } from '@cloudflare/workers-types';
+import { drizzle } from 'drizzle-orm/d1';
 import type { prepareItem } from '../ingestion/processor/prepare';
 import type { getOrCreateCreator } from '../ingestion/processor/creators';
 import type { fetchLinkPreview } from '../lib/link-preview';
 
-import { items } from '../db/schema';
+import { items, rssFeeds } from '../db/schema';
 
 const mockPrepareItem = vi.fn();
 const mockFetchLinkPreview = vi.fn();
@@ -31,7 +33,7 @@ vi.mock('../ingestion/processor/creators', () => ({
     mockGetOrCreateCreator(...args),
 }));
 
-import { syncRssFeed } from './service';
+import { rssServiceInternals, syncRssFeed } from './service';
 
 type SyncDb = Parameters<typeof syncRssFeed>[0];
 type SyncFeed = Parameters<typeof syncRssFeed>[1];
@@ -172,6 +174,25 @@ describe('syncRssFeed', () => {
 
     expect(result.processedEntries).toBe(1);
     expect(mockPrepareItem).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips unsubscribed feeds before making a network request', async () => {
+    const { db, spies } = createMockDb();
+
+    const result = await syncRssFeed(db, { ...feed, status: 'UNSUBSCRIBED' } as SyncFeed, {
+      maxEntries: 20,
+      useConditional: false,
+    });
+
+    expect(result).toEqual({
+      newItems: 0,
+      processedEntries: 0,
+      skipped: true,
+      reason: 'unsubscribed',
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(spies.updateSpy).not.toHaveBeenCalled();
+    expect(mockPrepareItem).not.toHaveBeenCalled();
   });
 
   it('uses the requested batch size after the feed has synced successfully', async () => {
@@ -358,5 +379,23 @@ describe('syncRssFeed', () => {
     expect(itemUpdates.thumbnailUrl).toBe('https://example.com/cover.jpg');
     expect(itemUpdates.summary).toBe('Clean description from article extractor.');
     expect(itemUpdates.creatorId).toBe('creator_123');
+  });
+});
+
+describe('RSS polling eligibility', () => {
+  it('groups the stale timestamp alternatives under the active-feed requirements', () => {
+    const now = Date.parse('2026-08-14T12:45:00.000Z');
+    const db = drizzle({ prepare: vi.fn() } as unknown as D1Database);
+
+    const query = db
+      .select({ id: rssFeeds.id })
+      .from(rssFeeds)
+      .where(rssServiceInternals.dueRssFeedCondition(now));
+    const generated = query.toSQL();
+
+    expect(generated.sql).toContain(
+      '"rss_feeds"."status" = ? and "rss_feeds"."poll_interval_seconds" > ? and ("rss_feeds"."last_polled_at" is null or "rss_feeds"."last_polled_at" < ? - ("rss_feeds"."poll_interval_seconds" * 1000))'
+    );
+    expect(generated.params).toEqual(['ACTIVE', 0, now]);
   });
 });
