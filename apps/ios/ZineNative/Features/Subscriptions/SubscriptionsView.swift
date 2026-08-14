@@ -48,7 +48,7 @@ struct SubscriptionsView: View {
     var body: some View {
         Group {
             if store.isLoading && store.sources.isEmpty {
-                ProgressView("Loading subscriptions…")
+                ZineLoadingView(label: "Loading subscriptions…")
             } else if let error = store.errorMessage, store.sources.isEmpty {
                 ContentUnavailableView {
                     Label("Subscriptions unavailable", systemImage: "exclamationmark.triangle")

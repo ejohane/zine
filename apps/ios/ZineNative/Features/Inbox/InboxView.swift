@@ -77,7 +77,7 @@ struct InboxView: View {
     @ViewBuilder
     private var content: some View {
         if store.isLoading && store.items.isEmpty {
-            ProgressView("Loading inbox…")
+            ZineLoadingView(label: "Loading inbox…")
         } else if let error = store.errorMessage, store.items.isEmpty {
             ContentUnavailableView {
                 Label("Inbox unavailable", systemImage: "exclamationmark.triangle")

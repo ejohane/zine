@@ -105,7 +105,7 @@ struct HomeView: View {
     @ViewBuilder
     private var content: some View {
         if store.isLoading && dashboardSections.isEmpty {
-            ProgressView("Loading \(title)…")
+            ZineLoadingView(label: "Loading \(title)…")
         } else if let error = store.errorMessage, dashboardSections.isEmpty {
             ContentUnavailableView {
                 Label("\(title) unavailable", systemImage: "exclamationmark.triangle")

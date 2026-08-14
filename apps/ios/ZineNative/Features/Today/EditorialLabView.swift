@@ -10,7 +10,7 @@ struct EditorialLabView: View {
         NavigationStack {
             Group {
                 if store.isLoading && store.experiments.isEmpty {
-                    ProgressView("Loading experiments…")
+                    ZineLoadingView(label: "Loading experiments…")
                 } else if let experiment = store.selectedExperiment {
                     experimentContent(experiment)
                 } else {

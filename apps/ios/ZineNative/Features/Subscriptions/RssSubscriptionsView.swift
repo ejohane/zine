@@ -130,7 +130,7 @@ struct RssSubscriptionsView: View {
     var body: some View {
         Group {
             if store.isLoading && store.response == nil {
-                ProgressView("Loading RSS feeds…")
+                ZineLoadingView(label: "Loading RSS feeds…")
             } else if let error = store.errorMessage, store.response == nil {
                 ContentUnavailableView {
                     Label("RSS unavailable", systemImage: "exclamationmark.triangle")

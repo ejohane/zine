@@ -98,26 +98,42 @@ private struct ScreenshotHomeSectionListView: View {
         return ScreenshotHomeFixtures.openedBookmarks.filter { $0.contentType == contentType }
     }
 
+    private var showsLoadingState: Bool {
+        ProcessInfo.processInfo.arguments.contains("-screenshot-filtered-list-loading-fixture")
+    }
+
     var body: some View {
         List {
             CollapsingListTitle(
                 title: route.title,
-                progress: titleCollapseProgress
+                progress: titleCollapseProgress,
+                background: ZineTheme.surface
             )
 
             Section {
-                ForEach(bookmarks) { bookmark in
-                    BookmarkRow(bookmark: bookmark)
+                if showsLoadingState {
+                    FilteredListLoadingRow(
+                        label: "Loading \(route.title.lowercased())…",
+                        background: ZineTheme.surface
+                    )
+                } else {
+                    ForEach(bookmarks) { bookmark in
+                        BookmarkRow(bookmark: bookmark)
+                            .listRowBackground(ZineTheme.surface)
+                    }
                 }
             } header: {
-                ContentTypeFilterBar(selection: $contentType)
+                ContentTypeFilterBar(
+                    selection: $contentType,
+                    background: ZineTheme.surface
+                )
                     .textCase(nil)
                     .listRowInsets(EdgeInsets())
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
+        .background(ZineTheme.surface)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             let offset = geometry.contentOffset.y + geometry.contentInsets.top
             return CollapsingListTitle.collapseProgress(scrollOffset: offset)
@@ -126,7 +142,8 @@ private struct ScreenshotHomeSectionListView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .contentTypeFilterChrome()
+        .contentTypeFilterChrome(background: ZineTheme.surface)
+        .toolbarBackground(ZineTheme.surface, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .principal) {

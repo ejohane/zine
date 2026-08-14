@@ -33,12 +33,12 @@ the surrounding theme changes.
   `ZineTheme.tertiaryText` for de-emphasized metadata.
 - Use `zineAppTheme()` at an app-level container and `zineScreenChrome()` for
   list-style screens when those modifiers fit the view structure.
-- Keep navigation bars and tab bars system-managed. Semantic colors may tint
-  controls and provide the content beneath them, but must not globally replace
-  native materials, scroll-edge behavior, or shadows with opaque palette
-  backgrounds. A collapsing filtered-list header may provide the canvas as its
-  toolbar background style, but must not force the material visible: forced
-  source chrome remains pinned over an interactive detail dismissal.
+- Keep navigation bars and tab bars system-managed. Shared screen and tab-shell
+  modifiers provide the canvas as their preferred toolbar background style so
+  the chrome matches the content, but must not force that background visible or
+  replace native scroll-edge behavior and shadows through UIKit appearance
+  customization. Native floating controls may retain their system material;
+  immersive destinations still own tab-bar visibility.
 - Keep the root tab bar and ordinary screen navigation bars explicitly visible.
   Visibility and semantic item tint are separate from the system-managed bar
   material; hiding either bar must remain scoped to an immersive destination.
@@ -54,6 +54,14 @@ the surrounding theme changes.
   long-form reading surfaces.
 - Keep the reading hierarchy neutral: body content uses surface and text roles,
   while links and narrow annotations may use the accent roles.
+- When a list intentionally uses surface-backed rows, extend `surface` through
+  its title, filters, empty space, navigation chrome, and tab-bar safe area so
+  the screen reads as one continuous background. Keep canvas-backed lists on
+  `canvas` throughout instead of mixing the two roles.
+- Full-screen loading views must fill their container with the destination's
+  semantic background. Loading, error, and empty rows inside a `List` must set
+  the same `listRowBackground` as the surrounding content instead of falling
+  back to a system background.
 - Check both light and dark appearances. Preserve Dynamic Type, system control
   behavior, sufficient contrast, and non-color indicators for meaningful
   state.

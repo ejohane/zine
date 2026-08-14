@@ -138,7 +138,7 @@ struct NewsletterSubscriptionsView: View {
     var body: some View {
         Group {
             if store.isLoading && store.response == nil {
-                ProgressView("Loading newsletters…")
+                ZineLoadingView(label: "Loading newsletters…")
             } else if let error = store.errorMessage, store.response == nil {
                 ContentUnavailableView {
                     Label("Newsletters unavailable", systemImage: "exclamationmark.triangle")

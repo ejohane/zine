@@ -124,7 +124,7 @@ struct XSubscriptionsView: View {
     var body: some View {
         Group {
             if store.isLoading && store.response == nil {
-                ProgressView("Loading X bookmarks…")
+                ZineLoadingView(label: "Loading X bookmarks…")
             } else if let error = store.errorMessage, store.response == nil {
                 ContentUnavailableView {
                     Label("X bookmarks unavailable", systemImage: "exclamationmark.triangle")
