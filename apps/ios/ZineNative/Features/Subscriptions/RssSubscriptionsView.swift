@@ -168,6 +168,16 @@ struct RssSubscriptionsView: View {
     private var feedList: some View {
         List {
             Section {
+                SourceDetailHero(
+                    source: .rss,
+                    title: "RSS Feeds",
+                    detail: SubscriptionSource.rss.connectedDescription,
+                    status: rssStatus
+                )
+                .sourceHeroRow()
+            }
+
+            Section {
                 HStack {
                     TextField("https://example.com/feed.xml", text: $feedURL)
                         .keyboardType(.URL)
@@ -190,6 +200,7 @@ struct RssSubscriptionsView: View {
             } footer: {
                 Text("RSS connects directly—no external account is required.")
             }
+            .sourceManagementRow()
 
             if filteredFeeds.isEmpty {
                 Section {
@@ -203,14 +214,15 @@ struct RssSubscriptionsView: View {
                         )
                     )
                 }
+                .sourceManagementRow()
             } else {
                 Section("Feeds") {
                     ForEach(filteredFeeds) { feed in feedRow(feed) }
                 }
+                .sourceManagementRow()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
+        .sourceManagementListStyle()
         .refreshable { await store.reload() }
     }
 
@@ -227,9 +239,11 @@ struct RssSubscriptionsView: View {
             .clipShape(.circle)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(feed.title).lineLimit(2)
+                Text(feed.title)
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .lineLimit(2)
                 Text(feed.status.title)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(
                         feed.status == .active ? ZineTheme.secondaryText : ZineTheme.brandAccent
                     )
@@ -269,6 +283,11 @@ struct RssSubscriptionsView: View {
             }
         }
         .padding(.vertical, 3)
+    }
+
+    private var rssStatus: String {
+        let active = store.response?.stats.active ?? 0
+        return active == 1 ? "1 active feed" : "\(active) active feeds"
     }
 
     private var messageBinding: Binding<Bool> {

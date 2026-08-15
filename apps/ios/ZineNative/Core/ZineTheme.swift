@@ -1,6 +1,21 @@
 import SwiftUI
 import UIKit
 
+enum ZineNavigationSurface: CaseIterable {
+    case root
+    case bookmarkDetail
+    case articleReader
+}
+
+enum ZineTabBarVisibilityContract {
+    static func keepsTabBarVisible(on surface: ZineNavigationSurface) -> Bool {
+        switch surface {
+        case .root, .bookmarkDetail, .articleReader:
+            true
+        }
+    }
+}
+
 enum ZineTheme {
     enum Role: CaseIterable, Hashable {
         case canvas
@@ -121,11 +136,20 @@ extension View {
             .tint(ZineTheme.brandAccent)
             .toolbarBackground(ZineTheme.canvas, for: .navigationBar)
             .toolbar(.visible, for: .navigationBar)
+            .zineTabBarVisibility(for: .root)
     }
 
     func zineTabShellChrome() -> some View {
         tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
             .toolbarBackground(ZineTheme.canvas, for: .tabBar)
+            .zineTabBarVisibility(for: .root)
+    }
+
+    func zineTabBarVisibility(for surface: ZineNavigationSurface) -> some View {
+        toolbarVisibility(
+            ZineTabBarVisibilityContract.keepsTabBarVisible(on: surface) ? .visible : .hidden,
+            for: .tabBar
+        )
     }
 }

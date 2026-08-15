@@ -159,6 +159,17 @@ struct XSubscriptionsView: View {
 
     private var settingsList: some View {
         List {
+            Section {
+                SourceDetailHero(
+                    source: .x,
+                    title: "X Bookmarks",
+                    detail: SubscriptionSource.x.connectedDescription,
+                    status: connectionLabel,
+                    needsAttention: store.response?.connection?.needsAttention == true
+                )
+                .sourceHeroRow()
+            }
+
             Section("Account") {
                 LabeledContent("X") {
                     Text(connectionLabel).foregroundStyle(connectionColor)
@@ -181,6 +192,7 @@ struct XSubscriptionsView: View {
                     }
                 }
             }
+            .sourceManagementRow()
 
             if store.response?.connection?.isActive == true {
                 Section {
@@ -217,6 +229,7 @@ struct XSubscriptionsView: View {
                 } footer: {
                     Text("X applies API limits and Zine enforces a cooldown between manual syncs.")
                 }
+                .sourceManagementRow()
             } else {
                 Section {
                     ContentUnavailableView(
@@ -225,10 +238,10 @@ struct XSubscriptionsView: View {
                         description: Text("Connect X to import bookmarks into your Zine library.")
                     )
                 }
+                .sourceManagementRow()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
+        .sourceManagementListStyle()
         .refreshable { await store.reload() }
     }
 

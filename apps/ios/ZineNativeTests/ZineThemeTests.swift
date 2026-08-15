@@ -45,6 +45,14 @@ final class ZineThemeTests: XCTestCase {
         }
     }
 
+    func testTabBarRemainsVisibleAcrossRootAndPushedReadingSurfaces() {
+        XCTAssertTrue(
+            ZineNavigationSurface.allCases.allSatisfy {
+                ZineTabBarVisibilityContract.keepsTabBarVisible(on: $0)
+            }
+        )
+    }
+
     @MainActor
     func testUIKitBarsKeepSystemManagedMaterialsAndScrollEdges() {
         ZineTheme.configureUIKitAppearance()
