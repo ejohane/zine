@@ -92,6 +92,7 @@ struct ArticleReaderView: View {
             }
         }
         .toolbarVisibility(.hidden, for: .navigationBar)
+        .toolbarVisibility(.hidden, for: .tabBar)
         .task(id: store.metadata.bookmarkID) {
             guard loadsOnAppear else { return }
             await store.load()

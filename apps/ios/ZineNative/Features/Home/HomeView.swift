@@ -172,6 +172,26 @@ struct HomeView: View {
                 onBookmarkCommit: { _, _ in onContentChanged() },
                 onExternalOpen: onExternalOpen
             )
+        case .articleReader(let item):
+            ArticleReaderView(
+                metadata: ArticleReaderMetadata(
+                    bookmarkID: item.id,
+                    title: item.title,
+                    creator: item.creator,
+                    creatorImageURL: item.creatorImageUrl,
+                    canonicalURL: item.canonicalUrl,
+                    readingTimeMinutes: item.readingTimeMinutes,
+                    initialProgress: item.progress,
+                    isFinished: false,
+                    tags: []
+                ),
+                client: client,
+                onRead: { onHomeItemExternalOpen(item) },
+                onProgressSaved: { _ in onContentChanged() },
+                onFinishedChanged: { _, _ in onContentChanged() },
+                onFinishedCommit: { _ in onContentChanged() },
+                onTagsChanged: { _ in onContentChanged() }
+            )
         }
     }
 }
