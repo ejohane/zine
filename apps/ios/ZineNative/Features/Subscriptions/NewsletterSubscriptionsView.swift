@@ -187,6 +187,17 @@ struct NewsletterSubscriptionsView: View {
 
     private var newsletterList: some View {
         List {
+            Section {
+                SourceDetailHero(
+                    source: .gmail,
+                    title: "Newsletters",
+                    detail: SubscriptionSource.gmail.connectedDescription,
+                    status: connectionLabel,
+                    needsAttention: store.response?.connection?.needsAttention == true
+                )
+                .sourceHeroRow()
+            }
+
             connectionSection
 
             if store.response?.connection?.isActive != true {
@@ -197,6 +208,7 @@ struct NewsletterSubscriptionsView: View {
                         description: Text("Connect Gmail with read-only access to detect and manage newsletters.")
                     )
                 }
+                .sourceManagementRow()
             } else if filteredFeeds.isEmpty {
                 Section {
                     ContentUnavailableView(
@@ -209,14 +221,15 @@ struct NewsletterSubscriptionsView: View {
                         )
                     )
                 }
+                .sourceManagementRow()
             } else {
                 Section("Newsletters") {
                     ForEach(filteredFeeds) { feed in newsletterRow(feed) }
                 }
+                .sourceManagementRow()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
+        .sourceManagementListStyle()
         .refreshable { await store.reload() }
     }
 
@@ -252,6 +265,7 @@ struct NewsletterSubscriptionsView: View {
                 }
             }
         }
+        .sourceManagementRow()
     }
 
     private var connectionLabel: String {
@@ -279,9 +293,11 @@ struct NewsletterSubscriptionsView: View {
             .clipShape(.circle)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(feed.displayName).lineLimit(2)
+                Text(feed.displayName)
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .lineLimit(2)
                 Text(feed.fromAddress ?? feed.status.title)
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(ZineTheme.secondaryText)
                     .lineLimit(1)
             }

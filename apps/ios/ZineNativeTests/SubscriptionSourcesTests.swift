@@ -3,6 +3,15 @@ import Testing
 @testable import ZineNative
 
 struct SubscriptionSourcesTests {
+    @Test func routesEverySupportedSourceToItsRealManagementScreen() {
+        #expect(SubscriptionSource.youtube.destination == .providerSubscriptions)
+        #expect(SubscriptionSource.spotify.destination == .providerSubscriptions)
+        #expect(SubscriptionSource.gmail.destination == .newsletters)
+        #expect(SubscriptionSource.x.destination == .xBookmarks)
+        #expect(SubscriptionSource.rss.destination == .rssFeeds)
+        #expect(SubscriptionSource.allCases.count == 5)
+    }
+
     @Test func buildsOAuthRequestsForEveryConnectedProvider() throws {
         let app = AppConfiguration(
             apiBaseURL: URL(string: "https://api.example.com")!,
@@ -141,6 +150,29 @@ struct SubscriptionSourcesTests {
         #expect(await recorder.addedIDs == [item.channelId])
     }
 
+    @MainActor
+    @Test func sourceDashboardKeepsKnownStatusWhenRefreshFails() async {
+        let connected = SubscriptionSourceSummary(
+            provider: .youtube,
+            connectionStatus: "ACTIVE",
+            activeCount: 2
+        )
+        let recorder = HubClientRecorder(
+            results: [
+                .success(SubscriptionsHubResponse(sources: [connected])),
+                .failure(HubTestError.offline),
+            ]
+        )
+        let store = SubscriptionsHubStore(loadSources: recorder.load)
+
+        await store.reload()
+        await store.reload()
+
+        #expect(store.sources == [connected])
+        #expect(store.errorMessage == HubTestError.offline.localizedDescription)
+        #expect(store.isLoading == false)
+    }
+
     private func response(items: [ProviderSubscriptionItem]) -> ProviderSubscriptionsResponse {
         ProviderSubscriptionsResponse(
             connection: ProviderConnection(
@@ -159,6 +191,28 @@ struct SubscriptionSourcesTests {
         return Dictionary(uniqueKeysWithValues: (query?.queryItems ?? []).compactMap {
             item in item.value.map { (item.name, $0) }
         })
+    }
+}
+
+private enum HubTestError: Error, LocalizedError {
+    case offline
+
+    var errorDescription: String? { "No connection" }
+}
+
+private actor HubClientRecorder {
+    private var results: [Result<SubscriptionsHubResponse, Error>]
+
+    init(results: [Result<SubscriptionsHubResponse, Error>]) {
+        self.results = results
+    }
+
+    nonisolated var load: () async throws -> SubscriptionsHubResponse {
+        { [self] in try await next() }
+    }
+
+    private func next() throws -> SubscriptionsHubResponse {
+        try results.removeFirst().get()
     }
 }
 

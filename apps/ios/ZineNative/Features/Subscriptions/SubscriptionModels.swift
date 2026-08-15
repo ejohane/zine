@@ -58,6 +58,22 @@ enum SubscriptionSource: String, CaseIterable, Decodable, Hashable, Identifiable
         case .rss: "RSS feeds sync directly without an external account."
         }
     }
+
+    var destination: SubscriptionDestination {
+        switch self {
+        case .youtube, .spotify: .providerSubscriptions
+        case .gmail: .newsletters
+        case .x: .xBookmarks
+        case .rss: .rssFeeds
+        }
+    }
+}
+
+enum SubscriptionDestination: Equatable {
+    case providerSubscriptions
+    case newsletters
+    case xBookmarks
+    case rssFeeds
 }
 
 enum ProviderSubscriptionStatus: String, Decodable {

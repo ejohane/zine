@@ -102,6 +102,17 @@ struct ProviderSubscriptionsView: View {
 
     private var subscriptionList: some View {
         List {
+            Section {
+                SourceDetailHero(
+                    source: provider,
+                    title: provider.title,
+                    detail: provider.connectedDescription,
+                    status: connectionLabel,
+                    needsAttention: store.connection?.needsAttention == true
+                )
+                .sourceHeroRow()
+            }
+
             connectionSection
 
             if store.connectionRequired || store.connection?.isActive != true {
@@ -114,6 +125,7 @@ struct ProviderSubscriptionsView: View {
                         )
                     )
                 }
+                .sourceManagementRow()
             } else if filteredItems.isEmpty {
                 Section {
                     ContentUnavailableView(
@@ -126,14 +138,15 @@ struct ProviderSubscriptionsView: View {
                         )
                     )
                 }
+                .sourceManagementRow()
             } else {
                 Section(provider == .youtube ? "Channels" : "Shows") {
                     ForEach(filteredItems) { item in itemRow(item) }
                 }
+                .sourceManagementRow()
             }
         }
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
+        .sourceManagementListStyle()
         .refreshable { await store.reload() }
     }
 
@@ -169,6 +182,7 @@ struct ProviderSubscriptionsView: View {
                 }
             }
         }
+        .sourceManagementRow()
     }
 
     private var connectionLabel: String {
@@ -196,9 +210,11 @@ struct ProviderSubscriptionsView: View {
             .clipShape(.circle)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.name).lineLimit(2)
+                Text(item.name)
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .lineLimit(2)
                 Text(item.status?.title ?? "Available to add")
-                    .font(.caption)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundStyle(
                         item.status == .active || item.status == nil
                             ? ZineTheme.secondaryText

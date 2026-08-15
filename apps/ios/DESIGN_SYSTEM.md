@@ -39,12 +39,12 @@ the surrounding theme changes.
   replace native scroll-edge behavior and shadows through UIKit appearance
   customization. Native floating controls may retain their system material;
   immersive destinations still own tab-bar visibility.
-- Keep the root tab bar and ordinary screen navigation bars explicitly visible.
-  Visibility and semantic item tint are separate from the system-managed bar
-  material; hiding either bar must remain scoped to an immersive destination.
-  Each tab's root screen must reset tab-bar visibility to automatic so an
-  interactive pop cannot leave behind hidden state from the departing
-  destination while immersive detail views can still hide it locally.
+- Keep the root tab bar visibly overlaid above content across pushed bookmark
+  details and the article reader. Visibility and semantic item tint are
+  separate from the system-managed bar material. Do not hide the tab bar from a
+  pushed destination: an interactive pop can otherwise leave the tab shell in
+  the departing destination's hidden state. Root and pushed reading surfaces
+  use the shared persistent tab-bar visibility contract.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update
