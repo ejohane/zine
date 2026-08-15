@@ -234,6 +234,10 @@ struct BookmarkDetailView: View {
         .task(id: content.id) {
             await hydrateSubscriptionSettings()
         }
+        .task(id: articleWarmupID) {
+            guard let articleWarmupID else { return }
+            try? await client.warmArticleContent(id: articleWarmupID)
+        }
         .alert("Couldn’t update", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -350,6 +354,13 @@ struct BookmarkDetailView: View {
                     .padding(.trailing, 8)
             }
         }
+    }
+
+    private var articleWarmupID: String? {
+        guard content.provider.opensInZineReader(contentType: content.contentType) else {
+            return nil
+        }
+        return content.id
     }
 
     @ViewBuilder
