@@ -1,0 +1,7 @@
+interface:
+  display_name: 'Ship Zine'
+  short_description: 'Merge Zine changes and install on iPhone'
+  default_prompt: 'Use $zine-ship to create and merge a ready PR, verify main, and install the merged native build on my iPhone.'
+
+policy:
+  allow_implicit_invocation: true
