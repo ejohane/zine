@@ -35,6 +35,7 @@ struct APIClient {
     let tokenProvider: TokenProvider
     var session: URLSession
     private let articleBodyCache: ArticleBodyCache?
+    private let articleContentRequests: ArticleContentRequestCoordinator
 
     init(
         baseURL: URL,
@@ -46,6 +47,7 @@ struct APIClient {
         self.tokenProvider = tokenProvider
         self.session = session
         self.articleBodyCache = articleBodyCache
+        articleContentRequests = ArticleContentRequestCoordinator()
     }
 
     func getHome() async throws -> HomeResponse {
@@ -391,9 +393,31 @@ struct APIClient {
     }
 
     func getArticleContent(id: String) async throws -> ArticleContentResponse {
-        try await request(
-            url: baseURL.appending(path: "/api/v1/bookmarks/\(id)/article-content")
-        )
+        let url = baseURL.appending(path: "/api/v1/bookmarks/\(id)/article-content")
+        return try await articleContentRequests.response(
+            bookmarkID: id,
+            purpose: .reader
+        ) {
+            try await request(url: url)
+        }
+    }
+
+    func warmArticleContent(id: String) async throws {
+        if let cached = await cachedArticleContent(id: id),
+           cached.readableContent != nil
+        {
+            return
+        }
+
+        let url = baseURL.appending(path: "/api/v1/bookmarks/\(id)/article-content")
+        let response = try await articleContentRequests.response(
+            bookmarkID: id,
+            purpose: .warmup
+        ) {
+            try await request(url: url)
+        }
+        try Task.checkCancellation()
+        await cacheArticleContent(response, id: id)
     }
 
     func requestArticleContent(id: String) async throws -> ArticleContentResponse {

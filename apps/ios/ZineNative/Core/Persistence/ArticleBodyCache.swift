@@ -72,3 +72,153 @@ actor ArticleBodyCache {
         }
     }
 }
+
+actor ArticleContentRequestCoordinator {
+    enum Purpose {
+        case warmup
+        case reader
+    }
+
+    private struct InFlightRequest {
+        let id: UUID
+        let task: Task<ArticleContentResponse, Error>
+        var waiterIDs: Set<UUID>
+        let startedByWarmup: Bool
+        var hasReader: Bool
+    }
+
+    private struct WarmedResponse {
+        let response: ArticleContentResponse
+        let storedAt: Date
+    }
+
+    private static let maximumWarmedResponses = 8
+
+    private var inFlightRequests: [String: InFlightRequest] = [:]
+    private var warmedResponses: [String: WarmedResponse] = [:]
+
+    func response(
+        bookmarkID: String,
+        purpose: Purpose,
+        fetch: @escaping () async throws -> ArticleContentResponse
+    ) async throws -> ArticleContentResponse {
+        if purpose == .reader,
+           let warmed = warmedResponses.removeValue(forKey: bookmarkID)
+        {
+            return warmed.response
+        }
+
+        let waiterID = UUID()
+        let requestID: UUID
+        let task: Task<ArticleContentResponse, Error>
+
+        if var inFlight = inFlightRequests[bookmarkID] {
+            inFlight.waiterIDs.insert(waiterID)
+            if purpose == .reader {
+                inFlight.hasReader = true
+            }
+            inFlightRequests[bookmarkID] = inFlight
+            requestID = inFlight.id
+            task = inFlight.task
+        } else {
+            requestID = UUID()
+            task = Task {
+                try await fetch()
+            }
+            inFlightRequests[bookmarkID] = InFlightRequest(
+                id: requestID,
+                task: task,
+                waiterIDs: [waiterID],
+                startedByWarmup: purpose == .warmup,
+                hasReader: purpose == .reader
+            )
+        }
+
+        return try await withTaskCancellationHandler {
+            do {
+                let response = try await task.value
+                try Task.checkCancellation()
+                completeWaiter(
+                    waiterID,
+                    requestID: requestID,
+                    bookmarkID: bookmarkID,
+                    response: response
+                )
+                return response
+            } catch {
+                completeWaiter(
+                    waiterID,
+                    requestID: requestID,
+                    bookmarkID: bookmarkID,
+                    response: nil
+                )
+                throw error
+            }
+        } onCancel: {
+            Task {
+                await self.cancelWaiter(
+                    waiterID,
+                    requestID: requestID,
+                    bookmarkID: bookmarkID
+                )
+            }
+        }
+    }
+
+    private func completeWaiter(
+        _ waiterID: UUID,
+        requestID: UUID,
+        bookmarkID: String,
+        response: ArticleContentResponse?
+    ) {
+        guard var inFlight = inFlightRequests[bookmarkID],
+              inFlight.id == requestID,
+              inFlight.waiterIDs.remove(waiterID) != nil
+        else { return }
+
+        if let response,
+           response.readableContent != nil,
+           inFlight.startedByWarmup,
+           !inFlight.hasReader
+        {
+            warmedResponses[bookmarkID] = WarmedResponse(
+                response: response,
+                storedAt: Date()
+            )
+            pruneWarmedResponses()
+        }
+
+        if inFlight.waiterIDs.isEmpty {
+            inFlightRequests.removeValue(forKey: bookmarkID)
+        } else {
+            inFlightRequests[bookmarkID] = inFlight
+        }
+    }
+
+    private func cancelWaiter(
+        _ waiterID: UUID,
+        requestID: UUID,
+        bookmarkID: String
+    ) {
+        guard var inFlight = inFlightRequests[bookmarkID],
+              inFlight.id == requestID,
+              inFlight.waiterIDs.remove(waiterID) != nil
+        else { return }
+
+        if inFlight.waiterIDs.isEmpty {
+            inFlight.task.cancel()
+            inFlightRequests.removeValue(forKey: bookmarkID)
+        } else {
+            inFlightRequests[bookmarkID] = inFlight
+        }
+    }
+
+    private func pruneWarmedResponses() {
+        guard warmedResponses.count > Self.maximumWarmedResponses else { return }
+        let retainedKeys = warmedResponses
+            .sorted { $0.value.storedAt > $1.value.storedAt }
+            .prefix(Self.maximumWarmedResponses)
+            .map(\.key)
+        warmedResponses = warmedResponses.filter { retainedKeys.contains($0.key) }
+    }
+}

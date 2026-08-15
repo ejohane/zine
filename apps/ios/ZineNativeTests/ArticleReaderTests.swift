@@ -197,6 +197,91 @@ final class ArticleReaderTests: XCTestCase {
     }
 
     @MainActor
+    func testWarmupMakesReaderReadyWithoutASecondArticleContentRequest() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "article-warmup-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let client = Self.client(
+            articleBodyCache: ArticleBodyCache(userID: "warm-user", baseDirectory: directory)
+        ) { request in
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertEqual(request.url?.path, "/api/v1/bookmarks/bookmark-1/article-content")
+            return (200, Self.availableJSON)
+        }
+
+        try await client.warmArticleContent(id: "bookmark-1")
+        let store = ArticleReaderStore(metadata: Self.metadata(), client: client)
+        await store.load()
+
+        guard case let .ready(document) = store.phase else {
+            return XCTFail("Expected a ready reader, got \(store.phase)")
+        }
+        XCTAssertEqual(document.response.articleBody.contentHash, "hash-1")
+        XCTAssertEqual(ArticleReaderURLProtocol.requests.count, 1)
+    }
+
+    func testReaderJoinsAnInFlightWarmupRequest() async throws {
+        let response = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.utf8)
+        )
+        let coordinator = ArticleContentRequestCoordinator()
+        let gate = ArticleRequestGate()
+        let fetchStarted = expectation(description: "article content fetch started")
+        fetchStarted.assertForOverFulfill = true
+        let fetch = {
+            fetchStarted.fulfill()
+            await gate.wait()
+            return response
+        }
+
+        let warmup = Task {
+            try await coordinator.response(
+                bookmarkID: "bookmark-1",
+                purpose: .warmup,
+                fetch: fetch
+            )
+        }
+        await fulfillment(of: [fetchStarted], timeout: 1)
+        let reader = Task {
+            try await coordinator.response(
+                bookmarkID: "bookmark-1",
+                purpose: .reader,
+                fetch: fetch
+            )
+        }
+        await Task.yield()
+        await gate.open()
+
+        let warmedResponse = try await warmup.value
+        let readerResponse = try await reader.value
+        XCTAssertEqual(warmedResponse.articleBody.contentHash, "hash-1")
+        XCTAssertEqual(readerResponse.articleBody.contentHash, "hash-1")
+    }
+
+    func testWarmupOnlyGetsStoredContentAndDoesNotCacheAnUnreadableResponse() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "article-warmup-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = ArticleBodyCache(userID: "warm-user", baseDirectory: directory)
+        let client = Self.client(articleBodyCache: cache) { request in
+            return (200, Self.unavailableJSON)
+        }
+
+        try await client.warmArticleContent(id: "bookmark-1")
+
+        XCTAssertEqual(ArticleReaderURLProtocol.requests.count, 1)
+        XCTAssertEqual(ArticleReaderURLProtocol.requests.first?.httpMethod, "GET")
+        XCTAssertEqual(
+            ArticleReaderURLProtocol.requests.first?.url?.path,
+            "/api/v1/bookmarks/bookmark-1/article-content"
+        )
+        let cached = await cache.load(bookmarkID: "bookmark-1")
+        XCTAssertNil(cached)
+    }
+
+    @MainActor
     func testStoreLoadsAnAvailableArticleWithoutRequestingAgain() async throws {
         let client = Self.client { request in
             XCTAssertEqual(request.httpMethod, "GET")
@@ -342,6 +427,7 @@ final class ArticleReaderTests: XCTestCase {
     }
 
     private static func client(
+        articleBodyCache: ArticleBodyCache? = nil,
         handler: @escaping (URLRequest) throws -> (Int, String)
     ) -> APIClient {
         ArticleReaderURLProtocol.handler = handler
@@ -351,7 +437,8 @@ final class ArticleReaderTests: XCTestCase {
         return APIClient(
             baseURL: URL(string: "https://api.myzine.app")!,
             tokenProvider: { "test-token" },
-            session: URLSession(configuration: configuration)
+            session: URLSession(configuration: configuration),
+            articleBodyCache: articleBodyCache
         )
     }
 
@@ -441,4 +528,23 @@ private final class ArticleReaderURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {}
+}
+
+private actor ArticleRequestGate {
+    private var isOpen = false
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+        }
+    }
+
+    func open() {
+        isOpen = true
+        let pending = continuations
+        continuations.removeAll()
+        pending.forEach { $0.resume() }
+    }
 }
