@@ -78,7 +78,57 @@ struct ScreenshotHomeView: View {
         case .bookmark(let bookmark):
             Text(bookmark.title)
                 .navigationTitle(bookmark.title)
+        case .articleReader(let item):
+            fixtureArticleReader(for: item)
         }
+    }
+
+    private func fixtureArticleReader(for item: HomeItem) -> some View {
+        let metadata = ArticleReaderMetadata(
+            bookmarkID: item.id,
+            title: item.title,
+            creator: item.creator,
+            creatorImageURL: item.creatorImageUrl,
+            canonicalURL: item.canonicalUrl,
+            readingTimeMinutes: item.readingTimeMinutes,
+            initialProgress: item.progress,
+            isFinished: false,
+            tags: []
+        )
+        let response = ArticleContentResponse(
+            content: """
+            <p>The next generation of tools will be shaped less by universal workflows and more by software that learns the context, taste, and intent of one person.</p>
+            <h2>Software that adapts to one person</h2>
+            <p>Personal agents change how interfaces should expose context, decisions, and useful next steps. The best tools will make that relationship understandable without making the machinery feel heavy.</p>
+            """,
+            articleBody: ArticleBodyStatus(
+                availability: .available,
+                pipelineStatus: .available,
+                schemaVersion: 1,
+                extractorVersion: 1,
+                sourceKind: "PUBLIC_WEB",
+                contentHash: "home-featured-article-fixture",
+                wordCount: 820,
+                readingTimeMinutes: item.readingTimeMinutes,
+                qualityScore: 0.98,
+                qualityWarnings: [],
+                lastErrorCode: nil,
+                updatedAt: "2026-08-14T12:00:00Z"
+            ),
+            request: nil,
+            requestId: "home-fixture-request",
+            traceId: "home-fixture-trace"
+        )
+
+        return ArticleReaderView(
+            metadata: metadata,
+            client: APIClient(
+                baseURL: URL(string: "https://api.myzine.app")!,
+                tokenProvider: { "fixture-token" }
+            ),
+            initialPhase: .ready(ArticleReaderDocument(metadata: metadata, response: response)),
+            loadsOnAppear: false
+        )
     }
 }
 
