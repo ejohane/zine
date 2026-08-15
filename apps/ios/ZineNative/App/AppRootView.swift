@@ -49,6 +49,10 @@ private struct AuthenticatedAppView: View {
     @State private var homeStore: HomeStore
     @State private var search = ""
     @State private var selectedTab = AppTab.home
+    @State private var homeNavigationPath = NavigationPath()
+    @State private var libraryNavigationPath = NavigationPath()
+    @State private var settingsNavigationPath = NavigationPath()
+    @State private var searchNavigationPath = NavigationPath()
     @State private var homeTabReselection = 0
     @State private var libraryTabReselection = 0
     @State private var homeRevision = 0
@@ -83,7 +87,8 @@ private struct AuthenticatedAppView: View {
                     onContentChanged: markBookmarkContentChanged,
                     onExternalOpen: handleExternalOpen,
                     onHomeItemExternalOpen: handleHomeItemExternalOpen,
-                    tabReselection: homeTabReselection
+                    tabReselection: homeTabReselection,
+                    navigationPath: $homeNavigationPath
                 )
                 .tint(ZineTheme.brandAccent)
             }
@@ -95,13 +100,17 @@ private struct AuthenticatedAppView: View {
                     refreshRevision: libraryRevision,
                     onContentChanged: markHomeChanged,
                     onExternalOpen: handleExternalOpen,
-                    tabReselection: libraryTabReselection
+                    tabReselection: libraryTabReselection,
+                    navigationPath: $libraryNavigationPath
                 )
                 .tint(ZineTheme.brandAccent)
             }
 
             Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                AppSettingsView(client: client)
+                AppSettingsView(
+                    client: client,
+                    navigationPath: $settingsNavigationPath
+                )
                     .tint(ZineTheme.brandAccent)
             }
 
@@ -112,13 +121,18 @@ private struct AuthenticatedAppView: View {
                     searchText: $search,
                     refreshRevision: libraryRevision,
                     onContentChanged: markHomeChanged,
-                    onExternalOpen: handleExternalOpen
+                    onExternalOpen: handleExternalOpen,
+                    navigationPath: $searchNavigationPath
                 )
                 .searchable(text: $search, prompt: "Search your library")
                 .tint(ZineTheme.brandAccent)
             }
         }
         .zineTabShellChrome()
+        .zineNavigationTabBar(
+            for: selectedRootSurface,
+            navigationDepth: selectedNavigationDepth
+        )
         .task(id: homeRevision) {
             await homeStore.reload()
         }
@@ -157,6 +171,28 @@ private struct AuthenticatedAppView: View {
                 }
             }
         )
+    }
+
+    private var selectedNavigationDepth: Int {
+        switch selectedTab {
+        case .home:
+            homeNavigationPath.count
+        case .library:
+            libraryNavigationPath.count
+        case .settings:
+            settingsNavigationPath.count
+        case .search:
+            searchNavigationPath.count
+        }
+    }
+
+    private var selectedRootSurface: ZineTabRootSurface {
+        switch selectedTab {
+        case .home: .home
+        case .library: .library
+        case .settings: .settings
+        case .search: .search
+        }
     }
 
     private func handleTabReselection(_ tab: AppTab) {

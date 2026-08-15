@@ -46,6 +46,7 @@ struct HomeView: View {
     let onHomeItemExternalOpen: (HomeItem) -> Void
     let tabReselection: Int
 
+    @Binding private var navigationPath: NavigationPath
     @Namespace private var bookmarkTransition
 
     init(
@@ -56,7 +57,8 @@ struct HomeView: View {
         onContentChanged: @escaping () -> Void,
         onExternalOpen: @escaping (Bookmark) -> Void,
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void,
-        tabReselection: Int = 0
+        tabReselection: Int = 0,
+        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
     ) {
         self.client = client
         self.store = store
@@ -66,10 +68,11 @@ struct HomeView: View {
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
         self.tabReselection = tabReselection
+        _navigationPath = navigationPath
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             content
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)

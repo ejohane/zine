@@ -225,7 +225,7 @@ struct BookmarkDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .zineTabBarVisibility(for: .bookmarkDetail)
+        .zineNonRootTabBar(for: .bookmarkDetail)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task(id: content.id) {

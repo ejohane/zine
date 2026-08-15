@@ -9,6 +9,7 @@ struct LibraryView: View {
     let tabReselection: Int
 
     @State private var store: LibraryStore
+    @Binding private var navigationPath: NavigationPath
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
@@ -23,7 +24,8 @@ struct LibraryView: View {
         refreshRevision: Int = 0,
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
-        tabReselection: Int = 0
+        tabReselection: Int = 0,
+        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
     ) {
         self.client = client
         self.searchText = searchText
@@ -31,6 +33,7 @@ struct LibraryView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
+        _navigationPath = navigationPath
         _store = State(initialValue: LibraryStore(
             client: client,
             cache: cache,
@@ -56,7 +59,7 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             content
                 .navigationTitle(isSearchMode ? "Search" : "Library")
                 .navigationBarTitleDisplayMode(.inline)
