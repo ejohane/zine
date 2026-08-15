@@ -45,12 +45,21 @@ final class SettingsStore {
 
 struct AppSettingsView: View {
     let client: APIClient
+    let navigationPath: Binding<NavigationPath>
 
     @Environment(Clerk.self) private var clerk
     @State private var store = SettingsStore()
 
+    init(
+        client: APIClient,
+        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
+    ) {
+        self.client = client
+        self.navigationPath = navigationPath
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: navigationPath) {
             Group {
                 if clerk.session?.tasks?.isEmpty == false {
                     AuthView(isDismissible: false)
@@ -117,7 +126,6 @@ struct AppSettingsView: View {
         .background(ZineTheme.canvas)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .zineTabBarVisibility(for: .root)
     }
 
     private var settingsHeader: some View {

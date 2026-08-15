@@ -39,12 +39,15 @@ the surrounding theme changes.
   replace native scroll-edge behavior and shadows through UIKit appearance
   customization. Native floating controls may retain their system material;
   immersive destinations still own tab-bar visibility.
-- Keep the root tab bar visibly overlaid above content across pushed bookmark
-  details and the article reader. Visibility and semantic item tint are
-  separate from the system-managed bar material. Do not hide the tab bar from a
-  pushed destination: an interactive pop can otherwise leave the tab shell in
-  the departing destination's hidden state. Root and pushed reading surfaces
-  use the shared persistent tab-bar visibility contract.
+- Show the shared bottom navigation only on the Home, Library, and Settings
+  roots. Hide it for Search and whenever one of those root navigation stacks
+  has a pushed destination, including bookmark details, source management, and
+  the article reader. Use automatic system visibility at an allowed root and
+  hidden visibility while its bound navigation path is nonempty. Destinations
+  reached with destination-form `NavigationLink` do not add their push to that
+  path, so bookmark details and the article reader also apply the shared
+  non-root hidden modifier locally. Never force a root visible, and do not use
+  delayed restoration after interactive pop.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update
