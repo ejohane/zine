@@ -45,35 +45,17 @@ final class SettingsStore {
 
 struct AppSettingsView: View {
     let client: APIClient
-    let navigationPath: Binding<NavigationPath>
 
     @Environment(Clerk.self) private var clerk
+    @Environment(\.zineTabNavigationActions) private var navigation
     @State private var store = SettingsStore()
 
-    init(
-        client: APIClient,
-        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
-    ) {
-        self.client = client
-        self.navigationPath = navigationPath
-    }
-
     var body: some View {
-        NavigationStack(path: navigationPath) {
-            Group {
-                if clerk.session?.tasks?.isEmpty == false {
-                    AuthView(isDismissible: false)
-                } else {
-                    settingsContent
-                }
-            }
-            .navigationDestination(for: SettingsRoute.self) { route in
-                switch route {
-                case .sources:
-                    SubscriptionsView(client: client)
-                case .appearance:
-                    AppearanceSettingsView()
-                }
+        Group {
+            if clerk.session?.tasks?.isEmpty == false {
+                AuthView(isDismissible: false)
+            } else {
+                settingsContent
             }
         }
         .zineScreenChrome()
@@ -183,74 +165,102 @@ struct AppSettingsView: View {
     }
 
     private var sourcesCard: some View {
-        NavigationLink(value: SettingsRoute.sources) {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top) {
-                    SettingsIconTile(systemImage: "dot.radiowaves.up.forward", isPrimary: true)
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(.headline, design: .rounded, weight: .bold))
-                        .foregroundStyle(ZineTheme.brandAccent)
+        Group {
+            if let navigate = navigation.settings {
+                Button {
+                    navigate(.sources)
+                } label: {
+                    sourcesCardLabel
                 }
-
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("Sources")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundStyle(ZineTheme.primaryText)
-                    Text("Connect the places you follow and decide what flows into your Inbox and Library.")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(ZineTheme.secondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
+            } else {
+                NavigationLink(value: SettingsRoute.sources) {
+                    sourcesCardLabel
                 }
-
-                HStack(spacing: 8) {
-                    sourceChip("play.rectangle.fill")
-                    sourceChip("waveform.circle.fill")
-                    sourceChip("envelope.fill")
-                    sourceChip("bookmark.square.fill")
-                    sourceChip("dot.radiowaves.left.and.right")
-                }
-            }
-            .padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(ZineTheme.surface, in: .rect(cornerRadius: 22))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(ZineTheme.border.opacity(0.75), lineWidth: 1)
             }
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings-sources")
     }
 
-    private var appearanceCard: some View {
-        NavigationLink(value: SettingsRoute.appearance) {
-            HStack(spacing: 14) {
-                SettingsIconTile(systemImage: "circle.lefthalf.filled", isPrimary: false)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Appearance")
-                        .font(.system(.headline, design: .rounded, weight: .bold))
-                        .foregroundStyle(ZineTheme.primaryText)
-                    Text("System, light, or dark")
-                        .font(.system(.subheadline, design: .rounded))
-                        .foregroundStyle(ZineTheme.secondaryText)
-                }
-
+    private var sourcesCardLabel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .top) {
+                SettingsIconTile(systemImage: "dot.radiowaves.up.forward", isPrimary: true)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ZineTheme.tertiaryText)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .foregroundStyle(ZineTheme.brandAccent)
             }
-            .padding(16)
-            .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(ZineTheme.border.opacity(0.65), lineWidth: 1)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text("Sources")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(ZineTheme.primaryText)
+                Text("Connect the places you follow and decide what flows into your Inbox and Library.")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(ZineTheme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 8) {
+                sourceChip("play.rectangle.fill")
+                sourceChip("waveform.circle.fill")
+                sourceChip("envelope.fill")
+                sourceChip("bookmark.square.fill")
+                sourceChip("dot.radiowaves.left.and.right")
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(ZineTheme.border.opacity(0.75), lineWidth: 1)
+        }
+    }
+
+    private var appearanceCard: some View {
+        Group {
+            if let navigate = navigation.settings {
+                Button {
+                    navigate(.appearance)
+                } label: {
+                    appearanceCardLabel
+                }
+            } else {
+                NavigationLink(value: SettingsRoute.appearance) {
+                    appearanceCardLabel
+                }
             }
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("settings-appearance")
+    }
+
+    private var appearanceCardLabel: some View {
+        HStack(spacing: 14) {
+            SettingsIconTile(systemImage: "circle.lefthalf.filled", isPrimary: false)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Appearance")
+                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .foregroundStyle(ZineTheme.primaryText)
+                Text("System, light, or dark")
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundStyle(ZineTheme.secondaryText)
+            }
+
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ZineTheme.tertiaryText)
+        }
+        .padding(16)
+        .background(ZineTheme.surface, in: .rect(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(ZineTheme.border.opacity(0.65), lineWidth: 1)
+        }
     }
 
     private var signOutButton: some View {

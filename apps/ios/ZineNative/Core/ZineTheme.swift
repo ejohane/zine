@@ -1,41 +1,6 @@
 import SwiftUI
 import UIKit
 
-enum ZineTabRootSurface: CaseIterable, Hashable {
-    case home
-    case library
-    case settings
-    case search
-}
-
-enum ZineTabBarSurface: Hashable {
-    case tabRoot(ZineTabRootSurface)
-    case bookmarkDetail
-    case articleReader
-}
-
-enum ZineTabBarVisibilityContract {
-    private static let visibleRoots: Set<ZineTabRootSurface> = [
-        .home,
-        .library,
-        .settings,
-    ]
-
-    static func showsTabBar(
-        on surface: ZineTabBarSurface,
-        navigationDepth: Int
-    ) -> Bool {
-        guard navigationDepth == 0 else { return false }
-
-        return switch surface {
-        case .tabRoot(let root):
-            visibleRoots.contains(root)
-        case .bookmarkDetail, .articleReader:
-            false
-        }
-    }
-}
-
 enum ZineTheme {
     enum Role: CaseIterable, Hashable {
         case canvas
@@ -162,28 +127,5 @@ extension View {
         tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
             .toolbarBackground(ZineTheme.canvas, for: .tabBar)
-    }
-
-    func zineNavigationTabBar(
-        for surface: ZineTabRootSurface,
-        navigationDepth: Int
-    ) -> some View {
-        toolbarVisibility(
-            ZineTabBarVisibilityContract.showsTabBar(
-                on: .tabRoot(surface),
-                navigationDepth: navigationDepth
-            ) ? .automatic : .hidden,
-            for: .tabBar
-        )
-    }
-
-    func zineNonRootTabBar(for surface: ZineTabBarSurface) -> some View {
-        toolbarVisibility(
-            ZineTabBarVisibilityContract.showsTabBar(
-                on: surface,
-                navigationDepth: 0
-            ) ? .automatic : .hidden,
-            for: .tabBar
-        )
     }
 }

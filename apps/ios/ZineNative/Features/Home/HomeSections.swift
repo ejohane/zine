@@ -70,10 +70,18 @@ struct HomeNavigationLink<Label: View>: View {
     let transitionNamespace: Namespace.ID
     @ViewBuilder let label: () -> Label
 
+    @Environment(\.zineTabNavigationActions) private var navigation
+
     var body: some View {
-        NavigationLink(value: route, label: label)
-            .buttonStyle(.plain)
-            .matchedTransitionSource(id: route.sourceID, in: transitionNamespace)
+        Group {
+            if let navigate = navigation.home {
+                Button(action: { navigate(route) }, label: label)
+            } else {
+                NavigationLink(value: route, label: label)
+            }
+        }
+        .buttonStyle(.plain)
+        .matchedTransitionSource(id: route.sourceID, in: transitionNamespace)
     }
 }
 
@@ -262,17 +270,22 @@ private struct HomeSectionHeader: View {
     var subtitle: String?
     let route: HomeSectionRoute
 
+    @Environment(\.zineTabNavigationActions) private var navigation
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            NavigationLink(value: route) {
-                HStack(spacing: 6) {
-                    Text(title)
-                        .font(.title3.bold())
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ZineTheme.secondaryText)
+            Group {
+                if let navigate = navigation.homeSection {
+                    Button {
+                        navigate(route)
+                    } label: {
+                        headerLabel
+                    }
+                } else {
+                    NavigationLink(value: route) {
+                        headerLabel
+                    }
                 }
-                .foregroundStyle(ZineTheme.primaryText)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("View all \(title)")
@@ -284,6 +297,17 @@ private struct HomeSectionHeader: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var headerLabel: some View {
+        HStack(spacing: 6) {
+            Text(title)
+                .font(.title3.bold())
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ZineTheme.secondaryText)
+        }
+        .foregroundStyle(ZineTheme.primaryText)
     }
 }
 
@@ -328,6 +352,7 @@ private struct HomeJumpBackInSection: View {
             }
         }
     }
+
 }
 
 struct HomeCompactHorizontalCard: View {

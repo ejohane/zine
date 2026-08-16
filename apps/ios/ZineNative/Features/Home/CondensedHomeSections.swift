@@ -79,20 +79,36 @@ private struct CondensedSectionHeader: View {
     let title: String
     let route: HomeSectionRoute
 
+    @Environment(\.zineTabNavigationActions) private var navigation
+
     var body: some View {
-        NavigationLink(value: route) {
-            HStack(spacing: 5) {
-                Text(title)
-                    .font(.headline)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(ZineTheme.tertiaryText)
+        Group {
+            if let navigate = navigation.homeSection {
+                Button {
+                    navigate(route)
+                } label: {
+                    headerLabel
+                }
+            } else {
+                NavigationLink(value: route) {
+                    headerLabel
+                }
             }
-            .foregroundStyle(ZineTheme.primaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("View all \(title)")
+    }
+
+    private var headerLabel: some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.headline)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ZineTheme.tertiaryText)
+        }
+        .foregroundStyle(ZineTheme.primaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

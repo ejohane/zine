@@ -14,6 +14,24 @@ struct ExternalBookmarkOpenEvent: Equatable {
     let change: Change
 }
 
+struct ZineTabNavigationActions {
+    var home: ((HomeNavigationRoute) -> Void)?
+    var homeSection: ((HomeSectionRoute) -> Void)?
+    var bookmark: ((Bookmark) -> Void)?
+    var settings: ((SettingsRoute) -> Void)?
+}
+
+private struct ZineTabNavigationActionsKey: EnvironmentKey {
+    static let defaultValue = ZineTabNavigationActions()
+}
+
+extension EnvironmentValues {
+    var zineTabNavigationActions: ZineTabNavigationActions {
+        get { self[ZineTabNavigationActionsKey.self] }
+        set { self[ZineTabNavigationActionsKey.self] = newValue }
+    }
+}
+
 struct AppRootView: View {
     let configuration: AppConfiguration
 
@@ -49,16 +67,14 @@ private struct AuthenticatedAppView: View {
     @State private var homeStore: HomeStore
     @State private var search = ""
     @State private var selectedTab = AppTab.home
-    @State private var homeNavigationPath = NavigationPath()
-    @State private var libraryNavigationPath = NavigationPath()
-    @State private var settingsNavigationPath = NavigationPath()
-    @State private var searchNavigationPath = NavigationPath()
+    @State private var navigationPath = NavigationPath()
     @State private var homeTabReselection = 0
     @State private var libraryTabReselection = 0
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
     @State private var externalOpenEvent: ExternalBookmarkOpenEvent?
     @State private var externalOpenError: String?
+    @Namespace private var navigationTransition
 
     init(configuration: AppConfiguration, userID: String) {
         let client = APIClient(
@@ -78,61 +94,76 @@ private struct AuthenticatedAppView: View {
     }
 
     var body: some View {
-        TabView(selection: tabSelection) {
-            Tab("Home", systemImage: "house", value: AppTab.home) {
-                HomeView(
-                    client: client,
-                    store: homeStore,
-                    density: .compact,
-                    onContentChanged: markBookmarkContentChanged,
-                    onExternalOpen: handleExternalOpen,
-                    onHomeItemExternalOpen: handleHomeItemExternalOpen,
-                    tabReselection: homeTabReselection,
-                    navigationPath: $homeNavigationPath
-                )
-                .tint(ZineTheme.brandAccent)
-            }
-
-            Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
-                LibraryView(
-                    client: client,
-                    cache: libraryCache,
-                    refreshRevision: libraryRevision,
-                    onContentChanged: markHomeChanged,
-                    onExternalOpen: handleExternalOpen,
-                    tabReselection: libraryTabReselection,
-                    navigationPath: $libraryNavigationPath
-                )
-                .tint(ZineTheme.brandAccent)
-            }
-
-            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                AppSettingsView(
-                    client: client,
-                    navigationPath: $settingsNavigationPath
-                )
+        NavigationStack(path: $navigationPath) {
+            TabView(selection: tabSelection) {
+                Tab("Home", systemImage: "house", value: AppTab.home) {
+                    HomeView(
+                        client: client,
+                        store: homeStore,
+                        density: .compact,
+                        onContentChanged: markBookmarkContentChanged,
+                        onExternalOpen: handleExternalOpen,
+                        onHomeItemExternalOpen: handleHomeItemExternalOpen,
+                        tabReselection: homeTabReselection,
+                        transitionNamespace: navigationTransition,
+                        registersNavigationDestinations: false
+                    )
                     .tint(ZineTheme.brandAccent)
-            }
+                }
 
-            Tab(value: AppTab.search, role: .search) {
-                LibraryView(
-                    client: client,
-                    cache: libraryCache,
-                    searchText: $search,
-                    refreshRevision: libraryRevision,
-                    onContentChanged: markHomeChanged,
-                    onExternalOpen: handleExternalOpen,
-                    navigationPath: $searchNavigationPath
-                )
-                .searchable(text: $search, prompt: "Search your library")
-                .tint(ZineTheme.brandAccent)
+                Tab("Library", systemImage: "books.vertical", value: AppTab.library) {
+                    LibraryView(
+                        client: client,
+                        cache: libraryCache,
+                        refreshRevision: libraryRevision,
+                        onContentChanged: markHomeChanged,
+                        onExternalOpen: handleExternalOpen,
+                        tabReselection: libraryTabReselection,
+                        transitionNamespace: navigationTransition
+                    )
+                    .tint(ZineTheme.brandAccent)
+                }
+
+                Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
+                    AppSettingsView(client: client)
+                    .tint(ZineTheme.brandAccent)
+                }
+
+                Tab(value: AppTab.search, role: .search) {
+                    LibraryView(
+                        client: client,
+                        cache: libraryCache,
+                        searchText: $search,
+                        refreshRevision: libraryRevision,
+                        onContentChanged: markHomeChanged,
+                        onExternalOpen: handleExternalOpen,
+                        transitionNamespace: navigationTransition
+                    )
+                    .searchable(text: $search, prompt: "Search your library")
+                    .tint(ZineTheme.brandAccent)
+                }
+            }
+            .zineTabShellChrome()
+            .environment(\.zineTabNavigationActions, tabNavigationActions)
+            .navigationDestination(for: HomeNavigationRoute.self) { route in
+                homeDestination(for: route)
+                    .navigationTransition(
+                        .zoom(sourceID: route.sourceID, in: navigationTransition)
+                    )
+            }
+            .navigationDestination(for: HomeSectionRoute.self) { route in
+                homeSectionDestination(for: route)
+            }
+            .navigationDestination(for: Bookmark.self) { bookmark in
+                bookmarkDestination(for: bookmark)
+                    .navigationTransition(
+                        .zoom(sourceID: bookmark.id, in: navigationTransition)
+                    )
+            }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                settingsDestination(for: route)
             }
         }
-        .zineTabShellChrome()
-        .zineNavigationTabBar(
-            for: selectedRootSurface,
-            navigationDepth: selectedNavigationDepth
-        )
         .task(id: homeRevision) {
             await homeStore.reload()
         }
@@ -173,26 +204,13 @@ private struct AuthenticatedAppView: View {
         )
     }
 
-    private var selectedNavigationDepth: Int {
-        switch selectedTab {
-        case .home:
-            homeNavigationPath.count
-        case .library:
-            libraryNavigationPath.count
-        case .settings:
-            settingsNavigationPath.count
-        case .search:
-            searchNavigationPath.count
-        }
-    }
-
-    private var selectedRootSurface: ZineTabRootSurface {
-        switch selectedTab {
-        case .home: .home
-        case .library: .library
-        case .settings: .settings
-        case .search: .search
-        }
+    private var tabNavigationActions: ZineTabNavigationActions {
+        ZineTabNavigationActions(
+            home: { navigationPath.append($0) },
+            homeSection: { navigationPath.append($0) },
+            bookmark: { navigationPath.append($0) },
+            settings: { navigationPath.append($0) }
+        )
     }
 
     private func handleTabReselection(_ tab: AppTab) {
@@ -213,6 +231,95 @@ private struct AuthenticatedAppView: View {
     private func markBookmarkContentChanged() {
         homeRevision += 1
         libraryRevision += 1
+    }
+
+    @ViewBuilder
+    private func homeDestination(for route: HomeNavigationRoute) -> some View {
+        switch route.destination {
+        case .item(let item):
+            BookmarkDetailView(
+                item: item,
+                client: client,
+                onUpdate: { _ in markBookmarkContentChanged() },
+                onBookmarkCommit: { _, _ in markBookmarkContentChanged() },
+                onExternalOpen: { bookmark, item in
+                    if let bookmark {
+                        handleExternalOpen(bookmark)
+                    } else {
+                        handleHomeItemExternalOpen(item)
+                    }
+                }
+            )
+        case .bookmark(let bookmark):
+            BookmarkDetailView(
+                bookmark: bookmark,
+                client: client,
+                onUpdate: { _ in markBookmarkContentChanged() },
+                onBookmarkCommit: { _, _ in markBookmarkContentChanged() },
+                onExternalOpen: handleExternalOpen
+            )
+        case .articleReader(let item):
+            ArticleReaderView(
+                metadata: ArticleReaderMetadata(
+                    bookmarkID: item.id,
+                    title: item.title,
+                    creator: item.creator,
+                    creatorImageURL: item.creatorImageUrl,
+                    canonicalURL: item.canonicalUrl,
+                    readingTimeMinutes: item.readingTimeMinutes,
+                    initialProgress: item.progress,
+                    isFinished: false,
+                    tags: []
+                ),
+                client: client,
+                onRead: { handleHomeItemExternalOpen(item) },
+                onProgressSaved: { _ in markBookmarkContentChanged() },
+                onFinishedChanged: { _, _ in markBookmarkContentChanged() },
+                onFinishedCommit: { _ in markBookmarkContentChanged() },
+                onTagsChanged: { _ in markBookmarkContentChanged() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func homeSectionDestination(for route: HomeSectionRoute) -> some View {
+        switch route {
+        case .jumpBackIn:
+            JumpBackInListView(
+                client: client,
+                onContentChanged: markBookmarkContentChanged,
+                onExternalOpen: handleExternalOpen,
+                tabReselection: homeTabReselection
+            )
+        default:
+            HomeSectionListView(
+                route: route,
+                client: client,
+                onContentChanged: markBookmarkContentChanged,
+                onExternalOpen: handleExternalOpen,
+                tabReselection: homeTabReselection
+            )
+        }
+    }
+
+    private func bookmarkDestination(for bookmark: Bookmark) -> some View {
+        BookmarkDetailView(
+            bookmark: bookmark,
+            client: client,
+            onUpdate: { _ in markBookmarkContentChanged() },
+            onBookmarkChange: { _, _, _ in markBookmarkContentChanged() },
+            onExternalOpen: handleExternalOpen
+        )
+    }
+
+    @ViewBuilder
+    private func settingsDestination(for route: SettingsRoute) -> some View {
+        switch route {
+        case .sources:
+            SubscriptionsView(client: client)
+        case .appearance:
+            AppearanceSettingsView()
+        }
     }
 
     private func handleExternalOpen(_ bookmark: Bookmark) {
