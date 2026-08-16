@@ -45,9 +45,10 @@ struct HomeView: View {
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
     let tabReselection: Int
+    let transitionNamespace: Namespace.ID?
+    let registersNavigationDestinations: Bool
 
-    @Binding private var navigationPath: NavigationPath
-    @Namespace private var bookmarkTransition
+    @Namespace private var localTransitionNamespace
 
     init(
         client: APIClient,
@@ -58,7 +59,8 @@ struct HomeView: View {
         onExternalOpen: @escaping (Bookmark) -> Void,
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void,
         tabReselection: Int = 0,
-        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
+        transitionNamespace: Namespace.ID? = nil,
+        registersNavigationDestinations: Bool = true
     ) {
         self.client = client
         self.store = store
@@ -68,14 +70,14 @@ struct HomeView: View {
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
         self.tabReselection = tabReselection
-        _navigationPath = navigationPath
+        self.transitionNamespace = transitionNamespace
+        self.registersNavigationDestinations = registersNavigationDestinations
     }
 
+    @ViewBuilder
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            content
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+        if registersNavigationDestinations {
+            screen
                 .navigationDestination(for: HomeNavigationRoute.self) { route in
                     destination(for: route)
                         .navigationTransition(
@@ -101,8 +103,20 @@ struct HomeView: View {
                         )
                     }
                 }
+        } else {
+            screen
         }
-        .zineScreenChrome()
+    }
+
+    private var screen: some View {
+        content
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+            .zineScreenChrome()
+    }
+
+    private var bookmarkTransition: Namespace.ID {
+        transitionNamespace ?? localTransitionNamespace
     }
 
     @ViewBuilder

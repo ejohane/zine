@@ -3,70 +3,67 @@ import SwiftUI
 
 struct ScreenshotHomeTabShell: View {
     @State private var selectedTab = 0
+    @State private var navigationPath: NavigationPath
+    @Namespace private var navigationTransition
+
+    init() {
+        var initialPath = NavigationPath()
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-home-pushed-fixture") {
+            initialPath.append(
+                HomeNavigationRoute.articleReader(
+                    ScreenshotHomeFixtures.featuredArticle,
+                    sectionID: "featured"
+                )
+            )
+        }
+        _navigationPath = State(initialValue: initialPath)
+    }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house", value: 0) {
-                ScreenshotHomeView(density: .compact)
-            }
+        NavigationStack(path: $navigationPath) {
+            TabView(selection: $selectedTab) {
+                Tab("Home", systemImage: "house", value: 0) {
+                    ScreenshotHomeView(
+                        density: .compact,
+                        bookmarkTransition: navigationTransition
+                    )
+                }
 
-            Tab("Library", systemImage: "books.vertical", value: 1) {
-                ScreenshotLibraryView()
-            }
+                Tab("Library", systemImage: "books.vertical", value: 1) {
+                    ScreenshotLibraryContentView()
+                }
 
-            Tab("Settings", systemImage: "gearshape", value: 2) {
-                NavigationStack {
+                Tab("Settings", systemImage: "gearshape", value: 2) {
                     Text("Settings")
                         .navigationTitle("Settings")
+                        .zineScreenChrome()
                 }
-                .zineScreenChrome()
-            }
 
-            Tab("Search", systemImage: "magnifyingglass", value: 3) {
-                NavigationStack {
+                Tab("Search", systemImage: "magnifyingglass", value: 3) {
                     Text("Search")
                         .navigationTitle("Search")
+                        .zineScreenChrome()
                 }
-                .zineScreenChrome()
             }
-        }
-        .zineTabShellChrome()
-    }
-}
-
-struct ScreenshotHomeView: View {
-    var density: HomeLayoutDensity = .standard
-
-    @Namespace private var bookmarkTransition
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: density.sectionSpacing) {
-                    ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
-                        HomeDashboardSectionView(
-                            section: section,
-                            density: density,
-                            transitionNamespace: bookmarkTransition
-                        )
-                    }
-                }
-                .padding(.vertical, density == .compact ? 6 : 10)
-                .padding(.bottom, density == .compact ? 16 : 24)
-            }
-            .navigationTitle("Home")
-            .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+            .zineTabShellChrome()
+            .environment(\.zineTabNavigationActions, navigationActions)
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 fixtureDestination(for: route)
                     .navigationTransition(
-                        .zoom(sourceID: route.sourceID, in: bookmarkTransition)
+                        .zoom(sourceID: route.sourceID, in: navigationTransition)
                     )
             }
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 ScreenshotHomeSectionListView(route: route)
             }
         }
-        .zineScreenChrome()
+    }
+
+    private var navigationActions: ZineTabNavigationActions {
+        ZineTabNavigationActions(
+            home: { navigationPath.append($0) },
+            homeSection: { navigationPath.append($0) }
+        )
     }
 
     @ViewBuilder
@@ -129,6 +126,30 @@ struct ScreenshotHomeView: View {
             initialPhase: .ready(ArticleReaderDocument(metadata: metadata, response: response)),
             loadsOnAppear: false
         )
+    }
+}
+
+struct ScreenshotHomeView: View {
+    var density: HomeLayoutDensity = .standard
+    let bookmarkTransition: Namespace.ID
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: density.sectionSpacing) {
+                ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
+                    HomeDashboardSectionView(
+                        section: section,
+                        density: density,
+                        transitionNamespace: bookmarkTransition
+                    )
+                }
+            }
+            .padding(.vertical, density == .compact ? 6 : 10)
+            .padding(.bottom, density == .compact ? 16 : 24)
+        }
+        .navigationTitle("Home")
+        .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+        .zineScreenChrome()
     }
 }
 

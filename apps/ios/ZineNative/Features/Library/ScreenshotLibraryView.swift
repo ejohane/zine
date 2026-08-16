@@ -2,6 +2,14 @@
 import SwiftUI
 
 struct ScreenshotLibraryView: View {
+    var body: some View {
+        NavigationStack {
+            ScreenshotLibraryContentView()
+        }
+    }
+}
+
+struct ScreenshotLibraryContentView: View {
     private let client = APIClient(
         baseURL: URL(string: "https://example.invalid")!,
         tokenProvider: { "screenshot-fixture" }
@@ -16,58 +24,56 @@ struct ScreenshotLibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                CollapsingListTitle(
+        List {
+            CollapsingListTitle(
+                title: "Library",
+                progress: titleCollapseProgress
+            )
+
+            Section {
+                ForEach(0..<(bookmarks.count * 3), id: \.self) { index in
+                    let bookmark = bookmarks[index % bookmarks.count]
+                    let route = ScreenshotLibraryRoute(bookmark: bookmark, sourceID: index)
+                    NavigationLink(value: route) {
+                        BookmarkRow(bookmark: bookmark)
+                    }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
+                    .listRowBackground(ZineTheme.canvas)
+                    .listRowSeparator(.hidden)
+                    .matchedTransitionSource(id: route.sourceID, in: bookmarkTransition)
+                }
+            } header: {
+                ContentTypeFilterBar(selection: $contentType)
+                    .textCase(nil)
+                    .listRowInsets(EdgeInsets())
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(ZineTheme.canvas)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let offset = geometry.contentOffset.y + geometry.contentInsets.top
+            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+        } action: { _, progress in
+            titleCollapseProgress = progress
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .contentTypeFilterChrome()
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                CollapsedListTitle(
                     title: "Library",
                     progress: titleCollapseProgress
                 )
-
-                Section {
-                    ForEach(0..<(bookmarks.count * 3), id: \.self) { index in
-                        let bookmark = bookmarks[index % bookmarks.count]
-                        let route = ScreenshotLibraryRoute(bookmark: bookmark, sourceID: index)
-                        NavigationLink(value: route) {
-                            BookmarkRow(bookmark: bookmark)
-                        }
-                        .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
-                        .listRowBackground(ZineTheme.canvas)
-                        .listRowSeparator(.hidden)
-                        .matchedTransitionSource(id: route.sourceID, in: bookmarkTransition)
-                    }
-                } header: {
-                    ContentTypeFilterBar(selection: $contentType)
-                        .textCase(nil)
-                        .listRowInsets(EdgeInsets())
-                }
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(ZineTheme.canvas)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-            } action: { _, progress in
-                titleCollapseProgress = progress
-            }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .contentTypeFilterChrome()
-            .toolbar(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    CollapsedListTitle(
-                        title: "Library",
-                        progress: titleCollapseProgress
-                    )
-                }
-            }
-            .navigationDestination(for: ScreenshotLibraryRoute.self) { route in
-                BookmarkDetailView(bookmark: route.bookmark, client: client) { _ in }
-                    .navigationTransition(
-                        .zoom(sourceID: route.sourceID, in: bookmarkTransition)
-                    )
-            }
+        }
+        .navigationDestination(for: ScreenshotLibraryRoute.self) { route in
+            BookmarkDetailView(bookmark: route.bookmark, client: client) { _ in }
+                .navigationTransition(
+                    .zoom(sourceID: route.sourceID, in: bookmarkTransition)
+                )
         }
         .zineScreenChrome()
     }

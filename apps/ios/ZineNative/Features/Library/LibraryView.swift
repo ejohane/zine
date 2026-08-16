@@ -7,15 +7,15 @@ struct LibraryView: View {
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let tabReselection: Int
+    let transitionNamespace: Namespace.ID
 
     @State private var store: LibraryStore
-    @Binding private var navigationPath: NavigationPath
     @State private var showsFinished = false
     @State private var provider: Provider?
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
     @State private var isVisible = false
-    @Namespace private var bookmarkTransition
+    @Environment(\.zineTabNavigationActions) private var navigation
 
     init(
         client: APIClient,
@@ -25,7 +25,7 @@ struct LibraryView: View {
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
         tabReselection: Int = 0,
-        navigationPath: Binding<NavigationPath> = .constant(NavigationPath())
+        transitionNamespace: Namespace.ID
     ) {
         self.client = client
         self.searchText = searchText
@@ -33,7 +33,7 @@ struct LibraryView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
-        _navigationPath = navigationPath
+        self.transitionNamespace = transitionNamespace
         _store = State(initialValue: LibraryStore(
             client: client,
             cache: cache,
@@ -59,60 +59,44 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            content
-                .navigationTitle(isSearchMode ? "Search" : "Library")
-                .navigationBarTitleDisplayMode(.inline)
-                .contentTypeFilterChrome()
-                .toolbar(.visible, for: .navigationBar)
-                .toolbar {
-                    if isSearchMode {
-                        ToolbarItem(placement: .topBarLeading) {
-                            filterMenu
-                        }
-                    } else {
-                        ToolbarItem(placement: .principal) {
-                            CollapsedListTitle(
-                                title: "Library",
-                                progress: titleCollapseProgress
-                            )
-                        }
+        content
+            .navigationTitle(isSearchMode ? "Search" : "Library")
+            .navigationBarTitleDisplayMode(.inline)
+            .contentTypeFilterChrome()
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                if isSearchMode {
+                    ToolbarItem(placement: .topBarLeading) {
+                        filterMenu
+                    }
+                } else {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(
+                            title: "Library",
+                            progress: titleCollapseProgress
+                        )
                     }
                 }
-                .navigationDestination(for: Bookmark.self) { bookmark in
-                    BookmarkDetailView(
-                        bookmark: bookmark,
-                        client: client,
-                        onUpdate: { updated in store.update(updated) },
-                        onBookmarkChange: { changed, isBookmarked, _ in
-                            store.setBookmarked(changed, isBookmarked: isBookmarked)
-                        },
-                        onExternalOpen: onExternalOpen
-                    )
-                    .navigationTransition(
-                        .zoom(sourceID: bookmark.id, in: bookmarkTransition)
-                    )
+            }
+            .zineScreenChrome()
+            .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
+                if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    store.reset()
+                    return
                 }
-        }
-        .zineScreenChrome()
-        .task(id: LibraryReloadKey(query: query, revision: refreshRevision)) {
-            if isSearchMode && search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                store.reset()
-                return
+                if !search.isEmpty {
+                    try? await Task.sleep(for: .milliseconds(250))
+                }
+                guard !Task.isCancelled else { return }
+                await store.reload(query: query)
             }
-            if !search.isEmpty {
-                try? await Task.sleep(for: .milliseconds(250))
+            .alert("Couldn’t update bookmark", isPresented: actionErrorBinding) {
+                Button("OK", role: .cancel) {
+                    store.dismissActionError()
+                }
+            } message: {
+                Text(store.actionErrorMessage ?? "Please try again.")
             }
-            guard !Task.isCancelled else { return }
-            await store.reload(query: query)
-        }
-        .alert("Couldn’t update bookmark", isPresented: actionErrorBinding) {
-            Button("OK", role: .cancel) {
-                store.dismissActionError()
-            }
-        } message: {
-            Text(store.actionErrorMessage ?? "Please try again.")
-        }
     }
 
     @ViewBuilder
@@ -237,13 +221,24 @@ struct LibraryView: View {
     }
 
     private func bookmarkRow(_ bookmark: Bookmark) -> some View {
-        NavigationLink(value: bookmark) {
-            BookmarkRow(bookmark: bookmark)
+        Group {
+            if let navigate = navigation.bookmark {
+                Button {
+                    navigate(bookmark)
+                } label: {
+                    BookmarkRow(bookmark: bookmark)
+                }
+            } else {
+                NavigationLink(value: bookmark) {
+                    BookmarkRow(bookmark: bookmark)
+                }
+            }
         }
+        .buttonStyle(.plain)
         .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
         .listRowBackground(ZineTheme.canvas)
         .listRowSeparator(.hidden)
-        .matchedTransitionSource(id: bookmark.id, in: bookmarkTransition)
+        .matchedTransitionSource(id: bookmark.id, in: transitionNamespace)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             if !bookmark.isFinished {
                 Button {

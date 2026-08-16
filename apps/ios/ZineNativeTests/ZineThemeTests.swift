@@ -45,55 +45,6 @@ final class ZineThemeTests: XCTestCase {
         }
     }
 
-    func testTabBarIsVisibleOnlyOnPrimaryRootScreens() {
-        XCTAssertTrue(ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(.home), navigationDepth: 0))
-        XCTAssertTrue(ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(.library), navigationDepth: 0))
-        XCTAssertTrue(ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(.settings), navigationDepth: 0))
-        XCTAssertFalse(ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(.search), navigationDepth: 0))
-    }
-
-    func testTabBarIsHiddenForEveryPushedDestination() {
-        for surface in ZineTabRootSurface.allCases {
-            XCTAssertFalse(
-                ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(surface), navigationDepth: 1),
-                "Expected the tab bar to be hidden after pushing from \(surface)"
-            )
-            XCTAssertFalse(
-                ZineTabBarVisibilityContract.showsTabBar(on: .tabRoot(surface), navigationDepth: 2),
-                "Expected the tab bar to remain hidden deeper in \(surface)"
-            )
-        }
-    }
-
-    func testDestinationFormReaderPushHidesTabBarWithoutAPathEntry() {
-        XCTAssertFalse(
-            ZineTabBarVisibilityContract.showsTabBar(
-                on: .articleReader,
-                navigationDepth: 0
-            )
-        )
-        XCTAssertFalse(
-            ZineTabBarVisibilityContract.showsTabBar(
-                on: .bookmarkDetail,
-                navigationDepth: 0
-            )
-        )
-    }
-
-    func testInteractivePopReturnPathRestoresTabBarAtPrimaryRoot() {
-        let navigationDepths = [0, 1, 2, 1, 0]
-
-        XCTAssertEqual(
-            navigationDepths.map {
-                ZineTabBarVisibilityContract.showsTabBar(
-                    on: .tabRoot(.home),
-                    navigationDepth: $0
-                )
-            },
-            [true, false, false, false, true]
-        )
-    }
-
     @MainActor
     func testUIKitBarsKeepSystemManagedMaterialsAndScrollEdges() {
         ZineTheme.configureUIKitAppearance()
