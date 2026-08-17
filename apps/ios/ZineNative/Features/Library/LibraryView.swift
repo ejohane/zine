@@ -7,6 +7,7 @@ struct LibraryView: View {
     let onContentChanged: () -> Void
     let onExternalOpen: (Bookmark) -> Void
     let tabReselection: Int
+    let onTitleCollapseProgressChanged: (CGFloat) -> Void
     let transitionNamespace: Namespace.ID
 
     @State private var store: LibraryStore
@@ -25,6 +26,7 @@ struct LibraryView: View {
         onContentChanged: @escaping () -> Void = {},
         onExternalOpen: @escaping (Bookmark) -> Void = { _ in },
         tabReselection: Int = 0,
+        onTitleCollapseProgressChanged: @escaping (CGFloat) -> Void = { _ in },
         transitionNamespace: Namespace.ID
     ) {
         self.client = client
@@ -33,6 +35,7 @@ struct LibraryView: View {
         self.onContentChanged = onContentChanged
         self.onExternalOpen = onExternalOpen
         self.tabReselection = tabReselection
+        self.onTitleCollapseProgressChanged = onTitleCollapseProgressChanged
         self.transitionNamespace = transitionNamespace
         _store = State(initialValue: LibraryStore(
             client: client,
@@ -60,7 +63,7 @@ struct LibraryView: View {
 
     var body: some View {
         content
-            .navigationTitle(isSearchMode ? "Search" : "Library")
+            .navigationTitle(isSearchMode ? "Search" : "")
             .navigationBarTitleDisplayMode(.inline)
             .contentTypeFilterChrome()
             .toolbar(.visible, for: .navigationBar)
@@ -68,13 +71,6 @@ struct LibraryView: View {
                 if isSearchMode {
                     ToolbarItem(placement: .topBarLeading) {
                         filterMenu
-                    }
-                } else {
-                    ToolbarItem(placement: .principal) {
-                        CollapsedListTitle(
-                            title: "Library",
-                            progress: titleCollapseProgress
-                        )
                     }
                 }
             }
@@ -130,9 +126,10 @@ struct LibraryView: View {
             .background(ZineTheme.canvas)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+                return FilteredListScrollState.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
                 titleCollapseProgress = progress
+                onTitleCollapseProgressChanged(progress)
             }
             .onChange(of: tabReselection) {
                 handleTabReselection(using: proxy)

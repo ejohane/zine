@@ -306,7 +306,13 @@ final class HomeTests: XCTestCase {
         )
     }
 
-    func testContentTypeTitleCollapseProgressClampsScrollOffset() {
+    func testFilteredListCollapseProgressClampsScrollOffset() {
+        XCTAssertEqual(FilteredListScrollState.collapseProgress(scrollOffset: -20), 0)
+        XCTAssertEqual(FilteredListScrollState.collapseProgress(scrollOffset: 22), 0.5)
+        XCTAssertEqual(FilteredListScrollState.collapseProgress(scrollOffset: 80), 1)
+    }
+
+    func testRootTitleCollapseProgressClampsScrollOffset() {
         XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: -20), 0)
         XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 22), 0.5)
         XCTAssertEqual(CollapsingListTitle.collapseProgress(scrollOffset: 80), 1)

@@ -2,9 +2,21 @@
 import SwiftUI
 
 struct ScreenshotLibraryView: View {
+    @State private var titleCollapseProgress: CGFloat = 0
+
     var body: some View {
         NavigationStack {
-            ScreenshotLibraryContentView()
+            ScreenshotLibraryContentView(
+                onTitleCollapseProgressChanged: { titleCollapseProgress = $0 }
+            )
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    CollapsedListTitle(
+                        title: "Library",
+                        progress: titleCollapseProgress
+                    )
+                }
+            }
         }
     }
 }
@@ -18,13 +30,16 @@ struct ScreenshotLibraryContentView: View {
     @State private var titleCollapseProgress: CGFloat = 0
     @Namespace private var bookmarkTransition
 
+    var onTitleCollapseProgressChanged: (CGFloat) -> Void = { _ in }
+
     private var bookmarks: [Bookmark] {
         guard let contentType else { return ScreenshotFixtures.bookmarks }
         return ScreenshotFixtures.bookmarks.filter { $0.contentType == contentType }
     }
 
     var body: some View {
-        List {
+        ScrollViewReader { proxy in
+            List {
             CollapsingListTitle(
                 title: "Library",
                 progress: titleCollapseProgress
@@ -37,6 +52,7 @@ struct ScreenshotLibraryContentView: View {
                     NavigationLink(value: route) {
                         BookmarkRow(bookmark: bookmark)
                     }
+                    .id(index)
                     .listRowInsets(EdgeInsets(top: 6, leading: 18, bottom: 6, trailing: 14))
                     .listRowBackground(ZineTheme.canvas)
                     .listRowSeparator(.hidden)
@@ -47,28 +63,28 @@ struct ScreenshotLibraryContentView: View {
                     .textCase(nil)
                     .listRowInsets(EdgeInsets())
             }
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.canvas)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            let offset = geometry.contentOffset.y + geometry.contentInsets.top
-            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-        } action: { _, progress in
-            titleCollapseProgress = progress
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.canvas)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+                onTitleCollapseProgressChanged(progress)
+            }
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("-screenshot-scrolled-fixture") {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    proxy.scrollTo(5, anchor: .top)
+                }
+            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .contentTypeFilterChrome()
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                CollapsedListTitle(
-                    title: "Library",
-                    progress: titleCollapseProgress
-                )
-            }
-        }
         .navigationDestination(for: ScreenshotLibraryRoute.self) { route in
             BookmarkDetailView(bookmark: route.bookmark, client: client) { _ in }
                 .navigationTransition(

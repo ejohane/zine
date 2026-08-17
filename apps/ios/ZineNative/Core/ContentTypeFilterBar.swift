@@ -39,6 +39,12 @@ struct CollapsedListTitle: View {
     }
 }
 
+enum FilteredListScrollState {
+    static func collapseProgress(scrollOffset: CGFloat) -> CGFloat {
+        min(max(scrollOffset / 44, 0), 1)
+    }
+}
+
 struct ContentTypeFilterBar: View {
     @Binding var selection: ContentType?
     var background = ZineTheme.canvas
