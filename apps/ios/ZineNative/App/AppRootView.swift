@@ -70,6 +70,8 @@ private struct AuthenticatedAppView: View {
     @State private var navigationPath = NavigationPath()
     @State private var homeTabReselection = 0
     @State private var libraryTabReselection = 0
+    @State private var homeTitleCollapseProgress: CGFloat = 0
+    @State private var libraryTitleCollapseProgress: CGFloat = 0
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
     @State private var externalOpenEvent: ExternalBookmarkOpenEvent?
@@ -105,6 +107,7 @@ private struct AuthenticatedAppView: View {
                         onExternalOpen: handleExternalOpen,
                         onHomeItemExternalOpen: handleHomeItemExternalOpen,
                         tabReselection: homeTabReselection,
+                        onTitleCollapseProgressChanged: { homeTitleCollapseProgress = $0 },
                         transitionNamespace: navigationTransition,
                         registersNavigationDestinations: false
                     )
@@ -119,6 +122,7 @@ private struct AuthenticatedAppView: View {
                         onContentChanged: markHomeChanged,
                         onExternalOpen: handleExternalOpen,
                         tabReselection: libraryTabReselection,
+                        onTitleCollapseProgressChanged: { libraryTitleCollapseProgress = $0 },
                         transitionNamespace: navigationTransition
                     )
                     .tint(ZineTheme.brandAccent)
@@ -144,6 +148,18 @@ private struct AuthenticatedAppView: View {
                 }
             }
             .zineTabShellChrome()
+            .navigationTitle(selectedRootTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if navigationPath.isEmpty, let compactTitle = selectedCompactRootTitle {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(
+                            title: compactTitle.title,
+                            progress: compactTitle.progress
+                        )
+                    }
+                }
+            }
             .environment(\.zineTabNavigationActions, tabNavigationActions)
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 homeDestination(for: route)
@@ -202,6 +218,28 @@ private struct AuthenticatedAppView: View {
                 }
             }
         )
+    }
+
+    private var selectedRootTitle: String {
+        switch selectedTab {
+        case .home, .library:
+            ""
+        case .settings:
+            "Settings"
+        case .search:
+            "Search"
+        }
+    }
+
+    private var selectedCompactRootTitle: (title: String, progress: CGFloat)? {
+        switch selectedTab {
+        case .home:
+            ("Home", homeTitleCollapseProgress)
+        case .library:
+            ("Library", libraryTitleCollapseProgress)
+        case .settings, .search:
+            nil
+        }
     }
 
     private var tabNavigationActions: ZineTabNavigationActions {

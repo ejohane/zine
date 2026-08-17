@@ -31,19 +31,11 @@ struct HomeSectionListView: View {
 
     var body: some View {
         content
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(route.title)
+            .navigationBarTitleDisplayMode(.large)
             .contentTypeFilterChrome(background: ZineTheme.surface)
             .toolbarBackground(ZineTheme.surface, for: .tabBar)
             .toolbar(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    CollapsedListTitle(
-                        title: route.title,
-                        progress: titleCollapseProgress
-                    )
-                }
-            }
             .navigationDestination(for: Bookmark.self) { bookmark in
                 BookmarkDetailView(
                     bookmark: bookmark,
@@ -78,13 +70,6 @@ struct HomeSectionListView: View {
     private var content: some View {
         ScrollViewReader { proxy in
             List {
-                CollapsingListTitle(
-                    title: route.title,
-                    progress: titleCollapseProgress,
-                    background: ZineTheme.surface
-                )
-                .id(ScrollAnchor.top)
-
                 Section {
                     resultRows
                 } header: {
@@ -95,13 +80,14 @@ struct HomeSectionListView: View {
                         .textCase(nil)
                         .listRowInsets(EdgeInsets())
                 }
+                .id(ScrollAnchor.top)
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(ZineTheme.surface)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 let offset = geometry.contentOffset.y + geometry.contentInsets.top
-                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+                return FilteredListScrollState.collapseProgress(scrollOffset: offset)
             } action: { _, progress in
                 titleCollapseProgress = progress
             }

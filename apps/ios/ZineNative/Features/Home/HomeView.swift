@@ -45,10 +45,12 @@ struct HomeView: View {
     let onExternalOpen: (Bookmark) -> Void
     let onHomeItemExternalOpen: (HomeItem) -> Void
     let tabReselection: Int
+    let onTitleCollapseProgressChanged: (CGFloat) -> Void
     let transitionNamespace: Namespace.ID?
     let registersNavigationDestinations: Bool
 
     @Namespace private var localTransitionNamespace
+    @State private var titleCollapseProgress: CGFloat = 0
 
     init(
         client: APIClient,
@@ -59,6 +61,7 @@ struct HomeView: View {
         onExternalOpen: @escaping (Bookmark) -> Void,
         onHomeItemExternalOpen: @escaping (HomeItem) -> Void,
         tabReselection: Int = 0,
+        onTitleCollapseProgressChanged: @escaping (CGFloat) -> Void = { _ in },
         transitionNamespace: Namespace.ID? = nil,
         registersNavigationDestinations: Bool = true
     ) {
@@ -70,6 +73,7 @@ struct HomeView: View {
         self.onExternalOpen = onExternalOpen
         self.onHomeItemExternalOpen = onHomeItemExternalOpen
         self.tabReselection = tabReselection
+        self.onTitleCollapseProgressChanged = onTitleCollapseProgressChanged
         self.transitionNamespace = transitionNamespace
         self.registersNavigationDestinations = registersNavigationDestinations
     }
@@ -110,8 +114,18 @@ struct HomeView: View {
 
     private var screen: some View {
         content
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if registersNavigationDestinations {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(
+                            title: title,
+                            progress: titleCollapseProgress
+                        )
+                    }
+                }
+            }
             .zineScreenChrome()
     }
 
@@ -142,6 +156,9 @@ struct HomeView: View {
         } else {
             ScrollView {
                 LazyVStack(spacing: density.sectionSpacing) {
+                    CollapsingListTitle(title: title, progress: titleCollapseProgress)
+                        .padding(.horizontal, 18)
+
                     ForEach(dashboardSections) { section in
                         HomeDashboardSectionView(
                             section: section,
@@ -154,6 +171,13 @@ struct HomeView: View {
                 .padding(.bottom, density == .compact ? 16 : 24)
             }
             .background(ZineTheme.canvas)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+                onTitleCollapseProgressChanged(progress)
+            }
             .refreshable {
                 await store.reload()
             }

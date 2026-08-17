@@ -4,6 +4,8 @@ import SwiftUI
 struct ScreenshotHomeTabShell: View {
     @State private var selectedTab = 0
     @State private var navigationPath: NavigationPath
+    @State private var homeTitleCollapseProgress: CGFloat = 0
+    @State private var libraryTitleCollapseProgress: CGFloat = 0
     @Namespace private var navigationTransition
 
     init() {
@@ -25,12 +27,15 @@ struct ScreenshotHomeTabShell: View {
                 Tab("Home", systemImage: "house", value: 0) {
                     ScreenshotHomeView(
                         density: .compact,
-                        bookmarkTransition: navigationTransition
+                        bookmarkTransition: navigationTransition,
+                        onTitleCollapseProgressChanged: { homeTitleCollapseProgress = $0 }
                     )
                 }
 
                 Tab("Library", systemImage: "books.vertical", value: 1) {
-                    ScreenshotLibraryContentView()
+                    ScreenshotLibraryContentView(
+                        onTitleCollapseProgressChanged: { libraryTitleCollapseProgress = $0 }
+                    )
                 }
 
                 Tab("Settings", systemImage: "gearshape", value: 2) {
@@ -46,6 +51,18 @@ struct ScreenshotHomeTabShell: View {
                 }
             }
             .zineTabShellChrome()
+            .navigationTitle(selectedRootTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if navigationPath.isEmpty, let compactTitle = selectedCompactRootTitle {
+                    ToolbarItem(placement: .principal) {
+                        CollapsedListTitle(
+                            title: compactTitle.title,
+                            progress: compactTitle.progress
+                        )
+                    }
+                }
+            }
             .environment(\.zineTabNavigationActions, navigationActions)
             .navigationDestination(for: HomeNavigationRoute.self) { route in
                 fixtureDestination(for: route)
@@ -56,6 +73,28 @@ struct ScreenshotHomeTabShell: View {
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 ScreenshotHomeSectionListView(route: route)
             }
+        }
+    }
+
+    private var selectedRootTitle: String {
+        switch selectedTab {
+        case 0, 1:
+            ""
+        case 2:
+            "Settings"
+        default:
+            "Search"
+        }
+    }
+
+    private var selectedCompactRootTitle: (title: String, progress: CGFloat)? {
+        switch selectedTab {
+        case 0:
+            ("Home", homeTitleCollapseProgress)
+        case 1:
+            ("Library", libraryTitleCollapseProgress)
+        default:
+            nil
         }
     }
 
@@ -132,23 +171,45 @@ struct ScreenshotHomeTabShell: View {
 struct ScreenshotHomeView: View {
     var density: HomeLayoutDensity = .standard
     let bookmarkTransition: Namespace.ID
+    var onTitleCollapseProgressChanged: (CGFloat) -> Void = { _ in }
+
+    @State private var titleCollapseProgress: CGFloat = 0
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: density.sectionSpacing) {
-                ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
-                    HomeDashboardSectionView(
-                        section: section,
-                        density: density,
-                        transitionNamespace: bookmarkTransition
-                    )
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: density.sectionSpacing) {
+                    CollapsingListTitle(title: "Home", progress: titleCollapseProgress)
+                        .padding(.horizontal, 18)
+
+                    ForEach(density.visibleSections(from: ScreenshotHomeFixtures.sections)) { section in
+                        HomeDashboardSectionView(
+                            section: section,
+                            density: density,
+                            transitionNamespace: bookmarkTransition
+                        )
+                        .id(section.id)
+                    }
+                }
+                .padding(.vertical, density == .compact ? 6 : 10)
+                .padding(.bottom, density == .compact ? 16 : 24)
+            }
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return CollapsingListTitle.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+                onTitleCollapseProgressChanged(progress)
+            }
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("-screenshot-scrolled-fixture") {
+                    try? await Task.sleep(for: .milliseconds(300))
+                    proxy.scrollTo("inbox", anchor: .top)
                 }
             }
-            .padding(.vertical, density == .compact ? 6 : 10)
-            .padding(.bottom, density == .compact ? 16 : 24)
         }
-        .navigationTitle("Home")
-        .navigationBarTitleDisplayMode(density == .compact ? .inline : .automatic)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .zineScreenChrome()
     }
 }
@@ -157,7 +218,6 @@ private struct ScreenshotHomeSectionListView: View {
     let route: HomeSectionRoute
 
     @State private var contentType: ContentType?
-    @State private var titleCollapseProgress: CGFloat = 0
 
     init(route: HomeSectionRoute) {
         self.route = route
@@ -175,12 +235,6 @@ private struct ScreenshotHomeSectionListView: View {
 
     var body: some View {
         List {
-            CollapsingListTitle(
-                title: route.title,
-                progress: titleCollapseProgress,
-                background: ZineTheme.surface
-            )
-
             Section {
                 if showsLoadingState {
                     FilteredListLoadingRow(
@@ -205,25 +259,11 @@ private struct ScreenshotHomeSectionListView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(ZineTheme.surface)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            let offset = geometry.contentOffset.y + geometry.contentInsets.top
-            return CollapsingListTitle.collapseProgress(scrollOffset: offset)
-        } action: { _, progress in
-            titleCollapseProgress = progress
-        }
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle(route.title)
+        .navigationBarTitleDisplayMode(.large)
         .contentTypeFilterChrome(background: ZineTheme.surface)
         .toolbarBackground(ZineTheme.surface, for: .tabBar)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                CollapsedListTitle(
-                    title: route.title,
-                    progress: titleCollapseProgress
-                )
-            }
-        }
     }
 }
 
