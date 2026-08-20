@@ -2,6 +2,11 @@
 import SwiftUI
 
 struct ScreenshotHomeTabShell: View {
+    private let client = APIClient(
+        baseURL: URL(string: "https://example.invalid")!,
+        tokenProvider: { "screenshot-fixture" }
+    )
+
     @State private var selectedTab = 0
     @State private var navigationPath: NavigationPath
     @State private var homeTitleCollapseProgress: CGFloat = 0
@@ -10,7 +15,14 @@ struct ScreenshotHomeTabShell: View {
 
     init() {
         var initialPath = NavigationPath()
-        if ProcessInfo.processInfo.arguments.contains("-screenshot-home-pushed-fixture") {
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-home-bookmark-pushed-fixture") {
+            initialPath.append(
+                HomeNavigationRoute.bookmark(
+                    ScreenshotHomeFixtures.openedBookmarks[0],
+                    sectionID: "jump-back-in"
+                )
+            )
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-pushed-fixture") {
             initialPath.append(
                 HomeNavigationRoute.articleReader(
                     ScreenshotHomeFixtures.featuredArticle,
@@ -54,7 +66,9 @@ struct ScreenshotHomeTabShell: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if navigationPath.isEmpty, let compactTitle = selectedCompactRootTitle {
+                // Match the production shell's continuously registered root chrome so the
+                // interactive-pop fixture exercises the same navigation hierarchy.
+                if let compactTitle = selectedCompactRootTitle {
                     ToolbarItem(placement: .principal) {
                         CollapsedListTitle(
                             title: compactTitle.title,
@@ -109,11 +123,9 @@ struct ScreenshotHomeTabShell: View {
     private func fixtureDestination(for route: HomeNavigationRoute) -> some View {
         switch route.destination {
         case .item(let item):
-            Text(item.title)
-                .navigationTitle(item.title)
+            BookmarkDetailView(item: item, client: client) { _ in }
         case .bookmark(let bookmark):
-            Text(bookmark.title)
-                .navigationTitle(bookmark.title)
+            BookmarkDetailView(bookmark: bookmark, client: client) { _ in }
         case .articleReader(let item):
             fixtureArticleReader(for: item)
         }
