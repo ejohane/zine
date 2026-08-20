@@ -151,7 +151,9 @@ private struct AuthenticatedAppView: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if navigationPath.isEmpty, let compactTitle = selectedCompactRootTitle {
+                // Keep root chrome registered beneath pushed destinations so an interactive
+                // pop reveals the complete tab shell instead of reconstructing its title bar.
+                if let compactTitle = selectedCompactRootTitle {
                     ToolbarItem(placement: .principal) {
                         CollapsedListTitle(
                             title: compactTitle.title,
