@@ -45,10 +45,19 @@ final class SettingsStore {
 
 struct AppSettingsView: View {
     let client: APIClient
+    let onSignedOut: () async -> Void
 
     @Environment(Clerk.self) private var clerk
     @Environment(\.zineTabNavigationActions) private var navigation
     @State private var store = SettingsStore()
+
+    init(
+        client: APIClient,
+        onSignedOut: @escaping () async -> Void = {}
+    ) {
+        self.client = client
+        self.onSignedOut = onSignedOut
+    }
 
     var body: some View {
         Group {
@@ -68,6 +77,7 @@ struct AppSettingsView: View {
                 Task {
                     await store.signOut {
                         try await clerk.auth.signOut()
+                        await onSignedOut()
                     }
                 }
             }

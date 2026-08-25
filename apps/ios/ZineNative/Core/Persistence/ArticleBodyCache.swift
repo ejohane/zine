@@ -5,11 +5,25 @@ private struct CachedArticleBody: Codable {
     let savedAt: Date
 }
 
-actor ArticleBodyCache {
-    private static let maximumDocuments = 50
+private struct ArticleBodyCacheEntry: Codable {
+    var savedAt: Date?
+    var lastCheckedAt: Date
+}
 
-    private let fileURL: URL
-    private var documents: [String: CachedArticleBody]?
+private struct ArticleBodyCacheManifest: Codable {
+    var entries: [String: ArticleBodyCacheEntry]
+}
+
+actor ArticleBodyCache {
+    private static let maximumDocuments = 250
+    private static let maximumChecks = 500
+
+    private let directoryURL: URL
+    private let legacyFileURL: URL
+    private let manifestURL: URL
+    private let progressURL: URL
+    private var manifest: ArticleBodyCacheManifest?
+    private var pendingProgressValues: [String: Double]?
 
     init(userID: String, baseDirectory: URL? = nil) {
         let root = baseDirectory ?? FileManager.default.urls(
@@ -18,58 +32,214 @@ actor ArticleBodyCache {
         )[0]
         let safeUserID = userID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
             ?? "unknown-user"
-        fileURL = root
-            .appending(path: "ZineNative/Articles", directoryHint: .isDirectory)
-            .appending(path: "\(safeUserID).json")
+        let articlesRoot = root.appending(path: "ZineNative/Articles", directoryHint: .isDirectory)
+        directoryURL = articlesRoot.appending(path: safeUserID, directoryHint: .isDirectory)
+        legacyFileURL = articlesRoot.appending(path: "\(safeUserID).json")
+        manifestURL = directoryURL.appending(path: "manifest.json")
+        progressURL = directoryURL.appending(path: "pending-progress.json")
     }
 
     func load(bookmarkID: String) -> ArticleContentResponse? {
-        loadDocumentsIfNeeded()
-        return documents?[bookmarkID]?.response
+        loadManifestIfNeeded()
+        guard manifest?.entries[bookmarkID]?.savedAt != nil else { return nil }
+        let url = documentURL(bookmarkID: bookmarkID)
+        guard let data = try? Data(contentsOf: url),
+              let document = try? JSONDecoder().decode(CachedArticleBody.self, from: data)
+        else {
+            manifest?.entries[bookmarkID] = ArticleBodyCacheEntry(
+                savedAt: nil,
+                lastCheckedAt: .distantPast
+            )
+            persistManifest()
+            return nil
+        }
+        return document.response
     }
 
     func save(_ response: ArticleContentResponse, bookmarkID: String) {
         guard response.readableContent != nil else { return }
-        loadDocumentsIfNeeded()
-        documents?[bookmarkID] = CachedArticleBody(response: response, savedAt: Date())
-        pruneDocuments()
-        persistDocuments()
+        loadManifestIfNeeded()
+        let now = Date()
+        guard persist(
+            CachedArticleBody(response: response, savedAt: now),
+            to: documentURL(bookmarkID: bookmarkID)
+        ) else { return }
+        manifest?.entries[bookmarkID] = ArticleBodyCacheEntry(
+            savedAt: now,
+            lastCheckedAt: now
+        )
+        pruneManifest()
+        persistManifest()
     }
 
-    private func loadDocumentsIfNeeded() {
-        guard documents == nil else { return }
-        guard let data = try? Data(contentsOf: fileURL),
-              let decoded = try? JSONDecoder().decode([String: CachedArticleBody].self, from: data)
-        else {
-            documents = [:]
+    func recordOfflineCheck(_ response: ArticleContentResponse, bookmarkID: String) {
+        if response.readableContent != nil {
+            save(response, bookmarkID: bookmarkID)
             return
         }
-        documents = decoded
+        loadManifestIfNeeded()
+        let savedAt = manifest?.entries[bookmarkID]?.savedAt
+        manifest?.entries[bookmarkID] = ArticleBodyCacheEntry(
+            savedAt: savedAt,
+            lastCheckedAt: Date()
+        )
+        pruneManifest()
+        persistManifest()
     }
 
-    private func pruneDocuments() {
-        guard let documents, documents.count > Self.maximumDocuments else { return }
-        let retainedKeys = documents
-            .sorted { $0.value.savedAt > $1.value.savedAt }
-            .prefix(Self.maximumDocuments)
-            .map(\.key)
-        self.documents = documents.filter { retainedKeys.contains($0.key) }
+    func needsOfflineRefresh(
+        bookmarkID: String,
+        maximumAge: TimeInterval,
+        now: Date = Date()
+    ) -> Bool {
+        loadManifestIfNeeded()
+        guard let checkedAt = manifest?.entries[bookmarkID]?.lastCheckedAt else { return true }
+        return now.timeIntervalSince(checkedAt) >= maximumAge
     }
 
-    private func persistDocuments() {
-        guard let documents,
-              let data = try? JSONEncoder().encode(documents)
-        else { return }
+    func stageProgress(_ fraction: Double, bookmarkID: String) {
+        loadPendingProgressIfNeeded()
+        pendingProgressValues?[bookmarkID] = min(max(fraction, 0), 1)
+        persistPendingProgress()
+    }
 
+    func pendingProgress(bookmarkID: String) -> Double? {
+        loadPendingProgressIfNeeded()
+        return pendingProgressValues?[bookmarkID]
+    }
+
+    func allPendingProgress() -> [String: Double] {
+        loadPendingProgressIfNeeded()
+        return pendingProgressValues ?? [:]
+    }
+
+    func markProgressSynced(bookmarkID: String, fraction: Double) {
+        loadPendingProgressIfNeeded()
+        guard pendingProgressValues?[bookmarkID] == fraction else { return }
+        pendingProgressValues?.removeValue(forKey: bookmarkID)
+        persistPendingProgress()
+    }
+
+    func remove(bookmarkID: String) {
+        loadManifestIfNeeded()
+        loadPendingProgressIfNeeded()
+        manifest?.entries.removeValue(forKey: bookmarkID)
+        pendingProgressValues?.removeValue(forKey: bookmarkID)
+        try? FileManager.default.removeItem(at: documentURL(bookmarkID: bookmarkID))
+        persistManifest()
+        persistPendingProgress()
+    }
+
+    func removeAll() {
+        manifest = ArticleBodyCacheManifest(entries: [:])
+        pendingProgressValues = [:]
+        try? FileManager.default.removeItem(at: directoryURL)
+        try? FileManager.default.removeItem(at: legacyFileURL)
+    }
+
+    private func loadManifestIfNeeded() {
+        guard manifest == nil else { return }
+        if let data = try? Data(contentsOf: manifestURL),
+           let decoded = try? JSONDecoder().decode(ArticleBodyCacheManifest.self, from: data)
+        {
+            manifest = decoded
+            return
+        }
+
+        manifest = ArticleBodyCacheManifest(entries: [:])
+        guard let legacyData = try? Data(contentsOf: legacyFileURL),
+              let legacyDocuments = try? JSONDecoder().decode(
+                  [String: CachedArticleBody].self,
+                  from: legacyData
+              )
+        else {
+            return
+        }
+
+        for (bookmarkID, document) in legacyDocuments where document.response.readableContent != nil {
+            guard persist(document, to: documentURL(bookmarkID: bookmarkID)) else { continue }
+            manifest?.entries[bookmarkID] = ArticleBodyCacheEntry(
+                savedAt: document.savedAt,
+                lastCheckedAt: document.savedAt
+            )
+        }
+        pruneManifest()
+        if persistManifest() {
+            try? FileManager.default.removeItem(at: legacyFileURL)
+        }
+    }
+
+    private func loadPendingProgressIfNeeded() {
+        guard pendingProgressValues == nil else { return }
+        guard let data = try? Data(contentsOf: progressURL),
+              let decoded = try? JSONDecoder().decode([String: Double].self, from: data)
+        else {
+            pendingProgressValues = [:]
+            return
+        }
+        pendingProgressValues = decoded
+    }
+
+    private func pruneManifest() {
+        guard var manifest else { return }
+        let documents = manifest.entries.filter { $0.value.savedAt != nil }
+        if documents.count > Self.maximumDocuments {
+            let removedKeys = documents
+                .sorted { ($0.value.savedAt ?? .distantPast) > ($1.value.savedAt ?? .distantPast) }
+                .dropFirst(Self.maximumDocuments)
+                .map(\.key)
+            for key in removedKeys {
+                try? FileManager.default.removeItem(at: documentURL(bookmarkID: key))
+                manifest.entries[key]?.savedAt = nil
+            }
+        }
+
+        let checkOnlyEntries = manifest.entries.filter { $0.value.savedAt == nil }
+        if checkOnlyEntries.count > Self.maximumChecks {
+            let removedKeys = checkOnlyEntries
+                .sorted { $0.value.lastCheckedAt > $1.value.lastCheckedAt }
+                .dropFirst(Self.maximumChecks)
+                .map(\.key)
+            for key in removedKeys {
+                manifest.entries.removeValue(forKey: key)
+            }
+        }
+        self.manifest = manifest
+    }
+
+    @discardableResult
+    private func persistManifest() -> Bool {
+        guard let manifest else { return false }
+        return persist(manifest, to: manifestURL)
+    }
+
+    private func persistPendingProgress() {
+        guard let pendingProgressValues else { return }
+        _ = persist(pendingProgressValues, to: progressURL)
+    }
+
+    private func persist<Value: Encodable>(_ value: Value, to url: URL) -> Bool {
+        guard let data = try? JSONEncoder().encode(value) else { return false }
         do {
             try FileManager.default.createDirectory(
-                at: fileURL.deletingLastPathComponent(),
+                at: directoryURL,
                 withIntermediateDirectories: true
             )
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            var storedFileURL = url
+            try? storedFileURL.setResourceValues(resourceValues)
+            return true
         } catch {
-            // The cache is an optimization; the authenticated API remains the source of truth.
+            return false
         }
+    }
+
+    private func documentURL(bookmarkID: String) -> URL {
+        let safeBookmarkID = bookmarkID.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+            ?? UUID().uuidString
+        return directoryURL.appending(path: "\(safeBookmarkID).json")
     }
 }
 

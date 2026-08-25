@@ -9,7 +9,7 @@ Phase 3 turns the article-body foundation into a user-facing native reading expe
 - Active content cannot execute JavaScript, submit forms, embed frames, open network connections, or persist website data inside the reader.
 - Reader demand can enroll one eligible canonical article through the authenticated REST API and observes loading, preparing, available, degraded, unavailable, retryable failure, and offline-cache states without inventing content.
 - Scroll progress is restored and saved through the existing bookmark progress API. Opened and finished state continue to use the existing bookmark contracts.
-- The protected cache is isolated by authenticated user, stores only readable responses, and retains at most 50 immutable article documents.
+- The protected cache is isolated by authenticated user, stores only readable responses, and retains at most 250 immutable article documents. See [Offline article reading](./offline-reading.md) for synchronization and mutation boundaries.
 - Enrollment is staged independently from queue processing with `ARTICLE_BODY_ENROLLMENT_MODE=off|reader|saved|all`. Terminal failures at the current extractor version are not repeatedly enqueued by ordinary product triggers; repair jobs and extractor upgrades remain available.
 - Bookmark and RSS enrollment are best effort and never make the primary save or ingestion operation fail.
 - Article acquisition is intentionally serialized in one-message queue batches so a bounded cohort cannot create a burst of requests that trips publisher rate limits.

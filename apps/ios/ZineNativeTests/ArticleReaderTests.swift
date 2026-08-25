@@ -197,6 +197,66 @@ final class ArticleReaderTests: XCTestCase {
     }
 
     @MainActor
+    func testProgressRemainsLocalWhenOfflineAndFlushesAfterReconnect() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "article-progress-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = ArticleBodyCache(userID: "progress-user", baseDirectory: directory)
+        let offlineClient = Self.client(articleBodyCache: cache) { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            return (503, #"{"error":"offline"}"#)
+        }
+        let store = ArticleReaderStore(metadata: Self.metadata(), client: offlineClient)
+
+        let progress = await store.persistProgress(0.64)
+
+        XCTAssertEqual(progress?.fraction, 0.64)
+        let pendingProgress = await cache.pendingProgress(bookmarkID: "bookmark-1")
+        XCTAssertEqual(pendingProgress, 0.64)
+
+        let onlineClient = Self.client(articleBodyCache: cache) { request in
+            XCTAssertEqual(request.httpMethod, "PUT")
+            XCTAssertEqual(request.url?.path, "/api/v1/bookmarks/bookmark-1/progress")
+            return (200, "{}")
+        }
+        await onlineClient.flushPendingArticleProgress()
+
+        let flushedProgress = await cache.pendingProgress(bookmarkID: "bookmark-1")
+        XCTAssertNil(flushedProgress)
+        XCTAssertEqual(ArticleReaderURLProtocol.requests.count, 1)
+    }
+
+    @MainActor
+    func testReaderRestoresPendingOfflineProgressBeforeShowingCachedBody() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "article-progress-\(UUID().uuidString)", directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = ArticleBodyCache(userID: "progress-user", baseDirectory: directory)
+        let readable = try JSONDecoder().decode(
+            ArticleContentResponse.self,
+            from: Data(Self.availableJSON.utf8)
+        )
+        await cache.save(readable, bookmarkID: "bookmark-1")
+        await cache.stageProgress(0.73, bookmarkID: "bookmark-1")
+        let client = Self.client(articleBodyCache: cache) { _ in
+            (503, #"{"error":"offline"}"#)
+        }
+        let store = ArticleReaderStore(
+            metadata: Self.metadata(initialProgress: nil),
+            client: client
+        )
+
+        await store.load()
+
+        XCTAssertEqual(store.initialProgressFraction, 0.73)
+        guard case .ready = store.phase else {
+            return XCTFail("Expected cached article to remain ready while offline")
+        }
+    }
+
+    @MainActor
     func testWarmupMakesReaderReadyWithoutASecondArticleContentRequest() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "article-warmup-\(UUID().uuidString)", directoryHint: .isDirectory)

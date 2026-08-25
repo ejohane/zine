@@ -39,7 +39,7 @@ final class ArticleReaderStore {
     private var finishedState: OptimisticFinishedState
 
     let metadata: ArticleReaderMetadata
-    let initialProgressFraction: Double
+    private(set) var initialProgressFraction: Double
 
     private let client: APIClient
     private let progressWriteQueue: ArticleProgressWriteQueue
@@ -95,6 +95,10 @@ final class ArticleReaderStore {
         let generation = loadGeneration
         var hasReadableCache = false
 
+        if let pendingProgress = await client.pendingArticleProgress(id: metadata.bookmarkID) {
+            initialProgressFraction = pendingProgress
+        }
+
         if let cached = await client.cachedArticleContent(id: metadata.bookmarkID),
            cached.readableContent != nil
         {
@@ -129,7 +133,10 @@ final class ArticleReaderStore {
 
     func persistProgress(_ fraction: Double) async -> BookmarkProgress? {
         let clamped = min(max(fraction, 0), 1)
-        guard await progressWriteQueue.enqueue(clamped) else { return nil }
+        await client.stageArticleProgress(id: metadata.bookmarkID, fraction: clamped)
+        if await progressWriteQueue.enqueue(clamped) {
+            await client.markArticleProgressSynced(id: metadata.bookmarkID, fraction: clamped)
+        }
 
         return BookmarkProgress(
             position: clamped,

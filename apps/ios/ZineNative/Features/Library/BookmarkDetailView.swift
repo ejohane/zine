@@ -676,7 +676,8 @@ struct BookmarkDetailView: View {
             do {
                 let result = try await client.setFinished(
                     id: content.id,
-                    isFinished: mutation.requestedIsFinished
+                    isFinished: mutation.requestedIsFinished,
+                    bookmark: bookmark
                 )
                 finishedState.accept(
                     isFinished: result.isFinished,
@@ -710,7 +711,7 @@ struct BookmarkDetailView: View {
             if newValue {
                 try await client.bookmarkItem(id: bookmark.id)
             } else {
-                try await client.archiveBookmark(id: bookmark.id)
+                try await client.archiveBookmark(id: bookmark.id, bookmark: bookmark)
             }
             onBookmarkCommit(bookmark, newValue)
         } catch {

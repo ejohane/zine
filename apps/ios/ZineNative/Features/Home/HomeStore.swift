@@ -49,7 +49,11 @@ final class HomeStore {
         errorMessage = nil
 
         if let snapshot = await cache.load() {
-            home = snapshot.home
+            if let cachedHome = snapshot.home {
+                home = await client.overlayHome(cachedHome)
+            } else {
+                home = nil
+            }
             inboxItems = snapshot.inboxItems
             rebuildSections()
         }
