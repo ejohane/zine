@@ -66,9 +66,10 @@ struct ScreenshotHomeTabShell: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Match the production shell's continuously registered root chrome so the
-                // interactive-pop fixture exercises the same navigation hierarchy.
-                if let compactTitle = selectedCompactRootTitle {
+                // Match production: the pushed destination owns the navigation bar until
+                // an interactive pop commits and returns the path to its root.
+                if let compactTitle = selectedCompactRootTitle,
+                   RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
                     ToolbarItem(placement: .principal) {
                         CollapsedListTitle(
                             title: compactTitle.title,
