@@ -21,6 +21,12 @@ struct ZineTabNavigationActions {
     var settings: ((SettingsRoute) -> Void)?
 }
 
+enum RootNavigationChrome {
+    static func showsCompactTitle(isAtRoot: Bool) -> Bool {
+        isAtRoot
+    }
+}
+
 private struct ZineTabNavigationActionsKey: EnvironmentKey {
     static let defaultValue = ZineTabNavigationActions()
 }
@@ -166,9 +172,11 @@ private struct AuthenticatedAppView: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Keep root chrome registered beneath pushed destinations so an interactive
-                // pop reveals the complete tab shell instead of reconstructing its title bar.
-                if let compactTitle = selectedCompactRootTitle {
+                // Keep pushed destinations above the root title for the full interactive pop.
+                // NavigationPath remains non-empty until the transition commits, then the
+                // root title returns with the active tab shell.
+                if let compactTitle = selectedCompactRootTitle,
+                   RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
                     ToolbarItem(placement: .principal) {
                         CollapsedListTitle(
                             title: compactTitle.title,

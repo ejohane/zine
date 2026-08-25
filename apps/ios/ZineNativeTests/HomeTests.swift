@@ -3,6 +3,15 @@ import XCTest
 @testable import ZineNative
 
 final class HomeTests: XCTestCase {
+    func testCompactRootTitleIsRegisteredOnlyForTheRootNavigationEntry() {
+        XCTAssertTrue(
+            RootNavigationChrome.showsCompactTitle(isAtRoot: true)
+        )
+        XCTAssertFalse(
+            RootNavigationChrome.showsCompactTitle(isAtRoot: false)
+        )
+    }
+
     func testCompactHomeHidesQuickWinsCareRideAndFavesWithoutChangingStandardHome() {
         let sections: [HomeDashboardSection] = [
             .quickWins([makeHomeItem(id: "quick", minutes: 5)]),
