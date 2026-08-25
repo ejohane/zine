@@ -26,6 +26,7 @@ struct ArticleReaderView: View {
     @State private var scrollProgress: Double
     @State private var lastPersistedProgress: Double
     @State private var hasRecordedOpen = false
+    @State private var hasRestoredLocalProgress = false
     @State private var readerChromeOffset: CGFloat = 0
     @State private var showsEndActions: Bool
     @State private var presentedSheet: ArticleReaderSheet?
@@ -111,6 +112,11 @@ struct ArticleReaderView: View {
         }
         .onChange(of: store.readyDocument?.contentHash, initial: true) { _, hash in
             guard hash != nil else { return }
+            if !hasRestoredLocalProgress {
+                hasRestoredLocalProgress = true
+                scrollProgress = store.initialProgressFraction
+                lastPersistedProgress = store.initialProgressFraction
+            }
             recordOpenIfNeeded()
         }
         .onChange(of: scenePhase) { _, phase in

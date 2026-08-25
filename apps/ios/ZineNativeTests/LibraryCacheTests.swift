@@ -20,10 +20,47 @@ struct LibraryCacheTests {
         #expect(await cache.load(query: LibraryQuery()) == nil)
     }
 
-    private func makeBookmark() -> Bookmark {
+    @Test func preservesOfflineCorpusSeparatelyFromThePagedLibrarySnapshot() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = LibraryCache(userID: "test-user", baseDirectory: directory)
+        let first = makeBookmark(id: "bookmark-1")
+        let second = makeBookmark(id: "bookmark-2")
+
+        await cache.saveOfflineLibrary(items: [first, second], nextCursor: nil)
+        await cache.save(items: [first], nextCursor: "page-2", query: LibraryQuery())
+
+        let reloaded = LibraryCache(userID: "test-user", baseDirectory: directory)
+        #expect(await reloaded.load(query: LibraryQuery())?.items == [first])
+        #expect(await reloaded.loadOfflineLibrary()?.items == [first, second])
+    }
+
+    @Test func offlineCorpusSurvivesQuerySnapshotPruning() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let cache = LibraryCache(userID: "test-user", baseDirectory: directory)
+        let offlineItems = [makeBookmark(id: "offline")]
+        await cache.saveOfflineLibrary(items: offlineItems, nextCursor: nil)
+
+        for index in 0..<20 {
+            await cache.save(
+                items: [makeBookmark(id: "query-\(index)")],
+                nextCursor: nil,
+                query: LibraryQuery(search: "query-\(index)")
+            )
+        }
+
+        #expect(await cache.loadOfflineLibrary()?.items == offlineItems)
+    }
+
+    private func makeBookmark(id: String = "bookmark-1") -> Bookmark {
         Bookmark(
-            id: "bookmark-1",
-            itemId: "item-1",
+            id: id,
+            itemId: "item-\(id)",
             title: "Cached bookmark",
             thumbnailUrl: URL(string: "https://example.com/image.jpg"),
             canonicalUrl: URL(string: "https://example.com")!,

@@ -63,6 +63,7 @@ private struct AuthenticatedAppView: View {
 
     private let client: APIClient
     private let libraryCache: LibraryCache
+    private let offlineLibrarySynchronizer: OfflineLibrarySynchronizer
 
     @State private var homeStore: HomeStore
     @State private var search = ""
@@ -74,11 +75,13 @@ private struct AuthenticatedAppView: View {
     @State private var libraryTitleCollapseProgress: CGFloat = 0
     @State private var homeRevision = 0
     @State private var libraryRevision = 0
+    @State private var offlineSyncRevision = 0
     @State private var externalOpenEvent: ExternalBookmarkOpenEvent?
     @State private var externalOpenError: String?
     @Namespace private var navigationTransition
 
     init(configuration: AppConfiguration, userID: String) {
+        let bookmarkMutationOutbox = OfflineBookmarkMutationOutbox(userID: userID)
         let client = APIClient(
             baseURL: configuration.apiBaseURL,
             tokenProvider: {
@@ -87,11 +90,17 @@ private struct AuthenticatedAppView: View {
                 }
                 return token
             },
-            articleBodyCache: ArticleBodyCache(userID: userID)
+            articleBodyCache: ArticleBodyCache(userID: userID),
+            bookmarkMutationOutbox: bookmarkMutationOutbox
         )
         let homeCache = HomeCache(userID: userID)
         self.client = client
-        libraryCache = LibraryCache(userID: userID)
+        let libraryCache = LibraryCache(userID: userID)
+        self.libraryCache = libraryCache
+        offlineLibrarySynchronizer = OfflineLibrarySynchronizer(
+            client: client,
+            libraryCache: libraryCache
+        )
         _homeStore = State(initialValue: HomeStore(client: client, cache: homeCache))
     }
 
@@ -129,7 +138,13 @@ private struct AuthenticatedAppView: View {
                 }
 
                 Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                    AppSettingsView(client: client)
+                    AppSettingsView(
+                        client: client,
+                        onSignedOut: {
+                            await client.removeOfflineArticleData()
+                            await libraryCache.removeAll()
+                        }
+                    )
                     .tint(ZineTheme.brandAccent)
                 }
 
@@ -185,6 +200,9 @@ private struct AuthenticatedAppView: View {
         .task(id: homeRevision) {
             await homeStore.reload()
         }
+        .task(id: offlineSyncRevision) {
+            await offlineLibrarySynchronizer.synchronize()
+        }
         .onChange(of: externalOpenEvent, initial: true) { _, event in
             guard let event else { return }
             switch event.change {
@@ -197,6 +215,8 @@ private struct AuthenticatedAppView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 homeRevision += 1
+                libraryRevision += 1
+                offlineSyncRevision += 1
             }
         }
         .alert("Couldn’t update Jump Back In", isPresented: Binding(
@@ -395,6 +415,7 @@ private struct AuthenticatedAppView: View {
             } catch is CancellationError {
                 return
             } catch {
+                guard !error.isRetryableOfflineMutationFailure else { return }
                 externalOpenError = "Zine couldn’t save that open after retrying."
                 return
             }
@@ -420,6 +441,7 @@ private struct AuthenticatedAppView: View {
                     openedAt: openedAt,
                     change: .rollback
                 )
+                guard !error.isRetryableOfflineMutationFailure else { return }
                 externalOpenError = "Zine couldn’t save that open after retrying. Your Home screen has been restored."
                 return
             }

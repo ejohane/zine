@@ -45,11 +45,15 @@ final class LibraryStore {
             nextCursor = nil
         }
 
-        if let snapshot = await cache.load(query: query) {
+        var cachedSnapshot = await cache.load(query: query)
+        if cachedSnapshot == nil, query == LibraryQuery() {
+            cachedSnapshot = await cache.loadOfflineLibrary()
+        }
+        if let snapshot = cachedSnapshot {
             guard !Task.isCancelled, activeQuery == query else { return }
-            items = snapshot.items
+            items = await client.overlayLibraryBookmarks(snapshot.items, query: query)
             nextCursor = snapshot.nextCursor
-            prefetchImages(in: snapshot.items)
+            prefetchImages(in: items)
         }
 
         isLoading = items.isEmpty
@@ -70,6 +74,13 @@ final class LibraryStore {
             return
         } catch {
             guard activeQuery == query else { return }
+            if query == LibraryQuery(),
+               let offlineSnapshot = await cache.loadOfflineLibrary()
+            {
+                items = await client.overlayLibraryBookmarks(offlineSnapshot.items, query: query)
+                nextCursor = offlineSnapshot.nextCursor
+                prefetchImages(in: items)
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -139,7 +150,11 @@ final class LibraryStore {
         else { return }
 
         do {
-            _ = try await client.setFinished(id: bookmark.id, isFinished: true)
+            _ = try await client.setFinished(
+                id: bookmark.id,
+                isFinished: true,
+                bookmark: bookmark
+            )
             onContentChanged()
         } catch {
             restore(removal, message: "The bookmark couldn’t be completed. Please try again.")
@@ -150,7 +165,7 @@ final class LibraryStore {
         guard let removal = removeOptimistically(bookmark) else { return }
 
         do {
-            try await client.archiveBookmark(id: bookmark.id)
+            try await client.archiveBookmark(id: bookmark.id, bookmark: bookmark)
             onContentChanged()
         } catch {
             restore(removal, message: "The bookmark couldn’t be archived. Please try again.")
