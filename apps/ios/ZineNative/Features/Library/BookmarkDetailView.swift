@@ -104,6 +104,7 @@ struct BookmarkDetailContent: Equatable {
 }
 
 struct BookmarkDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.displayScale) private var displayScale
 
@@ -205,7 +206,7 @@ struct BookmarkDetailView: View {
         GeometryReader { viewport in
             let heroHeight = heroHeight(in: viewport.size)
 
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 ZineTheme.canvas
                     .ignoresSafeArea()
 
@@ -222,11 +223,14 @@ struct BookmarkDetailView: View {
                 }
                 .coordinateSpace(name: "bookmarkDetailScroll")
                 .ignoresSafeArea(edges: .top)
+
+                detailBackButton
+                    .padding(.leading, 16)
+                    .padding(.top, 8)
             }
         }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarVisibility(.hidden, for: .navigationBar)
+        .zinePushedDestinationChrome()
         .task(id: content.id) {
             await hydrateBookmark()
         }
@@ -245,6 +249,23 @@ struct BookmarkDetailView: View {
         } message: {
             Text(errorMessage ?? "Please try again.")
         }
+    }
+
+    private var detailBackButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "chevron.left")
+                .font(.headline.weight(.semibold))
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .background(.ultraThinMaterial, in: Circle())
+        .environment(\.colorScheme, .dark)
+        .overlay { Circle().stroke(.white.opacity(0.16), lineWidth: 1) }
+        .accessibilityLabel("Back")
+        .accessibilityIdentifier("bookmark-detail-back")
     }
 
     private var details: some View {

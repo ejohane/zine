@@ -87,25 +87,29 @@ struct HomeView: View {
                         .navigationTransition(
                             .zoom(sourceID: route.sourceID, in: bookmarkTransition)
                         )
+                        .zinePushedDestinationChrome()
                 }
                 .navigationDestination(for: HomeSectionRoute.self) { route in
-                    switch route {
-                    case .jumpBackIn:
-                        JumpBackInListView(
-                            client: client,
-                            onContentChanged: onContentChanged,
-                            onExternalOpen: onExternalOpen,
-                            tabReselection: tabReselection
-                        )
-                    default:
-                        HomeSectionListView(
-                            route: route,
-                            client: client,
-                            onContentChanged: onContentChanged,
-                            onExternalOpen: onExternalOpen,
-                            tabReselection: tabReselection
-                        )
+                    Group {
+                        switch route {
+                        case .jumpBackIn:
+                            JumpBackInListView(
+                                client: client,
+                                onContentChanged: onContentChanged,
+                                onExternalOpen: onExternalOpen,
+                                tabReselection: tabReselection
+                            )
+                        default:
+                            HomeSectionListView(
+                                route: route,
+                                client: client,
+                                onContentChanged: onContentChanged,
+                                onExternalOpen: onExternalOpen,
+                                tabReselection: tabReselection
+                            )
+                        }
                     }
+                    .zinePushedDestinationChrome()
                 }
         } else {
             screen

@@ -84,12 +84,12 @@ struct ScreenshotLibraryContentView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .contentTypeFilterChrome()
-        .toolbar(.visible, for: .navigationBar)
         .navigationDestination(for: ScreenshotLibraryRoute.self) { route in
             BookmarkDetailView(bookmark: route.bookmark, client: client) { _ in }
                 .navigationTransition(
                     .zoom(sourceID: route.sourceID, in: bookmarkTransition)
                 )
+                .zinePushedDestinationChrome()
         }
         .zineScreenChrome()
     }

@@ -59,6 +59,7 @@ struct InboxView: View {
                     .navigationTransition(
                         .zoom(sourceID: bookmark.id, in: bookmarkTransition)
                     )
+                    .zinePushedDestinationChrome()
                 }
         }
         .zineScreenChrome()
