@@ -172,9 +172,6 @@ private struct AuthenticatedAppView: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Keep pushed destinations above the root title for the full interactive pop.
-                // NavigationPath remains non-empty until the transition commits, then the
-                // root title returns with the active tab shell.
                 if let compactTitle = selectedCompactRootTitle,
                    RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
                     ToolbarItem(placement: .principal) {
@@ -191,18 +188,22 @@ private struct AuthenticatedAppView: View {
                     .navigationTransition(
                         .zoom(sourceID: route.sourceID, in: navigationTransition)
                     )
+                    .zinePushedDestinationChrome()
             }
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 homeSectionDestination(for: route)
+                    .zinePushedDestinationChrome()
             }
             .navigationDestination(for: Bookmark.self) { bookmark in
                 bookmarkDestination(for: bookmark)
                     .navigationTransition(
                         .zoom(sourceID: bookmark.id, in: navigationTransition)
                     )
+                    .zinePushedDestinationChrome()
             }
             .navigationDestination(for: SettingsRoute.self) { route in
                 settingsDestination(for: route)
+                    .zinePushedDestinationChrome()
             }
         }
         .task(id: homeRevision) {

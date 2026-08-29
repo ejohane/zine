@@ -29,6 +29,10 @@ struct ScreenshotHomeTabShell: View {
                     sectionID: "featured"
                 )
             )
+        } else if ProcessInfo.processInfo.arguments.contains("-screenshot-home-section-fixture") {
+            initialPath.append(
+                HomeSectionRoute.collection(id: "fixture-collection", title: "Design Ideas")
+            )
         }
         _navigationPath = State(initialValue: initialPath)
     }
@@ -66,8 +70,6 @@ struct ScreenshotHomeTabShell: View {
             .navigationTitle(selectedRootTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Match production: the pushed destination owns the navigation bar until
-                // an interactive pop commits and returns the path to its root.
                 if let compactTitle = selectedCompactRootTitle,
                    RootNavigationChrome.showsCompactTitle(isAtRoot: navigationPath.isEmpty) {
                     ToolbarItem(placement: .principal) {
@@ -84,9 +86,11 @@ struct ScreenshotHomeTabShell: View {
                     .navigationTransition(
                         .zoom(sourceID: route.sourceID, in: navigationTransition)
                     )
+                    .zinePushedDestinationChrome()
             }
             .navigationDestination(for: HomeSectionRoute.self) { route in
                 ScreenshotHomeSectionListView(route: route)
+                    .zinePushedDestinationChrome()
             }
         }
     }
@@ -231,6 +235,7 @@ private struct ScreenshotHomeSectionListView: View {
     let route: HomeSectionRoute
 
     @State private var contentType: ContentType?
+    @State private var titleCollapseProgress: CGFloat = 0
 
     init(route: HomeSectionRoute) {
         self.route = route
@@ -238,8 +243,8 @@ private struct ScreenshotHomeSectionListView: View {
     }
 
     private var bookmarks: [Bookmark] {
-        guard let contentType else { return ScreenshotHomeFixtures.openedBookmarks }
-        return ScreenshotHomeFixtures.openedBookmarks.filter { $0.contentType == contentType }
+        guard let contentType else { return ScreenshotHomeFixtures.collectionBookmarks }
+        return ScreenshotHomeFixtures.collectionBookmarks.filter { $0.contentType == contentType }
     }
 
     private var showsLoadingState: Bool {
@@ -247,36 +252,66 @@ private struct ScreenshotHomeSectionListView: View {
     }
 
     var body: some View {
-        List {
-            Section {
-                if showsLoadingState {
-                    FilteredListLoadingRow(
-                        label: "Loading \(route.title.lowercased())…",
-                        background: ZineTheme.surface
-                    )
-                } else {
-                    ForEach(bookmarks) { bookmark in
-                        BookmarkRow(bookmark: bookmark)
-                            .listRowBackground(ZineTheme.surface)
-                    }
-                }
-            } header: {
-                ContentTypeFilterBar(
-                    selection: $contentType,
+        ScrollViewReader { proxy in
+            List {
+                CollapsingListTitle(
+                    title: route.title,
+                    progress: titleCollapseProgress,
                     background: ZineTheme.surface
                 )
+                .id("screenshot-home-section-top")
+
+                Section {
+                    if showsLoadingState {
+                        FilteredListLoadingRow(
+                            label: "Loading \(route.title.lowercased())…",
+                            background: ZineTheme.surface
+                        )
+                    } else {
+                        ForEach(bookmarks) { bookmark in
+                            BookmarkRow(bookmark: bookmark)
+                                .listRowBackground(ZineTheme.surface)
+                                .id(bookmark.id)
+                        }
+                    }
+                } header: {
+                    ContentTypeFilterBar(
+                        selection: $contentType,
+                        background: ZineTheme.surface
+                    )
                     .textCase(nil)
                     .listRowInsets(EdgeInsets())
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(ZineTheme.surface)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                let offset = geometry.contentOffset.y + geometry.contentInsets.top
+                return FilteredListScrollState.collapseProgress(scrollOffset: offset)
+            } action: { _, progress in
+                titleCollapseProgress = progress
+            }
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("-screenshot-scrolled-fixture"),
+                   let lastBookmark = bookmarks.last {
+                    await Task.yield()
+                    proxy.scrollTo(lastBookmark.id, anchor: .bottom)
+                }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .background(ZineTheme.surface)
-        .navigationTitle(route.title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                CollapsedListTitle(
+                    title: route.title,
+                    progress: titleCollapseProgress
+                )
+            }
+        }
         .contentTypeFilterChrome(background: ZineTheme.surface)
-        .toolbarBackground(ZineTheme.surface, for: .tabBar)
-        .toolbar(.visible, for: .navigationBar)
+        .zinePushedDestinationChrome()
     }
 }
 
@@ -285,6 +320,15 @@ private enum ScreenshotHomeFixtures {
         bookmark(id: "opened-1", title: "Building products that feel inevitable", creator: "Lenny’s Podcast"),
         bookmark(id: "opened-2", title: "The hidden systems behind great teams", creator: "Acquired"),
         bookmark(id: "opened-3", title: "A practical guide to product intuition", creator: "Every"),
+    ]
+
+    static let collectionBookmarks = openedBookmarks + [
+        bookmark(id: "collection-4", title: "Why small tools can have enormous leverage", creator: "Works in Progress"),
+        bookmark(id: "collection-5", title: "The craft of making software feel calm", creator: "Dense Discovery"),
+        bookmark(id: "collection-6", title: "Building an enduring creative practice", creator: "The New Yorker"),
+        bookmark(id: "collection-7", title: "What comes after the app?", creator: "Stratechery"),
+        bookmark(id: "collection-8", title: "Designing tools for thought", creator: "Maggie Appleton"),
+        bookmark(id: "collection-9", title: "The quiet craft of good software", creator: "Thorsten Ball"),
     ]
 
     static let featuredArticle = homeItem(

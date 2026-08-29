@@ -33,22 +33,29 @@ the surrounding theme changes.
   `ZineTheme.tertiaryText` for de-emphasized metadata.
 - Use `zineAppTheme()` at an app-level container and `zineScreenChrome()` for
   list-style screens when those modifiers fit the view structure.
-- Keep navigation bars and tab bars system-managed. Shared screen and tab-shell
-  modifiers provide the canvas as their preferred toolbar background style so
-  the chrome matches the content, but must not force that background visible or
-  replace native scroll-edge behavior and shadows through UIKit appearance
-  customization. Native floating controls may retain their system material;
-  immersive destinations still own tab-bar visibility.
-- Keep the shared bottom navigation inside the app-level `NavigationStack` root.
-  Home, Library, Settings, and Search are root tab content; pushed destinations
-  such as bookmark details, source management, creators, and the article reader
-  cover the complete tab shell. Do not issue explicit tab-bar visibility
-  preferences from the shell or destinations. Interactive pop must reveal the
-  intact tab shell underneath instead of hiding and reconstructing its bar.
-  Root-tab controls must route explicitly into the app-owned navigation path;
-  do not rely on value-based `NavigationLink` to discover and mutate a stack
-  across the lazy `TabView` boundary. Once a destination is pushed, deeper
-  links may use its normal stack-local navigation registration.
+- Keep navigation bars and tab bars system-managed. The navigation-bar
+  background must remain hidden at both the scroll edge and the collapsed
+  scroll position. SwiftUI's automatic background visibility must not own this
+  state: UIKit shares the navigation bar across the stack, so an opaque
+  scrolled background can otherwise crossfade above the outgoing destination
+  during an interactive pop. Screen-owned semantic backgrounds provide visual
+  continuity and compact-title readability without global UIKit appearance
+  customization; those backdrops must remain in the screen's view hierarchy,
+  beneath pushed destinations. Native floating controls may retain their
+  system material; pushed destinations cover the intact tab shell instead of
+  changing the tab bar's visibility state.
+- Keep the shared `TabView` intact inside the app shell's outer
+  `NavigationStack`. Pushed destinations cover that shell instead of toggling
+  tab-bar visibility. During an interactive pop, the root screen and its tab
+  bar are therefore uncovered together from the first frame; do not reintroduce
+  navigation-depth or destination-level tab-bar visibility changes. Card and
+  bookmark-row routes retain their matched `.zoom` transition; non-card routes
+  use the standard stack transition. Bookmark detail owns its over-image back
+  control inside the destination view and hides the system navigation bar, so
+  the control is present in the matched transition's first frame instead of
+  fading in as separate toolbar chrome. The transition style remains independent
+  of navigation-bar background ownership and must not be removed as a workaround
+  for interactive-pop chrome.
 - Do not scatter raw hex, RGB, `Color.primary`, or `Color.secondary` values
   through supported native views. If the product needs a new reusable role,
   add it to `ZineTheme.Role`, define both appearances, and update

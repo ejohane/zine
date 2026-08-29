@@ -108,6 +108,19 @@ private extension UIColor {
 }
 
 extension View {
+    func zineNavigationBarContentBackdrop(_ background: Color) -> some View {
+        overlay(alignment: .top) {
+            GeometryReader { geometry in
+                background
+                    .frame(height: max(44, geometry.safeAreaInsets.top))
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .ignoresSafeArea(edges: .top)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
     func zineAppTheme() -> some View {
         foregroundStyle(ZineTheme.primaryText)
             .tint(ZineTheme.brandAccent)
@@ -120,12 +133,20 @@ extension View {
             .foregroundStyle(ZineTheme.primaryText)
             .tint(ZineTheme.brandAccent)
             .toolbarBackground(ZineTheme.canvas, for: .navigationBar)
-            .toolbar(.visible, for: .navigationBar)
+            // Automatic visibility turns opaque after scrolling. Because UIKit's
+            // navigation bar is shared by the stack, that opaque layer otherwise
+            // crossfades above the outgoing screen during an interactive pop.
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .zineNavigationBarContentBackdrop(ZineTheme.canvas)
     }
 
     func zineTabShellChrome() -> some View {
         tint(ZineTheme.brandAccent)
             .background(ZineTheme.canvas)
             .toolbarBackground(ZineTheme.canvas, for: .tabBar)
+    }
+
+    func zinePushedDestinationChrome() -> some View {
+        toolbarBackground(.hidden, for: .navigationBar)
     }
 }

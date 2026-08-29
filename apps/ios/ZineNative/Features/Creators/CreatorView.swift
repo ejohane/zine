@@ -53,6 +53,8 @@ struct CreatorView: View {
         }
         .navigationTitle(store.profile?.name ?? fallbackName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .zineNavigationBarContentBackdrop(ZineTheme.canvas)
         .task { await store.reload() }
         .refreshable { await store.reload() }
     }

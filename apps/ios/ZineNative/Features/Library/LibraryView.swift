@@ -66,7 +66,6 @@ struct LibraryView: View {
             .navigationTitle(isSearchMode ? "Search" : "")
             .navigationBarTitleDisplayMode(.inline)
             .contentTypeFilterChrome()
-            .toolbar(.visible, for: .navigationBar)
             .toolbar {
                 if isSearchMode {
                     ToolbarItem(placement: .topBarLeading) {
