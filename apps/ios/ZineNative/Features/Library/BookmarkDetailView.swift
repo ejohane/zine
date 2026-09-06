@@ -770,6 +770,13 @@ struct BookmarkDetailView: View {
         guard var bookmark else { return }
         bookmark.isFinished = finishedState.isFinished
         bookmark.finishedAt = finishedState.finishedAt
+        if notify && finishedState.isFinished && !isBookmarked {
+            isBookmarked = true
+            hasToggledBookmark = true
+            bookmark.state = "BOOKMARKED"
+            onBookmarkChange(bookmark, true, .optimistic)
+            onBookmarkCommit(bookmark, true)
+        }
         self.bookmark = bookmark
         if notify {
             onUpdate(bookmark)

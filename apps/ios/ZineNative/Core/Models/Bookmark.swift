@@ -81,7 +81,7 @@ struct Bookmark: Codable, Hashable, Identifiable {
     let publishedAt: String?
     let wordCount: Int?
     let readingTimeMinutes: Int?
-    let state: String
+    var state: String
     let ingestedAt: String
     let bookmarkedAt: String?
     let lastOpenedAt: String?
