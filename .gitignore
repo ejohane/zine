@@ -12,21 +12,17 @@ out/
 
 # App build artifacts
 apps/worker/dist/
-apps/mobile/dist/
-apps/mobile/dist/_expo/static/
 
 # Turborepo
 .turbo/
 
-# Expo
-.expo/
+# Signing credentials
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 *.orig.*
-web-build/
 
 # Testing
 coverage/
@@ -75,5 +71,3 @@ bun.lockb
 *.log
 *.local
 tmp/
-
-*/uniwind-types.d.ts

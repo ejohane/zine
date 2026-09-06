@@ -1,6 +1,6 @@
 # Native article reader beta (phase 3)
 
-Phase 3 turns the article-body foundation into a user-facing native reading experience. The supported client is `apps/ios`; the deprecated Expo client is intentionally unchanged.
+Phase 3 turns the article-body foundation into a user-facing native reading experience. The supported client is `apps/ios`.
 
 ## Definition of done
 

@@ -9,7 +9,7 @@ Run the editorial product loop as a durable server-backed workflow. Treat the ex
 
 ## Non-negotiable rules
 
-- Work only in the supported native app under `apps/ios`. Never implement this workflow in deprecated `apps/mobile`.
+- Work only in the supported native app under `apps/ios`.
 - Start every resumed request with `bun run editorial:experiment:status -- --experiment-id <id>`. If no ID is known, list experiments first and identify the relevant active record with the user.
 - Keep all local files under `.local-data/editorial/experiments/<experiment-id>/`. Never depend on a temporary chat-only brief or unstored variant.
 - Lock the brief only after the user agrees to its hypothesis, proposed change, desired outcomes, and guardrails.

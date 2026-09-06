@@ -12,7 +12,6 @@ export default tseslint.config(
       'coverage/**',
       '*.config.js',
       '*.config.ts',
-      '.expo/**',
       '.wrangler/**',
     ],
   },

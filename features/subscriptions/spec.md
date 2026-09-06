@@ -43,7 +43,7 @@ Zine uses **Cloudflare D1** (managed SQLite) with **tRPC** for type-safe API com
 - [A: OAuth Redirect URIs](#appendix-a-oauth-redirect-uris)
 - [B: Error Handling Matrix](#appendix-b-error-handling-matrix)
 - [C: YouTube Quota Management](#appendix-c-quota-management-youtube)
-- [D: Mobile OAuth with Expo AuthSession](#appendix-d-mobile-oauth-with-expo-authsession)
+- [D: Native OAuth](#appendix-d-native-oauth)
 - [E: Wrangler Configuration](#appendix-e-wrangler-configuration)
 - [F: Open Questions](#appendix-f-open-questions)
 
@@ -1228,7 +1228,7 @@ OAUTH_STATE_SECRET = "..."     # For signing state tokens
 - [x] Implement token refresh logic with distributed locking
 - [x] Add YouTube OAuth integration
 - [x] Add Spotify OAuth integration
-- [x] Create mobile OAuth deep link handling (Expo WebBrowser)
+- [x] Create client OAuth callback handling
 
 **Deliverable**: Users can connect/disconnect YouTube and Spotify accounts
 
@@ -1342,58 +1342,11 @@ zine://oauth/callback  # For mobile deep linking
 
 ---
 
-## Appendix D: Mobile OAuth with Expo AuthSession
+## Appendix D: Native OAuth
 
-### PKCE Flow for Mobile
-
-Mobile OAuth uses **PKCE (Proof Key for Code Exchange)** via Expo AuthSession for security:
-
-```typescript
-// apps/mobile/lib/oauth.ts
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
-
-WebBrowser.maybeCompleteAuthSession();
-
-const redirectUri = AuthSession.makeRedirectUri({
-  scheme: 'zine',
-  path: 'oauth/callback',
-});
-
-export function useOAuthFlow(provider: 'youtube' | 'spotify') {
-  const discovery =
-    provider === 'youtube'
-      ? AuthSession.useAutoDiscovery('https://accounts.google.com')
-      : {
-          authorizationEndpoint: 'https://accounts.spotify.com/authorize',
-          tokenEndpoint: 'https://accounts.spotify.com/api/token',
-        };
-
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: provider === 'youtube' ? GOOGLE_CLIENT_ID : SPOTIFY_CLIENT_ID,
-      scopes:
-        provider === 'youtube'
-          ? ['https://www.googleapis.com/auth/youtube.readonly']
-          : ['user-library-read'],
-      redirectUri,
-      usePKCE: true,
-    },
-    discovery
-  );
-
-  // Handle response and send code to backend
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      // Send code + code_verifier to backend for token exchange
-      exchangeCodeOnServer(provider, code, request?.codeVerifier);
-    }
-  }, [response]);
-
-  return { request, promptAsync };
-}
-```
+Native OAuth uses PKCE and `ASWebAuthenticationSession` in
+`apps/ios/ZineNative/Features/Subscriptions/ProviderOAuthSession.swift`. The native client
+registers state and exchanges callbacks through the `/api/v1` REST boundary.
 
 ### Server-Side Token Exchange with PKCE
 

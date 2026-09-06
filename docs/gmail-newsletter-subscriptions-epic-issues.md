@@ -87,7 +87,7 @@
 - **Why**: Avoids blocked engineering/test cycles from environment-level misconfiguration.
 - **Primary Files**:
   - `docs/gmail-newsletter-subscriptions-plan.md`
-  - `apps/mobile/app.config.ts` (or equivalent OAuth config source)
+  - `apps/ios/ZineNative/App/AppConfiguration.swift`
   - worker environment configuration for OAuth client settings
 
 ### Requirements
@@ -160,10 +160,7 @@
 - **Summary**: Implement Gmail connection flow from subscriptions UI using existing PKCE/state/callback patterns.
 - **Why**: User entrypoint for feature.
 - **Primary Files**:
-  - `apps/mobile/lib/oauth.ts`
-  - `apps/mobile/app/subscriptions/index.tsx`
-  - `apps/mobile/app/subscriptions/[provider].tsx`
-  - `apps/mobile/app/subscriptions/connect/gmail.tsx`
+  - `apps/ios/ZineNative/Features/Subscriptions/ProviderOAuthSession.swift`
 
 ### Requirements
 
@@ -190,7 +187,7 @@
 ### Verification
 
 - Mobile manual connect/disconnect flows.
-- `apps/mobile` tests for OAuth error handling.
+- `apps/ios/ZineNativeTests` tests for OAuth error handling.
 
 ---
 
@@ -516,8 +513,7 @@
 - **Summary**: Build provider detail UX for Gmail with feed list and actions.
 - **Why**: Usable management surface.
 - **Primary Files**:
-  - `apps/mobile/app/subscriptions/[provider].tsx`
-  - `apps/mobile/hooks/*connections*`
+  - `apps/ios/ZineNative/Features/Subscriptions`
 
 ### Requirements
 

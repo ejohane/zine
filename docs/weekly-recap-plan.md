@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposed for implementation.
+Historical product and backend proposal. Client-specific implementation guidance
+was retired; any future native recap needs a fresh SwiftUI/REST design.
 
 ## Purpose
 
@@ -99,7 +100,7 @@ Recommended contents:
 
 Add a dedicated route for the full recap screen:
 
-- Suggested route: `apps/mobile/app/recap/weekly.tsx`
+- Native navigation and presentation remain to be designed.
 
 Recommended sections:
 
@@ -245,9 +246,7 @@ Recommended worker shape:
 
 Recommended mobile shape:
 
-- query hook in `apps/mobile/hooks/use-insights-trpc.ts`
-- teaser card on `apps/mobile/app/(tabs)/index.tsx`
-- full route at `apps/mobile/app/recap/weekly.tsx`
+- Future native presentation should use the existing REST boundary.
 
 ## Why a separate router
 
@@ -262,29 +261,6 @@ Cons:
 - adds a new router surface
 
 Decision: separate router.
-
-## Current implementation touchpoints
-
-The initial implementation should plug into these existing files:
-
-- `apps/worker/src/trpc/router.ts`
-  - mount the new `insights` router
-- `apps/worker/src/trpc/routers/items.ts`
-  - broaden `markOpened`
-  - keep `toggleFinished` as the explicit completion signal
-- `apps/worker/src/db/schema.ts`
-  - add recap indexes now
-  - add event schema later in V2
-- `apps/mobile/app/(tabs)/index.tsx`
-  - add the recap teaser card to Home
-- `apps/mobile/hooks/use-items-trpc.ts`
-  - current home/item flows are useful reference points for query hooks and cache invalidation
-- `apps/mobile/components/home/quick-stats.tsx`
-  - existing teaser component that can be reused or replaced
-- `apps/mobile/lib/analytics.ts`
-  - analytics can mirror recap events later but must not power recap data
-
----
 
 ## API Design
 
@@ -632,49 +608,10 @@ Do not block the V1 recap on the V2 event table. The event table is the durabili
 
 ---
 
-## Mobile Implementation Plan
+## Native Implementation
 
-## Home Tab
-
-Update `apps/mobile/app/(tabs)/index.tsx` to add a recap teaser card near the top of the screen.
-
-Recommended behavior:
-
-- fetch teaser data only
-- show skeleton/loading state with the rest of Home
-- navigate to full recap route on press
-
-## Detail Screen
-
-Create:
-
-- `apps/mobile/app/recap/weekly.tsx`
-
-Suggested UI breakdown:
-
-- `apps/mobile/components/insights/weekly-recap-card.tsx`
-- `apps/mobile/components/insights/weekly-recap-chart.tsx`
-- `apps/mobile/components/insights/weekly-recap-list.tsx`
-
-## Hook
-
-Create:
-
-- `apps/mobile/hooks/use-insights-trpc.ts`
-
-Suggested exports:
-
-- `useWeeklyRecap()`
-- `useWeeklyRecapTeaser()`
-
-## Design Notes
-
-- use the Home tab only as the entry point, not the entire recap experience
-- prefer stacked bars or segmented rows over a pie chart for the mode split
-- keep item rows consistent with existing `ItemCard` metadata patterns
-- label all estimated-time UI explicitly
-
----
+The earlier client implementation plan has been retired. The product and metric
+requirements above remain a proposal, not a statement of native feature support.
 
 ## Worker Implementation Plan
 

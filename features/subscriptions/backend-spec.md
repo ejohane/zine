@@ -4,7 +4,7 @@
 
 This document covers the backend implementation of the Zine subscriptions feature, including data models, provider integration (YouTube/Spotify), polling architecture, ingestion pipeline, API design, and security considerations.
 
-For the mobile app UX implementation, see `frontend-spec.md`.
+For native client implementation, see `apps/ios/ZineNative/Features/Subscriptions`.
 
 ### Key Principles
 
@@ -370,7 +370,7 @@ const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
 ### 2.2 OAuth Flow Architecture
 
-> **PKCE Security Model**: The PKCE verifier and challenge MUST be generated on the mobile client. See `frontend-spec.md` for the mobile implementation.
+> **PKCE Security Model**: The PKCE verifier and challenge MUST be generated on the mobile client. See `apps/ios/ZineNative/Features/Subscriptions/ProviderOAuthSession.swift` for the native implementation.
 
 #### Server Responsibilities
 

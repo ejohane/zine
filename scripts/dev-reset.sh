@@ -11,11 +11,9 @@
 #   - .wrangler/state/.seeded-from-main (marker file)
 #   - .wrangler/state/ (entire database directory)
 #   - apps/worker/.dev.vars (symlink to main)
-#   - apps/mobile/.env.local (generated env file)
 #
 # WHAT IT PRESERVES:
 #   - node_modules/
-#   - .expo/
 #   - Git state
 #   - Main worktree (NEVER modified)
 #
@@ -54,14 +52,6 @@ if [ -L apps/worker/.dev.vars ]; then
     echo "   ✓ Removed .dev.vars symlink"
 elif [ -f apps/worker/.dev.vars ]; then
     echo "   ⚠️  apps/worker/.dev.vars is a real file, not touching it"
-fi
-
-# -----------------------------------------------------------------------------
-# Remove generated mobile env
-# -----------------------------------------------------------------------------
-if [ -f apps/mobile/.env.local ]; then
-    rm apps/mobile/.env.local
-    echo "   ✓ Removed mobile .env.local"
 fi
 
 # -----------------------------------------------------------------------------

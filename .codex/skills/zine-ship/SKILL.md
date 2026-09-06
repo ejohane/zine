@@ -38,7 +38,7 @@ Carry finished work through GitHub and onto the physical iPhone. Treat build, in
 
 ## 5. Put the merged native build on the phone
 
-Use `apps/ios/ZineNative.xcodeproj`, scheme `ZineNative`, and bundle `app.zine.native`. Never substitute deprecated `apps/mobile`, Expo, Expo Go, EAS, or bundle `app.zine.mobile` unless the user explicitly requests legacy Expo work.
+Use `apps/ios/ZineNative.xcodeproj`, scheme `ZineNative`, and bundle `app.zine.native`.
 
 1. Build only after the merge and required post-merge workflows pass.
 2. Ensure the build source is the exact merge SHA. A clean current worktree is acceptable only when its tree equals `origin/main^{tree}`; otherwise use a clean detached worktree at the merge SHA.

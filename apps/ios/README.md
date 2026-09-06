@@ -2,9 +2,7 @@
 
 This is Zine's canonical, supported mobile client. It is a native SwiftUI app
 with the `app.zine.native` bundle identifier and uses the same Zine account and
-production data as the rest of the product. The former Expo client in
-`apps/mobile` is deprecated and retained only for legacy reference and
-compatibility coverage.
+production data as the rest of the product.
 
 ## Configure
 
@@ -25,6 +23,20 @@ Open `ZineNative.xcodeproj`, select the `ZineNative` scheme, and run it on an
 iOS 18 or newer simulator or device.
 
 All new iOS product work, verification, and deployment belongs in this project.
+
+## Tests
+
+Select the `ZineNative` scheme in Xcode and use Product → Test to run
+`ZineNativeTests`. These tests are separate from the root JavaScript test command.
+
+For the dedicated simulator used by the preview workflow:
+
+```sh
+xcodebuild -project apps/ios/ZineNative.xcodeproj -scheme ZineNative \
+  -destination 'platform=iOS Simulator,name=iPhone 17 — Zine' test
+```
+
+Run this command from the repository root.
 
 ## Browser simulator preview
 
