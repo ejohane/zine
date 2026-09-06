@@ -84,13 +84,13 @@ describe('design-system foundations', () => {
 });
 
 describe('design-system primitive specs', () => {
-  test('defines the button API shared by web and mobile wrappers', () => {
+  test('defines the button API used by web wrappers', () => {
     expect(ButtonSpec.variants).toEqual(['primary', 'secondary', 'outline', 'ghost']);
     expect(ButtonSpec.sizes).toEqual(['sm', 'md', 'lg']);
     expect(ButtonSpec.tones).toEqual(['default', 'danger']);
   });
 
-  test('preserves the mobile primitive palettes for shared button and badge semantics', () => {
+  test('preserves the primitive palettes for shared button and badge semantics', () => {
     expect(getButtonPalette(Colors.dark, 'primary', 'default')).toEqual({
       backgroundColor: Colors.dark.accent,
       foregroundColor: Colors.dark.accentForeground,
@@ -111,7 +111,7 @@ describe('design-system primitive specs', () => {
     });
   });
 
-  test('preserves the mobile primitive metrics for shared controls', () => {
+  test('preserves the primitive metrics for shared controls', () => {
     expect(getButtonMetrics('md')).toMatchObject({
       minHeight: 44,
       paddingX: Spacing.lg,
@@ -134,7 +134,7 @@ describe('design-system primitive specs', () => {
     });
   });
 
-  test('derives surface and filter chip states from the shared mobile baseline', () => {
+  test('derives surface and filter chip states from the shared design baseline', () => {
     expect(getSurfaceBackgroundColor(Colors.dark, 'warning')).toBe(
       Colors.dark.statusWarningSurface
     );

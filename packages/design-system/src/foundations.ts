@@ -73,15 +73,6 @@ const brand = {
   secondaryLight: CoolReadingScale[300],
 } as const;
 
-// Compatibility aliases consumed by the deprecated Expo client. New surfaces
-// should use StatusColors and SemanticColorRoles directly.
-const legacySemantic = {
-  success: '#10B981',
-  warning: '#F59E0B',
-  error: '#EF4444',
-  info: '#3B82F6',
-} as const;
-
 export const ContentColors = {
   podcast: CoolReadingScale[500],
   video: CoolReadingScale[800],
@@ -175,7 +166,6 @@ export const Colors = {
     statusErrorSurface: StatusColors.danger.surface,
     statusInfoSurface: StatusColors.information.surface,
     ...brand,
-    ...legacySemantic,
   },
   dark: {
     text: SemanticColorRoles.dark.primaryText,
@@ -228,7 +218,6 @@ export const Colors = {
     statusErrorSurface: StatusColors.danger.surface,
     statusInfoSurface: StatusColors.information.surface,
     ...brand,
-    ...legacySemantic,
   },
 } as const;
 

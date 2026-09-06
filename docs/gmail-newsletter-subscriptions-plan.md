@@ -75,7 +75,7 @@ The feature should feel like "connect once, then newsletters appear and are mana
 We reuse major existing components:
 
 1. OAuth state registration + callback flow:
-   - `apps/mobile/lib/oauth.ts`
+   - `apps/ios/ZineNative/Features/Subscriptions/ProviderOAuthSession.swift`
    - `apps/worker/src/trpc/routers/connections.ts`
 2. Encrypted token storage in `provider_connections`:
    - `apps/worker/src/db/schema.ts`
@@ -214,15 +214,11 @@ Suggested indexes:
 
 ## OAuth and Provider Connection Plan
 
-## Mobile
+## Native iOS
 
-1. Add Gmail OAuth config in `apps/mobile/lib/oauth.ts`.
-2. Reuse PKCE/state flow (`registerState` -> browser auth -> `callback` mutation).
-3. Add Gmail provider card and route flow in subscriptions surfaces:
-   - `apps/mobile/app/subscriptions/index.tsx`
-   - `apps/mobile/app/subscriptions/[provider].tsx`
-   - `apps/mobile/app/subscriptions/connect/gmail.tsx`
-4. Keep Settings as status/management visibility, but connection initiation should originate from Subscriptions UX.
+Use `apps/ios/ZineNative/Features/Subscriptions/ProviderOAuthSession.swift` and the
+subscription views under `apps/ios/ZineNative/Features/Subscriptions`.
+Native requests go through `APIClient` and the `/api/v1` REST boundary.
 
 ## Worker
 

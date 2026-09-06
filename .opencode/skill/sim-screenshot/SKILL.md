@@ -1,11 +1,11 @@
 ---
 name: sim-screenshot
-description: Take a screenshot of the iOS simulator and save it to apps/mobile/tmp/. Use when the user wants to capture the current screen.
+description: Take a screenshot of the iOS simulator and save it to .local-data/simulator/. Use when the user wants to capture the current screen.
 ---
 
 # Take iOS Simulator Screenshot
 
-Take a screenshot of the currently booted iOS simulator and save it to `apps/mobile/tmp/`.
+Take a screenshot of the currently booted iOS simulator and save it to `.local-data/simulator/`.
 
 ## Instructions
 

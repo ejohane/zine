@@ -1,42 +1,58 @@
 # Zine
 
-Zine is a monorepo with apps and shared packages.
+Zine brings saved content and subscriptions into a native iOS reader and a web app.
 
-## Repo structure
+## Repository structure
 
-- `apps/mobile`: Expo mobile app
+- `apps/ios`: supported SwiftUI iOS app and share extension (`app.zine.native`)
 - `apps/web`: Vite + React web app
-- `apps/worker`: Cloudflare Worker backend
-- `packages/*`: Shared libraries used by the apps
-- `docs/*`: Architecture and system docs
-- `scripts/*`: Dev and maintenance scripts
+- `apps/worker`: Cloudflare Worker API, ingestion, and background jobs
+- `apps/editorial`: editorial generation and publishing CLI
+- `apps/x-archive` and `apps/x-collector`: source archive and collection tooling
+- `apps/chrome-extension`: browser bookmark capture
+- `packages/*`: shared schemas, types, and web design system
+- `docs/*`: architecture, product, and operational documentation
 
-## Quick start
+## Local development
+
+Use Bun 1.3.4 and the Node 22 version pinned in `.nvmrc`:
 
 ```bash
 bun install
-bun run dev
+bun run dev:worktree
 ```
 
-This runs the workspace dev tasks via Turbo. For app-specific workflows:
+The worktree command selects service ports, seeds local Worker data, generates
+`apps/web/.env.local`, and starts the services plus the native iOS simulator
+preview. It requires Apple Silicon and Xcode for the native preview.
+
+Native configuration lives in `apps/ios/Configuration/Local.xcconfig` (see the
+example beside it). Set `ZINE_API_BASE_URL` there to the local Worker URL when
+needed; the native app otherwise defaults to the production API. Worker secrets
+belong in `apps/worker/.dev.vars`; web configuration belongs in `apps/web/.env.local`.
+
+Use `bun run dev` for workspace services without the native preview, or
+`bun run ios:preview` for the standalone native simulator preview.
+
+## Validation
 
 ```bash
-# Mobile
-bun run --cwd apps/mobile dev
-
-# Web
-bun run --cwd apps/web dev
-
-# Worker
-bun run --cwd apps/worker dev
+bun run lint
+bun run typecheck
+bun run test
+bun run design-system:check
+bun run build
+bun run format:check
 ```
 
-For worktree-safe local development, use `bun run dev:worktree`. Keep app secrets in each app's own env file: `apps/mobile/.env.local` for mobile and `apps/web/.env.local` for web. The script rewrites only the dynamic API URL for each app and preserves the rest from that app's existing env file.
+`test` runs Worker and web tests. Native XCTest/build instructions live in
+`apps/ios/README.md`. Editorial and X archive suites are available through
+`bun run editorial:test` and `bun run x:archive:test`.
 
-## Where to look next
+## Further guidance
 
-- `docs/zine-architecture.md`
-- `docs/zine-tech-stack.md`
-- `docs/web-cloudflare-deployment.md`
-- `apps/mobile/README.md`
-- `AGENTS.md`
+- [Agent guide](AGENTS.md)
+- [Native iOS](apps/ios/README.md)
+- [Tech stack](docs/zine-tech-stack.md)
+- [Architecture](docs/zine-architecture.md)
+- [Web testing](docs/web/testing.md)

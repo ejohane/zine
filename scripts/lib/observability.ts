@@ -639,11 +639,7 @@ export function buildIncidentReport(input: {
 
 export function resolveBaseUrl(): string {
   const workerPort = process.env.ZINE_WORKER_PORT ?? '8787';
-  return (
-    process.env.ZINE_DIAG_BASE_URL ??
-    process.env.EXPO_PUBLIC_API_URL ??
-    `http://localhost:${workerPort}`
-  );
+  return process.env.ZINE_DIAG_BASE_URL ?? `http://localhost:${workerPort}`;
 }
 
 export function parseCommandArgs(argv: string[]): Record<string, string | boolean | string[]> {

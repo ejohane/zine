@@ -42,4 +42,4 @@ You can also interact with the simulator using natural language:
 
 ## Prerequisites
 
-Ensure the MCP server is configured in your Claude Code settings. See `apps/mobile/AGENTS.md` for setup instructions.
+Ensure the MCP server is configured in your Claude Code settings. See `AGENTS.md` for setup instructions.

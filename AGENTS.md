@@ -8,7 +8,6 @@
 - Node version is pinned to `22` in `.nvmrc`.
 - Workspace layout:
   - `apps/ios`: supported native SwiftUI iOS app
-  - `apps/mobile`: deprecated Expo React Native app retained for legacy reference only
   - `apps/worker`: Cloudflare Worker backend
   - `packages/shared`: shared types/schemas/constants
   - `docs`: architecture and system docs
@@ -16,10 +15,8 @@
 ## Supported Client Direction
 
 - `apps/ios` is the canonical and only supported mobile client.
-- `apps/mobile` is deprecated. Do not implement features, fixes, refactors, UI changes, auth changes, previews, or deployments there unless the user explicitly requests legacy Expo work.
 - Default all new mobile product work, verification, tests, and device deployments to `apps/ios/ZineNative.xcodeproj` and the `app.zine.native` bundle.
 - The native app uses Clerk-authenticated `/api/v1` REST endpoints. Reuse and extend that boundary instead of introducing tRPC or a parallel native-only API.
-- Existing Expo scripts and CI jobs may remain while deprecation cleanup is pending; their presence does not make `apps/mobile` a supported implementation target.
 
 ## Common Commands (Repo Root)
 
@@ -28,13 +25,13 @@
 - Start the web app only: `bun run dev:web`
 - Worktree-safe dev startup with native `serve-sim` preview: `bun run dev:worktree`
 - Reset worktree state before re-seeding: `bun run dev:reset`
-- Run repository tests (deprecated Expo compatibility + worker + web unit/component): `bun run test`
+- Run repository tests (worker + web unit/component): `bun run test`
 - Run web unit/component tests: `bun run test:web`
 - Run Storybook browser checks: `bun run test:web:storybook`
 - Run web smoke tests: `bun run test:web:e2e`
 - Run the full web CI-parity suite: `bun run test:web:ci`
 - Lint: `bun run lint`
-- Design system checks: `bun run design-system:check`
+- Web design system checks: `bun run design-system:check`
 - Typecheck: `bun run typecheck`
 - Build: `bun run build`
 - Format check: `bun run format:check`
@@ -42,10 +39,9 @@
 ## Test Commands
 
 - Root test command (`bun run test`) runs:
-  - `bun run --cwd apps/mobile test`
   - `bun run --cwd apps/worker test:run`
   - `bun run --cwd apps/web test`
-- The `apps/mobile` lane above is retained compatibility coverage for the deprecated client. New mobile behavior must be tested in the native Xcode project.
+- Native tests run through the `ZineNative` Xcode scheme; see `apps/ios/README.md`.
 - Worker CI/parity test subset:
   - `bun run test:worker:ci`
   - Excludes `**/user-do.test.ts` and `**/scheduler.test.ts`
@@ -60,17 +56,14 @@
 
 - `scripts/dev.sh` is worktree-aware:
   - Computes an available worker port (default range `8700-8799`)
-  - Computes an available Metro port (`8081` in main, `8100+` in worktrees)
   - Seeds `apps/worker/.wrangler/state` from the main worktree on first run
   - Applies local D1 migrations
   - Symlinks `apps/worker/.dev.vars` from the main worktree when appropriate
-  - Detects the current Tailscale IPv4 when available and uses it for Expo Go + `EXPO_PUBLIC_API_URL`
+  - Detects the current Tailscale IPv4 when available for web and physical-device API access
   - Falls back to `localhost` when Tailscale is unavailable
   - Starts a small local HTTP proxy for non-localhost phone access because local `workerd` is not directly reachable on the Tailscale interface
-  - Generates `apps/mobile/.env.local` with `EXPO_PUBLIC_API_URL=http://<reachable-host>:<public-api-port>`
   - Builds, installs, and launches `apps/ios/ZineNative.xcodeproj` in the dedicated Zine Simulator
   - Starts a scoped `serve-sim` browser preview and stops it with the rest of the dev stack
-- The Metro, Expo Go, and `apps/mobile/.env.local` behavior above is legacy support for the deprecated client. Do not use it as the default path for new mobile development or verification.
 - Override worker port with `ZINE_WORKER_PORT=<port> bun run dev:worktree`.
 - Override the mobile/API host with `ZINE_DEV_HOST=<host> bun run dev:worktree`.
 - Override the public API port with `ZINE_API_PORT=<port> bun run dev:worktree`.
@@ -85,7 +78,7 @@
 - For native local testing and verification, open the exact `serve-sim` URL printed by the command in the Codex in-app Browser and use the Browser plugin's computer-use surface to exercise the relevant user journey.
 - A successful native build, test run, install, launch, loaded preview page, or shell-only `simctl` interaction is not UI verification. Require a real streamed frame, computer-use interaction, and visible final state.
 - Report automated checks, build, install, launch, live stream, computer-use interaction, and UI observation as separate evidence states.
-- If the host cannot provide the simulator or Browser computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never silently substitute legacy Expo, a static screenshot, or logs.
+- If the host cannot provide the simulator or Browser computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never substitute a static screenshot or logs.
 
 ### Production-Shaped Local Data
 
@@ -119,7 +112,7 @@
 
 - Configure the native app through `apps/ios/Configuration/Local.xcconfig`, copied from `Local.xcconfig.example` when a local override is needed.
 - Use ClerkKit authentication and the existing Clerk-authenticated `/api/v1` REST surface.
-- Build, run, and verify the `ZineNative` scheme from `apps/ios/ZineNative.xcodeproj` on an iOS Simulator or physical device. Do not use Expo Go for current mobile verification.
+- Build, run, and verify the `ZineNative` scheme from `apps/ios/ZineNative.xcodeproj` on an iOS Simulator or physical device.
 - The API defaults to `https://api.myzine.app`; set `ZINE_API_BASE_URL` in `Local.xcconfig` when verification requires a local Worker.
 
 ### Local D1 Data Recovery
@@ -142,19 +135,6 @@
     - the main worktree D1 path
   - Restart `wrangler dev` after the copy.
 
-#### Deprecated Expo-Specific Follow-up (Legacy Only)
-
-- Use these steps only when the user explicitly requests work on `apps/mobile`.
-- Check `apps/mobile/.env.local` for `EXPO_PUBLIC_API_URL` and confirm Expo Go is not talking to an older `exp://<host>:<port>` development server.
-- Expo Go cache gotcha:
-  - After the DB is fixed, Expo Go can still show stale anonymous React Query results.
-  - Cold restart Expo Go and reopen the project after restoring the DB.
-  - In this repo, `apps/mobile/providers/trpc-provider.tsx` now clears the anonymous persisted query cache in development to reduce this failure mode.
-- Verification:
-  - Query the running local worker directly before trusting the UI:
-    - `bun -e "import { createTRPCProxyClient, httpBatchLink } from '@trpc/client'; import superjson from 'superjson'; const client = createTRPCProxyClient({ links:[httpBatchLink({ url:'http://localhost:8787/trpc', transformer: superjson })]}); const home = await client.items.home.query(); console.log(home.recentBookmarks.map(i => i.title));"`
-  - Then verify in the iOS simulator after reopening the project in Expo Go.
-
 ## Quality Gates and Commit Hygiene
 
 - Pre-commit (`.husky/pre-commit`):
@@ -169,13 +149,12 @@
 
 ## CI and Deploy Parity
 
-- CI workflow: `.github/workflows/ci.yml` (lint, typecheck, mobile tests, worker tests, web unit tests, web browser tests, build).
+- CI workflow: `.github/workflows/ci.yml` (lint, typecheck, worker tests, web unit tests, web browser tests, build).
 - Worker deploy workflow: `.github/workflows/deploy-worker.yml` (shared build, DB migrate, production deploy).
 
 ## Additional Agent Context
 
-- Native iOS setup and architecture guidance lives in `apps/ios/README.md`; its older additive-coexistence language is superseded by **Supported Client Direction** above.
-- `apps/mobile/AGENTS.md` applies only to explicitly requested legacy Expo work.
+- Native iOS setup and architecture guidance lives in `apps/ios/README.md`; it documents the supported client configuration and preview workflow.
 - Web testing guidance lives in `docs/web/testing.md`.
 
 ## Design System Workflow
@@ -186,12 +165,7 @@
 - Keep Zine orange (`#EF661F`) restrained to selection, primary actions, progress, links, and small brand moments. Keep cards and long-form reading surfaces neutral, and preserve the Zine logo exactly.
 - Verify material native color changes in both light and dark mode across the affected screen states. Changes to saved-content or reading UI must include Library, bookmark detail, and article-reader verification where applicable.
 - Content artwork, provider branding, contrast-driven media overlays, semantic status feedback, and third-party account UI may retain their established colors; keep these exceptions local and do not use them as alternate app palette logic.
-- The Expo-specific guidance below applies only to explicitly requested legacy `apps/mobile` work.
 
-- When editing deprecated Expo shared mobile UI, read:
-  - `docs/mobile/design-system/principles.md`
-  - `docs/mobile/design-system/foundations.md`
-  - `docs/mobile/design-system/components.md`
 - When editing shared web UI or `packages/design-system`, read:
   - `docs/web/design-system.md`
   - `docs/web/testing.md`
@@ -210,11 +184,6 @@
   - `bun run --cwd apps/web lint`
   - `bun run --cwd apps/web typecheck`
   - `bun run --cwd apps/web storybook:build`
-- In `apps/mobile/components`, prefer `@/components/primitives` (`Badge`, `Button`, `IconButton`, `Surface`, `Text`) plus semantic theme tokens before introducing new one-off shared styles.
-- For `apps/mobile/components`, prefer canonical components and semantic theme tokens over one-off styles.
-- Do not add new raw hex/rgb colors or ad hoc typography literals in shared mobile components unless the line is marked with `design-system-exception:` and a short reason.
-- Do not expand legacy mobile UI paths (`apps/mobile/components/home/*`, `apps/mobile/components/themed-*`, `apps/mobile/components/ui/*`) for new work.
-- Run `bun run design-system:check` when mobile shared UI changes.
 
 ## Observability Guidance
 

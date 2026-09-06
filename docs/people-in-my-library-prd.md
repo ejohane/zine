@@ -102,9 +102,7 @@ Each person row should show:
 
 ### Person Detail Page
 
-Add a mobile route:
-
-- `apps/mobile/app/person/[id].tsx`
+Native navigation for this proposed person detail surface remains to be designed.
 
 Recommended sections:
 

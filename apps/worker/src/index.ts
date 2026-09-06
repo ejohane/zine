@@ -93,10 +93,8 @@ app.use('*', async (c, next) => {
 /**
  * CORS middleware - allow cross-origin requests
  *
- * Note: React Native/Expo mobile apps don't require CORS since requests
- * come from native HTTP clients. These origins are primarily for:
- * - Local development with Expo web
- * - Web builds (Expo web output)
+ * Native iOS requests use URLSession and do not require CORS.
+ * These origins serve local and deployed browser clients.
  */
 app.use(
   '*',
