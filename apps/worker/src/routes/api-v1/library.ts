@@ -1,7 +1,5 @@
 import { ContentTypeSchema, ProviderSchema, UserItemState } from '@zine/shared';
-import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { ulid } from 'ulid';
 import { z } from 'zod';
 import {
   enqueueArticleBody,
@@ -11,7 +9,7 @@ import {
 } from '../../article-body/service';
 import { getArticleBodyArtifact } from '../../article-body/storage';
 import { createDb } from '../../db';
-import { userItemConsumptionEvents, userItems } from '../../db/schema';
+import { changeItemFinishedState } from '../../items/finished-state';
 import { logger } from '../../lib/logger';
 import { createContext } from '../../trpc/context';
 import { appRouter } from '../../trpc/router';
@@ -556,13 +554,12 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
     );
   }
 
-  const db = createDb(c.env.DB);
-  const bookmark = await db.query.userItems.findFirst({
-    where: and(
-      eq(userItems.id, bookmarkId),
-      eq(userItems.userId, userId),
-      eq(userItems.state, UserItemState.BOOKMARKED)
-    ),
+  const bookmark = await changeItemFinishedState(createDb(c.env.DB), {
+    userId,
+    userItemId: bookmarkId,
+    change: { type: 'set', isFinished: getRequestedFinishedState(parsedBody.data) },
+    requiredState: UserItemState.BOOKMARKED,
+    eventMetadata: { source: 'api_v1' },
   });
 
   if (!bookmark) {
@@ -577,43 +574,8 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
     );
   }
 
-  const isFinished = getRequestedFinishedState(parsedBody.data);
-  const finishedAt = isFinished ? (bookmark.finishedAt ?? new Date().toISOString()) : null;
-
-  if (bookmark.isFinished !== isFinished) {
-    const now = Date.now();
-
-    await db
-      .update(userItems)
-      .set({
-        isFinished,
-        finishedAt,
-        updatedAt: new Date(now).toISOString(),
-      })
-      .where(eq(userItems.id, bookmarkId));
-
-    await db.insert(userItemConsumptionEvents).values({
-      id: ulid(),
-      userId,
-      userItemId: bookmark.id,
-      itemId: bookmark.itemId,
-      eventType: isFinished ? 'FINISHED' : 'UNFINISHED',
-      occurredAt: now,
-      positionSeconds: null,
-      durationSeconds: null,
-      deltaSeconds: null,
-      source: 'MANUAL_FINISH_TOGGLE',
-      metadata: JSON.stringify({ source: 'api_v1' }),
-    });
-  }
-
   return c.json({
-    bookmark: {
-      id: bookmark.id,
-      itemId: bookmark.itemId,
-      isFinished,
-      finishedAt,
-    },
+    bookmark,
     requestId: c.get('requestId'),
     traceId: c.get('traceId'),
   });
