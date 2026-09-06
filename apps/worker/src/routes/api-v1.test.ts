@@ -718,6 +718,54 @@ describe('apiV1Routes', () => {
     });
   });
 
+  it('preserves the mounted HTTP route contract', () => {
+    const routes = createTestApp()
+      .routes.filter((route) => route.path.startsWith('/api/v1/'))
+      .map(({ method, path }) => `${method} ${path}`)
+      .sort();
+    expect(routes).toMatchSnapshot();
+  });
+
+  const protectedRoutes = Array.from(
+    new Map(
+      apiV1Routes.routes
+        .filter((route) => route.path !== '/openapi.json')
+        .map(({ method, path }) => [`${method} ${path}`, { method, path }])
+    ).values()
+  );
+
+  it.each(protectedRoutes)(
+    'requires authentication for $method $path',
+    async ({ method, path }) => {
+      const app = createTestApp();
+      const response = await app.fetch(
+        new Request(`http://localhost/api/v1${path.replace(/:[^/]+/g, 'test-id')}`, { method }),
+        createMockEnv()
+      );
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({
+        code: 'UNAUTHORIZED',
+        requestId: 'test-request-id',
+        traceId: 'test-trace-id',
+      });
+      expect(mockCreateCaller).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(protectedRoutes)('enforces token scope for $method $path', async ({ method, path }) => {
+    mockDbToken(createTokenRecord([]));
+    const response = await createTestApp().fetch(
+      new Request(`http://localhost/api/v1${path.replace(/:[^/]+/g, 'test-id')}`, {
+        method,
+        headers: { Authorization: 'Bearer zine_pat_read' },
+      }),
+      createMockEnv()
+    );
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockCreateCaller).not.toHaveBeenCalled();
+  });
+
   it('serves an OpenAPI document without PAT auth', async () => {
     const app = createTestApp();
 
