@@ -556,12 +556,13 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
     );
   }
 
+  const isFinished = getRequestedFinishedState(parsedBody.data);
   const db = createDb(c.env.DB);
   const bookmark = await db.query.userItems.findFirst({
     where: and(
       eq(userItems.id, bookmarkId),
       eq(userItems.userId, userId),
-      eq(userItems.state, UserItemState.BOOKMARKED)
+      isFinished ? undefined : eq(userItems.state, UserItemState.BOOKMARKED)
     ),
   });
 
@@ -577,21 +578,27 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
     );
   }
 
-  const isFinished = getRequestedFinishedState(parsedBody.data);
   const finishedAt = isFinished ? (bookmark.finishedAt ?? new Date().toISOString()) : null;
 
-  if (bookmark.isFinished !== isFinished) {
+  const shouldBookmark = isFinished && bookmark.state !== UserItemState.BOOKMARKED;
+  if (bookmark.isFinished !== isFinished || shouldBookmark) {
     const now = Date.now();
 
     await db
       .update(userItems)
       .set({
+        ...(shouldBookmark
+          ? { state: UserItemState.BOOKMARKED, bookmarkedAt: new Date(now).toISOString() }
+          : {}),
         isFinished,
         finishedAt,
         updatedAt: new Date(now).toISOString(),
       })
       .where(eq(userItems.id, bookmarkId));
+  }
 
+  if (bookmark.isFinished !== isFinished) {
+    const now = Date.now();
     await db.insert(userItemConsumptionEvents).values({
       id: ulid(),
       userId,

@@ -98,6 +98,58 @@ describe('assembled Worker REST API with D1', () => {
     ).toBe(true);
   });
 
+  it.each(['INBOX', 'ARCHIVED'])(
+    'saves and finishes an unsaved %s item, with idempotent retries',
+    async (state) => {
+      await db
+        .update(userItems)
+        .set({ state, bookmarkedAt: null })
+        .where(eq(userItems.id, 'owner-bookmark'));
+      expect(
+        (await request('/bookmarks/owner-bookmark', 'PATCH', { isFinished: true })).status
+      ).toBe(200);
+      const saved = await db.query.userItems.findFirst({
+        where: eq(userItems.id, 'owner-bookmark'),
+      });
+      expect(saved).toMatchObject({
+        state: 'BOOKMARKED',
+        bookmarkedAt: expect.any(String),
+        isFinished: true,
+        finishedAt: expect.any(String),
+      });
+      expect(
+        (await request('/bookmarks/owner-bookmark', 'PATCH', { isFinished: true })).status
+      ).toBe(200);
+      expect(
+        await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
+      ).toEqual(saved);
+      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+      expect(await (await request('/bookmarks/owner-bookmark')).json()).toMatchObject({
+        item: { state: 'BOOKMARKED', isFinished: true },
+      });
+      expect(
+        (await request('/bookmarks/owner-bookmark', 'PATCH', { isFinished: false })).status
+      ).toBe(200);
+      expect(
+        await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
+      ).toMatchObject({ state: 'BOOKMARKED', isFinished: false });
+    }
+  );
+
+  it('does not save an inbox item when marking unfinished', async () => {
+    await db
+      .update(userItems)
+      .set({ state: 'INBOX', bookmarkedAt: null })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    expect(
+      (await request('/bookmarks/owner-bookmark', 'PATCH', { isFinished: false })).status
+    ).toBe(404);
+    expect(
+      await db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') })
+    ).toMatchObject({ state: 'INBOX', bookmarkedAt: null, isFinished: false });
+    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+  });
+
   it('rejects cross-user reads and mutations without changing data or emitting events', async () => {
     expect((await request('/bookmarks/other-bookmark')).status).toBe(404);
     expect((await request('/bookmarks/other-bookmark', 'PATCH', { isFinished: true })).status).toBe(
