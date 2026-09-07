@@ -1,3 +1,4 @@
+import { getBookmarkEnrichmentHealth } from '../enrichment/outbox';
 import { getDLQSummary } from '../sync/dlq-consumer';
 import { getArticleBodyHealth } from '../article-body/diagnostics';
 import { parseArticleUnderstandingMode } from '../enrichment/article-understanding-rollout';
@@ -68,13 +69,17 @@ export async function getDependencyHealth(env: Bindings) {
 }
 
 export async function getQueueHealth(env: Bindings) {
-  const [dlqSummary, articleBody] = await Promise.all([
+  const [dlqSummary, articleBody, bookmarkEnrichment] = await Promise.all([
     getDLQSummary(env.OAUTH_STATE_KV),
     getArticleBodyHealth(env),
+    getBookmarkEnrichmentHealth(env),
   ]);
 
   const degraded =
-    dlqSummary.count > 0 || articleBody.status === 'error' || articleBody.dlqCount > 0;
+    bookmarkEnrichment.status !== 'ok' ||
+    dlqSummary.count > 0 ||
+    articleBody.status === 'error' ||
+    articleBody.dlqCount > 0;
   const articleUnderstandingMode = parseArticleUnderstandingMode(env.ARTICLE_UNDERSTANDING_MODE);
 
   return {
@@ -95,6 +100,7 @@ export async function getQueueHealth(env: Bindings) {
         })),
       },
       articleBody,
+      bookmarkEnrichment,
       articleUnderstanding: {
         mode: articleUnderstandingMode,
         automaticEnrollment: articleUnderstandingMode === 'all',

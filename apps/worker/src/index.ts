@@ -1,3 +1,4 @@
+import { retryBookmarkEnrichment } from './enrichment/outbox';
 /**
  * @zine/worker - Cloudflare Workers backend
  *
@@ -406,6 +407,11 @@ export default {
    * @see /features/subscriptions/backend-spec.md - Section 3: Polling Architecture
    */
   async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext): Promise<void> {
+    if (event.cron === '*/5 * * * *') {
+      ctx.waitUntil(retryBookmarkEnrichment(env));
+      return;
+    }
+
     if (event.cron === '0 * * * *') {
       ctx.waitUntil(pollProviderSubscriptions('YOUTUBE', env, ctx));
       return;

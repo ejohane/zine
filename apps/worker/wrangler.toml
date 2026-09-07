@@ -51,7 +51,7 @@ database_id = "a69f0e9e-2c1c-4c10-8538-0ef4c03418c0"
 # YouTube polls at :00, Gmail newsletters at :15, Spotify at :30, RSS at :45
 # Each provider has its own distributed lock for failure isolation
 [triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
+crons = ["*/5 * * * *", "0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 
 # Queue for async pull-to-refresh sync
 # Producer: subscriptions.syncAllAsync tRPC procedure
@@ -173,7 +173,7 @@ ARTICLE_BODY_PIPELINE_ENABLED = "false"
 ARTICLE_BODY_ENROLLMENT_MODE = "off"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.staging.triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
+crons = ["*/5 * * * *", "0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 [[env.staging.queues.producers]]
 queue = "zine-sync-queue-staging"
 binding = "SYNC_QUEUE"
@@ -270,7 +270,7 @@ ARTICLE_BODY_PIPELINE_ENABLED = "true"
 ARTICLE_BODY_ENROLLMENT_MODE = "all"
 # Set via wrangler secret: CLERK_WEBHOOK_SECRET
 [env.production.triggers]
-crons = ["0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
+crons = ["*/5 * * * *", "0 * * * *", "15 * * * *", "30 * * * *", "45 * * * *", "5 8 * * *"]
 [[env.production.queues.producers]]
 queue = "zine-sync-queue-prod"
 binding = "SYNC_QUEUE"

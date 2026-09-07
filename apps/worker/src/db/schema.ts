@@ -1439,3 +1439,27 @@ export const providerItemsSeen = sqliteTable(
     ),
   ]
 );
+
+// Durable delivery intent, committed in the same D1 batch as a bookmark save.
+export const bookmarkEnrichmentOutbox = sqliteTable(
+  'bookmark_enrichment_outbox',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userItemId: text('user_item_id')
+      .notNull()
+      .references(() => userItems.id, { onDelete: 'cascade' }),
+    itemId: text('item_id')
+      .notNull()
+      .references(() => items.id, { onDelete: 'cascade' }),
+    trigger: text('trigger', { enum: ['manual_save', 'inbox_bookmark'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    nextAttemptAt: integer('next_attempt_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('bookmark_enrichment_outbox_user_item_idx').on(table.userItemId),
+    index('bookmark_enrichment_outbox_due_idx').on(table.nextAttemptAt),
+  ]
+);

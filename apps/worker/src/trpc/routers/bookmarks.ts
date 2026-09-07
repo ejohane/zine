@@ -29,7 +29,7 @@ import { getValidAccessToken, type TokenRefreshEnv } from '../../lib/token-refre
 import { extractArticle } from '../../lib/article-extractor';
 import { storeArticleContent } from '../../lib/article-storage';
 import { logger } from '../../lib/logger';
-import { enqueueBookmarkEnrichment } from '../../enrichment/service';
+import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../../enrichment/outbox';
 import { syncPeopleForUserItemBestEffort } from '../../people/service';
 import {
   findOrCreateCreator,
@@ -334,6 +334,10 @@ export const bookmarksRouter = router({
           await mergeTagsForUserItem(ctx, existingUserItem.id, input.tags);
         }
 
+        await dispatchBookmarkEnrichment(ctx, {
+          userId: ctx.userId,
+          userItemId: existingUserItem.id,
+        });
         // Already bookmarked - no change needed
         return {
           itemId,
@@ -343,19 +347,25 @@ export const bookmarksRouter = router({
       }
 
       // 3b. Exists with different status (INBOX or ARCHIVED) - rebookmark it
-      await ctx.db
-        .update(userItems)
-        .set({
-          state: UserItemState.BOOKMARKED,
-          bookmarkedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, existingUserItem.id));
-
-      await enqueueBookmarkEnrichment(ctx, {
-        itemId,
+      await ctx.db.batch([
+        ctx.db
+          .update(userItems)
+          .set({
+            state: UserItemState.BOOKMARKED,
+            bookmarkedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(userItems.id, existingUserItem.id)),
+        bookmarkEnrichmentIntent(ctx.db, {
+          userId: ctx.userId,
+          itemId,
+          userItemId: existingUserItem.id,
+          trigger: 'manual_save',
+        }),
+      ]);
+      await dispatchBookmarkEnrichment(ctx, {
+        userId: ctx.userId,
         userItemId: existingUserItem.id,
-        trigger: 'manual_save',
       });
 
       await syncPeopleForUserItemBestEffort(ctx.db, {
@@ -388,28 +398,31 @@ export const bookmarksRouter = router({
       .onConflictDoNothing();
 
     const userItemId = ulid();
-    await ctx.db.insert(userItems).values({
-      id: userItemId,
-      userId: ctx.userId,
-      itemId,
-      state: UserItemState.BOOKMARKED,
-      ingestedAt: now,
-      bookmarkedAt: now,
-      archivedAt: null,
-      progressPosition: null,
-      progressDuration: null,
-      progressUpdatedAt: null,
-      isFinished: false,
-      finishedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await enqueueBookmarkEnrichment(ctx, {
-      itemId,
-      userItemId,
-      trigger: 'manual_save',
-    });
+    await ctx.db.batch([
+      ctx.db.insert(userItems).values({
+        id: userItemId,
+        userId: ctx.userId,
+        itemId,
+        state: UserItemState.BOOKMARKED,
+        ingestedAt: now,
+        bookmarkedAt: now,
+        archivedAt: null,
+        progressPosition: null,
+        progressDuration: null,
+        progressUpdatedAt: null,
+        isFinished: false,
+        finishedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      bookmarkEnrichmentIntent(ctx.db, {
+        userId: ctx.userId,
+        itemId,
+        userItemId,
+        trigger: 'manual_save',
+      }),
+    ]);
+    await dispatchBookmarkEnrichment(ctx, { userId: ctx.userId, userItemId });
 
     await syncPeopleForUserItemBestEffort(ctx.db, {
       userId: ctx.userId,
