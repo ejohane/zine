@@ -9,13 +9,14 @@ import {
 } from '../../article-body/service';
 import { getArticleBodyArtifact } from '../../article-body/storage';
 import { createDb } from '../../db';
+import { bookmarkItem, archiveItem, unbookmarkItem } from '../../items/library-state';
 import { changeItemFinishedState } from '../../items/finished-state';
 import { logger } from '../../lib/logger';
 import { createContext } from '../../trpc/context';
 import { appRouter } from '../../trpc/router';
 import type { Env } from '../../types';
 import { apiAuth } from './auth';
-import { trpcErrorResponse } from './errors';
+import { itemStateErrorResponse, trpcErrorResponse } from './errors';
 import { parseBoolean, parseLimit } from './request';
 
 const apiV1Routes = new Hono<Env>();
@@ -217,11 +218,18 @@ apiV1Routes.get('/home', apiAuth('bookmarks:read'), async (c) => {
 });
 
 apiV1Routes.post('/inbox/:id/bookmark', apiAuth('bookmarks:write'), async (c) => {
+  const context = {
+    db: createDb(c.env.DB),
+    env: c.env,
+    userId: c.get('userId')!,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  };
   const caller = appRouter.createCaller(await createContext(c));
 
   try {
     const item = await caller.items.get({ id: c.req.param('id') });
-    const result = await caller.items.bookmark({ id: c.req.param('id') });
+    const result = await bookmarkItem(context, { id: c.req.param('id') });
     await enrollSavedArticleBestEffort(c.env, item, c.get('traceId'));
     return c.json({
       ...result,
@@ -229,22 +237,28 @@ apiV1Routes.post('/inbox/:id/bookmark', apiAuth('bookmarks:write'), async (c) =>
       traceId: c.get('traceId'),
     });
   } catch (error) {
-    return trpcErrorResponse(c, error);
+    return itemStateErrorResponse(c, error);
   }
 });
 
 apiV1Routes.post('/inbox/:id/archive', apiAuth('bookmarks:write'), async (c) => {
-  const caller = appRouter.createCaller(await createContext(c));
+  const context = {
+    db: createDb(c.env.DB),
+    env: c.env,
+    userId: c.get('userId')!,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  };
 
   try {
-    const result = await caller.items.archive({ id: c.req.param('id') });
+    const result = await archiveItem(context, { id: c.req.param('id') });
     return c.json({
       ...result,
       requestId: c.get('requestId'),
       traceId: c.get('traceId'),
     });
   } catch (error) {
-    return trpcErrorResponse(c, error);
+    return itemStateErrorResponse(c, error);
   }
 });
 
@@ -584,17 +598,23 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
 });
 
 apiV1Routes.delete('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
-  const caller = appRouter.createCaller(await createContext(c));
+  const context = {
+    db: createDb(c.env.DB),
+    env: c.env,
+    userId: c.get('userId')!,
+    requestId: c.get('requestId'),
+    traceId: c.get('traceId'),
+  };
 
   try {
-    const result = await caller.items.unbookmark({ id: c.req.param('id') });
+    const result = await unbookmarkItem(context, { id: c.req.param('id') });
     return c.json({
       ...result,
       requestId: c.get('requestId'),
       traceId: c.get('traceId'),
     });
   } catch (error) {
-    return trpcErrorResponse(c, error);
+    return itemStateErrorResponse(c, error);
   }
 });
 

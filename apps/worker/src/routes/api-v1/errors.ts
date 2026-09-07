@@ -1,3 +1,4 @@
+import { ItemStateError } from '../../items/library-state';
 import { TRPCError } from '@trpc/server';
 import type { Context } from 'hono';
 import type { Env } from '../../types';
@@ -66,4 +67,19 @@ export function trpcErrorResponse(c: Context<Env>, error: unknown) {
   }
 
   throw error;
+}
+
+export function itemStateErrorResponse(c: Context<Env>, error: unknown) {
+  if (error instanceof ItemStateError) {
+    return c.json(
+      {
+        error: error.message,
+        code: error.code,
+        requestId: c.get('requestId'),
+        traceId: c.get('traceId'),
+      },
+      error.code === 'NOT_FOUND' ? 404 : 400
+    );
+  }
+  return trpcErrorResponse(c, error);
 }

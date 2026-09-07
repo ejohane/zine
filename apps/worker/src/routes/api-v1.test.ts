@@ -1,3 +1,5 @@
+import type * as LibraryStateModule from '../items/library-state';
+import { ItemStateError } from '../items/library-state';
 /**
  * @vitest-environment miniflare
  */
@@ -186,6 +188,13 @@ const {
   mockGetPeopleDailySection: vi.fn(),
   mockListPeopleDailyEditions: vi.fn(),
   mockActivatePeopleDailyEdition: vi.fn(),
+}));
+
+vi.mock('../items/library-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof LibraryStateModule>()),
+  bookmarkItem: mockBookmarkInboxItem,
+  archiveItem: mockArchiveInboxItem,
+  unbookmarkItem: mockUnbookmark,
 }));
 
 vi.mock('../db', () => ({
@@ -658,9 +667,6 @@ describe('apiV1Routes', () => {
         quickWins: mockQuickWins,
         get: mockGetItem,
         subscriptionSettings: mockGetItemSubscriptionSettings,
-        bookmark: mockBookmarkInboxItem,
-        archive: mockArchiveInboxItem,
-        unbookmark: mockUnbookmark,
         setTags: mockSetTags,
         markOpened: mockMarkOpened,
         updateProgress: mockUpdateProgress,
@@ -2426,7 +2432,10 @@ describe('apiV1Routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockBookmarkInboxItem).toHaveBeenCalledWith({ id: 'ui_inbox_1' });
+    expect(mockBookmarkInboxItem).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: expect.any(String) }),
+      { id: 'ui_inbox_1' }
+    );
     expect(mockEnqueueArticleBody).toHaveBeenCalledWith(
       expect.anything(),
       env,
@@ -2452,7 +2461,10 @@ describe('apiV1Routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockArchiveInboxItem).toHaveBeenCalledWith({ id: 'ui_inbox_1' });
+    expect(mockArchiveInboxItem).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: expect.any(String) }),
+      { id: 'ui_inbox_1' }
+    );
     expect((await res.json()) as JsonBody).toMatchObject({ success: true });
   });
 
@@ -2749,13 +2761,16 @@ describe('apiV1Routes', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mockUnbookmark).toHaveBeenCalledWith({ id: 'ui_1' });
+    expect(mockUnbookmark).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: expect.any(String) }),
+      { id: 'ui_1' }
+    );
     expect((await res.json()) as JsonBody).toMatchObject({ success: true });
   });
 
   it('maps unbookmark bad request errors to REST 400 responses', async () => {
     mockUnbookmark.mockRejectedValue(
-      new TRPCError({ code: 'BAD_REQUEST', message: 'Item is not bookmarked' })
+      new ItemStateError({ code: 'BAD_REQUEST', message: 'Item is not bookmarked' })
     );
     const app = createTestApp();
 
