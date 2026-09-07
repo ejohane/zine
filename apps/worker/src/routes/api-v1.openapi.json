@@ -643,7 +643,7 @@
         "tags": ["Bookmarks"],
         "operationId": "updateBookmarkFinishedState",
         "summary": "Mark a bookmark as finished or unfinished",
-        "description": "Sets the finished state for a bookmarked item; idempotent when the requested state already matches the stored state.",
+        "description": "Marks an owned item finished, saving it as bookmarked in the same update if needed. Marking unfinished requires an existing bookmark and keeps it saved. Repeating the requested state is idempotent.",
         "security": [
           {
             "bearerAuth": []

@@ -1,4 +1,4 @@
-import { type JsonObject, type UserItemState } from '@zine/shared';
+import { type JsonObject, UserItemState } from '@zine/shared';
 import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type { Database } from '../db';
@@ -8,7 +8,7 @@ type FinishedStateChange = { type: 'set'; isFinished: boolean } | { type: 'toggl
 
 /**
  * Change an owned item's finished state and record its consumption event.
- * Explicit sets retain an existing finished timestamp and do not write on repeat;
+ * Explicit sets retain an existing finished timestamp and only write on repeat when saving an unsaved item;
  * toggles always use a fresh timestamp. Callers choose eligible states and event
  * metadata, and translate a missing/ineligible item into their API's error shape.
  */
@@ -19,6 +19,7 @@ export async function changeItemFinishedState(
     userItemId: string;
     change: FinishedStateChange;
     requiredState?: UserItemState;
+    bookmarkOnFinish?: boolean;
     eventMetadata?: JsonObject;
   }
 ) {
@@ -39,13 +40,23 @@ export async function changeItemFinishedState(
     ? (toggleTime ?? item.finishedAt ?? new Date().toISOString())
     : null;
 
-  if (item.isFinished !== isFinished) {
-    const occurredAt = toggleTimeMs ?? Date.now();
+  const shouldBookmark =
+    input.bookmarkOnFinish && isFinished && item.state !== UserItemState.BOOKMARKED;
+  if (item.isFinished !== isFinished || shouldBookmark) {
+    const updatedAt = toggleTime ?? new Date().toISOString();
     await db
       .update(userItems)
-      .set({ isFinished, finishedAt, updatedAt: toggleTime ?? new Date(occurredAt).toISOString() })
+      .set({
+        ...(shouldBookmark ? { state: UserItemState.BOOKMARKED, bookmarkedAt: updatedAt } : {}),
+        isFinished,
+        finishedAt,
+        updatedAt,
+      })
       .where(eq(userItems.id, input.userItemId));
+  }
 
+  if (item.isFinished !== isFinished) {
+    const occurredAt = toggleTimeMs ?? Date.now();
     // Keep the existing sequential writes; transaction/retry changes are separate.
     await db.insert(userItemConsumptionEvents).values({
       id: ulid(),

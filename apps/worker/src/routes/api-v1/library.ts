@@ -554,11 +554,13 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
     );
   }
 
+  const isFinished = getRequestedFinishedState(parsedBody.data);
   const bookmark = await changeItemFinishedState(createDb(c.env.DB), {
     userId,
     userItemId: bookmarkId,
-    change: { type: 'set', isFinished: getRequestedFinishedState(parsedBody.data) },
-    requiredState: UserItemState.BOOKMARKED,
+    change: { type: 'set', isFinished },
+    requiredState: isFinished ? undefined : UserItemState.BOOKMARKED,
+    bookmarkOnFinish: true,
     eventMetadata: { source: 'api_v1' },
   });
 
