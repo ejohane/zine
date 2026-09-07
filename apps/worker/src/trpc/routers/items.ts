@@ -72,6 +72,7 @@ import {
   syncPeopleForUserItemBestEffort,
 } from '../../people/service';
 import { replaceTagsForUserItem } from '../tagging';
+import { changeItemFinishedState } from '../../items/finished-state';
 
 export type ItemTag = {
   id: string;
@@ -1609,49 +1610,18 @@ export const itemsRouter = router({
   toggleFinished: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const now = new Date().toISOString();
-      const nowMs = Date.now();
-
-      // Find the user item
-      const existing = await ctx.db
-        .select({ id: userItems.id, itemId: userItems.itemId, isFinished: userItems.isFinished })
-        .from(userItems)
-        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Item not found',
-        });
-      }
-
-      // Calculate new state
-      const newIsFinished = !existing[0].isFinished;
-      const newFinishedAt = newIsFinished ? now : null;
-
-      // Update
-      await ctx.db
-        .update(userItems)
-        .set({
-          isFinished: newIsFinished,
-          finishedAt: newFinishedAt,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, input.id));
-
-      await insertConsumptionEvent(ctx, {
-        userItemId: existing[0].id,
-        itemId: existing[0].itemId,
-        eventType: newIsFinished ? 'FINISHED' : 'UNFINISHED',
-        occurredAt: nowMs,
-        source: 'MANUAL_FINISH_TOGGLE',
+      const result = await changeItemFinishedState(ctx.db, {
+        userId: ctx.userId,
+        userItemId: input.id,
+        change: { type: 'toggle' },
       });
-
+      if (!result) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Item not found' });
+      }
       return {
         success: true as const,
-        isFinished: newIsFinished,
-        finishedAt: newFinishedAt,
+        isFinished: result.isFinished,
+        finishedAt: result.finishedAt,
       };
     }),
 
