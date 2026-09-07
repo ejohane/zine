@@ -1,9 +1,20 @@
+import { expectLoggerErrorCalls } from '../test/mock-logger';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../index';
 import { createDb } from '../db';
-import { apiTokens, items, userItemConsumptionEvents, userItems, users } from '../db/schema';
+import {
+  apiTokens,
+  items,
+  itemEnrichments,
+  userPeople,
+  userPersonMentions,
+  userItemConsumptionEvents,
+  userItems,
+  users,
+} from '../db/schema';
+import { ENRICHMENT_SCHEMA_VERSION } from '../enrichment/types';
 import { hashApiToken } from '../lib/api-tokens';
 import type { Bindings } from '../types';
 import type * as AuthModule from '../lib/auth';
@@ -366,4 +377,181 @@ describe('finish contracts across REST and tRPC HTTP', () => {
     ).toBe(200);
     expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(2);
   });
+});
+
+describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', (api) => {
+  const send = vi.fn(async () => {});
+  async function mutate(operation: 'bookmark' | 'archive' | 'unbookmark', id = 'owner-bookmark') {
+    const requestBindings = { ...bindings, ENRICHMENT_QUEUE: { send } as unknown as Queue };
+    const path =
+      api === 'tRPC'
+        ? `/trpc/items.${operation}`
+        : operation === 'unbookmark'
+          ? `/api/v1/bookmarks/${id}`
+          : `/api/v1/inbox/${id}/${operation}`;
+    return app.request(
+      path,
+      {
+        method: api === 'REST' && operation === 'unbookmark' ? 'DELETE' : 'POST',
+        headers: {
+          Authorization: `Bearer ${api === 'REST' ? token : 'test-clerk-session'}`,
+          'Content-Type': 'application/json',
+        },
+        ...(api === 'tRPC' ? { body: JSON.stringify({ json: { id } }) } : {}),
+      },
+      requestBindings as Bindings
+    );
+  }
+  const read = () => db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') });
+  beforeEach(async () => {
+    send.mockReset();
+    await db.insert(itemEnrichments).values({
+      id: 'enrichment',
+      itemId: 'item',
+      schemaVersion: ENRICHMENT_SCHEMA_VERSION,
+      contentHash: 'fixture',
+      status: 'COMPLETE',
+      entitiesJson: JSON.stringify([{ name: 'Test Person', type: 'PERSON', confidence: 0.9 }]),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  });
+
+  it.each(['INBOX', 'BOOKMARKED', 'ARCHIVED'])(
+    'bookmarks %s, queues only Inbox transitions, and indexes People',
+    async (state) => {
+      await db
+        .update(userItems)
+        .set({ state, archivedAt: now, isFinished: true, finishedAt: now })
+        .where(eq(userItems.id, 'owner-bookmark'));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+      expect((await mutate('bookmark')).status).toBe(200);
+      expect(await read()).toMatchObject({
+        state: 'BOOKMARKED',
+        bookmarkedAt: '2026-09-07T12:00:00.000Z',
+        updatedAt: '2026-09-07T12:00:00.000Z',
+        archivedAt: now,
+        isFinished: true,
+        finishedAt: now,
+      });
+      expect(send).toHaveBeenCalledTimes(state === 'INBOX' ? 1 : 0);
+      if (state === 'INBOX')
+        expect(send).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 'owner',
+            userItemId: 'owner-bookmark',
+            itemId: 'item',
+            trigger: 'inbox_bookmark',
+          })
+        );
+      expect(await db.select().from(userPeople)).toMatchObject([{ userId: 'owner', itemCount: 1 }]);
+      expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
+      vi.setSystemTime(new Date('2026-09-07T12:01:00Z'));
+      expect((await mutate('bookmark')).status).toBe(200);
+      expect(await read()).toMatchObject({ bookmarkedAt: '2026-09-07T12:01:00.000Z' });
+      expect(send).toHaveBeenCalledTimes(state === 'INBOX' ? 1 : 0);
+      expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+    }
+  );
+
+  it.each(['archive', 'unbookmark'] as const)(
+    '%s deactivates People and preserves its timestamp rules',
+    async (operation) => {
+      expect((await mutate('bookmark')).status).toBe(200);
+      const savedAt = (await read())!.bookmarkedAt;
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
+      expect((await mutate(operation)).status).toBe(200);
+      expect(await read()).toMatchObject({
+        state: 'ARCHIVED',
+        archivedAt: '2026-09-07T12:00:00.000Z',
+        updatedAt: '2026-09-07T12:00:00.000Z',
+        bookmarkedAt: operation === 'archive' ? savedAt : null,
+      });
+      expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 0 }]);
+      expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: false }]);
+      expect((await mutate(operation)).status).toBe(operation === 'archive' ? 200 : 400);
+      expect((await mutate('bookmark')).status).toBe(200);
+      expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
+      expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+      expect(send).not.toHaveBeenCalled();
+      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+    }
+  );
+
+  it.each(['INBOX', 'ARCHIVED'])(
+    'archives %s without changing saved or finished fields',
+    async (state) => {
+      await db
+        .update(userItems)
+        .set({ state, bookmarkedAt: null, isFinished: true, finishedAt: now })
+        .where(eq(userItems.id, 'owner-bookmark'));
+      expect((await mutate('archive')).status).toBe(200);
+      expect(await read()).toMatchObject({
+        state: 'ARCHIVED',
+        bookmarkedAt: null,
+        isFinished: true,
+        finishedAt: now,
+      });
+      expect(send).not.toHaveBeenCalled();
+    }
+  );
+
+  it('preserves the existing partial write when enrichment enqueue fails', async () => {
+    await db
+      .update(userItems)
+      .set({ state: 'INBOX', bookmarkedAt: null })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    send.mockRejectedValueOnce(new Error('Queue unavailable'));
+    expect((await mutate('bookmark')).status).toBe(500);
+    if (api === 'REST')
+      expectLoggerErrorCalls([
+        [
+          'Unhandled error',
+          expect.objectContaining({ path: '/api/v1/inbox/owner-bookmark/bookmark' }),
+        ],
+      ]);
+    expect(await read()).toMatchObject({ state: 'BOOKMARKED', bookmarkedAt: expect.any(String) });
+    // Indexing follows enqueue, so the failed request has not indexed People yet.
+    expect(await db.select().from(userPeople)).toHaveLength(0);
+    expect((await mutate('bookmark')).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+  });
+
+  it.each(['INBOX', 'ARCHIVED'])('rejects unbookmark of %s without writes', async (state) => {
+    await db.update(userItems).set({ state }).where(eq(userItems.id, 'owner-bookmark'));
+    const before = await read();
+    const response = await mutate('unbookmark');
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject(
+      api === 'REST'
+        ? { code: 'BAD_REQUEST', error: 'Item is not bookmarked' }
+        : { error: { json: { message: 'Item is not bookmarked', data: { code: 'BAD_REQUEST' } } } }
+    );
+    expect(await read()).toEqual(before);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each(['bookmark', 'archive', 'unbookmark'] as const)(
+    '%s rejects missing and foreign items without writes',
+    async (operation) => {
+      const before = await db.select().from(userItems);
+      for (const id of ['missing', 'other-bookmark']) {
+        const response = await mutate(operation, id);
+        expect(response.status).toBe(404);
+        const message = operation === 'unbookmark' ? 'Item not found' : `Item ${id} not found`;
+        expect(await response.json()).toMatchObject(
+          api === 'REST'
+            ? { code: 'NOT_FOUND', error: message }
+            : { error: { json: { message, data: { code: 'NOT_FOUND' } } } }
+        );
+      }
+      expect(await db.select().from(userItems)).toEqual(before);
+      expect(send).not.toHaveBeenCalled();
+      expect(await db.select().from(userPeople)).toHaveLength(0);
+    }
+  );
 });

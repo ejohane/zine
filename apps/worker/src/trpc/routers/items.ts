@@ -63,15 +63,15 @@ import { decodeCursor, encodeCursor, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '..
 import { getArticleContent } from '../../lib/article-storage';
 import type { Database } from '../../db';
 import { buildNewsletterAvatarUrl } from '../../newsletters/avatar';
-import { enqueueBookmarkEnrichment } from '../../enrichment/service';
 import { ENRICHMENT_SCHEMA_VERSION, type SuggestedTag } from '../../enrichment/types';
-import {
-  deactivatePeopleForUserItemBestEffort,
-  normalizePersonDisplayName,
-  normalizePersonName,
-  syncPeopleForUserItemBestEffort,
-} from '../../people/service';
+import { normalizePersonDisplayName, normalizePersonName } from '../../people/service';
 import { replaceTagsForUserItem } from '../tagging';
+import {
+  bookmarkItem,
+  archiveItem,
+  unbookmarkItem,
+  ItemStateError,
+} from '../../items/library-state';
 import { changeItemFinishedState } from '../../items/finished-state';
 
 export type ItemTag = {
@@ -1468,139 +1468,40 @@ export const itemsRouter = router({
   bookmark: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const now = new Date().toISOString();
-
-      // Verify the item exists and belongs to the user
-      const existing = await ctx.db
-        .select({ id: userItems.id, itemId: userItems.itemId, state: userItems.state })
-        .from(userItems)
-        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `Item ${input.id} not found`,
-        });
+      try {
+        return await bookmarkItem(ctx, input);
+      } catch (error) {
+        if (error instanceof ItemStateError) {
+          throw new TRPCError({ code: error.code, message: error.message });
+        }
+        throw error;
       }
-
-      // Update the item state
-      await ctx.db
-        .update(userItems)
-        .set({
-          state: UserItemState.BOOKMARKED,
-          bookmarkedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, input.id));
-
-      if (existing[0].state === UserItemState.INBOX) {
-        await enqueueBookmarkEnrichment(ctx, {
-          itemId: existing[0].itemId,
-          userItemId: existing[0].id,
-          trigger: 'inbox_bookmark',
-        });
-      }
-
-      await syncPeopleForUserItemBestEffort(ctx.db, {
-        userId: ctx.userId,
-        userItemId: existing[0].id,
-        operation: 'items.bookmark',
-      });
-
-      return { success: true as const };
     }),
 
-  /**
-   * Move an item to ARCHIVED state.
-   */
   archive: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const now = new Date().toISOString();
-
-      // Verify the item exists and belongs to the user
-      const existing = await ctx.db
-        .select({ id: userItems.id })
-        .from(userItems)
-        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: `Item ${input.id} not found`,
-        });
+      try {
+        return await archiveItem(ctx, input);
+      } catch (error) {
+        if (error instanceof ItemStateError) {
+          throw new TRPCError({ code: error.code, message: error.message });
+        }
+        throw error;
       }
-
-      // Update the item state
-      await ctx.db
-        .update(userItems)
-        .set({
-          state: UserItemState.ARCHIVED,
-          archivedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, input.id));
-
-      await deactivatePeopleForUserItemBestEffort(ctx.db, {
-        userId: ctx.userId,
-        userItemId: input.id,
-        operation: 'items.archive',
-      });
-
-      return { success: true as const };
     }),
 
-  /**
-   * Move an item from BOOKMARKED to ARCHIVED state.
-   * Use case: User removes a bookmark and dismisses the item.
-   */
   unbookmark: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const now = new Date().toISOString();
-
-      // Find the user item
-      const existing = await ctx.db
-        .select({ id: userItems.id, state: userItems.state })
-        .from(userItems)
-        .where(and(eq(userItems.id, input.id), eq(userItems.userId, ctx.userId)))
-        .limit(1);
-
-      if (existing.length === 0) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Item not found',
-        });
+      try {
+        return await unbookmarkItem(ctx, input);
+      } catch (error) {
+        if (error instanceof ItemStateError) {
+          throw new TRPCError({ code: error.code, message: error.message });
+        }
+        throw error;
       }
-
-      // Verify bookmarked state
-      if (existing[0].state !== UserItemState.BOOKMARKED) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Item is not bookmarked',
-        });
-      }
-
-      // Update to ARCHIVED state
-      await ctx.db
-        .update(userItems)
-        .set({
-          state: UserItemState.ARCHIVED,
-          bookmarkedAt: null,
-          archivedAt: now,
-          updatedAt: now,
-        })
-        .where(eq(userItems.id, input.id));
-
-      await deactivatePeopleForUserItemBestEffort(ctx.db, {
-        userId: ctx.userId,
-        userItemId: input.id,
-        operation: 'items.unbookmark',
-      });
-
-      return { success: true as const };
     }),
 
   /**
