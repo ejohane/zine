@@ -2,9 +2,11 @@ import { expectLoggerErrorCalls } from '../test/mock-logger';
 import { applyD1Migrations, env } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { app } from '../index';
+import worker, { app } from '../index';
+import { dispatchBookmarkEnrichment, getBookmarkEnrichmentHealth } from '../enrichment/outbox';
 import { createDb } from '../db';
 import {
+  bookmarkEnrichmentOutbox,
   apiTokens,
   items,
   itemEnrichments,
@@ -499,26 +501,53 @@ describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', 
     }
   );
 
-  it('preserves the existing partial write when enrichment enqueue fails', async () => {
+  it('returns success, indexes People, and durably retries failed enrichment delivery', async () => {
     await db
       .update(userItems)
       .set({ state: 'INBOX', bookmarkedAt: null })
       .where(eq(userItems.id, 'owner-bookmark'));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const startedAt = Date.now();
     send.mockRejectedValueOnce(new Error('Queue unavailable'));
-    expect((await mutate('bookmark')).status).toBe(500);
-    if (api === 'REST')
-      expectLoggerErrorCalls([
-        [
-          'Unhandled error',
-          expect.objectContaining({ path: '/api/v1/inbox/owner-bookmark/bookmark' }),
-        ],
-      ]);
-    expect(await read()).toMatchObject({ state: 'BOOKMARKED', bookmarkedAt: expect.any(String) });
-    // Indexing follows enqueue, so the failed request has not indexed People yet.
-    expect(await db.select().from(userPeople)).toHaveLength(0);
     expect((await mutate('bookmark')).status).toBe(200);
-    expect(send).toHaveBeenCalledTimes(1);
+    expect(await read()).toMatchObject({ state: 'BOOKMARKED', bookmarkedAt: expect.any(String) });
     expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toMatchObject([
+      { userId: 'owner', userItemId: 'owner-bookmark', trigger: 'inbox_bookmark' },
+    ]);
+    expect((await mutate('bookmark')).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(1); // respect the retry delay
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(1);
+    vi.setSystemTime(startedAt + 5 * 60 * 1000);
+    const jobs: Promise<unknown>[] = [];
+    await worker.scheduled(
+      { cron: '*/5 * * * *' } as ScheduledEvent,
+      { ...bindings, ENRICHMENT_QUEUE: { send } as unknown as Queue } as Bindings,
+      { waitUntil: (job: Promise<unknown>) => jobs.push(job) } as unknown as ExecutionContext
+    );
+    await Promise.all(jobs);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+  });
+
+  it('rolls back the save if its durable enrichment intent cannot be written', async () => {
+    await db
+      .update(userItems)
+      .set({ state: 'INBOX', bookmarkedAt: null })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    const before = await read();
+    await bindings.DB.prepare(
+      "CREATE TRIGGER reject_enrichment_intent BEFORE INSERT ON bookmark_enrichment_outbox BEGIN SELECT RAISE(ABORT, 'test failure'); END"
+    ).run();
+    try {
+      expect((await mutate('bookmark')).status).toBe(500);
+      if (api === 'REST') expectLoggerErrorCalls([['Unhandled error']]);
+      expect(await read()).toEqual(before);
+      expect(send).not.toHaveBeenCalled();
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+    } finally {
+      await bindings.DB.prepare('DROP TRIGGER reject_enrichment_intent').run();
+    }
   });
 
   it.each(['INBOX', 'ARCHIVED'])('rejects unbookmark of %s without writes', async (state) => {
@@ -554,4 +583,143 @@ describe.each(['REST', 'tRPC'] as const)('%s library state operations with D1', 
       expect(await db.select().from(userPeople)).toHaveLength(0);
     }
   );
+});
+
+describe('durable manual saves and enrichment delivery', () => {
+  const input = {
+    url: 'https://www.youtube.com/watch?v=video',
+    canonicalUrl: 'https://www.youtube.com/watch?v=video',
+    title: 'Fixture',
+    provider: 'YOUTUBE',
+    contentType: 'VIDEO',
+    providerId: 'video',
+    thumbnailUrl: null,
+    creator: 'Test Creator',
+    duration: 120,
+  };
+  const send = vi.fn(async () => {});
+  const queueBindings = () =>
+    ({ ...bindings, ENRICHMENT_QUEUE: { send } as unknown as Queue }) as Bindings;
+  const context = () => ({ db, env: queueBindings(), requestId: 'test', traceId: 'test' });
+  const save = () =>
+    app.request(
+      '/trpc/bookmarks.save',
+      {
+        method: 'POST',
+        headers: { Authorization: 'Bearer test-clerk-session', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ json: input }),
+      },
+      queueBindings()
+    );
+  beforeEach(() => send.mockReset());
+
+  it.each(['INBOX', 'ARCHIVED', 'new'])(
+    'keeps %s manual saves successful across queue failure and retry',
+    async (state) => {
+      if (state === 'new') await db.delete(userItems).where(eq(userItems.id, 'owner-bookmark'));
+      else await db.update(userItems).set({ state }).where(eq(userItems.id, 'owner-bookmark'));
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const now = Date.now();
+      send.mockRejectedValueOnce(new Error('Queue unavailable'));
+      const result = await save();
+      expect(result.status).toBe(200);
+      const saved = await db.query.userItems.findFirst({ where: eq(userItems.userId, 'owner') });
+      expect(saved).toMatchObject({ state: 'BOOKMARKED' });
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toMatchObject([
+        { userItemId: saved!.id, trigger: 'manual_save' },
+      ]);
+      expect((await save()).status).toBe(200);
+      expect(send).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(now + 5 * 60 * 1000);
+      expect((await save()).status).toBe(200);
+      expect(send).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+    }
+  );
+
+  it('keeps pending work when no queue is configured and recovers once it is available', async () => {
+    const { bookmarkEnrichmentIntent } = await import('../enrichment/outbox');
+    await bookmarkEnrichmentIntent(db, {
+      userId: 'owner',
+      userItemId: 'owner-bookmark',
+      itemId: 'item',
+      trigger: 'inbox_bookmark',
+    });
+    await dispatchBookmarkEnrichment({
+      ...context(),
+      env: { ...bindings, ENRICHMENT_QUEUE: undefined },
+    });
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(1);
+    await dispatchBookmarkEnrichment(context());
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+  });
+
+  it('claims pending work once across overlapping dispatchers and limits request retries to the owner', async () => {
+    const { bookmarkEnrichmentIntent } = await import('../enrichment/outbox');
+    for (const userId of ['owner', 'other'])
+      await bookmarkEnrichmentIntent(db, {
+        userId,
+        userItemId: `${userId}-bookmark`,
+        itemId: 'item',
+        trigger: 'inbox_bookmark',
+      });
+    await Promise.all([
+      dispatchBookmarkEnrichment(context(), { userId: 'owner', userItemId: 'owner-bookmark' }),
+      dispatchBookmarkEnrichment(context(), { userId: 'owner', userItemId: 'owner-bookmark' }),
+    ]);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toMatchObject([{ userId: 'other' }]);
+    await dispatchBookmarkEnrichment(context());
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+  });
+
+  it('recovers an expired claim after a Worker interruption', async () => {
+    const { bookmarkEnrichmentIntent } = await import('../enrichment/outbox');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const now = Date.now();
+    await bookmarkEnrichmentIntent(db, {
+      userId: 'owner',
+      userItemId: 'owner-bookmark',
+      itemId: 'item',
+      trigger: 'inbox_bookmark',
+    });
+    await db.update(bookmarkEnrichmentOutbox).set({ nextAttemptAt: now + 5 * 60 * 1000 });
+    await dispatchBookmarkEnrichment(context());
+    expect(send).not.toHaveBeenCalled();
+    vi.setSystemTime(now + 5 * 60 * 1000);
+    await dispatchBookmarkEnrichment(context());
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+  });
+  it('exposes pending age without identities and recovers health after delivery', async () => {
+    const { bookmarkEnrichmentIntent } = await import('../enrichment/outbox');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const now = Date.now();
+    await bookmarkEnrichmentIntent(db, {
+      userId: 'owner',
+      userItemId: 'owner-bookmark',
+      itemId: 'item',
+      trigger: 'inbox_bookmark',
+    });
+    expect(await getBookmarkEnrichmentHealth(queueBindings())).toEqual({
+      status: 'ok',
+      configured: true,
+      pending: 1,
+      oldestAt: now,
+    });
+    vi.setSystemTime(now + 31 * 60 * 1000);
+    expect(await getBookmarkEnrichmentHealth(queueBindings())).toMatchObject({
+      status: 'degraded',
+      pending: 1,
+    });
+    await dispatchBookmarkEnrichment(context());
+    expect(await getBookmarkEnrichmentHealth(queueBindings())).toEqual({
+      status: 'ok',
+      configured: true,
+      pending: 0,
+      oldestAt: null,
+    });
+  });
 });

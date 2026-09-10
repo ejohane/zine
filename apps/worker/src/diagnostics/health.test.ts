@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDependencyHealth, getQueueHealth } from './health';
 
-const { getDLQSummary, getArticleBodyHealth } = vi.hoisted(() => ({
+const { getDLQSummary, getArticleBodyHealth, getBookmarkEnrichmentHealth } = vi.hoisted(() => ({
   getDLQSummary: vi.fn(),
+  getBookmarkEnrichmentHealth: vi.fn(),
   getArticleBodyHealth: vi.fn(),
 }));
+
+vi.mock('../enrichment/outbox', () => ({ getBookmarkEnrichmentHealth }));
 
 vi.mock('../sync/dlq-consumer', () => ({
   getDLQSummary,
@@ -36,6 +39,12 @@ describe('getDependencyHealth', () => {
 describe('getQueueHealth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getBookmarkEnrichmentHealth.mockResolvedValue({
+      status: 'ok',
+      configured: true,
+      pending: 0,
+      oldestAt: null,
+    });
     getArticleBodyHealth.mockResolvedValue({
       status: 'ok',
       enabled: false,
@@ -160,5 +169,17 @@ describe('getQueueHealth', () => {
       aiConfigured: false,
       modelConfigured: false,
     });
+  });
+  it('reports a stalled bookmark enrichment backlog as degraded', async () => {
+    getDLQSummary.mockResolvedValue({ count: 0, recent: [] });
+    getBookmarkEnrichmentHealth.mockResolvedValue({
+      status: 'degraded',
+      pending: 1,
+      oldestAt: 1,
+      configured: true,
+    });
+    const result = await getQueueHealth({} as never);
+    expect(result.status).toBe('degraded');
+    expect(result.queues.bookmarkEnrichment.pending).toBe(1);
   });
 });

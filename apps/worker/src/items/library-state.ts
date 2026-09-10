@@ -2,7 +2,7 @@ import { UserItemState } from '@zine/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Database } from '../db';
 import { userItems } from '../db/schema';
-import { enqueueBookmarkEnrichment } from '../enrichment/service';
+import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../enrichment/outbox';
 import {
   deactivatePeopleForUserItemBestEffort,
   syncPeopleForUserItemBestEffort,
@@ -46,8 +46,7 @@ export async function bookmarkItem(ctx: ItemStateContext, input: { id: string })
     });
   }
 
-  // Update the item state
-  await ctx.db
+  const update = ctx.db
     .update(userItems)
     .set({
       state: UserItemState.BOOKMARKED,
@@ -55,14 +54,21 @@ export async function bookmarkItem(ctx: ItemStateContext, input: { id: string })
       updatedAt: now,
     })
     .where(eq(userItems.id, input.id));
-
   if (existing[0].state === UserItemState.INBOX) {
-    await enqueueBookmarkEnrichment(ctx, {
-      itemId: existing[0].itemId,
-      userItemId: existing[0].id,
-      trigger: 'inbox_bookmark',
-    });
+    await ctx.db.batch([
+      update,
+      bookmarkEnrichmentIntent(ctx.db, {
+        userId: ctx.userId,
+        itemId: existing[0].itemId,
+        userItemId: existing[0].id,
+        trigger: 'inbox_bookmark',
+      }),
+    ]);
+  } else {
+    await update;
   }
+  // Also retries an existing intent when the client repeats a saved request.
+  await dispatchBookmarkEnrichment(ctx, { userId: ctx.userId, userItemId: existing[0].id });
 
   await syncPeopleForUserItemBestEffort(ctx.db, {
     userId: ctx.userId,

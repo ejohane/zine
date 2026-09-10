@@ -179,3 +179,24 @@ Agents should prefer the skill workflow over ad hoc command composition when dia
 
 - No deploy marker timeline beyond release metadata stamped into runtime logs yet
 - Long-horizon retained-log guarantees still depend on Cloudflare plan/sink decisions outside this repo
+
+### Pending bookmark enrichment
+
+`/health/queues` includes `queues.bookmarkEnrichment`: queue configuration,
+pending delivery count, and the oldest pending timestamp (Unix milliseconds).
+It reports degraded when pending work is older than 30 minutes or the queue is
+unconfigured, and error when the pending-work table cannot be read.
+
+Inbox bookmarks and manual URL saves commit their saved state and enrichment
+intent in one D1 batch. Queue delivery is attempted immediately, with at most 25
+pending entries retried every five minutes. Failed or interrupted deliveries
+remain pending; client retries also attempt due work for that owned item.
+This provides at-least-once delivery, so an interruption after sending but before
+clearing the intent can redeliver. The consumer reuses completed content hashes;
+concurrent duplicates can still overlap before completion.
+
+If the backlog grows, check the enrichment queue binding, queue health, and the
+`Bookmark enrichment delivery deferred` / `Bookmark enrichment outbox unavailable`
+warning logs. Restoring queue/database availability allows the scheduler to drain
+pending entries without a user repeating the save. This mechanism applies to new
+saves; it does not reconstruct enrichment work missed before its deployment.
