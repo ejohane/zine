@@ -3,6 +3,9 @@ import { and, eq } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import type { Database } from '../db';
 import { userItemConsumptionEvents, userItems } from '../db/schema';
+import { bookmarkEnrichmentIntent, dispatchBookmarkEnrichment } from '../enrichment/outbox';
+import { syncPeopleForUserItemBestEffort } from '../people/service';
+import type { Bindings } from '../types';
 
 type FinishedStateChange = { type: 'set'; isFinished: boolean } | { type: 'toggle' };
 
@@ -13,9 +16,8 @@ type FinishedStateChange = { type: 'set'; isFinished: boolean } | { type: 'toggl
  * metadata, and translate a missing/ineligible item into their API's error shape.
  */
 export async function changeItemFinishedState(
-  db: Database,
+  ctx: { db: Database; userId: string; env: Bindings; requestId: string; traceId: string },
   input: {
-    userId: string;
     userItemId: string;
     change: FinishedStateChange;
     requiredState?: UserItemState;
@@ -23,13 +25,14 @@ export async function changeItemFinishedState(
     eventMetadata?: JsonObject;
   }
 ) {
+  const { db, userId } = ctx;
   // Preserve the toggle operation's clock capture before its database lookup.
   const toggleTime = input.change.type === 'toggle' ? new Date().toISOString() : null;
   const toggleTimeMs = input.change.type === 'toggle' ? Date.now() : null;
   const item = await db.query.userItems.findFirst({
     where: and(
       eq(userItems.id, input.userItemId),
-      eq(userItems.userId, input.userId),
+      eq(userItems.userId, userId),
       input.requiredState === undefined ? undefined : eq(userItems.state, input.requiredState)
     ),
   });
@@ -42,9 +45,24 @@ export async function changeItemFinishedState(
 
   const shouldBookmark =
     input.bookmarkOnFinish && isFinished && item.state !== UserItemState.BOOKMARKED;
+  const consumptionEvent = () =>
+    db.insert(userItemConsumptionEvents).values({
+      id: ulid(),
+      userId,
+      userItemId: item.id,
+      itemId: item.itemId,
+      eventType: isFinished ? 'FINISHED' : 'UNFINISHED',
+      occurredAt: toggleTimeMs ?? Date.now(),
+      positionSeconds: null,
+      durationSeconds: null,
+      deltaSeconds: null,
+      source: 'MANUAL_FINISH_TOGGLE',
+      metadata: input.eventMetadata ? JSON.stringify(input.eventMetadata) : null,
+    });
+
   if (item.isFinished !== isFinished || shouldBookmark) {
     const updatedAt = toggleTime ?? new Date().toISOString();
-    await db
+    const update = db
       .update(userItems)
       .set({
         ...(shouldBookmark ? { state: UserItemState.BOOKMARKED, bookmarkedAt: updatedAt } : {}),
@@ -53,23 +71,34 @@ export async function changeItemFinishedState(
         updatedAt,
       })
       .where(eq(userItems.id, input.userItemId));
+    if (shouldBookmark) {
+      // Saving through completion must persist the follow-up work with the save.
+      // Include the event so a failed batch can safely be retried in full.
+      await db.batch([
+        update,
+        bookmarkEnrichmentIntent(db, {
+          userId,
+          userItemId: item.id,
+          itemId: item.itemId,
+          trigger: item.state === UserItemState.INBOX ? 'inbox_bookmark' : 'manual_save',
+        }),
+        ...(item.isFinished !== isFinished ? [consumptionEvent()] : []),
+      ]);
+    } else {
+      await update;
+      await consumptionEvent();
+    }
   }
 
-  if (item.isFinished !== isFinished) {
-    const occurredAt = toggleTimeMs ?? Date.now();
-    // Keep the existing sequential writes; transaction/retry changes are separate.
-    await db.insert(userItemConsumptionEvents).values({
-      id: ulid(),
-      userId: input.userId,
+  if (input.bookmarkOnFinish && isFinished) {
+    // Repeated completion requests can recover existing intent without creating more work.
+    await dispatchBookmarkEnrichment(ctx, { userId, userItemId: item.id });
+  }
+  if (shouldBookmark) {
+    await syncPeopleForUserItemBestEffort(db, {
+      userId,
       userItemId: item.id,
-      itemId: item.itemId,
-      eventType: isFinished ? 'FINISHED' : 'UNFINISHED',
-      occurredAt,
-      positionSeconds: null,
-      durationSeconds: null,
-      deltaSeconds: null,
-      source: 'MANUAL_FINISH_TOGGLE',
-      metadata: input.eventMetadata ? JSON.stringify(input.eventMetadata) : null,
+      operation: 'items.finishAndBookmark',
     });
   }
 

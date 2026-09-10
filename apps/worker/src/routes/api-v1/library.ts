@@ -569,14 +569,22 @@ apiV1Routes.patch('/bookmarks/:id', apiAuth('bookmarks:write'), async (c) => {
   }
 
   const isFinished = getRequestedFinishedState(parsedBody.data);
-  const bookmark = await changeItemFinishedState(createDb(c.env.DB), {
-    userId,
-    userItemId: bookmarkId,
-    change: { type: 'set', isFinished },
-    requiredState: isFinished ? undefined : UserItemState.BOOKMARKED,
-    bookmarkOnFinish: true,
-    eventMetadata: { source: 'api_v1' },
-  });
+  const bookmark = await changeItemFinishedState(
+    {
+      db: createDb(c.env.DB),
+      userId,
+      env: c.env,
+      requestId: c.get('requestId'),
+      traceId: c.get('traceId'),
+    },
+    {
+      userItemId: bookmarkId,
+      change: { type: 'set', isFinished },
+      requiredState: isFinished ? undefined : UserItemState.BOOKMARKED,
+      bookmarkOnFinish: true,
+      eventMetadata: { source: 'api_v1' },
+    }
+  );
 
   if (!bookmark) {
     return c.json(
