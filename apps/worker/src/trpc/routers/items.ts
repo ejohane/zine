@@ -1511,8 +1511,7 @@ export const itemsRouter = router({
   toggleFinished: protectedProcedure
     .input(z.object({ id: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
-      const result = await changeItemFinishedState(ctx.db, {
-        userId: ctx.userId,
+      const result = await changeItemFinishedState(ctx, {
         userItemId: input.id,
         change: { type: 'toggle' },
       });

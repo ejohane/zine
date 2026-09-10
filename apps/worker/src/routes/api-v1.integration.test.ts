@@ -723,3 +723,138 @@ describe('durable manual saves and enrichment delivery', () => {
     });
   });
 });
+
+describe('REST completion saves with durable enrichment and People', () => {
+  const send = vi.fn(async () => {});
+  const complete = (id = 'owner-bookmark', isFinished = true) =>
+    app.request(
+      `/api/v1/bookmarks/${id}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFinished }),
+      },
+      { ...bindings, ENRICHMENT_QUEUE: { send } } as unknown as Bindings
+    );
+  const read = () => db.query.userItems.findFirst({ where: eq(userItems.id, 'owner-bookmark') });
+  beforeEach(async () => {
+    send.mockReset();
+    await db
+      .update(userItems)
+      .set({ state: 'INBOX', bookmarkedAt: null })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    await db.insert(itemEnrichments).values({
+      id: 'completion-enrichment',
+      itemId: 'item',
+      schemaVersion: ENRICHMENT_SCHEMA_VERSION,
+      contentHash: 'fixture',
+      status: 'COMPLETE',
+      entitiesJson: JSON.stringify([{ name: 'Test Person', type: 'PERSON', confidence: 0.9 }]),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  });
+
+  it.each(['INBOX', 'ARCHIVED'])(
+    'enriches and indexes newly saved %s content once across retries',
+    async (state) => {
+      await db.update(userItems).set({ state }).where(eq(userItems.id, 'owner-bookmark'));
+      expect((await complete()).status).toBe(200);
+      const saved = await read();
+      expect(saved).toMatchObject({
+        state: 'BOOKMARKED',
+        isFinished: true,
+        bookmarkedAt: expect.any(String),
+      });
+      expect(send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'owner',
+          userItemId: 'owner-bookmark',
+          itemId: 'item',
+          trigger: state === 'INBOX' ? 'inbox_bookmark' : 'manual_save',
+        })
+      );
+      expect(await db.select().from(userPeople)).toMatchObject([{ userId: 'owner', itemCount: 1 }]);
+      expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
+      expect((await complete()).status).toBe(200);
+      expect(await read()).toEqual(saved);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+      expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+      expect((await complete('owner-bookmark', false)).status).toBe(200);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(await db.select().from(userPersonMentions)).toMatchObject([{ isActive: true }]);
+    }
+  );
+
+  it('keeps a committed completion successful during queue failure and retries delivery without repeating writes', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(now));
+    send.mockRejectedValueOnce(new Error('Queue unavailable'));
+    expect((await complete()).status).toBe(200);
+    const saved = await read();
+    expect(saved).toMatchObject({ state: 'BOOKMARKED', isFinished: true });
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(1);
+    expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+    vi.setSystemTime(new Date(Date.parse(now) + 5 * 60 * 1000));
+    expect((await complete()).status).toBe(200);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(await read()).toEqual(saved);
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(1);
+  });
+
+  it.each(['bookmark_enrichment_outbox', 'user_item_consumption_events'])(
+    'rolls back saving, finishing, and intent if %s rejects its write',
+    async (table) => {
+      const before = await read();
+      await bindings.DB.exec(
+        `CREATE TRIGGER reject_completion BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, 'test failure'); END`
+      );
+      try {
+        expect((await complete()).status).toBe(500);
+        expectLoggerErrorCalls([['Unhandled error']]);
+        expect(await read()).toEqual(before);
+        expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+        expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+        expect(await db.select().from(userPeople)).toHaveLength(0);
+        expect(send).not.toHaveBeenCalled();
+      } finally {
+        await bindings.DB.exec('DROP TRIGGER reject_completion');
+      }
+    }
+  );
+
+  it('saves and indexes already-finished unsaved content without inventing a completion event', async () => {
+    await db
+      .update(userItems)
+      .set({ isFinished: true, finishedAt: now })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    expect((await complete()).status).toBe(200);
+    expect(await read()).toMatchObject({ state: 'BOOKMARKED', finishedAt: now });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(await db.select().from(userPeople)).toMatchObject([{ itemCount: 1 }]);
+    expect(await db.select().from(userItemConsumptionEvents)).toHaveLength(0);
+  });
+
+  it('does not enqueue new work when completing saved content or toggling unsaved content through tRPC', async () => {
+    expect((await toggle('owner-bookmark')).status).toBe(200);
+    expect(await read()).toMatchObject({ state: 'INBOX', isFinished: true });
+    await db
+      .update(userItems)
+      .set({ state: 'BOOKMARKED', isFinished: false })
+      .where(eq(userItems.id, 'owner-bookmark'));
+    expect((await complete()).status).toBe(200);
+    expect(send).not.toHaveBeenCalled();
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+    expect(await db.select().from(userPeople)).toHaveLength(0);
+  });
+
+  it('does not schedule work or index People for another user', async () => {
+    await db.update(userItems).set({ state: 'INBOX' }).where(eq(userItems.id, 'other-bookmark'));
+    expect((await complete('other-bookmark')).status).toBe(404);
+    expect(send).not.toHaveBeenCalled();
+    expect(await db.select().from(bookmarkEnrichmentOutbox)).toHaveLength(0);
+    expect(await db.select().from(userPeople)).toHaveLength(0);
+  });
+});
