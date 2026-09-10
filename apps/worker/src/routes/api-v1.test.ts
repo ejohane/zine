@@ -1,3 +1,4 @@
+import type * as BookmarkSaveModule from '../bookmarks/save';
 import type * as LibraryStateModule from '../items/library-state';
 import { ItemStateError } from '../items/library-state';
 /**
@@ -372,6 +373,11 @@ function createMockEnv(): Env['Bindings'] {
   } as Env['Bindings'];
 }
 
+vi.mock('../bookmarks/save', async (importOriginal) => ({
+  ...(await importOriginal<typeof BookmarkSaveModule>()),
+  saveBookmark: mockSave,
+}));
+
 function mockDbToken(token: ReturnType<typeof createTokenRecord> | null) {
   const tokenUpdateWhere = vi.fn().mockResolvedValue(undefined);
   const tokenUpdateSet = vi.fn().mockReturnValue({ where: tokenUpdateWhere });
@@ -678,7 +684,6 @@ describe('apiV1Routes', () => {
       },
       bookmarks: {
         preview: mockPreview,
-        save: mockSave,
       },
       creators: {
         get: mockGetCreator,
@@ -2590,6 +2595,7 @@ describe('apiV1Routes', () => {
     expect(res.status).toBe(200);
     expect(mockPreview).toHaveBeenCalledWith({ url: 'https://example.com/article' });
     expect(mockSave).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user_123' }),
       expect.objectContaining({
         url: 'https://example.com/article',
         title: 'Article title',
