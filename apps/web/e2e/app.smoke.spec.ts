@@ -2,6 +2,32 @@ import { expect, test } from '@playwright/test';
 
 import { mockWebTrpc } from './trpc-mocks';
 
+test('public information pages work without JavaScript or authentication', async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  try {
+    await page.goto('/about/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Your reading, in one place.');
+    await page.screenshot({ path: testInfo.outputPath('about-desktop.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: testInfo.outputPath('about-mobile.png'), fullPage: true });
+    await page.getByRole('link', { name: 'Privacy', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Privacy policy');
+    await page.screenshot({ path: testInfo.outputPath('privacy-mobile.png'), fullPage: true });
+    await expect(
+      page.getByRole('link', { name: 'Google API Services User Data Policy' })
+    ).toBeVisible();
+    await page.getByRole('link', { name: 'Terms', exact: true }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Terms of use');
+    await page.screenshot({ path: testInfo.outputPath('terms-mobile.png'), fullPage: true });
+    await expect(page.getByRole('link', { name: 'Open Zine' })).toHaveAttribute('href', '/sign-in');
+  } finally {
+    await context.close();
+  }
+});
+
 test('loads the mobile-parity app routes and opens canonical detail', async ({ page }) => {
   await mockWebTrpc(page);
 
