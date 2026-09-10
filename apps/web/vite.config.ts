@@ -67,7 +67,7 @@ export default defineConfig({
             },
             workbox: {
               navigateFallback: '/index.html',
-              navigateFallbackDenylist: [/^\/trpc\//],
+              navigateFallbackDenylist: [/^\/trpc\//, /^\/(about|privacy|terms)(\/|$)/],
               runtimeCaching: [
                 {
                   urlPattern: ({ request }) => request.destination === 'image',
@@ -96,6 +96,16 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
+    },
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        app: path.resolve(__dirname, 'index.html'),
+        about: path.resolve(__dirname, 'about/index.html'),
+        privacy: path.resolve(__dirname, 'privacy/index.html'),
+        terms: path.resolve(__dirname, 'terms/index.html'),
+      },
     },
   },
   server: {

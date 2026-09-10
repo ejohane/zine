@@ -63,6 +63,11 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             />
           )}
         </div>
+        <nav aria-label="About Zine" className="flex flex-wrap gap-4 text-sm">
+          <a href="/about/">About Zine</a>
+          <a href="/privacy/">Privacy</a>
+          <a href="/terms/">Terms</a>
+        </nav>
       </section>
     </main>
   );
