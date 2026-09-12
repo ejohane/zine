@@ -135,7 +135,7 @@ private enum ScreenshotFixtures {
                 string: "https://i.scdn.co/image/ab6765630000ba8a116b917b6fbd4a810de9a368"
             ),
             duration: 2_846,
-            summary: "A conversation about building, taste, and using AI without losing the thread."
+            summary: "A conversation about building, taste, and using AI without losing the thread.\nRead more at https://example.com. 👋 More notes: https://example.org."
         ),
         make(
             id: "2",

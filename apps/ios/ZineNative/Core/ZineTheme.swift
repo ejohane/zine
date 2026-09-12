@@ -12,6 +12,7 @@ enum ZineTheme {
         case brandAccent
         case onAccent
         case inlineLink
+        case bookmarkDescriptionLink
 
         var lightHex: String {
             switch self {
@@ -24,6 +25,7 @@ enum ZineTheme {
             case .brandAccent: "EF661F"
             case .onAccent: "000000"
             case .inlineLink: "B64012"
+            case .bookmarkDescriptionLink: "000000"
             }
         }
 
@@ -38,6 +40,7 @@ enum ZineTheme {
             case .brandAccent: "EF661F"
             case .onAccent: "000000"
             case .inlineLink: "FFAD7C"
+            case .bookmarkDescriptionLink: "FFFFFF"
             }
         }
     }
@@ -51,6 +54,7 @@ enum ZineTheme {
     static let brandAccent = color(.brandAccent)
     static let onAccent = color(.onAccent)
     static let inlineLink = color(.inlineLink)
+    static let bookmarkDescriptionLink = color(.bookmarkDescriptionLink)
     static let tertiaryText = secondaryText.opacity(0.72)
 
     static func color(_ role: Role) -> Color {
