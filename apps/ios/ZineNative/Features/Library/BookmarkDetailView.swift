@@ -280,7 +280,11 @@ struct BookmarkDetailView: View {
             actionRow
 
             if let summary = content.summary, !summary.isEmpty {
-                Text(BookmarkDescription.attributedText(summary))
+                Text(BookmarkDescription.attributedText(
+                    summary,
+                    youtubeURL: content.provider == .youtube ? content.canonicalUrl : nil,
+                    duration: content.duration
+                ))
                     .font(.body)
                     .foregroundStyle(ZineTheme.secondaryText)
                     .tint(ZineTheme.bookmarkDescriptionLink)

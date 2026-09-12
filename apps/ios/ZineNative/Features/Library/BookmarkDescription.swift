@@ -5,7 +5,11 @@ enum BookmarkDescription {
         types: NSTextCheckingResult.CheckingType.link.rawValue
     )
 
-    static func attributedText(_ text: String) -> AttributedString {
+    static func attributedText(
+        _ text: String,
+        youtubeURL: URL? = nil,
+        duration: Int? = nil
+    ) -> AttributedString {
         var result = AttributedString(text)
         let matches = detector?.matches(
             in: text,
@@ -23,6 +27,17 @@ enum BookmarkDescription {
             result[range].link = url
             result[range].foregroundColor = ZineTheme.bookmarkDescriptionLink
             result[range].font = .body.weight(.medium)
+        }
+        if let youtubeURL {
+            for chapter in YouTubeDescriptionChapters.links(in: text, videoURL: youtubeURL, duration: duration) {
+                guard !matches.contains(where: { NSIntersectionRange($0.range, chapter.range).length > 0 }),
+                      let stringRange = Range(chapter.range, in: text),
+                      let range = Range(stringRange, in: result)
+                else { continue }
+                result[range].link = chapter.url
+                result[range].foregroundColor = ZineTheme.bookmarkDescriptionLink
+                result[range].font = .body.weight(.medium)
+            }
         }
         return result
     }
