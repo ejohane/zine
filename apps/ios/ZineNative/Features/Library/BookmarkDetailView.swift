@@ -280,9 +280,10 @@ struct BookmarkDetailView: View {
             actionRow
 
             if let summary = content.summary, !summary.isEmpty {
-                Text(summary)
+                Text(BookmarkDescription.attributedText(summary))
                     .font(.body)
                     .foregroundStyle(ZineTheme.secondaryText)
+                    .tint(ZineTheme.bookmarkDescriptionLink)
             }
 
             if !content.tags.isEmpty {

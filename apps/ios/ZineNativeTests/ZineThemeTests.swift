@@ -16,6 +16,7 @@ final class ZineThemeTests: XCTestCase {
                 .brandAccent: "EF661F",
                 .onAccent: "000000",
                 .inlineLink: "B64012",
+                .bookmarkDescriptionLink: "000000",
             ]
         )
     }
@@ -33,12 +34,13 @@ final class ZineThemeTests: XCTestCase {
                 .brandAccent: "EF661F",
                 .onAccent: "000000",
                 .inlineLink: "FFAD7C",
+                .bookmarkDescriptionLink: "FFFFFF",
             ]
         )
     }
 
     func testEveryRoleHasAValueInBothAppearances() {
-        XCTAssertEqual(ZineTheme.Role.allCases.count, 9)
+        XCTAssertEqual(ZineTheme.Role.allCases.count, 10)
         for role in ZineTheme.Role.allCases {
             XCTAssertEqual(role.lightHex.count, 6)
             XCTAssertEqual(role.darkHex.count, 6)
