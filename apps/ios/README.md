@@ -17,6 +17,18 @@ override the relevant values there.
 The API defaults to `https://api.myzine.app`. Override
 `ZINE_API_BASE_URL` in `Local.xcconfig` for local worker development.
 
+For an HTTP API on a named host or IP address, also opt the development build
+into one host-scoped ATS exception:
+
+```xcconfig
+ZINE_API_BASE_URL = http:/$()/100.92.242.50:8787
+INFOPLIST_PREPROCESSOR_DEFINITIONS = $(inherited) ZINE_ALLOW_INSECURE_LOCAL_API=1 ZINE_ATS_EXCEPTION_DOMAIN=100.92.242.50
+```
+
+`bun run dev:worktree` derives these settings from its selected local API URL.
+Production builds omit `ZINE_ALLOW_INSECURE_LOCAL_API` and retain strict ATS in
+both the app and Share Extension.
+
 ## Build
 
 Open `ZineNative.xcodeproj`, select the `ZineNative` scheme, and run it on an

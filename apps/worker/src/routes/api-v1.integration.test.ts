@@ -1054,4 +1054,49 @@ describe.each(['REST', 'tRPC'])('%s manual bookmark save contract', (api) => {
     ).toBe('already_bookmarked');
     expect(send).toHaveBeenCalledTimes(1);
   });
+
+  it('deduplicates podcast saves by episode identity while retaining the latest timestamp', async () => {
+    const first = await result(
+      await save({
+        provider: 'WEB',
+        contentType: 'PODCAST',
+        providerId: 'pocket_casts:episode-123',
+        canonicalUrl: 'https://pca.st/episode/episode-123?t=30',
+        title: 'Episode',
+        creator: 'Example Show',
+        duration: 1800,
+      })
+    );
+    const repeat = await result(
+      await save({
+        provider: 'WEB',
+        contentType: 'PODCAST',
+        providerId: 'pocket_casts:episode-123',
+        canonicalUrl: 'https://pca.st/episode/episode-123?t=420',
+        title: 'Episode',
+        creator: 'Example Show',
+        duration: 1800,
+      })
+    );
+
+    expect(repeat).toEqual({ ...first, status: 'already_bookmarked' });
+    expect(await db.query.items.findFirst({ where: eq(items.id, first.itemId) })).toMatchObject({
+      contentType: 'PODCAST',
+      canonicalUrl: 'https://pca.st/episode/episode-123?t=30',
+    });
+    expect(
+      await db.query.userItems.findFirst({ where: eq(userItems.id, first.userItemId) })
+    ).toMatchObject({
+      handoffUrl: 'https://pca.st/episode/episode-123?t=420',
+    });
+    const libraryResponse = await request('/bookmarks');
+    expect(libraryResponse.status).toBe(200);
+    const library = (await libraryResponse.json()) as {
+      items: Array<{ id: string; canonicalUrl: string }>;
+    };
+    expect(library.items[0]).toMatchObject({
+      id: first.userItemId,
+      canonicalUrl: 'https://pca.st/episode/episode-123?t=420',
+    });
+  });
 });

@@ -202,6 +202,66 @@ describe('scrapeOpenGraph', () => {
     });
   });
 
+  describe('public podcast metadata', () => {
+    it('extracts Apple PodcastEpisode structured data', async () => {
+      mockFetch(`
+        <html><head>
+          <meta property="og:title" content="Episode title">
+          <script type="application/ld+json">
+            {"@type":"PodcastEpisode","name":"Episode title","duration":"PT1H2M3S","thumbnailUrl":"/art.jpg","partOfSeries":{"name":"Example Show"}}
+          </script>
+        </head></html>
+      `);
+
+      const result = await scrapeOpenGraph('https://podcasts.apple.com/us/podcast/example');
+
+      expect(result.podcastEpisode).toEqual({
+        title: 'Episode title',
+        showName: 'Example Show',
+        artworkUrl: 'https://podcasts.apple.com/art.jpg',
+        duration: 3723,
+      });
+    });
+
+    it('extracts Pocket Casts show name and displayed duration', async () => {
+      mockFetch(`
+        <html><head><meta property="og:title" content="Episode title"></head>
+        <body>
+          <a data-testid="podcast-title">Example Show</a>
+          <span class="episode-duration-text">1 hr 7 mins</span>
+        </body></html>
+      `);
+
+      const result = await scrapeOpenGraph(
+        'https://pocketcasts.com/podcast/example/show/episode/id'
+      );
+
+      expect(result.podcastEpisode).toMatchObject({
+        title: 'Episode title',
+        showName: 'Example Show',
+        duration: 4020,
+      });
+    });
+
+    it('extracts Overcast episode attributes without requiring account data', async () => {
+      mockFetch(`
+        <html><head><meta property="og:title" content="Episode title — Example Show"></head>
+        <body>
+          <audio id="audioplayer" data-title="Episode title" data-podcast-title="Example Show" data-artwork-url="/art.jpg"></audio>
+        </body></html>
+      `);
+
+      const result = await scrapeOpenGraph('https://overcast.fm/+episode');
+
+      expect(result.podcastEpisode).toEqual({
+        title: 'Episode title',
+        showName: 'Example Show',
+        artworkUrl: 'https://overcast.fm/art.jpg',
+        duration: null,
+      });
+    });
+  });
+
   describe('URL resolution', () => {
     it('should resolve relative image URLs', async () => {
       mockFetch(createHtmlWithOG({ image: '/images/og.jpg' }));
@@ -246,6 +306,7 @@ describe('scrapeOpenGraph', () => {
       expect(result.title).toBeNull();
       expect(result.description).toBeNull();
       expect(result.image).toBeNull();
+      expect(result.responseStatus).toBe(404);
     });
 
     it('should return empty result on non-HTML content', async () => {

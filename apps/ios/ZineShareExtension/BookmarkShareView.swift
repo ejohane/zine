@@ -326,7 +326,7 @@ private struct BookmarkPreviewCard: View {
                     .lineLimit(3)
 
                 HStack(spacing: 4) {
-                    Text(preview.creator)
+                    Text(preview.creatorLabel)
                     Text("·")
                     Text(preview.sourceLabel)
                 }

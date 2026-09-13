@@ -61,7 +61,14 @@ export interface LinkPreviewResult {
   /** Description/summary of the content */
   description?: string;
   /** Source that provided the metadata */
-  source: 'provider_api' | 'oembed' | 'opengraph' | 'fallback' | 'article_extractor' | 'fxtwitter';
+  source:
+    | 'provider_api'
+    | 'oembed'
+    | 'opengraph'
+    | 'fallback'
+    | 'article_extractor'
+    | 'fxtwitter'
+    | 'podcast_page';
 
   // Article-specific fields
   /** Publication or site name (for articles) */
@@ -94,6 +101,169 @@ export interface PreviewContext {
 // Logger
 
 const previewLogger = logger.child('link-preview');
+
+export class LinkPreviewUnsupportedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LinkPreviewUnsupportedError';
+  }
+}
+
+function safeUrlForLogging(value: string): string {
+  try {
+    const url = new URL(value);
+    if (url.username || url.password)
+      return `${url.protocol}//${url.hostname}/[credentials-redacted]`;
+
+    if (
+      (url.hostname === 'pca.st' || url.hostname.endsWith('.pocketcasts.com')) &&
+      url.pathname.startsWith('/follow/')
+    ) {
+      url.pathname = '/follow/[private-feed-redacted]';
+    }
+
+    for (const key of [...url.searchParams.keys()]) {
+      if (/token|secret|auth|key/i.test(key)) url.searchParams.set(key, '[redacted]');
+    }
+
+    return url.toString();
+  } catch {
+    return '[invalid-url]';
+  }
+}
+
+function pocketCastsEpisodeId(value: string): string | null {
+  try {
+    const parts = new URL(value).pathname.split('/').filter(Boolean);
+    if (parts[0] === 'episode' && parts[1]) return parts[1];
+    if (parts[0] === 'podcast' && parts.length >= 5) return parts[4] ?? null;
+  } catch {
+    // The caller will use its existing fallback identity.
+  }
+  return null;
+}
+
+function overcastTitleParts(value: string | null): { title: string; showName: string } | null {
+  if (!value) return null;
+  const separator = value.lastIndexOf(' — ');
+  if (separator <= 0) return null;
+  return {
+    title: value.slice(0, separator).trim(),
+    showName: value.slice(separator + 3).trim(),
+  };
+}
+
+function decodePodcastText(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  const decodeCodePoint = (entity: string, code: string, radix: number): string => {
+    const codePoint = Number.parseInt(code, radix);
+    return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+      ? String.fromCodePoint(codePoint)
+      : entity;
+  };
+
+  return value
+    .replace(/&#x([0-9a-f]+);/gi, (entity, code: string) => decodeCodePoint(entity, code, 16))
+    .replace(/&#(\d+);/g, (entity, code: string) => decodeCodePoint(entity, code, 10))
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&');
+}
+
+async function fetchPodcastPlayerPreview(parsedLink: ParsedLink): Promise<LinkPreviewResult> {
+  const podcastLink = parsedLink.podcastLink!;
+
+  if (podcastLink.kind === 'show') {
+    throw new LinkPreviewUnsupportedError(
+      'This is a podcast show link. Share or paste a public episode link instead.'
+    );
+  }
+  if (podcastLink.kind === 'private') {
+    throw new LinkPreviewUnsupportedError(
+      'Private or login-gated podcast episodes aren’t supported yet.'
+    );
+  }
+
+  const ogData = await scrapeOpenGraph(parsedLink.canonicalUrl);
+  const resolvedUrl = ogData.resolvedUrl ?? parsedLink.canonicalUrl;
+  const resolvedPath = (() => {
+    try {
+      return new URL(resolvedUrl).pathname;
+    } catch {
+      return '';
+    }
+  })();
+
+  if (
+    ogData.responseStatus === 401 ||
+    ogData.responseStatus === 403 ||
+    resolvedPath === '/login' ||
+    resolvedPath.startsWith('/user/login') ||
+    resolvedPath.startsWith('/auth/')
+  ) {
+    throw new LinkPreviewUnsupportedError(
+      'Private or login-gated podcast episodes aren’t supported yet.'
+    );
+  }
+
+  if (ogData.responseStatus && ogData.responseStatus >= 400) {
+    throw new LinkPreviewUnsupportedError(
+      'This podcast episode isn’t publicly accessible from its shared link.'
+    );
+  }
+
+  let episodeId = podcastLink.episodeId;
+  if (podcastLink.player === 'pocket_casts') {
+    episodeId = episodeId ?? pocketCastsEpisodeId(resolvedUrl) ?? undefined;
+    const resolvedParts = resolvedPath.split('/').filter(Boolean);
+    const resolvedToShow = resolvedParts[0] === 'podcast' && resolvedParts.length === 3;
+    if (resolvedToShow) {
+      throw new LinkPreviewUnsupportedError(
+        'This is a podcast show link. Share or paste a public episode link instead.'
+      );
+    }
+    if (!episodeId) {
+      throw new LinkPreviewUnsupportedError(
+        'Zine couldn’t confirm this Pocket Casts link is a public episode.'
+      );
+    }
+  }
+
+  if (podcastLink.kind === 'unknown' && podcastLink.player !== 'pocket_casts') {
+    throw new LinkPreviewUnsupportedError(
+      'Zine needs an exact public episode link from this podcast player.'
+    );
+  }
+
+  const overcastParts = podcastLink.player === 'overcast' ? overcastTitleParts(ogData.title) : null;
+  const episode = ogData.podcastEpisode;
+  const title =
+    decodePodcastText(episode?.title ?? overcastParts?.title ?? ogData.title) ?? 'Podcast episode';
+  const showName =
+    decodePodcastText(episode?.showName ?? overcastParts?.showName) ?? 'Unknown show';
+
+  return {
+    provider: Provider.WEB,
+    contentType: ContentType.PODCAST,
+    providerId: `${podcastLink.player}:${episodeId ?? parsedLink.providerId}`,
+    title,
+    creator: showName,
+    thumbnailUrl: episode?.artworkUrl ?? ogData.image,
+    duration: episode?.duration ?? null,
+    canonicalUrl: parsedLink.canonicalUrl,
+    description: ogData.description ?? undefined,
+    siteName:
+      podcastLink.player === 'apple_podcasts'
+        ? 'Apple Podcasts'
+        : podcastLink.player === 'overcast'
+          ? 'Overcast'
+          : 'Pocket Casts',
+    source: 'podcast_page',
+  };
+}
 
 // Provider API Fetchers
 
@@ -744,7 +914,7 @@ export async function fetchLinkPreview(
   }
 
   previewLogger.debug('Fetching link preview', {
-    url,
+    url: safeUrlForLogging(url),
     provider: parsedLink.provider,
     contentType: parsedLink.contentType,
     hasYouTubeToken: !!context?.accessTokens?.youtube,
@@ -753,51 +923,57 @@ export async function fetchLinkPreview(
 
   let result: LinkPreviewResult | null = null;
 
+  if (parsedLink.podcastLink) {
+    result = await fetchPodcastPlayerPreview(parsedLink);
+  }
+
   // Strategy based on provider
-  switch (parsedLink.provider) {
-    case Provider.YOUTUBE:
-      result = await fetchYouTubePreview(parsedLink, context);
-      break;
+  if (!result) {
+    switch (parsedLink.provider) {
+      case Provider.YOUTUBE:
+        result = await fetchYouTubePreview(parsedLink, context);
+        break;
 
-    case Provider.SPOTIFY:
-      result = await fetchSpotifyPreview(parsedLink, context);
-      break;
+      case Provider.SPOTIFY:
+        result = await fetchSpotifyPreview(parsedLink, context);
+        break;
 
-    case Provider.X:
-      result = await fetchXProviderPreview(parsedLink);
-      break;
+      case Provider.X:
+        result = await fetchXProviderPreview(parsedLink);
+        break;
 
-    case Provider.RSS:
-      // RSS provider is used for Twitter/X and generic URLs
-      result = await fetchRssProviderPreview(parsedLink);
-      break;
+      case Provider.RSS:
+        // RSS provider is used for Twitter/X and generic URLs
+        result = await fetchRssProviderPreview(parsedLink);
+        break;
 
-    case Provider.SUBSTACK:
-      // Substack uses Open Graph
-      result = await fetchViaOpenGraph(parsedLink);
-      break;
+      case Provider.SUBSTACK:
+        // Substack uses Open Graph
+        result = await fetchViaOpenGraph(parsedLink);
+        break;
 
-    case Provider.WEB:
-      // WEB provider uses article extraction with OG fallback
-      result = await fetchWebProviderPreview(parsedLink);
-      break;
+      case Provider.WEB:
+        // WEB provider uses article extraction with OG fallback
+        result = await fetchWebProviderPreview(parsedLink);
+        break;
 
-    default:
-      // Fallback to Open Graph for unknown providers
-      result = await fetchViaOpenGraph(parsedLink);
+      default:
+        // Fallback to Open Graph for unknown providers
+        result = await fetchViaOpenGraph(parsedLink);
+    }
   }
 
   // If all methods failed, create a minimal fallback
   if (!result) {
     previewLogger.debug('All fetch methods failed, using fallback', {
-      url,
+      url: safeUrlForLogging(url),
       provider: parsedLink.provider,
     });
     result = createFallbackResult(parsedLink);
   }
 
   previewLogger.debug('Link preview fetched', {
-    url,
+    url: safeUrlForLogging(url),
     source: result.source,
     hasTitle: !!result.title,
     hasThumbnail: !!result.thumbnailUrl,

@@ -215,7 +215,7 @@ export function toItemView(
     itemId: item.id,
     title: item.title,
     thumbnailUrl,
-    canonicalUrl: normalizeCanonicalUrlForResponse(item.canonicalUrl),
+    canonicalUrl: normalizeCanonicalUrlForResponse(userItem.handoffUrl ?? item.canonicalUrl),
     contentType: item.contentType as ContentType,
     provider: responseProvider as Provider,
     // Creator data from creators table (normalized)
