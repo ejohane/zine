@@ -11,6 +11,7 @@ final class ZineThemeTests: XCTestCase {
                 .surface: "FFFFFF",
                 .raised: "E9EDF0",
                 .primaryText: "151719",
+                .readerBodyText: "151719",
                 .secondaryText: "5D646C",
                 .border: "CFD4DA",
                 .brandAccent: "EF661F",
@@ -29,6 +30,7 @@ final class ZineThemeTests: XCTestCase {
                 .surface: "14171A",
                 .raised: "20252A",
                 .primaryText: "F5F7F8",
+                .readerBodyText: "D8DCE0",
                 .secondaryText: "B2BAC2",
                 .border: "343A40",
                 .brandAccent: "EF661F",
@@ -40,7 +42,7 @@ final class ZineThemeTests: XCTestCase {
     }
 
     func testEveryRoleHasAValueInBothAppearances() {
-        XCTAssertEqual(ZineTheme.Role.allCases.count, 10)
+        XCTAssertEqual(ZineTheme.Role.allCases.count, 11)
         for role in ZineTheme.Role.allCases {
             XCTAssertEqual(role.lightHex.count, 6)
             XCTAssertEqual(role.darkHex.count, 6)

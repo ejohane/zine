@@ -97,6 +97,19 @@ actor ArticleBodyCache {
         return now.timeIntervalSince(checkedAt) >= maximumAge
     }
 
+    func readingPosition(bookmarkID: String) -> ArticleReadingPosition? {
+        guard let data = try? Data(contentsOf: positionURL(bookmarkID: bookmarkID)) else { return nil }
+        return try? JSONDecoder().decode(ArticleReadingPosition.self, from: data)
+    }
+
+    func saveReadingPosition(_ position: ArticleReadingPosition, bookmarkID: String) {
+        _ = persist(position, to: positionURL(bookmarkID: bookmarkID))
+    }
+
+    private func positionURL(bookmarkID: String) -> URL {
+        documentURL(bookmarkID: bookmarkID).appendingPathExtension("position")
+    }
+
     func stageProgress(_ fraction: Double, bookmarkID: String) {
         loadPendingProgressIfNeeded()
         pendingProgressValues?[bookmarkID] = min(max(fraction, 0), 1)
@@ -125,6 +138,7 @@ actor ArticleBodyCache {
         loadPendingProgressIfNeeded()
         manifest?.entries.removeValue(forKey: bookmarkID)
         pendingProgressValues?.removeValue(forKey: bookmarkID)
+        try? FileManager.default.removeItem(at: positionURL(bookmarkID: bookmarkID))
         try? FileManager.default.removeItem(at: documentURL(bookmarkID: bookmarkID))
         persistManifest()
         persistPendingProgress()

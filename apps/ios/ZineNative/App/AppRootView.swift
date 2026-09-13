@@ -235,6 +235,9 @@ private struct AuthenticatedAppView: View {
             if let bridge = SimulatorCommandBridge(session: commandSession) { await bridge.run() }
             #endif
         }
+        .onReceive(NotificationCenter.default.publisher(for: .zineBookmarkSaved)) { _ in
+            markBookmarkContentChanged()
+        }
         .task(id: homeRevision) {
             await homeStore.reload()
         }

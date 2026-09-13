@@ -30,7 +30,8 @@ struct ScreenshotLibraryContentView: View {
         return APIClient(
             baseURL: URL(string: "https://example.invalid")!,
             tokenProvider: { "screenshot-fixture" },
-            session: URLSession(configuration: configuration)
+            session: URLSession(configuration: configuration),
+            articleBodyCache: ArticleBodyCache(userID: "reader-links-context-fixture")
         )
     }()
     @State private var contentType: ContentType?
@@ -250,25 +251,55 @@ private final class ReaderRoutingFixtureURLProtocol: URLProtocol, @unchecked Sen
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let isArticle = request.url?.path.hasSuffix("/article-content") == true
-        let body = isArticle ? """
-        {
-          "content":"<p>This synthetic article was opened through the real Library and bookmark detail reader action.</p><h2>Native reader routing verified</h2><p>Substack articles, including custom domains identified by provider metadata, use the same reading view as regular articles.</p>",
-          "articleBody":{
-            "availability":"AVAILABLE","pipelineStatus":"AVAILABLE","schemaVersion":1,
-            "extractorVersion":1,"sourceKind":"PUBLIC_WEB","contentHash":"reader-routing-fixture",
-            "wordCount":50,"readingTimeMinutes":3,"qualityScore":1,"qualityWarnings":[]
-          },
-          "requestId":"routing-fixture","traceId":"routing-fixture"
+        let path = request.url?.path ?? ""
+        let isArticle = path.hasSuffix("/article-content")
+        let paragraphs = (1...18).map { index in
+            "<h2>Passage \(index)</h2><p>This is synthetic reading content for testing the native reader. A quiet interface gives the article room to breathe. The text stays readable while controls appear only when they are useful. Changing the typeface should keep this passage in view, even when the lines wrap differently.</p>"
+        }.joined()
+        let article = "<p>This synthetic article was opened through Library and bookmark detail.</p><p><a href='https://example.com/reader-link'>Open the example source</a></p><p>For more on this topic, <a href='https://example.org/research'>read the supporting research</a> and <a href='https://example.com/reader-link'>revisit the source</a>.</p><p><a href='https://example.com/photo.jpg'>Full-size image</a></p>" + paragraphs
+        let body: [String: Any]
+        if isArticle {
+            body = [
+                "content": article,
+                "articleBody": [
+                    "availability": "AVAILABLE", "pipelineStatus": "AVAILABLE", "schemaVersion": 1,
+                    "extractorVersion": 1, "sourceKind": "PUBLIC_WEB", "contentHash": "reader-experience-fixture-v1",
+                    "wordCount": 1000, "readingTimeMinutes": 5, "qualityScore": 1, "qualityWarnings": [],
+                ],
+                "requestId": "routing-fixture", "traceId": "routing-fixture",
+            ]
+        } else if path.hasSuffix("/bookmarks"), request.httpMethod == "POST" {
+            body = ["bookmark": ["itemId": "fixture-saved-item", "userItemId": "fixture-saved-bookmark", "status": "saved"]]
+        } else if path.hasSuffix("/tags") {
+            body = ["success": true, "tags": [["id": "fixture-design", "name": "Design"]]]
+        } else if request.httpMethod == "PATCH" {
+            let requested = Self.requestBody(request)?["isFinished"] as? Bool ?? true
+            body = ["bookmark": ["id": path.components(separatedBy: "/").last ?? "fixture", "itemId": "fixture-item", "isFinished": requested]]
+        } else {
+            body = [:]
         }
-        """ : "{}"
         let response = HTTPURLResponse(
-            url: request.url!, statusCode: isArticle ? 200 : 404,
+            url: request.url!, statusCode: 200,
             httpVersion: nil, headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocol(self, didLoad: (try? JSONSerialization.data(withJSONObject: body)) ?? Data())
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    private static func requestBody(_ request: URLRequest) -> [String: Any]? {
+        var data = request.httpBody ?? Data()
+        if let stream = request.httpBodyStream {
+            stream.open()
+            defer { stream.close() }
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                guard count > 0 else { break }
+                data.append(buffer, count: count)
+            }
+        }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     override func stopLoading() {}

@@ -17,6 +17,7 @@ same hierarchy works in light and dark appearances.
 | Surface                   | `#FFFFFF` | `#14171A` | Cards, sheets, reader surfaces, and elevated regions          |
 | Raised                    | `#E9EDF0` | `#20252A` | Placeholders, subdued controls, and elevated regions          |
 | Primary text              | `#151719` | `#F5F7F8` | Titles, body copy, and primary icons                          |
+| Reader body text          | `#151719` | `#D8DCE0` | Article body only; headings and controls retain primary text  |
 | Secondary text            | `#5D646C` | `#B2BAC2` | Metadata, supporting copy, and inactive controls              |
 | Border                    | `#CFD4DA` | `#343A40` | Dividers, outlines, and control boundaries                    |
 | Brand accent              | `#EF661F` | `#EF661F` | Selection, primary actions, progress, and small brand moments |

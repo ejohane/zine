@@ -43,7 +43,7 @@ final class ArticleReaderTests: XCTestCase {
 
         XCTAssertTrue(html.contains("--reader-font-scale: 1.3"))
         XCTAssertTrue(html.contains("font-size: calc(17px * var(--reader-font-scale))"))
-        XCTAssertTrue(html.contains("padding: 88.0px 22px 96px"))
+        XCTAssertTrue(html.contains("padding: calc(var(--reader-top-inset) + 72px) 22px 0"))
         XCTAssertFalse(html.contains("zoom:"))
     }
 
@@ -136,36 +136,94 @@ final class ArticleReaderTests: XCTestCase {
         XCTAssertEqual(maximumActiveWrites, 1)
     }
 
-    func testReaderChromeOffsetDirectlyTracksBothScrollDirections() {
-        var tracker = ArticleReaderChromeOffsetTracker()
-
-        tracker.begin(at: 100)
-        XCTAssertEqual(tracker.update(scrollOffset: 120), 20)
-        XCTAssertEqual(tracker.update(scrollOffset: 150), 50)
-        XCTAssertNil(tracker.update(scrollOffset: 150))
-        XCTAssertEqual(tracker.offset, 50)
-
-        XCTAssertEqual(tracker.update(scrollOffset: 138), 38)
-        XCTAssertEqual(tracker.update(scrollOffset: 100), 0)
+    func testChromeStartsVisibleAndStaysVisibleAtTop() {
+        var chrome = ArticleReaderChromeState()
+        XCTAssertTrue(chrome.isVisible)
+        chrome.toggle(at: 0)
+        XCTAssertTrue(chrome.isVisible)
+        chrome.toggle(at: 200)
+        XCTAssertFalse(chrome.isVisible)
+        XCTAssertEqual(chrome.update(offset: 0), true)
+        XCTAssertTrue(chrome.isVisible)
     }
 
-    func testReaderChromeOffsetStaysPutAcrossAPause() {
-        var tracker = ArticleReaderChromeOffsetTracker()
-
-        tracker.begin(at: 0)
-        XCTAssertEqual(tracker.update(scrollOffset: 80), 56)
-        tracker.end()
-        XCTAssertEqual(tracker.offset, 56)
-
-        tracker.begin(at: 80)
-        XCTAssertNil(tracker.update(scrollOffset: 80))
-        XCTAssertEqual(tracker.update(scrollOffset: 66), 42)
+    func testCompletionPromptWaitsForBottomAndOnlyPresentsOnce() {
+        var end = ArticleReaderEndState()
+        XCTAssertFalse(end.settled(offset: 500, maximum: 1000))
+        XCTAssertTrue(end.settled(offset: 998, maximum: 1000))
+        XCTAssertFalse(end.settled(offset: 1000, maximum: 1000))
+        XCTAssertFalse(end.settled(offset: 500, maximum: 1000))
+        XCTAssertFalse(end.settled(offset: 1000, maximum: 1000))
     }
 
-    func testEndActionsRevealOnlyAtTheArticleBottom() {
-        XCTAssertFalse(ArticleReaderEndActions.shouldReveal(for: 0.98))
-        XCTAssertTrue(ArticleReaderEndActions.shouldReveal(for: 0.985))
-        XCTAssertTrue(ArticleReaderEndActions.shouldReveal(for: 1))
+    func testShortArticleCanPresentCompletionAfterUserScroll() {
+        var end = ArticleReaderEndState()
+        XCTAssertTrue(end.settled(offset: 0, maximum: -100))
+    }
+
+    func testChromeRequiresSustainedDirectionAndIgnoresJitter() {
+        var chrome = ArticleReaderChromeState()
+        chrome.toggle(at: 200)
+        chrome.begin(at: 200)
+        XCTAssertNil(chrome.update(offset: 190))
+        XCTAssertNil(chrome.update(offset: 195))
+        XCTAssertNil(chrome.update(offset: 185))
+        XCTAssertEqual(chrome.update(offset: 160), true)
+        XCTAssertNil(chrome.update(offset: 170))
+        XCTAssertNil(chrome.update(offset: 180))
+        XCTAssertEqual(chrome.update(offset: 205), false)
+        chrome.end()
+        chrome.begin(at: 205)
+        XCTAssertNil(chrome.update(offset: 200))
+        XCTAssertFalse(chrome.isVisible)
+    }
+
+    func testAppearanceMigratesAndPersistsAcrossInstances() throws {
+        let suite = "reader-appearance-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set("extraLarge", forKey: ArticleReaderFontSize.storageKey)
+        XCTAssertEqual(ArticleReaderAppearance.scale(in: defaults), 1.3)
+        defaults.set(1.45, forKey: ArticleReaderAppearance.scaleKey)
+        defaults.set(ArticleReaderFontFamily.charter.rawValue, forKey: ArticleReaderFontFamily.storageKey)
+        let reopened = try XCTUnwrap(UserDefaults(suiteName: suite))
+        XCTAssertEqual(ArticleReaderAppearance.scale(in: reopened), 1.45)
+        XCTAssertEqual(reopened.string(forKey: ArticleReaderFontFamily.storageKey), "charter")
+    }
+
+    func testPassagePersistsPerAccountAndSurvivesProgressSync() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = ArticleBodyCache(userID: "one", baseDirectory: directory)
+        let position = ArticleReadingPosition(contentHash: "hash", nodeIndex: 4, offset: 72,
+            quote: "The passage", viewportY: 20, fraction: 0.4)
+        await cache.saveReadingPosition(position, bookmarkID: "article")
+        await cache.stageProgress(0.4, bookmarkID: "article")
+        await cache.markProgressSynced(bookmarkID: "article", fraction: 0.4)
+        let reopened = ArticleBodyCache(userID: "one", baseDirectory: directory)
+        let restored = await reopened.readingPosition(bookmarkID: "article")
+        XCTAssertEqual(restored, position)
+        let other = ArticleBodyCache(userID: "two", baseDirectory: directory)
+        let isolated = await other.readingPosition(bookmarkID: "article")
+        XCTAssertNil(isolated)
+        await reopened.remove(bookmarkID: "article")
+        let removed = await reopened.readingPosition(bookmarkID: "article")
+        XCTAssertNil(removed)
+    }
+
+    @MainActor
+    func testStoreLoadsTheLocalPassageBeforeMakingTheArticleReady() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let cache = ArticleBodyCache(userID: "reader", baseDirectory: directory)
+        let position = ArticleReadingPosition(contentHash: "hash-1", nodeIndex: 3, offset: 12,
+            quote: "Remember this passage", viewportY: 20, fraction: 0.6)
+        await cache.saveReadingPosition(position, bookmarkID: "bookmark-1")
+        let client = Self.client(articleBodyCache: cache) { _ in (200, Self.availableJSON) }
+        let store = ArticleReaderStore(metadata: Self.metadata(), client: client)
+        await store.load()
+        XCTAssertNotNil(store.readyDocument)
+        XCTAssertEqual(store.initialReadingPosition, position)
     }
 
     func testCachePersistsOnlyReadableDocumentsPerUser() async throws {
@@ -484,6 +542,27 @@ final class ArticleReaderTests: XCTestCase {
             isFinished: false,
             tags: []
         )
+    }
+
+    @MainActor
+    func testLinkSaveNotifiesHomeAndLibraryOnlyAfterSuccess() async throws {
+        let committed = expectation(forNotification: .zineBookmarkSaved, object: nil)
+        let client = Self.client { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.url?.path, "/api/v1/bookmarks")
+            return (200, #"{"bookmark":{"itemId":"new-item","userItemId":"new-bookmark","status":"saved"}}"#)
+        }
+        _ = try await client.saveBookmark(url: URL(string: "https://example.com/new")!)
+        await fulfillment(of: [committed], timeout: 1)
+
+        let noRefresh = expectation(forNotification: .zineBookmarkSaved, object: nil)
+        noRefresh.isInverted = true
+        let failingClient = Self.client { _ in (500, "{}") }
+        do {
+            _ = try await failingClient.saveBookmark(url: URL(string: "https://example.com/failure")!)
+            XCTFail("Save should fail")
+        } catch {}
+        await fulfillment(of: [noRefresh], timeout: 0.1)
     }
 
     private static func client(
