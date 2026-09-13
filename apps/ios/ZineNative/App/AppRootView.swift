@@ -71,6 +71,7 @@ private struct AuthenticatedAppView: View {
     private let libraryCache: LibraryCache
     private let offlineLibrarySynchronizer: OfflineLibrarySynchronizer
 
+    @State private var commandSession: NativeCommandSession
     @State private var homeStore: HomeStore
     @State private var search = ""
     @State private var selectedTab = AppTab.home
@@ -101,6 +102,7 @@ private struct AuthenticatedAppView: View {
         )
         let homeCache = HomeCache(userID: userID)
         self.client = client
+        _commandSession = State(initialValue: NativeCommandSession(client: client))
         let libraryCache = LibraryCache(userID: userID)
         self.libraryCache = libraryCache
         offlineLibrarySynchronizer = OfflineLibrarySynchronizer(
@@ -205,6 +207,33 @@ private struct AuthenticatedAppView: View {
                 settingsDestination(for: route)
                     .zinePushedDestinationChrome()
             }
+        }
+        .environment(\.nativeCommandSession, commandSession)
+        .task {
+            commandSession.navigate = navigateCommand
+            commandSession.queryLibrary = { query in
+                let target: AppTab = query.search.isEmpty ? .library : .search
+                let route = query.search.isEmpty ? "library" : "search"
+                navigationPath = NavigationPath()
+                selectedTab = target
+                for _ in 0..<100 {
+                    if commandSession.route == route, let apply = commandSession.applyLibraryQuery {
+                        await apply(query)
+                        // The view task may supersede the explicit reload after bindings change.
+                        for _ in 0..<2500 {
+                            if let library = commandSession.library,
+                               library.activeQuery == query, !library.isReloading { return }
+                            try await Task.sleep(for: .milliseconds(20))
+                        }
+                        throw CommandError("library_query_timed_out")
+                    }
+                    try await Task.sleep(for: .milliseconds(20))
+                }
+                throw CommandError("library_navigation_timed_out")
+            }
+            #if DEBUG && targetEnvironment(simulator)
+            if let bridge = SimulatorCommandBridge(session: commandSession) { await bridge.run() }
+            #endif
         }
         .task(id: homeRevision) {
             await homeStore.reload()
@@ -369,6 +398,44 @@ private struct AuthenticatedAppView: View {
                 tabReselection: homeTabReselection
             )
         }
+    }
+
+    private func navigateCommand(_ name: String, id: String?) async throws {
+        switch name {
+        case "library.open":
+            commandSession.reader = nil
+            commandSession.bookmarkID = nil
+            guard let queryLibrary = commandSession.queryLibrary else { throw CommandError("library_unavailable") }
+            try await queryLibrary(LibraryQuery())
+            return
+        case "bookmark.open":
+            guard let id else { throw CommandError("bookmark_id_required") }
+            let bookmark = try await client.getBookmark(id: id)
+            commandSession.openReader = nil
+            navigationPath = NavigationPath()
+            navigationPath.append(bookmark)
+            for _ in 0..<100 {
+                if commandSession.bookmarkID == id, commandSession.openReader != nil { return }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        case "reader.open":
+            guard id == commandSession.bookmarkID, let openReader = commandSession.openReader else {
+                throw CommandError("open_bookmark_first")
+            }
+            openReader()
+            for _ in 0..<2500 {
+                if commandSession.route == "reader", let reader = commandSession.reader {
+                    switch reader.phase {
+                    case .ready: return
+                    case .failed, .unavailable: throw CommandError("reader_unavailable")
+                    default: break
+                    }
+                }
+                try await Task.sleep(for: .milliseconds(20))
+            }
+        default: throw CommandError("unknown_navigation")
+        }
+        throw CommandError("navigation_timed_out")
     }
 
     private func bookmarkDestination(for bookmark: Bookmark) -> some View {

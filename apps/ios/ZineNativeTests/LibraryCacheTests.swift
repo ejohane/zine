@@ -1,6 +1,10 @@
 import Foundation
 import Testing
+#if canImport(ZineCore)
+@testable import ZineCore
+#else
 @testable import ZineNative
+#endif
 
 struct LibraryCacheTests {
     @Test func roundTripsSnapshotsByQuery() async throws {

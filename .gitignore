@@ -71,3 +71,6 @@ bun.lockb
 *.log
 *.local
 tmp/
+
+# Desktop native core build outputs
+apps/ios/.build/

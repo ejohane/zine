@@ -5,6 +5,8 @@ import Observation
 @Observable
 final class LibraryStore {
     private(set) var items: [Bookmark] = []
+    private(set) var dataSource: String?
+    private(set) var isReloading = false
     private(set) var isLoading = false
     private(set) var isLoadingMore = false
     private(set) var errorMessage: String?
@@ -14,20 +16,27 @@ final class LibraryStore {
     private let client: APIClient
     private let cache: LibraryCache
     private let onContentChanged: () -> Void
-    private var activeQuery = LibraryQuery()
+    private let prefetch: ([URL]) -> Void
+    private(set) var activeQuery = LibraryQuery()
+    private var generation = 0
     private var unbookmarkedIndices: [String: Int] = [:]
 
     init(
         client: APIClient,
         cache: LibraryCache,
-        onContentChanged: @escaping () -> Void = {}
+        onContentChanged: @escaping () -> Void = {},
+        prefetch: @escaping ([URL]) -> Void = { _ in }
     ) {
         self.client = client
         self.cache = cache
         self.onContentChanged = onContentChanged
+        self.prefetch = prefetch
     }
 
     func reset() {
+        generation += 1
+        isReloading = false
+        dataSource = nil
         items = []
         nextCursor = nil
         errorMessage = nil
@@ -36,11 +45,16 @@ final class LibraryStore {
     }
 
     func reload(query: LibraryQuery) async {
+        generation += 1
+        let loadGeneration = generation
+        isReloading = true
+        defer { if generation == loadGeneration { isReloading = false } }
         let queryChanged = activeQuery != query
         activeQuery = query
         errorMessage = nil
 
         if queryChanged {
+            dataSource = nil
             items = []
             nextCursor = nil
         }
@@ -50,18 +64,20 @@ final class LibraryStore {
             cachedSnapshot = await cache.loadOfflineLibrary()
         }
         if let snapshot = cachedSnapshot {
-            guard !Task.isCancelled, activeQuery == query else { return }
+            guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
+            dataSource = "cache"
             items = await client.overlayLibraryBookmarks(snapshot.items, query: query)
             nextCursor = snapshot.nextCursor
             prefetchImages(in: items)
         }
 
         isLoading = items.isEmpty
-        defer { isLoading = false }
+        defer { if generation == loadGeneration { isLoading = false } }
 
         do {
             let response = try await client.listBookmarks(query: query)
-            guard !Task.isCancelled, activeQuery == query else { return }
+            guard !Task.isCancelled, activeQuery == query, generation == loadGeneration else { return }
+            dataSource = "network"
             items = response.items
             nextCursor = response.nextCursor
             prefetchImages(in: response.items)
@@ -73,10 +89,11 @@ final class LibraryStore {
         } catch is CancellationError {
             return
         } catch {
-            guard activeQuery == query else { return }
+            guard activeQuery == query, generation == loadGeneration else { return }
             if query == LibraryQuery(),
                let offlineSnapshot = await cache.loadOfflineLibrary()
             {
+                dataSource = "cache"
                 items = await client.overlayLibraryBookmarks(offlineSnapshot.items, query: query)
                 nextCursor = offlineSnapshot.nextCursor
                 prefetchImages(in: items)
@@ -92,23 +109,26 @@ final class LibraryStore {
               !isLoadingMore
         else { return }
 
+        let query = activeQuery
+        let loadGeneration = generation
         isLoadingMore = true
         defer { isLoadingMore = false }
 
         do {
             let response = try await client.listBookmarks(
-                query: activeQuery,
+                query: query,
                 cursor: nextCursor
             )
-            guard !Task.isCancelled else { return }
-            let existingIDs = Set(items.map(\.id))
-            items.append(contentsOf: response.items.filter { !existingIDs.contains($0.id) })
+            guard !Task.isCancelled, generation == loadGeneration, activeQuery == query else { return }
+            var existingIDs = Set(items.map(\.id))
+            items.append(contentsOf: response.items.filter { existingIDs.insert($0.id).inserted })
             self.nextCursor = response.nextCursor
             prefetchImages(in: response.items)
             await cache.save(items: items, nextCursor: response.nextCursor, query: activeQuery)
         } catch is CancellationError {
             return
         } catch {
+            guard generation == loadGeneration, activeQuery == query else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -142,6 +162,15 @@ final class LibraryStore {
 
         persistCurrentState()
         onContentChanged()
+    }
+
+    func setFinished(_ bookmark: Bookmark, value: Bool) async throws -> NativeMutationDelivery {
+        let receipt = try await client.setFinishedWithReceipt(id: bookmark.id, isFinished: value, bookmark: bookmark)
+        var updated = bookmark
+        updated.isFinished = receipt.value.isFinished
+        updated.finishedAt = receipt.value.finishedAt
+        update(updated)
+        return receipt.delivery
     }
 
     func complete(_ bookmark: Bookmark) async {
@@ -182,7 +211,7 @@ final class LibraryStore {
             .flatMap { [$0.thumbnailUrl, $0.creatorImageUrl].compactMap { $0 } }
             .filter { seenURLs.insert($0).inserted }
 
-        AppImagePipeline.prefetch(urls)
+        prefetch(urls)
     }
 
     private func persistCurrentState() {

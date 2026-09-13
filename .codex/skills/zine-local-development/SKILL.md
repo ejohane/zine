@@ -5,10 +5,26 @@ description: Run and visually verify Zine in a local worktree with the repo-owne
 
 # Zine Local Development
 
-Use the worktree-safe stack and treat interactive browser-visible proof as part
-of local verification, not as an optional follow-up.
+Choose the verification mode for the claim being tested. Use the headless loop
+for native business-logic iteration, then the worktree-safe stack for live native
+integration and UI verification. Interactive browser-visible proof is required
+when claiming UI behavior works.
 
-## Required workflow
+## Headless native development
+
+Follow `docs/native-cli-development.md`. From the repository root, run
+`bun run test:native:core` and `bun run native:agent scenario run all`. These
+compile canonical native sources on macOS with isolated transport/persistence
+fixtures; they require no Simulator, Worker, Clerk login, or production data.
+Run a focused scenario during edits and the full suite before publishing.
+
+Headless-only regression work does not require starting the live stack below.
+For changes affecting app integration, lifecycle, navigation, or UI, also use
+the live workflow and focused Xcode tests as applicable. The remote CLI controls
+the actual Debug Simulator app; it is not headless coverage. Keep fixture
+assertions, remote command results, and observed UI behavior separate.
+
+## Required live workflow
 
 1. Work from the repository root and install dependencies with `bun install`
    when `node_modules` is missing or stale.
@@ -49,7 +65,7 @@ of local verification, not as an optional follow-up.
 
 ## Verification contract
 
-Do not call local native behavior verified from build output, unit tests,
+Do not call native UI behavior verified from build output, unit tests,
 `simctl`, logs, installation, launch, a loaded preview page, or a static
 simulator screenshot alone. Verification requires an actual streamed frame and
 Browser computer-use interaction with the relevant behavior.

@@ -41,7 +41,9 @@
 - Root test command (`bun run test`) runs:
   - `bun run --cwd apps/worker test:run`
   - `bun run --cwd apps/web test`
-- Native tests run through the `ZineNative` Xcode scheme; see `apps/ios/README.md`.
+- Headless native core tests: `bun run test:native:core`.
+- Headless native workflow regressions: `bun run native:agent scenario run all`.
+- Platform-specific native tests run through the `ZineNative` Xcode scheme; see `apps/ios/README.md`.
 - Worker CI/parity test subset:
   - `bun run test:worker:ci`
   - Excludes `**/user-do.test.ts` and `**/scheduler.test.ts`
@@ -51,6 +53,13 @@
   - `bun run test:web:e2e` → Playwright smoke coverage against the real Vite app
   - `bun run test:web:ci` → all web lanes together
 - Full web testing workflow, debugging notes, and manual verification guidance live in `docs/web/testing.md`.
+
+## Native CLI development and testing
+
+- Start native business-logic iteration with the headless SwiftPM tests and deterministic CLI scenarios above. They compile canonical app sources and use isolated fixtures; they need no Simulator, Worker, login, or production data.
+- Follow [the native CLI developer quickstart](docs/native-cli-development.md) for prerequisites, the edit/test loop, adding commands and scenarios, and switching to the running app.
+- Use the opt-in Debug Simulator bridge for real app stores/navigation and authenticated local integration. This is a separate mode from headless fixtures.
+- Headless-only regression work can be verified without launching `dev:worktree`. For changes affecting native integration, lifecycle, navigation, or UI, also perform the live workflow below before declaring those behaviors verified. Commands and fixture assertions do not prove gestures, rendering, or live provider ingestion.
 
 ## Worktree Behavior
 
@@ -77,8 +86,8 @@
 ### Required Local Development and Verification Workflow
 
 - Use `.codex/skills/zine-local-development/SKILL.md` for every request to implement, run, test, verify, debug, inspect, or visually review local Zine runtime behavior.
-- `bun run dev:worktree` is the default local entrypoint. It starts the canonical native app and `serve-sim`; do not launch a parallel preview unless the task explicitly requires an isolated alternate simulator.
-- For native local testing and verification, open the exact `serve-sim` URL printed by the command in the Codex in-app Browser and use the Browser plugin's computer-use surface to exercise the relevant user journey.
+- For live app integration and UI verification, `bun run dev:worktree` is the default local entrypoint. It starts the canonical native app and `serve-sim`; do not launch a parallel preview unless the task explicitly requires an isolated alternate simulator.
+- For native UI verification, open the exact `serve-sim` URL printed by the command in the Codex in-app Browser and use the Browser plugin's computer-use surface to exercise the relevant user journey.
 - A successful native build, test run, install, launch, loaded preview page, or shell-only `simctl` interaction is not UI verification. Require a real streamed frame, computer-use interaction, and visible final state.
 - Report automated checks, build, install, launch, live stream, computer-use interaction, and UI observation as separate evidence states.
 - If the host cannot provide the simulator or Browser computer-use surface, run every remaining safe check but report native UI verification as skipped or blocked; never substitute a static screenshot or logs.

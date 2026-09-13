@@ -35,8 +35,15 @@ final class ArticleProgressWriteQueue {
 @MainActor
 @Observable
 final class ArticleReaderStore {
+    private(set) var contentSource: String?
     private(set) var phase: ArticleReaderPhase
     private var finishedState: OptimisticFinishedState
+
+    private(set) var lastTagDelivery: NativeMutationDelivery?
+    private(set) var lastFinishedDelivery: NativeMutationDelivery?
+    private(set) var lastProgressDelivery: NativeMutationDelivery?
+    private(set) var tags: [BookmarkTag]
+    private(set) var progressFraction: Double
 
     let metadata: ArticleReaderMetadata
     private(set) var initialProgressFraction: Double
@@ -51,6 +58,8 @@ final class ArticleReaderStore {
         initialPhase: ArticleReaderPhase = .loading
     ) {
         self.metadata = metadata
+        tags = metadata.tags
+        progressFraction = metadata.initialProgress?.fraction ?? 0
         self.client = client
         let bookmarkID = metadata.bookmarkID
         progressWriteQueue = ArticleProgressWriteQueue { fraction in
@@ -85,6 +94,23 @@ final class ArticleReaderStore {
         finishedState.isUpdating
     }
 
+    var phaseName: String {
+        switch phase {
+        case .loading: "loading"
+        case .preparing: "preparing"
+        case .ready: "ready"
+        case .unavailable: "unavailable"
+        case .failed: "failed"
+        }
+    }
+
+    var loadError: String? {
+        switch phase {
+        case .unavailable(let message), .failed(let message): message
+        default: nil
+        }
+    }
+
     var readyDocument: ArticleReaderDocument? {
         guard case let .ready(document) = phase else { return nil }
         return document
@@ -97,14 +123,17 @@ final class ArticleReaderStore {
 
         if let pendingProgress = await client.pendingArticleProgress(id: metadata.bookmarkID) {
             initialProgressFraction = pendingProgress
+            progressFraction = pendingProgress
         }
 
         if let cached = await client.cachedArticleContent(id: metadata.bookmarkID),
            cached.readableContent != nil
         {
+            contentSource = "cache"
             phase = .ready(ArticleReaderDocument(metadata: metadata, response: cached))
             hasReadableCache = true
         } else {
+            contentSource = nil
             phase = .loading
         }
 
@@ -112,6 +141,7 @@ final class ArticleReaderStore {
             let current = try await client.getArticleContent(id: metadata.bookmarkID)
             guard !Task.isCancelled, generation == loadGeneration else { return }
             if await acceptIfReadable(current) { return }
+            if hasReadableCache { return }
 
             phase = .preparing
             let requested = try await client.requestArticleContent(id: metadata.bookmarkID)
@@ -133,9 +163,13 @@ final class ArticleReaderStore {
 
     func persistProgress(_ fraction: Double) async -> BookmarkProgress? {
         let clamped = min(max(fraction, 0), 1)
+        progressFraction = clamped
         await client.stageArticleProgress(id: metadata.bookmarkID, fraction: clamped)
         if await progressWriteQueue.enqueue(clamped) {
+            lastProgressDelivery = .serverCommitted
             await client.markArticleProgressSynced(id: metadata.bookmarkID, fraction: clamped)
+        } else {
+            lastProgressDelivery = .localPending
         }
 
         return BookmarkProgress(
@@ -145,19 +179,32 @@ final class ArticleReaderStore {
         )
     }
 
+    func setTags(_ names: [String]) async throws -> [BookmarkTag] {
+        let receipt = try await client.setTagsWithReceipt(id: metadata.bookmarkID, tags: names)
+        lastTagDelivery = receipt.delivery
+        tags = receipt.value
+        return receipt.value
+    }
+
+    func reconcile(_ bookmark: Bookmark) {
+        finishedState.accept(isFinished: bookmark.isFinished, finishedAt: bookmark.finishedAt)
+        tags = bookmark.tags
+    }
+
     func beginFinishedToggle() -> OptimisticFinishedState.Mutation? {
         finishedState.beginToggle()
     }
 
     func persistFinishedToggle(_ mutation: OptimisticFinishedState.Mutation) async -> Bool {
         do {
-            let result = try await client.setFinished(
+            let receipt = try await client.setFinishedWithReceipt(
                 id: metadata.bookmarkID,
                 isFinished: mutation.requestedIsFinished
             )
+            lastFinishedDelivery = receipt.delivery
             finishedState.accept(
-                isFinished: result.isFinished,
-                finishedAt: result.finishedAt
+                isFinished: receipt.value.isFinished,
+                finishedAt: receipt.value.finishedAt
             )
             return true
         } catch is CancellationError {
@@ -201,6 +248,7 @@ final class ArticleReaderStore {
     private func acceptIfReadable(_ response: ArticleContentResponse) async -> Bool {
         guard response.readableContent != nil else { return false }
         await client.cacheArticleContent(response, id: metadata.bookmarkID)
+        contentSource = "network"
         phase = .ready(ArticleReaderDocument(metadata: metadata, response: response))
         return true
     }

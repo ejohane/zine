@@ -99,4 +99,14 @@ to open Zine and sign in before trying the share action again. The share modal
 loads the user’s existing tags and supports selecting or creating tags before
 saving the bookmark.
 
+## Native CLI development and testing
+
+Start with [the developer quickstart](../../docs/native-cli-development.md) for the
+headless edit/test loop, Simulator integration, and adding regression coverage.
+
+See [the first native agent experiment](../../docs/native-agent-experiment.md) for
+shared desktop tests, deterministic offline scenarios, and explicitly enabled
+Simulator commands against the authenticated local app.
+See [workflow coverage and commands](../../docs/native-agent-workflows.md) for the expanded CLI.
+
 Local manual verification uses real Clerk login and sanitized local D1/R2. See [the authenticated local workflow](../../docs/local-development.md). `dev:worktree` passes its selected local API URL as a build setting, overriding production defaults.
