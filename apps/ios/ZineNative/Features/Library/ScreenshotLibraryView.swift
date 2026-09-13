@@ -22,10 +22,17 @@ struct ScreenshotLibraryView: View {
 }
 
 struct ScreenshotLibraryContentView: View {
-    private let client = APIClient(
-        baseURL: URL(string: "https://example.invalid")!,
-        tokenProvider: { "screenshot-fixture" }
-    )
+    private let client: APIClient = {
+        let configuration = URLSessionConfiguration.ephemeral
+        if ProcessInfo.processInfo.arguments.contains("-screenshot-reader-routing-fixtures") {
+            configuration.protocolClasses = [ReaderRoutingFixtureURLProtocol.self]
+        }
+        return APIClient(
+            baseURL: URL(string: "https://example.invalid")!,
+            tokenProvider: { "screenshot-fixture" },
+            session: URLSession(configuration: configuration)
+        )
+    }()
     @State private var contentType: ContentType?
     @State private var titleCollapseProgress: CGFloat = 0
     @Namespace private var bookmarkTransition
@@ -33,8 +40,10 @@ struct ScreenshotLibraryContentView: View {
     var onTitleCollapseProgressChanged: (CGFloat) -> Void = { _ in }
 
     private var bookmarks: [Bookmark] {
-        guard let contentType else { return ScreenshotFixtures.bookmarks }
-        return ScreenshotFixtures.bookmarks.filter { $0.contentType == contentType }
+        let items = ProcessInfo.processInfo.arguments.contains("-screenshot-reader-routing-fixtures")
+            ? ScreenshotFixtures.readerRoutingBookmarks : ScreenshotFixtures.bookmarks
+        guard let contentType else { return items }
+        return items.filter { $0.contentType == contentType }
     }
 
     var body: some View {
@@ -175,6 +184,26 @@ private enum ScreenshotFixtures {
         ),
     ]
 
+    static let readerRoutingBookmarks: [Bookmark] = [
+        make(
+            id: "routing-substack", title: "Substack article routing", creator: "Reader Test",
+            provider: .substack, contentType: .article, readingTime: 3,
+            canonicalUrl: URL(string: "https://reader-test.substack.com/p/article")!,
+            summary: "Synthetic Substack article for verifying the native reader destination."
+        ),
+        make(
+            id: "routing-custom", title: "Custom-domain Substack article", creator: "Reader Test",
+            provider: .substack, contentType: .article, readingTime: 3,
+            canonicalUrl: URL(string: "https://newsletter.example.com/p/article")!,
+            summary: "Identified by SUBSTACK metadata on a custom domain."
+        ),
+        make(
+            id: "routing-web", title: "Regular web article routing", creator: "Reader Test",
+            provider: .web, contentType: .article, readingTime: 3,
+            summary: "Synthetic regular article for verifying the existing reader destination."
+        ),
+    ]
+
     private static func make(
         id: String,
         title: String,
@@ -184,6 +213,7 @@ private enum ScreenshotFixtures {
         thumbnailUrl: URL? = nil,
         duration: Int? = nil,
         readingTime: Int? = nil,
+        canonicalUrl: URL? = nil,
         summary: String
     ) -> Bookmark {
         Bookmark(
@@ -191,7 +221,7 @@ private enum ScreenshotFixtures {
             itemId: "item_\(id)",
             title: title,
             thumbnailUrl: thumbnailUrl,
-            canonicalUrl: URL(string: "https://example.com/items/\(id)")!,
+            canonicalUrl: canonicalUrl ?? URL(string: "https://example.com/items/\(id)")!,
             contentType: contentType,
             provider: provider,
             creator: creator,
@@ -213,5 +243,34 @@ private enum ScreenshotFixtures {
             tags: id == "1" ? [BookmarkTag(id: "tag_1", name: "software")] : []
         )
     }
+}
+
+private final class ReaderRoutingFixtureURLProtocol: URLProtocol, @unchecked Sendable {
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let isArticle = request.url?.path.hasSuffix("/article-content") == true
+        let body = isArticle ? """
+        {
+          "content":"<p>This synthetic article was opened through the real Library and bookmark detail reader action.</p><h2>Native reader routing verified</h2><p>Substack articles, including custom domains identified by provider metadata, use the same reading view as regular articles.</p>",
+          "articleBody":{
+            "availability":"AVAILABLE","pipelineStatus":"AVAILABLE","schemaVersion":1,
+            "extractorVersion":1,"sourceKind":"PUBLIC_WEB","contentHash":"reader-routing-fixture",
+            "wordCount":50,"readingTimeMinutes":3,"qualityScore":1,"qualityWarnings":[]
+          },
+          "requestId":"routing-fixture","traceId":"routing-fixture"
+        }
+        """ : "{}"
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: isArticle ? 200 : 404,
+            httpVersion: nil, headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
 #endif

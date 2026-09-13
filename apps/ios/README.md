@@ -72,6 +72,14 @@ bun run ios:preview -- --theme dark --panes tools
 This workflow requires Apple Silicon, Xcode command-line tools, and the Node 22
 version pinned by the repository.
 
+## Reader routing fixture
+
+After building and installing a Debug app, launch with `-screenshot-fixtures`
+and `-screenshot-reader-routing-fixtures` to exercise Library → bookmark detail →
+Read in Zine with Substack, custom-domain Substack, and regular web articles.
+This uses the real navigation and reader views with synthetic article responses;
+it does not verify authentication or production article extraction.
+
 ## Design system
 
 The native color palette, semantic roles, usage rules, exceptions, and
